@@ -53,6 +53,9 @@ describe('MultiSelectFilter', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /all locations/i }));
 
+    const searchInput = screen.getByPlaceholderText('Search locations...');
+    expect(searchInput.parentElement).toHaveClass('items-center');
+    expect(searchInput).toHaveClass('p-0');
     expect(screen.getByText('TEST LOCATION')).toBeInTheDocument();
     expect(screen.getByText('Vans')).toBeInTheDocument();
     expect(screen.getByText('Sites')).toBeInTheDocument();

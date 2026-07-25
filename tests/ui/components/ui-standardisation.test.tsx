@@ -2,6 +2,12 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DataViewToggle } from '@/components/ui/data-view-controls';
 import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Dialog,
   DialogContent,
   DialogScrollArea,
@@ -111,6 +117,21 @@ describe('UI standardisation helpers', () => {
     expect(closeButton.className).toContain(
       'top-[max(1rem,env(safe-area-inset-top,0px))]',
     );
+  });
+
+  it('keeps alert dialogs inside native safe areas', () => {
+    render(
+      <AlertDialog open>
+        <AlertDialogContent>
+          <AlertDialogTitle>Safe alert</AlertDialogTitle>
+          <AlertDialogDescription>Confirm the requested action.</AlertDialogDescription>
+        </AlertDialogContent>
+      </AlertDialog>,
+    );
+
+    const dialog = screen.getByRole('alertdialog', { name: 'Safe alert' });
+    expect(dialog.getAttribute('style')).toContain('safe-area-inset-top');
+    expect(dialog.getAttribute('style')).toContain('safe-area-inset-bottom');
   });
 
   it('lays out search icons beside placeholder text', () => {

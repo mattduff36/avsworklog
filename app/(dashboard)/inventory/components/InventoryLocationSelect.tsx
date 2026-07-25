@@ -55,6 +55,13 @@ const SERVER_SEARCH_DEBOUNCE_MS = 300;
 const MOBILE_PICKER_MEDIA_QUERY = '(max-width: 639px)';
 const MOBILE_PICKER_MARGIN_PX = 8;
 
+interface MobilePickerViewportStyle extends CSSProperties {
+  '--mobile-picker-top'?: string;
+  '--mobile-picker-left'?: string;
+  '--mobile-picker-width'?: string;
+  '--mobile-picker-height'?: string;
+}
+
 function getIsMobilePickerViewport(): boolean {
   if (typeof window === 'undefined') return false;
   if (typeof window.matchMedia === 'function') {
@@ -63,7 +70,7 @@ function getIsMobilePickerViewport(): boolean {
   return window.innerWidth < 640;
 }
 
-function getMobilePickerViewportStyle(isInsideDialog: boolean): CSSProperties {
+function getMobilePickerViewportStyle(isInsideDialog: boolean): MobilePickerViewportStyle {
   if (typeof window === 'undefined') return {};
 
   const visualViewport = window.visualViewport;
@@ -73,15 +80,16 @@ function getMobilePickerViewportStyle(isInsideDialog: boolean): CSSProperties {
   const viewportHeight = visualViewport?.height ?? window.innerHeight;
   const visibleWidth = Math.max(0, viewportWidth - (MOBILE_PICKER_MARGIN_PX * 2));
   const visibleHeight = Math.max(0, viewportHeight - (MOBILE_PICKER_MARGIN_PX * 2));
+  const pickerTop = (isInsideDialog ? 0 : viewportTop) + MOBILE_PICKER_MARGIN_PX;
+  const pickerLeft = (isInsideDialog ? 0 : viewportLeft) + MOBILE_PICKER_MARGIN_PX;
 
   return {
     position: 'absolute',
     zIndex: 1,
-    top: `${(isInsideDialog ? 0 : viewportTop) + MOBILE_PICKER_MARGIN_PX}px`,
-    left: `${(isInsideDialog ? 0 : viewportLeft) + MOBILE_PICKER_MARGIN_PX}px`,
-    width: `${visibleWidth}px`,
-    height: `${visibleHeight}px`,
-    maxHeight: `${visibleHeight}px`,
+    '--mobile-picker-top': `${pickerTop}px`,
+    '--mobile-picker-left': `${pickerLeft}px`,
+    '--mobile-picker-width': `${visibleWidth}px`,
+    '--mobile-picker-height': `${visibleHeight}px`,
   };
 }
 
@@ -493,7 +501,12 @@ export function InventoryLocationSelect({
             aria-modal="false"
             aria-label="Choose inventory location"
             data-mobile-scroll-lock="true"
-            className="z-[220] flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-950 text-slate-200 shadow-2xl"
+            className={cn(
+              'z-[220] flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-700 bg-slate-950 text-slate-200 shadow-2xl',
+              isMobilePickerInsideDialog
+                ? 'left-[var(--mobile-picker-left)] top-[var(--mobile-picker-top)] h-[var(--mobile-picker-height)] max-h-[var(--mobile-picker-height)] w-[var(--mobile-picker-width)]'
+                : 'left-[max(var(--mobile-picker-left),calc(env(safe-area-inset-left,0px)+0.5rem))] top-[max(var(--mobile-picker-top),calc(env(safe-area-inset-top,0px)+0.5rem))] h-[calc(var(--mobile-picker-height)-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] max-h-[calc(var(--mobile-picker-height)-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px))] w-[calc(var(--mobile-picker-width)-env(safe-area-inset-left,0px)-env(safe-area-inset-right,0px))]',
+            )}
             style={mobilePickerStyle}
           >
             {pickerContent}

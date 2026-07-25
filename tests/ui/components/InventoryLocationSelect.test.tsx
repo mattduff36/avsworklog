@@ -150,7 +150,9 @@ describe('InventoryLocationSelect', () => {
     expect(picker.style.zIndex).toBe('1');
     expect(picker.parentElement).toHaveAttribute('data-mobile-location-picker-layer', 'true');
     expect(picker.parentElement?.style.zIndex).toBe('220');
-    expect(picker.style.height).toContain('484px');
+    expect(picker.style.getPropertyValue('--mobile-picker-height')).toBe('484px');
+    expect(picker.className).toContain('safe-area-inset-top');
+    expect(picker.className).toContain('safe-area-inset-bottom');
     expect(screen.getByRole('listbox', { name: 'Inventory locations' }))
       .toHaveAttribute('data-mobile-scroll-lock', 'true');
 
@@ -158,7 +160,7 @@ describe('InventoryLocationSelect', () => {
     viewportListeners.get('resize')?.forEach((listener) => listener(new Event('resize')));
 
     await waitFor(() => {
-      expect(picker.style.height).toContain('304px');
+      expect(picker.style.getPropertyValue('--mobile-picker-height')).toBe('304px');
     });
   });
 

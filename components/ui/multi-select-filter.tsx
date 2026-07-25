@@ -1,9 +1,9 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Search } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { SearchInput } from '@/components/ui/search-input';
 import { cn } from '@/lib/utils';
 
 export interface MultiSelectFilterOption<TValue extends string> {
@@ -212,15 +212,14 @@ export function MultiSelectFilter<TValue extends string>({
         >
           {searchable ? (
             <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950 p-2">
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <Input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder={searchPlaceholder}
-                  className="h-9 border-slate-700 bg-slate-900 pl-9 text-white placeholder:text-slate-500"
-                />
-              </div>
+              <SearchInput
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder={searchPlaceholder}
+                containerClassName="h-9 border-slate-700 bg-slate-900"
+                className="text-white placeholder:text-slate-500"
+                iconClassName="text-slate-500"
+              />
             </div>
           ) : null}
           {showPanelLabel ? (
