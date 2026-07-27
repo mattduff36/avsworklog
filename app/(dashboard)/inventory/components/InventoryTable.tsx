@@ -477,8 +477,8 @@ export function InventoryTable({
   return (
     <TooltipProvider delayDuration={150}>
     <div className="min-w-0 space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="max-w-sm flex-1">
+      <div className="flex flex-row items-end justify-between gap-3">
+        <div className="min-w-0 max-w-sm flex-1">
           <SearchInput
             placeholder={`Search ${tableLabel}...`}
             value={search}
@@ -488,92 +488,92 @@ export function InventoryTable({
           />
         </div>
 
-        {selectedItems.length > 0 ? (
-          <Button
-            variant="outline"
-            onClick={() => (onBulkAction || onMove)(selectedItems)}
-            className="min-h-11 w-full border-slate-600 text-white hover:bg-slate-800 sm:w-auto"
-          >
-            <Truck className="mr-2 h-4 w-4" />
-            {bulkActionLabel || 'Move Selected'} ({selectedItems.length})
-          </Button>
-        ) : null}
-      </div>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Filters</p>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {showLocationFilter ? (
+              <LegacyQuoteLocationOptIn
+                enabled={includeLegacyQuotes}
+                onEnabledChange={setIncludeLegacyQuotes}
+              />
+            ) : null}
+            {hasAnyFilters ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearFilters}
+                className="min-h-11 border-slate-600 text-muted-foreground hover:bg-slate-700/50 sm:min-h-8"
+              >
+                Reset Filters
+              </Button>
+            ) : null}
 
-      <div className="flex flex-col gap-2 lg:items-end">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Filters</p>
-        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
-          {showLocationFilter ? (
-            <LegacyQuoteLocationOptIn
-              enabled={includeLegacyQuotes}
-              onEnabledChange={setIncludeLegacyQuotes}
-            />
-          ) : null}
-          {hasAnyFilters ? (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={clearFilters}
-              className="min-h-11 border-slate-600 text-muted-foreground hover:bg-slate-700/50 sm:min-h-8"
-            >
-              Reset Filters
-            </Button>
-          ) : null}
+            {!retiredMode && statusFilterOptions.length > 0 ? (
+              <MultiSelectFilter
+                label="Check Status"
+                allLabel="All status"
+                selectedValues={statusFilters}
+                options={statusFilterOptions}
+                onSelectedValuesChange={setStatusFilters}
+                triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
+              />
+            ) : null}
 
-          {!retiredMode && statusFilterOptions.length > 0 ? (
-            <MultiSelectFilter
-              label="Check Status"
-              allLabel="All status"
-              selectedValues={statusFilters}
-              options={statusFilterOptions}
-              onSelectedValuesChange={setStatusFilters}
-              triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
-            />
-          ) : null}
+            {showCategoryFilter ? (
+              <MultiSelectFilter
+                label="Category"
+                allLabel="All categories"
+                selectedValues={categoryFilters}
+                options={categoryFilterOptions}
+                onSelectedValuesChange={setCategoryFilters}
+                triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
+              />
+            ) : null}
 
-          {showCategoryFilter ? (
-            <MultiSelectFilter
-              label="Category"
-              allLabel="All categories"
-              selectedValues={categoryFilters}
-              options={categoryFilterOptions}
-              onSelectedValuesChange={setCategoryFilters}
-              triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
-            />
-          ) : null}
+            {retiredMode && retireReasonFilterOptions.length > 0 ? (
+              <MultiSelectFilter
+                label="Retire Reason"
+                allLabel="All reasons"
+                selectedValues={retireReasonFilters}
+                options={retireReasonFilterOptions}
+                onSelectedValuesChange={setRetireReasonFilters}
+                triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
+              />
+            ) : null}
 
-          {retiredMode && retireReasonFilterOptions.length > 0 ? (
-            <MultiSelectFilter
-              label="Retire Reason"
-              allLabel="All reasons"
-              selectedValues={retireReasonFilters}
-              options={retireReasonFilterOptions}
-              onSelectedValuesChange={setRetireReasonFilters}
-              triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
-            />
-          ) : null}
+            {showLocationFilter && locationFilterOptions.length > 0 ? (
+              <MultiSelectFilter
+                label="Location"
+                allLabel="All locations"
+                selectedValues={locationFilters}
+                options={locationFilterOptions}
+                onSelectedValuesChange={setLocationFilters}
+                triggerClassName="min-h-11 sm:min-h-9 sm:w-[260px]"
+                panelClassName="left-auto right-0 max-h-[min(36rem,calc(100dvh-8rem))] w-[min(28rem,calc(100vw-2rem))]"
+                searchable
+                searchPlaceholder="Search locations..."
+                emptyLabel="No locations found"
+                allOptionPosition="bottom"
+                showPanelLabel={false}
+                collapsibleGroupLabels={COLLAPSIBLE_LOCATION_FILTER_GROUPS}
+                minimumSearchCharactersByGroupLabel={LOCATION_FILTER_MINIMUM_SEARCH_CHARACTERS}
+                onOpenChange={(open) => {
+                  if (!open) setIncludeLegacyQuotes(false);
+                }}
+              />
+            ) : null}
 
-          {showLocationFilter && locationFilterOptions.length > 0 ? (
-            <MultiSelectFilter
-              label="Location"
-              allLabel="All locations"
-              selectedValues={locationFilters}
-              options={locationFilterOptions}
-              onSelectedValuesChange={setLocationFilters}
-              triggerClassName="min-h-11 sm:min-h-9 sm:w-[260px]"
-              panelClassName="left-auto right-0 max-h-[min(36rem,calc(100dvh-8rem))] w-[min(28rem,calc(100vw-2rem))]"
-              searchable
-              searchPlaceholder="Search locations..."
-              emptyLabel="No locations found"
-              allOptionPosition="bottom"
-              showPanelLabel={false}
-              collapsibleGroupLabels={COLLAPSIBLE_LOCATION_FILTER_GROUPS}
-              minimumSearchCharactersByGroupLabel={LOCATION_FILTER_MINIMUM_SEARCH_CHARACTERS}
-              onOpenChange={(open) => {
-                if (!open) setIncludeLegacyQuotes(false);
-              }}
-            />
-          ) : null}
+            {selectedItems.length > 0 ? (
+              <Button
+                variant="outline"
+                onClick={() => (onBulkAction || onMove)(selectedItems)}
+                className="min-h-11 w-full border-slate-600 text-white hover:bg-slate-800 sm:w-auto"
+              >
+                <Truck className="mr-2 h-4 w-4" />
+                {bulkActionLabel || 'Move Selected'} ({selectedItems.length})
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
 
