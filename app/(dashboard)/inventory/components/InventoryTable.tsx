@@ -477,7 +477,7 @@ export function InventoryTable({
   return (
     <TooltipProvider delayDuration={150}>
     <div className="min-w-0 space-y-6">
-      <div className="flex flex-row items-end justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0 max-w-sm flex-1">
           <SearchInput
             placeholder={`Search ${tableLabel}...`}
@@ -488,9 +488,9 @@ export function InventoryTable({
           />
         </div>
 
-        <div className="flex shrink-0 flex-col items-end gap-2">
+        <div className="flex min-w-0 flex-col items-stretch gap-2 lg:items-end">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Filters</p>
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
             {showLocationFilter ? (
               <LegacyQuoteLocationOptIn
                 enabled={includeLegacyQuotes}
@@ -515,7 +515,7 @@ export function InventoryTable({
                 selectedValues={statusFilters}
                 options={statusFilterOptions}
                 onSelectedValuesChange={setStatusFilters}
-                triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
+                triggerClassName="min-h-11 w-full sm:min-h-9 sm:w-[170px]"
               />
             ) : null}
 
@@ -526,7 +526,7 @@ export function InventoryTable({
                 selectedValues={categoryFilters}
                 options={categoryFilterOptions}
                 onSelectedValuesChange={setCategoryFilters}
-                triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
+                triggerClassName="min-h-11 w-full sm:min-h-9 sm:w-[170px]"
               />
             ) : null}
 
@@ -537,7 +537,7 @@ export function InventoryTable({
                 selectedValues={retireReasonFilters}
                 options={retireReasonFilterOptions}
                 onSelectedValuesChange={setRetireReasonFilters}
-                triggerClassName="min-h-11 sm:min-h-9 sm:w-[170px]"
+                triggerClassName="min-h-11 w-full sm:min-h-9 sm:w-[170px]"
               />
             ) : null}
 
@@ -548,7 +548,7 @@ export function InventoryTable({
                 selectedValues={locationFilters}
                 options={locationFilterOptions}
                 onSelectedValuesChange={setLocationFilters}
-                triggerClassName="min-h-11 sm:min-h-9 sm:w-[260px]"
+                triggerClassName="min-h-11 w-full sm:min-h-9 sm:w-[260px]"
                 panelClassName="left-auto right-0 max-h-[min(36rem,calc(100dvh-8rem))] w-[min(28rem,calc(100vw-2rem))]"
                 searchable
                 searchPlaceholder="Search locations..."

@@ -125,6 +125,10 @@ describe('GET /api/quotes', () => {
       data: [],
       error: null,
     });
+    const purchaseOrderIn = vi.fn().mockResolvedValue({
+      data: [],
+      error: null,
+    });
     let quoteSelectCount = 0;
     const selectQuotes = vi.fn((columns: string) => {
       if (columns.includes('customer:customers')) {
@@ -151,6 +155,10 @@ describe('GET /api/quotes', () => {
     const selectInvoiceRequests = vi.fn(() => ({
       in: invoiceRequestIn,
     }));
+    const selectPurchaseOrders = vi.fn(() => ({
+      in: purchaseOrderIn,
+    }));
+    const emptyMergeQuery = createQueryableResult([]);
 
     mockCreateClient.mockResolvedValue({
       auth: {
@@ -174,10 +182,28 @@ describe('GET /api/quotes', () => {
         if (table === 'quote_financial_adjustments') {
           return { select: vi.fn(() => adjustmentsQuery) };
         }
+        if (table === 'quote_purchase_orders') {
+          return { select: selectPurchaseOrders };
+        }
 
         throw new Error(`Unexpected table: ${table}`);
       }),
     } as unknown as SupabaseClient);
+
+    mockCreateAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (
+          table === 'quote_merge_members'
+          || table === 'quote_merge_groups'
+          || table === 'quote_reference_aliases'
+          || table === 'quote_pdf_snapshots'
+        ) {
+          return { select: vi.fn(() => emptyMergeQuery) };
+        }
+
+        throw new Error(`Unexpected admin table: ${table}`);
+      }),
+    });
 
     const response = await GET(new NextRequest('http://localhost/api/quotes?limit=2&offset=0'));
     const payload = await response.json();

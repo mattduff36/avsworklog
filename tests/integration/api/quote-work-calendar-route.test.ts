@@ -5,13 +5,19 @@ vi.mock('server-only', () => ({}));
 
 const {
   mockCreateClient,
+  mockCreateAdminClient,
   mockCanEffectiveRoleAccessModule,
+  mockLoadQuoteModuleSettings,
+  mockResolveCanonicalQuoteId,
   mockQuotesOrder,
   mockManualOrder,
   mockManualInsert,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
+  mockCreateAdminClient: vi.fn(),
   mockCanEffectiveRoleAccessModule: vi.fn(),
+  mockLoadQuoteModuleSettings: vi.fn(),
+  mockResolveCanonicalQuoteId: vi.fn(),
   mockQuotesOrder: vi.fn(),
   mockManualOrder: vi.fn(),
   mockManualInsert: vi.fn(),
@@ -21,12 +27,24 @@ vi.mock('@/lib/supabase/server', () => ({
   createClient: mockCreateClient,
 }));
 
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: mockCreateAdminClient,
+}));
+
 vi.mock('@/lib/utils/rbac', () => ({
   canEffectiveRoleAccessModule: mockCanEffectiveRoleAccessModule,
 }));
 
 vi.mock('@/lib/server/sensitive-module-access', () => ({
   requireSensitiveModuleAccess: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/server/quote-workflow', () => ({
+  loadQuoteModuleSettings: mockLoadQuoteModuleSettings,
+}));
+
+vi.mock('@/lib/server/quote-merge-resolution', () => ({
+  resolveCanonicalQuoteId: mockResolveCanonicalQuoteId,
 }));
 
 function createQuotesQuery() {
@@ -54,8 +72,12 @@ describe('/api/quotes/work-calendar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCanEffectiveRoleAccessModule.mockResolvedValue(true);
+    mockLoadQuoteModuleSettings.mockResolvedValue({
+      default_estimated_duration_days: 1,
+    });
+    mockResolveCanonicalQuoteId.mockImplementation(async (_admin, quoteId: string) => quoteId);
     mockQuotesOrder.mockResolvedValue({
-      data: [{ id: 'quote-1', quote_reference: 'Q-001', start_date: '2026-04-25' }],
+      data: [{ id: 'quote-1', quote_thread_id: 'thread-1', quote_reference: 'Q-001', start_date: '2026-04-25' }],
       error: null,
     });
     mockManualOrder.mockResolvedValue({
@@ -69,6 +91,17 @@ describe('/api/quotes/work-calendar', () => {
           error: null,
         }),
       })),
+    });
+    mockCreateAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'quote_reference_aliases') {
+          return {
+            select: vi.fn().mockResolvedValue({ data: [], error: null }),
+          };
+        }
+
+        throw new Error(`Unexpected admin table: ${table}`);
+      }),
     });
     mockCreateClient.mockResolvedValue({
       auth: {
@@ -121,6 +154,7 @@ describe('/api/quotes/work-calendar', () => {
 
     expect(response.status).toBe(201);
     expect(payload.entry.id).toBe('entry-2');
+    expect(mockResolveCanonicalQuoteId).toHaveBeenCalledWith(expect.anything(), 'quote-1');
     expect(mockManualInsert).toHaveBeenCalledWith(expect.objectContaining({
       title: 'Manual work',
       quote_id: 'quote-1',

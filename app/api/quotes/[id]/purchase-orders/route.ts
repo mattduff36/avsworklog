@@ -101,6 +101,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
+    if (!await isEffectiveRoleManagerOrHigher()) {
+      return NextResponse.json(
+        { error: 'Only managers and administrators can manage purchase orders.' },
+        { status: 403 }
+      );
+    }
 
     const body = await request.json() as {
       po_number?: string;

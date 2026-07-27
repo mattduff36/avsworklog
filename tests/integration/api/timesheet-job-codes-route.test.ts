@@ -75,6 +75,18 @@ function createRangeMock<T>(rowsOrPages: T[] | T[][]) {
   return range;
 }
 
+function createAliasQuery(
+  rows: Array<{
+    alias_reference: string;
+    source_quote_thread_id: string;
+    canonical_quote_thread_id: string;
+  }> = [],
+) {
+  return {
+    select: vi.fn().mockResolvedValue({ data: rows, error: null }),
+  };
+}
+
 function createQuoteQuery(rowsOrPages: QuoteJobCodeTestRow[] | QuoteJobCodeTestRow[][]) {
   const range = createRangeMock(rowsOrPages);
   const order = vi.fn().mockReturnValue({ range });
@@ -187,14 +199,18 @@ describe('GET /api/timesheets/job-codes', () => {
         merged_into_project_number_id: null,
       },
     ]);
-    const from = vi.fn((table: string) => ({
-      select: vi.fn(() => {
-        if (table === 'quotes') return quoteQuery.query;
-        if (table === 'legacy_quotes') return legacyQuoteQuery.query;
-        if (table === 'quote_project_numbers') return projectNumberQuery.query;
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    }));
+    const aliasQuery = createAliasQuery();
+    const from = vi.fn((table: string) => {
+      if (table === 'quote_reference_aliases') return aliasQuery;
+      return {
+        select: vi.fn(() => {
+          if (table === 'quotes') return quoteQuery.query;
+          if (table === 'legacy_quotes') return legacyQuoteQuery.query;
+          if (table === 'quote_project_numbers') return projectNumberQuery.query;
+          throw new Error(`Unexpected table ${table}`);
+        }),
+      };
+    });
 
     mockCreateAdminClient.mockReturnValue({
       from,
@@ -283,14 +299,18 @@ describe('GET /api/timesheets/job-codes', () => {
       title: 'Combined drainage works',
       description: null,
     }]);
-    const from = vi.fn((table: string) => ({
-      select: vi.fn(() => {
-        if (table === 'quotes') return quoteQuery.query;
-        if (table === 'legacy_quotes') return legacyQuoteQuery.query;
-        if (table === 'quote_project_numbers') return projectNumberQuery.query;
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    }));
+    const aliasQuery = createAliasQuery();
+    const from = vi.fn((table: string) => {
+      if (table === 'quote_reference_aliases') return aliasQuery;
+      return {
+        select: vi.fn(() => {
+          if (table === 'quotes') return quoteQuery.query;
+          if (table === 'legacy_quotes') return legacyQuoteQuery.query;
+          if (table === 'quote_project_numbers') return projectNumberQuery.query;
+          throw new Error(`Unexpected table ${table}`);
+        }),
+      };
+    });
     mockCreateAdminClient.mockReturnValue({ from });
 
     const { GET } = await import('@/app/api/timesheets/job-codes/route');
@@ -324,14 +344,18 @@ describe('GET /api/timesheets/job-codes', () => {
       ],
     ]);
     const projectNumberQuery = createProjectNumberQuery([]);
-    const from = vi.fn((table: string) => ({
-      select: vi.fn(() => {
-        if (table === 'quotes') return quoteQuery.query;
-        if (table === 'legacy_quotes') return legacyQuoteQuery.query;
-        if (table === 'quote_project_numbers') return projectNumberQuery.query;
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    }));
+    const aliasQuery = createAliasQuery();
+    const from = vi.fn((table: string) => {
+      if (table === 'quote_reference_aliases') return aliasQuery;
+      return {
+        select: vi.fn(() => {
+          if (table === 'quotes') return quoteQuery.query;
+          if (table === 'legacy_quotes') return legacyQuoteQuery.query;
+          if (table === 'quote_project_numbers') return projectNumberQuery.query;
+          throw new Error(`Unexpected table ${table}`);
+        }),
+      };
+    });
 
     mockCreateAdminClient.mockReturnValue({
       from,

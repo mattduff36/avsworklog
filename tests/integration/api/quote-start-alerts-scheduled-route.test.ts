@@ -77,6 +77,13 @@ describe('/api/quotes/start-alerts-scheduled', () => {
         },
       },
       from: vi.fn((table: string) => {
+        if (table === 'quote_merge_members') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
+            })),
+          };
+        }
         if (table !== 'quotes') throw new Error(`Unexpected table ${table}`);
         return {
           select: vi.fn(() => ({
