@@ -17,6 +17,8 @@ const {
   mockGetQuoteEmailCcEmails,
   mockGetQuoteNotificationRecipientEmails,
   mockCanManageQuoteSage,
+  mockIsEffectiveRoleManagerOrHigher,
+  mockRemapPurchaseOrderLinesForRevision,
   mockCopyQuoteCustomerContactRecipients,
   mockNormalizeSecondaryContactIds,
   mockReplaceQuoteCustomerContactRecipients,
@@ -41,6 +43,8 @@ const {
   mockGetQuoteEmailCcEmails: vi.fn(),
   mockGetQuoteNotificationRecipientEmails: vi.fn(),
   mockCanManageQuoteSage: vi.fn(),
+  mockIsEffectiveRoleManagerOrHigher: vi.fn(),
+  mockRemapPurchaseOrderLinesForRevision: vi.fn(),
   mockCopyQuoteCustomerContactRecipients: vi.fn(),
   mockNormalizeSecondaryContactIds: vi.fn(),
   mockReplaceQuoteCustomerContactRecipients: vi.fn(),
@@ -69,6 +73,10 @@ vi.mock('@/lib/server/quote-sage-access', () => ({
   canManageQuoteSage: mockCanManageQuoteSage,
 }));
 
+vi.mock('@/lib/utils/rbac', () => ({
+  isEffectiveRoleManagerOrHigher: mockIsEffectiveRoleManagerOrHigher,
+}));
+
 vi.mock('@/lib/server/quote-recipient-contacts', () => ({
   copyQuoteCustomerContactRecipients: mockCopyQuoteCustomerContactRecipients,
   normalizeSecondaryContactIds: mockNormalizeSecondaryContactIds,
@@ -80,7 +88,7 @@ vi.mock('@/lib/server/quote-purchase-orders', () => ({
   formatPurchaseOrderNumbersForEmail: vi.fn((orders: Array<{ po_number: string }>) => (
     orders.length > 0 ? orders.map(order => order.po_number).join(', ') : 'Not supplied'
   )),
-  remapPurchaseOrderLinesForRevision: vi.fn().mockResolvedValue(undefined),
+  remapPurchaseOrderLinesForRevision: mockRemapPurchaseOrderLinesForRevision,
   syncQuotePoRollup: vi.fn().mockResolvedValue({
     po_number: null,
     po_value: null,
@@ -146,6 +154,8 @@ describe('PATCH /api/quotes/[id]', () => {
     mockGetQuoteEmailCcEmails.mockResolvedValue(['ops-copy@avsquires.co.uk']);
     mockGetQuoteNotificationRecipientEmails.mockResolvedValue(['ops-copy@avsquires.co.uk']);
     mockCanManageQuoteSage.mockResolvedValue(false);
+    mockIsEffectiveRoleManagerOrHigher.mockResolvedValue(true);
+    mockRemapPurchaseOrderLinesForRevision.mockResolvedValue(undefined);
     mockGenerateQuoteReferenceForManager.mockResolvedValue({ quoteReference: '80001-CD', initials: 'CD' });
     mockGetQuoteManagerOption.mockResolvedValue({
       profile_id: 'manager-2',
@@ -580,6 +590,13 @@ describe('PATCH /api/quotes/[id]', () => {
     }));
     expect(mockQuoteUpdateEq).toHaveBeenCalledWith('quote_thread_id', 'thread-1');
     expect(mockQuoteUpdateNeq).toHaveBeenCalledWith('id', expect.any(String));
+    expect(mockRemapPurchaseOrderLinesForRevision).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        quoteThreadId: 'thread-1',
+        previousQuoteId: 'quote-1',
+      })
+    );
   });
 
   it('sends a PO request email to selected saved customer recipients', async () => {

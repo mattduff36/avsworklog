@@ -79,17 +79,7 @@ import type {
   QuotePurchaseOrder,
   QuoteRevisionType,
 } from '../types';
-import { getQuoteStatusConfig } from '../types';
-
-const PO_EDITABLE_STATUSES = new Set([
-  'sent',
-  'po_received',
-  'in_progress',
-  'completed_part',
-  'completed_full',
-  'partially_invoiced',
-  'invoiced',
-]);
+import { getQuoteStatusConfig, PO_EDITABLE_STATUSES } from '../types';
 
 interface QuoteDetailsModalProps {
   open: boolean;
@@ -329,6 +319,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [poRequestDialogOpen, setPoRequestDialogOpen] = useState(false);
   const [poRequestRecipientEmails, setPoRequestRecipientEmails] = useState<string[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [poPendingDeletion, setPoPendingDeletion] = useState<QuotePurchaseOrder | null>(null);
   const [ramsComments, setRamsComments] = useState('');
   const [ramsDialogOpen, setRamsDialogOpen] = useState(false);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
@@ -355,7 +346,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const quoteDisplayName = quote ? buildQuoteDisplayName(quote) : '';
   const isLatestVersion = Boolean(quote?.is_latest_version);
   const isHistoricalVersion = Boolean(quote && !quote.is_latest_version);
-  const canEditPoDetails = quote ? isLatestVersion && PO_EDITABLE_STATUSES.has(quote.status) : false;
+  const canEditPoDetails = quote
+    ? Boolean(
+      quote.can_manage_purchase_orders
+      && isLatestVersion
+      && PO_EDITABLE_STATUSES.has(quote.status)
+    )
+    : false;
   const canTriggerRams = Boolean(isLatestVersion && quote?.status === 'sent');
   const canManageSchedule = Boolean(isLatestVersion && quote && ['po_received', 'in_progress'].includes(quote.status));
   const canEditQuote = Boolean(isLatestVersion && quote && ['draft', 'changes_requested', 'pending_internal_approval'].includes(quote.status));
@@ -719,6 +716,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setAttachmentError(null);
     setDeleteError(null);
     setDeleteDialogOpen(false);
+    setPoPendingDeletion(null);
     setRemovingAttachmentId(null);
     setReplacingAttachmentId(null);
     setDetailsBaselineSnapshot(buildDirtySnapshot({
@@ -828,6 +826,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       setDuplicateManagerProfileId('');
       setPoRequestDialogOpen(false);
       setPoRequestRecipientEmails([]);
+      setPoPendingDeletion(null);
       setDetailsBaselineSnapshot('');
       setPoRequestBaselineSnapshot('');
       setDuplicateBaselineSnapshot('');
@@ -1215,6 +1214,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       } else {
         await fetchQuote();
       }
+      setPoPendingDeletion(null);
       toast.success('Purchase order removed');
       onRefresh();
     } catch (error) {
@@ -1614,6 +1614,12 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     </div>
                   ) : null}
 
+                  {isHistoricalVersion ? (
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                      Purchase-order coverage is maintained against the latest quote version. Open the latest version to review or change PO coverage.
+                    </div>
+                  ) : (
+                    <>
                   <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <h4 className="text-sm font-medium text-white">Purchase orders</h4>
@@ -1803,7 +1809,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                                 variant="outline"
                                 size="sm"
                                 disabled={actionLoading}
-                                onClick={() => deletePurchaseOrder(order.id)}
+                                onClick={() => setPoPendingDeletion(order)}
                                 className="border-red-500/40 text-red-200 hover:bg-red-500/10"
                               >
                                 <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
@@ -1816,6 +1822,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       <p className="text-sm text-muted-foreground">No purchase orders recorded yet.</p>
                     )}
                   </div>
+                    </>
+                  )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -2724,6 +2732,63 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
               <>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Delete Quote
+              </>
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    <AlertDialog
+      open={Boolean(poPendingDeletion)}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && !actionLoading) {
+          setPoPendingDeletion(null);
+          clearWorkflowError();
+        }
+      }}
+    >
+      <AlertDialogContent className="border border-red-500/50 bg-slate-900 text-white">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete purchase order?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will permanently delete PO{' '}
+            <span className="font-semibold text-white">
+              {poPendingDeletion?.po_number || ''}
+            </span>{' '}
+            and its quote-line coverage. This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {workflowError ? (
+          <div role="alert" className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-100">
+            {workflowError}
+          </div>
+        ) : null}
+        <AlertDialogFooter>
+          <AlertDialogCancel
+            disabled={actionLoading}
+            className="border-slate-500 bg-slate-800 text-white hover:bg-slate-700 hover:text-white"
+          >
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(event) => {
+              event.preventDefault();
+              if (poPendingDeletion) {
+                void deletePurchaseOrder(poPendingDeletion.id);
+              }
+            }}
+            disabled={actionLoading || !poPendingDeletion}
+            className="border border-red-400 bg-red-600 text-white hover:bg-red-500 focus-visible:ring-2 focus-visible:ring-red-300 disabled:border-slate-600 disabled:bg-slate-800 disabled:text-slate-500"
+          >
+            {actionLoading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete PO
               </>
             )}
           </AlertDialogAction>

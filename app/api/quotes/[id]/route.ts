@@ -14,6 +14,7 @@ import {
   getInitialsFromName,
   getQuoteEmailCcEmails,
   getQuoteManagerOption,
+  serializeQuoteBundle,
   sendQuotePoRequestEmail,
   sendQuoteRamsRequestEmail,
   sendQuoteToCustomerEmail,
@@ -34,6 +35,7 @@ import {
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { canManageQuoteSage } from '@/lib/server/quote-sage-access';
 import { syncQuoteSiteLocation } from '@/lib/server/inventory-site-location-sync';
+import { isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
 
 type QuoteFieldErrors = Record<string, string>;
 
@@ -53,29 +55,6 @@ function normalizeOptionalInteger(value: unknown): number | null {
 
   const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
   return Number.isInteger(parsed) ? parsed : Number.NaN;
-}
-
-function serializeQuoteBundle(
-  bundle: Awaited<ReturnType<typeof fetchQuoteBundle>>,
-  canManageSage?: boolean
-) {
-  return {
-    ...bundle.quote,
-    ...(typeof canManageSage === 'boolean' ? { can_manage_sage: canManageSage } : {}),
-    line_items: bundle.lineItems,
-    attachments: bundle.attachments,
-    rams_documents: bundle.ramsDocuments,
-    invoices: bundle.invoices,
-    invoice_requests: bundle.invoiceRequests,
-    purchase_orders: bundle.purchaseOrders,
-    po_coverage: bundle.poCoverage,
-    purchase_order_count: bundle.purchaseOrders.length,
-    versions: bundle.versions,
-    timeline: bundle.timeline,
-    invoice_summary: bundle.invoiceSummary,
-    financial_summary: bundle.financialSummary,
-    financial_adjustments: bundle.financialAdjustments,
-  };
 }
 
 function isMeaningfulLineItem(item: { description?: string; unit?: string; quantity?: number; unit_rate?: number }) {
@@ -160,10 +139,16 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     const bundle = await fetchQuoteBundle(admin, id);
     await syncQuoteSiteLocation(admin, bundle.quote, user.id);
-    const canManageSage = await canManageQuoteSage();
+    const [canManageSage, canManagePurchaseOrders] = await Promise.all([
+      canManageQuoteSage(),
+      isEffectiveRoleManagerOrHigher(),
+    ]);
 
     return NextResponse.json({
-      quote: serializeQuoteBundle(bundle, canManageSage),
+      quote: serializeQuoteBundle(bundle, {
+        canManageSage,
+        canManagePurchaseOrders,
+      }),
     });
   } catch (error) {
     console.error('Error fetching quote:', error);
@@ -777,8 +762,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       });
 
       const bundle = await fetchQuoteBundle(admin, newQuoteId);
+      const [canManageSage, canManagePurchaseOrders] = await Promise.all([
+        canManageQuoteSage(),
+        isEffectiveRoleManagerOrHigher(),
+      ]);
       return NextResponse.json({
-        quote: serializeQuoteBundle(bundle, await canManageQuoteSage()),
+        quote: serializeQuoteBundle(bundle, {
+          canManageSage,
+          canManagePurchaseOrders,
+        }),
       });
     } else if (action) {
       return NextResponse.json({ error: `Unsupported quote action: ${action}` }, { status: 400 });
@@ -1064,9 +1056,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const bundle = await fetchQuoteBundle(admin, id);
-    const canManageSage = await canManageQuoteSage();
+    const [canManageSage, canManagePurchaseOrders] = await Promise.all([
+      canManageQuoteSage(),
+      isEffectiveRoleManagerOrHigher(),
+    ]);
     return NextResponse.json({
-      quote: serializeQuoteBundle(bundle, canManageSage),
+      quote: serializeQuoteBundle(bundle, {
+        canManageSage,
+        canManagePurchaseOrders,
+      }),
     });
   } catch (error) {
     console.error('Error updating quote:', error);

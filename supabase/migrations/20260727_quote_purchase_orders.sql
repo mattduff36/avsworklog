@@ -4,7 +4,7 @@
 CREATE TABLE IF NOT EXISTS public.quote_purchase_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   quote_thread_id UUID NOT NULL,
-  quote_id UUID NOT NULL REFERENCES public.quotes(id) ON DELETE CASCADE,
+  quote_id UUID NOT NULL REFERENCES public.quotes(id) ON DELETE RESTRICT,
   po_number VARCHAR(100) NOT NULL,
   po_value NUMERIC(12,2),
   received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -28,7 +28,7 @@ CREATE INDEX IF NOT EXISTS idx_quote_purchase_orders_po_number
 CREATE TABLE IF NOT EXISTS public.quote_purchase_order_lines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   quote_purchase_order_id UUID NOT NULL REFERENCES public.quote_purchase_orders(id) ON DELETE CASCADE,
-  quote_line_item_id UUID REFERENCES public.quote_line_items(id) ON DELETE SET NULL,
+  quote_line_item_id UUID NOT NULL REFERENCES public.quote_line_items(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -43,6 +43,27 @@ CREATE INDEX IF NOT EXISTS idx_quote_purchase_order_lines_po_id
 
 CREATE INDEX IF NOT EXISTS idx_quote_purchase_order_lines_line_id
   ON public.quote_purchase_order_lines(quote_line_item_id);
+
+CREATE OR REPLACE FUNCTION public.validate_quote_purchase_order_thread()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.quotes q
+    WHERE q.quote_thread_id = NEW.quote_thread_id
+  ) THEN
+    RAISE EXCEPTION 'Quote thread % does not exist', NEW.quote_thread_id
+      USING ERRCODE = 'foreign_key_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SET search_path = public;
+
+DROP TRIGGER IF EXISTS quote_purchase_orders_validate_thread_trigger
+  ON public.quote_purchase_orders;
+CREATE TRIGGER quote_purchase_orders_validate_thread_trigger
+BEFORE INSERT OR UPDATE OF quote_thread_id ON public.quote_purchase_orders
+FOR EACH ROW EXECUTE FUNCTION public.validate_quote_purchase_order_thread();
 
 CREATE OR REPLACE FUNCTION public.update_quote_purchase_orders_updated_at()
 RETURNS TRIGGER AS $$
@@ -104,6 +125,7 @@ WITH thread_candidates AS (
         FROM public.quotes latest
         WHERE latest.quote_thread_id = q.quote_thread_id
           AND latest.is_latest_version = true
+          AND (latest.po_number IS NOT NULL OR latest.po_value IS NOT NULL)
         ORDER BY latest.created_at DESC
         LIMIT 1
       ),
@@ -165,7 +187,7 @@ WITH rollups AS (
       ORDER BY first_po.received_at ASC, first_po.created_at ASC
       LIMIT 1
     ) AS po_number,
-    SUM(COALESCE(po.po_value, 0)) AS po_value,
+    SUM(po.po_value) AS po_value,
     MIN(po.received_at) AS po_received_at
   FROM public.quote_purchase_orders po
   GROUP BY po.quote_thread_id

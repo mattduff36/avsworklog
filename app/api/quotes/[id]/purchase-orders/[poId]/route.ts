@@ -2,26 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
-  appendQuoteTimelineEvent,
   fetchQuoteBundle,
+  serializeQuoteBundle,
 } from '@/lib/server/quote-workflow';
 import {
-  buildQuotePoCoverageSummary,
-  listQuotePurchaseOrders,
-  replacePurchaseOrderLineLinks,
-  syncQuotePoRollup,
+  deleteQuotePurchaseOrderTransaction,
+  updateQuotePurchaseOrderTransaction,
 } from '@/lib/server/quote-purchase-orders';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
+import { canManageQuoteSage } from '@/lib/server/quote-sage-access';
+import { PO_EDITABLE_STATUSES } from '@/app/(dashboard)/quotes/types';
 
 type PoFieldErrors = Record<string, string>;
 
 interface RouteParams {
   params: Promise<{ id: string; poId: string }>;
-}
-
-function formatMoney(value: number | null): string | null {
-  if (value === null || !Number.isFinite(value)) return null;
-  return `£${value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
 }
 
 async function validateLineItemIds(
@@ -63,6 +59,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
+    if (!await isEffectiveRoleManagerOrHigher()) {
+      return NextResponse.json(
+        { error: 'Only managers and administrators can manage purchase orders.' },
+        { status: 403 }
+      );
+    }
 
     const body = await request.json() as {
       po_number?: string;
@@ -72,7 +74,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     };
 
     const fieldErrors: PoFieldErrors = {};
+    const hasPoNumber = Object.prototype.hasOwnProperty.call(body, 'po_number');
     const normalizedPoNumber = typeof body.po_number === 'string' ? body.po_number.trim() : '';
+    const hasNotes = Object.prototype.hasOwnProperty.call(body, 'notes');
     const normalizedNotes = typeof body.notes === 'string' ? body.notes.trim() || null : null;
     const hasPoValue = Object.prototype.hasOwnProperty.call(body, 'po_value');
     const rawPoValue = typeof body.po_value === 'number' ? body.po_value : Number(body.po_value);
@@ -84,12 +88,17 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       ? Array.from(new Set(body.line_item_ids!.filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))))
       : [];
 
-    if (!normalizedPoNumber) {
+    if (hasPoNumber && !normalizedPoNumber) {
       fieldErrors.po_number = 'Enter a PO number.';
+    } else if (normalizedPoNumber.length > 100) {
+      fieldErrors.po_number = 'PO number must be 100 characters or fewer.';
     }
 
     if (hasPoValue && body.po_value !== null && body.po_value !== undefined && (!Number.isFinite(normalizedPoValue) || (normalizedPoValue ?? 0) < 0)) {
       fieldErrors.po_value = 'Enter a valid PO value.';
+    }
+    if (normalizedNotes && normalizedNotes.length > 2000) {
+      fieldErrors.notes = 'Notes must be 2,000 characters or fewer.';
     }
 
     if (Object.keys(fieldErrors).length > 0) {
@@ -106,15 +115,14 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (!bundle.quote.is_latest_version) {
       return NextResponse.json({ error: 'Only the latest quote version can update purchase orders.' }, { status: 400 });
     }
+    if (!bundle.quote.status || !PO_EDITABLE_STATUSES.has(bundle.quote.status)) {
+      return NextResponse.json(
+        { error: 'Purchase orders cannot be updated while the quote is in its current status.' },
+        { status: 400 }
+      );
+    }
 
-    const { data: existing, error: existingError } = await admin
-      .from('quote_purchase_orders')
-      .select('*')
-      .eq('id', poId)
-      .eq('quote_thread_id', bundle.quote.quote_thread_id)
-      .maybeSingle();
-
-    if (existingError) throw existingError;
+    const existing = bundle.purchaseOrders.find(order => order.id === poId);
     if (!existing) {
       return NextResponse.json({ error: 'Purchase order not found for this quote.' }, { status: 404 });
     }
@@ -127,66 +135,43 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const now = new Date().toISOString();
-    const { error: updateError } = await admin
-      .from('quote_purchase_orders')
-      .update({
-        quote_id: bundle.quote.id,
-        po_number: normalizedPoNumber,
-        po_value: hasPoValue ? normalizedPoValue : existing.po_value,
-        notes: Object.prototype.hasOwnProperty.call(body, 'notes') ? normalizedNotes : existing.notes,
-        updated_at: now,
-      })
-      .eq('id', poId);
+    const finalPoNumber = hasPoNumber ? normalizedPoNumber : existing.po_number;
+    const finalPoValue = hasPoValue ? normalizedPoValue : existing.po_value;
+    const finalNotes = hasNotes ? normalizedNotes : existing.notes;
+    const finalLineItemIds = hasLineItemIds
+      ? lineItemIds
+      : (existing.lines || [])
+        .map(line => line.quote_line_item_id)
+        .filter((lineId): lineId is string => Boolean(lineId));
 
-    if (updateError) throw updateError;
-
-    if (hasLineItemIds) {
-      await replacePurchaseOrderLineLinks(admin, poId, lineItemIds);
-    }
-
-    await syncQuotePoRollup(admin, bundle.quote.quote_thread_id, user.id);
-
-    await appendQuoteTimelineEvent(admin, {
+    await updateQuotePurchaseOrderTransaction({
       quoteId: bundle.quote.id,
       quoteThreadId: bundle.quote.quote_thread_id,
       quoteReference: bundle.quote.quote_reference,
-      eventType: 'po_details_saved',
-      title: 'PO details updated',
-      description: [
-        `PO: ${normalizedPoNumber}`,
-        formatMoney(hasPoValue ? normalizedPoValue : (existing.po_value === null ? null : Number(existing.po_value)))
-          ? `Value: ${formatMoney(hasPoValue ? normalizedPoValue : (existing.po_value === null ? null : Number(existing.po_value)))}`
-          : null,
-      ].filter(Boolean).join(' • '),
       actorUserId: user.id,
-      createdAt: now,
+      purchaseOrderId: poId,
+      poNumber: finalPoNumber,
+      poValue: finalPoValue,
+      notes: finalNotes,
+      updatedAt: now,
+      lineItemIds: finalLineItemIds,
     });
 
-    const purchaseOrders = await listQuotePurchaseOrders(admin, bundle.quote.quote_thread_id);
     const refreshed = await fetchQuoteBundle(admin, id);
-    const poCoverage = buildQuotePoCoverageSummary({
-      quoteTotal: Number(refreshed.quote.total || 0),
-      lineItemIds: refreshed.lineItems.map(item => item.id),
-      purchaseOrders,
-    });
+    const canManageSage = await canManageQuoteSage();
 
     return NextResponse.json({
-      purchase_order: purchaseOrders.find(order => order.id === poId) || null,
-      purchase_orders: purchaseOrders,
-      po_coverage: poCoverage,
-      quote: {
-        ...refreshed.quote,
-        purchase_orders: purchaseOrders,
-        po_coverage: poCoverage,
-        purchase_order_count: purchaseOrders.length,
-      },
+      purchase_order: refreshed.purchaseOrders.find(order => order.id === poId) || null,
+      purchase_orders: refreshed.purchaseOrders,
+      po_coverage: refreshed.poCoverage,
+      quote: serializeQuoteBundle(refreshed, {
+        canManageSage,
+        canManagePurchaseOrders: true,
+      }),
     });
   } catch (error) {
     console.error('Error updating quote purchase order:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unable to update this purchase order right now.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Unable to update this purchase order right now.' }, { status: 500 });
   }
 }
 
@@ -206,71 +191,52 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
     const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
+    if (!await isEffectiveRoleManagerOrHigher()) {
+      return NextResponse.json(
+        { error: 'Only managers and administrators can manage purchase orders.' },
+        { status: 403 }
+      );
+    }
 
     const bundle = await fetchQuoteBundle(admin, id);
     if (!bundle.quote.is_latest_version) {
       return NextResponse.json({ error: 'Only the latest quote version can delete purchase orders.' }, { status: 400 });
     }
+    if (!bundle.quote.status || !PO_EDITABLE_STATUSES.has(bundle.quote.status)) {
+      return NextResponse.json(
+        { error: 'Purchase orders cannot be deleted while the quote is in its current status.' },
+        { status: 400 }
+      );
+    }
 
-    const { data: existing, error: existingError } = await admin
-      .from('quote_purchase_orders')
-      .select('id, po_number, po_value')
-      .eq('id', poId)
-      .eq('quote_thread_id', bundle.quote.quote_thread_id)
-      .maybeSingle();
-
-    if (existingError) throw existingError;
+    const existing = bundle.purchaseOrders.find(order => order.id === poId);
     if (!existing) {
       return NextResponse.json({ error: 'Purchase order not found for this quote.' }, { status: 404 });
     }
 
-    const { error: deleteError } = await admin
-      .from('quote_purchase_orders')
-      .delete()
-      .eq('id', poId);
-
-    if (deleteError) throw deleteError;
-
-    await syncQuotePoRollup(admin, bundle.quote.quote_thread_id, user.id);
-
     const now = new Date().toISOString();
-    await appendQuoteTimelineEvent(admin, {
+    await deleteQuotePurchaseOrderTransaction({
       quoteId: bundle.quote.id,
       quoteThreadId: bundle.quote.quote_thread_id,
       quoteReference: bundle.quote.quote_reference,
-      eventType: 'po_details_saved',
-      title: 'PO removed',
-      description: [
-        `PO: ${existing.po_number}`,
-        existing.po_value !== null ? `Value: ${formatMoney(Number(existing.po_value))}` : null,
-      ].filter(Boolean).join(' • '),
       actorUserId: user.id,
-      createdAt: now,
+      purchaseOrderId: poId,
+      deletedAt: now,
     });
 
-    const purchaseOrders = await listQuotePurchaseOrders(admin, bundle.quote.quote_thread_id);
     const refreshed = await fetchQuoteBundle(admin, id);
-    const poCoverage = buildQuotePoCoverageSummary({
-      quoteTotal: Number(refreshed.quote.total || 0),
-      lineItemIds: refreshed.lineItems.map(item => item.id),
-      purchaseOrders,
-    });
+    const canManageSage = await canManageQuoteSage();
 
     return NextResponse.json({
-      purchase_orders: purchaseOrders,
-      po_coverage: poCoverage,
-      quote: {
-        ...refreshed.quote,
-        purchase_orders: purchaseOrders,
-        po_coverage: poCoverage,
-        purchase_order_count: purchaseOrders.length,
-      },
+      purchase_orders: refreshed.purchaseOrders,
+      po_coverage: refreshed.poCoverage,
+      quote: serializeQuoteBundle(refreshed, {
+        canManageSage,
+        canManagePurchaseOrders: true,
+      }),
     });
   } catch (error) {
     console.error('Error deleting quote purchase order:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unable to delete this purchase order right now.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Unable to delete this purchase order right now.' }, { status: 500 });
   }
 }

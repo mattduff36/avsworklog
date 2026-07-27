@@ -1,5 +1,8 @@
+import pg from 'pg';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
+
+const { Client } = pg;
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 type QuotePurchaseOrderRow = Database['public']['Tables']['quote_purchase_orders']['Row'];
@@ -9,7 +12,7 @@ type QuoteLineItemRow = Database['public']['Tables']['quote_line_items']['Row'];
 export interface QuotePurchaseOrderLineLink {
   id: string;
   quote_purchase_order_id: string;
-  quote_line_item_id: string | null;
+  quote_line_item_id: string;
   created_at: string;
   description?: string | null;
   line_total?: number | null;
@@ -28,6 +31,321 @@ export interface QuotePoCoverageSummary {
   coveredLineCount: number;
   totalLineCount: number;
   purchaseOrderCount: number;
+}
+
+interface QuotePoMutationContext {
+  quoteId: string;
+  quoteThreadId: string;
+  quoteReference: string;
+  actorUserId: string;
+}
+
+export interface CreateQuotePurchaseOrderInput extends QuotePoMutationContext {
+  poNumber: string;
+  poValue: number | null;
+  notes: string | null;
+  receivedAt: string;
+  lineItemIds: string[];
+}
+
+export interface UpdateQuotePurchaseOrderInput extends QuotePoMutationContext {
+  purchaseOrderId: string;
+  poNumber: string;
+  poValue: number | null;
+  notes: string | null;
+  updatedAt: string;
+  lineItemIds: string[];
+}
+
+export interface DeleteQuotePurchaseOrderInput extends QuotePoMutationContext {
+  purchaseOrderId: string;
+  deletedAt: string;
+}
+
+interface QuotePoPgResult<Row extends Record<string, unknown> = Record<string, unknown>> {
+  rows: Row[];
+}
+
+export interface QuotePoPgClient {
+  connect(): Promise<void>;
+  query<Row extends Record<string, unknown> = Record<string, unknown>>(
+    text: string,
+    values?: unknown[]
+  ): Promise<QuotePoPgResult<Row>>;
+  end(): Promise<void>;
+}
+
+export type QuotePoPgClientFactory = () => QuotePoPgClient;
+
+function createQuotePoPgClient(): QuotePoPgClient {
+  const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+  if (!connectionString) {
+    throw new Error('Missing database connection string for quote purchase orders');
+  }
+
+  const url = new URL(connectionString);
+  return new Client({
+    host: url.hostname,
+    port: Number.parseInt(url.port || '5432', 10),
+    database: url.pathname.slice(1),
+    user: url.username,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
+    ssl: { rejectUnauthorized: false },
+  }) as QuotePoPgClient;
+}
+
+async function withQuotePoTransaction<Result>(
+  work: (client: QuotePoPgClient) => Promise<Result>,
+  createClient: QuotePoPgClientFactory
+): Promise<Result> {
+  const client = createClient();
+  await client.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await work(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+async function replacePurchaseOrderLineLinksInTransaction(
+  client: QuotePoPgClient,
+  purchaseOrderId: string,
+  lineItemIds: string[]
+): Promise<void> {
+  const uniqueIds = Array.from(new Set(lineItemIds.filter(Boolean)));
+  await client.query(
+    'DELETE FROM public.quote_purchase_order_lines WHERE quote_purchase_order_id = $1',
+    [purchaseOrderId]
+  );
+
+  if (uniqueIds.length > 0) {
+    await client.query(
+      `
+        INSERT INTO public.quote_purchase_order_lines (
+          quote_purchase_order_id,
+          quote_line_item_id
+        )
+        SELECT $1::uuid, line_item_id
+        FROM unnest($2::uuid[]) AS line_item_id
+      `,
+      [purchaseOrderId, uniqueIds]
+    );
+  }
+}
+
+async function syncQuotePoRollupInTransaction(
+  client: QuotePoPgClient,
+  quoteThreadId: string,
+  updatedBy?: string | null
+): Promise<void> {
+  await client.query(
+    `
+      WITH rollup AS (
+        SELECT
+          (ARRAY_AGG(po_number ORDER BY received_at ASC, created_at ASC))[1] AS po_number,
+          SUM(po_value) AS po_value,
+          MIN(received_at) AS po_received_at
+        FROM public.quote_purchase_orders
+        WHERE quote_thread_id = $1
+      )
+      UPDATE public.quotes q
+      SET
+        po_number = rollup.po_number,
+        po_value = rollup.po_value,
+        po_received_at = rollup.po_received_at,
+        updated_by = COALESCE($2::uuid, q.updated_by)
+      FROM rollup
+      WHERE q.quote_thread_id = $1
+    `,
+    [quoteThreadId, updatedBy || null]
+  );
+}
+
+async function appendPoTimelineEventInTransaction(
+  client: QuotePoPgClient,
+  input: QuotePoMutationContext & {
+    title: string;
+    description: string;
+    createdAt: string;
+  }
+): Promise<void> {
+  await client.query(
+    `
+      INSERT INTO public.quote_timeline_events (
+        quote_id,
+        quote_thread_id,
+        quote_reference,
+        event_type,
+        title,
+        description,
+        actor_user_id,
+        created_at
+      )
+      VALUES ($1, $2, $3, 'po_details_saved', $4, $5, $6, $7)
+    `,
+    [
+      input.quoteId,
+      input.quoteThreadId,
+      input.quoteReference,
+      input.title,
+      input.description,
+      input.actorUserId,
+      input.createdAt,
+    ]
+  );
+}
+
+export async function createQuotePurchaseOrderTransaction(
+  input: CreateQuotePurchaseOrderInput,
+  createClient: QuotePoPgClientFactory = createQuotePoPgClient
+): Promise<string> {
+  return withQuotePoTransaction(async client => {
+    const result = await client.query<{ id: string }>(
+      `
+        INSERT INTO public.quote_purchase_orders (
+          quote_thread_id,
+          quote_id,
+          po_number,
+          po_value,
+          received_at,
+          notes,
+          created_by
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING id
+      `,
+      [
+        input.quoteThreadId,
+        input.quoteId,
+        input.poNumber,
+        input.poValue,
+        input.receivedAt,
+        input.notes,
+        input.actorUserId,
+      ]
+    );
+    const purchaseOrderId = result.rows[0]?.id;
+    if (!purchaseOrderId) {
+      throw new Error('Unable to create purchase order');
+    }
+
+    await replacePurchaseOrderLineLinksInTransaction(client, purchaseOrderId, input.lineItemIds);
+    await syncQuotePoRollupInTransaction(client, input.quoteThreadId, input.actorUserId);
+    await appendPoTimelineEventInTransaction(client, {
+      ...input,
+      title: 'PO added',
+      description: [
+        `PO: ${input.poNumber}`,
+        input.poValue !== null ? `Value: £${input.poValue.toLocaleString('en-GB', { minimumFractionDigits: 2 })}` : null,
+        input.lineItemIds.length > 0 ? `Covers ${input.lineItemIds.length} quote line(s)` : null,
+      ].filter(Boolean).join(' • '),
+      createdAt: input.receivedAt,
+    });
+
+    return purchaseOrderId;
+  }, createClient);
+}
+
+export async function updateQuotePurchaseOrderTransaction(
+  input: UpdateQuotePurchaseOrderInput,
+  createClient: QuotePoPgClientFactory = createQuotePoPgClient
+): Promise<void> {
+  await withQuotePoTransaction(async client => {
+    const existing = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM public.quote_purchase_orders
+        WHERE id = $1 AND quote_thread_id = $2
+        FOR UPDATE
+      `,
+      [input.purchaseOrderId, input.quoteThreadId]
+    );
+    if (!existing.rows[0]) {
+      throw new Error('Purchase order not found for this quote');
+    }
+
+    await client.query(
+      `
+        UPDATE public.quote_purchase_orders
+        SET
+          quote_id = $2,
+          po_number = $3,
+          po_value = $4,
+          notes = $5,
+          updated_at = $6
+        WHERE id = $1
+      `,
+      [
+        input.purchaseOrderId,
+        input.quoteId,
+        input.poNumber,
+        input.poValue,
+        input.notes,
+        input.updatedAt,
+      ]
+    );
+    await replacePurchaseOrderLineLinksInTransaction(
+      client,
+      input.purchaseOrderId,
+      input.lineItemIds
+    );
+    await syncQuotePoRollupInTransaction(client, input.quoteThreadId, input.actorUserId);
+    await appendPoTimelineEventInTransaction(client, {
+      ...input,
+      title: 'PO details updated',
+      description: [
+        `PO: ${input.poNumber}`,
+        input.poValue !== null ? `Value: £${input.poValue.toLocaleString('en-GB', { minimumFractionDigits: 2 })}` : null,
+      ].filter(Boolean).join(' • '),
+      createdAt: input.updatedAt,
+    });
+  }, createClient);
+}
+
+export async function deleteQuotePurchaseOrderTransaction(
+  input: DeleteQuotePurchaseOrderInput,
+  createClient: QuotePoPgClientFactory = createQuotePoPgClient
+): Promise<void> {
+  await withQuotePoTransaction(async client => {
+    const existing = await client.query<{
+      id: string;
+      po_number: string;
+      po_value: string | number | null;
+    }>(
+      `
+        SELECT id, po_number, po_value
+        FROM public.quote_purchase_orders
+        WHERE id = $1 AND quote_thread_id = $2
+        FOR UPDATE
+      `,
+      [input.purchaseOrderId, input.quoteThreadId]
+    );
+    const purchaseOrder = existing.rows[0];
+    if (!purchaseOrder) {
+      throw new Error('Purchase order not found for this quote');
+    }
+
+    await client.query('DELETE FROM public.quote_purchase_orders WHERE id = $1', [
+      input.purchaseOrderId,
+    ]);
+    await syncQuotePoRollupInTransaction(client, input.quoteThreadId, input.actorUserId);
+    const poValue = purchaseOrder.po_value === null ? null : Number(purchaseOrder.po_value);
+    await appendPoTimelineEventInTransaction(client, {
+      ...input,
+      title: 'PO removed',
+      description: [
+        `PO: ${purchaseOrder.po_number}`,
+        poValue !== null ? `Value: £${poValue.toLocaleString('en-GB', { minimumFractionDigits: 2 })}` : null,
+      ].filter(Boolean).join(' • '),
+      createdAt: input.deletedAt,
+    });
+  }, createClient);
 }
 
 export function buildQuotePoCoverageSummary(input: {
@@ -79,7 +397,10 @@ export function computeQuotePoRollup(purchaseOrders: Array<{
     return a.created_at.localeCompare(b.created_at);
   });
 
-  const poValueSum = purchaseOrders.reduce((sum, po) => sum + Number(po.po_value || 0), 0);
+  const valuedPurchaseOrders = purchaseOrders.filter(po => po.po_value !== null);
+  const poValueSum = valuedPurchaseOrders.length > 0
+    ? valuedPurchaseOrders.reduce((sum, po) => sum + Number(po.po_value), 0)
+    : null;
 
   return {
     po_number: sorted[0]?.po_number || null,
@@ -302,7 +623,8 @@ export async function remapPurchaseOrderLinesForRevision(
     nextQuoteId: string;
     previousLineItems: Array<{ id: string; description: string | null; sort_order: number | null }>;
     nextLineItems: Array<{ id: string; description: string | null; sort_order: number | null }>;
-  }
+  },
+  createClient: QuotePoPgClientFactory = createQuotePoPgClient
 ): Promise<void> {
   const purchaseOrders = await listQuotePurchaseOrders(supabase, input.quoteThreadId);
   if (purchaseOrders.length === 0) {
@@ -310,25 +632,28 @@ export async function remapPurchaseOrderLinesForRevision(
     return;
   }
 
-  for (const order of purchaseOrders) {
+  const remappedOrders = purchaseOrders.map(order => {
     const previousLinkedIds = order.lines
       .map(line => line.quote_line_item_id)
       .filter((id): id is string => Boolean(id));
-    const nextLinkedIds = mapLineItemIdsAcrossRevision(
-      input.previousLineItems,
-      input.nextLineItems,
-      previousLinkedIds
-    );
+    return {
+      id: order.id,
+      lineItemIds: mapLineItemIdsAcrossRevision(
+        input.previousLineItems,
+        input.nextLineItems,
+        previousLinkedIds
+      ),
+    };
+  });
 
-    await replacePurchaseOrderLineLinks(supabase, order.id, nextLinkedIds);
-
-    const { error: updateError } = await supabase
-      .from('quote_purchase_orders')
-      .update({ quote_id: input.nextQuoteId })
-      .eq('id', order.id);
-
-    if (updateError) throw updateError;
-  }
-
-  await syncQuotePoRollup(supabase, input.quoteThreadId);
+  await withQuotePoTransaction(async client => {
+    for (const order of remappedOrders) {
+      await replacePurchaseOrderLineLinksInTransaction(client, order.id, order.lineItemIds);
+      await client.query(
+        'UPDATE public.quote_purchase_orders SET quote_id = $2 WHERE id = $1',
+        [order.id, input.nextQuoteId]
+      );
+    }
+    await syncQuotePoRollupInTransaction(client, input.quoteThreadId);
+  }, createClient);
 }

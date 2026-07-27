@@ -2,26 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
-  appendQuoteTimelineEvent,
   fetchQuoteBundle,
+  serializeQuoteBundle,
 } from '@/lib/server/quote-workflow';
 import {
   buildQuotePoCoverageSummary,
+  createQuotePurchaseOrderTransaction,
   listQuotePurchaseOrders,
-  replacePurchaseOrderLineLinks,
-  syncQuotePoRollup,
 } from '@/lib/server/quote-purchase-orders';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
+import { canManageQuoteSage } from '@/lib/server/quote-sage-access';
+import { PO_EDITABLE_STATUSES } from '@/app/(dashboard)/quotes/types';
 
 type PoFieldErrors = Record<string, string>;
 
 interface RouteParams {
   params: Promise<{ id: string }>;
-}
-
-function formatMoney(value: number | null): string | null {
-  if (value === null || !Number.isFinite(value)) return null;
-  return `£${value.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`;
 }
 
 async function validateLineItemIds(
@@ -62,6 +59,12 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
 
     const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
+    if (!await isEffectiveRoleManagerOrHigher()) {
+      return NextResponse.json(
+        { error: 'Only managers and administrators can manage purchase orders.' },
+        { status: 403 }
+      );
+    }
 
     const admin = createAdminClient();
     const bundle = await fetchQuoteBundle(admin, id);
@@ -118,10 +121,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (!normalizedPoNumber) {
       fieldErrors.po_number = 'Enter a PO number.';
+    } else if (normalizedPoNumber.length > 100) {
+      fieldErrors.po_number = 'PO number must be 100 characters or fewer.';
     }
 
     if (normalizedPoValue !== null && (!Number.isFinite(normalizedPoValue) || normalizedPoValue < 0)) {
       fieldErrors.po_value = 'Enter a valid PO value.';
+    }
+    if (normalizedNotes && normalizedNotes.length > 2000) {
+      fieldErrors.notes = 'Notes must be 2,000 characters or fewer.';
     }
 
     if (Object.keys(fieldErrors).length > 0) {
@@ -138,6 +146,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (!bundle.quote.is_latest_version) {
       return NextResponse.json({ error: 'Only the latest quote version can record purchase orders.' }, { status: 400 });
     }
+    if (!bundle.quote.status || !PO_EDITABLE_STATUSES.has(bundle.quote.status)) {
+      return NextResponse.json(
+        { error: 'Purchase orders cannot be added while the quote is in its current status.' },
+        { status: 400 }
+      );
+    }
 
     const lineValidationError = await validateLineItemIds(admin, bundle.quote.id, lineItemIds);
     if (lineValidationError) {
@@ -145,66 +159,32 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const now = new Date().toISOString();
-    const { data: inserted, error: insertError } = await admin
-      .from('quote_purchase_orders')
-      .insert({
-        quote_thread_id: bundle.quote.quote_thread_id,
-        quote_id: bundle.quote.id,
-        po_number: normalizedPoNumber,
-        po_value: normalizedPoValue,
-        received_at: now,
-        notes: normalizedNotes,
-        created_by: user.id,
-      })
-      .select('*')
-      .single();
-
-    if (insertError || !inserted) {
-      throw insertError || new Error('Unable to create purchase order.');
-    }
-
-    await replacePurchaseOrderLineLinks(admin, inserted.id, lineItemIds);
-    await syncQuotePoRollup(admin, bundle.quote.quote_thread_id, user.id);
-
-    await appendQuoteTimelineEvent(admin, {
+    const purchaseOrderId = await createQuotePurchaseOrderTransaction({
       quoteId: bundle.quote.id,
       quoteThreadId: bundle.quote.quote_thread_id,
       quoteReference: bundle.quote.quote_reference,
-      eventType: 'po_details_saved',
-      title: 'PO added',
-      description: [
-        `PO: ${normalizedPoNumber}`,
-        formatMoney(normalizedPoValue) ? `Value: ${formatMoney(normalizedPoValue)}` : null,
-        lineItemIds.length > 0 ? `Covers ${lineItemIds.length} quote line(s)` : null,
-      ].filter(Boolean).join(' • '),
       actorUserId: user.id,
-      createdAt: now,
+      poNumber: normalizedPoNumber,
+      poValue: normalizedPoValue,
+      notes: normalizedNotes,
+      receivedAt: now,
+      lineItemIds,
     });
 
-    const purchaseOrders = await listQuotePurchaseOrders(admin, bundle.quote.quote_thread_id);
     const refreshed = await fetchQuoteBundle(admin, id);
-    const poCoverage = buildQuotePoCoverageSummary({
-      quoteTotal: Number(refreshed.quote.total || 0),
-      lineItemIds: refreshed.lineItems.map(item => item.id),
-      purchaseOrders,
-    });
+    const canManageSage = await canManageQuoteSage();
 
     return NextResponse.json({
-      purchase_order: purchaseOrders.find(order => order.id === inserted.id) || null,
-      purchase_orders: purchaseOrders,
-      po_coverage: poCoverage,
-      quote: {
-        ...refreshed.quote,
-        purchase_orders: purchaseOrders,
-        po_coverage: poCoverage,
-        purchase_order_count: purchaseOrders.length,
-      },
+      purchase_order: refreshed.purchaseOrders.find(order => order.id === purchaseOrderId) || null,
+      purchase_orders: refreshed.purchaseOrders,
+      po_coverage: refreshed.poCoverage,
+      quote: serializeQuoteBundle(refreshed, {
+        canManageSage,
+        canManagePurchaseOrders: true,
+      }),
     });
   } catch (error) {
     console.error('Error creating quote purchase order:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unable to save this purchase order right now.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Unable to save this purchase order right now.' }, { status: 500 });
   }
 }

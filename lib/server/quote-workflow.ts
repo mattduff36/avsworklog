@@ -155,6 +155,37 @@ export interface QuoteBundle {
   financialSummary: QuoteThreadFinancialSummary;
 }
 
+export function serializeQuoteBundle(
+  bundle: QuoteBundle,
+  permissions: {
+    canManageSage?: boolean;
+    canManagePurchaseOrders?: boolean;
+  } = {}
+) {
+  return {
+    ...bundle.quote,
+    ...(typeof permissions.canManageSage === 'boolean'
+      ? { can_manage_sage: permissions.canManageSage }
+      : {}),
+    ...(typeof permissions.canManagePurchaseOrders === 'boolean'
+      ? { can_manage_purchase_orders: permissions.canManagePurchaseOrders }
+      : {}),
+    line_items: bundle.lineItems,
+    attachments: bundle.attachments,
+    rams_documents: bundle.ramsDocuments,
+    invoices: bundle.invoices,
+    invoice_requests: bundle.invoiceRequests,
+    purchase_orders: bundle.purchaseOrders,
+    po_coverage: bundle.poCoverage,
+    purchase_order_count: bundle.purchaseOrders.length,
+    versions: bundle.versions,
+    timeline: bundle.timeline,
+    invoice_summary: bundle.invoiceSummary,
+    financial_summary: bundle.financialSummary,
+    financial_adjustments: bundle.financialAdjustments,
+  };
+}
+
 export async function appendQuoteTimelineEvent(
   supabase: ReturnType<typeof createAdminClient>,
   input: {

@@ -56,7 +56,7 @@ export interface QuoteInvoiceAllocation {
 export interface QuotePurchaseOrderLine {
   id: string;
   quote_purchase_order_id: string;
-  quote_line_item_id: string | null;
+  quote_line_item_id: string;
   created_at: string;
   description?: string | null;
   line_total?: number | null;
@@ -433,6 +433,7 @@ export interface Quote {
   sage_posted_by: string | null;
   sage_status?: QuoteSageStatus;
   can_manage_sage?: boolean;
+  can_manage_purchase_orders?: boolean;
   // Joined
   customer?: {
     id: string;
@@ -514,6 +515,16 @@ export type QuoteStatus =
   | 'partially_invoiced'
   | 'invoiced'
   | 'closed';
+
+export const PO_EDITABLE_STATUSES = new Set<QuoteStatus>([
+  'sent',
+  'po_received',
+  'in_progress',
+  'completed_part',
+  'completed_full',
+  'partially_invoiced',
+  'invoiced',
+]);
 
 export const QUOTE_STATUS_CONFIG: Record<QuoteStatus, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'border-slate-500/30 text-slate-400 bg-slate-500/10' },

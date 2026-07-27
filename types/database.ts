@@ -5765,19 +5765,19 @@ export type Database = {
         Row: {
           id: string
           quote_purchase_order_id: string
-          quote_line_item_id: string | null
+          quote_line_item_id: string
           created_at: string
         }
         Insert: {
           id?: string
           quote_purchase_order_id: string
-          quote_line_item_id?: string | null
+          quote_line_item_id: string
           created_at?: string
         }
         Update: {
           id?: string
           quote_purchase_order_id?: string
-          quote_line_item_id?: string | null
+          quote_line_item_id?: string
           created_at?: string
         }
         Relationships: [
