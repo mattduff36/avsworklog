@@ -862,7 +862,9 @@ export default function InventoryPage() {
   if (!isManagerOrAdmin) {
     return (
       <AppPageShell width="wide" className="inventory-mobile-ui">
-        <InventoryDevelopmentBanner />
+        <div className="hidden sm:block">
+          <InventoryDevelopmentBanner />
+        </div>
 
         <AppPageHeader
           title="Inventory"

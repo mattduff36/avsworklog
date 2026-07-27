@@ -280,7 +280,7 @@ export function InventoryEmployeeView({
 
   return (
     <div className="space-y-6">
-      <Card className="border-slate-700 bg-slate-900/70">
+      <Card className="hidden border-slate-700 bg-slate-900/70 sm:block">
         <CardContent className="flex flex-col gap-4 p-3 min-[380px]:p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="flex min-w-0 items-start gap-2 text-sm font-medium text-white">
