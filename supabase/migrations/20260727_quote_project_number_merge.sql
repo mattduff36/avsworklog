@@ -505,4 +505,6 @@ COMMENT ON FUNCTION public.convert_quote_project_numbers(
   UUID[], UUID, UUID[], JSONB, JSONB, UUID
 ) IS 'Atomically converts and optionally merges open project numbers into one live quote.';
 
+NOTIFY pgrst, 'reload schema';
+
 COMMIT;

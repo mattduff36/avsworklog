@@ -169,12 +169,6 @@ async function listProjectNumbers(admin: ReturnType<typeof createAdminClient>) {
         subject_line,
         customer:customers(company_name)
       ),
-      merged_into_project_number:quote_project_numbers!quote_project_numbers_merged_into_project_number_id_fkey(
-        id,
-        project_reference,
-        title,
-        converted_quote_id
-      ),
       costs:quote_project_costs(*)
     `)
     .order('created_at', { ascending: false });
@@ -184,15 +178,25 @@ async function listProjectNumbers(admin: ReturnType<typeof createAdminClient>) {
     costs?: QuoteProjectCostRow[];
     [key: string]: unknown;
   }>;
+  const rowsById = new Map(rows.map(row => [row.id, row]));
   const summaries = await loadLabourSummaries(admin, rows.map(row => row.project_reference));
 
   return rows.map((row) => {
     const costs = row.costs || [];
     const totals = calculateManualTotals(costs);
+    const mergedTarget = row.merged_into_project_number_id
+      ? rowsById.get(row.merged_into_project_number_id)
+      : null;
     return {
       ...row,
       ...totals,
       costs,
+      merged_into_project_number: mergedTarget ? {
+        id: mergedTarget.id,
+        project_reference: mergedTarget.project_reference,
+        title: mergedTarget.title,
+        converted_quote_id: mergedTarget.converted_quote_id,
+      } : null,
       labour_summary: summaries.get(row.project_reference) || null,
     };
   });

@@ -190,6 +190,62 @@ describe('POST /api/quotes/project-numbers', () => {
     expect(mockGenerateQuoteReferenceForManager).not.toHaveBeenCalled();
   });
 
+  it('hydrates merged targets without a PostgREST self-relation', async () => {
+    const projectSelect = vi.fn((selection: string) => {
+      expect(selection).not.toContain('quote_project_numbers_merged_into_project_number_id_fkey');
+      return {
+        order: vi.fn().mockResolvedValue({
+          data: [
+            {
+              id: 'project-1',
+              project_reference: '60001-MD',
+              title: 'Combined works',
+              status: 'converted',
+              merged_into_project_number_id: null,
+              converted_quote_id: 'quote-1',
+              costs: [],
+            },
+            {
+              id: 'project-2',
+              project_reference: '60002-LC',
+              title: 'Old works',
+              status: 'merged',
+              merged_into_project_number_id: 'project-1',
+              converted_quote_id: 'quote-1',
+              costs: [],
+            },
+          ],
+          error: null,
+        }),
+      };
+    });
+    mockCreateAdminClient.mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'quote_project_numbers') return { select: projectSelect };
+        if (table === 'timesheet_entry_job_codes') {
+          return {
+            select: vi.fn(() => ({
+              in: vi.fn().mockResolvedValue({ data: [], error: null }),
+            })),
+          };
+        }
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    });
+
+    const { GET } = await import('@/app/api/quotes/project-numbers/route');
+    const response = await GET();
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.project_numbers[1].merged_into_project_number).toEqual({
+      id: 'project-1',
+      project_reference: '60001-MD',
+      title: 'Combined works',
+      converted_quote_id: 'quote-1',
+    });
+  });
+
   it('dispatches multi-project conversion and syncs every resulting project', async () => {
     mockCreateAdminClient.mockReturnValue({ from: vi.fn() });
 

@@ -44,10 +44,12 @@ interface LegacyQuoteJobCodeRow {
 }
 
 interface ProjectNumberJobCodeRow {
+  id: string;
   project_reference: string | null;
   title: string | null;
   description: string | null;
   status: 'open' | 'merged';
+  merged_into_project_number_id: string | null;
   merged_into_project_number?: {
     project_reference: string | null;
     title: string | null;
@@ -280,15 +282,12 @@ async function fetchProjectNumberJobCodeRows(
     const result = await admin
       .from('quote_project_numbers')
       .select(`
+        id,
         project_reference,
         title,
         description,
         status,
-        merged_into_project_number:quote_project_numbers!quote_project_numbers_merged_into_project_number_id_fkey(
-          project_reference,
-          title,
-          description
-        )
+        merged_into_project_number_id
       `)
       .in('status', ['open', 'merged'])
       .order('project_reference', { ascending: true })
@@ -301,7 +300,24 @@ async function fetchProjectNumberJobCodeRows(
     if (pageRows.length < pageLimit) break;
   }
 
-  return rows;
+  const targetIds = Array.from(new Set(rows
+    .map(row => row.merged_into_project_number_id)
+    .filter((id): id is string => Boolean(id))));
+  if (targetIds.length === 0) return rows;
+
+  const { data: targets, error: targetsError } = await admin
+    .from('quote_project_numbers')
+    .select('id, project_reference, title, description')
+    .in('id', targetIds);
+  if (targetsError) throw targetsError;
+
+  const targetsById = new Map((targets || []).map(target => [target.id, target]));
+  return rows.map(row => ({
+    ...row,
+    merged_into_project_number: row.merged_into_project_number_id
+      ? targetsById.get(row.merged_into_project_number_id) || null
+      : null,
+  }));
 }
 
 export async function GET(request: NextRequest) {

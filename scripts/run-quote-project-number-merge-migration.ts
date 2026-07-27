@@ -3,7 +3,16 @@ import path from 'node:path';
 import dotenv from 'dotenv';
 import pg from 'pg';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+const envFileFlagIndex = process.argv.indexOf('--env-file');
+const envFile = envFileFlagIndex >= 0
+  ? process.argv[envFileFlagIndex + 1]
+  : '.env.local';
+
+if (!envFile) {
+  throw new Error('The --env-file option requires a file path');
+}
+
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
 
 const { Client } = pg;
 const connectionString = process.env.POSTGRES_URL_NON_POOLING;

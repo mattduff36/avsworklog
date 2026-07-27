@@ -48,10 +48,12 @@ interface LegacyQuoteJobCodeTestRow {
 }
 
 interface ProjectNumberJobCodeTestRow {
+  id: string;
   project_reference: string | null;
   title: string | null;
   description: string | null;
   status: 'open' | 'merged';
+  merged_into_project_number_id: string | null;
   merged_into_project_number?: {
     project_reference: string | null;
     title: string | null;
@@ -96,13 +98,26 @@ function createLegacyQuoteQuery(rowsOrPages: LegacyQuoteJobCodeTestRow[] | Legac
   return { query, order, range };
 }
 
-function createProjectNumberQuery(rowsOrPages: ProjectNumberJobCodeTestRow[] | ProjectNumberJobCodeTestRow[][]) {
+function createProjectNumberQuery(
+  rowsOrPages: ProjectNumberJobCodeTestRow[] | ProjectNumberJobCodeTestRow[][],
+  targetRows: Array<{
+    id: string;
+    project_reference: string;
+    title: string;
+    description: string | null;
+  }> = [],
+) {
   const range = createRangeMock(rowsOrPages);
   const order = vi.fn().mockReturnValue({ range });
   const query = {
-    in: vi.fn().mockReturnThis(),
+    in: vi.fn(),
     order,
   };
+  query.in.mockImplementation((column: string) => (
+    column === 'status'
+      ? query
+      : Promise.resolve({ data: targetRows, error: null })
+  ));
 
   return { query, order, range };
 }
@@ -164,10 +179,12 @@ describe('GET /api/timesheets/job-codes', () => {
     ]);
     const projectNumberQuery = createProjectNumberQuery([
       {
+        id: 'project-1',
         project_reference: '60001-MD',
         title: 'Emergency enabling works',
         description: null,
         status: 'open',
+        merged_into_project_number_id: null,
       },
     ]);
     const from = vi.fn((table: string) => ({
@@ -254,15 +271,17 @@ describe('GET /api/timesheets/job-codes', () => {
     const quoteQuery = createQuoteQuery([]);
     const legacyQuoteQuery = createLegacyQuoteQuery([]);
     const projectNumberQuery = createProjectNumberQuery([{
+      id: 'project-2',
       project_reference: '60002-LC',
       title: 'Old drainage project',
       description: null,
       status: 'merged',
-      merged_into_project_number: {
-        project_reference: '60001-MD',
-        title: 'Combined drainage works',
-        description: null,
-      },
+      merged_into_project_number_id: 'project-1',
+    }], [{
+      id: 'project-1',
+      project_reference: '60001-MD',
+      title: 'Combined drainage works',
+      description: null,
     }]);
     const from = vi.fn((table: string) => ({
       select: vi.fn(() => {
