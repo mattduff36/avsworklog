@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.22.1
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): resolve user location RPC ambiguity`
+
+**PUSHED AT**
+2026-07-27T12:35:34.326Z
+
+**WHAT CHANGED**
+Resolve user location RPC ambiguity.
+
+**VERSION HISTORY DETAILS**
+- Resolve user location RPC ambiguity, with changes to automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to automation scripts, automated tests, and data storage.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): resolve user location RPC ambiguity`
+
 ## 0726.22.0
 
 **GIT COMMIT MESSAGE**

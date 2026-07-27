@@ -1,5 +1,23 @@
 [
   {
+    "version": "0726.22.1",
+    "updateKind": "minor",
+    "title": "Inventory improvements",
+    "description": "Resolve user location RPC ambiguity.",
+    "summary": "Resolve user location RPC ambiguity.",
+    "details": [
+      "Resolve user location RPC ambiguity, with changes to automation scripts, automated tests, and data storage.",
+      "Updated data storage, with changes to automation scripts, automated tests, and data storage."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-07-27T12:35:34.326Z"
+  },
+  {
     "version": "0726.22.0",
     "updateKind": "major",
     "title": "Projects update",
