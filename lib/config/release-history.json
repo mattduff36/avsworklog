@@ -1,5 +1,37 @@
 [
   {
+    "version": "0726.21.0",
+    "updateKind": "major",
+    "title": "Quotes update",
+    "description": "Updated Quotes, Projects, Timesheets, Help and FAQ, Data storage, and Inventory.",
+    "summary": "Updated Quotes, Projects, Timesheets, Help and FAQ, Data storage, and Inventory.",
+    "details": [
+      "Updated Quotes, Projects, Timesheets, Help and FAQ, Data storage, and Inventory, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated projects, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Updated timesheets, with changes to background routes, automated tests, and documentation.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated inventory, with changes to shared logic."
+    ],
+    "areas": [
+      "Quotes",
+      "Projects",
+      "Timesheets",
+      "Help",
+      "FAQ",
+      "Data storage",
+      "Inventory"
+    ],
+    "areaKeys": [
+      "quotes",
+      "projects",
+      "timesheets",
+      "data-storage",
+      "inventory"
+    ],
+    "pushedAt": "2026-07-27T10:42:01.757Z"
+  },
+  {
     "version": "0726.20.2",
     "updateKind": "minor",
     "title": "Error reporting improvements",
