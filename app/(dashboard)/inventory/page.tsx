@@ -862,8 +862,6 @@ export default function InventoryPage() {
   if (inventoryLoadError && !inventoryContext) {
     return (
       <AppPageShell width="wide" className="inventory-mobile-ui">
-        <InventoryDevelopmentBanner />
-
         <AppPageHeader
           title="Inventory"
           titleMeta={<InventoryBetaBadge />}
@@ -881,10 +879,6 @@ export default function InventoryPage() {
   if (showEmployeeView) {
     return (
       <AppPageShell width="wide" className="inventory-mobile-ui">
-        <div className="hidden sm:block">
-          <InventoryDevelopmentBanner />
-        </div>
-
         <AppPageHeader
           title="Inventory"
           titleMeta={<InventoryBetaBadge />}
@@ -956,8 +950,6 @@ export default function InventoryPage() {
 
   return (
     <AppPageShell width="wide" className="inventory-mobile-ui">
-      <InventoryDevelopmentBanner />
-
       <AppPageHeader
         title="Inventory"
         titleMeta={<InventoryBetaBadge />}
@@ -1385,14 +1377,6 @@ function InventoryConfirmActionDialog({ action, onClose }: InventoryConfirmActio
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
-}
-
-function InventoryDevelopmentBanner() {
-  return (
-    <div className="rounded-lg border border-amber-400/20 bg-amber-400/10 px-3 py-2 text-center text-xs font-medium text-amber-100 sm:text-sm">
-      Inventory module is still in development.
-    </div>
   );
 }
 
