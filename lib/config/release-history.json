@@ -1,5 +1,31 @@
 [
   {
+    "version": "0726.22.0",
+    "updateKind": "major",
+    "title": "Projects update",
+    "description": "Updated Projects, Quotes, Timesheets, and Data storage.",
+    "summary": "Updated Projects, Quotes, Timesheets, and Data storage.",
+    "details": [
+      "Updated Projects, Quotes, Timesheets, and Data storage, with changes to background routes, automation scripts, automated tests, and data storage.",
+      "Updated quotes, with changes to background routes, automation scripts, automated tests, and data storage.",
+      "Updated timesheets, with changes to background routes and automated tests.",
+      "Updated data storage, with changes to automation scripts and data storage."
+    ],
+    "areas": [
+      "Projects",
+      "Quotes",
+      "Timesheets",
+      "Data storage"
+    ],
+    "areaKeys": [
+      "projects",
+      "quotes",
+      "timesheets",
+      "data-storage"
+    ],
+    "pushedAt": "2026-07-27T11:00:32.895Z"
+  },
+  {
     "version": "0726.21.0",
     "updateKind": "major",
     "title": "Quotes update",
