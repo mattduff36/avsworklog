@@ -2,6 +2,34 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.25.0
+
+**GIT COMMIT MESSAGE**
+`feat(quotes): update Quotes, Timesheets, and Inventory`
+
+**PUSHED AT**
+2026-07-27T16:08:09.237Z
+
+**WHAT CHANGED**
+Update Quotes, Timesheets, and Inventory. Add durable live quote merging. Put search and filters on one row in inventory table. Remove redundant current-location banner from employee view. Move location assignments below employee inventory view. Remove under-development banner from inventory page. Add management/employee view toggle for managers.
+
+**VERSION HISTORY DETAILS**
+- Updated Quotes, Timesheets, and Inventory, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage.
+- Put search and filters on one row in inventory table, with changes to app screens and automated tests.
+- Updated timesheets, with changes to background routes and automated tests.
+- Updated projects, with changes to app screens and automated tests.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(quotes): update Quotes, Timesheets, and Inventory`
+- `feat(quotes): add durable live quote merging`
+- `fix(inventory): put search and filters on one row in inventory table`
+- `fix(inventory): remove redundant current-location banner from employee view`
+- `fix(inventory): move location assignments below employee inventory view`
+- `feat(inventory): remove under-development banner from inventory page`
+- `feat(inventory): add management/employee view toggle for managers`
+
 ## 0726.24.0
 
 **GIT COMMIT MESSAGE**
