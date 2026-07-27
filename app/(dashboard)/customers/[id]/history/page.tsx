@@ -37,6 +37,7 @@ interface QuoteSummary {
   total: number;
   quote_date: string;
   po_number: string | null;
+  purchase_order_count?: number;
   commercial_status: 'open' | 'closed';
   invoice_summary?: {
     remainingBalance: number;
@@ -307,7 +308,10 @@ export default function CustomerHistoryPage({ params }: PageProps) {
                       <div>
                         <span className="text-sm text-slate-300 truncate max-w-[200px] block">{q.subject_line || 'Untitled'}</span>
                         <span className="text-xs text-muted-foreground">
-                          {q.version_label || 'Original'}{q.po_number ? ` • PO ${q.po_number}` : ''}
+                          {q.version_label || 'Original'}
+                          {q.po_number
+                            ? ` • PO ${q.po_number}${(q.purchase_order_count || 0) > 1 ? ` +${(q.purchase_order_count || 0) - 1}` : ''}`
+                            : ''}
                         </span>
                       </div>
                     </div>

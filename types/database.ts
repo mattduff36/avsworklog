@@ -5707,6 +5707,96 @@ export type Database = {
           },
         ]
       }
+      quote_purchase_orders: {
+        Row: {
+          id: string
+          quote_thread_id: string
+          quote_id: string
+          po_number: string
+          po_value: number | null
+          received_at: string
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          quote_thread_id: string
+          quote_id: string
+          po_number: string
+          po_value?: number | null
+          received_at?: string
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          quote_thread_id?: string
+          quote_id?: string
+          po_number?: string
+          po_value?: number | null
+          received_at?: string
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_purchase_orders_created_by_fkey'
+            columns: ['created_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_purchase_orders_quote_id_fkey'
+            columns: ['quote_id']
+            isOneToOne: false
+            referencedRelation: 'quotes'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      quote_purchase_order_lines: {
+        Row: {
+          id: string
+          quote_purchase_order_id: string
+          quote_line_item_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_purchase_order_id: string
+          quote_line_item_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_purchase_order_id?: string
+          quote_line_item_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'quote_purchase_order_lines_quote_line_item_id_fkey'
+            columns: ['quote_line_item_id']
+            isOneToOne: false
+            referencedRelation: 'quote_line_items'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_purchase_order_lines_quote_purchase_order_id_fkey'
+            columns: ['quote_purchase_order_id']
+            isOneToOne: false
+            referencedRelation: 'quote_purchase_orders'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       quote_project_costs: {
         Row: {
           id: string

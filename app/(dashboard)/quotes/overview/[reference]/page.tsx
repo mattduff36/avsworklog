@@ -380,7 +380,14 @@ export default function QuoteOverviewDetailPage() {
                     <div><dt className="text-slate-500">Contact</dt><dd className="text-slate-200">{quote.attention_name || quote.customer?.contact_name || '-'}</dd></div>
                     <div><dt className="text-slate-500">Manager</dt><dd className="text-slate-200">{quote.manager_name || '-'}</dd></div>
                     <div><dt className="text-slate-500">Quote Value</dt><dd className="text-slate-200">{formatCurrency(quote.total)}</dd></div>
-                    <div><dt className="text-slate-500">PO Number</dt><dd className="text-slate-200">{quote.po_number || '-'}</dd></div>
+                    <div>
+                      <dt className="text-slate-500">PO Number</dt>
+                      <dd className="text-slate-200">
+                        {quote.po_number
+                          ? `${quote.po_number}${(quote.purchase_order_count || 0) > 1 ? ` (+${(quote.purchase_order_count || 0) - 1} more)` : ''}`
+                          : '-'}
+                      </dd>
+                    </div>
                     <div><dt className="text-slate-500">Status</dt><dd><Badge variant="outline" className={cn('capitalize', getStatusBadgeClass(quote.status))}>{getStatusLabel(quote.status)}</Badge></dd></div>
                   </dl>
                 ) : (

@@ -163,17 +163,19 @@ If changes are needed, update the quote or create a new version, then continue t
     'quotes',
     'quote-po-received',
     'How do PO numbers and Accepted status work?',
-    'Recording purchase orders and acceptance.',
+    'Recording one or more purchase orders and acceptance.',
     `# How do PO numbers and Accepted status work?
 
 When a customer issues a purchase order or formal acceptance:
 
 1. Open the quote **Workflow** tab.
-2. Use **Request PO** if you are chasing a PO.
-3. Record the PO / acceptance details when received.
-4. The quote can move to **Accepted**.
+2. Use **Request PO** if you are chasing the first PO.
+3. Add one or more purchase orders with PO number and value.
+4. Tick the quote lines each PO covers when the PO is only for part of the quote.
+5. Use the coverage summary to see PO total vs quote total and how many lines are covered.
+6. The quote can move to **Accepted**.
 
-Filters such as **With PO** and **No PO** help managers review outstanding acceptances.`,
+Filters such as **With PO** and **No PO** help managers review outstanding acceptances. Quotes with multiple POs show the first PO number plus a count of additional POs.`,
     9
   ),
   article(

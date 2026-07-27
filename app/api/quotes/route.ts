@@ -144,6 +144,24 @@ export async function GET(request: NextRequest) {
 
     const quotes = data || [];
     const threadIds = quotes.map(quote => quote.quote_thread_id).filter(Boolean);
+    const purchaseOrderCountByThread = new Map<string, number>();
+    if (threadIds.length > 0) {
+      const { data: purchaseOrderRows, error: purchaseOrderError } = await supabase
+        .from('quote_purchase_orders')
+        .select('quote_thread_id')
+        .in('quote_thread_id', threadIds);
+
+      if (purchaseOrderError) {
+        throw purchaseOrderError;
+      }
+
+      for (const row of purchaseOrderRows || []) {
+        purchaseOrderCountByThread.set(
+          row.quote_thread_id,
+          (purchaseOrderCountByThread.get(row.quote_thread_id) || 0) + 1
+        );
+      }
+    }
     let previousVersionsByThreadId = new Map<string, typeof quotes>();
     let previousVersions: typeof quotes = [];
 
@@ -331,11 +349,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       quotes: quotes.map(quote => ({
         ...quote,
+        purchase_order_count: purchaseOrderCountByThread.get(quote.quote_thread_id)
+          || (quote.po_number ? 1 : 0),
         invoice_summary: summaries.get(quote.id) || getInvoiceSummary({ total: Number(quote.total || 0), invoices: [] }),
         financial_summary: financialSummaries.get(quote.quote_thread_id),
         sage_status: getQuoteSageStatus(quote),
         previous_versions: (previousVersionsByThreadId.get(quote.quote_thread_id) || []).map(version => ({
           ...version,
+          purchase_order_count: purchaseOrderCountByThread.get(version.quote_thread_id)
+            || (version.po_number ? 1 : 0),
           invoice_summary: summaries.get(version.id) || getInvoiceSummary({ total: Number(version.total || 0), invoices: [] }),
           financial_summary: financialSummaries.get(version.quote_thread_id),
           sage_status: getQuoteSageStatus(version),

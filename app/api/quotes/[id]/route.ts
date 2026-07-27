@@ -18,6 +18,11 @@ import {
   sendQuoteRamsRequestEmail,
   sendQuoteToCustomerEmail,
 } from '@/lib/server/quote-workflow';
+import {
+  formatPurchaseOrderNumbersForEmail,
+  remapPurchaseOrderLinesForRevision,
+  syncQuotePoRollup,
+} from '@/lib/server/quote-purchase-orders';
 import { buildQuoteDisplayName } from '@/lib/quotes/quote-display-name';
 import { renderConfiguredQuoteEmailTemplate } from '@/lib/server/quote-email-templates';
 import {
@@ -48,6 +53,29 @@ function normalizeOptionalInteger(value: unknown): number | null {
 
   const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
   return Number.isInteger(parsed) ? parsed : Number.NaN;
+}
+
+function serializeQuoteBundle(
+  bundle: Awaited<ReturnType<typeof fetchQuoteBundle>>,
+  canManageSage?: boolean
+) {
+  return {
+    ...bundle.quote,
+    ...(typeof canManageSage === 'boolean' ? { can_manage_sage: canManageSage } : {}),
+    line_items: bundle.lineItems,
+    attachments: bundle.attachments,
+    rams_documents: bundle.ramsDocuments,
+    invoices: bundle.invoices,
+    invoice_requests: bundle.invoiceRequests,
+    purchase_orders: bundle.purchaseOrders,
+    po_coverage: bundle.poCoverage,
+    purchase_order_count: bundle.purchaseOrders.length,
+    versions: bundle.versions,
+    timeline: bundle.timeline,
+    invoice_summary: bundle.invoiceSummary,
+    financial_summary: bundle.financialSummary,
+    financial_adjustments: bundle.financialAdjustments,
+  };
 }
 
 function isMeaningfulLineItem(item: { description?: string; unit?: string; quantity?: number; unit_rate?: number }) {
@@ -135,20 +163,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const canManageSage = await canManageQuoteSage();
 
     return NextResponse.json({
-      quote: {
-        ...bundle.quote,
-        can_manage_sage: canManageSage,
-        line_items: bundle.lineItems,
-        attachments: bundle.attachments,
-        rams_documents: bundle.ramsDocuments,
-        invoices: bundle.invoices,
-        invoice_requests: bundle.invoiceRequests,
-        versions: bundle.versions,
-        timeline: bundle.timeline,
-        invoice_summary: bundle.invoiceSummary,
-        financial_summary: bundle.financialSummary,
-        financial_adjustments: bundle.financialAdjustments,
-      },
+      quote: serializeQuoteBundle(bundle, canManageSage),
     });
   } catch (error) {
     console.error('Error fetching quote:', error);
@@ -202,9 +217,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const normalizedPoNumber = typeof quoteUpdates.po_number === 'string'
       ? quoteUpdates.po_number.trim() || null
       : quoteUpdates.po_number ?? null;
-    const normalizedPoValue = typeof quoteUpdates.po_value === 'number'
-      ? quoteUpdates.po_value
-      : quoteUpdates.po_value ?? null;
     const normalizedStartAlertDays = normalizeOptionalInteger(quoteUpdates.start_alert_days);
     const normalizedEstimatedDurationDays = normalizeOptionalInteger(quoteUpdates.estimated_duration_days);
     const pricingMode = quoteUpdates.pricing_mode === 'attachments_only' ? 'attachments_only' : 'itemized';
@@ -368,8 +380,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Send this quote to the customer before requesting a PO.' }, { status: 400 });
       }
 
-      if (current.quote.po_number) {
-        return NextResponse.json({ error: 'A PO number has already been saved for this quote.' }, { status: 400 });
+      if (current.purchaseOrders.length > 0 || current.quote.po_number) {
+        return NextResponse.json({ error: 'A purchase order has already been saved for this quote.' }, { status: 400 });
       }
 
       const selectedRecipientEmails = normalizeEmailList(quoteUpdates.po_request_recipient_emails);
@@ -413,33 +425,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         actorUserId: user.id,
       });
     } else if (action === 'save_po_details') {
-      const now = new Date().toISOString();
-      const hasPoDetails = normalizedPoNumber !== null || normalizedPoValue !== null;
-
-      const { error } = await supabase
-        .from('quotes')
-        .update({
-          po_number: normalizedPoNumber,
-          po_value: normalizedPoValue,
-          po_received_at: hasPoDetails ? (current.quote.po_received_at || now) : current.quote.po_received_at,
-          updated_by: user.id,
-        })
-        .eq('quote_thread_id', current.quote.quote_thread_id);
-
-      if (error) throw error;
-      await appendQuoteTimelineEvent(admin, {
-        quoteId: id,
-        quoteThreadId: current.quote.quote_thread_id,
-        quoteReference: current.quote.quote_reference,
-        eventType: 'po_details_saved',
-        title: 'PO details updated',
-        description: [
-          normalizedPoNumber ? `PO: ${normalizedPoNumber}` : null,
-          normalizedPoValue !== null ? `Value: £${Number(normalizedPoValue).toLocaleString('en-GB', { minimumFractionDigits: 2 })}` : null,
-        ].filter(Boolean).join(' • ') || 'PO details were updated.',
-        actorUserId: user.id,
-        createdAt: now,
-      });
+      return NextResponse.json(
+        { error: 'Use the purchase orders API to add or update PO details.' },
+        { status: 400 }
+      );
     } else if (action === 'toggle_sage') {
       if (!await canManageQuoteSage()) {
         return NextResponse.json({ error: 'Only Accounts or admin users can update Sage status.' }, { status: 403 });
@@ -493,7 +482,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         subjectLine: current.quote.subject_line || 'No subject provided',
         cc: await getQuoteEmailCcEmails(admin, 'quote_rams_request_copy', [user.id]),
         scope: current.quote.scope || null,
-        poNumber: String(normalizedPoNumber || current.quote.po_number || 'Not supplied'),
+        poNumber: formatPurchaseOrderNumbersForEmail(current.purchaseOrders) !== 'Not supplied'
+          ? formatPurchaseOrderNumbersForEmail(current.purchaseOrders)
+          : String(normalizedPoNumber || current.quote.po_number || 'Not supplied'),
         managerName: current.quote.manager_name || 'Unknown manager',
         internalNotes: current.quote.version_notes || null,
         completionComments: current.quote.completion_comments || null,
@@ -736,6 +727,35 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         if (lineError) throw lineError;
       }
 
+      if (!isDuplicate) {
+        const { data: nextLineItems, error: nextLineItemsError } = await admin
+          .from('quote_line_items')
+          .select('id, description, sort_order')
+          .eq('quote_id', newQuoteId)
+          .order('sort_order', { ascending: true });
+
+        if (nextLineItemsError) throw nextLineItemsError;
+
+        await remapPurchaseOrderLinesForRevision(admin, {
+          quoteThreadId: current.quote.quote_thread_id,
+          previousQuoteId: current.quote.id,
+          nextQuoteId: newQuoteId,
+          previousLineItems: current.lineItems.map(item => ({
+            id: item.id,
+            description: item.description,
+            sort_order: item.sort_order,
+          })),
+          nextLineItems: (nextLineItems || []).map(item => ({
+            id: item.id,
+            description: item.description,
+            sort_order: item.sort_order,
+          })),
+        });
+      } else {
+        // New thread starts with no POs; ensure rollup columns stay clear.
+        await syncQuotePoRollup(admin, newQuoteId, user.id);
+      }
+
       await copyQuoteCustomerContactRecipients(
         supabase,
         newQuoteId,
@@ -758,19 +778,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       const bundle = await fetchQuoteBundle(admin, newQuoteId);
       return NextResponse.json({
-        quote: {
-          ...bundle.quote,
-          can_manage_sage: await canManageQuoteSage(),
-          line_items: bundle.lineItems,
-          attachments: bundle.attachments,
-          invoices: bundle.invoices,
-          invoice_requests: bundle.invoiceRequests,
-          versions: bundle.versions,
-          timeline: bundle.timeline,
-          invoice_summary: bundle.invoiceSummary,
-          financial_summary: bundle.financialSummary,
-          financial_adjustments: bundle.financialAdjustments,
-        },
+        quote: serializeQuoteBundle(bundle, await canManageQuoteSage()),
       });
     } else if (action) {
       return NextResponse.json({ error: `Unsupported quote action: ${action}` }, { status: 400 });
@@ -1058,18 +1066,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const bundle = await fetchQuoteBundle(admin, id);
     const canManageSage = await canManageQuoteSage();
     return NextResponse.json({
-      quote: {
-        ...bundle.quote,
-        can_manage_sage: canManageSage,
-        line_items: bundle.lineItems,
-        attachments: bundle.attachments,
-        invoices: bundle.invoices,
-        versions: bundle.versions,
-        timeline: bundle.timeline,
-        invoice_summary: bundle.invoiceSummary,
-        financial_summary: bundle.financialSummary,
-        financial_adjustments: bundle.financialAdjustments,
-      },
+      quote: serializeQuoteBundle(bundle, canManageSage),
     });
   } catch (error) {
     console.error('Error updating quote:', error);
@@ -1123,6 +1120,17 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
     nextLatestVersionId = remainingVersions?.[0]?.id ?? null;
 
+    // Purchase orders FK quote_id with ON DELETE CASCADE; re-point before deleting a version.
+    if (nextLatestVersionId) {
+      const { error: repointError } = await admin
+        .from('quote_purchase_orders')
+        .update({ quote_id: nextLatestVersionId })
+        .eq('quote_thread_id', bundle.quote.quote_thread_id)
+        .eq('quote_id', id);
+
+      if (repointError) throw repointError;
+    }
+
     const { error } = await supabase.from('quotes').delete().eq('id', id);
     if (error) throw error;
 
@@ -1135,6 +1143,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
       if (promoteError) {
         throw promoteError;
       }
+
+      await syncQuotePoRollup(admin, bundle.quote.quote_thread_id, user.id);
     }
 
     return NextResponse.json({ success: true });

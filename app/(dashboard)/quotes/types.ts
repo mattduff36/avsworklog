@@ -53,6 +53,39 @@ export interface QuoteInvoiceAllocation {
   created_at: string;
 }
 
+export interface QuotePurchaseOrderLine {
+  id: string;
+  quote_purchase_order_id: string;
+  quote_line_item_id: string | null;
+  created_at: string;
+  description?: string | null;
+  line_total?: number | null;
+  sort_order?: number | null;
+}
+
+export interface QuotePurchaseOrder {
+  id: string;
+  quote_thread_id: string;
+  quote_id: string;
+  po_number: string;
+  po_value: number | null;
+  received_at: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+  lines?: QuotePurchaseOrderLine[];
+}
+
+export interface QuotePoCoverageSummary {
+  quoteTotal: number;
+  poTotal: number;
+  remaining: number;
+  coveredLineCount: number;
+  totalLineCount: number;
+  purchaseOrderCount: number;
+}
+
 export interface QuoteInvoice {
   id: string;
   quote_id: string;
@@ -421,6 +454,9 @@ export interface Quote {
   rams_documents?: QuoteRamsDocument[];
   invoices?: QuoteInvoice[];
   invoice_requests?: QuoteInvoiceRequest[];
+  purchase_orders?: QuotePurchaseOrder[];
+  po_coverage?: QuotePoCoverageSummary;
+  purchase_order_count?: number;
   financial_adjustments?: QuoteFinancialAdjustment[];
   versions?: Quote[];
   previous_versions?: Quote[];

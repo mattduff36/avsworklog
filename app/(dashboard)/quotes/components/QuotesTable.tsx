@@ -210,6 +210,9 @@ function InvoiceProgressCell({ quote }: { quote: Quote }) {
       {quote.po_number ? (
         <span className="mt-1 block truncate text-xs text-muted-foreground">
           PO# {quote.po_number}
+          {(quote.purchase_order_count || 0) > 1
+            ? ` +${(quote.purchase_order_count || 0) - 1}`
+            : ''}
         </span>
       ) : null}
     </div>

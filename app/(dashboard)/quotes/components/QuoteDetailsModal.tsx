@@ -71,7 +71,14 @@ import {
   uploadQuoteAttachment,
 } from '../quote-attachment-client';
 import { FormattedQuoteText } from './FormattedQuoteText';
-import type { Quote, QuoteAttachment, QuoteCompletionStatus, QuoteManagerOption, QuoteRevisionType } from '../types';
+import type {
+  Quote,
+  QuoteAttachment,
+  QuoteCompletionStatus,
+  QuoteManagerOption,
+  QuotePurchaseOrder,
+  QuoteRevisionType,
+} from '../types';
 import { getQuoteStatusConfig } from '../types';
 
 const PO_EDITABLE_STATUSES = new Set([
@@ -101,8 +108,11 @@ interface QuoteRecipientOption {
 }
 
 interface QuoteDetailsDirtySnapshot {
-  poNumber: string;
-  poValue: string;
+  newPoNumber: string;
+  newPoValue: string;
+  newPoNotes: string;
+  selectedPoLineItemIds: string[];
+  editingPoId: string;
   startDate: string;
   startAlertDays: string;
   completionStatus: QuoteCompletionStatus;
@@ -292,8 +302,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [activeTab, setActiveTab] = useState('overview');
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
-  const [poNumber, setPoNumber] = useState('');
-  const [poValue, setPoValue] = useState('');
+  const [newPoNumber, setNewPoNumber] = useState('');
+  const [newPoValue, setNewPoValue] = useState('');
+  const [newPoNotes, setNewPoNotes] = useState('');
+  const [selectedPoLineItemIds, setSelectedPoLineItemIds] = useState<string[]>([]);
+  const [editingPoId, setEditingPoId] = useState<string | null>(null);
   const [startDate, setStartDate] = useState('');
   const [startAlertDays, setStartAlertDays] = useState('');
   const [completionStatus, setCompletionStatus] = useState<QuoteCompletionStatus>('approved_in_full');
@@ -351,7 +364,16 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const canManageAttachments = isLatestVersion;
   const canCreateVersions = isLatestVersion;
   const canManageSage = Boolean(quote?.can_manage_sage);
-  const canRequestPo = Boolean(isLatestVersion && quote && !quote.po_number && recipientEmail && (quote.sent_at || quote.customer_sent_at || quote.status === 'sent'));
+  const purchaseOrders = quote?.purchase_orders || [];
+  const poCoverage = quote?.po_coverage;
+  const hasPurchaseOrders = purchaseOrders.length > 0 || Boolean(quote?.po_number);
+  const canRequestPo = Boolean(
+    isLatestVersion
+    && quote
+    && !hasPurchaseOrders
+    && recipientEmail
+    && (quote.sent_at || quote.customer_sent_at || quote.status === 'sent')
+  );
   const hasMultipleVersions = (quote?.versions?.length ?? 0) > 1;
   const availableToRequest = Number(
     quote?.financial_summary?.available_to_request ??
@@ -396,8 +418,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const managerRequestCtaLabel = pendingInvoiceRequests.length > 0 ? 'Request Another Invoice' : 'Mark Ready To Invoice';
   const managerRequestControlsDisabled = !canManageInvoices || availableToRequest <= 0 || Boolean(pendingFullInvoiceRequest);
   const currentDetailsSnapshot = buildDirtySnapshot({
-    poNumber,
-    poValue,
+    newPoNumber,
+    newPoValue,
+    newPoNotes,
+    selectedPoLineItemIds,
+    editingPoId: editingPoId || '',
     startDate,
     startAlertDays,
     completionStatus,
@@ -661,8 +686,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     const nextSelectedInvoiceRequestId = (nextQuote.invoice_requests || []).find(request => request.status === 'pending')?.id || '';
 
     setQuote(nextQuote);
-    setPoNumber(nextQuote.po_number || '');
-    setPoValue(nextQuote.po_value ? String(nextQuote.po_value) : '');
+    setNewPoNumber('');
+    setNewPoValue('');
+    setNewPoNotes('');
+    setSelectedPoLineItemIds([]);
+    setEditingPoId(null);
     setStartDate(nextQuote.start_date || '');
     setStartAlertDays(nextQuote.start_alert_days ? String(nextQuote.start_alert_days) : '');
     setCompletionStatus(nextQuote.completion_status === 'approved_in_part' ? 'approved_in_part' : 'approved_in_full');
@@ -694,8 +722,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setRemovingAttachmentId(null);
     setReplacingAttachmentId(null);
     setDetailsBaselineSnapshot(buildDirtySnapshot({
-      poNumber: nextQuote.po_number || '',
-      poValue: nextQuote.po_value ? String(nextQuote.po_value) : '',
+      newPoNumber: '',
+      newPoValue: '',
+      newPoNotes: '',
+      selectedPoLineItemIds: [],
+      editingPoId: '',
       startDate: nextQuote.start_date || '',
       startAlertDays: nextQuote.start_alert_days ? String(nextQuote.start_alert_days) : '',
       completionStatus: nextQuote.completion_status === 'approved_in_part' ? 'approved_in_part' : 'approved_in_full',
@@ -1061,6 +1092,134 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to retract this invoice request right now.';
       setInvoiceRequestError(message);
+      toast.error(message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  function resetPoForm() {
+    setNewPoNumber('');
+    setNewPoValue('');
+    setNewPoNotes('');
+    setSelectedPoLineItemIds([]);
+    setEditingPoId(null);
+    clearWorkflowError('po_number');
+    clearWorkflowError('po_value');
+  }
+
+  function beginEditPurchaseOrder(order: QuotePurchaseOrder) {
+    setEditingPoId(order.id);
+    setNewPoNumber(order.po_number || '');
+    setNewPoValue(order.po_value !== null && order.po_value !== undefined ? String(order.po_value) : '');
+    setNewPoNotes(order.notes || '');
+    setSelectedPoLineItemIds(
+      (order.lines || [])
+        .map(line => line.quote_line_item_id)
+        .filter((id): id is string => Boolean(id))
+    );
+    clearWorkflowError();
+  }
+
+  function togglePoLineItem(lineItemId: string) {
+    setSelectedPoLineItemIds(current => (
+      current.includes(lineItemId)
+        ? current.filter(id => id !== lineItemId)
+        : [...current, lineItemId]
+    ));
+  }
+
+  async function savePurchaseOrder() {
+    if (!activeQuoteId || !canEditPoDetails) return;
+
+    const fieldErrors: DetailFieldErrors = {};
+    if (!newPoNumber.trim()) {
+      fieldErrors.po_number = 'Enter a PO number.';
+    }
+    if (newPoValue.trim()) {
+      const parsed = Number(newPoValue);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        fieldErrors.po_value = 'Enter a valid PO value.';
+      }
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      setWorkflowFieldErrors(fieldErrors);
+      setWorkflowError('Please correct the highlighted fields and try again.');
+      toast.error('Please correct the highlighted fields and try again.');
+      return;
+    }
+
+    setActionLoading(true);
+    clearWorkflowError();
+    try {
+      const payload = {
+        po_number: newPoNumber.trim(),
+        po_value: newPoValue.trim() ? Number(newPoValue) : null,
+        notes: newPoNotes.trim() || null,
+        line_item_ids: selectedPoLineItemIds,
+      };
+      const res = await fetch(
+        editingPoId
+          ? `/api/quotes/${activeQuoteId}/purchase-orders/${editingPoId}`
+          : `/api/quotes/${activeQuoteId}/purchase-orders`,
+        {
+          method: editingPoId ? 'PATCH' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to save this purchase order right now.');
+      }
+
+      const data = await res.json();
+      if (data.quote) {
+        applyQuoteState(data.quote);
+      } else {
+        await fetchQuote();
+      }
+      toast.success(editingPoId ? 'Purchase order updated' : 'Purchase order added');
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to save this purchase order right now.';
+      const fieldErrors = error instanceof Error && 'fieldErrors' in error
+        ? ((error as Error & { fieldErrors?: DetailFieldErrors }).fieldErrors || {})
+        : {};
+      setWorkflowFieldErrors(fieldErrors);
+      setWorkflowError(message);
+      toast.error(message);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  async function deletePurchaseOrder(orderId: string) {
+    if (!activeQuoteId || !canEditPoDetails) return;
+
+    setActionLoading(true);
+    clearWorkflowError();
+    try {
+      const res = await fetch(`/api/quotes/${activeQuoteId}/purchase-orders/${orderId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        throw await buildResponseError(res, 'Unable to delete this purchase order right now.');
+      }
+
+      const data = await res.json();
+      if (data.quote) {
+        applyQuoteState(data.quote);
+      } else {
+        await fetchQuote();
+      }
+      toast.success('Purchase order removed');
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to delete this purchase order right now.';
+      setWorkflowError(message);
       toast.error(message);
     } finally {
       setActionLoading(false);
@@ -1455,35 +1614,207 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     </div>
                   ) : null}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>PO Number</Label>
-                      <Input
-                        value={poNumber}
-                        disabled={!canEditPoDetails}
-                        onChange={e => {
-                          clearWorkflowError('po_number');
-                          setPoNumber(e.target.value);
-                        }}
-                        className={getFieldClassName(workflowFieldErrors, 'po_number')}
-                      />
-                      {renderFieldError(workflowFieldErrors, 'po_number')}
+                  <div className="rounded-lg border border-slate-700 bg-slate-800/30 p-4 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <h4 className="text-sm font-medium text-white">Purchase orders</h4>
+                      <p className="text-xs text-muted-foreground">
+                        {(poCoverage?.purchaseOrderCount ?? purchaseOrders.length)} PO
+                        {(poCoverage?.purchaseOrderCount ?? purchaseOrders.length) === 1 ? '' : 's'}
+                      </p>
                     </div>
-                    <div className="space-y-2">
-                      <Label>PO Value</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={poValue}
-                        disabled={!canEditPoDetails}
-                        onChange={e => {
-                          clearWorkflowError('po_value');
-                          setPoValue(e.target.value);
-                        }}
-                        className={getFieldClassName(workflowFieldErrors, 'po_value')}
-                      />
-                      {renderFieldError(workflowFieldErrors, 'po_value')}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Quote total</p>
+                        <p className="font-medium text-white">
+                          £{Number(poCoverage?.quoteTotal ?? quote.total ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">PO total</p>
+                        <p className="font-medium text-white">
+                          £{Number(poCoverage?.poTotal ?? quote.po_value ?? 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Remaining</p>
+                        <p className="font-medium text-white">
+                          £{Number(poCoverage?.remaining ?? (Number(quote.total || 0) - Number(quote.po_value || 0))).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Lines covered</p>
+                        <p className="font-medium text-white">
+                          {poCoverage
+                            ? `${poCoverage.coveredLineCount} of ${poCoverage.totalLineCount}`
+                            : `${purchaseOrders.length ? '—' : '0'} of ${(quote.line_items || []).length}`}
+                        </p>
+                      </div>
                     </div>
+                  </div>
+
+                  {canEditPoDetails ? (
+                    <div className="rounded-lg border border-slate-700 bg-slate-800/20 p-4 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="text-sm font-medium text-white">
+                          {editingPoId ? 'Edit purchase order' : 'Add purchase order'}
+                        </h4>
+                        {editingPoId ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={resetPoForm}
+                            disabled={actionLoading}
+                            className="text-muted-foreground"
+                          >
+                            Cancel edit
+                          </Button>
+                        ) : null}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>PO Number</Label>
+                          <Input
+                            value={newPoNumber}
+                            disabled={actionLoading}
+                            onChange={e => {
+                              clearWorkflowError('po_number');
+                              setNewPoNumber(e.target.value);
+                            }}
+                            className={getFieldClassName(workflowFieldErrors, 'po_number')}
+                          />
+                          {renderFieldError(workflowFieldErrors, 'po_number')}
+                        </div>
+                        <div className="space-y-2">
+                          <Label>PO Value</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={newPoValue}
+                            disabled={actionLoading}
+                            onChange={e => {
+                              clearWorkflowError('po_value');
+                              setNewPoValue(e.target.value);
+                            }}
+                            className={getFieldClassName(workflowFieldErrors, 'po_value')}
+                          />
+                          {renderFieldError(workflowFieldErrors, 'po_value')}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Notes</Label>
+                        <Textarea
+                          value={newPoNotes}
+                          disabled={actionLoading}
+                          onChange={e => setNewPoNotes(e.target.value)}
+                          rows={2}
+                          className="bg-slate-800 border-slate-600"
+                        />
+                      </div>
+                      {(quote.line_items || []).length > 0 ? (
+                        <div className="space-y-2">
+                          <Label>Quote lines covered</Label>
+                          <div className="space-y-2 rounded-md border border-slate-700 bg-slate-900/40 p-3">
+                            {(quote.line_items || []).filter(line => Boolean(line.id)).map(line => {
+                              const lineId = line.id as string;
+                              return (
+                              <label key={lineId} className="flex items-start gap-2 text-sm text-slate-200">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedPoLineItemIds.includes(lineId)}
+                                  disabled={actionLoading}
+                                  onChange={() => togglePoLineItem(lineId)}
+                                  className="mt-1"
+                                />
+                                <span className="flex-1">
+                                  <span className="block">{line.description || 'Untitled line'}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    £{Number(line.line_total || 0).toLocaleString('en-GB', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </span>
+                              </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          No quote lines available to link. Attachments-only quotes can still record PO number and value.
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          onClick={savePurchaseOrder}
+                          disabled={actionLoading}
+                          className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+                        >
+                          <FolderKanban className="mr-2 h-4 w-4" />
+                          {editingPoId ? 'Update PO' : 'Add PO'}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="space-y-2">
+                    {purchaseOrders.length > 0 ? purchaseOrders.map(order => (
+                      <div key={order.id} className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="font-medium text-white">PO# {order.po_number}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Received {format(new Date(order.received_at), 'dd MMM yyyy')}
+                              {order.po_value !== null && order.po_value !== undefined
+                                ? ` • £${Number(order.po_value).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`
+                                : ''}
+                            </p>
+                            {(order.lines || []).length > 0 ? (
+                              <ul className="mt-2 space-y-1 text-sm text-slate-300">
+                                {(order.lines || []).map(line => (
+                                  <li key={line.id}>
+                                    {line.description || 'Quote line'}
+                                    {line.line_total !== null && line.line_total !== undefined
+                                      ? ` — £${Number(line.line_total).toLocaleString('en-GB', { minimumFractionDigits: 2 })}`
+                                      : ''}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="mt-2 text-xs text-muted-foreground">No quote lines linked.</p>
+                            )}
+                            {order.notes ? (
+                              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{order.notes}</p>
+                            ) : null}
+                          </div>
+                          {canEditPoDetails ? (
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={actionLoading}
+                                onClick={() => beginEditPurchaseOrder(order)}
+                                className="border-slate-600 text-muted-foreground"
+                              >
+                                <Pencil className="mr-1 h-3.5 w-3.5" /> Edit
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={actionLoading}
+                                onClick={() => deletePurchaseOrder(order.id)}
+                                className="border-red-500/40 text-red-200 hover:bg-red-500/10"
+                              >
+                                <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete
+                              </Button>
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                    )) : (
+                      <p className="text-sm text-muted-foreground">No purchase orders recorded yet.</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1556,19 +1887,6 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                         className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
                       >
                         <Send className="mr-2 h-4 w-4" /> Confirm And Send
-                      </Button>
-                    )}
-                    {canEditPoDetails && (
-                      <Button
-                        variant="outline"
-                        onClick={() => callAction('save_po_details', {
-                          po_number: poNumber.trim() || null,
-                          po_value: poValue ? Number(poValue) : null,
-                        })}
-                        disabled={actionLoading}
-                        className="border-slate-600 text-muted-foreground"
-                      >
-                        <FolderKanban className="mr-2 h-4 w-4" /> Save PO
                       </Button>
                     )}
                     {canRequestPo && (

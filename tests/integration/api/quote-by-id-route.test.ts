@@ -76,12 +76,57 @@ vi.mock('@/lib/server/quote-recipient-contacts', () => ({
   validateSecondaryContactIdsForCustomer: mockValidateSecondaryContactIdsForCustomer,
 }));
 
+vi.mock('@/lib/server/quote-purchase-orders', () => ({
+  formatPurchaseOrderNumbersForEmail: vi.fn((orders: Array<{ po_number: string }>) => (
+    orders.length > 0 ? orders.map(order => order.po_number).join(', ') : 'Not supplied'
+  )),
+  remapPurchaseOrderLinesForRevision: vi.fn().mockResolvedValue(undefined),
+  syncQuotePoRollup: vi.fn().mockResolvedValue({
+    po_number: null,
+    po_value: null,
+    po_received_at: null,
+  }),
+}));
+
 vi.mock('@/lib/server/quote-workflow', async () => {
   const actual = await vi.importActual<typeof import('@/lib/server/quote-workflow')>('@/lib/server/quote-workflow');
   return {
     ...actual,
     appendQuoteTimelineEvent: mockAppendQuoteTimelineEvent,
-    fetchQuoteBundle: mockFetchQuoteBundle,
+    fetchQuoteBundle: async (...args: unknown[]) => {
+      const result = await mockFetchQuoteBundle(...args);
+      const defaultCoverage = {
+        quoteTotal: Number(result?.quote?.total || 0),
+        poTotal: 0,
+        remaining: Number(result?.quote?.total || 0),
+        coveredLineCount: 0,
+        totalLineCount: 0,
+        purchaseOrderCount: 0,
+      };
+      return {
+        lineItems: [],
+        attachments: [],
+        ramsDocuments: [],
+        invoices: [],
+        invoiceRequests: [],
+        versions: [],
+        timeline: [],
+        selectedSecondaryContacts: [],
+        invoiceSummary: {
+          invoicedTotal: 0,
+          pendingRequestedTotal: 0,
+          remainingBalance: 0,
+          availableToRequest: 0,
+          lastInvoiceAt: null,
+          status: 'not_invoiced',
+        },
+        financialAdjustments: [],
+        financialSummary: null,
+        ...result,
+        purchaseOrders: result?.purchaseOrders ?? [],
+        poCoverage: result?.poCoverage ?? defaultCoverage,
+      };
+    },
     generateQuoteReferenceForManager: mockGenerateQuoteReferenceForManager,
     getInitialsFromName: mockGetInitialsFromName,
     getQuoteEmailCcEmails: mockGetQuoteEmailCcEmails,
@@ -133,6 +178,31 @@ describe('PATCH /api/quotes/[id]', () => {
                     limit: vi.fn(() => mockListRemainingVersions()),
                   })),
                 })),
+              })),
+            })),
+            update: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn().mockResolvedValue({ error: null }),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'quote_line_items') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                order: vi.fn().mockResolvedValue({ data: [], error: null }),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'quote_purchase_orders') {
+          return {
+            update: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn().mockResolvedValue({ error: null }),
               })),
             })),
           };
@@ -611,16 +681,16 @@ describe('PATCH /api/quotes/[id]', () => {
     });
 
     const response = await PATCH(request, { params: Promise.resolve({ id: 'quote-1' }) });
+    const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(mockQuoteUpdate).toHaveBeenCalledWith(
+    expect(response.status).toBe(400);
+    expect(payload.error).toContain('purchase orders API');
+    expect(mockQuoteUpdate).not.toHaveBeenCalledWith(
       expect.objectContaining({
         po_number: 'PO-123',
         po_value: 5000,
-        updated_by: 'user-1',
       })
     );
-    expect(mockQuoteUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ status: 'po_received' }));
     expect(mockSendQuoteRamsRequestEmail).not.toHaveBeenCalled();
   });
 
@@ -938,6 +1008,16 @@ describe('DELETE /api/quotes/[id]', () => {
                     limit: vi.fn(() => mockListRemainingVersions()),
                   })),
                 })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'quote_purchase_orders') {
+          return {
+            update: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn().mockResolvedValue({ error: null }),
               })),
             })),
           };

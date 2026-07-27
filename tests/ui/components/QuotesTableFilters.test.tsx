@@ -53,6 +53,7 @@ function buildQuote(overrides: Partial<Quote>): Quote {
     po_number: overrides.po_number ?? null,
     po_received_at: null,
     po_value: null,
+    purchase_order_count: overrides.purchase_order_count,
     started: false,
     start_date: null,
     start_alert_days: null,
@@ -231,6 +232,26 @@ describe('QuotesTable filters', () => {
     poLabels.forEach((poLabel) => {
       expect(poLabel).toHaveClass('text-muted-foreground');
     });
+  });
+
+  it('shows additional PO count when a quote has multiple purchase orders', () => {
+    const quotes = [
+      buildQuote({
+        id: 'multi-po',
+        quote_reference: '50001-LC',
+        po_number: 'PO-123456',
+        purchase_order_count: 3,
+      }),
+    ];
+    render(
+      <QuotesTable
+        quotes={quotes}
+        statusCounts={buildStatusCounts(quotes)}
+        onRowClick={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText('PO# PO-123456 +2').length).toBeGreaterThan(0);
   });
 
   it('keeps quote number and customer out of the Details column', () => {

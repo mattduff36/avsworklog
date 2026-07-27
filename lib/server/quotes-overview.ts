@@ -318,7 +318,10 @@ function toInvoiceRequest(row: QuoteInvoiceRequestRow): QuoteOverviewInvoiceRequ
   };
 }
 
-function toQuoteDetail(quote: QuoteSourceRow | null): QuoteOverviewQuoteDetail | null {
+function toQuoteDetail(
+  quote: QuoteSourceRow | null,
+  purchaseOrderCount = 0
+): QuoteOverviewQuoteDetail | null {
   if (!quote) return null;
   const customer = getSingleRelation(quote.customer);
 
@@ -338,6 +341,7 @@ function toQuoteDetail(quote: QuoteSourceRow | null): QuoteOverviewQuoteDetail |
     status: quote.status,
     commercial_status: quote.commercial_status,
     po_number: quote.po_number,
+    purchase_order_count: purchaseOrderCount || (quote.po_number ? 1 : 0),
     manager_name: quote.manager_name,
     customer: customer ? {
       id: customer.id,
@@ -978,7 +982,7 @@ export async function getQuoteOverviewDetail(
   );
   if (!record) return null;
 
-  const [lineItemsResult, invoiceRequestsResult] = await Promise.all([
+  const [lineItemsResult, invoiceRequestsResult, purchaseOrdersResult] = await Promise.all([
     record.quote?.id
       ? admin
         .from('quote_line_items')
@@ -993,17 +997,25 @@ export async function getQuoteOverviewDetail(
         .in('quote_id', record.quoteIds)
         .order('requested_at', { ascending: false })
       : Promise.resolve({ data: [], error: null }),
+    record.quote?.quote_thread_id
+      ? admin
+        .from('quote_purchase_orders')
+        .select('id')
+        .eq('quote_thread_id', record.quote.quote_thread_id)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (lineItemsResult.error) throw lineItemsResult.error;
   if (invoiceRequestsResult.error) throw invoiceRequestsResult.error;
+  if (purchaseOrdersResult.error) throw purchaseOrdersResult.error;
 
   const labourRows = getLabourRowsForReferences(sources.labourRowsByReference, record.sourceReferences);
   const invoices = getInvoicesForQuoteIds(sources.invoicesByQuoteId, record.quoteIds);
+  const purchaseOrderCount = (purchaseOrdersResult.data || []).length;
 
   return {
     item: record.item,
-    quote: toQuoteDetail(record.quote),
+    quote: toQuoteDetail(record.quote, purchaseOrderCount),
     project: toProjectDetail(record.project),
     line_items: ((lineItemsResult.data || []) as QuoteLineItemRow[]).map(toLineItem),
     invoices,

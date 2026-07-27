@@ -153,6 +153,7 @@ export interface QuoteOverviewQuoteDetail {
   status: string | null;
   commercial_status: string | null;
   po_number: string | null;
+  purchase_order_count?: number;
   manager_name: string | null;
   customer?: {
     id: string;

@@ -26,8 +26,14 @@ import {
 import { calculateQuoteFinancials } from '@/lib/utils/quote-financial-adjustments';
 import type {
   QuoteFinancialAdjustment,
+  QuotePoCoverageSummary,
+  QuotePurchaseOrder,
   QuoteThreadFinancialSummary,
 } from '@/app/(dashboard)/quotes/types';
+import {
+  buildQuotePoCoverageSummary,
+  listQuotePurchaseOrders,
+} from '@/lib/server/quote-purchase-orders';
 
 const { Client } = pg;
 const QUOTE_NOTIFICATION_MODULE_KEY: NotificationModuleKey = 'quotes';
@@ -139,6 +145,8 @@ export interface QuoteBundle {
   ramsDocuments: RamsDocumentRow[];
   invoices: Array<QuoteInvoiceRow & { allocations: QuoteInvoiceAllocationRow[] }>;
   invoiceRequests: QuoteInvoiceRequestRow[];
+  purchaseOrders: QuotePurchaseOrder[];
+  poCoverage: QuotePoCoverageSummary;
   versions: QuoteRow[];
   timeline: Array<QuoteTimelineEventRow & { actor?: { id: string; full_name: string | null } | null }>;
   selectedSecondaryContacts: CustomerContactRow[];
@@ -504,13 +512,21 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     invoiceRequests,
   });
 
+  const lineItems = (lineItemsResult.data || []) as QuoteLineItemRow[];
+  const purchaseOrders = await listQuotePurchaseOrders(supabase, typedQuote.quote_thread_id);
+  const poCoverage = buildQuotePoCoverageSummary({
+    quoteTotal: Number(typedQuote.total || 0),
+    lineItemIds: lineItems.map(item => item.id),
+    purchaseOrders,
+  });
+
   return {
     quote: {
       ...typedQuote,
       selected_secondary_contact_ids: selectedContacts.map(contact => contact.id),
       selected_secondary_contacts: selectedContacts,
     },
-    lineItems: (lineItemsResult.data || []) as QuoteLineItemRow[],
+    lineItems,
     attachments: (attachmentsResult.data || []) as QuoteAttachmentRow[],
     ramsDocuments: (ramsDocumentsResult.data || []) as RamsDocumentRow[],
     versions,
@@ -521,6 +537,8 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
       allocations: allocationsByInvoice.get(invoice.id) || [],
     })),
     invoiceRequests,
+    purchaseOrders,
+    poCoverage,
     invoiceSummary,
     financialAdjustments: financialCalculation.adjustments,
     financialSummary: financialCalculation.threadSummary,
