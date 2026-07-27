@@ -76,6 +76,15 @@ interface ConfirmActionState {
 
 type InventoryOverviewTab = 'small_tools' | 'minor_plant' | 'hardware' | 'retired';
 type InventoryLocationsTab = 'directory' | 'site_assignments';
+type InventoryRoleViewMode = 'management' | 'employee';
+
+const INVENTORY_ROLE_VIEW_STORAGE_KEY = 'inventory-role-view-mode';
+
+function getStoredInventoryRoleViewMode(): InventoryRoleViewMode {
+  if (typeof window === 'undefined') return 'management';
+  const stored = window.localStorage.getItem(INVENTORY_ROLE_VIEW_STORAGE_KEY);
+  return stored === 'employee' ? 'employee' : 'management';
+}
 
 function getInventoryOverviewHref(overviewTab: InventoryOverviewTab): string {
   const overviewByTab: Record<InventoryOverviewTab, string> = {
@@ -149,6 +158,12 @@ export default function InventoryPage() {
     locationFilters: [],
     search: '',
   });
+  const [roleViewMode, setRoleViewMode] = useState<InventoryRoleViewMode>(getStoredInventoryRoleViewMode);
+
+  const handleRoleViewModeChange = useCallback((nextViewMode: InventoryRoleViewMode) => {
+    setRoleViewMode(nextViewMode);
+    window.localStorage.setItem(INVENTORY_ROLE_VIEW_STORAGE_KEY, nextViewMode);
+  }, []);
 
   const fetchInventoryData = useCallback(async () => {
     try {
@@ -833,12 +848,16 @@ export default function InventoryPage() {
   }
 
   const isManagerOrAdmin = inventoryContext?.is_manager_or_admin === true;
+  const showEmployeeView = !isManagerOrAdmin || roleViewMode === 'employee';
   const employeeUserLocation = inventoryContext?.is_user_location_valid === false
     ? null
     : inventoryContext?.user_location || null;
   const employeeLocationName = employeeUserLocation?.location?.is_active === false
     ? null
     : employeeUserLocation?.location?.name || null;
+  const roleViewToggle = isManagerOrAdmin ? (
+    <InventoryRoleViewToggle value={roleViewMode} onValueChange={handleRoleViewModeChange} />
+  ) : null;
 
   if (inventoryLoadError && !inventoryContext) {
     return (
@@ -859,7 +878,7 @@ export default function InventoryPage() {
     );
   }
 
-  if (!isManagerOrAdmin) {
+  if (showEmployeeView) {
     return (
       <AppPageShell width="wide" className="inventory-mobile-ui">
         <div className="hidden sm:block">
@@ -871,10 +890,15 @@ export default function InventoryPage() {
           titleMeta={<InventoryBetaBadge />}
           description={employeeLocationName ? `Current location: ${employeeLocationName}` : 'Set your location, view assigned inventory, and claim or move items.'}
           icon={<PackageSearch className="h-5 w-5" />}
-          actions={employeeLocationName ? (
-            <Button variant="outline" onClick={() => setChangeLocationDialogOpen(true)} className="min-h-11 border-slate-600">
-              Change My Location
-            </Button>
+          actions={(roleViewToggle || employeeLocationName) ? (
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              {roleViewToggle}
+              {employeeLocationName ? (
+                <Button variant="outline" onClick={() => setChangeLocationDialogOpen(true)} className="min-h-11 border-slate-600">
+                  Change My Location
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         />
 
@@ -943,7 +967,8 @@ export default function InventoryPage() {
         }
         icon={<PackageSearch className="h-5 w-5" />}
         actions={(
-          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+            {roleViewToggle}
             <Button
               variant="outline"
               onClick={() => setChangeLocationDialogOpen(true)}
@@ -966,9 +991,10 @@ export default function InventoryPage() {
         <InventoryLoadErrorNotice message={inventoryLoadError} onRetry={fetchInventoryData} />
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:gap-4">
+      <div className="grid grid-cols-5 gap-1 sm:gap-2 lg:gap-4">
         <SummaryCard
           label="Active Items"
+          shortLabel="Active"
           value={summary.total}
           icon={<PackageSearch className="h-5 w-5" />}
           onClick={() => applyInventorySummaryFilter({})}
@@ -982,6 +1008,7 @@ export default function InventoryPage() {
         />
         <SummaryCard
           label="Due Soon"
+          shortLabel="Soon"
           value={summary.dueSoon}
           icon={<AlertTriangle className="h-5 w-5" />}
           tone="warning"
@@ -989,6 +1016,7 @@ export default function InventoryPage() {
         />
         <SummaryCard
           label="Needs Check"
+          shortLabel="Check"
           value={summary.needsCheck}
           icon={<CheckCircle2 className="h-5 w-5" />}
           tone="info"
@@ -1433,31 +1461,82 @@ function InventoryLoadErrorNotice({ message, onRetry }: InventoryLoadErrorNotice
   );
 }
 
+interface InventoryRoleViewToggleProps {
+  value: InventoryRoleViewMode;
+  onValueChange: (value: InventoryRoleViewMode) => void;
+}
+
+function InventoryRoleViewToggle({ value, onValueChange }: InventoryRoleViewToggleProps) {
+  return (
+    <div
+      className="flex w-full items-center rounded-lg border border-slate-700 bg-slate-800/80 p-0.5 sm:w-auto"
+      role="group"
+      aria-label="Inventory view mode"
+    >
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onValueChange('management')}
+        className={`h-9 min-h-9 flex-1 gap-1.5 px-2.5 sm:flex-none sm:px-3 ${
+          value === 'management'
+            ? 'bg-white text-slate-900 hover:bg-white hover:text-slate-900'
+            : 'text-muted-foreground hover:bg-transparent hover:text-white'
+        }`}
+        aria-pressed={value === 'management'}
+      >
+        <Settings className="h-3.5 w-3.5" />
+        <span className="text-xs font-medium sm:text-sm">Management</span>
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => onValueChange('employee')}
+        className={`h-9 min-h-9 flex-1 gap-1.5 px-2.5 sm:flex-none sm:px-3 ${
+          value === 'employee'
+            ? 'bg-white text-slate-900 hover:bg-white hover:text-slate-900'
+            : 'text-muted-foreground hover:bg-transparent hover:text-white'
+        }`}
+        aria-pressed={value === 'employee'}
+      >
+        <Users className="h-3.5 w-3.5" />
+        <span className="text-xs font-medium sm:text-sm">My Location</span>
+      </Button>
+    </div>
+  );
+}
+
 interface SummaryCardProps {
   label: string;
+  shortLabel?: string;
   value: number;
   icon: ReactNode;
   tone?: 'default' | 'danger' | 'warning' | 'info';
   onClick?: () => void;
 }
 
-function SummaryCard({ label, value, icon, tone = 'default', onClick }: SummaryCardProps) {
+function SummaryCard({ label, shortLabel, value, icon, tone = 'default', onClick }: SummaryCardProps) {
   const toneClassName = {
     default: 'text-inventory bg-inventory-soft',
     danger: 'text-red-300 bg-red-500/10',
     warning: 'text-amber-300 bg-amber-500/10',
     info: 'text-blue-300 bg-blue-500/10',
   }[tone];
+  const mobileLabel = shortLabel || label;
 
   const card = (
     <Card className={`h-full border-slate-700 bg-slate-900/70 transition-colors ${onClick ? 'hover:border-slate-500 hover:bg-slate-800/70' : ''}`}>
-      <CardContent className="flex min-h-[88px] flex-row items-center gap-2 p-3 sm:min-h-[104px] sm:flex-col sm:items-start sm:justify-center sm:p-2 min-[900px]:min-h-0 min-[900px]:flex-row min-[900px]:items-center min-[900px]:gap-3 min-[900px]:p-4">
-        <div className={`rounded-lg p-1.5 min-[900px]:p-2 [&_svg]:h-4 [&_svg]:w-4 min-[900px]:[&_svg]:h-5 min-[900px]:[&_svg]:w-5 ${toneClassName}`}>
+      <CardContent className="flex min-h-0 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-center sm:min-h-[104px] sm:items-start sm:justify-center sm:gap-0 sm:p-2 sm:text-left min-[900px]:min-h-0 min-[900px]:flex-row min-[900px]:items-center min-[900px]:gap-3 min-[900px]:p-4">
+        <div className={`hidden rounded-lg p-1.5 sm:block min-[900px]:p-2 [&_svg]:h-4 [&_svg]:w-4 min-[900px]:[&_svg]:h-5 min-[900px]:[&_svg]:w-5 ${toneClassName}`}>
           {icon}
         </div>
-        <div>
-          <div className="text-xl font-bold text-white min-[900px]:text-2xl">{value}</div>
-          <div className="text-[10px] font-medium uppercase leading-tight tracking-wide text-muted-foreground min-[900px]:text-xs">{label}</div>
+        <div className="min-w-0">
+          <div className="text-sm font-bold leading-none text-white sm:text-xl min-[900px]:text-2xl">{value}</div>
+          <div className="mt-0.5 text-[8px] font-medium uppercase leading-tight tracking-wide text-muted-foreground sm:mt-0 sm:text-[10px] min-[900px]:text-xs">
+            <span className="sm:hidden">{mobileLabel}</span>
+            <span className="hidden sm:inline">{label}</span>
+          </div>
         </div>
       </CardContent>
     </Card>
