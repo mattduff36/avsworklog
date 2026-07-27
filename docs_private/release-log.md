@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.24.0
+
+**GIT COMMIT MESSAGE**
+`feat(quotes): update Quotes and Data storage`
+
+**PUSHED AT**
+2026-07-27T13:36:31.405Z
+
+**WHAT CHANGED**
+Update Quotes and Data storage. Support multiple POs with quote-line coverage.
+
+**VERSION HISTORY DETAILS**
+- Updated Quotes and Data storage, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage.
+- Updated help and FAQ, with changes to automation scripts.
+- Updated customers, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(quotes): update Quotes and Data storage`
+- `feat(quotes): support multiple POs with quote-line coverage`
+
 ## 0726.23.0
 
 **GIT COMMIT MESSAGE**

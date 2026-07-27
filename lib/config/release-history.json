@@ -1,5 +1,26 @@
 [
   {
+    "version": "0726.24.0",
+    "updateKind": "major",
+    "title": "Quotes update",
+    "description": "Updated Quotes and Data storage. Support multiple POs with quote-line coverage.",
+    "summary": "Updated Quotes and Data storage. Support multiple POs with quote-line coverage.",
+    "details": [
+      "Updated Quotes and Data storage, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.",
+      "Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage.",
+      "Updated help and FAQ, with changes to automation scripts.",
+      "Updated customers, with changes to app screens."
+    ],
+    "areas": [
+      "Quotes",
+      "Data storage. Support multiple POs with quote-line coverage"
+    ],
+    "areaKeys": [
+      "quotes"
+    ],
+    "pushedAt": "2026-07-27T13:36:31.405Z"
+  },
+  {
     "version": "0726.23.0",
     "updateKind": "major",
     "title": "Inventory update",
