@@ -900,17 +900,6 @@ export default function InventoryPage() {
           <InventoryLoadErrorNotice message={inventoryLoadError} onRetry={fetchInventoryData} />
         ) : null}
 
-        {inventoryContext?.can_manage_site_locations ? (
-          <InventorySiteAssignmentsPanel
-            users={siteAssignmentUsers}
-            assignableLocations={assignableLocations}
-            assignments={siteAssignments}
-            onAssign={handleAssignLocation}
-            onRemove={handleRemoveLocationAssignment}
-            onIncludeLegacyQuotesChange={handleSiteAssignmentLegacyQuoteOptIn}
-          />
-        ) : null}
-
         <InventoryEmployeeView
           items={items}
           locations={primaryLocationOptions}
@@ -927,6 +916,17 @@ export default function InventoryPage() {
           onChangeLocation={() => setChangeLocationDialogOpen(true)}
           onTransferHardware={handleHardwareTransfer}
         />
+
+        {inventoryContext?.can_manage_site_locations ? (
+          <InventorySiteAssignmentsPanel
+            users={siteAssignmentUsers}
+            assignableLocations={assignableLocations}
+            assignments={siteAssignments}
+            onAssign={handleAssignLocation}
+            onRemove={handleRemoveLocationAssignment}
+            onIncludeLegacyQuotesChange={handleSiteAssignmentLegacyQuoteOptIn}
+          />
+        ) : null}
 
         <MoveInventoryDialog
           open={movingItems.length > 0}
