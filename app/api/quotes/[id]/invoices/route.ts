@@ -11,6 +11,7 @@ import { buildInvoiceAddedTimelineDescription } from '@/lib/quotes/quote-timelin
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { buildQuoteDisplayName } from '@/lib/quotes/quote-display-name';
 import { renderConfiguredQuoteEmailTemplate } from '@/lib/server/quote-email-templates';
+import { allocateMergeBillingAmount } from '@/lib/server/quote-merge-resolution';
 
 type InvoiceFieldErrors = Record<string, string>;
 
@@ -73,6 +74,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       invoice_scope?: 'full' | 'partial';
       confirm_matches_request?: boolean;
       comments?: string;
+      merge_billing_scope?: 'single' | 'combined' | 'source';
+      merge_source_thread_ids?: string[];
       allocations?: Array<{
         quote_line_item_id?: string | null;
         quantity_invoiced?: number | null;
@@ -89,6 +92,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       : new Date().toISOString().slice(0, 10);
     const normalizedAmount = typeof body.amount === 'number' ? body.amount : Number(body.amount);
     const normalizedInvoiceScope = body.invoice_scope === 'full' ? 'full' : 'partial';
+    const normalizedMergeBillingScope = body.merge_billing_scope === 'source'
+      ? 'source'
+      : body.merge_billing_scope === 'combined'
+        ? 'combined'
+        : 'single';
+    const normalizedMergeSourceThreadIds = Array.isArray(body.merge_source_thread_ids)
+      ? Array.from(new Set(body.merge_source_thread_ids.filter((value): value is string => typeof value === 'string' && Boolean(value))))
+      : [];
 
     if (!normalizedInvoiceNumber) {
       fieldErrors.invoice_number = 'Enter an invoice number.';
@@ -113,8 +124,30 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const bundleBeforeInsert = await fetchQuoteBundle(admin, id);
+    if (
+      bundleBeforeInsert.mergeInfo
+      && bundleBeforeInsert.mergeInfo.survivor_quote_thread_id !== bundleBeforeInsert.quote.quote_thread_id
+    ) {
+      return NextResponse.json(
+        { error: `This quote was merged into ${bundleBeforeInsert.mergeInfo.canonical_reference || 'the retained quote'}. Open the retained quote to add invoices.` },
+        { status: 400 },
+      );
+    }
     if (!bundleBeforeInsert.quote.is_latest_version) {
       return NextResponse.json({ error: 'Only the latest quote version can be invoiced.' }, { status: 400 });
+    }
+    const validMergeThreadIds = new Set(bundleBeforeInsert.mergeInfo?.members.map(member => member.quote_thread_id) || []);
+    if (!bundleBeforeInsert.mergeInfo && normalizedMergeBillingScope !== 'single') {
+      return NextResponse.json({ error: 'Combined/source invoicing is only available for merged quotes.' }, { status: 400 });
+    }
+    if (
+      normalizedMergeBillingScope === 'source'
+      && (
+        normalizedMergeSourceThreadIds.length === 0
+        || normalizedMergeSourceThreadIds.some(threadId => !validMergeThreadIds.has(threadId))
+      )
+    ) {
+      return NextResponse.json({ error: 'Choose at least one valid merged quote source to invoice.' }, { status: 400 });
     }
 
     const quoteInvoiceRequests = bundleBeforeInsert.invoiceRequests || [];
@@ -179,15 +212,38 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           { status: 400 }
         );
       }
+      if (
+        normalizedMergeBillingScope !== linkedRequest.merge_billing_scope
+        || normalizedMergeSourceThreadIds.slice().sort().join(',')
+          !== (linkedRequest.merge_source_thread_ids || []).slice().sort().join(',')
+      ) {
+        return NextResponse.json(
+          { error: 'Merged quote billing sources must match the manager request.' },
+          { status: 400 },
+        );
+      }
     }
 
-    const remainingBalance = Number(
+    const selectedSourceBalance = normalizedMergeBillingScope === 'source'
+      ? normalizedMergeSourceThreadIds.reduce((total, threadId) => {
+          const summary = bundleBeforeInsert.mergeSourceFinancialSummaries[threadId];
+          return total + Number(
+            linkedRequest
+              ? summary?.remaining_to_invoice || 0
+              : summary?.available_to_request || 0,
+          );
+        }, 0)
+      : null;
+    const groupRemainingBalance = Number(
       linkedRequest
-        ? bundleBeforeInsert.financialSummary?.remaining_to_invoice ??
-          bundleBeforeInsert.invoiceSummary.remainingBalance
-        : bundleBeforeInsert.financialSummary?.available_to_request ??
-          bundleBeforeInsert.invoiceSummary.remainingBalance,
+        ? bundleBeforeInsert.financialSummary?.remaining_to_invoice
+          ?? bundleBeforeInsert.invoiceSummary.remainingBalance
+        : bundleBeforeInsert.financialSummary?.available_to_request
+          ?? bundleBeforeInsert.invoiceSummary.remainingBalance,
     );
+    const remainingBalance = selectedSourceBalance === null
+      ? groupRemainingBalance
+      : Math.min(selectedSourceBalance, groupRemainingBalance);
 
     if (normalizedAmount - remainingBalance > 0.005) {
       return NextResponse.json(
@@ -201,6 +257,85 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    let lineDerivedSourceAmounts: Map<string, number> | null = null;
+    if (
+      normalizedMergeBillingScope === 'source'
+      && !body.allocations?.length
+      && normalizedMergeSourceThreadIds.length > 1
+    ) {
+      return NextResponse.json(
+        { error: 'Choose one source quote or provide line allocations for each selected source.' },
+        { status: 400 },
+      );
+    }
+    if (normalizedMergeBillingScope === 'source' && body.allocations?.length) {
+      const allocationLineIds = body.allocations
+        .map(allocation => allocation.quote_line_item_id)
+        .filter((lineId): lineId is string => Boolean(lineId));
+      if (allocationLineIds.length !== body.allocations.length) {
+        return NextResponse.json(
+          { error: 'Source-scoped invoice allocations must identify a quote line.' },
+          { status: 400 },
+        );
+      }
+      const [{ data: provenanceRows, error: provenanceError }, { data: allocationLines, error: allocationLineError }] = await Promise.all([
+        admin
+          .from('quote_line_item_merge_sources')
+          .select('consolidated_line_item_id, source_quote_thread_id')
+          .in('consolidated_line_item_id', allocationLineIds),
+        admin
+          .from('quote_line_items')
+          .select('id, quote:quotes!inner(quote_thread_id)')
+          .in('id', allocationLineIds),
+      ]);
+      if (provenanceError) throw provenanceError;
+      if (allocationLineError) throw allocationLineError;
+      const sourceThreadByLineId = new Map(
+        (provenanceRows || []).map(row => [
+          row.consolidated_line_item_id,
+          row.source_quote_thread_id,
+        ]),
+      );
+      for (const line of allocationLines || []) {
+        const quoteRelation = Array.isArray(line.quote) ? line.quote[0] : line.quote;
+        if (!sourceThreadByLineId.has(line.id) && quoteRelation?.quote_thread_id) {
+          sourceThreadByLineId.set(line.id, quoteRelation.quote_thread_id);
+        }
+      }
+      const selectedThreadIds = new Set(normalizedMergeSourceThreadIds);
+      if (
+        allocationLineIds.some(lineId => (
+          !sourceThreadByLineId.has(lineId)
+          || !selectedThreadIds.has(sourceThreadByLineId.get(lineId)!)
+        ))
+      ) {
+        return NextResponse.json(
+          { error: 'Invoice allocations must belong to the selected merged quote sources.' },
+          { status: 400 },
+        );
+      }
+      const allocationTotal = body.allocations.reduce(
+        (total, allocation) => total + Number(allocation.amount_invoiced || 0),
+        0,
+      );
+      if (Math.abs(allocationTotal - normalizedAmount) > 0.005) {
+        return NextResponse.json(
+          { error: 'Source-scoped allocations must add up to the invoice amount.' },
+          { status: 400 },
+        );
+      }
+      lineDerivedSourceAmounts = new Map<string, number>();
+      for (const allocation of body.allocations) {
+        const lineId = allocation.quote_line_item_id!;
+        const sourceThreadId = sourceThreadByLineId.get(lineId)!;
+        lineDerivedSourceAmounts.set(
+          sourceThreadId,
+          (lineDerivedSourceAmounts.get(sourceThreadId) || 0)
+            + Number(allocation.amount_invoiced || 0),
+        );
+      }
+    }
+
     const { data: invoice, error: invoiceError } = await supabase
       .from('quote_invoices')
       .insert({
@@ -212,11 +347,81 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         invoice_scope: normalizedInvoiceScope,
         comments: normalizedComments,
         created_by: user.id,
+        merge_billing_scope: bundleBeforeInsert.mergeInfo ? normalizedMergeBillingScope : 'single',
+        merge_source_thread_ids: normalizedMergeBillingScope === 'source'
+          ? normalizedMergeSourceThreadIds
+          : [],
       })
       .select()
       .single();
 
     if (invoiceError || !invoice) throw invoiceError;
+
+    if (bundleBeforeInsert.mergeInfo) {
+      let sourceAllocations: Array<{ source_quote_thread_id: string; amount: number }>;
+      if (linkedRequest) {
+        const { data: requestSourceAllocations, error: requestSourceAllocationError } = await admin
+          .from('quote_billing_source_allocations')
+          .select('source_quote_thread_id, amount')
+          .eq('quote_invoice_request_id', linkedRequest.id);
+        if (requestSourceAllocationError) {
+          await admin.from('quote_invoices').delete().eq('id', invoice.id);
+          throw requestSourceAllocationError;
+        }
+        sourceAllocations = (requestSourceAllocations || []).map(allocation => ({
+          source_quote_thread_id: allocation.source_quote_thread_id,
+          amount: Number(allocation.amount),
+        }));
+      } else {
+        const sourceThreadIds = normalizedMergeBillingScope === 'source'
+          ? normalizedMergeSourceThreadIds
+          : bundleBeforeInsert.mergeInfo.members.map(member => member.quote_thread_id);
+        const capacities = Object.fromEntries(sourceThreadIds.map(threadId => [
+          threadId,
+          Number(bundleBeforeInsert.mergeSourceFinancialSummaries[threadId]?.available_to_request || 0),
+        ]));
+        sourceAllocations = lineDerivedSourceAmounts
+          ? Array.from(lineDerivedSourceAmounts, ([source_quote_thread_id, amount]) => ({
+              source_quote_thread_id,
+              amount: Math.round(amount * 100) / 100,
+            }))
+          : allocateMergeBillingAmount(
+              normalizedAmount,
+              sourceThreadIds,
+              capacities,
+            );
+      }
+      if (sourceAllocations.length === 0) {
+        await admin.from('quote_invoices').delete().eq('id', invoice.id);
+        return NextResponse.json(
+          { error: 'Merged quote source allocation is missing.' },
+          { status: 400 },
+        );
+      }
+      const sourceLimits = Object.fromEntries(
+        bundleBeforeInsert.mergeInfo.members.map(member => [
+          member.quote_thread_id,
+          Number(
+            bundleBeforeInsert.mergeSourceFinancialSummaries[member.quote_thread_id]
+              ?.adjusted_quote_value || 0,
+          ),
+        ]),
+      );
+      const { error: sourceAllocationError } = await admin.rpc(
+        'reserve_quote_billing_sources',
+        {
+          p_parent_type: 'invoice',
+          p_parent_id: invoice.id,
+          p_allocations: sourceAllocations,
+          p_source_capacities: sourceLimits,
+          p_exclude_request_id: linkedRequest?.id || null,
+        },
+      );
+      if (sourceAllocationError) {
+        await admin.from('quote_invoices').delete().eq('id', invoice.id);
+        throw sourceAllocationError;
+      }
+    }
 
     if (body.allocations?.length) {
       const { error: allocationError } = await supabase
@@ -231,7 +436,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
           }))
         );
 
-      if (allocationError) throw allocationError;
+      if (allocationError) {
+        await admin.from('quote_invoices').delete().eq('id', invoice.id);
+        throw allocationError;
+      }
     }
 
     if (linkedRequest) {

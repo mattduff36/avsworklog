@@ -331,6 +331,7 @@ export default function QuotesPage() {
 
   const customerId = searchParams.get('customer_id');
   const quoteIdFromQuery = searchParams.get('quote_id');
+  const quoteReferenceFromQuery = searchParams.get('quote_reference');
   const pageTab = getQuotePageTab(searchParams.get('tab'));
   const settingsParam = searchParams.get('settings') || 'notifications';
   const settingsTab: QuoteSettingsSubTab = isQuoteSettingsSubTab(settingsParam) ? settingsParam : 'notifications';
@@ -553,6 +554,17 @@ export default function QuotesPage() {
   useEffect(() => {
     setDetailQuoteId(quoteIdFromQuery);
   }, [quoteIdFromQuery]);
+
+  useEffect(() => {
+    if (quoteIdFromQuery || !quoteReferenceFromQuery) return;
+    const normalizedReference = quoteReferenceFromQuery.trim().toUpperCase();
+    const matchedQuote = quotes.find(quote => (
+      quote.quote_reference.toUpperCase() === normalizedReference
+      || quote.base_quote_reference.toUpperCase() === normalizedReference
+      || quote.merge_info?.aliases.some(alias => alias.toUpperCase() === normalizedReference)
+    ));
+    if (matchedQuote) setDetailQuoteId(matchedQuote.id);
+  }, [quoteIdFromQuery, quoteReferenceFromQuery, quotes]);
 
   async function handleCreate(data: QuoteFormData) {
     const res = await fetch('/api/quotes', {
@@ -832,6 +844,11 @@ export default function QuotesPage() {
             onRowClick={handleRowClick}
             managerFilter={currentManagerFilter}
             emptyMessage="No current quotes yet. Create your first quote to get started."
+            canMerge={canEditLegacyQuotes}
+            onMerged={async (nextQuoteId) => {
+              await fetchData();
+              handleOpenQuoteDetails(nextQuoteId);
+            }}
           />
         </TabsContent>
 

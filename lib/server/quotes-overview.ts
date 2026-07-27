@@ -21,6 +21,10 @@ import type {
   QuoteInvoiceRequest,
 } from '@/app/(dashboard)/quotes/types';
 import { calculateQuoteFinancials } from '@/lib/utils/quote-financial-adjustments';
+import {
+  getMergeContextByThread,
+  loadQuoteMergeContexts,
+} from '@/lib/server/quote-merge-resolution';
 
 type SupabaseAdminClient = ReturnType<typeof createAdminClient>;
 type QuoteRow = Database['public']['Tables']['quotes']['Row'];
@@ -47,6 +51,11 @@ interface ProfileRelation {
 
 export interface QuoteSourceRow extends QuoteRow {
   customer?: CustomerRelation | CustomerRelation[] | null;
+  merge_aliases?: string[];
+  merge_source_quote_ids?: string[];
+  merge_source_thread_ids?: string[];
+  is_merged_source?: boolean;
+  merge_total?: number;
 }
 
 interface QuoteReferenceRelation {
@@ -719,6 +728,7 @@ export function buildOverviewRecords(params: {
   const orderedReferences: string[] = [];
 
   params.quotes.forEach((quote) => {
+    if (quote.is_merged_source) return;
     getQuoteReferences(quote).forEach((reference) => {
       if (!quoteByReference.has(reference)) {
         quoteByReference.set(reference, quote);
@@ -749,11 +759,15 @@ export function buildOverviewRecords(params: {
     const sourceReferences = uniqueValues([
       reference,
       ...(quote ? getQuoteReferences(quote) : []),
+      ...(quote?.merge_aliases || []),
       ...projects.map(sourceProject => sourceProject.project_reference),
     ]);
     const quoteIds = buildOverviewQuoteIds(
       quote?.id,
-      projects.flatMap(sourceProject => getProjectQuoteIds(sourceProject)),
+      [
+        ...(quote?.merge_source_quote_ids || []),
+        ...projects.flatMap(sourceProject => getProjectQuoteIds(sourceProject)),
+      ],
     );
     const invoices = getInvoicesForQuoteIds(params.invoicesByQuoteId, quoteIds);
     const labourRows = getLabourRowsForReferences(params.labourRowsByReference, sourceReferences);
@@ -781,7 +795,7 @@ export function buildOverviewRecords(params: {
       commercial_status: quote?.commercial_status || null,
       quote_id: quote?.id || project?.converted_quote_id || project?.linked_quote_id || null,
       project_number_id: project?.id || null,
-      quote_total: Number(quote?.total || 0),
+      quote_total: Number(quote?.merge_total ?? quote?.total ?? 0),
       manual_cost_total: calculateManualCostTotal(projects),
       invoice_total: Math.round(invoiceTotal * 100) / 100,
       invoice_count: invoices.length,
@@ -808,6 +822,7 @@ export function buildOverviewRecords(params: {
         reference,
         quote?.quote_reference,
         quote?.base_quote_reference,
+        ...(quote?.merge_aliases || []),
         quote?.attention_name,
         quote?.subject_line,
         quote?.project_description,
@@ -837,17 +852,38 @@ export function buildOverviewRecords(params: {
 }
 
 async function loadOverviewSources(admin: SupabaseAdminClient): Promise<OverviewSources> {
-  const [quotes, projects] = await Promise.all([
+  const [loadedQuotes, projects] = await Promise.all([
     loadQuotes(admin),
     loadProjects(admin),
   ]);
+  const mergeContexts = await loadQuoteMergeContexts(
+    admin,
+    loadedQuotes.map(quote => quote.quote_thread_id),
+  );
+  const mergeContextByThread = getMergeContextByThread(mergeContexts);
+  const quotes = loadedQuotes.map(quote => {
+    const context = mergeContextByThread.get(quote.quote_thread_id);
+    if (!context) return quote;
+    return {
+      ...quote,
+      is_merged_source: context.group.survivor_quote_thread_id !== quote.quote_thread_id,
+      merge_aliases: context.aliases.map(alias => alias.alias_reference),
+      merge_source_quote_ids: context.members.map(member => member.source_latest_quote_id),
+      merge_source_thread_ids: context.members.map(member => member.quote_thread_id),
+      merge_total: context.members.reduce((total, member) => {
+        const source = loadedQuotes.find(candidate => candidate.quote_thread_id === member.quote_thread_id);
+        return total + Number(source?.total || 0);
+      }, 0),
+    };
+  });
 
   const quoteIds = uniqueIdentifiers([
-    ...quotes.map(quote => quote.id),
+    ...quotes.flatMap(quote => [quote.id, ...(quote.merge_source_quote_ids || [])]),
     ...projects.flatMap(project => [project.linked_quote_id, project.converted_quote_id]),
   ]);
   const references = uniqueValues([
     ...quotes.flatMap(getQuoteReferences),
+    ...quotes.flatMap(quote => quote.merge_aliases || []),
     ...projects.map(project => project.project_reference),
   ]);
 
@@ -855,7 +891,9 @@ async function loadOverviewSources(admin: SupabaseAdminClient): Promise<Overview
     loadInvoices(admin, quoteIds, quotes),
     loadLabourRowsByReference(admin, references),
   ]);
-  const threadIds = quotes.map(quote => quote.quote_thread_id);
+  const threadIds = uniqueIdentifiers(
+    quotes.flatMap(quote => quote.merge_source_thread_ids || [quote.quote_thread_id]),
+  );
 
   if (threadIds.length > 0) {
     const { data: versions, error: versionError } = await admin
@@ -925,6 +963,13 @@ async function loadOverviewSources(admin: SupabaseAdminClient): Promise<Overview
           invoice_request_id: invoice.invoice_request_id,
         })),
       );
+    }
+    for (const quote of quotes) {
+      if (!quote.merge_source_thread_ids || quote.is_merged_source) continue;
+      quote.merge_total = quote.merge_source_thread_ids.reduce((total, threadId) => {
+        const sourceQuote = quotes.find(candidate => candidate.quote_thread_id === threadId);
+        return total + Number(sourceQuote?.total || 0);
+      }, 0);
     }
   }
 

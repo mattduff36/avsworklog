@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { loadQuoteModuleSettings } from '@/lib/server/quote-workflow';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { resolveCanonicalQuoteId } from '@/lib/server/quote-merge-resolution';
 
 function normalizeDate(value: string | null, fallback: Date) {
   if (!value) return format(fallback, 'yyyy-MM-dd');
@@ -45,11 +46,13 @@ export async function GET(request: NextRequest) {
     const end = normalizeDate(searchParams.get('end'), addDays(new Date(), 60));
     const quoteStartFloor = format(subDays(new Date(start), 120), 'yyyy-MM-dd');
 
-    const [quotesResult, manualResult] = await Promise.all([
+    const admin = createAdminClient();
+    const [quotesResult, manualResult, retiredResult] = await Promise.all([
       supabase
         .from('quotes')
         .select(`
           id,
+          quote_thread_id,
           quote_reference,
           subject_line,
           project_description,
@@ -75,13 +78,16 @@ export async function GET(request: NextRequest) {
         .gte('start_date', quoteStartFloor)
         .lte('start_date', end)
         .order('start_date', { ascending: true }),
+      admin.from('quote_reference_aliases').select('source_quote_thread_id'),
     ]);
 
     if (quotesResult.error) throw quotesResult.error;
     if (manualResult.error) throw manualResult.error;
+    if (retiredResult.error) throw retiredResult.error;
+    const retiredThreadIds = new Set((retiredResult.data || []).map(row => row.source_quote_thread_id));
 
     return NextResponse.json({
-      quotes: quotesResult.data || [],
+      quotes: (quotesResult.data || []).filter(quote => !retiredThreadIds.has(quote.quote_thread_id)),
       manual_entries: manualResult.data || [],
       range: { start, end },
     });
@@ -100,19 +106,26 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const title = typeof body.title === 'string' ? body.title.trim() : '';
     const startDate = normalizeDate(typeof body.start_date === 'string' ? body.start_date : null, new Date());
-    const moduleSettings = await loadQuoteModuleSettings(createAdminClient());
+    const admin = createAdminClient();
+    const moduleSettings = await loadQuoteModuleSettings(admin);
     const estimatedDurationDays = typeof body.estimated_duration_days === 'undefined'
       ? moduleSettings.default_estimated_duration_days ?? 1
       : normalizeDuration(body.estimated_duration_days);
 
     if (!title) return NextResponse.json({ error: 'Enter a calendar entry title.' }, { status: 400 });
 
+    const requestedQuoteId = typeof body.quote_id === 'string' && body.quote_id.trim()
+      ? body.quote_id.trim()
+      : null;
+    const canonicalQuoteId = requestedQuoteId
+      ? await resolveCanonicalQuoteId(admin, requestedQuoteId)
+      : null;
     const { data, error: insertError } = await supabase
       .from('work_calendar_entries')
       .insert({
         title,
         summary: typeof body.summary === 'string' && body.summary.trim() ? body.summary.trim() : null,
-        quote_id: typeof body.quote_id === 'string' && body.quote_id.trim() ? body.quote_id.trim() : null,
+        quote_id: canonicalQuoteId,
         start_date: startDate,
         estimated_duration_days: estimatedDurationDays,
         created_by: user.id,
@@ -138,11 +151,17 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const id = typeof body.id === 'string' ? body.id.trim() : '';
     if (!id) return NextResponse.json({ error: 'Calendar entry id is required.' }, { status: 400 });
+    const requestedQuoteId = typeof body.quote_id === 'string' && body.quote_id.trim()
+      ? body.quote_id.trim()
+      : null;
+    const canonicalQuoteId = requestedQuoteId
+      ? await resolveCanonicalQuoteId(createAdminClient(), requestedQuoteId)
+      : null;
 
     const updates = {
       title: typeof body.title === 'string' ? body.title.trim() : undefined,
       summary: typeof body.summary === 'string' && body.summary.trim() ? body.summary.trim() : null,
-      quote_id: typeof body.quote_id === 'string' && body.quote_id.trim() ? body.quote_id.trim() : null,
+      quote_id: typeof body.quote_id === 'undefined' ? undefined : canonicalQuoteId,
       start_date: typeof body.start_date === 'string' ? normalizeDate(body.start_date, new Date()) : undefined,
       estimated_duration_days: typeof body.estimated_duration_days === 'undefined' ? undefined : normalizeDuration(body.estimated_duration_days),
       updated_by: user.id,

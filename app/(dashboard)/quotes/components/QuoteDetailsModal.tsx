@@ -310,6 +310,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [invoiceRequestDate, setInvoiceRequestDate] = useState(new Date().toISOString().slice(0, 10));
   const [invoiceRequestScope, setInvoiceRequestScope] = useState<'full' | 'partial'>('full');
   const [invoiceRequestComments, setInvoiceRequestComments] = useState('');
+  const [invoiceRequestMergeScope, setInvoiceRequestMergeScope] = useState<'combined' | 'source'>('combined');
+  const [invoiceRequestSourceThreadIds, setInvoiceRequestSourceThreadIds] = useState<string[]>([]);
+  const [invoiceMergeScope, setInvoiceMergeScope] = useState<'combined' | 'source'>('combined');
+  const [invoiceSourceThreadIds, setInvoiceSourceThreadIds] = useState<string[]>([]);
   const [selectedInvoiceRequestId, setSelectedInvoiceRequestId] = useState('');
   const [invoiceMatchesRequest, setInvoiceMatchesRequest] = useState(false);
   const [revisionType, setRevisionType] = useState<QuoteRevisionType>('revision');
@@ -643,6 +647,9 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     if (Number.isFinite(amount) && invoiceRequestScope === 'partial' && amount >= availableToRequest - 0.005) {
       errors.requested_invoice_scope = 'Select full invoice for the remaining balance.';
     }
+    if (quote?.merge_info && invoiceRequestMergeScope === 'source' && invoiceRequestSourceThreadIds.length === 0) {
+      errors.merge_sources = 'Choose at least one source quote.';
+    }
 
     return errors;
   }
@@ -668,6 +675,14 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
     if (Number.isFinite(amount) && amount - suggestedInvoiceAmount > 0.005) {
       errors.amount = `This quote has £${suggestedInvoiceAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })} remaining. Create a new version first if the amount has increased.`;
+    }
+    if (
+      quote?.merge_info
+      && !selectedInvoiceRequest
+      && invoiceMergeScope === 'source'
+      && invoiceSourceThreadIds.length === 0
+    ) {
+      errors.merge_sources = 'Choose at least one source quote.';
     }
 
     return errors;
@@ -701,6 +716,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setInvoiceRequestDate(today);
     setInvoiceRequestScope(nextInvoiceRequestScope);
     setInvoiceRequestComments('');
+    setInvoiceRequestMergeScope('combined');
+    setInvoiceRequestSourceThreadIds([]);
+    setInvoiceMergeScope('combined');
+    setInvoiceSourceThreadIds([]);
     setSelectedInvoiceRequestId(nextSelectedInvoiceRequestId);
     setInvoiceMatchesRequest(false);
     setRevisionType('revision');
@@ -1042,6 +1061,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
           requested_invoice_date: invoiceRequestDate,
           requested_invoice_scope: invoiceRequestScope,
           manager_comments: invoiceRequestComments,
+          merge_billing_scope: quote?.merge_info ? invoiceRequestMergeScope : 'single',
+          merge_source_thread_ids: invoiceRequestMergeScope === 'source'
+            ? invoiceRequestSourceThreadIds
+            : [],
         }),
       });
 
@@ -1251,6 +1274,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
           invoice_scope: selectedInvoiceRequest?.requested_invoice_scope || invoiceScope,
           confirm_matches_request: Boolean(selectedInvoiceRequest) ? invoiceMatchesRequest : undefined,
           comments: invoiceComments,
+          merge_billing_scope: selectedInvoiceRequest?.merge_billing_scope
+            || (quote?.merge_info ? invoiceMergeScope : 'single'),
+          merge_source_thread_ids: selectedInvoiceRequest?.merge_source_thread_ids
+            || (invoiceMergeScope === 'source' ? invoiceSourceThreadIds : []),
         }),
       });
 
@@ -1384,6 +1411,30 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   You are viewing an older quote version. Switch back to the latest version to edit, invoice, upload files, or delete.
                 </div>
               ) : null}
+              {quote.merge_info ? (
+                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                  <p className="font-semibold">
+                    Merged quote group · {quote.merge_info.merge_mode === 'consolidated' ? 'Consolidated document' : 'Separate documents'}
+                  </p>
+                  <p className="mt-1">
+                    Retired numbers: {quote.merge_info.aliases.join(', ') || 'None'}
+                  </p>
+                  {quote.merge_info.pdf_snapshots?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {quote.merge_info.pdf_snapshots.map(snapshot => (
+                        <a
+                          key={snapshot.id}
+                          href={`/api/quotes/${snapshot.quote_id}/merge-snapshot`}
+                          className="inline-flex items-center gap-1 rounded border border-amber-400/30 px-2 py-1 text-xs hover:bg-amber-500/10"
+                        >
+                          <FileDown className="h-3.5 w-3.5" />
+                          {snapshot.original_reference} {snapshot.version_label || 'Original'}
+                        </a>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                 <div>
@@ -1470,6 +1521,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     {quote.rams_documents.map(document => (
                       <p key={document.id} className="text-xs text-emerald-100">
                         {document.title} • {format(new Date(document.created_at), 'dd MMM yyyy')}
+                        {document.source_reference ? ` • ${document.source_reference}` : ''}
                       </p>
                     ))}
                   </div>
@@ -1512,6 +1564,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                                 <td className="px-3 py-2 text-white">
                                   {item.description}
                                   {item.unit && <span className="text-muted-foreground ml-1">({item.unit})</span>}
+                                  {item.source_quote_reference ? (
+                                    <span className="ml-2 text-xs text-amber-300">
+                                      {item.source_quote_reference}
+                                    </span>
+                                  ) : null}
                                 </td>
                                 <td className="px-3 py-2 text-right text-slate-300">{item.quantity}</td>
                                 <td className="px-3 py-2 text-right text-slate-300">
@@ -1767,7 +1824,12 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       <div key={order.id} className="rounded-lg border border-slate-700 bg-slate-800/30 p-4">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
-                            <p className="font-medium text-white">PO# {order.po_number}</p>
+                            <p className="font-medium text-white">
+                              PO# {order.po_number}
+                              {quote.merge_info
+                                ? ` • ${quote.merge_info.members.find(member => member.quote_thread_id === order.quote_thread_id)?.base_quote_reference || quote.base_quote_reference}`
+                                : ''}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                               Received {format(new Date(order.received_at), 'dd MMM yyyy')}
                               {order.po_value !== null && order.po_value !== undefined
@@ -2146,6 +2208,51 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                           </div>
                         </div>
 
+                        {quote.merge_info ? (
+                          <div className="space-y-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                            <div className="space-y-2">
+                              <Label>Merged quote billing</Label>
+                              <Select
+                                value={invoiceRequestMergeScope}
+                                onValueChange={(value: 'combined' | 'source') => {
+                                  setInvoiceRequestMergeScope(value);
+                                  clearInvoiceRequestError('merge_sources');
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="combined">Invoice the merged quote together</SelectItem>
+                                  <SelectItem value="source">Invoice selected original quote work separately</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {invoiceRequestMergeScope === 'source' ? (
+                              <div className="flex flex-wrap gap-3">
+                                {quote.merge_info.members.map(member => (
+                                  <label key={member.quote_thread_id} className="flex items-center gap-2 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      checked={invoiceRequestSourceThreadIds.includes(member.quote_thread_id)}
+                                      onChange={() => {
+                                        clearInvoiceRequestError('merge_sources');
+                                        setInvoiceRequestSourceThreadIds(current => (
+                                          current.includes(member.quote_thread_id)
+                                            ? current.filter(id => id !== member.quote_thread_id)
+                                            : [...current, member.quote_thread_id]
+                                        ));
+                                      }}
+                                    />
+                                    {member.base_quote_reference}
+                                  </label>
+                                ))}
+                              </div>
+                            ) : null}
+                            {renderFieldError(invoiceRequestFieldErrors, 'merge_sources')}
+                          </div>
+                        ) : null}
+
                         <div className="space-y-2">
                           <Label>Internal Comments</Label>
                           <Textarea
@@ -2324,6 +2431,61 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       </div>
                     </div>
 
+                    {quote.merge_info ? (
+                      <div className="space-y-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                        <div className="space-y-2">
+                          <Label>Merged quote billing</Label>
+                          <Select
+                            value={selectedInvoiceRequest?.merge_billing_scope === 'source'
+                              ? 'source'
+                              : selectedInvoiceRequest
+                                ? 'combined'
+                                : invoiceMergeScope}
+                            onValueChange={(value: 'combined' | 'source') => {
+                              setInvoiceMergeScope(value);
+                              clearInvoiceError('merge_sources');
+                            }}
+                            disabled={Boolean(selectedInvoiceRequest)}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="combined">Invoice the merged quote together</SelectItem>
+                              <SelectItem value="source">Invoice selected original quote work separately</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {(selectedInvoiceRequest?.merge_billing_scope === 'source'
+                          || (!selectedInvoiceRequest && invoiceMergeScope === 'source')) ? (
+                          <div className="flex flex-wrap gap-3">
+                            {quote.merge_info.members.map(member => {
+                              const selectedSourceIds = selectedInvoiceRequest?.merge_source_thread_ids || invoiceSourceThreadIds;
+                              return (
+                                <label key={member.quote_thread_id} className="flex items-center gap-2 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedSourceIds.includes(member.quote_thread_id)}
+                                    disabled={Boolean(selectedInvoiceRequest)}
+                                    onChange={() => {
+                                      clearInvoiceError('merge_sources');
+                                      setInvoiceSourceThreadIds(current => (
+                                        current.includes(member.quote_thread_id)
+                                          ? current.filter(id => id !== member.quote_thread_id)
+                                          : [...current, member.quote_thread_id]
+                                      ));
+                                    }}
+                                  />
+                                  {member.base_quote_reference}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                        {renderFieldError(invoiceFieldErrors, 'merge_sources')}
+                      </div>
+                    ) : null}
+
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-h-10 flex-1">
                         {selectedInvoiceRequest ? (
@@ -2432,6 +2594,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-medium text-white">{attachment.file_name}</p>
+                            {attachment.source_reference ? (
+                              <Badge variant="outline" className="border-amber-500/30 text-amber-200">
+                                {attachment.source_reference}
+                              </Badge>
+                            ) : null}
                             {attachment.is_client_visible && (
                               <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-200">Client</Badge>
                             )}

@@ -4,6 +4,14 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
 import { MultiSelectFilter, type MultiSelectFilterOption } from '@/components/ui/multi-select-filter';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
@@ -14,12 +22,15 @@ import {
   ChevronDown,
   ChevronRight,
   Receipt,
+  GitMerge,
+  AlertTriangle,
 } from 'lucide-react';
 import { buildQuoteDisplayName, getQuoteLocationSegment } from '@/lib/quotes/quote-display-name';
 import { cn } from '@/lib/utils';
 import { getQuoteManagerNameFilterValue, isQuoteManagerNameFilterValue } from '../types';
 import type { Quote, QuoteListSummary, QuoteSageStatus, QuoteStatus } from '../types';
 import { ACTIVE_QUOTE_STATUS_ORDER, getQuoteStatusConfig } from '../types';
+import { toast } from 'sonner';
 
 interface QuotesTableProps {
   quotes: Quote[];
@@ -28,6 +39,29 @@ interface QuotesTableProps {
   managerFilter?: string;
   emptyMessage?: string;
   emptySearchMessage?: string;
+  canMerge?: boolean;
+  onMerged?: (quoteId: string) => Promise<void> | void;
+}
+
+interface QuoteMergePreview {
+  quotes: Array<{
+    id: string;
+    reference: string;
+    total: number;
+    line_items: Array<{
+      description: string;
+      quantity: number;
+      unit: string | null;
+      unit_rate: number;
+      line_total: number;
+    }>;
+    purchase_orders: Array<{ po_number: string; po_value: number | null }>;
+    rams_count: number;
+    attachment_count: number;
+    invoice_count: number;
+    version_count: number;
+    sage_posted: boolean;
+  }>;
 }
 
 type SortField = 'quote_reference' | 'customer' | 'quote_date' | 'total' | 'status';
@@ -332,6 +366,8 @@ export function QuotesTable({
   managerFilter = 'all',
   emptyMessage = 'No quotes yet. Create your first quote to get started.',
   emptySearchMessage = 'No quotes match your search.',
+  canMerge = false,
+  onMerged,
 }: QuotesTableProps) {
   const [search, setSearch] = useState('');
   const [statusFilters, setStatusFilters] = useState<QuoteStatus[]>([]);
@@ -343,6 +379,109 @@ export function QuotesTable({
   const [sortField, setSortField] = useState<SortField>('quote_date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [expandedThreads, setExpandedThreads] = useState<Record<string, boolean>>({});
+  const [mergeSelectionMode, setMergeSelectionMode] = useState(false);
+  const [selectedMergeQuoteIds, setSelectedMergeQuoteIds] = useState<string[]>([]);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  const [survivorQuoteId, setSurvivorQuoteId] = useState('');
+  const [mergeMode, setMergeMode] = useState<'consolidated' | 'grouped'>('consolidated');
+  const [irreversibleConfirmed, setIrreversibleConfirmed] = useState(false);
+  const [mergeSubmitting, setMergeSubmitting] = useState(false);
+  const [mergePreview, setMergePreview] = useState<QuoteMergePreview | null>(null);
+  const [mergePreviewLoading, setMergePreviewLoading] = useState(false);
+
+  const selectedMergeQuotes = useMemo(
+    () => quotes.filter(quote => selectedMergeQuoteIds.includes(quote.id)),
+    [quotes, selectedMergeQuoteIds],
+  );
+
+  function isQuoteMergeCompatible(quote: Quote): boolean {
+    if (!quote.is_latest_version || quote.commercial_status !== 'open' || !quote.requester_id) return false;
+    const first = selectedMergeQuotes[0];
+    if (!first) return true;
+    return first.customer_id === quote.customer_id && first.requester_id === quote.requester_id;
+  }
+
+  function toggleMergeQuote(quote: Quote) {
+    if (!isQuoteMergeCompatible(quote) && !selectedMergeQuoteIds.includes(quote.id)) {
+      toast.error('Merged quotes must have the same customer and manager.');
+      return;
+    }
+    setSelectedMergeQuoteIds(current => (
+      current.includes(quote.id)
+        ? current.filter(id => id !== quote.id)
+        : [...current, quote.id]
+    ));
+    setIrreversibleConfirmed(false);
+  }
+
+  function cancelMergeSelection() {
+    setMergeSelectionMode(false);
+    setSelectedMergeQuoteIds([]);
+    setSurvivorQuoteId('');
+    setIrreversibleConfirmed(false);
+    setMergePreview(null);
+  }
+
+  async function reviewMerge() {
+    if (selectedMergeQuotes.length < 2) {
+      toast.error('Select at least two quotes to merge.');
+      return;
+    }
+    setSurvivorQuoteId(current => (
+      selectedMergeQuoteIds.includes(current) ? current : selectedMergeQuoteIds[0] || ''
+    ));
+    const existingMode = selectedMergeQuotes.find(quote => quote.merge_info)?.merge_info?.merge_mode;
+    if (existingMode) setMergeMode(existingMode);
+    setMergeDialogOpen(true);
+    setMergePreviewLoading(true);
+    try {
+      const response = await fetch('/api/quotes/merge/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quote_ids: selectedMergeQuoteIds }),
+      });
+      const payload = await response.json().catch(() => null) as (QuoteMergePreview & { error?: string }) | null;
+      if (!response.ok || !payload) throw new Error(payload?.error || 'Unable to preview the merge.');
+      setMergePreview(payload);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to preview the merge.');
+      setMergeDialogOpen(false);
+    } finally {
+      setMergePreviewLoading(false);
+    }
+  }
+
+  async function submitMerge() {
+    if (!survivorQuoteId || !irreversibleConfirmed) return;
+    setMergeSubmitting(true);
+    try {
+      const response = await fetch('/api/quotes/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          quote_ids: selectedMergeQuoteIds,
+          survivor_quote_id: survivorQuoteId,
+          merge_mode: mergeMode,
+          irreversible_confirmed: true,
+        }),
+      });
+      const payload = await response.json().catch(() => null) as {
+        error?: string;
+        merge?: { quote_id: string; canonical_reference: string };
+      } | null;
+      if (!response.ok || !payload?.merge) {
+        throw new Error(payload?.error || 'Unable to merge quotes.');
+      }
+      toast.success(`Quotes permanently merged into ${payload.merge.canonical_reference}`);
+      setMergeDialogOpen(false);
+      cancelMergeSelection();
+      await onMerged?.(payload.merge.quote_id);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to merge quotes.');
+    } finally {
+      setMergeSubmitting(false);
+    }
+  }
 
   function quoteMatchesSearch(quote: Quote, query: string) {
     return (
@@ -354,7 +493,8 @@ export function QuotesTable({
       quote.attention_name?.toLowerCase().includes(query) ||
       quote.po_number?.toLowerCase().includes(query) ||
       quote.invoice_number?.toLowerCase().includes(query) ||
-      quote.manager_name?.toLowerCase().includes(query)
+      quote.manager_name?.toLowerCase().includes(query) ||
+      quote.merge_info?.aliases.some(alias => alias.toLowerCase().includes(query))
     );
   }
 
@@ -554,6 +694,37 @@ export function QuotesTable({
             className="pl-9 bg-slate-800 border-slate-600 text-white placeholder:text-muted-foreground"
           />
         </div>
+        {canMerge ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {mergeSelectionMode ? (
+              <>
+                <span className="text-sm text-slate-300">
+                  {selectedMergeQuoteIds.length} selected
+                </span>
+                <Button variant="outline" size="sm" onClick={cancelMergeSelection}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={reviewMerge}
+                  disabled={selectedMergeQuoteIds.length < 2}
+                  className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+                >
+                  Review Merge
+                </Button>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setMergeSelectionMode(true)}
+              >
+                <GitMerge className="mr-2 h-4 w-4" />
+                Merge Quotes
+              </Button>
+            )}
+          </div>
+        ) : null}
       </div>
 
       {/* Filters */}
@@ -658,11 +829,24 @@ export function QuotesTable({
                   <Fragment key={quote.id}>
                     <tr
                       key={quote.id}
-                      onClick={() => onRowClick(quote)}
+                      onClick={() => (
+                        mergeSelectionMode ? toggleMergeQuote(quote) : onRowClick(quote)
+                      )}
                       className="hover:bg-slate-800/50 cursor-pointer transition-colors"
                     >
                       <td className="px-4 py-3 font-mono font-semibold text-avs-yellow">
                         <div className="flex items-center gap-2">
+                          {mergeSelectionMode ? (
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${quote.base_quote_reference} for merge`}
+                              checked={selectedMergeQuoteIds.includes(quote.id)}
+                              disabled={!isQuoteMergeCompatible(quote) && !selectedMergeQuoteIds.includes(quote.id)}
+                              onClick={event => event.stopPropagation()}
+                              onChange={() => toggleMergeQuote(quote)}
+                              className="h-4 w-4"
+                            />
+                          ) : null}
                           {previousVersions.length > 0 ? (
                             <button
                               type="button"
@@ -679,6 +863,11 @@ export function QuotesTable({
                             <span className="inline-flex h-6 w-6" />
                           )}
                           <span>{quote.quote_reference}</span>
+                          {quote.merge_info?.aliases.length ? (
+                            <span className="font-sans text-[11px] font-normal text-amber-300">
+                              Includes {quote.merge_info.aliases.join(', ')}
+                            </span>
+                          ) : null}
                         </div>
                       </td>
                       <td className={cn('px-4 py-3 text-white', isTestCustomerName(quoteCustomerName) && 'text-red-300')}>
@@ -769,11 +958,24 @@ export function QuotesTable({
             return (
               <div
                 key={quote.id}
-                onClick={() => onRowClick(quote)}
+                onClick={() => (
+                  mergeSelectionMode ? toggleMergeQuote(quote) : onRowClick(quote)
+                )}
                 className="bg-slate-800/50 border border-slate-700 rounded-lg p-4 space-y-2 cursor-pointer hover:bg-slate-800 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
+                    {mergeSelectionMode ? (
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${quote.base_quote_reference} for merge`}
+                        checked={selectedMergeQuoteIds.includes(quote.id)}
+                        disabled={!isQuoteMergeCompatible(quote) && !selectedMergeQuoteIds.includes(quote.id)}
+                        onClick={event => event.stopPropagation()}
+                        onChange={() => toggleMergeQuote(quote)}
+                        className="h-4 w-4"
+                      />
+                    ) : null}
                     {previousVersions.length > 0 ? (
                       <button
                         type="button"
@@ -799,6 +1001,11 @@ export function QuotesTable({
                   </div>
                 </div>
                 <div className="text-xs text-slate-400">{quote.version_label || 'Original'}</div>
+                {quote.merge_info?.aliases.length ? (
+                  <div className="text-xs text-amber-300">
+                    Retired numbers: {quote.merge_info.aliases.join(', ')}
+                  </div>
+                ) : null}
                 <div className="text-sm text-white">
                   <QuoteDetailsCell quote={quote} />
                 </div>
@@ -851,6 +1058,157 @@ export function QuotesTable({
           })
         )}
       </div>
+
+      <Dialog
+        open={mergeDialogOpen}
+        onOpenChange={(open) => {
+          if (mergeSubmitting) return;
+          setMergeDialogOpen(open);
+          if (!open) setIrreversibleConfirmed(false);
+        }}
+      >
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitMerge className="h-5 w-5 text-amber-500" />
+              Merge Live Quotes
+            </DialogTitle>
+            <DialogDescription>
+              Choose the retained quote number and how the commercial documents should be presented.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Selected quotes
+              </p>
+              <div className="mt-2 space-y-2">
+                {selectedMergeQuotes.map(quote => (
+                  <div key={quote.id} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-mono font-semibold text-avs-yellow">
+                      {quote.base_quote_reference}
+                    </span>
+                    <span className="truncate text-slate-300">
+                      {quote.subject_line || quote.project_description || 'Untitled quote'} · {formatCurrency(quote.total)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {mergePreviewLoading ? (
+              <p className="text-sm text-slate-400">Loading commercial and audit preview…</p>
+            ) : mergePreview ? (
+              <div className="max-h-64 space-y-3 overflow-y-auto rounded-lg border border-slate-700 p-3">
+                {mergePreview.quotes.map(previewQuote => (
+                  <div key={previewQuote.id} className="space-y-2 border-b border-slate-700 pb-3 last:border-0 last:pb-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-mono text-sm font-semibold text-avs-yellow">
+                        {previewQuote.reference}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        {previewQuote.version_count} PDF version{previewQuote.version_count === 1 ? '' : 's'} · {previewQuote.rams_count} RAMS · {previewQuote.attachment_count} attachment{previewQuote.attachment_count === 1 ? '' : 's'} · {previewQuote.invoice_count} invoice{previewQuote.invoice_count === 1 ? '' : 's'}{previewQuote.sage_posted ? ' · On Sage' : ''}
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      {previewQuote.line_items.map((line, index) => (
+                        <div key={`${previewQuote.id}-${index}`} className="flex justify-between gap-3 text-xs text-slate-300">
+                          <span className="truncate">
+                            {line.description} · {line.quantity} {line.unit || ''} @ {formatCurrency(line.unit_rate)}
+                          </span>
+                          <span className="shrink-0">{formatCurrency(line.line_total)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {previewQuote.purchase_orders.length > 0 ? (
+                      <p className="text-xs text-slate-400">
+                        POs: {previewQuote.purchase_orders.map(order => (
+                          `${order.po_number}${order.po_value === null ? '' : ` (${formatCurrency(order.po_value)})`}`
+                        )).join(', ')}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <label className="block space-y-2 text-sm">
+              <span className="font-medium">Quote number to keep</span>
+              <select
+                value={survivorQuoteId}
+                onChange={event => setSurvivorQuoteId(event.target.value)}
+                className="h-10 w-full rounded-md border border-slate-600 bg-slate-900 px-3 text-white"
+              >
+                {selectedMergeQuotes.map(quote => (
+                  <option key={quote.id} value={quote.id}>
+                    {quote.base_quote_reference} — {quote.subject_line || 'Untitled quote'}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block space-y-2 text-sm">
+              <span className="font-medium">Document handling</span>
+              <select
+                value={mergeMode}
+                onChange={event => setMergeMode(event.target.value as 'consolidated' | 'grouped')}
+                className="h-10 w-full rounded-md border border-slate-600 bg-slate-900 px-3 text-white"
+              >
+                <option value="consolidated">Create a new consolidated quote revision</option>
+                <option value="grouped">Keep the quote documents separate under the retained number</option>
+              </select>
+              <span className="block text-xs text-slate-400">
+                Every existing quote version is saved as an immutable original PDF before merging.
+              </span>
+            </label>
+
+            {selectedMergeQuotes.some(quote => quote.sage_posted_at || (quote.invoices?.length || 0) > 0) ? (
+              <div className="rounded-md border border-violet-500/40 bg-violet-500/10 p-3 text-sm text-violet-100">
+                Existing invoices and Sage history will remain under their original numbers. Only the retained number is used for future activity; retire the other numbers manually in Sage.
+              </div>
+            ) : null}
+
+            <div className="rounded-md border border-amber-500/50 bg-amber-500/10 p-3 text-amber-100">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">
+                    This merge is permanent. These quotes cannot be un-merged.
+                  </p>
+                  <label className="flex cursor-pointer items-start gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={irreversibleConfirmed}
+                      onChange={event => setIrreversibleConfirmed(event.target.checked)}
+                      className="mt-1 h-4 w-4"
+                    />
+                    <span>
+                      I understand the retired numbers will permanently redirect to the retained quote.
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setMergeDialogOpen(false)}
+              disabled={mergeSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitMerge}
+              disabled={!survivorQuoteId || !irreversibleConfirmed || mergeSubmitting || mergePreviewLoading || !mergePreview}
+              className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+            >
+              {mergeSubmitting ? 'Merging…' : 'Permanently Merge Quotes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <LoadMorePagination
         visibleCount={visibleQuotes.length}

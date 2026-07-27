@@ -6,6 +6,8 @@ export interface QuoteLineItem {
   unit_rate: number;
   line_total: number;
   sort_order: number;
+  source_quote_reference?: string | null;
+  source_quote_thread_id?: string | null;
 }
 
 export interface CustomerContact {
@@ -32,6 +34,7 @@ export interface QuoteAttachment {
   created_at: string;
   is_client_visible: boolean;
   attachment_purpose: 'internal' | 'client_pricing' | 'client_supporting';
+  source_reference?: string | null;
 }
 
 export interface QuoteRamsDocument {
@@ -41,6 +44,7 @@ export interface QuoteRamsDocument {
   file_name: string;
   created_at: string;
   document_type_id: string | null;
+  source_reference?: string | null;
 }
 
 export interface QuoteInvoiceAllocation {
@@ -98,6 +102,8 @@ export interface QuoteInvoice {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  merge_billing_scope?: 'single' | 'combined' | 'source';
+  merge_source_thread_ids?: string[];
   allocations?: QuoteInvoiceAllocation[];
 }
 
@@ -207,6 +213,36 @@ export interface QuoteInvoiceRequest {
   fulfilled_at: string | null;
   created_at: string;
   updated_at: string;
+  merge_billing_scope?: 'single' | 'combined' | 'source';
+  merge_source_thread_ids?: string[];
+}
+
+export interface QuotePdfSnapshot {
+  id: string;
+  quote_id: string;
+  original_reference: string;
+  version_label: string | null;
+  file_size: number;
+  created_at: string;
+}
+
+export interface QuoteMergeMember {
+  quote_thread_id: string;
+  source_latest_quote_id: string;
+  base_quote_reference: string;
+  is_survivor: boolean;
+  merged_at: string;
+}
+
+export interface QuoteMergeInfo {
+  id: string;
+  survivor_quote_thread_id: string;
+  merge_mode: 'consolidated' | 'grouped';
+  merged_at: string;
+  canonical_reference: string | null;
+  members: QuoteMergeMember[];
+  aliases: string[];
+  pdf_snapshots?: QuotePdfSnapshot[];
 }
 
 export interface QuoteManagerOption {
@@ -471,6 +507,12 @@ export interface Quote {
     status: 'not_invoiced' | 'ready_to_invoice' | 'partially_invoiced' | 'invoiced';
   };
   financial_summary?: QuoteThreadFinancialSummary;
+  merge_info?: QuoteMergeInfo | null;
+  merge_source_quotes?: Quote[];
+  merge_source_financial_summaries?: Record<string, QuoteThreadFinancialSummary>;
+  is_merged_source?: boolean;
+  canonical_quote_id?: string | null;
+  canonical_reference?: string | null;
 }
 
 export interface QuoteListSummary {

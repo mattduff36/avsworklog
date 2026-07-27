@@ -5577,6 +5577,8 @@ export type Database = {
           fulfilled_at: string | null
           created_at: string
           updated_at: string
+          merge_billing_scope: 'single' | 'combined' | 'source'
+          merge_source_thread_ids: string[]
         }
         Insert: {
           id?: string
@@ -5594,6 +5596,8 @@ export type Database = {
           fulfilled_at?: string | null
           created_at?: string
           updated_at?: string
+          merge_billing_scope?: 'single' | 'combined' | 'source'
+          merge_source_thread_ids?: string[]
         }
         Update: {
           id?: string
@@ -5611,6 +5615,8 @@ export type Database = {
           fulfilled_at?: string | null
           created_at?: string
           updated_at?: string
+          merge_billing_scope?: 'single' | 'combined' | 'source'
+          merge_source_thread_ids?: string[]
         }
         Relationships: [
           {
@@ -5656,6 +5662,8 @@ export type Database = {
           created_at: string
           updated_at: string
           invoice_request_id: string | null
+          merge_billing_scope: 'single' | 'combined' | 'source'
+          merge_source_thread_ids: string[]
         }
         Insert: {
           id?: string
@@ -5669,6 +5677,8 @@ export type Database = {
           created_at?: string
           updated_at?: string
           invoice_request_id?: string | null
+          merge_billing_scope?: 'single' | 'combined' | 'source'
+          merge_source_thread_ids?: string[]
         }
         Update: {
           id?: string
@@ -5682,6 +5692,8 @@ export type Database = {
           created_at?: string
           updated_at?: string
           invoice_request_id?: string | null
+          merge_billing_scope?: 'single' | 'combined' | 'source'
+          merge_source_thread_ids?: string[]
         }
         Relationships: [
           {
@@ -5995,6 +6007,192 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      quote_billing_source_allocations: {
+        Row: {
+          id: string
+          quote_invoice_id: string | null
+          quote_invoice_request_id: string | null
+          source_quote_thread_id: string
+          amount: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_invoice_id?: string | null
+          quote_invoice_request_id?: string | null
+          source_quote_thread_id: string
+          amount: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_invoice_id?: string | null
+          quote_invoice_request_id?: string | null
+          source_quote_thread_id?: string
+          amount?: number
+          created_at?: string
+        }
+        Relationships: []
+      }
+      quote_line_item_merge_sources: {
+        Row: {
+          consolidated_line_item_id: string
+          merge_group_id: string
+          source_quote_thread_id: string
+          source_quote_id: string
+          source_line_item_id: string
+          source_quote_reference: string
+        }
+        Insert: {
+          consolidated_line_item_id: string
+          merge_group_id: string
+          source_quote_thread_id: string
+          source_quote_id: string
+          source_line_item_id: string
+          source_quote_reference: string
+        }
+        Update: {
+          consolidated_line_item_id?: string
+          merge_group_id?: string
+          source_quote_thread_id?: string
+          source_quote_id?: string
+          source_line_item_id?: string
+          source_quote_reference?: string
+        }
+        Relationships: []
+      }
+      quote_merge_groups: {
+        Row: {
+          id: string
+          survivor_quote_thread_id: string
+          consolidated_quote_id: string | null
+          merge_mode: 'consolidated' | 'grouped'
+          merged_by: string
+          merged_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          survivor_quote_thread_id: string
+          consolidated_quote_id?: string | null
+          merge_mode: 'consolidated' | 'grouped'
+          merged_by: string
+          merged_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          survivor_quote_thread_id?: string
+          consolidated_quote_id?: string | null
+          merge_mode?: 'consolidated' | 'grouped'
+          merged_by?: string
+          merged_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      quote_merge_members: {
+        Row: {
+          merge_group_id: string
+          quote_thread_id: string
+          source_latest_quote_id: string
+          base_quote_reference: string
+          is_survivor: boolean
+          original_sage_posted_at: string | null
+          original_sage_posted_by: string | null
+          merged_at: string
+        }
+        Insert: {
+          merge_group_id: string
+          quote_thread_id: string
+          source_latest_quote_id: string
+          base_quote_reference: string
+          is_survivor?: boolean
+          original_sage_posted_at?: string | null
+          original_sage_posted_by?: string | null
+          merged_at?: string
+        }
+        Update: {
+          merge_group_id?: string
+          quote_thread_id?: string
+          source_latest_quote_id?: string
+          base_quote_reference?: string
+          is_survivor?: boolean
+          original_sage_posted_at?: string | null
+          original_sage_posted_by?: string | null
+          merged_at?: string
+        }
+        Relationships: []
+      }
+      quote_pdf_snapshots: {
+        Row: {
+          id: string
+          quote_id: string
+          merge_group_id: string
+          original_reference: string
+          version_label: string | null
+          storage_path: string
+          file_sha256: string
+          file_size: number
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          quote_id: string
+          merge_group_id: string
+          original_reference: string
+          version_label?: string | null
+          storage_path: string
+          file_sha256: string
+          file_size: number
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          quote_id?: string
+          merge_group_id?: string
+          original_reference?: string
+          version_label?: string | null
+          storage_path?: string
+          file_sha256?: string
+          file_size?: number
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      quote_reference_aliases: {
+        Row: {
+          alias_reference: string
+          merge_group_id: string
+          source_quote_thread_id: string
+          canonical_quote_thread_id: string
+          canonical_reference: string
+          created_by: string
+          created_at: string
+        }
+        Insert: {
+          alias_reference: string
+          merge_group_id: string
+          source_quote_thread_id: string
+          canonical_quote_thread_id: string
+          canonical_reference: string
+          created_by: string
+          created_at?: string
+        }
+        Update: {
+          alias_reference?: string
+          merge_group_id?: string
+          source_quote_thread_id?: string
+          canonical_quote_thread_id?: string
+          canonical_reference?: string
+          created_by?: string
+          created_at?: string
+        }
+        Relationships: []
       }
       quote_line_items: {
         Row: {
@@ -9809,6 +10007,38 @@ export type Database = {
           p_actor_user_id: string
         }
         Returns: Json
+      }
+      merge_live_quotes: {
+        Args: {
+          p_quote_ids: string[]
+          p_survivor_quote_id: string
+          p_merge_mode: string
+          p_consolidated_quote: Json
+          p_line_items: Json
+          p_snapshots: Json
+          p_actor_user_id: string
+        }
+        Returns: Json
+      }
+      resolve_live_quote_reference: {
+        Args: {
+          p_reference: string
+        }
+        Returns: {
+          canonical_quote_thread_id: string
+          canonical_reference: string
+          alias_reference: string
+        }[]
+      }
+      reserve_quote_billing_sources: {
+        Args: {
+          p_parent_type: string
+          p_parent_id: string
+          p_allocations: Json
+          p_source_capacities: Json
+          p_exclude_request_id?: string | null
+        }
+        Returns: undefined
       }
       inventory_kiosk_confirm_device_pairing: {
         Args: {

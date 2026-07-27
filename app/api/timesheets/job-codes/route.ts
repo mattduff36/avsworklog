@@ -29,12 +29,15 @@ interface QuoteJobCodeCustomer {
 }
 
 interface QuoteJobCodeRow {
+  quote_thread_id: string;
   base_quote_reference: string | null;
   quote_reference: string | null;
   subject_line: string | null;
   project_description: string | null;
   site_address: string | null;
   customer: QuoteJobCodeCustomer | QuoteJobCodeCustomer[] | null;
+  aliases?: string[];
+  isMergedSource?: boolean;
 }
 
 interface LegacyQuoteJobCodeRow {
@@ -121,6 +124,7 @@ function mapJobCodeRowsToOptions(
   const options: TimesheetJobCodeOption[] = [];
 
   for (const row of rows) {
+    if (row.isMergedSource) continue;
     const reference = normalizeJobNumberInput(row.base_quote_reference || row.quote_reference || '');
     if (!QUOTE_JOB_NUMBER_REGEX.test(reference)) continue;
     const customer = getQuoteCustomer(row);
@@ -136,6 +140,7 @@ function mapJobCodeRowsToOptions(
         source: 'live_quote',
       },
       normalizedQuery,
+      row.aliases || [],
     );
   }
 
@@ -220,6 +225,7 @@ async function fetchQuoteJobCodeRows(admin: ReturnType<typeof createAdminClient>
       .select(`
         base_quote_reference,
         quote_reference,
+        quote_thread_id,
         subject_line,
         project_description,
         site_address,
@@ -342,15 +348,33 @@ export async function GET(request: NextRequest) {
     const limit = Math.min(Math.max(Number.parseInt(searchParams.get('limit') || '10000', 10) || 10000, 1), 10000);
     const query = searchParams.get('q') || '';
 
-    const [quoteRows, legacyQuoteRows, projectNumberRows] = await Promise.all([
+    const [quoteRows, legacyQuoteRows, projectNumberRows, { data: liveQuoteAliases, error: liveAliasError }] = await Promise.all([
       fetchQuoteJobCodeRows(admin, limit),
       fetchLegacyQuoteJobCodeRows(admin, limit),
       fetchProjectNumberJobCodeRows(admin, limit),
+      admin
+        .from('quote_reference_aliases')
+        .select('alias_reference, source_quote_thread_id, canonical_quote_thread_id'),
     ]);
+    if (liveAliasError) throw liveAliasError;
+    const aliasesByCanonicalThread = new Map<string, string[]>();
+    const retiredThreadIds = new Set<string>();
+    for (const alias of liveQuoteAliases || []) {
+      retiredThreadIds.add(alias.source_quote_thread_id);
+      aliasesByCanonicalThread.set(alias.canonical_quote_thread_id, [
+        ...(aliasesByCanonicalThread.get(alias.canonical_quote_thread_id) || []),
+        alias.alias_reference,
+      ]);
+    }
+    const resolvedQuoteRows = quoteRows.map(row => ({
+      ...row,
+      aliases: aliasesByCanonicalThread.get(row.quote_thread_id) || [],
+      isMergedSource: retiredThreadIds.has(row.quote_thread_id),
+    }));
 
     return NextResponse.json({
       job_codes: mapJobCodeRowsToOptions(
-        quoteRows,
+        resolvedQuoteRows,
         legacyQuoteRows,
         projectNumberRows,
         query

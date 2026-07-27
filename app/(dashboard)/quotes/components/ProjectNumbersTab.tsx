@@ -173,6 +173,7 @@ export function ProjectNumbersTab({
   const [convertForm, setConvertForm] = useState<ConvertFormState>(emptyConvertForm);
   const [convertProjectIds, setConvertProjectIds] = useState<string[]>([]);
   const [survivorProjectId, setSurvivorProjectId] = useState('');
+  const [mergeConfirmed, setMergeConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [projectFormBaseline, setProjectFormBaseline] = useState(buildDialogSnapshot(emptyProjectForm));
   const [costFormBaseline, setCostFormBaseline] = useState(buildDialogSnapshot(buildEmptyCostForm()));
@@ -259,6 +260,7 @@ export function ProjectNumbersTab({
       setConvertForm(emptyConvertForm);
       setConvertProjectIds([]);
       setSurvivorProjectId('');
+      setMergeConfirmed(false);
       setConvertFormBaseline(buildActionSnapshot(emptyConvertForm, [], ''));
     },
   });
@@ -317,6 +319,10 @@ export function ProjectNumbersTab({
     const actionProjects = actionMode === 'convert'
       ? selectedConversionProjects
       : [activeProject];
+    if (actionMode === 'convert' && actionProjects.length > 1 && !mergeConfirmed) {
+      toast.error('Confirm that this permanent merge cannot be undone.');
+      return;
+    }
     const costIds = actionProjects.flatMap(project => (
       getSelectedCostIds(selectedCosts, project.id, getOpenCosts(project))
     ));
@@ -353,6 +359,7 @@ export function ProjectNumbersTab({
       setConvertForm(emptyConvertForm);
       setConvertProjectIds([]);
       setSurvivorProjectId('');
+      setMergeConfirmed(false);
       await onRefresh();
       if (payload?.quote_id) onOpenQuote(payload.quote_id);
     } catch (error) {
@@ -398,6 +405,7 @@ export function ProjectNumbersTab({
     setConvertForm(nextForm);
     setConvertProjectIds(nextProjectIds);
     setSurvivorProjectId(nextSurvivorProjectId);
+    setMergeConfirmed(false);
     setConvertFormBaseline(buildActionSnapshot(
       nextForm,
       nextProjectIds,
@@ -414,6 +422,7 @@ export function ProjectNumbersTab({
       setSurvivorProjectId((survivor) => (
         next.includes(survivor) ? survivor : next[0] || ''
       ));
+      setMergeConfirmed(false);
       return next;
     });
   }
@@ -967,9 +976,23 @@ export function ProjectNumbersTab({
                   </div>
 
                   {selectedConversionProjects.length > 1 ? (
-                    <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-200">
-                      Existing timesheets using the other selected numbers will be moved to the retained number. The old numbers remain searchable aliases.
-                    </p>
+                    <div className="space-y-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-200">
+                      <p className="font-semibold">
+                        Permanent action: merged project numbers cannot be un-merged.
+                      </p>
+                      <p>
+                        Existing timesheets using the other selected numbers will be moved to the retained number. The old numbers remain searchable aliases.
+                      </p>
+                      <label className="flex cursor-pointer items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={mergeConfirmed}
+                          onChange={(event) => setMergeConfirmed(event.target.checked)}
+                          className="mt-0.5"
+                        />
+                        <span>I understand this merge is permanent and cannot be undone.</span>
+                      </label>
+                    </div>
                   ) : null}
 
                   <div className="space-y-2">
@@ -1046,7 +1069,11 @@ export function ProjectNumbersTab({
                     isSubmitting
                     || (
                       actionMode === 'convert'
-                      && (!survivorProjectId || selectedConversionCosts.length === 0)
+                      && (
+                        !survivorProjectId
+                        || selectedConversionCosts.length === 0
+                        || (selectedConversionProjects.length > 1 && !mergeConfirmed)
+                      )
                     )
                   }
                   className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"

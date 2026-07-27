@@ -137,7 +137,21 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
     const sensitiveAccessResponse = await requireSensitiveModuleAccess('quotes');
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
-    const bundle = await fetchQuoteBundle(admin, id);
+    let bundle = await fetchQuoteBundle(admin, id);
+    const requestedMergedReference = bundle.mergeInfo
+      && bundle.mergeInfo.survivor_quote_thread_id !== bundle.quote.quote_thread_id
+      ? bundle.quote.base_quote_reference
+      : null;
+    if (requestedMergedReference && bundle.mergeInfo) {
+      const { data: canonicalQuote, error: canonicalError } = await admin
+        .from('quotes')
+        .select('id')
+        .eq('quote_thread_id', bundle.mergeInfo.survivor_quote_thread_id)
+        .eq('is_latest_version', true)
+        .single();
+      if (canonicalError || !canonicalQuote) throw canonicalError || new Error('Merged quote survivor not found');
+      bundle = await fetchQuoteBundle(admin, canonicalQuote.id);
+    }
     await syncQuoteSiteLocation(admin, bundle.quote, user.id);
     const [canManageSage, canManagePurchaseOrders] = await Promise.all([
       canManageQuoteSage(),
@@ -149,6 +163,7 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
         canManageSage,
         canManagePurchaseOrders,
       }),
+      requested_merged_reference: requestedMergedReference,
     });
   } catch (error) {
     console.error('Error fetching quote:', error);
@@ -193,6 +208,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     };
 
     const current = await fetchQuoteBundle(admin, id);
+    if (
+      current.mergeInfo
+      && current.mergeInfo.survivor_quote_thread_id !== current.quote.quote_thread_id
+    ) {
+      return NextResponse.json(
+        { error: `This quote was permanently merged into ${current.mergeInfo.canonical_reference || 'another quote'}. Open the retained quote to make changes.` },
+        { status: 400 },
+      );
+    }
     if (!current.quote.is_latest_version) {
       return NextResponse.json(
         { error: 'Only the latest quote version can be changed.' },
@@ -1089,6 +1113,12 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const bundle = await fetchQuoteBundle(admin, id);
+    if (bundle.mergeInfo) {
+      return NextResponse.json(
+        { error: 'Quotes in a permanent merge group cannot be deleted.' },
+        { status: 400 },
+      );
+    }
     if (!bundle.quote.is_latest_version) {
       return NextResponse.json({ error: 'Only the latest draft version can be deleted.' }, { status: 400 });
     }

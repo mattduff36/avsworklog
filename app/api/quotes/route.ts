@@ -28,6 +28,11 @@ import {
 } from '@/lib/server/quote-recipient-contacts';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { calculateQuoteFinancials } from '@/lib/utils/quote-financial-adjustments';
+import {
+  getMergeContextByThread,
+  loadQuoteMergeContexts,
+  serializeMergeContext,
+} from '@/lib/server/quote-merge-resolution';
 
 type QuoteFieldErrors = Record<string, string>;
 type QuoteSageStatus = 'not_on_sage' | 'on_sage';
@@ -142,7 +147,17 @@ export async function GET(request: NextRequest) {
     if (error) throw error;
     if (summaryError) throw summaryError;
 
-    const quotes = data || [];
+    const rawQuotes = data || [];
+    const mergeContexts = await loadQuoteMergeContexts(createAdminClient());
+    const mergeContextByThread = getMergeContextByThread(mergeContexts);
+    const isRetiredThread = (threadId: string) => {
+      const context = mergeContextByThread.get(threadId);
+      return Boolean(context && context.group.survivor_quote_thread_id !== threadId);
+    };
+    const quotes = rawQuotes.filter(quote => !isRetiredThread(quote.quote_thread_id));
+    const activeSummaryRows = (summaryRows || []).filter(
+      quote => !isRetiredThread(quote.quote_thread_id),
+    );
     const threadIds = quotes.map(quote => quote.quote_thread_id).filter(Boolean);
     const purchaseOrderCountByThread = new Map<string, number>();
     if (threadIds.length > 0) {
@@ -194,7 +209,8 @@ export async function GET(request: NextRequest) {
     const allVisibleQuotes = [...quotes, ...previousVersions];
     const financialThreadIds = Array.from(new Set([
       ...allVisibleQuotes.map(quote => quote.quote_thread_id),
-      ...(summaryRows || []).map(quote => quote.quote_thread_id),
+      ...activeSummaryRows.map(quote => quote.quote_thread_id),
+      ...mergeContexts.flatMap(context => context.members.map(member => member.quote_thread_id)),
     ].filter(Boolean)));
     if (financialThreadIds.length > 0) {
       const visibleQuoteIdsForQuery = allVisibleQuotes.length > 0
@@ -320,6 +336,52 @@ export async function GET(request: NextRequest) {
         });
         financialSummaries.set(threadId, calculation.threadSummary);
       }
+      for (const context of mergeContexts) {
+        const sourceSummaries = context.members
+          .map(member => financialSummaries.get(member.quote_thread_id))
+          .filter((summary): summary is QuoteThreadFinancialSummary => Boolean(summary));
+        const survivorSummary = financialSummaries.get(context.group.survivor_quote_thread_id);
+        if (!survivorSummary || sourceSummaries.length === 0) continue;
+        const sum = (field: keyof QuoteThreadFinancialSummary) => (
+          Math.round(sourceSummaries.reduce(
+            (total, summary) => total + Number(summary[field] || 0),
+            0,
+          ) * 100) / 100
+        );
+        const adjustedQuoteValue = context.group.merge_mode === 'consolidated'
+          ? Number(survivorSummary.adjusted_quote_value)
+          : sum('adjusted_quote_value');
+        const netInvoiced = sum('net_invoiced');
+        const writeOffsTotal = sum('write_offs_total');
+        const pendingRequestedTotal = sum('pending_requested_total');
+        const remainingToInvoice = Math.round(
+          (adjustedQuoteValue - netInvoiced - writeOffsTotal) * 100,
+        ) / 100;
+        financialSummaries.set(context.group.survivor_quote_thread_id, {
+          ...survivorSummary,
+          adjusted_quote_value: adjustedQuoteValue,
+          net_invoiced: netInvoiced,
+          write_offs_total: writeOffsTotal,
+          pending_requested_total: pendingRequestedTotal,
+          remaining_to_invoice: remainingToInvoice,
+          available_to_request: Math.max(
+            0,
+            Math.round((remainingToInvoice - pendingRequestedTotal) * 100) / 100,
+          ),
+          invoice_status: remainingToInvoice <= 0.005
+            ? 'invoiced'
+            : pendingRequestedTotal > 0.005
+              ? 'ready_to_invoice'
+              : netInvoiced > 0.005
+                ? 'partially_invoiced'
+                : 'not_invoiced',
+          reconciliation_status: remainingToInvoice < -0.005
+            ? 'over_invoiced'
+            : Math.abs(remainingToInvoice) <= 0.005
+              ? writeOffsTotal > 0.005 ? 'written_off' : 'balanced'
+              : 'outstanding',
+        });
+      }
     }
 
     const statusCounts = ACTIVE_QUOTE_STATUS_ORDER.reduce<Record<string, number>>(
@@ -329,7 +391,7 @@ export async function GET(request: NextRequest) {
     let acceptedQuotes = 0;
     let acceptedValue = 0;
 
-    (summaryRows || []).forEach((quote) => {
+    activeSummaryRows.forEach((quote) => {
       const status = quote.status ?? 'draft';
       statusCounts.all += 1;
       if (status in statusCounts) {
@@ -349,6 +411,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       quotes: quotes.map(quote => ({
         ...quote,
+        merge_info: mergeContextByThread.has(quote.quote_thread_id)
+          ? serializeMergeContext(mergeContextByThread.get(quote.quote_thread_id)!)
+          : null,
         purchase_order_count: purchaseOrderCountByThread.get(quote.quote_thread_id)
           || (quote.po_number ? 1 : 0),
         invoice_summary: summaries.get(quote.id) || getInvoiceSummary({ total: Number(quote.total || 0), invoices: [] }),
@@ -372,7 +437,7 @@ export async function GET(request: NextRequest) {
       pagination: {
         offset,
         limit,
-        has_more: quotes.length === limit,
+        has_more: rawQuotes.length === limit,
       },
     });
   } catch (error) {

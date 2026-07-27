@@ -11,6 +11,7 @@ import { buildInvoiceRequestTimelineDescription } from '@/lib/quotes/quote-timel
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { buildQuoteDisplayName } from '@/lib/quotes/quote-display-name';
 import { renderConfiguredQuoteEmailTemplate } from '@/lib/server/quote-email-templates';
+import { allocateMergeBillingAmount } from '@/lib/server/quote-merge-resolution';
 
 type InvoiceRequestFieldErrors = Record<string, string>;
 
@@ -40,6 +41,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       requested_invoice_date?: string;
       requested_invoice_scope?: 'full' | 'partial';
       manager_comments?: string;
+      merge_billing_scope?: 'single' | 'combined' | 'source';
+      merge_source_thread_ids?: string[];
     };
 
     const fieldErrors: InvoiceRequestFieldErrors = {};
@@ -53,6 +56,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const normalizedComments = typeof body.manager_comments === 'string'
       ? body.manager_comments.trim() || null
       : null;
+    const normalizedMergeBillingScope = body.merge_billing_scope === 'source'
+      ? 'source'
+      : body.merge_billing_scope === 'combined'
+        ? 'combined'
+        : 'single';
+    const normalizedMergeSourceThreadIds = Array.isArray(body.merge_source_thread_ids)
+      ? Array.from(new Set(body.merge_source_thread_ids.filter((value): value is string => typeof value === 'string' && Boolean(value))))
+      : [];
 
     if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
       fieldErrors.requested_amount = 'Enter an invoice request amount greater than 0.';
@@ -73,15 +84,47 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const bundle = await fetchQuoteBundle(admin, id);
+    if (
+      bundle.mergeInfo
+      && bundle.mergeInfo.survivor_quote_thread_id !== bundle.quote.quote_thread_id
+    ) {
+      return NextResponse.json(
+        { error: `This quote was merged into ${bundle.mergeInfo.canonical_reference || 'the retained quote'}. Open the retained quote to request an invoice.` },
+        { status: 400 },
+      );
+    }
     if (!bundle.quote.is_latest_version) {
       return NextResponse.json({ error: 'Only the latest quote version can be marked ready to invoice.' }, { status: 400 });
     }
+    const validMergeThreadIds = new Set(bundle.mergeInfo?.members.map(member => member.quote_thread_id) || []);
+    if (!bundle.mergeInfo && normalizedMergeBillingScope !== 'single') {
+      return NextResponse.json({ error: 'Combined/source invoicing is only available for merged quotes.' }, { status: 400 });
+    }
+    if (
+      normalizedMergeBillingScope === 'source'
+      && (
+        normalizedMergeSourceThreadIds.length === 0
+        || normalizedMergeSourceThreadIds.some(threadId => !validMergeThreadIds.has(threadId))
+      )
+    ) {
+      return NextResponse.json({ error: 'Choose at least one valid merged quote source to invoice.' }, { status: 400 });
+    }
 
-    const availableToRequest = Number(
-      bundle.financialSummary?.available_to_request ??
-        bundle.invoiceSummary.availableToRequest ??
-        0,
+    const selectedSourceAvailable = normalizedMergeBillingScope === 'source'
+      ? normalizedMergeSourceThreadIds.reduce((total, threadId) => (
+          total + Number(
+            bundle.mergeSourceFinancialSummaries[threadId]?.available_to_request || 0,
+          )
+        ), 0)
+      : null;
+    const groupAvailableToRequest = Number(
+      bundle.financialSummary?.available_to_request
+      ?? bundle.invoiceSummary.availableToRequest
+      ?? 0,
     );
+    const availableToRequest = selectedSourceAvailable === null
+      ? groupAvailableToRequest
+      : Math.min(selectedSourceAvailable, groupAvailableToRequest);
     if (availableToRequest <= 0.005) {
       return NextResponse.json(
         {
@@ -147,12 +190,49 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         requested_invoice_scope: normalizedScope,
         manager_comments: normalizedComments,
         requested_by: user.id,
+        merge_billing_scope: bundle.mergeInfo ? normalizedMergeBillingScope : 'single',
+        merge_source_thread_ids: normalizedMergeBillingScope === 'source'
+          ? normalizedMergeSourceThreadIds
+          : [],
       })
       .select()
       .single();
 
     if (insertError || !invoiceRequest) {
       throw insertError || new Error('Unable to create invoice request');
+    }
+
+    if (bundle.mergeInfo) {
+      const sourceThreadIds = normalizedMergeBillingScope === 'source'
+        ? normalizedMergeSourceThreadIds
+        : bundle.mergeInfo.members.map(member => member.quote_thread_id);
+      const capacities = Object.fromEntries(sourceThreadIds.map(threadId => [
+        threadId,
+        Number(bundle.mergeSourceFinancialSummaries[threadId]?.available_to_request || 0),
+      ]));
+      const sourceAllocations = allocateMergeBillingAmount(
+        normalizedAmount,
+        sourceThreadIds,
+        capacities,
+      );
+      const sourceLimits = Object.fromEntries(sourceThreadIds.map(threadId => [
+        threadId,
+        Number(bundle.mergeSourceFinancialSummaries[threadId]?.adjusted_quote_value || 0),
+      ]));
+      const { error: sourceAllocationError } = await admin.rpc(
+        'reserve_quote_billing_sources',
+        {
+          p_parent_type: 'request',
+          p_parent_id: invoiceRequest.id,
+          p_allocations: sourceAllocations,
+          p_source_capacities: sourceLimits,
+          p_exclude_request_id: null,
+        },
+      );
+      if (sourceAllocationError) {
+        await admin.from('quote_invoice_requests').delete().eq('id', invoiceRequest.id);
+        throw sourceAllocationError;
+      }
     }
 
     try {
@@ -255,6 +335,15 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const bundle = await fetchQuoteBundle(admin, id);
+    if (
+      bundle.mergeInfo
+      && bundle.mergeInfo.survivor_quote_thread_id !== bundle.quote.quote_thread_id
+    ) {
+      return NextResponse.json(
+        { error: `This quote was merged into ${bundle.mergeInfo.canonical_reference || 'the retained quote'}. Open the retained quote to change invoice requests.` },
+        { status: 400 },
+      );
+    }
     if (!bundle.quote.is_latest_version) {
       return NextResponse.json({ error: 'Only the latest quote version can have invoice requests retracted.' }, { status: 400 });
     }

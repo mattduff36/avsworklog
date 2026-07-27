@@ -36,6 +36,7 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
       .from('quotes')
       .select(`
         id,
+        quote_thread_id,
         quote_reference,
         requester_id,
         created_by,
@@ -56,6 +57,12 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
       .limit(limit);
 
     if (error) throw error;
+    const { data: retiredMembers, error: retiredError } = await admin
+      .from('quote_merge_members')
+      .select('quote_thread_id')
+      .eq('is_survivor', false);
+    if (retiredError) throw retiredError;
+    const retiredThreadIds = new Set((retiredMembers || []).map(member => member.quote_thread_id));
 
     const requesterIds = Array.from(
       new Set((quotes || []).map((quote) => quote.requester_id).filter((value): value is string => Boolean(value)))
@@ -75,6 +82,7 @@ async function handleQuoteStartAlerts(request: NextRequest, method: 'GET' | 'POS
     let processed = 0;
 
     for (const quote of quotes || []) {
+      if (retiredThreadIds.has(quote.quote_thread_id)) continue;
       const manager = Array.isArray(quote.manager) ? quote.manager[0] || null : quote.manager;
       const customer = Array.isArray(quote.customer) ? quote.customer[0] || null : quote.customer;
       const managerEmail = quote.requester_id ? requesterEmailById.get(quote.requester_id) || null : null;

@@ -120,5 +120,9 @@ describe('ProjectNumbersTab', () => {
     fireEvent.click(screen.getByLabelText('Include 60002-LC'));
 
     expect(screen.getByText(/old numbers remain searchable aliases/i)).toBeInTheDocument();
+    expect(screen.getByText(/cannot be un-merged/i)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', {
+      name: /i understand this merge is permanent/i,
+    })).not.toBeChecked();
   });
 });

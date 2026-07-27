@@ -34,6 +34,10 @@ import {
   buildQuotePoCoverageSummary,
   listQuotePurchaseOrders,
 } from '@/lib/server/quote-purchase-orders';
+import {
+  loadQuoteMergeContexts,
+  serializeMergeContext,
+} from '@/lib/server/quote-merge-resolution';
 
 const { Client } = pg;
 const QUOTE_NOTIFICATION_MODULE_KEY: NotificationModuleKey = 'quotes';
@@ -140,9 +144,12 @@ export interface QuoteBundle {
     selected_secondary_contact_ids?: string[];
     selected_secondary_contacts?: CustomerContactRow[];
   };
-  lineItems: QuoteLineItemRow[];
-  attachments: QuoteAttachmentRow[];
-  ramsDocuments: RamsDocumentRow[];
+  lineItems: Array<QuoteLineItemRow & {
+    source_quote_reference?: string | null;
+    source_quote_thread_id?: string | null;
+  }>;
+  attachments: Array<QuoteAttachmentRow & { source_reference?: string | null }>;
+  ramsDocuments: Array<RamsDocumentRow & { source_reference?: string | null }>;
   invoices: Array<QuoteInvoiceRow & { allocations: QuoteInvoiceAllocationRow[] }>;
   invoiceRequests: QuoteInvoiceRequestRow[];
   purchaseOrders: QuotePurchaseOrder[];
@@ -153,6 +160,9 @@ export interface QuoteBundle {
   invoiceSummary: InvoiceSummary;
   financialAdjustments: QuoteFinancialAdjustment[];
   financialSummary: QuoteThreadFinancialSummary;
+  mergeInfo: ReturnType<typeof serializeMergeContext> | null;
+  mergeSourceQuotes: QuoteRow[];
+  mergeSourceFinancialSummaries: Record<string, QuoteThreadFinancialSummary>;
 }
 
 export function serializeQuoteBundle(
@@ -183,6 +193,9 @@ export function serializeQuoteBundle(
     invoice_summary: bundle.invoiceSummary,
     financial_summary: bundle.financialSummary,
     financial_adjustments: bundle.financialAdjustments,
+    merge_info: bundle.mergeInfo,
+    merge_source_quotes: bundle.mergeSourceQuotes,
+    merge_source_financial_summaries: bundle.mergeSourceFinancialSummaries,
   };
 }
 
@@ -430,12 +443,16 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
   }
 
   const typedQuote = quote as QuoteBundle['quote'];
+  const [mergeContext] = await loadQuoteMergeContexts(supabase, [typedQuote.quote_thread_id]);
+  const mergeThreadIds = mergeContext
+    ? mergeContext.members.map(member => member.quote_thread_id)
+    : [typedQuote.quote_thread_id];
 
   const [lineItemsResult, attachmentsResult, ramsDocumentsResult, versionsResult, invoicesResult, invoiceRequestsResult, timelineResult, selectedContacts] = await Promise.all([
     supabase.from('quote_line_items').select('*').eq('quote_id', quoteId).order('sort_order', { ascending: true }),
     supabase.from('quote_attachments').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
     supabase.from('rams_documents').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
-    supabase.from('quotes').select('*').eq('quote_thread_id', typedQuote.quote_thread_id).order('created_at', { ascending: false }),
+    supabase.from('quotes').select('*').in('quote_thread_id', mergeThreadIds).order('created_at', { ascending: false }),
     supabase.from('quote_invoices').select('*').eq('quote_id', quoteId).order('invoice_date', { ascending: false }),
     supabase.from('quote_invoice_requests').select('*').eq('quote_id', quoteId).order('requested_at', { ascending: false }),
     supabase
@@ -444,7 +461,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
         *,
         actor:profiles!quote_timeline_events_actor_user_id_fkey(id, full_name)
       `)
-      .eq('quote_thread_id', typedQuote.quote_thread_id)
+      .in('quote_thread_id', mergeThreadIds)
       .order('created_at', { ascending: false }),
     fetchQuoteSelectedSecondaryContacts(supabase, quoteId),
   ]);
@@ -475,7 +492,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     supabase
       .from('quote_financial_adjustments')
       .select('*')
-      .eq('quote_thread_id', typedQuote.quote_thread_id)
+      .in('quote_thread_id', mergeThreadIds)
       .order('effective_date', { ascending: false })
       .order('created_at', { ascending: false }),
   ]);
@@ -499,27 +516,151 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     metadata_after: (adjustment.metadata_after || {}) as Record<string, unknown>,
     document_snapshot: (adjustment.document_snapshot || {}) as Record<string, unknown>,
   })) as QuoteFinancialAdjustment[];
-  const financialCalculation = calculateQuoteFinancials({
-    versions: versions.map(version => ({
-      id: version.id,
-      quote_thread_id: version.quote_thread_id,
-      total: Number(version.total || 0),
-      revision_type: version.revision_type,
-      revision_number: Number(version.revision_number || 0),
-      created_at: version.created_at,
-    })),
-    invoices: threadInvoices,
-    requests: threadRequests,
-    adjustments: financialAdjustments,
+  const mergedInvoices = threadInvoices.filter(invoice => invoice.merge_billing_scope !== 'single');
+  const pendingMergedRequests = threadRequests.filter(request => (
+    request.merge_billing_scope !== 'single' && request.status === 'pending'
+  ));
+  const [invoiceSourceAllocationResult, requestSourceAllocationResult] = await Promise.all([
+    mergedInvoices.length > 0
+      ? supabase
+          .from('quote_billing_source_allocations')
+          .select('quote_invoice_id, source_quote_thread_id, amount')
+          .in('quote_invoice_id', mergedInvoices.map(invoice => invoice.id))
+      : Promise.resolve({ data: [], error: null }),
+    pendingMergedRequests.length > 0
+      ? supabase
+          .from('quote_billing_source_allocations')
+          .select('quote_invoice_request_id, source_quote_thread_id, amount')
+          .in('quote_invoice_request_id', pendingMergedRequests.map(request => request.id))
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (invoiceSourceAllocationResult.error) throw invoiceSourceAllocationResult.error;
+  if (requestSourceAllocationResult.error) throw requestSourceAllocationResult.error;
+  const allocatedInvoicesByThread = new Map<string, number>();
+  const allocatedRequestsByThread = new Map<string, number>();
+  for (const allocation of invoiceSourceAllocationResult.data || []) {
+    allocatedInvoicesByThread.set(
+      allocation.source_quote_thread_id,
+      (allocatedInvoicesByThread.get(allocation.source_quote_thread_id) || 0) + Number(allocation.amount),
+    );
+  }
+  for (const allocation of requestSourceAllocationResult.data || []) {
+    allocatedRequestsByThread.set(
+      allocation.source_quote_thread_id,
+      (allocatedRequestsByThread.get(allocation.source_quote_thread_id) || 0) + Number(allocation.amount),
+    );
+  }
+  const financialCalculations = mergeThreadIds.map((threadId) => {
+    const threadVersions = versions.filter(version => version.quote_thread_id === threadId);
+    const threadVersionIds = new Set(threadVersions.map(version => version.id));
+    return calculateQuoteFinancials({
+      versions: threadVersions.map(version => ({
+        id: version.id,
+        quote_thread_id: version.quote_thread_id,
+        total: Number(version.total || 0),
+        revision_type: version.revision_type,
+        revision_number: Number(version.revision_number || 0),
+        created_at: version.created_at,
+      })),
+      invoices: threadInvoices.filter(invoice => threadVersionIds.has(invoice.quote_id)),
+      requests: threadRequests.filter(request => threadVersionIds.has(request.quote_id)),
+      adjustments: financialAdjustments.filter(adjustment => adjustment.quote_thread_id === threadId),
+    });
   });
+  const survivorFinancialCalculation = financialCalculations.find(
+    calculation => calculation.threadSummary.quote_thread_id === typedQuote.quote_thread_id,
+  ) || financialCalculations[0];
+  if (!survivorFinancialCalculation) {
+    throw new Error('Quote financial calculation is unavailable.');
+  }
+  const sumFinancialField = (field: keyof QuoteThreadFinancialSummary) => (
+    Math.round(financialCalculations.reduce(
+      (sum, calculation) => sum + Number(calculation.threadSummary[field] || 0),
+      0,
+    ) * 100) / 100
+  );
+  const getCommercialValueField = (field: keyof QuoteThreadFinancialSummary) => (
+    mergeContext?.group.merge_mode !== 'consolidated'
+      ? sumFinancialField(field)
+      : field === 'adjusted_quote_value'
+        ? Math.round((
+            Number(survivorFinancialCalculation.threadSummary.original_quote_value)
+            + sumFinancialField('quote_adjustments')
+          ) * 100) / 100
+        : field === 'quote_adjustments'
+          ? sumFinancialField('quote_adjustments')
+          : Number(survivorFinancialCalculation.threadSummary[field] || 0)
+  );
+  const adjustedQuoteValue = getCommercialValueField('adjusted_quote_value');
+  const netInvoiced = sumFinancialField('net_invoiced');
+  const writeOffsTotal = sumFinancialField('write_offs_total');
+  const pendingRequestedTotal = sumFinancialField('pending_requested_total');
+  const remainingToInvoice = Math.round(
+    (adjustedQuoteValue - netInvoiced - writeOffsTotal) * 100,
+  ) / 100;
+  const availableToRequest = Math.max(
+    0,
+    Math.round((remainingToInvoice - pendingRequestedTotal) * 100) / 100,
+  );
+  const financialCalculation = mergeContext
+    ? {
+        adjustments: financialCalculations.flatMap(calculation => calculation.adjustments),
+        effectiveInvoices: financialCalculations.flatMap(calculation => calculation.effectiveInvoices),
+        versionSummaries: Object.assign(
+          {},
+          ...financialCalculations.map(calculation => calculation.versionSummaries),
+        ),
+        threadSummary: {
+          ...survivorFinancialCalculation.threadSummary,
+          quote_id: typedQuote.id,
+          quote_thread_id: typedQuote.quote_thread_id,
+          included_quote_ids: mergeContext.group.merge_mode === 'consolidated'
+            ? survivorFinancialCalculation.threadSummary.included_quote_ids
+            : financialCalculations.flatMap(
+                calculation => calculation.threadSummary.included_quote_ids,
+              ),
+          superseded_quote_ids: financialCalculations.flatMap(
+            calculation => calculation.threadSummary.superseded_quote_ids,
+          ),
+          original_quote_value: getCommercialValueField('original_quote_value'),
+          quote_adjustments: getCommercialValueField('quote_adjustments'),
+          adjusted_quote_value: adjustedQuoteValue,
+          gross_invoiced: sumFinancialField('gross_invoiced'),
+          credits_total: sumFinancialField('credits_total'),
+          debits_total: sumFinancialField('debits_total'),
+          voids_total: sumFinancialField('voids_total'),
+          net_invoiced: netInvoiced,
+          refunds_total: sumFinancialField('refunds_total'),
+          write_offs_total: writeOffsTotal,
+          pending_requested_total: pendingRequestedTotal,
+          remaining_to_invoice: remainingToInvoice,
+          available_to_request: availableToRequest,
+          has_variance: financialCalculations.some(calculation => calculation.threadSummary.has_variance),
+          reconciliation_status: remainingToInvoice < -0.005
+            ? 'over_invoiced' as const
+            : Math.abs(remainingToInvoice) <= 0.005
+              ? writeOffsTotal > 0.005 ? 'written_off' as const : 'balanced' as const
+              : 'outstanding' as const,
+          invoice_status: remainingToInvoice <= 0.005 && netInvoiced >= adjustedQuoteValue - 0.005
+            ? 'invoiced' as const
+            : pendingRequestedTotal > 0.005
+              ? 'ready_to_invoice' as const
+              : netInvoiced > 0.005
+                ? 'partially_invoiced' as const
+                : 'not_invoiced' as const,
+        },
+      }
+    : survivorFinancialCalculation;
+  const displayInvoices = mergeContext ? threadInvoices : invoices;
+  const displayInvoiceRequests = mergeContext ? threadRequests : invoiceRequests;
   const timeline = enrichQuoteTimelineEventDescriptions(
     (timelineResult.data || []) as QuoteBundle['timeline'],
     {
-      invoiceRequests,
-      invoices,
+      invoiceRequests: displayInvoiceRequests,
+      invoices: displayInvoices,
     }
   );
-  const invoiceIds = invoices.map(invoice => invoice.id);
+  const invoiceIds = displayInvoices.map(invoice => invoice.id);
   const allocationsByInvoice = new Map<string, QuoteInvoiceAllocationRow[]>();
 
   if (invoiceIds.length > 0) {
@@ -539,17 +680,153 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
 
   const invoiceSummary = getInvoiceSummary({
     total: Number(typedQuote.total || 0),
-    invoices,
-    invoiceRequests,
+    invoices: displayInvoices,
+    invoiceRequests: displayInvoiceRequests,
   });
 
-  const lineItems = (lineItemsResult.data || []) as QuoteLineItemRow[];
-  const purchaseOrders = await listQuotePurchaseOrders(supabase, typedQuote.quote_thread_id);
+  let lineItems: Array<QuoteLineItemRow & {
+    source_quote_reference?: string | null;
+    source_quote_thread_id?: string | null;
+  }> =
+    (lineItemsResult.data || []) as QuoteLineItemRow[];
+  if (mergeContext && lineItems.length > 0) {
+    const { data: lineSources, error: lineSourceError } = await supabase
+      .from('quote_line_item_merge_sources')
+      .select('consolidated_line_item_id, source_quote_reference, source_quote_thread_id')
+      .in('consolidated_line_item_id', lineItems.map(item => item.id));
+    if (lineSourceError) throw lineSourceError;
+    const sourceReferenceByLineId = new Map(
+      (lineSources || []).map(source => [
+        source.consolidated_line_item_id,
+        source.source_quote_reference,
+      ]),
+    );
+    const sourceThreadByLineId = new Map(
+      (lineSources || []).map(source => [
+        source.consolidated_line_item_id,
+        source.source_quote_thread_id,
+      ]),
+    );
+    lineItems = lineItems.map(item => ({
+      ...item,
+      source_quote_reference: sourceReferenceByLineId.get(item.id) || null,
+      source_quote_thread_id: sourceThreadByLineId.get(item.id) || null,
+    }));
+  }
+  const purchaseOrders = (
+    await Promise.all(mergeThreadIds.map(threadId => listQuotePurchaseOrders(supabase, threadId)))
+  ).flat();
+  let attachments = (attachmentsResult.data || []) as QuoteAttachmentRow[];
+  let ramsDocuments = (ramsDocumentsResult.data || []) as RamsDocumentRow[];
+  if (mergeContext && versionIds.length > 0) {
+    const [groupAttachments, groupRams] = await Promise.all([
+      supabase.from('quote_attachments').select('*').in('quote_id', versionIds).order('created_at', { ascending: false }),
+      supabase.from('rams_documents').select('*').in('quote_id', versionIds).order('created_at', { ascending: false }),
+    ]);
+    if (groupAttachments.error) throw groupAttachments.error;
+    if (groupRams.error) throw groupRams.error;
+    const referenceByQuoteId = new Map(versions.map(version => [version.id, version.base_quote_reference]));
+    attachments = Array.from(
+      new Map((groupAttachments.data || []).map(attachment => [
+        attachment.file_path,
+        {
+          ...attachment,
+          source_reference: referenceByQuoteId.get(attachment.quote_id) || null,
+        },
+      ])).values(),
+    );
+    ramsDocuments = Array.from(
+      new Map((groupRams.data || []).map(document => [
+        document.file_path,
+        {
+          ...document,
+          source_reference: document.quote_id
+            ? referenceByQuoteId.get(document.quote_id) || null
+            : null,
+        },
+      ])).values(),
+    );
+  }
   const poCoverage = buildQuotePoCoverageSummary({
     quoteTotal: Number(typedQuote.total || 0),
     lineItemIds: lineItems.map(item => item.id),
     purchaseOrders,
   });
+  const mergedInvoiceTotal = mergedInvoices.reduce(
+    (total, invoice) => total + Number(invoice.amount || 0),
+    0,
+  );
+  const mergedPendingRequestTotal = pendingMergedRequests.reduce(
+    (total, request) => total + Number(request.requested_amount || 0),
+    0,
+  );
+  const consolidatedBaseValueByThread = new Map<string, number>();
+  if (mergeContext?.group.merge_mode === 'consolidated') {
+    for (const lineItem of lineItems) {
+      const sourceThreadId = lineItem.source_quote_thread_id || typedQuote.quote_thread_id;
+      consolidatedBaseValueByThread.set(
+        sourceThreadId,
+        (consolidatedBaseValueByThread.get(sourceThreadId) || 0) + Number(lineItem.line_total || 0),
+      );
+    }
+  }
+  const mergeSourceFinancialSummaries = Object.fromEntries(
+    financialCalculations.map((calculation) => {
+      const summary = calculation.threadSummary;
+      const isSurvivorThread = summary.quote_thread_id === typedQuote.quote_thread_id;
+      const originalQuoteValue = mergeContext?.group.merge_mode === 'consolidated'
+        ? Math.round((consolidatedBaseValueByThread.get(summary.quote_thread_id) || 0) * 100) / 100
+        : Number(summary.original_quote_value);
+      const sourceAdjustedQuoteValue = Math.round((
+        originalQuoteValue + Number(summary.quote_adjustments)
+      ) * 100) / 100;
+      const netInvoiced = Math.round((
+        Number(summary.net_invoiced)
+        - (isSurvivorThread ? mergedInvoiceTotal : 0)
+        + (allocatedInvoicesByThread.get(summary.quote_thread_id) || 0)
+      ) * 100) / 100;
+      const pendingRequestedTotal = Math.round((
+        Number(summary.pending_requested_total)
+        - (isSurvivorThread ? mergedPendingRequestTotal : 0)
+        + (allocatedRequestsByThread.get(summary.quote_thread_id) || 0)
+      ) * 100) / 100;
+      const remainingToInvoice = Math.round((
+        sourceAdjustedQuoteValue
+        - netInvoiced
+        - Number(summary.write_offs_total)
+      ) * 100) / 100;
+      const availableToRequest = Math.max(
+        0,
+        Math.round((remainingToInvoice - pendingRequestedTotal) * 100) / 100,
+      );
+      return [
+        summary.quote_thread_id,
+        {
+          ...summary,
+          original_quote_value: originalQuoteValue,
+          adjusted_quote_value: sourceAdjustedQuoteValue,
+          net_invoiced: netInvoiced,
+          pending_requested_total: pendingRequestedTotal,
+          remaining_to_invoice: remainingToInvoice,
+          available_to_request: availableToRequest,
+          invoice_status: remainingToInvoice <= 0.005
+            ? 'invoiced' as const
+            : pendingRequestedTotal > 0.005
+              ? 'ready_to_invoice' as const
+              : netInvoiced > 0.005
+                ? 'partially_invoiced' as const
+                : 'not_invoiced' as const,
+          reconciliation_status: remainingToInvoice < -0.005
+            ? 'over_invoiced' as const
+            : Math.abs(remainingToInvoice) <= 0.005
+              ? Number(summary.write_offs_total) > 0.005
+                ? 'written_off' as const
+                : 'balanced' as const
+              : 'outstanding' as const,
+        },
+      ];
+    }),
+  );
 
   return {
     quote: {
@@ -558,21 +835,26 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
       selected_secondary_contacts: selectedContacts,
     },
     lineItems,
-    attachments: (attachmentsResult.data || []) as QuoteAttachmentRow[],
-    ramsDocuments: (ramsDocumentsResult.data || []) as RamsDocumentRow[],
+    attachments,
+    ramsDocuments,
     versions,
     timeline,
     selectedSecondaryContacts: selectedContacts,
-    invoices: invoices.map(invoice => ({
+    invoices: displayInvoices.map(invoice => ({
       ...invoice,
       allocations: allocationsByInvoice.get(invoice.id) || [],
     })),
-    invoiceRequests,
+    invoiceRequests: displayInvoiceRequests,
     purchaseOrders,
     poCoverage,
     invoiceSummary,
     financialAdjustments: financialCalculation.adjustments,
     financialSummary: financialCalculation.threadSummary,
+    mergeInfo: mergeContext ? serializeMergeContext(mergeContext) : null,
+    mergeSourceQuotes: mergeContext
+      ? versions.filter(version => version.is_latest_version)
+      : [],
+    mergeSourceFinancialSummaries,
   };
 }
 
@@ -698,7 +980,9 @@ export async function renderQuotePdfAttachment(
     siteAddress: bundle.quote.site_address || '',
     managerEmail,
     lineItems: bundle.lineItems.map(item => ({
-      description: item.description,
+      description: item.source_quote_reference
+        ? `[${item.source_quote_reference}] ${item.description}`
+        : item.description,
       quantity: Number(item.quantity),
       unit: item.unit,
       unit_rate: Number(item.unit_rate),
