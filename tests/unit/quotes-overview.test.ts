@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildAllocatedLabourRows,
+  buildOverviewRecords,
   buildOverviewSummary,
   buildOverviewQuoteIds,
   buildQuoteLevelInvoiceFallback,
@@ -9,6 +10,7 @@ import {
   type LabourJobCodeSourceRow,
   type LabourTimesheetSource,
   type OverviewSummaryRecord,
+  type ProjectSourceRow,
 } from '@/lib/server/quotes-overview';
 import type { QuoteOverviewInvoice, QuoteOverviewItem } from '@/app/(dashboard)/quotes/overview-types';
 
@@ -121,6 +123,71 @@ describe('quotes overview labour allocation', () => {
 
     expect(rowsByReference.get('01234-MD')?.[0]?.allocated_hours).toBe(5);
     expect(rowsByReference.get('05678-JS')?.[0]?.allocated_hours).toBe(5);
+  });
+});
+
+describe('quotes overview merged project aliases', () => {
+  function createProject(
+    id: string,
+    reference: string,
+    amount: number,
+    mergedIntoProjectNumberId: string | null,
+  ): ProjectSourceRow {
+    return {
+      id,
+      project_reference: reference,
+      manager_profile_id: 'manager-1',
+      requester_initials: 'MD',
+      title: `${reference} works`,
+      description: null,
+      status: mergedIntoProjectNumberId ? 'merged' : 'converted',
+      linked_quote_id: null,
+      linked_at: null,
+      converted_quote_id: 'quote-1',
+      converted_at: '2026-07-27T10:00:00.000Z',
+      cancelled_at: null,
+      merged_into_project_number_id: mergedIntoProjectNumberId,
+      merged_at: mergedIntoProjectNumberId ? '2026-07-27T10:00:00.000Z' : null,
+      notes: null,
+      created_by: 'user-1',
+      updated_by: 'user-1',
+      created_at: '2026-07-20T10:00:00.000Z',
+      updated_at: '2026-07-27T10:00:00.000Z',
+      costs: [{
+        id: `cost-${id}`,
+        project_number_id: id,
+        cost_date: '2026-07-20',
+        category: 'materials',
+        supplier: null,
+        description: 'Materials',
+        amount,
+        notes: null,
+        linked_quote_id: 'quote-1',
+        linked_quote_line_item_id: `line-${id}`,
+        linked_at: '2026-07-27T10:00:00.000Z',
+        created_by: 'user-1',
+        updated_by: 'user-1',
+        created_at: '2026-07-20T10:00:00.000Z',
+        updated_at: '2026-07-27T10:00:00.000Z',
+      }],
+    };
+  }
+
+  it('folds merged aliases and their costs into the survivor record', () => {
+    const records = buildOverviewRecords({
+      quotes: [],
+      projects: [
+        createProject('project-1', '60001-MD', 100, null),
+        createProject('project-2', '60002-LC', 50, 'project-1'),
+      ],
+      invoicesByQuoteId: new Map(),
+      labourRowsByReference: new Map(),
+    });
+
+    expect(records).toHaveLength(1);
+    expect(records[0].item.reference).toBe('60001-MD');
+    expect(records[0].sourceReferences).toEqual(['60001-MD', '60002-LC']);
+    expect(records[0].item.manual_cost_total).toBe(150);
   });
 });
 

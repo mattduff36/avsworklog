@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="color-scheme" content="light">
-  <title>Squires App — Timesheet &amp; Payroll Rules Review</title>
+  <title>Squires App — Timesheet &amp; Payroll Rules Manager Sign-off — Version 2</title>
   <style>
     :root {
       --ink: #0f172a;
@@ -817,11 +817,11 @@
       </div>
 
       <div class="cover-content">
-        <p class="eyebrow">Client review document</p>
+        <p class="eyebrow">Manager sign-off document · Version 2</p>
         <h1>Timesheet &amp; Payroll Rules</h1>
         <p class="cover-lead">
-          Proposed calculation logic, administration controls and the final decisions required
-          before development can be completed safely.
+          Updated calculation logic and administration controls, incorporating the client
+          clarifications received on 27 July 2026.
         </p>
       </div>
 
@@ -832,11 +832,11 @@
         </div>
         <div>
           <strong>Date</strong>
-          <span>25 July 2026</span>
+          <span>27 July 2026</span>
         </div>
         <div>
           <strong>Status</strong>
-          <span>Client review required</span>
+          <span>Manager sign-off required</span>
         </div>
       </div>
     </header>
@@ -847,7 +847,7 @@
           <span class="section-number">01</span>
           <div>
             <h2>Purpose of this review</h2>
-            <p class="section-intro">Confirm the business rules before they become payroll logic.</p>
+            <p class="section-intro">Manager review of the final calculation rules before development.</p>
           </div>
         </div>
 
@@ -858,9 +858,9 @@
         </p>
 
         <div class="callout">
-          <strong>No unclear payroll value will be guessed.</strong>
-          The proposed system will keep incomplete rule sets in draft and prevent them from being
-          activated until the outstanding client answers in Section 04 have been confirmed.
+          <strong>All previously outstanding payroll questions have now been answered.</strong>
+          This Version 2 document incorporates those answers and is presented as the final rules
+          summary for manager review and sign-off.
         </div>
 
         <div class="status-strip" aria-label="Review summary">
@@ -869,12 +869,12 @@
             <span class="label">Payroll rule sets</span>
           </div>
           <div class="status-card">
-            <span class="value">7</span>
-            <span class="label">Agreed design decisions</span>
+            <span class="value">11</span>
+            <span class="label">Confirmed rule decisions</span>
           </div>
           <div class="status-card">
-            <span class="value">4</span>
-            <span class="label">Client answers required</span>
+            <span class="value">0</span>
+            <span class="label">Open client questions</span>
           </div>
         </div>
       </section>
@@ -896,7 +896,7 @@
               <li><strong>Saturday:</strong> first 4 payable hours at Overtime; remaining hours at Double Time.</li>
               <li><strong>Sunday:</strong> all payable hours at Double Time.</li>
               <li>Deduct a 30-minute unpaid break when elapsed work is more than 6 hours.</li>
-              <li>No separate night-shift premium was specified.</li>
+              <li>No separate night-shift premium applies.</li>
             </ul>
           </article>
 
@@ -931,7 +931,7 @@
               <li><strong>Saturday:</strong> first 4 payable hours at Overtime; remaining hours at Double Time.</li>
               <li><strong>Sunday:</strong> all payable hours at Double Time.</li>
               <li>Deduct a 30-minute unpaid break when elapsed work is more than 6 hours.</li>
-              <li>No separate night-shift premium was specified.</li>
+              <li><strong>Night shift:</strong> the whole shift at Double Time.</li>
             </ul>
           </article>
         </div>
@@ -952,11 +952,11 @@
               </tr>
               <tr>
                 <td>Night shifts</td>
-                <td>The employee or authorised editor selects “Night Shift” for the day. Where the assigned rule set includes a night premium, the whole shift is paid at that band.</td>
+                <td>The employee or authorised editor selects “Night Shift” for the day. For Civils, Plant and Others, the whole shift is Double Time. Lorries has no separate night-shift premium.</td>
               </tr>
               <tr>
                 <td>Time precision</td>
-                <td>Use exact entered minutes. Do not round start or finish times to 15-minute intervals. Display and export final totals to two decimal places.</td>
+                <td>Round entered start and finish times to the nearest 15-minute interval. Display and export final totals to two decimal places.</td>
               </tr>
               <tr>
                 <td>Subsistence</td>
@@ -964,7 +964,15 @@
               </tr>
               <tr>
                 <td>Paid leave</td>
-                <td>Use contracted weekday hours held in the employee’s effective payroll rule. A half day contributes half the configured full-day value.</td>
+                <td>Report paid and unpaid leave as separate day counts only, including half days where applicable. Do not convert leave into hours; paid leave is settled using average earnings outside the hours calculation.</td>
+              </tr>
+              <tr>
+                <td>Bank holidays</td>
+                <td>All hours worked on a bank holiday are Double Time for every payroll rule set.</td>
+              </tr>
+              <tr>
+                <td>Pay-treatment totals</td>
+                <td>Keep Basic, Overtime (1.5× treatment) and Double Time hours separate. Do not multiply hours when calculating worked-hour totals; for example, 39 Basic + 12 Overtime + 4 Double Time remains 55 worked hours, shown in three separate buckets.</td>
               </tr>
               <tr>
                 <td>Historical records</td>
@@ -1033,163 +1041,46 @@
         <div class="section-heading">
           <span class="section-number">04</span>
           <div>
-            <h2>Client answers required</h2>
-            <p class="section-intro">Please complete each item before the new rules are activated.</p>
+            <h2>Client clarifications incorporated</h2>
+            <p class="section-intro">The answers received on 27 July 2026 are now part of the specification.</p>
           </div>
         </div>
 
-        <article class="question">
-          <div class="question-header">
-            <span class="question-id">1</span>
-            <h3>Plant example: 07:30 to 18:00</h3>
+        <div class="decision-grid">
+          <div class="decision">
+            <strong>Plant example corrected</strong>
+            A 07:30–18:00 Plant shift is 10.5 elapsed hours. After the 30-minute unpaid break,
+            it produces 8 Basic hours and 2 Overtime hours.
           </div>
-          <div class="question-body">
-            <p>
-              The email states that this shift produces <strong>8 Basic hours and 1 Overtime hour</strong>.
-              The arithmetic does not currently reconcile:
-            </p>
-            <div class="evidence">
-              07:30–18:00 = 10.5 elapsed hours. Less a 0.5-hour unpaid break = 10 payable hours.
-              With an 8-hour Basic limit, this normally produces <strong>8 Basic + 2 Overtime</strong>.
-            </div>
-
-            <p><strong>Please select the intended result:</strong></p>
-            <div class="choice">
-              <input id="plant-a" name="plant-example" type="radio">
-              <label for="plant-a">8 Basic + 2 Overtime. The “1 hour Overtime” in the email was a typo.</label>
-            </div>
-            <div class="choice">
-              <input id="plant-b" name="plant-example" type="radio">
-              <label for="plant-b">8 Basic + 1 Overtime. Please explain how the remaining 1 hour should be treated.</label>
-            </div>
-            <div class="choice">
-              <input id="plant-c" name="plant-example" type="radio">
-              <label for="plant-c">A different result applies; details are provided below.</label>
-            </div>
-
-            <label class="answer-label" for="plant-notes">Client explanation / notes</label>
-            <textarea id="plant-notes"></textarea>
+          <div class="decision">
+            <strong>Leave remains in days</strong>
+            Paid and unpaid leave are reported as separate day counts. Leave is not converted to
+            hours because paid leave uses an average-earnings payment.
           </div>
-        </article>
-
-        <article class="question">
-          <div class="question-header">
-            <span class="question-id">2</span>
-            <h3>Paid-leave hours for Lorries and Civils</h3>
+          <div class="decision">
+            <strong>Bank holidays</strong>
+            All hours worked on a bank holiday are Double Time for Lorries, Civils, Plant and Others.
           </div>
-          <div class="question-body">
-            <p>
-              Plant and Others have a stated contracted week of 8 hours Monday–Thursday and
-              7 hours Friday. Equivalent paid-leave values were not provided for Lorries or Civils.
-            </p>
-
-            <div class="field-grid">
-              <div class="field">
-                <label for="lorries-mon-thu">Lorries — full day Monday–Thursday</label>
-                <input id="lorries-mon-thu" class="answer-line" type="text" placeholder="e.g. 8 hours">
-              </div>
-              <div class="field">
-                <label for="lorries-fri">Lorries — full day Friday</label>
-                <input id="lorries-fri" class="answer-line" type="text" placeholder="e.g. 7 hours">
-              </div>
-              <div class="field">
-                <label for="civils-mon-thu">Civils — full day Monday–Thursday</label>
-                <input id="civils-mon-thu" class="answer-line" type="text" placeholder="e.g. 8 hours">
-              </div>
-              <div class="field">
-                <label for="civils-fri">Civils — full day Friday</label>
-                <input id="civils-fri" class="answer-line" type="text" placeholder="e.g. 7 hours">
-              </div>
-            </div>
-
-            <label class="answer-label" for="leave-notes">Any different values for other weekdays or half days?</label>
-            <textarea id="leave-notes" placeholder="Half days will default to half the full-day value unless instructed otherwise."></textarea>
+          <div class="decision">
+            <strong>Overtime treatment</strong>
+            Overtime remains the 1.5× pay treatment, but the system records raw Overtime hours
+            separately and never multiplies them into worked-hour totals.
           </div>
-        </article>
-
-        <article class="question">
-          <div class="question-header">
-            <span class="question-id">3</span>
-            <h3>Bank-holiday treatment</h3>
+          <div class="decision">
+            <strong>Others night shifts</strong>
+            A night shift under the Others rule set is paid wholly at Double Time.
           </div>
-          <div class="question-body">
-            <p>
-              The current app treats bank-holiday work as Double Time. The new email does not
-              mention bank holidays. The new system can configure this independently for each rule set.
-            </p>
-
-            <div class="field-grid">
-              <div class="field">
-                <label for="bank-lorries">Lorries</label>
-                <select id="bank-lorries">
-                  <option selected>Please select</option>
-                  <option>Use the normal day rule</option>
-                  <option>Overtime</option>
-                  <option>Double Time</option>
-                  <option>Other — explain below</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="bank-civils">Civils</label>
-                <select id="bank-civils">
-                  <option selected>Please select</option>
-                  <option>Use the normal day rule</option>
-                  <option>Overtime</option>
-                  <option>Double Time</option>
-                  <option>Other — explain below</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="bank-plant">Plant</label>
-                <select id="bank-plant">
-                  <option selected>Please select</option>
-                  <option>Use the normal day rule</option>
-                  <option>Overtime</option>
-                  <option>Double Time</option>
-                  <option>Other — explain below</option>
-                </select>
-              </div>
-              <div class="field">
-                <label for="bank-others">Others</label>
-                <select id="bank-others">
-                  <option selected>Please select</option>
-                  <option>Use the normal day rule</option>
-                  <option>Overtime</option>
-                  <option>Double Time</option>
-                  <option>Other — explain below</option>
-                </select>
-              </div>
-            </div>
-
-            <label class="answer-label" for="bank-notes">Bank-holiday notes</label>
-            <textarea id="bank-notes"></textarea>
+          <div class="decision">
+            <strong>Quarter-hour precision</strong>
+            Entered start and finish times are rounded to the nearest 15-minute interval.
           </div>
-        </article>
+        </div>
 
-        <article class="question">
-          <div class="question-header">
-            <span class="question-id">4</span>
-            <h3>Overtime rate label</h3>
-          </div>
-          <div class="question-body">
-            <p>
-              The existing payroll report labels standard Overtime as <strong>1.5×</strong>.
-              The email uses the word “overtime” without restating the multiplier.
-            </p>
-
-            <div class="choice">
-              <input id="ot-a" name="overtime-rate" type="radio">
-              <label for="ot-a">Confirm Overtime remains 1.5×.</label>
-            </div>
-            <div class="choice">
-              <input id="ot-b" name="overtime-rate" type="radio">
-              <label for="ot-b">Use a different multiplier or payroll label, explained below.</label>
-            </div>
-
-            <label class="answer-label" for="ot-notes">Alternative multiplier / notes</label>
-            <textarea id="ot-notes"></textarea>
-          </div>
-        </article>
+        <div class="callout">
+          <strong>Worked-hours example:</strong>
+          39 Basic hours + 12 Overtime hours + 4 Double Time hours is reported as three separate
+          treatments totalling 55 worked hours—not 65 multiplied hours.
+        </div>
       </section>
 
       <section class="section page-break">
@@ -1249,14 +1140,14 @@
             <span class="step-marker">1</span>
             <div>
               <h3>Employee entry and confirmation</h3>
-              <p>The employee enters exact start/finish times, travel, subsistence and any Night Shift selection, then sees the calculated weekly breakdown before submission.</p>
+              <p>The employee enters start/finish times, which are rounded to 15-minute intervals, plus travel, subsistence and any Night Shift selection, then sees the calculated weekly breakdown before submission.</p>
             </div>
           </div>
           <div class="step">
             <span class="step-marker">2</span>
             <div>
               <h3>Manager approval</h3>
-              <p>The approver sees Basic, Overtime, Double Time, leave, travel, IPR and subsistence totals alongside the original entries.</p>
+              <p>The approver sees separate Basic, Overtime and Double Time hours, paid/unpaid leave days, travel, IPR and subsistence alongside the original entries.</p>
             </div>
           </div>
           <div class="step">
@@ -1289,8 +1180,10 @@
           <li>Test every weekday and weekend rule for Lorries, Civils, Plant and Others.</li>
           <li>Test the break boundary at exactly 6 hours and immediately above 6 hours.</li>
           <li>Test Saturday’s first 4 hours and the transition into Double Time.</li>
-          <li>Test exact-minute entries, overnight shifts and manual Night Shift selection.</li>
-          <li>Test full-day and half-day paid leave against contracted weekday hours.</li>
+          <li>Test nearest-15-minute rounding, overnight shifts and manual Night Shift selection, including Others.</li>
+          <li>Test full-day and half-day paid/unpaid leave counts with no conversion into hours.</li>
+          <li>Test bank-holiday Double Time for every rule set.</li>
+          <li>Test that Basic, Overtime and Double Time remain separate raw-hour buckets with no multiplier applied to total worked hours.</li>
           <li>Test Plant weekly travel and the IPR five-day / 1.0-unit cap.</li>
           <li>Test team assignment, employee overrides and Civils fallback behaviour.</li>
           <li>Test that later rule edits cannot alter approved or processed historical payroll.</li>
@@ -1303,20 +1196,20 @@
         <div class="section-heading">
           <span class="section-number">08</span>
           <div>
-            <h2>Client confirmation</h2>
-            <p class="section-intro">Return the completed answers in Section 04 with any amendments.</p>
+            <h2>Manager sign-off</h2>
+            <p class="section-intro">Confirm the Version 2 rules summary or record required amendments.</p>
           </div>
         </div>
 
         <div class="approval">
           <p>
-            Please confirm that the calculation matrix in Section 02 accurately reflects the intended
-            payroll rules, subject to the answers and amendments supplied in Section 04.
+            Please confirm that the calculation matrix in Section 02, together with the incorporated
+            client clarifications in Section 04, accurately reflects the intended payroll rules.
           </p>
 
           <div class="choice">
             <input id="approval-a" name="approval" type="radio">
-            <label for="approval-a">Approved to proceed once the Section 04 answers are incorporated.</label>
+            <label for="approval-a">Approved for development as specified in this Version 2 document.</label>
           </div>
           <div class="choice">
             <input id="approval-b" name="approval" type="radio">
@@ -1341,8 +1234,8 @@
     </main>
 
     <footer>
-      <span>Squires App · Timesheet &amp; Payroll Rules Review</span>
-      <span>Prepared for A&amp;V Squires Plant Co. Ltd. · 25 July 2026</span>
+      <span>Squires App · Timesheet &amp; Payroll Rules · Version 2</span>
+      <span>Prepared for A&amp;V Squires Plant Co. Ltd. · 27 July 2026</span>
     </footer>
   </article>
 </body>

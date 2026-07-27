@@ -187,7 +187,12 @@ export async function syncProjectNumberSiteLocation(
   const reference = normalizeExternalReference(project.project_reference);
   const shouldBeActive = project.status === 'open';
 
-  if (!shouldBeActive && project.status !== 'cancelled' && project.status !== 'converted') {
+  if (
+    !shouldBeActive
+    && project.status !== 'cancelled'
+    && project.status !== 'converted'
+    && project.status !== 'merged'
+  ) {
     return { action: 'skipped', location_id: null, external_reference: reference };
   }
 

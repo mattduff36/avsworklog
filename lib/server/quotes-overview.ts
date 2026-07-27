@@ -45,7 +45,7 @@ interface ProfileRelation {
   employee_id?: string | null;
 }
 
-interface QuoteSourceRow extends QuoteRow {
+export interface QuoteSourceRow extends QuoteRow {
   customer?: CustomerRelation | CustomerRelation[] | null;
 }
 
@@ -57,7 +57,7 @@ interface QuoteReferenceRelation {
   customer?: Pick<CustomerRelation, 'company_name'> | Pick<CustomerRelation, 'company_name'>[] | null;
 }
 
-interface ProjectSourceRow extends ProjectRow {
+export interface ProjectSourceRow extends ProjectRow {
   manager?: ProfileRelation | ProfileRelation[] | null;
   linked_quote?: QuoteReferenceRelation | QuoteReferenceRelation[] | null;
   converted_quote?: QuoteReferenceRelation | QuoteReferenceRelation[] | null;
@@ -132,10 +132,11 @@ export interface QuoteLevelInvoiceSource {
   total: number | null;
 }
 
-interface OverviewRecord extends OverviewSummaryRecord {
+export interface OverviewRecord extends OverviewSummaryRecord {
   searchText: string;
   quote: QuoteSourceRow | null;
   project: ProjectSourceRow | null;
+  projects: ProjectSourceRow[];
 }
 
 interface OverviewSources {
@@ -227,8 +228,14 @@ function getLabourRowsForReferences(
   return references.flatMap(reference => labourRowsByReference.get(reference) || []);
 }
 
-function calculateManualCostTotal(project: ProjectSourceRow | null): number {
-  return roundHours((project?.costs || []).reduce((sum, cost) => sum + Number(cost.amount || 0), 0));
+function calculateManualCostTotal(projects: ProjectSourceRow[]): number {
+  return roundHours(projects.reduce(
+    (sum, project) => sum + (project.costs || []).reduce(
+      (projectSum, cost) => projectSum + Number(cost.amount || 0),
+      0,
+    ),
+    0,
+  ));
 }
 
 function buildSearchText(values: Array<string | number | null | undefined>): string {
@@ -695,7 +702,7 @@ async function loadLabourRowsByReference(
   );
 }
 
-function buildOverviewRecords(params: {
+export function buildOverviewRecords(params: {
   quotes: QuoteSourceRow[];
   projects: ProjectSourceRow[];
   invoicesByQuoteId: Map<string, QuoteOverviewInvoice[]>;
@@ -703,6 +710,8 @@ function buildOverviewRecords(params: {
 }): OverviewRecord[] {
   const quoteByReference = new Map<string, QuoteSourceRow>();
   const projectByReference = new Map<string, ProjectSourceRow>();
+  const projectsByReference = new Map<string, ProjectSourceRow[]>();
+  const projectById = new Map(params.projects.map(project => [project.id, project]));
   const orderedReferences: string[] = [];
 
   params.quotes.forEach((quote) => {
@@ -715,23 +724,33 @@ function buildOverviewRecords(params: {
   });
 
   params.projects.forEach((project) => {
-    const reference = normalizeReference(project.project_reference);
+    const canonicalProject = project.merged_into_project_number_id
+      ? projectById.get(project.merged_into_project_number_id) || project
+      : project;
+    const reference = normalizeReference(canonicalProject.project_reference);
     if (!reference) return;
-    if (!projectByReference.has(reference)) projectByReference.set(reference, project);
+    if (!projectByReference.has(reference)) projectByReference.set(reference, canonicalProject);
+    const groupedProjects = projectsByReference.get(reference) || [];
+    groupedProjects.push(project);
+    projectsByReference.set(reference, groupedProjects);
     if (!orderedReferences.includes(reference)) orderedReferences.push(reference);
   });
 
   return orderedReferences.map((reference) => {
     const quote = quoteByReference.get(reference) || null;
     const project = projectByReference.get(reference) || null;
+    const projects = projectsByReference.get(reference) || (project ? [project] : []);
     const customer = quote ? getSingleRelation(quote.customer) : null;
     const manager = project ? getSingleRelation(project.manager) : null;
     const sourceReferences = uniqueValues([
       reference,
       ...(quote ? getQuoteReferences(quote) : []),
-      project?.project_reference,
+      ...projects.map(sourceProject => sourceProject.project_reference),
     ]);
-    const quoteIds = buildOverviewQuoteIds(quote?.id, getProjectQuoteIds(project));
+    const quoteIds = buildOverviewQuoteIds(
+      quote?.id,
+      projects.flatMap(sourceProject => getProjectQuoteIds(sourceProject)),
+    );
     const invoices = getInvoicesForQuoteIds(params.invoicesByQuoteId, quoteIds);
     const labourRows = getLabourRowsForReferences(params.labourRowsByReference, sourceReferences);
     const employeeIds = new Set(labourRows.map(row => row.employee_id).filter(Boolean));
@@ -759,7 +778,7 @@ function buildOverviewRecords(params: {
       quote_id: quote?.id || project?.converted_quote_id || project?.linked_quote_id || null,
       project_number_id: project?.id || null,
       quote_total: Number(quote?.total || 0),
-      manual_cost_total: calculateManualCostTotal(project),
+      manual_cost_total: calculateManualCostTotal(projects),
       invoice_total: Math.round(invoiceTotal * 100) / 100,
       invoice_count: invoices.length,
       worked_hours: roundHours(workedHours),
@@ -769,10 +788,11 @@ function buildOverviewRecords(params: {
         quote?.updated_at,
         quote?.created_at,
         quote?.quote_date,
-        project?.updated_at,
-        project?.created_at,
+        ...projects.flatMap(sourceProject => [sourceProject.updated_at, sourceProject.created_at]),
         ...invoices.map(getInvoiceOverviewDate),
-        ...(project?.costs || []).flatMap(cost => [cost.updated_at, cost.created_at, cost.linked_at, cost.cost_date]),
+        ...projects.flatMap(sourceProject => (
+          sourceProject.costs || []
+        ).flatMap(cost => [cost.updated_at, cost.created_at, cost.linked_at, cost.cost_date])),
         getLatestLabourActivityDate(labourRows),
       ]),
       href: `/quotes/overview/${encodeURIComponent(reference)}`,
@@ -791,15 +811,19 @@ function buildOverviewRecords(params: {
         customer?.company_name,
         customer?.short_name,
         customer?.contact_name,
-        project?.title,
-        project?.description,
-        project?.requester_initials,
+        ...projects.flatMap(sourceProject => [
+          sourceProject.project_reference,
+          sourceProject.title,
+          sourceProject.description,
+          sourceProject.requester_initials,
+        ]),
         manager?.full_name,
       ]),
       sourceReferences,
       quoteIds,
       quote,
       project,
+      projects,
     };
   }).sort((a, b) => {
     const dateCompare = (b.item.latest_activity_at || '').localeCompare(a.item.latest_activity_at || '');
@@ -984,7 +1008,7 @@ export async function getQuoteOverviewDetail(
     line_items: ((lineItemsResult.data || []) as QuoteLineItemRow[]).map(toLineItem),
     invoices,
     invoice_requests: ((invoiceRequestsResult.data || []) as QuoteInvoiceRequestRow[]).map(toInvoiceRequest),
-    manual_costs: (record.project?.costs || []).map(toManualCost),
+    manual_costs: record.projects.flatMap(project => (project.costs || []).map(toManualCost)),
     labour_rows: labourRows,
     labour_by_employee: buildEmployeeSummaries(labourRows),
     summary: buildOverviewSummary({

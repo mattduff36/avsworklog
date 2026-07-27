@@ -230,7 +230,7 @@ export interface LegacyQuote {
   updated_at: string;
 }
 
-export type QuoteProjectNumberStatus = 'open' | 'linked' | 'converted' | 'cancelled';
+export type QuoteProjectNumberStatus = 'open' | 'linked' | 'converted' | 'cancelled' | 'merged';
 export type QuoteProjectCostCategory = 'materials' | 'subcontractor' | 'plant' | 'labour' | 'other';
 
 export interface QuoteProjectCost {
@@ -273,6 +273,8 @@ export interface QuoteProjectNumber {
   converted_quote_id: string | null;
   converted_at: string | null;
   cancelled_at: string | null;
+  merged_into_project_number_id: string | null;
+  merged_at: string | null;
   notes: string | null;
   created_by: string | null;
   updated_by: string | null;
@@ -299,6 +301,12 @@ export interface QuoteProjectNumber {
     customer?: {
       company_name: string;
     } | null;
+  } | null;
+  merged_into_project_number?: {
+    id: string;
+    project_reference: string;
+    title: string;
+    converted_quote_id: string | null;
   } | null;
   costs?: QuoteProjectCost[];
   manual_cost_total?: number;

@@ -8,6 +8,7 @@ const {
   mockGetInitialsFromName,
   mockGetQuoteManagerOption,
   mockSyncProjectNumberSiteLocation,
+  mockConvertProjectNumbersToQuote,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockCreateAdminClient: vi.fn(),
@@ -15,6 +16,7 @@ const {
   mockGetInitialsFromName: vi.fn(),
   mockGetQuoteManagerOption: vi.fn(),
   mockSyncProjectNumberSiteLocation: vi.fn(),
+  mockConvertProjectNumbersToQuote: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -39,6 +41,11 @@ vi.mock('@/lib/server/quote-workflow', () => ({
 
 vi.mock('@/lib/server/inventory-site-location-sync', () => ({
   syncProjectNumberSiteLocation: mockSyncProjectNumberSiteLocation,
+}));
+
+vi.mock('@/lib/server/quote-project-number-conversion', () => ({
+  convertProjectNumbersToQuote: mockConvertProjectNumbersToQuote,
+  getProjectConversionConflictMessage: vi.fn().mockReturnValue(null),
 }));
 
 describe('POST /api/quotes/project-numbers', () => {
@@ -66,6 +73,27 @@ describe('POST /api/quotes/project-numbers', () => {
       action: 'created',
       location_id: 'site-location-1',
       external_reference: '60001-MD',
+    });
+    mockConvertProjectNumbersToQuote.mockResolvedValue({
+      project: {
+        id: 'project-1',
+        project_reference: '60001-MD',
+        status: 'converted',
+      },
+      projects: [
+        {
+          id: 'project-1',
+          project_reference: '60001-MD',
+          status: 'converted',
+        },
+        {
+          id: 'project-2',
+          project_reference: '60002-LC',
+          status: 'merged',
+        },
+      ],
+      quote_id: 'quote-1',
+      aliases: ['60002-LC'],
     });
   });
 
@@ -160,5 +188,37 @@ describe('POST /api/quotes/project-numbers', () => {
       title: 'Enter a project title.',
     });
     expect(mockGenerateQuoteReferenceForManager).not.toHaveBeenCalled();
+  });
+
+  it('dispatches multi-project conversion and syncs every resulting project', async () => {
+    mockCreateAdminClient.mockReturnValue({ from: vi.fn() });
+
+    const body = {
+      action: 'convert_to_quote',
+      project_number_id: 'project-1',
+      project_number_ids: ['project-1', 'project-2'],
+      survivor_project_number_id: 'project-1',
+      cost_ids: ['cost-1', 'cost-2'],
+      customer_id: 'customer-1',
+      site_address: 'Site address',
+    };
+    const { PATCH } = await import('@/app/api/quotes/project-numbers/route');
+    const response = await PATCH(new NextRequest('http://localhost/api/quotes/project-numbers', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mockConvertProjectNumbersToQuote).toHaveBeenCalledWith(
+      expect.any(Object),
+      body,
+      'user-1',
+    );
+    expect(mockSyncProjectNumberSiteLocation).toHaveBeenCalledTimes(2);
+    expect(payload).toEqual(expect.objectContaining({
+      quote_id: 'quote-1',
+      aliases: ['60002-LC'],
+    }));
   });
 });

@@ -5805,12 +5805,14 @@ export type Database = {
           requester_initials: string
           title: string
           description: string | null
-          status: 'open' | 'linked' | 'converted' | 'cancelled'
+          status: 'open' | 'linked' | 'converted' | 'cancelled' | 'merged'
           linked_quote_id: string | null
           linked_at: string | null
           converted_quote_id: string | null
           converted_at: string | null
           cancelled_at: string | null
+          merged_into_project_number_id: string | null
+          merged_at: string | null
           notes: string | null
           created_by: string | null
           updated_by: string | null
@@ -5824,12 +5826,14 @@ export type Database = {
           requester_initials: string
           title: string
           description?: string | null
-          status?: 'open' | 'linked' | 'converted' | 'cancelled'
+          status?: 'open' | 'linked' | 'converted' | 'cancelled' | 'merged'
           linked_quote_id?: string | null
           linked_at?: string | null
           converted_quote_id?: string | null
           converted_at?: string | null
           cancelled_at?: string | null
+          merged_into_project_number_id?: string | null
+          merged_at?: string | null
           notes?: string | null
           created_by?: string | null
           updated_by?: string | null
@@ -5843,12 +5847,14 @@ export type Database = {
           requester_initials?: string
           title?: string
           description?: string | null
-          status?: 'open' | 'linked' | 'converted' | 'cancelled'
+          status?: 'open' | 'linked' | 'converted' | 'cancelled' | 'merged'
           linked_quote_id?: string | null
           linked_at?: string | null
           converted_quote_id?: string | null
           converted_at?: string | null
           cancelled_at?: string | null
+          merged_into_project_number_id?: string | null
+          merged_at?: string | null
           notes?: string | null
           created_by?: string | null
           updated_by?: string | null
@@ -5882,6 +5888,13 @@ export type Database = {
             columns: ['manager_profile_id']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'quote_project_numbers_merged_into_project_number_id_fkey'
+            columns: ['merged_into_project_number_id']
+            isOneToOne: false
+            referencedRelation: 'quote_project_numbers'
             referencedColumns: ['id']
           },
           {
@@ -9696,6 +9709,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      convert_quote_project_numbers: {
+        Args: {
+          p_project_number_ids: string[]
+          p_survivor_project_number_id: string
+          p_cost_ids: string[]
+          p_quote: Json
+          p_line_items: Json
+          p_actor_user_id: string
+        }
+        Returns: Json
+      }
       inventory_kiosk_confirm_device_pairing: {
         Args: {
           p_manager_user_id: string
@@ -9847,7 +9871,7 @@ export type Database = {
       check__quote_invoice_requests__status: 'pending' | 'fulfilled' | 'cancelled'
       check__quote_invoices__invoice_scope: 'full' | 'partial'
       check__quote_project_costs__category: 'materials' | 'subcontractor' | 'plant' | 'labour' | 'other'
-      check__quote_project_numbers__status: 'open' | 'linked' | 'converted' | 'cancelled'
+      check__quote_project_numbers__status: 'open' | 'linked' | 'converted' | 'cancelled' | 'merged'
       check__quotes__commercial_status: 'open' | 'closed'
       check__quotes__completion_status: 'not_completed' | 'approved_in_full' | 'approved_in_part'
       check__quotes__pricing_mode: 'itemized' | 'attachments_only'

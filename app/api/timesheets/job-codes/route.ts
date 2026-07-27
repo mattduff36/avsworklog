@@ -47,6 +47,16 @@ interface ProjectNumberJobCodeRow {
   project_reference: string | null;
   title: string | null;
   description: string | null;
+  status: 'open' | 'merged';
+  merged_into_project_number?: {
+    project_reference: string | null;
+    title: string | null;
+    description: string | null;
+  } | Array<{
+    project_reference: string | null;
+    title: string | null;
+    description: string | null;
+  }> | null;
 }
 
 interface TimesheetJobCodeOption {
@@ -61,7 +71,11 @@ function normalizeSearchQuery(query: string): string {
   return query.trim().toLowerCase();
 }
 
-function optionMatchesQuery(option: TimesheetJobCodeOption, query: string): boolean {
+function optionMatchesQuery(
+  option: TimesheetJobCodeOption,
+  query: string,
+  aliases: Array<string | null | undefined> = [],
+): boolean {
   if (!query) return true;
 
   const normalizedJobCodeQuery = normalizeJobNumberInput(query).toLowerCase();
@@ -69,6 +83,7 @@ function optionMatchesQuery(option: TimesheetJobCodeOption, query: string): bool
     option.value,
     option.customerName,
     option.quoteTitle,
+    ...aliases,
   ].filter(Boolean).join(' ').toLowerCase();
 
   return haystack.includes(query) || Boolean(normalizedJobCodeQuery && option.value.toLowerCase().includes(normalizedJobCodeQuery));
@@ -83,9 +98,10 @@ function addOption(
   options: TimesheetJobCodeOption[],
   seen: Set<string>,
   option: TimesheetJobCodeOption,
-  query: string
+  query: string,
+  aliases: Array<string | null | undefined> = [],
 ) {
-  if (!optionMatchesQuery(option, query)) return;
+  if (!optionMatchesQuery(option, query, aliases)) return;
   if (seen.has(option.value)) return;
 
   seen.add(option.value);
@@ -117,7 +133,7 @@ function mapJobCodeRowsToOptions(
         quoteTitle: row.subject_line || row.project_description || row.site_address || null,
         source: 'live_quote',
       },
-      normalizedQuery
+      normalizedQuery,
     );
   }
 
@@ -135,13 +151,38 @@ function mapJobCodeRowsToOptions(
         quoteTitle: row.title || null,
         source: 'legacy_quote',
       },
-      normalizedQuery
+      normalizedQuery,
     );
   }
 
   for (const row of projectRows) {
-    const reference = normalizeJobNumberInput(row.project_reference || '');
+    const mergedTarget = Array.isArray(row.merged_into_project_number)
+      ? row.merged_into_project_number[0] || null
+      : row.merged_into_project_number || null;
+    const reference = normalizeJobNumberInput(
+      row.status === 'merged'
+        ? mergedTarget?.project_reference || ''
+        : row.project_reference || '',
+    );
     if (!QUOTE_JOB_NUMBER_REGEX.test(reference)) continue;
+
+    if (row.status === 'merged') {
+      if (!normalizedQuery) continue;
+      const aliasHaystack = [
+        row.project_reference,
+        row.title,
+        row.description,
+        mergedTarget?.project_reference,
+        mergedTarget?.title,
+      ].filter(Boolean).join(' ').toLowerCase();
+      const normalizedAliasQuery = normalizeJobNumberInput(normalizedQuery).toLowerCase();
+      if (
+        !aliasHaystack.includes(normalizedQuery)
+        && !(normalizedAliasQuery && aliasHaystack.includes(normalizedAliasQuery))
+      ) {
+        continue;
+      }
+    }
 
     addOption(
       options,
@@ -149,11 +190,16 @@ function mapJobCodeRowsToOptions(
       {
         value: reference,
         label: reference,
-        customerName: 'Project number',
-        quoteTitle: row.title || row.description || null,
+        customerName: row.status === 'merged' ? 'Merged project number' : 'Project number',
+        quoteTitle: row.status === 'merged'
+          ? mergedTarget?.title || row.title || null
+          : row.title || row.description || null,
         source: 'project_number',
       },
-      normalizedQuery
+      normalizedQuery,
+      row.status === 'merged'
+        ? [row.project_reference, row.title, row.description]
+        : [],
     );
   }
 
@@ -233,8 +279,18 @@ async function fetchProjectNumberJobCodeRows(
     const to = from + pageLimit - 1;
     const result = await admin
       .from('quote_project_numbers')
-      .select('project_reference, title, description')
-      .eq('status', 'open')
+      .select(`
+        project_reference,
+        title,
+        description,
+        status,
+        merged_into_project_number:quote_project_numbers!quote_project_numbers_merged_into_project_number_id_fkey(
+          project_reference,
+          title,
+          description
+        )
+      `)
+      .in('status', ['open', 'merged'])
       .order('project_reference', { ascending: true })
       .range(from, to);
 

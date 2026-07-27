@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CheckCircle2, CircleDollarSign, Clock3, Link2, Plus, ReceiptText } from 'lucide-react';
+import { CheckCircle2, CircleDollarSign, Clock3, GitMerge, Link2, Plus, ReceiptText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -94,6 +94,18 @@ function buildDialogSnapshot(value: unknown) {
   return JSON.stringify(value);
 }
 
+function buildActionSnapshot(
+  form: ConvertFormState,
+  projectIds: string[],
+  survivorProjectId: string,
+) {
+  return buildDialogSnapshot({
+    form,
+    projectIds: [...projectIds].sort(),
+    survivorProjectId,
+  });
+}
+
 function buildEmptyCostForm(projectNumberId = ''): CostFormState {
   return {
     project_number_id: projectNumberId,
@@ -159,23 +171,43 @@ export function ProjectNumbersTab({
   const [actionProjectId, setActionProjectId] = useState<string | null>(null);
   const [actionMode, setActionMode] = useState<'link' | 'convert' | null>(null);
   const [convertForm, setConvertForm] = useState<ConvertFormState>(emptyConvertForm);
+  const [convertProjectIds, setConvertProjectIds] = useState<string[]>([]);
+  const [survivorProjectId, setSurvivorProjectId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [projectFormBaseline, setProjectFormBaseline] = useState(buildDialogSnapshot(emptyProjectForm));
   const [costFormBaseline, setCostFormBaseline] = useState(buildDialogSnapshot(buildEmptyCostForm()));
-  const [convertFormBaseline, setConvertFormBaseline] = useState(buildDialogSnapshot(emptyConvertForm));
+  const [convertFormBaseline, setConvertFormBaseline] = useState(
+    buildActionSnapshot(emptyConvertForm, [], ''),
+  );
 
   const activeProjects = useMemo(
     () => projectNumbers.filter(project => project.status === 'open'),
     [projectNumbers]
   );
   const activeProject = projectNumbers.find(project => project.id === actionProjectId) || null;
+  const selectedConversionProjects = useMemo(
+    () => activeProjects.filter(project => convertProjectIds.includes(project.id)),
+    [activeProjects, convertProjectIds],
+  );
+  const selectedConversionCosts = useMemo(
+    () => selectedConversionProjects.flatMap(project => getOpenCosts(project)),
+    [selectedConversionProjects],
+  );
+  const selectedConversionHours = useMemo(
+    () => selectedConversionProjects.reduce(
+      (total, project) => total + Number(project.labour_summary?.total_hours || 0),
+      0,
+    ),
+    [selectedConversionProjects],
+  );
   const openQuotes = useMemo(
     () => quotes.filter(quote => quote.is_latest_version && quote.commercial_status === 'open'),
     [quotes]
   );
   const isProjectFormDirty = projectFormOpen && buildDialogSnapshot(projectForm) !== projectFormBaseline;
   const isCostFormDirty = costFormOpen && buildDialogSnapshot(costForm) !== costFormBaseline;
-  const isActionFormDirty = Boolean(actionProjectId && actionMode) && buildDialogSnapshot(convertForm) !== convertFormBaseline;
+  const isActionFormDirty = Boolean(actionProjectId && actionMode)
+    && buildActionSnapshot(convertForm, convertProjectIds, survivorProjectId) !== convertFormBaseline;
   const {
     contentRef: projectDialogContentRef,
     handleOpenChange: handleProjectDialogOpenChange,
@@ -225,7 +257,9 @@ export function ProjectNumbersTab({
       setActionProjectId(null);
       setActionMode(null);
       setConvertForm(emptyConvertForm);
-      setConvertFormBaseline(buildDialogSnapshot(emptyConvertForm));
+      setConvertProjectIds([]);
+      setSurvivorProjectId('');
+      setConvertFormBaseline(buildActionSnapshot(emptyConvertForm, [], ''));
     },
   });
 
@@ -280,8 +314,12 @@ export function ProjectNumbersTab({
   async function submitProjectAction() {
     if (!activeProject || !actionMode) return;
 
-    const openCosts = getOpenCosts(activeProject);
-    const costIds = getSelectedCostIds(selectedCosts, activeProject.id, openCosts);
+    const actionProjects = actionMode === 'convert'
+      ? selectedConversionProjects
+      : [activeProject];
+    const costIds = actionProjects.flatMap(project => (
+      getSelectedCostIds(selectedCosts, project.id, getOpenCosts(project))
+    ));
     setIsSubmitting(true);
     try {
       const response = await fetch('/api/quotes/project-numbers', {
@@ -290,6 +328,12 @@ export function ProjectNumbersTab({
         body: JSON.stringify({
           action: actionMode === 'link' ? 'link_existing_quote' : 'convert_to_quote',
           project_number_id: activeProject.id,
+          project_number_ids: actionMode === 'convert'
+            ? actionProjects.map(project => project.id)
+            : undefined,
+          survivor_project_number_id: actionMode === 'convert'
+            ? survivorProjectId
+            : undefined,
           cost_ids: costIds,
           ...convertForm,
         }),
@@ -297,10 +341,18 @@ export function ProjectNumbersTab({
       const payload = await response.json().catch(() => null) as { error?: string; quote_id?: string } | null;
       if (!response.ok) throw new Error(payload?.error || 'Unable to update project number.');
 
-      toast.success(actionMode === 'link' ? 'Costs added to quote' : 'Project number converted to quote');
+      toast.success(
+        actionMode === 'link'
+          ? 'Costs added to quote'
+          : actionProjects.length > 1
+            ? 'Project numbers merged into quote'
+            : 'Project number converted to quote',
+      );
       setActionProjectId(null);
       setActionMode(null);
       setConvertForm(emptyConvertForm);
+      setConvertProjectIds([]);
+      setSurvivorProjectId('');
       await onRefresh();
       if (payload?.quote_id) onOpenQuote(payload.quote_id);
     } catch (error) {
@@ -333,6 +385,8 @@ export function ProjectNumbersTab({
     const firstCustomer = customers[0];
     setActionProjectId(project.id);
     setActionMode(mode);
+    const nextProjectIds = mode === 'convert' ? [project.id] : [];
+    const nextSurvivorProjectId = mode === 'convert' ? project.id : '';
     const nextForm = {
       ...emptyConvertForm,
       subject_line: project.title,
@@ -342,7 +396,26 @@ export function ProjectNumbersTab({
       site_address: firstCustomer ? getCustomerAddress(firstCustomer) : '',
     };
     setConvertForm(nextForm);
-    setConvertFormBaseline(buildDialogSnapshot(nextForm));
+    setConvertProjectIds(nextProjectIds);
+    setSurvivorProjectId(nextSurvivorProjectId);
+    setConvertFormBaseline(buildActionSnapshot(
+      nextForm,
+      nextProjectIds,
+      nextSurvivorProjectId,
+    ));
+  }
+
+  function toggleConversionProject(projectId: string) {
+    if (projectId === actionProjectId) return;
+    setConvertProjectIds((current) => {
+      const next = current.includes(projectId)
+        ? current.filter(id => id !== projectId)
+        : [...current, projectId];
+      setSurvivorProjectId((survivor) => (
+        next.includes(survivor) ? survivor : next[0] || ''
+      ));
+      return next;
+    });
   }
 
   function handleCustomerChange(customerId: string) {
@@ -404,6 +477,12 @@ export function ProjectNumbersTab({
                     <p className="mt-2 break-words text-xs text-slate-400">
                       Manager: {project.manager?.full_name || project.requester_initials} · Created {formatDate(project.created_at)}
                     </p>
+                    {project.status === 'merged' && project.merged_into_project_number ? (
+                      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-300">
+                        <GitMerge className="h-3.5 w-3.5" />
+                        Merged into {project.merged_into_project_number.project_reference}
+                      </p>
+                    ) : null}
                     {actionQuoteId ? (
                       <Button variant="link" className="mt-1 h-auto p-0 text-sm" onClick={() => onOpenQuote(actionQuoteId)}>
                         Open linked quote
@@ -798,6 +877,101 @@ export function ProjectNumbersTab({
                 </div>
               ) : (
                 <>
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/20 p-3">
+                    <div>
+                      <Label className="flex items-center gap-2">
+                        <GitMerge className="h-4 w-4 text-amber-500" />
+                        Project numbers to combine
+                      </Label>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Add other open projects, then choose which number the live quote keeps.
+                      </p>
+                    </div>
+                    <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+                      {activeProjects.map((project) => {
+                        const isInitiatingProject = project.id === actionProjectId;
+                        const isSelected = convertProjectIds.includes(project.id);
+                        return (
+                          <label
+                            key={project.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-md border border-border bg-background/70 p-2.5"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              disabled={isInitiatingProject}
+                              onChange={() => toggleConversionProject(project.id)}
+                              aria-label={`Include ${project.project_reference}`}
+                              className="mt-1"
+                            />
+                            <span className="min-w-0">
+                              <span className="block font-mono text-sm font-semibold text-amber-600 dark:text-amber-300">
+                                {project.project_reference}
+                              </span>
+                              <span className="block truncate text-xs text-slate-400">
+                                {project.title} · {formatCurrency(project.unlinked_manual_cost_total)} · {formatHours(project.labour_summary?.total_hours)}
+                              </span>
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Quote number to keep *</Label>
+                    <Select value={survivorProjectId} onValueChange={setSurvivorProjectId}>
+                      <SelectTrigger className="data-[placeholder]:[&>span]:!text-slate-400">
+                        <SelectValue placeholder="Choose retained number" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {selectedConversionProjects.map((project) => (
+                          <SelectItem
+                            key={project.id}
+                            value={project.id}
+                            textValue={`${project.project_reference} ${project.title}`}
+                          >
+                            <span className="flex flex-col text-left">
+                              <span className="font-mono">{project.project_reference}</span>
+                              <span className="text-xs text-slate-400">
+                                {project.title} · {project.manager?.full_name || project.requester_initials}
+                              </span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-400">
+                      The retained project controls the live quote number, manager, and sign-off.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                    <div>
+                      <p className="text-xs text-slate-400">Projects</p>
+                      <p className="font-semibold">{selectedConversionProjects.length}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Open costs</p>
+                      <p className="font-semibold">
+                        {formatCurrency(selectedConversionCosts.reduce(
+                          (total, cost) => total + Number(cost.amount || 0),
+                          0,
+                        ))}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Labour</p>
+                      <p className="font-semibold">{formatHours(selectedConversionHours)}</p>
+                    </div>
+                  </div>
+
+                  {selectedConversionProjects.length > 1 ? (
+                    <p className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-200">
+                      Existing timesheets using the other selected numbers will be moved to the retained number. The old numbers remain searchable aliases.
+                    </p>
+                  ) : null}
+
                   <div className="space-y-2">
                     <Label>Customer *</Label>
                     <Select value={convertForm.customer_id} onValueChange={handleCustomerChange}>
@@ -868,7 +1042,13 @@ export function ProjectNumbersTab({
                 </Button>
                 <Button
                   onClick={submitProjectAction}
-                  disabled={isSubmitting}
+                  disabled={
+                    isSubmitting
+                    || (
+                      actionMode === 'convert'
+                      && (!survivorProjectId || selectedConversionCosts.length === 0)
+                    )
+                  }
                   className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
                 >
                   {actionMode === 'link' ? 'Add to Quote' : 'Create Quote'}

@@ -51,6 +51,12 @@ interface ProjectNumberJobCodeTestRow {
   project_reference: string | null;
   title: string | null;
   description: string | null;
+  status: 'open' | 'merged';
+  merged_into_project_number?: {
+    project_reference: string | null;
+    title: string | null;
+    description: string | null;
+  } | null;
 }
 
 function normalizePages<T>(rowsOrPages: T[] | T[][]): T[][] {
@@ -94,7 +100,7 @@ function createProjectNumberQuery(rowsOrPages: ProjectNumberJobCodeTestRow[] | P
   const range = createRangeMock(rowsOrPages);
   const order = vi.fn().mockReturnValue({ range });
   const query = {
-    eq: vi.fn().mockReturnThis(),
+    in: vi.fn().mockReturnThis(),
     order,
   };
 
@@ -157,7 +163,12 @@ describe('GET /api/timesheets/job-codes', () => {
       { quote_reference: '40001-GH', customer_name: 'Duplicate Legacy', title: 'Ignored duplicate' },
     ]);
     const projectNumberQuery = createProjectNumberQuery([
-      { project_reference: '60001-MD', title: 'Emergency enabling works', description: null },
+      {
+        project_reference: '60001-MD',
+        title: 'Emergency enabling works',
+        description: null,
+        status: 'open',
+      },
     ]);
     const from = vi.fn((table: string) => ({
       select: vi.fn(() => {
@@ -236,7 +247,45 @@ describe('GET /api/timesheets/job-codes', () => {
       'invoiced',
     ]);
     expect(legacyQuoteQuery.query.not).toHaveBeenCalledWith('quote_reference', 'is', null);
-    expect(projectNumberQuery.query.eq).toHaveBeenCalledWith('status', 'open');
+    expect(projectNumberQuery.query.in).toHaveBeenCalledWith('status', ['open', 'merged']);
+  });
+
+  it('finds a canonical project number when searching by a merged alias', async () => {
+    const quoteQuery = createQuoteQuery([]);
+    const legacyQuoteQuery = createLegacyQuoteQuery([]);
+    const projectNumberQuery = createProjectNumberQuery([{
+      project_reference: '60002-LC',
+      title: 'Old drainage project',
+      description: null,
+      status: 'merged',
+      merged_into_project_number: {
+        project_reference: '60001-MD',
+        title: 'Combined drainage works',
+        description: null,
+      },
+    }]);
+    const from = vi.fn((table: string) => ({
+      select: vi.fn(() => {
+        if (table === 'quotes') return quoteQuery.query;
+        if (table === 'legacy_quotes') return legacyQuoteQuery.query;
+        if (table === 'quote_project_numbers') return projectNumberQuery.query;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    }));
+    mockCreateAdminClient.mockReturnValue({ from });
+
+    const { GET } = await import('@/app/api/timesheets/job-codes/route');
+    const response = await GET(new NextRequest('http://localhost/api/timesheets/job-codes?q=60002'));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.job_codes).toEqual([{
+      value: '60001-MD',
+      label: '60001-MD',
+      customerName: 'Merged project number',
+      quoteTitle: 'Combined drainage works',
+      source: 'project_number',
+    }]);
   });
 
   it('paginates legacy job codes so codes beyond the first Supabase page are searchable', async () => {

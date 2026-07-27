@@ -11,11 +11,14 @@ import {
 } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { syncProjectNumberSiteLocation } from '@/lib/server/inventory-site-location-sync';
+import {
+  convertProjectNumbersToQuote,
+  getProjectConversionConflictMessage,
+} from '@/lib/server/quote-project-number-conversion';
 
 type QuoteProjectNumberRow = Database['public']['Tables']['quote_project_numbers']['Row'];
 type QuoteProjectCostRow = Database['public']['Tables']['quote_project_costs']['Row'];
 type QuoteLineItemInsert = Database['public']['Tables']['quote_line_items']['Insert'];
-type QuoteInsert = Database['public']['Tables']['quotes']['Insert'];
 
 const PROJECT_COST_CATEGORIES = ['materials', 'subcontractor', 'plant', 'labour', 'other'] as const;
 type ProjectCostCategory = (typeof PROJECT_COST_CATEGORIES)[number];
@@ -40,22 +43,6 @@ function normalizeCostCategory(value: unknown): ProjectCostCategory {
   return PROJECT_COST_CATEGORIES.includes(value as ProjectCostCategory)
     ? (value as ProjectCostCategory)
     : 'other';
-}
-
-function buildAddress(customer: {
-  address_line_1?: string | null;
-  address_line_2?: string | null;
-  city?: string | null;
-  county?: string | null;
-  postcode?: string | null;
-} | null): string {
-  if (!customer) return '';
-  return [
-    customer.address_line_1,
-    customer.address_line_2,
-    [customer.city, customer.county].filter(Boolean).join(', ') || null,
-    customer.postcode,
-  ].filter(Boolean).join('\n');
 }
 
 async function getAuthenticatedUser() {
@@ -181,6 +168,12 @@ async function listProjectNumbers(admin: ReturnType<typeof createAdminClient>) {
         base_quote_reference,
         subject_line,
         customer:customers(company_name)
+      ),
+      merged_into_project_number:quote_project_numbers!quote_project_numbers_merged_into_project_number_id_fkey(
+        id,
+        project_reference,
+        title,
+        converted_quote_id
       ),
       costs:quote_project_costs(*)
     `)
@@ -405,123 +398,6 @@ async function linkCostsToExistingQuote(admin: ReturnType<typeof createAdminClie
   return { project: updatedProject };
 }
 
-async function convertProjectToQuote(admin: ReturnType<typeof createAdminClient>, body: Record<string, unknown>, userId: string) {
-  const projectNumberId = normalizeOptionalString(body.project_number_id);
-  const customerId = normalizeOptionalString(body.customer_id);
-  const siteAddress = normalizeOptionalString(body.site_address);
-  const fieldErrors: Record<string, string> = {};
-
-  if (!projectNumberId) fieldErrors.project_number_id = 'Select a project number.';
-  if (!customerId) fieldErrors.customer_id = 'Select a customer.';
-  if (!siteAddress) fieldErrors.site_address = 'Enter the site address.';
-  if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
-
-  const project = await loadProjectWithCosts(admin, projectNumberId!);
-  if (project.status === 'converted') {
-    return { fieldErrors: { project_number_id: 'This project number has already been converted.' } };
-  }
-  const selectedCosts = getSelectedCosts(project, body.cost_ids);
-  if (selectedCosts.length === 0) return { fieldErrors: { cost_ids: 'Select at least one unlinked cost.' } };
-
-  const [{ data: customer, error: customerError }, { data: managerProfile, error: managerError }] = await Promise.all([
-    admin.from('customers').select('*').eq('id', customerId).single(),
-    admin.from('profiles').select('id, full_name').eq('id', project.manager_profile_id).single(),
-  ]);
-  if (customerError || !customer) throw customerError || new Error('Unable to load customer');
-  if (managerError || !managerProfile) throw managerError || new Error('Unable to load manager profile');
-
-  const managerOption = await getQuoteManagerOption(project.manager_profile_id);
-  const quoteId = crypto.randomUUID();
-  const lineRows = buildLineItemRows(quoteId, project.project_reference, selectedCosts);
-  const totals = calculateQuoteTotals(lineRows.map(row => ({
-    description: row.description,
-    quantity: Number(row.quantity || 0),
-    unit: row.unit || '',
-    unit_rate: Number(row.unit_rate || 0),
-    sort_order: row.sort_order || 0,
-  })));
-  const today = new Date().toISOString().slice(0, 10);
-  const subjectLine = normalizeOptionalString(body.subject_line) || project.title;
-  const summary = normalizeOptionalString(body.project_description) || project.description || `Costs converted from project number ${project.project_reference}.`;
-  const scope = normalizeOptionalString(body.scope) || selectedCosts.map(cost => `- ${cost.description}`).join('\n');
-
-  const quotePayload: QuoteInsert = {
-    id: quoteId,
-    quote_reference: project.project_reference,
-    base_quote_reference: project.project_reference,
-    quote_thread_id: quoteId,
-    parent_quote_id: null,
-    revision_number: 0,
-    revision_type: 'original',
-    version_label: 'Original',
-    requester_id: project.manager_profile_id,
-    requester_initials: project.requester_initials,
-    customer_id: customerId!,
-    quote_date: normalizeOptionalString(body.quote_date) || today,
-    attention_name: normalizeOptionalString(body.attention_name) || customer.contact_name || customer.company_name,
-    attention_email: normalizeOptionalString(body.attention_email) || customer.contact_email || '',
-    site_address: siteAddress || buildAddress(customer),
-    subject_line: subjectLine,
-    project_description: summary,
-    scope,
-    salutation: customer.contact_name ? `Dear ${customer.contact_name.split(' ')[0]},` : '',
-    validity_days: Number(body.validity_days || customer.default_validity_days || 30),
-    pricing_mode: 'itemized',
-    subtotal: totals.subtotal,
-    total: totals.total,
-    status: 'draft',
-    commercial_status: 'open',
-    manager_name: managerOption?.profile?.full_name || managerOption?.signoff_name || managerProfile.full_name,
-    manager_email: managerOption?.manager_email || null,
-    approver_profile_id: managerOption?.approver_profile_id || project.manager_profile_id,
-    signoff_name: managerOption?.signoff_name || managerProfile.full_name,
-    signoff_title: managerOption?.signoff_title || null,
-    created_by: userId,
-    updated_by: userId,
-  };
-
-  const { error: quoteError } = await admin.from('quotes').insert(quotePayload);
-  if (quoteError) throw quoteError;
-  const { error: lineError } = await admin.from('quote_line_items').insert(lineRows);
-  if (lineError) throw lineError;
-
-  await Promise.all(selectedCosts.map((cost, index) => admin
-    .from('quote_project_costs')
-    .update({
-      linked_quote_id: quoteId,
-      linked_quote_line_item_id: lineRows[index].id,
-      linked_at: new Date().toISOString(),
-      updated_by: userId,
-    })
-    .eq('id', cost.id)));
-
-  const { data: updatedProject, error: projectUpdateError } = await admin
-    .from('quote_project_numbers')
-    .update({
-      status: 'converted',
-      converted_quote_id: quoteId,
-      converted_at: new Date().toISOString(),
-      updated_by: userId,
-    })
-    .eq('id', projectNumberId)
-    .select('*')
-    .single();
-  if (projectUpdateError) throw projectUpdateError;
-
-  await appendQuoteTimelineEvent(admin, {
-    quoteId,
-    quoteThreadId: quoteId,
-    quoteReference: project.project_reference,
-    eventType: 'project_number_converted',
-    title: 'Project number converted',
-    description: `${selectedCosts.length} cost row(s) converted from provisional project number.`,
-    toStatus: 'draft',
-    actorUserId: userId,
-  });
-
-  return { project: updatedProject, quote_id: quoteId };
-}
-
 export async function GET() {
   try {
     const { user } = await getAuthenticatedUser();
@@ -589,7 +465,7 @@ export async function PATCH(request: NextRequest) {
     if (action === 'link_existing_quote') {
       result = await linkCostsToExistingQuote(admin, body, user.id);
     } else if (action === 'convert_to_quote') {
-      result = await convertProjectToQuote(admin, body, user.id);
+      result = await convertProjectNumbersToQuote(admin, body, user.id);
     } else {
       return NextResponse.json({ error: 'Unsupported project number action.' }, { status: 400 });
     }
@@ -601,13 +477,30 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    if ('project' in result && result.project) {
-      await syncProjectNumberSiteLocation(admin, result.project as QuoteProjectNumberRow, user.id);
-    }
+    const projectsToSync = 'projects' in result && Array.isArray(result.projects)
+      ? result.projects
+      : 'project' in result && result.project
+        ? [result.project]
+        : [];
+    const syncResults = await Promise.allSettled(projectsToSync.map(project =>
+      syncProjectNumberSiteLocation(admin, project as QuoteProjectNumberRow, user.id)
+    ));
+    syncResults.forEach((syncResult, index) => {
+      if (syncResult.status === 'rejected') {
+        console.error('Project-number location sync failed after quote update:', {
+          projectNumberId: (projectsToSync[index] as { id?: string } | undefined)?.id,
+          error: syncResult.reason,
+        });
+      }
+    });
 
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error updating quote project number:', error);
+    const conflictMessage = getProjectConversionConflictMessage(error);
+    if (conflictMessage) {
+      return NextResponse.json({ error: conflictMessage }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Unable to update project number right now.' }, { status: 500 });
   }
 }
