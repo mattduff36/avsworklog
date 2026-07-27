@@ -137,15 +137,13 @@ describe('InventoryEmployeeView', () => {
           note: null,
           location: siteLocation,
         }]}
-        currentFleetAssignment={null}
         onSetUserLocation={vi.fn()}
         onRequestLocation={vi.fn()}
         onOpenMoveDialog={vi.fn()}
-        onChangeLocation={vi.fn()}
       />
     );
 
-    expect(screen.getByText('Current inventory location: Van - AB12 CDE')).toBeInTheDocument();
+    expect(screen.getByText('My Inventory Items')).toBeInTheDocument();
     expect(screen.getByText('Site: Site - 12345 - Yard Entrance')).toBeInTheDocument();
     expect(screen.getByText('Secondary Location')).toBeInTheDocument();
     expect(screen.getByText(/Site 12345: Site Barrier/)).toBeInTheDocument();
@@ -169,11 +167,9 @@ describe('InventoryEmployeeView', () => {
           note: null,
           location: manualLocation,
         }]}
-        currentFleetAssignment={null}
         onSetUserLocation={vi.fn()}
         onRequestLocation={vi.fn()}
         onOpenMoveDialog={vi.fn()}
-        onChangeLocation={vi.fn()}
       />,
     );
 
@@ -219,11 +215,9 @@ describe('InventoryEmployeeView', () => {
             location: siteLocation,
           },
         ]}
-        currentFleetAssignment={null}
         onSetUserLocation={vi.fn()}
         onRequestLocation={vi.fn()}
         onOpenMoveDialog={vi.fn()}
-        onChangeLocation={vi.fn()}
         onTransferHardware={vi.fn()}
       />,
     );
@@ -253,11 +247,9 @@ describe('InventoryEmployeeView', () => {
           quantity: 20,
           location: yardLocation,
         }]}
-        currentFleetAssignment={null}
         onSetUserLocation={vi.fn()}
         onRequestLocation={vi.fn()}
         onOpenMoveDialog={vi.fn()}
-        onChangeLocation={vi.fn()}
         onTransferHardware={vi.fn()}
       />,
     );

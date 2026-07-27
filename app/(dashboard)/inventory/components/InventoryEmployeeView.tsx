@@ -7,9 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRightLeft, Boxes, MapPin, PackageSearch, Send, Truck } from 'lucide-react';
+import { ArrowRightLeft, Boxes, MapPin, PackageSearch, Send } from 'lucide-react';
 import type {
-  CurrentFleetAssignment,
   InventoryHardwareBalance,
   InventoryHardwareItem,
   InventoryHardwareTransferPayload,
@@ -36,14 +35,12 @@ interface InventoryEmployeeViewProps {
   categoryLabels?: Record<string, string>;
   userLocation: InventoryUserLocation | null;
   secondarySiteLocations?: InventoryUserSiteLocation[];
-  currentFleetAssignment?: CurrentFleetAssignment | null;
   hardwareItems?: InventoryHardwareItem[];
   hardwareBalances?: InventoryHardwareBalance[];
   locationFilter?: (location: InventoryLocation) => boolean;
   onSetUserLocation: (locationId: string) => Promise<void>;
   onRequestLocation: (payload: { suggested_name: string; note: string }) => Promise<void>;
   onOpenMoveDialog: (items: InventoryItem[]) => void;
-  onChangeLocation: () => void;
   onTransferHardware?: (payload: InventoryHardwareTransferPayload) => Promise<void>;
 }
 
@@ -53,14 +50,12 @@ export function InventoryEmployeeView({
   categoryLabels,
   userLocation,
   secondarySiteLocations = [],
-  currentFleetAssignment,
   hardwareItems = [],
   hardwareBalances = [],
   locationFilter,
   onSetUserLocation,
   onRequestLocation,
   onOpenMoveDialog,
-  onChangeLocation,
   onTransferHardware,
 }: InventoryEmployeeViewProps) {
   const initialLocationId = userLocation?.location?.is_active === false ? '' : userLocation?.location_id || '';
@@ -280,35 +275,6 @@ export function InventoryEmployeeView({
 
   return (
     <div className="space-y-6">
-      <Card className="hidden border-slate-700 bg-slate-900/70 sm:block">
-        <CardContent className="flex flex-col gap-4 p-3 min-[380px]:p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-start gap-2 text-sm font-medium text-white">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-inventory" />
-              <span className="break-words">Current inventory location: {activeLocation.name}</span>
-            </div>
-            {currentFleetAssignment ? (
-              <div className="mt-2">
-                <Badge variant="outline" className="max-w-full whitespace-normal break-words border-blue-500/30 bg-blue-500/10 text-blue-300">
-                  <Truck className="mr-1 h-3 w-3" />
-                  Linked {currentFleetAssignment.asset_type.toUpperCase()}: {[
-                    currentFleetAssignment.asset_label,
-                    currentFleetAssignment.asset_nickname,
-                  ].filter(Boolean).join(' - ') || 'Fleet asset'}
-                </Badge>
-              </div>
-            ) : (
-              <p className="mt-1 text-xs text-muted-foreground">
-                This location is not linked to a current fleet asset assignment.
-              </p>
-            )}
-          </div>
-          <Button variant="outline" onClick={onChangeLocation} className="min-h-11 w-full border-slate-600 sm:w-auto">
-            Change Location
-          </Button>
-        </CardContent>
-      </Card>
-
       <Card className="border-slate-700 bg-slate-900/70">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-white">

@@ -906,14 +906,12 @@ export default function InventoryPage() {
           categoryLabels={categoryLabels}
           userLocation={employeeUserLocation}
           secondarySiteLocations={inventoryContext?.secondary_site_locations || []}
-          currentFleetAssignment={inventoryContext?.current_fleet_assignment || null}
           hardwareItems={hardwareItems}
           hardwareBalances={hardwareBalances}
           locationFilter={filterPrimaryLocation}
           onSetUserLocation={handleSetUserLocation}
           onRequestLocation={handleRequestLocation}
           onOpenMoveDialog={setMovingItems}
-          onChangeLocation={() => setChangeLocationDialogOpen(true)}
           onTransferHardware={handleHardwareTransfer}
         />
 
