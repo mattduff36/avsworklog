@@ -1,5 +1,22 @@
 [
   {
+    "version": "0726.25.1",
+    "updateKind": "minor",
+    "title": "Data storage maintenance update",
+    "description": "Updated data storage.",
+    "summary": "Updated data storage.",
+    "details": [
+      "Updated data storage, with changes to automation scripts and data storage."
+    ],
+    "areas": [
+      "Data storage"
+    ],
+    "areaKeys": [
+      "data-storage"
+    ],
+    "pushedAt": "2026-07-28T17:01:11.004Z"
+  },
+  {
     "version": "0726.25.0",
     "updateKind": "major",
     "title": "Quotes update",
