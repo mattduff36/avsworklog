@@ -25,13 +25,18 @@ import {
 } from 'lucide-react';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { NotificationPanel } from '@/components/messages/NotificationPanel';
+import { DashboardTaskBadgeLinks } from '@/components/layout/DashboardTaskBadgeLinks';
 import { TabletModeToggleActions } from '@/components/layout/TabletModeToggleActions';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { useDashboardTaskBadges } from '@/components/layout/dashboard-task-badge-context';
 import { ActiveNowUsersPanel } from '@/components/layout/ActiveNowUsersPanel';
 import { SidebarNav } from './SidebarNav';
 import { createClient } from '@/lib/supabase/client';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
-import { usePendingAbsenceCount, useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
+import {
+  usePendingAbsenceCount,
+  useRamsAssignmentSummary,
+} from '@/lib/hooks/useNavMetrics';
 import { useClientServiceOutage } from '@/lib/hooks/useClientServiceOutage';
 import { toast } from 'sonner';
 import { 
@@ -172,6 +177,10 @@ export function Navbar() {
   const effectiveIsAdmin = isAdmin;
 
   const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
+  const {
+    counts: dashboardTaskBadgeCounts,
+    ready: dashboardTaskBadgesReady,
+  } = useDashboardTaskBadges();
   const { data: ramsSummary } = useRamsAssignmentSummary(profile?.id);
   const { count: pendingAbsenceCount } = usePendingAbsenceCount(
     Boolean(profile?.id) && (effectiveIsManager || effectiveIsAdmin),
@@ -542,6 +551,25 @@ export function Navbar() {
     effectiveIsAdmin
   );
   const hasMobileManagementLinks = mobileManagerLinks.length > 0 || adminLinks.length > 0;
+  const isDashboardRoute = pathname === '/dashboard';
+  const dashboardTaskBadgeCountByHref: Record<string, number> = {
+    '/approvals': dashboardTaskBadgeCounts.approvals,
+    '/actions': dashboardTaskBadgeCounts.actions,
+    '/suggestions/manage': dashboardTaskBadgeCounts.suggestions,
+    '/quotes': dashboardTaskBadgeCounts.quotes,
+    '/admin/errors/manage': dashboardTaskBadgeCounts.errorReports,
+  };
+  const dashboardTopNavTaskLinks = dashboardTaskBadgesReady
+    ? [...mobileManagerLinks, ...adminLinks]
+        .filter(item => item.href in dashboardTaskBadgeCountByHref)
+        .map(item => ({
+          href: item.href,
+          label: item.label,
+          icon: item.icon,
+          count: dashboardTaskBadgeCountByHref[item.href] || 0,
+        }))
+        .filter(item => item.count > 0)
+    : [];
   const hasMobileDeveloperLinks = isActualSuperAdmin && !isViewingAs;
   const showInstallAppLink = !isStandaloneApp;
   const unreadBadgeLabel = unreadCount > 99 ? '99+' : unreadCount;
@@ -580,32 +608,45 @@ export function Navbar() {
         <div className="h-1 bg-gradient-to-r from-avs-yellow via-avs-yellow to-avs-yellow-hover"></div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {tabletModeEnabled ? (
-            <div className="flex items-center h-16">
+            <div className="relative flex items-center h-16">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2 group"
+                className="z-10 flex items-center gap-2 group"
               >
                 <House className="h-4 w-4 text-avs-yellow transition-colors group-hover:text-white" aria-hidden="true" />
                 <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
                   SQUIRES
                 </div>
               </Link>
-              <div className="ml-auto flex items-center gap-2">
+              {isDashboardRoute && dashboardTopNavTaskLinks.length > 0 ? (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                  <DashboardTaskBadgeLinks
+                    items={dashboardTopNavTaskLinks}
+                    variant="navbar"
+                    navbarSpacing="comfortable"
+                    navbarLabels="responsive"
+                    animateOnLoad
+                  />
+                </div>
+              ) : null}
+              <div className="z-10 ml-auto flex items-center gap-2">
                 <div className="hidden md:flex items-center">
                   <TabletModeToggleActions />
                 </div>
               </div>
             </div>
           ) : (
-          <div className="flex items-center h-16">
+          <div className="relative flex items-center h-16">
             {/* Mobile-only text logo */}
             <Link 
               href="/dashboard" 
-              className="md:hidden flex items-center gap-2 mr-4 group"
+                className="z-10 mr-4 flex items-center gap-2 group md:hidden"
               onClick={() => setMobileMenuOpen(false)}
             >
               <House className="h-4 w-4 text-avs-yellow transition-colors group-hover:text-white" aria-hidden="true" />
-              <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
+              <div className={`text-xl font-bold text-white group-hover:text-avs-yellow transition-colors ${
+                dashboardTopNavTaskLinks.length > 0 ? 'max-[419px]:hidden' : ''
+              }`}>
                 SQUIRES
               </div>
             </Link>
@@ -622,7 +663,12 @@ export function Navbar() {
             </Link>
 
             {/* Desktop Navigation - Centered, auto-compacts to icon-only when space is tight */}
-            <div ref={navRef} className="hidden md:flex flex-1 items-center justify-center space-x-1 overflow-hidden">
+            <div
+              ref={navRef}
+              className={`flex-1 items-center justify-center space-x-1 overflow-hidden ${
+                isDashboardRoute ? 'hidden lg:flex' : 'hidden md:flex'
+              }`}
+            >
               {[...dashboardNav, ...employeeNav.filter(item => item.href !== '/help')].map((item) => {
                 const Icon = item.icon;
                 const isActive = isLinkActive(item.href);
@@ -658,8 +704,20 @@ export function Navbar() {
               })}
             </div>
 
+            {isDashboardRoute && dashboardTopNavTaskLinks.length > 0 ? (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center lg:hidden">
+                <DashboardTaskBadgeLinks
+                  items={dashboardTopNavTaskLinks}
+                  variant="navbar"
+                  navbarSpacing="responsive"
+                  navbarLabels="responsive"
+                  animateOnLoad
+                />
+              </div>
+            ) : null}
+
             {/* Right side */}
-            <div className="flex items-center space-x-2 ml-auto">
+            <div className="z-10 ml-auto flex items-center space-x-2">
               {/* Desktop burger menu (non-tablet mode only) */}
               <div className="hidden md:flex items-center">
                 <Button

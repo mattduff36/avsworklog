@@ -12,6 +12,7 @@ import { PageLoader } from '@/components/ui/page-loader';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { getAccentFromRoute } from '@/lib/theme/getAccentFromRoute';
 import { TabletModeProvider, useTabletMode } from '@/components/layout/tablet-mode-context';
+import { DashboardTaskBadgeProvider } from '@/components/layout/dashboard-task-badge-context';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useClientServiceOutage } from '@/lib/hooks/useClientServiceOutage';
 import { fetchWithAuth } from '@/lib/utils/fetch-with-auth';
@@ -72,7 +73,9 @@ export function DashboardLayoutClient({
 }) {
   return (
     <TabletModeProvider>
-      <DashboardLayoutShell>{children}</DashboardLayoutShell>
+      <DashboardTaskBadgeProvider>
+        <DashboardLayoutShell>{children}</DashboardLayoutShell>
+      </DashboardTaskBadgeProvider>
     </TabletModeProvider>
   );
 }

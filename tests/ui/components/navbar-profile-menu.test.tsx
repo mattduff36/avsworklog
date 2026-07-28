@@ -62,6 +62,19 @@ vi.mock('@/lib/hooks/useNavMetrics', () => ({
   usePendingAbsenceCount: () => ({ count: 0 }),
 }));
 
+vi.mock('@/components/layout/dashboard-task-badge-context', () => ({
+  useDashboardTaskBadges: () => ({
+    counts: {
+      approvals: 0,
+      actions: 0,
+      suggestions: 0,
+      quotes: 0,
+      errorReports: 0,
+    },
+    ready: false,
+  }),
+}));
+
 vi.mock('@/components/layout/tablet-mode-context', () => ({
   useTabletMode: () => ({
     tabletModeEnabled: false,

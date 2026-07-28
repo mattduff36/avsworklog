@@ -9,8 +9,8 @@ import { SectionLoader } from '@/components/ui/section-loader';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { MobileTextSizeDialog } from '@/components/layout/MobileTextSizeDialog';
-import { ReleaseVersionLink } from '@/components/layout/ReleaseVersionLink';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { useDashboardTaskBadges } from '@/components/layout/dashboard-task-badge-context';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
@@ -21,7 +21,6 @@ import {
   FileText,
   Calendar,
   LockKeyhole,
-  Loader2,
   MonitorPlay,
 } from 'lucide-react';
 import { getEnabledForms } from '@/lib/config/forms';
@@ -31,6 +30,7 @@ import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError, createStatusError } from '@/lib/utils/http-error';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
+import { DashboardTaskBadgeLinks } from '@/components/layout/DashboardTaskBadgeLinks';
 import { YardKioskAutoLaunch } from './components/YardKioskAutoLaunch';
 
 type PendingApprovalCount = {
@@ -49,9 +49,6 @@ const sensitivePinIndicatorClass = [
   'group-hover:border-amber-300/40 group-hover:bg-amber-400/15 group-hover:text-amber-200 group-hover:opacity-100 group-hover:shadow-sm group-hover:ring-1 group-hover:ring-slate-950/40',
   'group-focus-visible:border-amber-300/40 group-focus-visible:bg-amber-400/15 group-focus-visible:text-amber-200 group-focus-visible:opacity-100 group-focus-visible:shadow-sm group-focus-visible:ring-1 group-focus-visible:ring-slate-950/40',
 ].join(' ');
-
-// Debug is a hidden sensitive module and is not exposed through permission metadata.
-const sensitivePinDashboardHrefOverrides: ReadonlySet<string> = new Set(['/debug']);
 
 /**
  * Safely applies alpha/opacity to an HSL color string.
@@ -92,6 +89,11 @@ export default function DashboardPage() {
     forceAuthRedirect,
   } = useAuth();
   const { tabletModeEnabled } = useTabletMode();
+  const {
+    ready: dashboardTaskBadgesReady,
+    publish: publishDashboardTaskBadges,
+    reset: resetDashboardTaskBadges,
+  } = useDashboardTaskBadges();
   const formTypes = getEnabledForms();
   const recoveryAttemptedRef = useRef(false);
   const dashboardGreetingRef = useRef<HTMLHeadingElement | null>(null);
@@ -306,6 +308,37 @@ export default function DashboardPage() {
   }, [authLoading, loadDashboardMetrics, permissionsLoading, profile?.id]);
 
   useEffect(() => {
+    if (badgesLoading || ramsSummaryLoading || permissionsLoading || !profile?.id) {
+      resetDashboardTaskBadges();
+      return;
+    }
+
+    publishDashboardTaskBadges({
+      approvals: approvalsTileBadgeCount,
+      actions: actionsUnassignedCount,
+      suggestions: newSuggestionsCount,
+      quotes: pendingQuotesCount,
+      errorReports: newErrorReportsCount,
+    });
+  }, [
+    actionsUnassignedCount,
+    approvalsTileBadgeCount,
+    badgesLoading,
+    newErrorReportsCount,
+    newSuggestionsCount,
+    pendingQuotesCount,
+    permissionsLoading,
+    profile?.id,
+    publishDashboardTaskBadges,
+    ramsSummaryLoading,
+    resetDashboardTaskBadges,
+  ]);
+
+  useEffect(() => () => {
+    resetDashboardTaskBadges();
+  }, [resetDashboardTaskBadges]);
+
+  useEffect(() => {
     recoveryAttemptedRef.current = false;
   }, [profile?.id]);
 
@@ -456,10 +489,20 @@ export default function DashboardPage() {
   };
   const hasManagementTileBadge = (href: string) => href in managementTileBadgeCountByHref;
   const getManagementTileBadgeCount = (href: string) => managementTileBadgeCountByHref[href] || 0;
-  const hasSensitivePinIndicator = (moduleName: ModuleName | undefined, href: string) => Boolean(
-    (moduleName && sensitivePinModuleSet.has(moduleName)) || sensitivePinDashboardHrefOverrides.has(href)
+  const dashboardHeaderTaskLinks = [...renderedManagerTiles, ...visibleAdminTiles]
+    .filter(link => hasManagementTileBadge(link.href))
+    .map(link => ({
+      href: link.href,
+      label: link.label,
+      icon: link.icon,
+      count: getManagementTileBadgeCount(link.href),
+    }))
+    .filter(link => link.count > 0);
+  const hasSensitivePinIndicator = (moduleName: ModuleName | undefined) => Boolean(
+    moduleName && sensitivePinModuleSet.has(moduleName)
   );
   const isDashboardLoading = permissionsLoading || !profile?.id;
+  let nextDashboardBadgeAnimationIndex = dashboardHeaderTaskLinks.length;
 
   if (isDashboardLoading) {
     return <PageLoader message="Loading SquiresApp" />;
@@ -473,7 +516,7 @@ export default function DashboardPage() {
         <div className="bg-slate-900 rounded-lg p-4 md:p-5 border border-slate-700 relative overflow-hidden">
           {/* Actual Content */}
           <div className="flex flex-col gap-3 md:flex-row md:items-stretch md:justify-between">
-            <div className="flex items-center gap-4 min-w-0">
+            <div className="flex min-w-0 flex-1 items-center gap-4">
               <Link
                 href="/profile"
                 aria-label="Open profile page"
@@ -508,7 +551,6 @@ export default function DashboardPage() {
                 <p className="mt-1 text-slate-400">
                   {headerSubtitle}
                 </p>
-                <ReleaseVersionLink className="mt-2 inline-flex md:hidden" />
               </div>
               <Button
                 type="button"
@@ -523,9 +565,11 @@ export default function DashboardPage() {
                 </span>
               </Button>
             </div>
-            <div className="hidden md:flex items-end justify-end">
-              <ReleaseVersionLink className="shrink-0" />
-            </div>
+            <DashboardTaskBadgeLinks
+              items={dashboardTaskBadgesReady ? dashboardHeaderTaskLinks : []}
+              className="hidden lg:block"
+              animateOnLoad
+            />
           </div>
         </div>
       )}
@@ -568,11 +612,26 @@ export default function DashboardPage() {
                 ? ramsSummaryLoading
                 : badgesLoading && canHavePrimaryTileBadge;
               const badgeCount = tileBadgeCountById[formType.id] || 0;
-              const showBadge = !showPrimaryBadgeLoading && badgeCount > 0;
+              const showBadge =
+                dashboardTaskBadgesReady &&
+                !showPrimaryBadgeLoading &&
+                badgeCount > 0;
               const showMaintenanceBadges =
+                dashboardTaskBadgesReady &&
                 formType.id === 'maintenance' &&
                 !showPrimaryBadgeLoading &&
                 (maintenanceDueSoonCount > 0 || maintenanceOverdueCount > 0);
+              const maintenanceDueSoonAnimationIndex =
+                showMaintenanceBadges && maintenanceDueSoonCount > 0
+                  ? nextDashboardBadgeAnimationIndex++
+                  : null;
+              const maintenanceOverdueAnimationIndex =
+                showMaintenanceBadges && maintenanceOverdueCount > 0
+                  ? nextDashboardBadgeAnimationIndex++
+                  : null;
+              const badgeAnimationIndex = showBadge
+                ? nextDashboardBadgeAnimationIndex++
+                : null;
               const showInventoryBetaBadge = formType.id === 'inventory';
               // Yellow backgrounds need dark text for contrast
               const needsDarkText = formType.color === 'avs-yellow';
@@ -588,25 +647,32 @@ export default function DashboardPage() {
                     className={`relative overflow-hidden bg-${formType.color} hover:opacity-90 hover:scale-105 transition-all duration-200 rounded-lg p-6 text-center shadow-lg ${isRemindersTile ? 'aspect-[2/1]' : 'aspect-square'} flex flex-col items-center justify-center space-y-3 cursor-pointer animate-tile-pop ${textColorClass}`}
                     style={{ animationDelay: `${(index + primaryTileAnimationOffset) * 75}ms` }}
                   >
-                    {showPrimaryBadgeLoading ? (
-                      <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-10 w-10 flex items-center justify-center shadow-lg ring-2 ring-white animate-pulse">
-                        <Loader2 className="h-5 w-5 animate-spin text-white" />
-                      </div>
-                    ) : showMaintenanceBadges ? (
+                    {showMaintenanceBadges ? (
                       <div className="absolute top-2 right-2 flex items-center gap-2">
                         {maintenanceDueSoonCount > 0 && (
-                          <div className="bg-amber-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white">
+                          <div
+                            className="bg-amber-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white animate-badge-pop motion-reduce:animate-none motion-reduce:opacity-100"
+                            style={{ animationDelay: `${75 + ((maintenanceDueSoonAnimationIndex ?? 0) * 75)}ms` }}
+                          >
                             {maintenanceDueSoonCount > 99 ? '99+' : maintenanceDueSoonCount}
                           </div>
                         )}
                         {maintenanceOverdueCount > 0 && (
-                          <div className="bg-red-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white">
+                          <div
+                            className="bg-red-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white animate-badge-pop motion-reduce:animate-none motion-reduce:opacity-100"
+                            style={{
+                              animationDelay: `${75 + ((maintenanceOverdueAnimationIndex ?? 0) * 75)}ms`,
+                            }}
+                          >
                             {maintenanceOverdueCount > 99 ? '99+' : maintenanceOverdueCount}
                           </div>
                         )}
                       </div>
                     ) : showBadge && (
-                      <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white">
+                      <div
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-10 w-10 flex items-center justify-center text-base font-bold shadow-lg ring-2 ring-white animate-badge-pop motion-reduce:animate-none motion-reduce:opacity-100"
+                        style={{ animationDelay: `${75 + ((badgeAnimationIndex ?? 0) * 75)}ms` }}
+                      >
                         {badgeCount > 99 ? '99+' : badgeCount}
                       </div>
                     )}
@@ -652,9 +718,12 @@ export default function DashboardPage() {
                 {/* Manager Links - Using shared navigation config */}
                 {renderedManagerTiles.map((link, index) => {
                   const Icon = link.icon;
-                  const canHaveBadge = hasManagementTileBadge(link.href);
                   const badgeCount = getManagementTileBadgeCount(link.href);
-                  const showSensitivePinIndicator = hasSensitivePinIndicator(link.module, link.href);
+                  const showTileBadge = dashboardTaskBadgesReady && badgeCount > 0;
+                  const badgeAnimationIndex = showTileBadge
+                    ? nextDashboardBadgeAnimationIndex++
+                    : null;
+                  const showSensitivePinIndicator = hasSensitivePinIndicator(link.module);
                   
                   return (
                     <Link key={link.href} href={link.href} className="group">
@@ -662,12 +731,11 @@ export default function DashboardPage() {
                         className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                         style={{ height: '100px', animationDelay: `${index * 75}ms` }}
                       >
-                        {badgesLoading && canHaveBadge ? (
-                          <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
-                          </div>
-                        ) : badgeCount > 0 ? (
-                          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
+                        {showTileBadge ? (
+                          <div
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800 animate-badge-pop motion-reduce:animate-none motion-reduce:opacity-100"
+                            style={{ animationDelay: `${75 + ((badgeAnimationIndex ?? 0) * 75)}ms` }}
+                          >
                             {badgeCount > 99 ? '99+' : badgeCount}
                           </div>
                         ) : null}
@@ -705,9 +773,12 @@ export default function DashboardPage() {
                 {visibleAdminTiles.map((link, index) => {
                   const Icon = link.icon;
                   const animationIndex = renderedManagerTiles.length + index;
-                  const canHaveBadge = hasManagementTileBadge(link.href);
                   const badgeCount = getManagementTileBadgeCount(link.href);
-                  const showSensitivePinIndicator = hasSensitivePinIndicator(link.module, link.href);
+                  const showTileBadge = dashboardTaskBadgesReady && badgeCount > 0;
+                  const badgeAnimationIndex = showTileBadge
+                    ? nextDashboardBadgeAnimationIndex++
+                    : null;
+                  const showSensitivePinIndicator = hasSensitivePinIndicator(link.module);
                   
                   return (
                     <Link key={link.href} href={link.href} className="group">
@@ -715,12 +786,11 @@ export default function DashboardPage() {
                         className="relative bg-slate-800 dark:bg-slate-900 border-4 border-slate-600 hover:border-slate-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                         style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
                       >
-                        {badgesLoading && canHaveBadge ? (
-                          <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
-                            <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
-                          </div>
-                        ) : badgeCount > 0 ? (
-                          <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
+                        {showTileBadge ? (
+                          <div
+                            className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800 animate-badge-pop motion-reduce:animate-none motion-reduce:opacity-100"
+                            style={{ animationDelay: `${75 + ((badgeAnimationIndex ?? 0) * 75)}ms` }}
+                          >
                             {badgeCount > 99 ? '99+' : badgeCount}
                           </div>
                         ) : null}
@@ -752,7 +822,11 @@ export default function DashboardPage() {
           {canAccessDebugTools && (() => {
             const Icon = Bug;
             const animationIndex = renderedManagementTiles.length;
-            const showSensitivePinIndicator = hasSensitivePinIndicator(undefined, '/debug');
+            const debugBadgeCount = getManagementTileBadgeCount('/debug');
+            const showDebugBadge = dashboardTaskBadgesReady && debugBadgeCount > 0;
+            const debugBadgeAnimationIndex = showDebugBadge
+              ? nextDashboardBadgeAnimationIndex++
+              : null;
             
             return (
               <div>
@@ -765,25 +839,14 @@ export default function DashboardPage() {
                       className="relative bg-slate-800 dark:bg-slate-900 border-4 border-red-600 hover:border-red-500 hover:scale-105 transition-all duration-200 rounded-lg p-4 shadow-md cursor-pointer animate-tile-pop"
                       style={{ height: '100px', animationDelay: `${animationIndex * 75}ms` }}
                     >
-                      {badgesLoading ? (
-                        <div className="absolute top-2 right-2 bg-slate-500/80 rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-slate-700 animate-pulse">
-                          <Loader2 className="h-3.5 w-3.5 animate-spin text-white" />
-                        </div>
-                      ) : getManagementTileBadgeCount('/debug') > 0 ? (
-                        <div className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800">
-                          {getManagementTileBadgeCount('/debug') > 99 ? '99+' : getManagementTileBadgeCount('/debug')}
+                      {showDebugBadge ? (
+                        <div
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full h-6 w-6 flex items-center justify-center text-xs font-bold shadow-lg ring-2 ring-slate-800 animate-badge-pop motion-reduce:animate-none motion-reduce:opacity-100"
+                          style={{ animationDelay: `${75 + ((debugBadgeAnimationIndex ?? 0) * 75)}ms` }}
+                        >
+                          {debugBadgeCount > 99 ? '99+' : debugBadgeCount}
                         </div>
                       ) : null}
-                      {showSensitivePinIndicator && (
-                        <span
-                          role="img"
-                          aria-label="Debug requires Sensitive PIN"
-                          title="Sensitive PIN required"
-                          className={sensitivePinIndicatorClass}
-                        >
-                          <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
-                        </span>
-                      )}
                       <div className="flex flex-col items-start justify-between h-full">
                         <Icon className="h-6 w-6 text-red-500" />
                         <span className="font-semibold text-base leading-tight text-red-500">
