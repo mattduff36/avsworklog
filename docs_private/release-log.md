@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.26.0
+
+**GIT COMMIT MESSAGE**
+`feat(layout): update Navigation, Dashboard, Profile, and Help and FAQ`
+
+**PUSHED AT**
+2026-07-28T23:19:21.291Z
+
+**WHAT CHANGED**
+Update Navigation, Dashboard, Profile, and Help and FAQ.
+
+**VERSION HISTORY DETAILS**
+- Updated Navigation, Dashboard, Profile, and Help and FAQ, with changes to interface components.
+- Updated dashboard, with changes to app screens.
+- Updated profile, with changes to automated tests.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(layout): update Navigation, Dashboard, Profile, and Help and FAQ`
+
 ## 0726.25.1
 
 **GIT COMMIT MESSAGE**
