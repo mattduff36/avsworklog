@@ -53,6 +53,10 @@ const MODULE_GROUP_DIVIDER_CLASS = 'border-l border-slate-600/20';
 const PERMISSION_LEVELS: PermissionAccessLevel[] = [0, 1, 2, 3, 4, 5];
 const NAVBAR_OFFSET_PX = 68;
 const USER_COLUMN_WIDTH_PX = 180;
+const MATRIX_HEADER_HEIGHT_PX = 118;
+const MATRIX_TEAM_ROW_MIN_HEIGHT_PX = 48;
+const SKELETON_TEAM_ROW_COUNT = 9;
+const SKELETON_MODULE_COLUMN_COUNT = 20;
 const FLOATING_MODULE_HEADER_HEIGHT_PX = 96;
 const FLOATING_HEADER_HIDDEN_TRANSFORM = 'translate3d(0, -12px, 0)';
 const FLOATING_HEADER_VISIBLE_TRANSFORM = 'translate3d(0, 0, 0)';
@@ -243,9 +247,9 @@ function RoleManagementSkeleton() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
-        <div className="grid gap-x-6 gap-y-2 rounded-lg border border-slate-700 bg-slate-950/40 p-2 text-xs md:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, index) => (
+      <CardContent className="space-y-4">
+        <div className="grid gap-2 rounded-lg border border-slate-700 bg-slate-950/40 p-3 text-xs md:grid-cols-3">
+          {Array.from({ length: PERMISSION_LEVELS.length }).map((_, index) => (
             <div key={index} className="flex h-7 items-center gap-2">
               <Skeleton className="h-7 w-9 bg-slate-800" />
               <Skeleton className="h-4 w-20 bg-slate-800" />
@@ -254,24 +258,36 @@ function RoleManagementSkeleton() {
         </div>
         <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-950/50">
           <div className="flex border-b border-slate-700">
-            <Skeleton className="h-24 w-[180px] shrink-0 rounded-none bg-slate-800" />
+            <Skeleton
+              className="shrink-0 rounded-none bg-slate-800"
+              style={{ width: USER_COLUMN_WIDTH_PX, height: MATRIX_HEADER_HEIGHT_PX }}
+            />
             <div className="flex min-w-0 flex-1 gap-px">
-              {Array.from({ length: 20 }).map((_, index) => (
-                <Skeleton key={index} className="h-24 flex-1 rounded-none bg-slate-800" />
+              {Array.from({ length: SKELETON_MODULE_COLUMN_COUNT }).map((_, index) => (
+                <Skeleton
+                  key={index}
+                  className="flex-1 rounded-none bg-slate-800"
+                  style={{ height: MATRIX_HEADER_HEIGHT_PX }}
+                />
               ))}
             </div>
           </div>
           <div>
-            {Array.from({ length: 8 }).map((_, rowIndex) => (
+            {Array.from({ length: SKELETON_TEAM_ROW_COUNT }).map((_, rowIndex) => (
               <div key={rowIndex} className="flex border-b border-slate-800/80 last:border-b-0">
-                <div className="flex h-9 w-[180px] shrink-0 items-center gap-2 bg-slate-950/70 px-2">
-                  <Skeleton className="h-3 w-3 bg-slate-800" />
-                  <Skeleton className="h-4 w-20 bg-slate-800" />
+                <div
+                  className="flex shrink-0 items-center gap-1.5 bg-slate-950/70 px-2 py-4"
+                  style={{ width: USER_COLUMN_WIDTH_PX, minHeight: MATRIX_TEAM_ROW_MIN_HEIGHT_PX }}
+                >
+                  <Skeleton className="h-3.5 w-3.5 bg-slate-800" />
+                  <Skeleton className="h-4 w-24 bg-slate-800" />
                   <Skeleton className="ml-auto h-4 w-6 bg-slate-800" />
                 </div>
-                <div className="flex min-w-0 flex-1 gap-px p-1">
-                  {Array.from({ length: 20 }).map((_, colIndex) => (
-                    <Skeleton key={colIndex} className="h-7 flex-1 bg-slate-800" />
+                <div className="flex min-w-0 flex-1 items-center gap-px px-0 py-3">
+                  {Array.from({ length: SKELETON_MODULE_COLUMN_COUNT }).map((_, colIndex) => (
+                    <div key={colIndex} className="flex flex-1 items-center justify-center">
+                      <Skeleton className="h-7 w-9 bg-slate-800" />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -1356,7 +1372,7 @@ export function RoleManagement() {
                     <tr className="border-b border-slate-700">
                       <th
                         className="sticky left-0 z-40 bg-slate-800 px-3 py-2 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider align-bottom border-b border-slate-700"
-                        style={{ height: 118 }}
+                        style={{ height: MATRIX_HEADER_HEIGHT_PX }}
                       >
                         User
                       </th>
