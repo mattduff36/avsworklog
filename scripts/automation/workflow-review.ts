@@ -1,0 +1,532 @@
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import path from 'path';
+import { updateAutomationMemory, loadAutomationMemory, saveAutomationMemory } from './memory';
+import { writeMonthlyAutomationPendingFollowUp } from './monthly-follow-up';
+import {
+  WORKFLOW_REVIEW_THRESHOLD,
+  WORKFLOW_SCRIPT_NAME,
+  getWorkflowPaths,
+  listWorkflowEvents,
+  loadWorkflowReviewState,
+  saveWorkflowReviewState,
+  withWorkflowLock,
+  writeWorkflowEvent,
+  type WorkflowPaths,
+} from './workflow-events';
+import { buildWorkflowFindings, estimatePremiumTokenReduction, ESTIMATE_FORMULA_VERSION } from './workflow-findings';
+import { extractWorkflowCompletionMarker } from './workflow-marker';
+import { assertNoForbiddenPayload, hashIdentifier } from './workflow-privacy';
+import { parseWorkflowTranscript } from './workflow-transcript';
+import type {
+  AutomationMemorySuggestion,
+  WorkflowReviewMetrics,
+  WorkflowReviewState,
+  WorkflowStopEvent,
+} from './types';
+
+export interface WorkflowStopHookInput {
+  conversation_id?: string;
+  generation_id?: string;
+  model?: string;
+  model_id?: string;
+  transcript_path?: string | null;
+  status?: string;
+  loop_count?: number;
+  hook_event_name?: string;
+}
+
+export interface WorkflowStopHookResult {
+  followup_message?: string;
+  createdEvent: boolean;
+  reviewTriggered: boolean;
+  pendingPath?: string;
+  reviewWindowId?: string;
+  reason?: string;
+}
+
+function monthKeyFromIso(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+function selectModel(input: WorkflowStopHookInput): {
+  selectedModel: string;
+  selectedModelSource: WorkflowStopEvent['selectedModelSource'];
+} {
+  if (typeof input.model_id === 'string' && input.model_id.trim()) {
+    return { selectedModel: input.model_id.trim(), selectedModelSource: 'model_id' };
+  }
+  if (typeof input.model === 'string' && input.model.trim()) {
+    return { selectedModel: input.model.trim(), selectedModelSource: 'model' };
+  }
+  return { selectedModel: 'unavailable', selectedModelSource: 'unavailable' };
+}
+
+function isQualifyingStatus(status: string | undefined, loopCount: number): boolean {
+  return status === 'completed' && loopCount === 0;
+}
+
+function buildSuggestionsFromFindings(
+  events: WorkflowStopEvent[],
+  monthKey: string,
+  reviewWindowId: string
+): AutomationMemorySuggestion[] {
+  const failed = events.flatMap((event) =>
+    event.findings.filter((finding) => finding.status === 'failed' && finding.severity !== 'info')
+  );
+  const byId = new Map<string, AutomationMemorySuggestion>();
+
+  for (const finding of failed) {
+    const existing = byId.get(finding.id);
+    if (existing) {
+      existing.evidence.push(...finding.evidenceLabels);
+      continue;
+    }
+    byId.set(finding.id, {
+      id: `${WORKFLOW_SCRIPT_NAME}-${reviewWindowId}-${finding.id}`,
+      scriptName: WORKFLOW_SCRIPT_NAME,
+      title: finding.title,
+      reason: finding.detail,
+      evidence: [...finding.evidenceLabels],
+      createdMonth: monthKey,
+      lastSeenMonth: monthKey,
+      status: 'pending',
+      source: 'advisor',
+    });
+  }
+
+  return [...byId.values()];
+}
+
+function buildMetrics(events: WorkflowStopEvent[]): WorkflowReviewMetrics {
+  const estimate = estimatePremiumTokenReduction(events);
+  const selectedModelCounts: Record<string, number> = {};
+  for (const event of events) {
+    selectedModelCounts[event.selectedModel] = (selectedModelCounts[event.selectedModel] ?? 0) + 1;
+  }
+
+  return {
+    qualifyingTaskCount: events.length,
+    highRiskCount: events.filter((event) => event.marker?.risk === 'high').length,
+    routineCount: events.filter((event) => event.marker?.risk === 'routine').length,
+    missingGateCount: events.filter((event) =>
+      event.findings.some((finding) => finding.id === 'missing-architecture-gate' && finding.status === 'failed')
+    ).length,
+    missingFinalReviewCount: events.filter((event) =>
+      event.findings.some((finding) => finding.id === 'missing-final-review' && finding.status === 'failed')
+    ).length,
+    truncatedEvidenceCount: events.filter((event) =>
+      event.findings.some((finding) => finding.id === 'truncated-verification-output' && finding.status === 'failed')
+    ).length,
+    incompleteHandoffCount: events.filter((event) =>
+      event.findings.some((finding) => finding.id === 'incomplete-handoff' && finding.status !== 'passed')
+    ).length,
+    selectedModelCounts,
+    estimatedPremiumTokenReductionLowPercent: estimate.lowPercent,
+    estimatedPremiumTokenReductionHighPercent: estimate.highPercent,
+    estimateFormulaVersion: ESTIMATE_FORMULA_VERSION,
+    estimateConfidence: 'low',
+  };
+}
+
+function selectEventsForReview(params: {
+  events: WorkflowStopEvent[];
+  state: WorkflowReviewState;
+  incomingMonthKey: string;
+}): { windowEvents: WorkflowStopEvent[]; reason: string } | null {
+  const unreviewed = params.events.filter(
+    (event) => event.qualifies && params.state.unreviewedEventIds.includes(event.eventId)
+  );
+
+  if (unreviewed.length === 0) return null;
+
+  const previousMonthKeys = [...new Set(unreviewed.map((event) => event.monthKey))]
+    .filter((key) => key < params.incomingMonthKey)
+    .sort();
+
+  if (previousMonthKeys.length > 0) {
+    const previousMonth = previousMonthKeys[0];
+    const remainder = unreviewed.filter((event) => event.monthKey === previousMonth);
+    if (remainder.length > 0 && remainder.length < WORKFLOW_REVIEW_THRESHOLD) {
+      return {
+        windowEvents: remainder,
+        reason: `month-boundary backstop for ${previousMonth} remainder (${remainder.length})`,
+      };
+    }
+  }
+
+  if (unreviewed.length >= WORKFLOW_REVIEW_THRESHOLD) {
+    return {
+      windowEvents: unreviewed.slice(0, WORKFLOW_REVIEW_THRESHOLD),
+      reason: `reached ${WORKFLOW_REVIEW_THRESHOLD} qualifying workflow tasks`,
+    };
+  }
+
+  return null;
+}
+
+function writeReviewArtifacts(params: {
+  paths: WorkflowPaths;
+  windowEvents: WorkflowStopEvent[];
+  reason: string;
+  now: Date;
+}): {
+  reviewWindowId: string;
+  reviewDirectory: string;
+  reviewPath: string;
+  suggestionsPath: string;
+  metricsPath: string;
+  suggestions: AutomationMemorySuggestion[];
+  monthKey: string;
+} {
+  const monthKey = params.windowEvents[params.windowEvents.length - 1]?.monthKey ?? monthKeyFromIso(params.now.toISOString());
+  const reviewWindowId = `${monthKey.replace(/-/gu, '')}-${params.now
+    .toISOString()
+    .replace(/[-:TZ.]/gu, '')}-${process.pid}-${Math.random().toString(16).slice(2, 8)}`;
+  const reviewDirectory = path.join(
+    params.paths.reviewsDirectory,
+    WORKFLOW_SCRIPT_NAME,
+    monthKey,
+    reviewWindowId
+  );
+  mkdirSync(reviewDirectory, { recursive: true });
+
+  const metrics = buildMetrics(params.windowEvents);
+  const suggestions = buildSuggestionsFromFindings(params.windowEvents, monthKey, reviewWindowId);
+  const estimate = estimatePremiumTokenReduction(params.windowEvents);
+
+  const reviewMarkdown = [
+    '# workflow-review Automation Self-Review',
+    '',
+    `Generated: ${params.now.toISOString()}`,
+    `Review window: ${reviewWindowId}`,
+    `Trigger: ${params.reason}`,
+    `Qualifying tasks reviewed: ${params.windowEvents.length}`,
+    '',
+    '## Selected parent models',
+    '',
+    ...Object.entries(metrics.selectedModelCounts).map(
+      ([model, count]) => `- ${model}: ${count}`
+    ),
+    '',
+    '## Estimated premium-token reduction',
+    '',
+    `- Range: ${estimate.lowPercent}% to ${estimate.highPercent}%`,
+    `- Confidence: ${estimate.confidence}`,
+    `- Formula: ${estimate.formulaVersion}`,
+    ...estimate.assumptions.map((assumption) => `- Assumption: ${assumption}`),
+    '',
+    '## Findings',
+    '',
+    ...params.windowEvents.flatMap((event) => [
+      `### Event ${event.eventId}`,
+      '',
+      `- Month: ${event.monthKey}`,
+      `- Model: ${event.selectedModel} (${event.selectedModelSource})`,
+      `- Marker: ${event.markerStatus}`,
+      ...event.findings.map(
+        (finding) => `- [${finding.severity}/${finding.status}] ${finding.title}: ${finding.detail}`
+      ),
+      '',
+    ]),
+    '## Suggestions',
+    '',
+    ...(suggestions.length > 0
+      ? suggestions.map((suggestion) => `- ${suggestion.title}: ${suggestion.reason}`)
+      : ['- No advisor suggestions generated.']),
+    '',
+  ].join('\n');
+
+  const reviewPath = path.join(reviewDirectory, 'review.md');
+  const suggestionsPath = path.join(reviewDirectory, 'suggestions.json');
+  const metricsPath = path.join(reviewDirectory, 'metrics.json');
+  const promptPath = path.join(reviewDirectory, 'review-prompt.md');
+  const eventsPath = path.join(reviewDirectory, 'events.json');
+
+  writeFileSync(reviewPath, reviewMarkdown, 'utf8');
+  writeFileSync(suggestionsPath, JSON.stringify(suggestions, null, 2), 'utf8');
+  writeFileSync(
+    metricsPath,
+    JSON.stringify(
+      {
+        scriptName: WORKFLOW_SCRIPT_NAME,
+        month: monthKey,
+        generatedAt: params.now.toISOString(),
+        runCount: params.windowEvents.length,
+        failureCount: params.windowEvents.filter((event) =>
+          event.findings.some((finding) => finding.status === 'failed')
+        ).length,
+        averageDurationMs: 0,
+        modeCounts: { workflow: params.windowEvents.length },
+        workflowReview: metrics,
+      },
+      null,
+      2
+    ),
+    'utf8'
+  );
+  writeFileSync(
+    promptPath,
+    [
+      '# workflow-review prompt',
+      '',
+      'Review the deterministic findings and approve only suggestions that improve the token-efficient workflow without weakening quality gates.',
+      '',
+    ].join('\n'),
+    'utf8'
+  );
+  writeFileSync(eventsPath, JSON.stringify(params.windowEvents, null, 2), 'utf8');
+
+  return {
+    reviewWindowId,
+    reviewDirectory,
+    reviewPath,
+    suggestionsPath,
+    metricsPath,
+    suggestions,
+    monthKey,
+  };
+}
+
+export async function buildWorkflowStopEvent(
+  input: WorkflowStopHookInput,
+  options?: { now?: () => Date }
+): Promise<WorkflowStopEvent> {
+  const now = options?.now?.() ?? new Date();
+  const loopCount = typeof input.loop_count === 'number' ? input.loop_count : 0;
+  const status =
+    input.status === 'completed' || input.status === 'aborted' || input.status === 'error'
+      ? input.status
+      : 'unknown';
+  const { selectedModel, selectedModelSource } = selectModel(input);
+  const conversationHash = hashIdentifier(input.conversation_id);
+  const generationHash = hashIdentifier(input.generation_id || `${input.conversation_id}:${now.toISOString()}`);
+  const qualifies = isQualifyingStatus(status, loopCount);
+  const qualificationReasons: string[] = [];
+
+  if (!qualifies) {
+    if (status !== 'completed') qualificationReasons.push(`status=${status}`);
+    if (loopCount !== 0) qualificationReasons.push(`loop_count=${loopCount}`);
+  }
+
+  let transcriptSignals = null;
+  let assistantText = '';
+  if (qualifies) {
+    const parsed = await parseWorkflowTranscript(input.transcript_path ?? null);
+    transcriptSignals = parsed.signals;
+    assistantText = parsed.assistantText;
+  }
+
+  const markerParse = assistantText
+    ? extractWorkflowCompletionMarker(assistantText)
+    : { status: 'missing' as const, marker: null, errors: ['no assistant text'] };
+
+  if (qualifies) {
+    if (markerParse.status === 'present') qualificationReasons.push('marker:present');
+    if (transcriptSignals?.skillRead) qualificationReasons.push('skill-read');
+    if (transcriptSignals?.architectureGateTask) qualificationReasons.push('architecture-gate');
+    if (transcriptSignals?.finalDiffReviewerTask) qualificationReasons.push('final-diff-reviewer');
+  }
+
+  const stronglyQualified =
+    qualifies &&
+    (markerParse.status === 'present' ||
+      Boolean(transcriptSignals?.skillRead) ||
+      Boolean(transcriptSignals?.architectureGateTask) ||
+      Boolean(transcriptSignals?.finalDiffReviewerTask));
+
+  const findings = buildWorkflowFindings({
+    marker: markerParse.marker,
+    markerStatus: markerParse.status,
+    transcriptSignals,
+  });
+
+  return {
+    schemaVersion: '1',
+    eventId: generationHash,
+    recordedAt: now.toISOString(),
+    conversationHash,
+    generationHash,
+    selectedModel,
+    selectedModelSource,
+    status,
+    loopCount,
+    qualifies: stronglyQualified,
+    qualificationReasons: stronglyQualified
+      ? qualificationReasons
+      : [...qualificationReasons, 'missing-strong-qualification-signal'],
+    marker: markerParse.marker,
+    markerStatus: markerParse.status,
+    transcriptSignals,
+    findings,
+    monthKey: monthKeyFromIso(now.toISOString()),
+  };
+}
+
+export async function processWorkflowStopEvent(
+  input: WorkflowStopHookInput,
+  options?: { repoRoot?: string; now?: () => Date }
+): Promise<WorkflowStopHookResult> {
+  const paths = getWorkflowPaths(options?.repoRoot);
+  const now = options?.now?.() ?? new Date();
+
+  if (typeof input.loop_count === 'number' && input.loop_count > 0) {
+    return {
+      createdEvent: false,
+      reviewTriggered: false,
+      reason: 'loop_count>0',
+    };
+  }
+
+  const event = await buildWorkflowStopEvent(input, { now: () => now });
+  const privacyViolations = assertNoForbiddenPayload(event);
+  if (privacyViolations.length > 0) {
+    throw new Error(`Workflow event privacy violation: ${privacyViolations.join('; ')}`);
+  }
+
+  return withWorkflowLock(paths.lockPath, () => {
+    const state = loadWorkflowReviewState(paths.statePath);
+    if (state.processedGenerationHashes.includes(event.generationHash)) {
+      return {
+        createdEvent: false,
+        reviewTriggered: false,
+        reason: 'duplicate-generation',
+      };
+    }
+
+    const written = writeWorkflowEvent(paths.eventsDirectory, event);
+    const nextState: WorkflowReviewState = {
+      ...state,
+      processedGenerationHashes: [...state.processedGenerationHashes, event.generationHash].slice(-500),
+      unreviewedEventIds: written.created && event.qualifies
+        ? [...state.unreviewedEventIds, event.eventId]
+        : state.unreviewedEventIds,
+    };
+
+    if (!event.qualifies) {
+      saveWorkflowReviewState(paths.statePath, nextState);
+      return {
+        createdEvent: written.created,
+        reviewTriggered: false,
+        reason: event.qualificationReasons.join(','),
+      };
+    }
+
+    if (nextState.pendingFollowUpPath) {
+      if (existsSync(nextState.pendingFollowUpPath)) {
+        saveWorkflowReviewState(paths.statePath, nextState);
+        return {
+          createdEvent: written.created,
+          reviewTriggered: false,
+          pendingPath: nextState.pendingFollowUpPath,
+          reason: 'pending-follow-up-unresolved',
+        };
+      }
+      nextState.pendingFollowUpPath = null;
+    }
+
+    const allEvents = listWorkflowEvents(paths.eventsDirectory);
+    const selection = selectEventsForReview({
+      events: allEvents,
+      state: nextState,
+      incomingMonthKey: event.monthKey,
+    });
+
+    if (!selection) {
+      saveWorkflowReviewState(paths.statePath, nextState);
+      return {
+        createdEvent: written.created,
+        reviewTriggered: false,
+        reason: `waiting (${nextState.unreviewedEventIds.length}/${WORKFLOW_REVIEW_THRESHOLD})`,
+      };
+    }
+
+    const artifacts = writeReviewArtifacts({
+      paths,
+      windowEvents: selection.windowEvents,
+      reason: selection.reason,
+      now,
+    });
+
+    const memory = loadAutomationMemory(paths.knowledgeDirectory, WORKFLOW_SCRIPT_NAME);
+    const nextMemory = updateAutomationMemory({
+      memory,
+      metrics: {
+        scriptName: WORKFLOW_SCRIPT_NAME,
+        month: artifacts.monthKey,
+        generatedAt: now.toISOString(),
+        runCount: selection.windowEvents.length,
+        failureCount: selection.windowEvents.filter((item) =>
+          item.findings.some((finding) => finding.status === 'failed')
+        ).length,
+        averageDurationMs: 0,
+        modeCounts: { workflow: selection.windowEvents.length },
+        workflowReview: buildMetrics(selection.windowEvents),
+      },
+      prompt: {
+        month: artifacts.monthKey,
+        focusAreas: ['workflow-compliance', 'premium-gate-usage'],
+        deprioritizedAreas: [],
+        prompt: 'Improve token-efficient workflow compliance using deterministic findings.',
+      },
+      suggestions: artifacts.suggestions,
+    });
+    saveAutomationMemory(paths.knowledgeDirectory, nextMemory);
+
+    let pendingPath: string | undefined;
+    if (artifacts.suggestions.length > 0) {
+      const pending = writeMonthlyAutomationPendingFollowUp({
+        scriptName: WORKFLOW_SCRIPT_NAME,
+        monthKey: artifacts.monthKey,
+        reviewPath: artifacts.reviewPath,
+        suggestionsPath: artifacts.suggestionsPath,
+        suggestions: artifacts.suggestions,
+        knowledgeDirectory: paths.knowledgeDirectory,
+        repoRoot: paths.repoRoot,
+        reviewWindowId: artifacts.reviewWindowId,
+        promptMode: 'skip',
+      });
+      pendingPath = pending.pendingPath;
+    }
+
+    // Event files remain immutable. Reviewed membership is tracked only in state.
+    const reviewedIds = new Set(selection.windowEvents.map((item) => item.eventId));
+    const reviewedState: WorkflowReviewState = {
+      ...nextState,
+      lastReviewAt: now.toISOString(),
+      lastReviewWindowId: artifacts.reviewWindowId,
+      lastReviewedEventId: selection.windowEvents[selection.windowEvents.length - 1]?.eventId ?? null,
+      unreviewedEventIds: nextState.unreviewedEventIds.filter((id) => !reviewedIds.has(id)),
+      pendingFollowUpPath: pendingPath ?? null,
+    };
+    saveWorkflowReviewState(paths.statePath, reviewedState);
+
+    return {
+      createdEvent: written.created,
+      reviewTriggered: true,
+      pendingPath,
+      reviewWindowId: artifacts.reviewWindowId,
+      reason: selection.reason,
+      followup_message: pendingPath
+        ? [
+            'A token-efficient workflow review is ready.',
+            `Pending follow-up artifact: ${pendingPath}`,
+            'Read the pending JSON, ask me to approve/reject/skip each suggestion with AskQuestion, then run:',
+            `npm run automation:followup:resolve -- --pending "${pendingPath}" --decision "<suggestion-id>=approve|reject|skip"`,
+            'Include one --decision argument for each answer.',
+          ].join('\n')
+        : undefined,
+    };
+  });
+}
+
+export function formatWorkflowReviewDiagnostics(repoRoot = process.cwd()): string {
+  const paths = getWorkflowPaths(repoRoot);
+  const state = loadWorkflowReviewState(paths.statePath);
+  const events = listWorkflowEvents(paths.eventsDirectory);
+  return [
+    `Events: ${events.length}`,
+    `Unreviewed: ${state.unreviewedEventIds.length}`,
+    `Last review: ${state.lastReviewAt ?? 'never'}`,
+    `Pending follow-up: ${state.pendingFollowUpPath ?? 'none'}`,
+  ].join('\n');
+}

@@ -1,5 +1,5 @@
 import { spawnSync } from 'child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import path from 'path';
 import {
@@ -7,6 +7,13 @@ import {
   type MonthlyFollowUpDecision,
   type PendingMonthlyFollowUp,
 } from './monthly-follow-up';
+import {
+  getWorkflowPaths,
+  loadWorkflowReviewState,
+  saveWorkflowReviewState,
+  withWorkflowLock,
+  WORKFLOW_SCRIPT_NAME,
+} from './workflow-events';
 
 interface ResolveOptions {
   pendingPath?: string;
@@ -94,6 +101,22 @@ async function main(): Promise<void> {
   const pending = loadPendingFollowUp(options.pendingPath);
   const decisionsById = new Map(options.decisions.map((decision) => [decision.suggestionId, decision]));
 
+  const unknownDecisions = options.decisions.filter(
+    (decision) => !pending.suggestions.some((suggestion) => suggestion.id === decision.suggestionId)
+  );
+  if (unknownDecisions.length > 0) {
+    throw new Error(
+      `Unknown suggestion id(s): ${unknownDecisions.map((decision) => decision.suggestionId).join(', ')}`
+    );
+  }
+
+  const duplicateIds = options.decisions
+    .map((decision) => decision.suggestionId)
+    .filter((id, index, all) => all.indexOf(id) !== index);
+  if (duplicateIds.length > 0) {
+    throw new Error(`Duplicate decision id(s): ${[...new Set(duplicateIds)].join(', ')}`);
+  }
+
   const result = await runMonthlyAutomationFollowUp({
     scriptName: pending.scriptName,
     monthKey: pending.monthKey,
@@ -102,11 +125,30 @@ async function main(): Promise<void> {
     suggestions: pending.suggestions,
     knowledgeDirectory: pending.knowledgeDirectory,
     repoRoot: pending.repoRoot,
+    reviewWindowId: pending.reviewWindowId,
     decisionProvider: (suggestion) => decisionsById.get(suggestion.id) ?? {
       suggestionId: suggestion.id,
       action: 'skip',
     },
   });
+
+  if (options.pendingPath && existsSync(options.pendingPath)) {
+    const resolvedPath = `${options.pendingPath}.resolved`;
+    renameSync(options.pendingPath, resolvedPath);
+  }
+
+  if (pending.scriptName === WORKFLOW_SCRIPT_NAME) {
+    const paths = getWorkflowPaths(pending.repoRoot);
+    withWorkflowLock(paths.lockPath, () => {
+      const state = loadWorkflowReviewState(paths.statePath);
+      if (state.pendingFollowUpPath === options.pendingPath || !state.pendingFollowUpPath) {
+        saveWorkflowReviewState(paths.statePath, {
+          ...state,
+          pendingFollowUpPath: null,
+        });
+      }
+    });
+  }
 
   if (result.planPath) {
     const cursorPlanPath = writeCursorPlanCopy(result.planPath, pending);

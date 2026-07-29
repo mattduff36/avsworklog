@@ -21,6 +21,8 @@
     "audit:all": "tsx scripts/audit-automation.ts --full",
     "audit:contrast": "tsx scripts/audit-input-contrast.ts",
     "automation:followup:resolve": "tsx scripts/automation/resolve-monthly-follow-up.ts",
+    "workflow-review": "tsx scripts/workflow-review.ts diagnostics",
+    "workflow-review:process": "tsx scripts/workflow-review.ts process-json",
     "fix:contrast": "tsx scripts/fix-input-contrast.ts",
     "fixerrors": "tsx scripts/fixerrors.ts",
     "version:bump": "tsx scripts/bump-release-version.ts",

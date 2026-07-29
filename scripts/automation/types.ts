@@ -148,6 +148,122 @@ export interface AutomationMonthlyMetrics {
     repeatedPatternCount: number;
     repeatedSourceFileCount: number;
   };
+  workflowReview?: WorkflowReviewMetrics;
+}
+
+export type WorkflowEvidenceState = 'passed' | 'failed' | 'unknown';
+export type WorkflowTaskType = 'change' | 'planning' | 'review';
+export type WorkflowRisk = 'high' | 'routine';
+export type WorkflowGateDecision =
+  | 'approved'
+  | 'approved_with_conditions'
+  | 'blocked'
+  | 'skipped'
+  | 'not_applicable'
+  | 'unknown';
+export type WorkflowCommitStatus = 'completed' | 'not_applicable' | 'pending' | 'unknown';
+export type WorkflowHandoffStatus = 'completed' | 'pending' | 'unknown';
+export type WorkflowFinalReviewStatus =
+  | 'passed'
+  | 'failed'
+  | 'skipped'
+  | 'not_applicable'
+  | 'unknown';
+
+export interface WorkflowRequiredTest {
+  id: string;
+  status: 'completed' | 'unresolved';
+  note?: string;
+}
+
+export interface WorkflowUnresolvedRisk {
+  id: string;
+  note: string;
+}
+
+export interface WorkflowCompletionMarker {
+  schemaVersion: '1';
+  taskId: string;
+  taskType: WorkflowTaskType;
+  risk: WorkflowRisk;
+  exploreCanonical: boolean;
+  architectureGate: WorkflowGateDecision;
+  requiredTests: WorkflowRequiredTest[];
+  unresolvedRisks: WorkflowUnresolvedRisk[];
+  verification: WorkflowEvidenceState;
+  finalReview: WorkflowFinalReviewStatus;
+  commit: WorkflowCommitStatus;
+  handoff: WorkflowHandoffStatus;
+}
+
+export interface WorkflowFinding {
+  id: string;
+  severity: 'info' | 'warning' | 'action';
+  status: WorkflowEvidenceState;
+  title: string;
+  detail: string;
+  evidenceLabels: string[];
+}
+
+export interface WorkflowTranscriptSignals {
+  adapterVersion: string;
+  skillRead: boolean;
+  architectureGateTask: boolean;
+  finalDiffReviewerTask: boolean;
+  exploreTask: boolean;
+  truncatedShellEvidence: boolean;
+  bulkInsertionScriptEvidence: boolean;
+  duplicateBroadSearchAfterExplore: boolean;
+  gitCommitEvidence: boolean;
+  markerPresent: boolean;
+  parseErrors: string[];
+}
+
+export interface WorkflowStopEvent {
+  schemaVersion: '1';
+  eventId: string;
+  recordedAt: string;
+  conversationHash: string;
+  generationHash: string;
+  selectedModel: string;
+  selectedModelSource: 'model_id' | 'model' | 'unavailable';
+  status: 'completed' | 'aborted' | 'error' | 'unknown';
+  loopCount: number;
+  qualifies: boolean;
+  qualificationReasons: string[];
+  marker: WorkflowCompletionMarker | null;
+  markerStatus: 'present' | 'missing' | 'malformed';
+  transcriptSignals: WorkflowTranscriptSignals | null;
+  findings: WorkflowFinding[];
+  monthKey: string;
+  reviewedInWindowId?: string;
+}
+
+export interface WorkflowReviewState {
+  schemaVersion: '1';
+  scriptName: 'workflow-review';
+  updatedAt: string;
+  lastReviewAt: string | null;
+  lastReviewWindowId: string | null;
+  lastReviewedEventId: string | null;
+  unreviewedEventIds: string[];
+  pendingFollowUpPath: string | null;
+  processedGenerationHashes: string[];
+}
+
+export interface WorkflowReviewMetrics {
+  qualifyingTaskCount: number;
+  highRiskCount: number;
+  routineCount: number;
+  missingGateCount: number;
+  missingFinalReviewCount: number;
+  truncatedEvidenceCount: number;
+  incompleteHandoffCount: number;
+  selectedModelCounts: Record<string, number>;
+  estimatedPremiumTokenReductionLowPercent: number;
+  estimatedPremiumTokenReductionHighPercent: number;
+  estimateFormulaVersion: string;
+  estimateConfidence: 'low';
 }
 
 export interface AutomationMemory {

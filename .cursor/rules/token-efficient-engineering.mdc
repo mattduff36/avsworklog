@@ -1,0 +1,18 @@
+---
+description: Automatically apply the global token-efficient engineering workflow for substantive software-engineering tasks in this repository.
+alwaysApply: true
+---
+
+# Token-Efficient Engineering (AVS)
+
+For substantive software-engineering tasks in this repository, automatically apply the global `token-efficient-engineering` Skill. Do not wait for the user to restate the workflow.
+
+Project rules take precedence for commit, push, migration, build, and PRD handling. In particular:
+
+- Stay on the current branch unless explicitly told otherwise.
+- Commit locally after completed coding tasks; never push unless the user authorizes it with the exact allowed phrases.
+- Never truncate compiler, test, lint, migration, or reviewer-diff output in a way that can hide failures.
+- Emit the versioned workflow completion marker at the end of substantive tasks.
+- For high-risk work, run `architecture-gate` before implementation and `final-diff-reviewer` after deterministic verification.
+
+If `Pending monthly follow-up artifact:` or a workflow-review pending artifact path is printed, resolve suggestions with the existing approve/reject/skip chat flow and `npm run automation:followup:resolve`.

@@ -33,6 +33,8 @@ export interface MonthlyFollowUpParams {
   suggestions: AutomationMemorySuggestion[];
   knowledgeDirectory: string;
   repoRoot?: string;
+  /** Optional unique window under the month for multi-review scripts such as workflow-review. */
+  reviewWindowId?: string;
   input?: TerminalReadableStream;
   output?: TerminalWritableStream;
   isInteractive?: boolean;
@@ -52,6 +54,7 @@ export interface PendingMonthlyFollowUp {
   knowledgeDirectory: string;
   repoRoot: string;
   suggestions: AutomationMemorySuggestion[];
+  reviewWindowId?: string;
 }
 
 const DECISION_REASON: Record<FollowUpAction, string> = {
@@ -69,11 +72,34 @@ function formatRelativePath(repoRoot: string, filePath: string): string {
   return path.relative(repoRoot, filePath).replace(/\\/gu, '/');
 }
 
-function getPlanPath(repoRoot: string, scriptName: string, monthKey: string): string {
-  return path.join(repoRoot, 'plans', 'automation', `${scriptName}-${monthKey}-upgrade-plan.md`);
+function getPlanPath(
+  repoRoot: string,
+  scriptName: string,
+  monthKey: string,
+  reviewWindowId?: string
+): string {
+  const suffix = reviewWindowId ? `-${reviewWindowId}` : '';
+  return path.join(repoRoot, 'plans', 'automation', `${scriptName}-${monthKey}${suffix}-upgrade-plan.md`);
 }
 
-function getPendingFollowUpPath(repoRoot: string, scriptName: string, monthKey: string): string {
+function getPendingFollowUpPath(
+  repoRoot: string,
+  scriptName: string,
+  monthKey: string,
+  reviewWindowId?: string
+): string {
+  if (reviewWindowId) {
+    return path.join(
+      repoRoot,
+      'docs_private',
+      'automation',
+      'follow-ups',
+      scriptName,
+      monthKey,
+      reviewWindowId,
+      'pending-follow-up.json'
+    );
+  }
   return path.join(repoRoot, 'docs_private', 'automation', 'follow-ups', scriptName, monthKey, 'pending-follow-up.json');
 }
 
@@ -186,7 +212,12 @@ export function writeMonthlyAutomationPendingFollowUp(params: MonthlyFollowUpPar
     return { mode: 'non-interactive', decisions: [], updatedSuggestions: params.suggestions };
   }
 
-  const pendingPath = getPendingFollowUpPath(repoRoot, params.scriptName, params.monthKey);
+  const pendingPath = getPendingFollowUpPath(
+    repoRoot,
+    params.scriptName,
+    params.monthKey,
+    params.reviewWindowId
+  );
   const pendingFollowUp: PendingMonthlyFollowUp = {
     scriptName: params.scriptName,
     monthKey: params.monthKey,
@@ -195,6 +226,7 @@ export function writeMonthlyAutomationPendingFollowUp(params: MonthlyFollowUpPar
     knowledgeDirectory: params.knowledgeDirectory,
     repoRoot,
     suggestions: params.suggestions,
+    reviewWindowId: params.reviewWindowId,
   };
 
   mkdirSync(path.dirname(pendingPath), { recursive: true });
@@ -461,7 +493,10 @@ export async function runMonthlyAutomationFollowUp(params: MonthlyFollowUpParams
   const approvedSuggestions = suggestions.filter((suggestion) =>
     decisions.some((decision) => decision.suggestionId === suggestion.id && decision.action === 'approve')
   );
-  const planPath = approvedSuggestions.length > 0 ? getPlanPath(repoRoot, params.scriptName, params.monthKey) : undefined;
+  const planPath =
+    approvedSuggestions.length > 0
+      ? getPlanPath(repoRoot, params.scriptName, params.monthKey, params.reviewWindowId)
+      : undefined;
 
   if (planPath) {
     mkdirSync(path.dirname(planPath), { recursive: true });
