@@ -2,6 +2,7 @@ import { sanitizeEvidenceLabel } from './workflow-privacy';
 import type {
   WorkflowCompletionMarker,
   WorkflowFinding,
+  WorkflowParentTier,
   WorkflowTranscriptSignals,
 } from './types';
 
@@ -27,8 +28,9 @@ export function buildWorkflowFindings(params: {
   marker: WorkflowCompletionMarker | null;
   markerStatus: 'present' | 'missing' | 'malformed';
   transcriptSignals: WorkflowTranscriptSignals | null;
+  observedParentTier?: WorkflowParentTier;
 }): WorkflowFinding[] {
-  const { marker, markerStatus, transcriptSignals } = params;
+  const { marker, markerStatus, transcriptSignals, observedParentTier } = params;
   const findings: WorkflowFinding[] = [];
 
   if (markerStatus === 'missing') {
@@ -38,7 +40,7 @@ export function buildWorkflowFindings(params: {
         'action',
         'unknown',
         'Missing workflow completion marker',
-        'Substantive tasks must emit the versioned workflow-completion-marker:v1 block. Missing markers are unknown, never passes.',
+        'Substantive tasks must emit the versioned workflow-completion-marker:v2 block. Missing markers are unknown, never passes.',
         ['marker:missing']
       )
     );
@@ -71,6 +73,53 @@ export function buildWorkflowFindings(params: {
     return findings;
   }
 
+  if (marker.schemaVersion === '1') {
+    findings.push(
+      finding(
+        'legacy-routing-evidence',
+        'warning',
+        'unknown',
+        'Legacy marker lacks routing evidence',
+        'Version 1 remains readable, but parent tier and review-source compliance are unknown.',
+        ['marker:schemaVersion=1']
+      )
+    );
+  }
+
+  const effectiveParentTier =
+    observedParentTier === undefined ? marker.executionParentTier ?? 'unknown' : observedParentTier;
+  if (
+    marker.schemaVersion === '2' &&
+    observedParentTier !== undefined &&
+    observedParentTier !== 'unknown' &&
+    marker.executionParentTier !== observedParentTier
+  ) {
+    findings.push(
+      finding(
+        'parent-tier-mismatch',
+        'action',
+        'failed',
+        'Marker parent tier conflicts with hook telemetry',
+        'Review-source eligibility must use the observed execution model tier, not an uncorroborated marker claim.',
+        [
+          `marker:executionParentTier=${marker.executionParentTier ?? 'unknown'}`,
+          `event:selectedModelTier=${observedParentTier}`,
+        ]
+      )
+    );
+  } else if (marker.schemaVersion === '2' && observedParentTier === 'unknown') {
+    findings.push(
+      finding(
+        'parent-tier-unavailable',
+        'warning',
+        'unknown',
+        'Execution model tier could not be corroborated',
+        'Unknown hook telemetry cannot establish eligibility for premium-parent structured review.',
+        ['event:selectedModelTier=unknown']
+      )
+    );
+  }
+
   if (marker.risk === 'high' && marker.architectureGate === 'skipped') {
     findings.push(
       finding(
@@ -78,7 +127,7 @@ export function buildWorkflowFindings(params: {
         'action',
         'failed',
         'High-risk task skipped architecture gate',
-        'High-risk work must run architecture-gate before implementation.',
+        'High-risk work must complete an eligible architecture review before implementation.',
         ['marker:architectureGate=skipped', 'marker:risk=high']
       )
     );
@@ -120,18 +169,54 @@ export function buildWorkflowFindings(params: {
     );
   }
 
-  if (marker.risk === 'high' && (marker.finalReview === 'skipped' || marker.finalReview === 'not_applicable')) {
+  if (marker.schemaVersion === '2' && marker.risk === 'high') {
+    const source = marker.architectureReviewSource ?? 'unknown';
+    const parentCanSelfReview = effectiveParentTier === 'premium';
+    const sourceIsValid = marker.independentReviewRequired
+      ? source === 'independent_subagent'
+      : source === 'independent_subagent' || (parentCanSelfReview && source === 'parent_structured');
+    if (!sourceIsValid) {
+      findings.push(
+        finding(
+          'invalid-architecture-review-source',
+          'action',
+          'failed',
+          'Architecture review source does not satisfy routing policy',
+          marker.independentReviewRequired
+            ? 'This task requires an independent architecture-gate review.'
+            : 'High-risk economical/unknown-parent work requires architecture-gate; eligible premium parents may use a structured parent contract.',
+          [
+            `marker:architectureReviewSource=${source}`,
+            `effective:executionParentTier=${effectiveParentTier}`,
+            `marker:independentReviewRequired=${Boolean(marker.independentReviewRequired)}`,
+          ]
+        )
+      );
+    }
+  }
+
+  const finalReviewRequired = marker.finalReviewRequired ?? marker.risk === 'high';
+  const escalationEvidence = marker.reviewEscalationReasons ?? [];
+
+  if (
+    finalReviewRequired &&
+    (marker.finalReview === 'skipped' || marker.finalReview === 'not_applicable')
+  ) {
     findings.push(
       finding(
         'missing-final-review',
         'action',
         'failed',
-        'High-risk task missing final review',
-        'High-risk work must invoke final-diff-reviewer after deterministic verification.',
-        [`marker:finalReview=${marker.finalReview}`]
+        'Required premium final review missing',
+        'High-risk or escalated routine work must complete an eligible final review after deterministic verification.',
+        [
+          `marker:finalReview=${marker.finalReview}`,
+          `marker:finalReviewRequired=${finalReviewRequired}`,
+          ...escalationEvidence.map((reason) => `marker:reviewEscalationReason=${reason}`),
+        ]
       )
     );
-  } else if (marker.risk === 'high' && marker.finalReview === 'failed') {
+  } else if (finalReviewRequired && marker.finalReview === 'failed') {
     findings.push(
       finding(
         'final-review-failed',
@@ -142,20 +227,46 @@ export function buildWorkflowFindings(params: {
         ['marker:finalReview=failed']
       )
     );
-  } else if (marker.risk === 'high' && marker.finalReview === 'unknown') {
+  } else if (finalReviewRequired && marker.finalReview === 'unknown') {
     findings.push(
       finding(
         'final-review-unknown',
         'warning',
         'unknown',
         'Final review evidence unknown',
-        'High-risk tasks need an explicit finalReview value in the completion marker. Transcript Task calls alone cannot convert unknown into passed.',
+        'High-risk or escalated routine tasks need an explicit finalReview value in the completion marker. Transcript Task calls alone cannot convert unknown into passed.',
         [
           'marker:finalReview=unknown',
           `transcript:finalDiffReviewerTask=${Boolean(transcriptSignals?.finalDiffReviewerTask)}`,
         ]
       )
     );
+  }
+
+  if (marker.schemaVersion === '2' && finalReviewRequired) {
+    const source = marker.finalReviewSource ?? 'unknown';
+    const parentCanSelfReview = effectiveParentTier === 'premium';
+    const sourceIsValid = marker.independentReviewRequired
+      ? source === 'independent_subagent'
+      : source === 'independent_subagent' || (parentCanSelfReview && source === 'parent_structured');
+    if (!sourceIsValid) {
+      findings.push(
+        finding(
+          'invalid-final-review-source',
+          'action',
+          'failed',
+          'Final review source does not satisfy routing policy',
+          marker.independentReviewRequired
+            ? 'This task requires an independent final-diff-reviewer pass.'
+            : 'Required review needs an independent reviewer, or an eligible structured premium-parent pass.',
+          [
+            `marker:finalReviewSource=${source}`,
+            `effective:executionParentTier=${effectiveParentTier}`,
+            `marker:independentReviewRequired=${Boolean(marker.independentReviewRequired)}`,
+          ]
+        )
+      );
+    }
   }
 
   const unresolvedRequired = marker.requiredTests.filter((test) => test.status === 'unresolved');

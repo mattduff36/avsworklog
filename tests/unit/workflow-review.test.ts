@@ -21,6 +21,10 @@ import {
   renderWorkflowCompletionMarker,
   validateWorkflowCompletionMarker,
 } from '@/scripts/automation/workflow-marker';
+import {
+  classifyWorkflowModelTier,
+  getWorkflowRoutingAction,
+} from '@/scripts/automation/workflow-model-tier';
 import { assertNoForbiddenPayload, hashIdentifier, sanitizeEvidenceLabel } from '@/scripts/automation/workflow-privacy';
 import { parseWorkflowTranscript } from '@/scripts/automation/workflow-transcript';
 import { processWorkflowStopEvent } from '@/scripts/automation/workflow-review';
@@ -45,19 +49,44 @@ afterEach(() => {
 });
 
 function marker(overrides: Partial<WorkflowCompletionMarker> = {}): WorkflowCompletionMarker {
+  const risk = overrides.risk ?? 'routine';
   return {
     schemaVersion: '1',
     taskId: overrides.taskId ?? 'task-1',
     taskType: overrides.taskType ?? 'change',
-    risk: overrides.risk ?? 'routine',
+    risk,
     exploreCanonical: overrides.exploreCanonical ?? true,
     architectureGate: overrides.architectureGate ?? 'skipped',
     requiredTests: overrides.requiredTests ?? [],
     unresolvedRisks: overrides.unresolvedRisks ?? [],
     verification: overrides.verification ?? 'passed',
+    finalReviewRequired: overrides.finalReviewRequired ?? risk === 'high',
+    reviewEscalationReasons: overrides.reviewEscalationReasons ?? [],
     finalReview: overrides.finalReview ?? 'skipped',
     commit: overrides.commit ?? 'completed',
     handoff: overrides.handoff ?? 'completed',
+  };
+}
+
+function markerV2(overrides: Partial<WorkflowCompletionMarker> = {}): WorkflowCompletionMarker {
+  const base = marker(overrides);
+  const finalReviewRequired = base.finalReviewRequired ?? base.risk === 'high';
+  return {
+    ...base,
+    ...overrides,
+    schemaVersion: '2',
+    initialParentTier: overrides.initialParentTier ?? 'premium',
+    executionParentTier: overrides.executionParentTier ?? 'premium',
+    routingDecision: overrides.routingDecision ?? 'continued_premium',
+    architectureReviewSource:
+      overrides.architectureReviewSource ?? (base.risk === 'high' ? 'parent_structured' : 'not_applicable'),
+    requiredTests:
+      overrides.requiredTests ??
+      (base.risk === 'high' ? [{ id: 'VERIFY-001', status: 'completed' }] : []),
+    independentReviewRequired: overrides.independentReviewRequired ?? false,
+    independentReviewReasons: overrides.independentReviewReasons ?? [],
+    finalReviewSource:
+      overrides.finalReviewSource ?? (finalReviewRequired ? 'parent_structured' : 'not_applicable'),
   };
 }
 
@@ -74,12 +103,87 @@ describe('workflow-marker', () => {
     expect(parsed.marker?.taskId).toBe('abc');
   });
 
+  it('MARKER-002 round-trips v2 routing evidence while preserving v1 compatibility', () => {
+    const v2 = markerV2({ taskId: 'route-2' });
+    const parsedV2 = extractWorkflowCompletionMarker(renderWorkflowCompletionMarker(v2));
+    expect(parsedV2.status).toBe('present');
+    expect(parsedV2.marker?.schemaVersion).toBe('2');
+    expect(parsedV2.marker?.executionParentTier).toBe('premium');
+
+    const parsedV1 = extractWorkflowCompletionMarker(renderWorkflowCompletionMarker(marker()));
+    expect(parsedV1.status).toBe('present');
+    expect(parsedV1.marker?.schemaVersion).toBe('1');
+  });
+
+  it('requires complete v2 routing and independent-review evidence', () => {
+    const incomplete = markerV2();
+    delete incomplete.routingDecision;
+    expect(validateWorkflowCompletionMarker(incomplete).status).toBe('malformed');
+
+    const missingReason = markerV2({
+      risk: 'high',
+      independentReviewRequired: true,
+      independentReviewReasons: [],
+    });
+    expect(validateWorkflowCompletionMarker(missingReason).status).toBe('malformed');
+
+    const missingReviewRequirement = markerV2();
+    delete missingReviewRequirement.finalReviewRequired;
+    expect(validateWorkflowCompletionMarker(missingReviewRequirement).status).toBe('malformed');
+
+    const contradictoryRouting = markerV2({
+      routingDecision: 'switched_to_economical',
+      executionParentTier: 'premium',
+    });
+    expect(validateWorkflowCompletionMarker(contradictoryRouting).status).toBe('malformed');
+
+    const duplicateTests = markerV2({
+      risk: 'high',
+      requiredTests: [
+        { id: 'VERIFY-001', status: 'completed' },
+        { id: 'VERIFY-001', status: 'unresolved' },
+      ],
+    });
+    expect(validateWorkflowCompletionMarker(duplicateTests).status).toBe('malformed');
+  });
+
   it('rejects malformed markers and missing markers', () => {
     expect(extractWorkflowCompletionMarker('no marker here').status).toBe('missing');
     expect(validateWorkflowCompletionMarker({ schemaVersion: '1' }).status).toBe('malformed');
     expect(
       extractWorkflowCompletionMarker('<!-- workflow-completion-marker:v1\n{not-json}\n-->').status
     ).toBe('malformed');
+  });
+
+  it('keeps old markers compatible and cannot bypass required review', () => {
+    const legacy = marker({ risk: 'routine' });
+    delete legacy.finalReviewRequired;
+    delete legacy.reviewEscalationReasons;
+    const legacyParsed = validateWorkflowCompletionMarker(legacy);
+    expect(legacyParsed.status).toBe('present');
+    expect(legacyParsed.marker?.finalReviewRequired).toBe(false);
+
+    const contradictoryHighRisk = validateWorkflowCompletionMarker({
+      ...marker({ risk: 'high', finalReviewRequired: false }),
+      finalReviewRequired: false,
+    });
+    expect(contradictoryHighRisk.marker?.finalReviewRequired).toBe(true);
+
+    const reasonsOnly = validateWorkflowCompletionMarker({
+      ...marker({
+        risk: 'routine',
+        finalReviewRequired: false,
+        reviewEscalationReasons: ['hardcoding'],
+      }),
+      finalReviewRequired: false,
+    });
+    expect(reasonsOnly.marker?.finalReviewRequired).toBe(true);
+
+    const invalidReason = validateWorkflowCompletionMarker({
+      ...marker(),
+      reviewEscalationReasons: ['hardcoding', 123],
+    });
+    expect(invalidReason.status).toBe('malformed');
   });
 });
 
@@ -92,6 +196,71 @@ describe('workflow-privacy', () => {
       'user@example.com'
     );
     expect(assertNoForbiddenPayload({ user_email: 'x@y.com' })).toContain('user_email must not be persisted');
+  });
+});
+
+describe('workflow model routing', () => {
+  it('uses the versioned model-tier registry without guessing unknown models', () => {
+    expect(classifyWorkflowModelTier('gpt-5.6-sol-high')).toBe('premium');
+    expect(classifyWorkflowModelTier('cursor-grok-4.5-high-fast')).toBe('economical');
+    expect(classifyWorkflowModelTier('composer-2.5-fast')).toBe('economical');
+    expect(classifyWorkflowModelTier('gpt-5.6-sol-unregistered')).toBe('unknown');
+    expect(classifyWorkflowModelTier('future-model')).toBe('unknown');
+    expect(classifyWorkflowModelTier(undefined)).toBe('unknown');
+  });
+
+  it('ROUTE-001 asks once for a premium-parent routine task', () => {
+    expect(
+      getWorkflowRoutingAction({
+        parentTier: 'premium',
+        risk: 'routine',
+        substantive: true,
+        explicitPremiumRequested: false,
+      })
+    ).toBe('ask_switch');
+  });
+
+  it('ROUTE-002 pauses when the user elects to switch', () => {
+    expect(
+      getWorkflowRoutingAction({
+        parentTier: 'premium',
+        risk: 'routine',
+        substantive: true,
+        explicitPremiumRequested: false,
+        premiumTaskDecision: 'pause_to_switch',
+      })
+    ).toBe('pause_for_switch');
+  });
+
+  it('ROUTE-003 does not repeat the prompt after continuing premium', () => {
+    expect(
+      getWorkflowRoutingAction({
+        parentTier: 'premium',
+        risk: 'routine',
+        substantive: true,
+        explicitPremiumRequested: false,
+        premiumTaskDecision: 'continue_premium',
+      })
+    ).toBe('continue');
+  });
+
+  it('ROUTE-004 skips prompting for factual or explicitly premium work', () => {
+    expect(
+      getWorkflowRoutingAction({
+        parentTier: 'premium',
+        risk: 'routine',
+        substantive: false,
+        explicitPremiumRequested: false,
+      })
+    ).toBe('continue');
+    expect(
+      getWorkflowRoutingAction({
+        parentTier: 'premium',
+        risk: 'routine',
+        substantive: true,
+        explicitPremiumRequested: true,
+      })
+    ).toBe('continue');
   });
 });
 
@@ -256,7 +425,7 @@ describe('workflow-findings', () => {
 
   it('allows planning tasks without commit and estimates savings conservatively', () => {
     const findings = buildWorkflowFindings({
-      marker: marker({
+      marker: markerV2({
         taskType: 'planning',
         commit: 'not_applicable',
         handoff: 'completed',
@@ -276,6 +445,106 @@ describe('workflow-findings', () => {
     expect(estimate.confidence).toBe('low');
     expect(estimate.highPercent).toBeGreaterThanOrEqual(estimate.lowPercent);
   });
+
+  it('requires premium review for an escalated routine change', () => {
+    const findings = buildWorkflowFindings({
+      marker: marker({
+        risk: 'routine',
+        finalReviewRequired: true,
+        reviewEscalationReasons: ['hardcoding'],
+        finalReview: 'skipped',
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+    });
+
+    const missing = findings.find((finding) => finding.id === 'missing-final-review');
+    expect(missing?.status).toBe('failed');
+    expect(missing?.evidenceLabels).toContain('marker:reviewEscalationReason=hardcoding');
+  });
+
+  it('GATE-001 requires independent pre/post review for sensitive work', () => {
+    const sensitiveParentReview = buildWorkflowFindings({
+      marker: markerV2({
+        risk: 'high',
+        architectureGate: 'approved',
+        architectureReviewSource: 'parent_structured',
+        finalReview: 'passed',
+        finalReviewSource: 'parent_structured',
+        independentReviewRequired: true,
+        independentReviewReasons: ['security'],
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+    });
+    expect(sensitiveParentReview.map((finding) => finding.id)).toEqual(
+      expect.arrayContaining([
+        'invalid-architecture-review-source',
+        'invalid-final-review-source',
+      ])
+    );
+  });
+
+  it('GATE-002 and REVIEW-001 allow complete premium-parent structured passes', () => {
+    const eligibleParentReview = buildWorkflowFindings({
+      marker: markerV2({
+        risk: 'high',
+        architectureGate: 'approved',
+        finalReview: 'passed',
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+    });
+    expect(
+      eligibleParentReview.some((finding) => finding.id === 'invalid-architecture-review-source')
+    ).toBe(false);
+    expect(
+      eligibleParentReview.some((finding) => finding.id === 'invalid-final-review-source')
+    ).toBe(false);
+  });
+
+  it('ECON-001 rejects parent-structured review for economical execution', () => {
+    const findings = buildWorkflowFindings({
+      marker: markerV2({
+        risk: 'high',
+        architectureGate: 'approved',
+        finalReview: 'passed',
+        executionParentTier: 'economical',
+        architectureReviewSource: 'parent_structured',
+        finalReviewSource: 'parent_structured',
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+      observedParentTier: 'economical',
+    });
+    expect(findings.map((finding) => finding.id)).toEqual(
+      expect.arrayContaining([
+        'invalid-architecture-review-source',
+        'invalid-final-review-source',
+      ])
+    );
+  });
+
+  it('AUDIT-001 reconciles marker tier claims with hook telemetry', () => {
+    const findings = buildWorkflowFindings({
+      marker: markerV2({
+        risk: 'high',
+        architectureGate: 'approved',
+        finalReview: 'passed',
+        executionParentTier: 'premium',
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+      observedParentTier: 'economical',
+    });
+    expect(findings.map((finding) => finding.id)).toEqual(
+      expect.arrayContaining([
+        'parent-tier-mismatch',
+        'invalid-architecture-review-source',
+        'invalid-final-review-source',
+      ])
+    );
+  });
 });
 
 describe('workflow events and lock', () => {
@@ -290,6 +559,7 @@ describe('workflow events and lock', () => {
       generationHash: 'g1',
       selectedModel: 'composer-2.5',
       selectedModelSource: 'model',
+      selectedModelTier: 'economical',
       status: 'completed',
       loopCount: 0,
       qualifies: true,
@@ -542,6 +812,7 @@ describe('workflow-review cadence', () => {
     const events = listWorkflowEvents(getWorkflowPaths(root).eventsDirectory);
     expect(events[0]?.selectedModel).toBe('composer-2.5-fast');
     expect(events[0]?.selectedModelSource).toBe('model_id');
+    expect(events[0]?.selectedModelTier).toBe('economical');
   });
 
   it('creates unique pending follow-up paths and does not persist forbidden fields', async () => {
@@ -661,6 +932,7 @@ describe('workflow-review cadence', () => {
     const events = listWorkflowEvents(getWorkflowPaths(unavailableRoot).eventsDirectory);
     expect(events[0]?.selectedModel).toBe('unavailable');
     expect(events[0]?.selectedModelSource).toBe('unavailable');
+    expect(events[0]?.selectedModelTier).toBe('unknown');
   });
 
   it('rejects oversized transcripts as unknown parse errors', async () => {

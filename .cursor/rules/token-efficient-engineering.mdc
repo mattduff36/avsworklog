@@ -1,18 +1,22 @@
 ---
-description: Automatically apply the global token-efficient engineering workflow for substantive software-engineering tasks in this repository.
+description: Automatically apply the global token-efficient engineering workflow for every codebase-specific implementation, planning, diagnosis, testing, or review task.
 alwaysApply: true
 ---
 
 # Token-Efficient Engineering (AVS)
 
-For substantive software-engineering tasks in this repository, automatically apply the global `token-efficient-engineering` Skill. Do not wait for the user to restate the workflow.
+For every codebase-specific task with implementation, planning, diagnosis, testing, or review intent in this repository—including small UI/layout edits—automatically apply the global `token-efficient-engineering` Skill. Do not wait for the user to restate the workflow. Exclude only factual Q&A, discussion with no implementation/review intent, and prose-only work with no system effect.
 
 Project rules take precedence for commit, push, migration, build, and PRD handling. In particular:
 
 - Stay on the current branch unless explicitly told otherwise.
 - Commit locally after completed coding tasks; never push unless the user authorizes it with the exact allowed phrases.
+- When the current parent is premium and the task is routine, use AskQuestion once before substantive work to offer pausing for a switch to Cursor Grok (recommended) or continuing premium. Respect that choice for the task and never infer a model switch.
+- Do not launch redundant premium subagents when a premium parent can produce the required structured evidence. Independent architecture and final review remain mandatory for persistence/migrations, authentication/authorization/security, permissions, money, concurrency, irreversible operations, production-data risk, broad cross-module regression risk, or explicit user request.
 - Never truncate compiler, test, lint, migration, or reviewer-diff output in a way that can hide failures.
+- Routine changes must inspect a canonical local pattern, use existing abstractions when semantically applicable, preserve design tokens/shared components/configuration, reject newly introduced hardcoding or duplication, and inspect the final diff.
+- Run premium final review for routine changes that modify shared layout/design-system/navigation/accessibility/responsive code, expand across modules, deviate from the canonical pattern, introduce or extend suspected hardcoding/duplication, have behavior-significant unresolved verification failures, or leave review uncertainty.
 - Emit the versioned workflow completion marker at the end of substantive tasks.
-- For high-risk work, run `architecture-gate` before implementation and `final-diff-reviewer` after deterministic verification.
+- For high-risk economical/unknown-parent work, run `architecture-gate` before implementation and `final-diff-reviewer` after deterministic verification. A premium parent may use structured parent passes only where the global skill permits; mandatory-independent categories always use both subagents.
 
 If `Pending monthly follow-up artifact:` or a workflow-review pending artifact path is printed, resolve suggestions with the existing approve/reject/skip chat flow and `npm run automation:followup:resolve`.

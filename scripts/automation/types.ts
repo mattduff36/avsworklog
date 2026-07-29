@@ -154,6 +154,20 @@ export interface AutomationMonthlyMetrics {
 export type WorkflowEvidenceState = 'passed' | 'failed' | 'unknown';
 export type WorkflowTaskType = 'change' | 'planning' | 'review';
 export type WorkflowRisk = 'high' | 'routine';
+export type WorkflowParentTier = 'premium' | 'economical' | 'unknown';
+export type WorkflowRoutingDecision =
+  | 'switched_to_economical'
+  | 'continued_premium'
+  | 'economical_default'
+  | 'explicit_premium'
+  | 'not_applicable'
+  | 'unknown';
+export type WorkflowReviewSource =
+  | 'independent_subagent'
+  | 'parent_structured'
+  | 'local'
+  | 'not_applicable'
+  | 'unknown';
 export type WorkflowGateDecision =
   | 'approved'
   | 'approved_with_conditions'
@@ -182,16 +196,26 @@ export interface WorkflowUnresolvedRisk {
 }
 
 export interface WorkflowCompletionMarker {
-  schemaVersion: '1';
+  schemaVersion: '1' | '2';
   taskId: string;
   taskType: WorkflowTaskType;
   risk: WorkflowRisk;
+  initialParentTier?: WorkflowParentTier;
+  executionParentTier?: WorkflowParentTier;
+  routingDecision?: WorkflowRoutingDecision;
   exploreCanonical: boolean;
   architectureGate: WorkflowGateDecision;
+  architectureReviewSource?: WorkflowReviewSource;
   requiredTests: WorkflowRequiredTest[];
   unresolvedRisks: WorkflowUnresolvedRisk[];
   verification: WorkflowEvidenceState;
+  /** Optional for backward compatibility; high-risk markers imply true. */
+  finalReviewRequired?: boolean;
+  reviewEscalationReasons?: string[];
+  independentReviewRequired?: boolean;
+  independentReviewReasons?: string[];
   finalReview: WorkflowFinalReviewStatus;
+  finalReviewSource?: WorkflowReviewSource;
   commit: WorkflowCommitStatus;
   handoff: WorkflowHandoffStatus;
 }
@@ -227,6 +251,7 @@ export interface WorkflowStopEvent {
   generationHash: string;
   selectedModel: string;
   selectedModelSource: 'model_id' | 'model' | 'unavailable';
+  selectedModelTier: WorkflowParentTier;
   status: 'completed' | 'aborted' | 'error' | 'unknown';
   loopCount: number;
   qualifies: boolean;
