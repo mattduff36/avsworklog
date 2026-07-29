@@ -1,5 +1,22 @@
 [
   {
+    "version": "0726.28.0",
+    "updateKind": "major",
+    "title": "App screens update",
+    "description": "Updated app screens. Route premium parents without redundant review. Enforce token-efficient workflow review automation.",
+    "summary": "Updated app screens. Route premium parents without redundant review. Enforce token-efficient workflow review automation.",
+    "details": [
+      "Updated app screens, with changes to interface components."
+    ],
+    "areas": [
+      "App screens"
+    ],
+    "areaKeys": [
+      "app-screens"
+    ],
+    "pushedAt": "2026-07-29T23:46:26.762Z"
+  },
+  {
     "version": "0726.27.0",
     "updateKind": "major",
     "title": "Fleet update",

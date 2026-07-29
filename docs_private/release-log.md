@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.28.0
+
+**GIT COMMIT MESSAGE**
+`feat(components): update app screens`
+
+**PUSHED AT**
+2026-07-29T23:46:26.762Z
+
+**WHAT CHANGED**
+Update app screens. Route premium parents without redundant review. Enforce token-efficient workflow review automation.
+
+**VERSION HISTORY DETAILS**
+- Updated app screens, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `feat(components): update app screens`
+- `feat(tooling): route premium parents without redundant review`
+- `feat(tooling): enforce token-efficient workflow review automation`
+
 ## 0726.27.0
 
 **GIT COMMIT MESSAGE**
