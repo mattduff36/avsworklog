@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0726.27.0
+
+**GIT COMMIT MESSAGE**
+`feat(fleet): update Fleet, Daily Tasks, Maintenance, Workshop Tasks, Inventory, PDF documents, Data storage, Reports, Help and FAQ, Actions, Reminders, Timesheets, Projects, Absence & Leave, Profile, Navigation, Training, Toolbox Talks, Admin Settings, Approvals, Dashboard, Error reporting, Suggestions, and User Management`
+
+**PUSHED AT**
+2026-07-29T01:14:06.828Z
+
+**WHAT CHANGED**
+Update Fleet, Daily Tasks, Maintenance, Workshop Tasks, Inventory, PDF documents, Data storage, Reports, Help and FAQ, Actions, Reminders, Timesheets, Projects, Absence & Leave, Profile, Navigation, Training, Toolbox Talks, Admin Settings, Approvals, Dashboard, Error reporting, Suggestions, and User Management.
+
+**VERSION HISTORY DETAILS**
+- Updated Fleet, Daily Tasks, Maintenance, Workshop Tasks, Inventory, PDF documents, Data storage, Reports, Help and FAQ, Actions, Reminders, Timesheets, Projects, Absence & Leave, Profile, Navigation, Training, Toolbox Talks, Admin Settings, Approvals, Dashboard, Error reporting, Suggestions, and User Management, with changes to background routes, interface components, shared logic, automation scripts, automated tests, and data storage.
+- Updated daily tasks, with changes to background routes, app screens, and shared logic.
+- Updated maintenance, with changes to background routes and app screens.
+- Updated workshop tasks, with changes to background routes, app screens, and interface components.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated inventory, with changes to background routes, app screens, shared logic, automated tests, and documentation.
+- Updated PDF documents, with changes to background routes and shared logic.
+- Updated reports, with changes to background routes and app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(fleet): update Fleet, Daily Tasks, Maintenance, Workshop Tasks, Inventory, PDF documents, Data storage, Reports, Help and FAQ, Actions, Reminders, Timesheets, Projects, Absence & Leave, Profile, Navigation, Training, Toolbox Talks, Admin Settings, Approvals, Dashboard, Error reporting, Suggestions, and User Management`
+
 ## 0726.26.0
 
 **GIT COMMIT MESSAGE**
