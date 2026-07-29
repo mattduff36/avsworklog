@@ -39,6 +39,7 @@ export type Vehicle = {
   reg_number: string;
   plant_id?: string | null;
   nickname: string | null;
+  category?: string | null;
   asset_type?: 'van' | 'plant' | 'hgv' | 'tool';
 };
 

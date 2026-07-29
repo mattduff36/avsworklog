@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils/date';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 export interface VanInspectionsColumnVisibility {
   employeeId: boolean;
@@ -35,6 +36,7 @@ interface VanInspectionRow {
   submitted_at: string | null;
   vans: {
     reg_number: string;
+    nickname?: string | null;
     van_categories: { name: string } | null;
   } | null;
   profile?: {
@@ -208,7 +210,10 @@ export function VanInspectionsListTable({
                 </TableCell>
               )}
               <TableCell className="text-white">
-                {inspection.vans?.reg_number || 'Unknown Van'}
+                {formatFleetAssetLabel({
+                  identifier: inspection.vans?.reg_number || 'Unknown Van',
+                  nickname: inspection.vans?.nickname,
+                })}
               </TableCell>
               {columnVisibility.vehicleCategory && (
                 <TableCell className="text-muted-foreground">

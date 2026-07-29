@@ -40,11 +40,35 @@ function buildUpdateClient(
 ) {
   const state = {
     updates: [] as Array<Record<string, unknown>>,
+    rpcCalls: [] as Array<{ name: string; args: Record<string, unknown> }>,
   };
   const client = {
+    rpc(name: string, args: Record<string, unknown>) {
+      state.rpcCalls.push({ name, args });
+      return Promise.resolve({
+        data: {
+          nickname: 'Conway Evans',
+          assignment_id: 'assign-1',
+          assigned_user_id: args.p_assigned_user_id || null,
+          action: args.p_assignment_action,
+        },
+        error: null,
+      });
+    },
     from(table: string) {
       if (table !== tableName) throw new Error(`Unexpected table ${table}`);
       return {
+        select() {
+          return {
+            eq() {
+              return {
+                async maybeSingle() {
+                  return { data, error: null };
+                },
+              };
+            },
+          };
+        },
         update(updates: Record<string, unknown>) {
           state.updates.push(updates);
           return {
@@ -127,5 +151,46 @@ describe('admin fleet update routes', () => {
 
     expect(response.status).toBe(403);
     expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('applies nickname assignment through the transactional RPC', async () => {
+    const { client, state } = buildUpdateClient('vans', {
+      id: 'asset-1',
+      nickname: 'Conway Evans',
+    });
+    vi.mocked(createAdminClient).mockReturnValue(client as never);
+
+    const response = await updateVan(
+      new NextRequest('http://localhost/api/admin/vans/asset-1', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nickname: 'Conway Evans',
+          assignment: {
+            action: 'assign',
+            userId: 'user-9',
+            expectedAssignmentId: null,
+          },
+        }),
+      }),
+      { params: Promise.resolve({ id: 'asset-1' }) },
+    );
+
+    expect(response.status).toBe(200);
+    expect(state.rpcCalls).toEqual([
+      {
+        name: 'admin_apply_fleet_asset_nickname_assignment',
+        args: {
+          p_asset_type: 'van',
+          p_asset_id: 'asset-1',
+          p_manual_nickname: 'Conway Evans',
+          p_assignment_action: 'assign',
+          p_assigned_user_id: 'user-9',
+          p_expected_assignment_id: null,
+          p_actor_user_id: 'user-1',
+        },
+      },
+    ]);
+    expect(state.updates).toEqual([]);
   });
 });

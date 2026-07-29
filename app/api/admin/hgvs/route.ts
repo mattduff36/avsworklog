@@ -9,6 +9,8 @@ import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
 import type { Database } from '@/types/database';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { applyCreateFleetNicknameAssignment } from '@/lib/server/apply-create-fleet-nickname-assignment';
 
 // GET - List all HGVs with category info
 export async function GET(request: NextRequest) {
@@ -131,11 +133,29 @@ export async function POST(request: NextRequest) {
 
     console.log(`[INFO] HGV created: ${data.reg_number} (ID: ${data.id})`);
 
+    const admin = createAdminClient();
+    const createAssignment = await applyCreateFleetNicknameAssignment({
+      admin,
+      body,
+      assetType: 'hgv',
+      assetId: data.id,
+      actorUserId: effectiveRole.user_id,
+      table: 'hgvs',
+    });
+    if (createAssignment.error) {
+      return NextResponse.json(
+        { error: createAssignment.error },
+        { status: createAssignment.status || 400 }
+      );
+    }
+
     const syncResult = await syncHgvData(data.id, data.reg_number, effectiveRole.user_id, supabase);
+    const { data: refreshedHgv } = await admin.from('hgvs').select().eq('id', data.id).maybeSingle();
 
     return NextResponse.json({
-      hgv: data,
+      hgv: refreshedHgv || data,
       syncResult,
+      assignment: createAssignment.result || null,
       message: syncResult.success
         ? 'HGV created and data synced successfully'
         : 'HGV created. Note: ' + (syncResult.warning || 'API sync will retry automatically'),

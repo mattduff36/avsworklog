@@ -21,11 +21,11 @@ import { ProjectsFavouriteStrip } from '@/components/projects/manage/ProjectsFav
 import { ProjectsDocumentsTable } from '@/components/projects/manage/ProjectsDocumentsTable';
 import { ProjectsDocumentsMobileCards } from '@/components/projects/manage/ProjectsDocumentsMobileCards';
 import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import type { ManageDocumentRow, ManageDocumentsQuery } from '@/types/rams';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { FileText, Upload } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -313,7 +313,14 @@ export default function ProjectsManagePage() {
 
   // Auth guard loading
   if (authLoading || projectsPermissionLoading || (!isManager && !isAdmin)) {
-    return <PageLoader message="Loading project management..." />;
+    return (
+      <AppPageLoadingShell
+        title="Manage Projects"
+        description="Upload, search, and manage project documents"
+        message="Loading project management..."
+        accent="rams"
+      />
+    );
   }
 
   if (!canAccessProjectsModule) {

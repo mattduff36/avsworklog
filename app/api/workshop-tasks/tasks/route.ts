@@ -6,6 +6,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { inferAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import type { Database } from '@/types/database';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 type AssetType = 'van' | 'plant' | 'hgv';
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
@@ -50,7 +51,10 @@ async function resolveAsset(assetType: AssetType, assetId: string): Promise<Asse
     if (!data) return null;
     return {
       id: data.id,
-      label: data.nickname ? `${data.plant_id || 'Unknown Plant'} (${data.nickname})` : data.plant_id || 'Unknown Plant',
+      label: formatFleetAssetLabel({
+        identifier: data.plant_id || 'Unknown Plant',
+        nickname: data.nickname,
+      }),
     };
   }
 
@@ -64,10 +68,12 @@ async function resolveAsset(assetType: AssetType, assetId: string): Promise<Asse
   if (error) throw error;
   if (!data) return null;
 
-  const label = data.reg_number || 'Unknown Asset';
   return {
     id: data.id,
-    label: data.nickname ? `${label} (${data.nickname})` : label,
+    label: formatFleetAssetLabel({
+      identifier: data.reg_number || 'Unknown Asset',
+      nickname: data.nickname,
+    }),
   };
 }
 

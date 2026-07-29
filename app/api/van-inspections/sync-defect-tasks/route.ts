@@ -9,6 +9,7 @@ import {
   extractInspectionDefectSignature,
   normalizeInspectionDefectSignature,
 } from '@/lib/utils/inspectionDefectSignature';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
@@ -115,11 +116,14 @@ export async function POST(request: NextRequest) {
     // Get vehicle registration for task titles
     const { data: vehicle } = await supabaseAdmin
       .from('vans')
-      .select('reg_number')
+      .select('reg_number, nickname')
       .eq('id', vehicleId)
       .single();
 
-    const vehicleReg = vehicle?.reg_number || 'Unknown Van';
+    const vehicleReg = formatFleetAssetLabel({
+      identifier: vehicle?.reg_number || 'Unknown Van',
+      nickname: vehicle?.nickname,
+    });
 
     // Get preferred taxonomy: Repair → Inspection defects
     const { data: repairCategory } = await supabaseAdmin

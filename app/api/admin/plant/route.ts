@@ -9,6 +9,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { validateAndNormalizePlantSerialNumber } from '@/lib/utils/plant-serial-number';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { applyCreateFleetNicknameAssignment } from '@/lib/server/apply-create-fleet-nickname-assignment';
 
 export async function POST(request: NextRequest) {
   try {
@@ -65,14 +67,33 @@ export async function POST(request: NextRequest) {
 
     console.log(`[INFO] Plant created: ${data.plant_id} (ID: ${data.id})`);
 
+    const admin = createAdminClient();
+    const createAssignment = await applyCreateFleetNicknameAssignment({
+      admin,
+      body,
+      assetType: 'plant',
+      assetId: data.id,
+      actorUserId: effectiveRole.user_id,
+      table: 'plant',
+    });
+    if (createAssignment.error) {
+      return NextResponse.json(
+        { error: createAssignment.error },
+        { status: createAssignment.status || 400 }
+      );
+    }
+
     let syncResult: { success: boolean; warning?: string } = { success: true };
     if (data.reg_number) {
       syncResult = await syncPlantData(data.id, data.reg_number, effectiveRole.user_id, supabase);
     }
 
+    const { data: refreshedPlant } = await admin.from('plant').select().eq('id', data.id).maybeSingle();
+
     return NextResponse.json({
-      plant: data,
+      plant: refreshedPlant || data,
       syncResult,
+      assignment: createAssignment.result || null,
       message: syncResult.success
         ? data.reg_number
           ? 'Plant created and data synced successfully'

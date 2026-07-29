@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { isUuid } from '@/lib/utils/uuid';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
@@ -81,6 +82,7 @@ type InspectionItem = {
 type VehicleWithCategory = {
   id: string;
   reg_number: string;
+  nickname?: string | null;
   vehicle_type: string;
   van_categories?: { name: string } | null;
 };
@@ -172,7 +174,8 @@ function NewInspectionContent() {
   
   const [vehicles, setVehicles] = useState<Array<{ 
     id: string; 
-    reg_number: string; 
+    reg_number: string;
+    nickname?: string | null;
     vehicle_type: string;
     current_mileage?: number | null;
     van_categories?: { name: string } | null;
@@ -2317,7 +2320,11 @@ function NewInspectionContent() {
                             <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
                             {recentVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
-                                {vehicle.reg_number} - {vehicle.van_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
+                                {formatFleetAssetLabel({
+                                  identifier: vehicle.reg_number,
+                                  nickname: vehicle.nickname,
+                                  category: vehicle.van_categories?.name || vehicle.vehicle_type || 'Uncategorized',
+                                })}
                               </SelectItem>
                             ))}
                           </SelectGroup>
@@ -2332,7 +2339,11 @@ function NewInspectionContent() {
                             )}
                             {otherVehicles.map((vehicle) => (
                               <SelectItem key={vehicle.id} value={vehicle.id} className="text-white">
-                                {vehicle.reg_number} - {vehicle.van_categories?.name || vehicle.vehicle_type || 'Uncategorized'}
+                                {formatFleetAssetLabel({
+                                  identifier: vehicle.reg_number,
+                                  nickname: vehicle.nickname,
+                                  category: vehicle.van_categories?.name || vehicle.vehicle_type || 'Uncategorized',
+                                })}
                               </SelectItem>
                             ))}
                           </SelectGroup>

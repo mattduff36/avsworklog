@@ -11,9 +11,11 @@ import {
   formatExcelStatus
 } from '@/lib/utils/excel';
 import type { ModuleName } from '@/types/roles';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 type VanVehicleRow = {
   reg_number?: string | null;
+  nickname?: string | null;
   vehicle_type?: string | null;
   van_categories?: { name: string } | null;
 };
@@ -156,6 +158,7 @@ export async function GET(request: NextRequest) {
                 status,
                 vehicle:vans (
                   reg_number,
+                  nickname,
                   vehicle_type,
                   van_categories(name)
                 ),
@@ -284,18 +287,27 @@ export async function GET(request: NextRequest) {
 
         if (source === 'VAN') {
           const vanInspection = inspection as VanInspectionRow;
-          assetReference = vanInspection.vehicle?.reg_number || '-';
+          assetReference = formatFleetAssetLabel({
+            identifier: vanInspection.vehicle?.reg_number || '-',
+            nickname: vanInspection.vehicle?.nickname,
+          });
           assetType = vanInspection.vehicle ? getVehicleCategoryName(vanInspection.vehicle) : 'Van';
         } else if (source === 'PLANT') {
           const plantInspection = inspection as PlantInspectionRow;
           assetReference =
             plantInspection.is_hired_plant
               ? plantInspection.hired_plant_id_serial || plantInspection.hired_plant_description || 'Hired Plant'
-              : plantInspection.plant?.plant_id || 'Plant';
+              : formatFleetAssetLabel({
+                  identifier: plantInspection.plant?.plant_id || 'Plant',
+                  nickname: plantInspection.plant?.nickname,
+                });
           assetType = plantInspection.plant?.van_categories?.name || 'Plant';
         } else {
           const hgvInspection = inspection as HgvInspectionRow;
-          assetReference = hgvInspection.hgv?.reg_number || 'HGV';
+          assetReference = formatFleetAssetLabel({
+            identifier: hgvInspection.hgv?.reg_number || 'HGV',
+            nickname: hgvInspection.hgv?.nickname,
+          });
           assetType = hgvInspection.hgv?.hgv_categories?.name || 'HGV';
         }
 

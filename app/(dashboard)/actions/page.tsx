@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BellRing, CheckCircle2, ClipboardList, EyeOff, Settings } from 'lucide-react';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
-import { PageLoader } from '@/components/ui/page-loader';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
@@ -172,11 +172,29 @@ function ActionsContent() {
   }
 
   if (actionsPermissionLoading || authLoading) {
-    return <PageLoader message="Loading actions..." />;
+    return (
+      <AppPageLoadingShell
+        title="Actions"
+        description="Generated actions that managers and admins can assign as employee reminders."
+        icon={<BellRing className="h-5 w-5" />}
+        message="Loading actions..."
+        accent="brand"
+        width="wide"
+      />
+    );
   }
 
   if (!canViewActions) {
-    return <PageLoader message="Redirecting..." />;
+    return (
+      <AppPageLoadingShell
+        title="Actions"
+        description="Generated actions that managers and admins can assign as employee reminders."
+        icon={<BellRing className="h-5 w-5" />}
+        message="Redirecting..."
+        accent="brand"
+        width="wide"
+      />
+    );
   }
 
   return (
@@ -250,7 +268,18 @@ function ActionsContent() {
 
 export default function ActionsPage() {
   return (
-    <Suspense fallback={<PageLoader message="Loading actions..." />}>
+    <Suspense
+      fallback={(
+        <AppPageLoadingShell
+          title="Actions"
+          description="Generated actions that managers and admins can assign as employee reminders."
+          icon={<BellRing className="h-5 w-5" />}
+          message="Loading actions..."
+          accent="brand"
+          width="wide"
+        />
+      )}
+    >
       <ActionsContent />
     </Suspense>
   );

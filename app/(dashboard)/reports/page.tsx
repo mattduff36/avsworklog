@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { toast } from 'sonner';
@@ -616,7 +616,15 @@ function ReportsContent() {
       : 'timesheets';
 
   if (isInitialLoading) {
-    return <PageLoader message="Preparing reports..." />;
+    return (
+      <AppPageLoadingShell
+        title="Reports"
+        description="Generate operational reports aligned to your current module and team permissions."
+        icon={<FileText className="h-5 w-5" />}
+        message="Preparing reports..."
+        accent="reports"
+      />
+    );
   }
 
   if (!canViewReports) {

@@ -42,7 +42,16 @@ interface WorkshopTaskFormDialogsProps {
   selectedVehicleId: string;
   onSelectedVehicleIdChange: (value: string) => void;
   vehicles: Vehicle[];
-  getAssetDisplay: (asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null }) => string;
+  getAssetDisplay: (
+    asset?: {
+      reg_number?: string | null;
+      plant_id?: string | null;
+      nickname?: string | null;
+      category?: string | null;
+      asset_type?: string | null;
+    },
+    options?: { forSelect?: boolean },
+  ) => string;
   selectedCategoryId: string;
   onSelectedCategoryIdChange: (value: string) => void;
   activeCategories: Category[];
@@ -329,7 +338,7 @@ export function WorkshopTaskFormDialogs({
                     .filter(v => assetTab === 'all' ? true : assetTab === 'plant' ? v.asset_type === 'plant' : assetTab === 'hgv' ? v.asset_type === 'hgv' : v.asset_type === 'van')
                     .map((vehicle) => (
                       <TabletAwareSelectItem key={vehicle.id} value={vehicle.id}>
-                        {getAssetDisplay(vehicle)}
+                        {getAssetDisplay(vehicle, { forSelect: true })}
                       </TabletAwareSelectItem>
                     ))}
                 </TabletAwareSelectContent>
@@ -542,7 +551,7 @@ export function WorkshopTaskFormDialogs({
                             <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
                             {recentVehicles.map((vehicle) => (
                               <TabletAwareSelectItem key={vehicle.id} value={vehicle.id}>
-                                {getAssetDisplay(vehicle)}
+                                {getAssetDisplay(vehicle, { forSelect: true })}
                               </TabletAwareSelectItem>
                             ))}
                           </SelectGroup>
@@ -557,7 +566,7 @@ export function WorkshopTaskFormDialogs({
                             )}
                             {otherVehicles.map((vehicle) => (
                               <TabletAwareSelectItem key={vehicle.id} value={vehicle.id}>
-                                {getAssetDisplay(vehicle)}
+                                {getAssetDisplay(vehicle, { forSelect: true })}
                               </TabletAwareSelectItem>
                             ))}
                           </SelectGroup>

@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils/cn';
 
-interface AppPageShellProps extends HTMLAttributes<HTMLDivElement> {
+export interface AppPageShellProps extends HTMLAttributes<HTMLDivElement> {
   className?: string;
   width?: 'narrow' | 'medium' | 'default' | 'wide' | 'full';
 }

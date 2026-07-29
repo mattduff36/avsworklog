@@ -5,6 +5,7 @@ import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { validateRegistrationNumber, formatRegistrationForStorage } from '@/lib/utils/registration';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { applyNicknameAssignmentFromBody } from '@/lib/server/apply-fleet-nickname-assignment-from-body';
 
 // PUT - Update an HGV
 export async function PUT(
@@ -30,6 +31,8 @@ export async function PUT(
     const hgvId = (await params).id;
     const body = await request.json();
     const { reg_number, category_id, status, nickname } = body;
+    const hasAssignmentIntent =
+      body && typeof body === 'object' && 'assignment' in body && body.assignment != null;
 
     const updates: Record<string, unknown> = {};
 
@@ -49,7 +52,7 @@ export async function PUT(
       updates.status = status;
     }
 
-    if (nickname !== undefined) {
+    if (nickname !== undefined && !hasAssignmentIntent) {
       updates.nickname = nickname?.trim() || null;
     }
 
@@ -86,22 +89,35 @@ export async function PUT(
       }
     }
 
-    const { data, error } = await supabase
-      .from('hgvs')
-      .update(updates)
-      .eq('id', hgvId)
-      .select()
-      .maybeSingle();
+    let data;
+    if (Object.keys(updates).length === 0) {
+      const { data: existingHgv, error: existingError } = await supabase
+        .from('hgvs')
+        .select()
+        .eq('id', hgvId)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      data = existingHgv;
+    } else {
+      const { data: updatedHgv, error } = await supabase
+        .from('hgvs')
+        .update(updates)
+        .eq('id', hgvId)
+        .select()
+        .maybeSingle();
 
-    if (error) {
-      if (error.code === '23505') {
-        return NextResponse.json(
-          { error: 'HGV with this registration already exists' },
-          { status: 400 }
-        );
+      if (error) {
+        if (error.code === '23505') {
+          return NextResponse.json(
+            { error: 'HGV with this registration already exists' },
+            { status: 400 }
+          );
+        }
+        throw error;
       }
-      throw error;
+      data = updatedHgv;
     }
+
     if (!data) {
       return NextResponse.json(
         { error: 'HGV not found' },
@@ -109,7 +125,31 @@ export async function PUT(
       );
     }
 
-    return NextResponse.json({ hgv: data });
+    const assignmentUpdate = await applyNicknameAssignmentFromBody({
+      admin: supabase,
+      body,
+      assetType: 'hgv',
+      assetId: hgvId,
+      actorUserId: effectiveRole.user_id,
+      fallbackNickname: typeof nickname === 'string' ? nickname : nickname ?? null,
+    });
+    if (assignmentUpdate.error) {
+      return NextResponse.json(
+        { error: assignmentUpdate.error },
+        { status: assignmentUpdate.status || 400 }
+      );
+    }
+    if (assignmentUpdate.applied) {
+      const { data: refreshedHgv, error: refreshError } = await supabase
+        .from('hgvs')
+        .select()
+        .eq('id', hgvId)
+        .maybeSingle();
+      if (refreshError) throw refreshError;
+      if (refreshedHgv) data = refreshedHgv;
+    }
+
+    return NextResponse.json({ hgv: data, assignment: assignmentUpdate.result || null });
   } catch (error) {
     console.error('Error updating HGV:', error);
 

@@ -47,6 +47,7 @@ import { getInspectionErrorMessage, isDuplicateInspectionError, isMissingDraftEr
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -1700,7 +1701,10 @@ function NewPlantInspectionContent() {
                             <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
                             {recentPlants.map((plant) => (
                               <SelectItem key={plant.id} value={plant.id}>
-                                {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.van_categories?.name || 'Uncategorized'})
+                                {formatFleetAssetLabel({
+                                  identifier: plant.plant_id,
+                                  nickname: plant.nickname,
+                                })}
                               </SelectItem>
                             ))}
                           </SelectGroup>
@@ -1715,7 +1719,10 @@ function NewPlantInspectionContent() {
                             )}
                             {otherPlants.map((plant) => (
                               <SelectItem key={plant.id} value={plant.id}>
-                                {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.van_categories?.name || 'Uncategorized'})
+                                {formatFleetAssetLabel({
+                                  identifier: plant.plant_id,
+                                  nickname: plant.nickname,
+                                })}
                               </SelectItem>
                             ))}
                           </SelectGroup>

@@ -8,11 +8,11 @@ import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { isUuid } from '@/lib/utils/uuid';
 import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
@@ -44,6 +44,7 @@ import {
   PlantInspectionsListTable,
 } from './components/PlantInspectionsListTable';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 interface InspectionWithPlant extends PlantInspection {
   plant: {
@@ -705,9 +706,10 @@ function PlantInspectionsContent() {
                     <SelectItem value="hired" className="text-amber-400">Hired Plant</SelectItem>
                     {plants.map((plant) => (
                       <SelectItem key={plant.id} value={plant.id}>
-                        {plant.plant_id}
-                        {plant.nickname && ` - ${plant.nickname}`}
-                        {plant.van_categories?.name && ` (${plant.van_categories.name})`}
+                        {formatFleetAssetLabel({
+                          identifier: plant.plant_id,
+                          nickname: plant.nickname,
+                        })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -806,8 +808,10 @@ function PlantInspectionsContent() {
                           </>
                         ) : (
                           <>
-                            {inspection.plant?.plant_id || 'Unknown Plant'}
-                            {inspection.plant?.nickname && ` - ${inspection.plant.nickname}`}
+                            {formatFleetAssetLabel({
+                              identifier: inspection.plant?.plant_id || 'Unknown Plant',
+                              nickname: inspection.plant?.nickname,
+                            })}
                             {inspection.plant?.serial_number && ` (SN: ${inspection.plant.serial_number})`}
                           </>
                         )}
@@ -928,7 +932,16 @@ function PlantInspectionsContent() {
 export default function PlantInspectionsPage() {
   return (
     <NuqsClientAdapter>
-      <Suspense fallback={<PageLoader message="Loading plant inspections..." />}>
+      <Suspense
+        fallback={
+          <AppPageLoadingShell
+            title="Plant Daily Checks"
+            description="Daily plant machinery safety checks"
+            message="Loading plant inspections..."
+            accent="plant-inspection"
+          />
+        }
+      >
         <PlantInspectionsContent />
       </Suspense>
     </NuqsClientAdapter>

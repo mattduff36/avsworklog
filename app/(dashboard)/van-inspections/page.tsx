@@ -7,12 +7,12 @@ import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { createClient } from '@/lib/supabase/client';
 import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
-import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { getRecentVehicleIds, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { isUuid } from '@/lib/utils/uuid';
@@ -51,10 +51,12 @@ import {
   VAN_INSPECTIONS_MAINTENANCE_MESSAGE,
   VAN_INSPECTIONS_MAINTENANCE_TITLE,
 } from '@/lib/config/van-inspections-maintenance';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 interface InspectionWithVehicle extends VanInspection {
   vans: {
     reg_number: string;
+    nickname?: string | null;
     van_categories: { name: string } | null;
   } | null;
   profile: { full_name: string } | null;
@@ -65,12 +67,13 @@ interface InspectionWithVehicle extends VanInspection {
 interface DeleteDialogInspectionInput {
   id: string;
   inspection_date: string;
-  vans?: { reg_number?: string | null } | null;
+  vans?: { reg_number?: string | null; nickname?: string | null } | null;
 }
 
 interface Vehicle {
   id: string;
   reg_number: string;
+  nickname?: string | null;
   van_categories: { name: string } | null;
 }
 
@@ -217,7 +220,8 @@ function InspectionsContent() {
           .from('vans')
           .select(`
             id, 
-            reg_number, 
+            reg_number,
+            nickname,
             van_categories (
               name
             )
@@ -228,6 +232,7 @@ function InspectionsContent() {
         setVehicles((data || []).map((vehicle) => ({
           ...vehicle,
           reg_number: vehicle.reg_number || 'Unknown',
+          nickname: vehicle.nickname ?? null,
         })));
       } catch (err) {
         if (isNetworkFetchError(err)) {
@@ -295,7 +300,7 @@ function InspectionsContent() {
       }));
       const validVanIds = Array.from(new Set(rows.map((row) => row.van_id).filter(isUuid)));
       const validUserIds = Array.from(new Set(rows.map((row) => row.user_id).filter(isUuid)));
-      let vehicleMap = new Map<string, { reg_number: string; van_categories: { name: string } | null }>();
+      let vehicleMap = new Map<string, { reg_number: string; nickname: string | null; van_categories: { name: string } | null }>();
       let profileMap = new Map<string, { full_name: string }>();
 
       if (validVanIds.length > 0) {
@@ -304,6 +309,7 @@ function InspectionsContent() {
           .select(`
             id,
             reg_number,
+            nickname,
             van_categories (
               name
             )
@@ -314,12 +320,13 @@ function InspectionsContent() {
           console.warn('Unable to load inspection vehicle details:', vansError);
         } else {
           vehicleMap = new Map(
-            ((vans || []) as Array<{ id: string; reg_number: string; van_categories: { name: string } | null }>)
+            ((vans || []) as Array<{ id: string; reg_number: string; nickname: string | null; van_categories: { name: string } | null }>)
               .filter((van) => Boolean(van.id))
               .map((van) => [
                 van.id,
                 {
                   reg_number: van.reg_number,
+                  nickname: van.nickname ?? null,
                   van_categories: van.van_categories ?? null,
                 },
               ])
@@ -590,7 +597,10 @@ function InspectionsContent() {
     e.stopPropagation(); // Prevent card click
     setInspectionToDelete({
       id: inspection.id,
-      vehicleReg: inspection.vans?.reg_number || 'Unknown',
+      vehicleReg: formatFleetAssetLabel({
+        identifier: inspection.vans?.reg_number || 'Unknown',
+        nickname: inspection.vans?.nickname,
+      }),
       date: formatDate(inspection.inspection_date),
     });
     setDeleteDialogOpen(true);
@@ -762,8 +772,11 @@ function InspectionsContent() {
                                 <SelectLabel className="">Recent</SelectLabel>
                                 {recentVehicles.map((vehicle: Vehicle) => (
                                   <SelectItem key={vehicle.id} value={vehicle.id}>
-                                    {vehicle.reg_number}
-                                    {vehicle.van_categories?.name && ` (${vehicle.van_categories.name})`}
+                                    {formatFleetAssetLabel({
+                                      identifier: vehicle.reg_number,
+                                      nickname: vehicle.nickname,
+                                      category: vehicle.van_categories?.name,
+                                    })}
                                   </SelectItem>
                                 ))}
                               </SelectGroup>
@@ -778,8 +791,11 @@ function InspectionsContent() {
                                 )}
                                 {otherVehicles.map((vehicle: Vehicle) => (
                                   <SelectItem key={vehicle.id} value={vehicle.id}>
-                                    {vehicle.reg_number}
-                                    {vehicle.van_categories?.name && ` (${vehicle.van_categories.name})`}
+                                    {formatFleetAssetLabel({
+                                      identifier: vehicle.reg_number,
+                                      nickname: vehicle.nickname,
+                                      category: vehicle.van_categories?.name,
+                                    })}
                                   </SelectItem>
                                 ))}
                               </SelectGroup>
@@ -884,7 +900,10 @@ function InspectionsContent() {
                     {getStatusIcon(inspection)}
                     <div>
                       <CardTitle className="text-lg text-white">
-                        {inspection.vans?.reg_number || 'Unknown Van'}
+                        {formatFleetAssetLabel({
+                          identifier: inspection.vans?.reg_number || 'Unknown Van',
+                          nickname: inspection.vans?.nickname,
+                        })}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
                         {canViewCrossUserInspections && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
@@ -990,7 +1009,16 @@ function InspectionsContent() {
 export default function InspectionsPage() {
   return (
     <NuqsClientAdapter>
-      <Suspense fallback={<PageLoader message="Loading van inspections..." />}>
+      <Suspense
+        fallback={
+          <AppPageLoadingShell
+            title="Van Daily Checks"
+            description="Daily safety check sheets"
+            message="Loading van inspections..."
+            accent="inspection"
+          />
+        }
+      >
         <InspectionsContent />
       </Suspense>
     </NuqsClientAdapter>

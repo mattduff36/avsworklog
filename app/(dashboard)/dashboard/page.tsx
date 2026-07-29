@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { SectionLoader } from '@/components/ui/section-loader';
-import { PageLoader } from '@/components/ui/page-loader';
 import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { MobileTextSizeDialog } from '@/components/layout/MobileTextSizeDialog';
+import { ReleaseVersionLink } from '@/components/layout/ReleaseVersionLink';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { useDashboardTaskBadges } from '@/components/layout/dashboard-task-badge-context';
 import Link from 'next/link';
@@ -505,7 +506,13 @@ export default function DashboardPage() {
   let nextDashboardBadgeAnimationIndex = dashboardHeaderTaskLinks.length;
 
   if (isDashboardLoading) {
-    return <PageLoader message="Loading SquiresApp" />;
+    return (
+      <AppPageLoadingShell
+        title={dashboardFullGreeting}
+        description={headerSubtitle}
+        message="Loading your dashboard..."
+      />
+    );
   }
 
   return (
@@ -943,6 +950,9 @@ export default function DashboardPage() {
         </Card>
       )}
 
+      <footer className="flex justify-end">
+        <ReleaseVersionLink />
+      </footer>
     </AppPageShell>
   );
 }

@@ -9,6 +9,7 @@ import {
 } from '@/lib/server/reminders/ensure-fleet-inspection-actions-fresh';
 import { mapReminderActionWithAsset } from '@/lib/server/reminders/generate-fleet-inspection-actions';
 import type { ReminderActionWithAsset } from '@/types/reminders';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -33,13 +34,17 @@ function uniqueValues(values: Array<string | null>): string[] {
 }
 
 function buildVehicleLabel(asset: VehicleAssetDetails): string {
-  const registration = asset.reg_number?.trim() || 'Unknown';
-  return asset.nickname?.trim() ? `${registration} (${asset.nickname.trim()})` : registration;
+  return formatFleetAssetLabel({
+    identifier: asset.reg_number?.trim() || 'Unknown',
+    nickname: asset.nickname,
+  });
 }
 
 function buildPlantLabel(asset: PlantAssetDetails): string {
-  const primary = asset.plant_id?.trim() || asset.reg_number?.trim() || 'Unknown Plant';
-  return asset.nickname?.trim() ? `${primary} (${asset.nickname.trim()})` : primary;
+  return formatFleetAssetLabel({
+    identifier: asset.plant_id?.trim() || asset.reg_number?.trim() || 'Unknown Plant',
+    nickname: asset.nickname,
+  });
 }
 
 async function enrichActionAssetMetadata(

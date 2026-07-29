@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -179,7 +179,14 @@ export default function SuggestionsManagePage() {
   };
 
   if (permissionLoading) {
-    return <PageLoader message="Loading suggestions..." />;
+    return (
+      <AppPageLoadingShell
+        title="Manage Suggestions"
+        description="Review and respond to user suggestions"
+        icon={<Lightbulb className="h-6 w-6 text-yellow-600" />}
+        message="Loading suggestions..."
+      />
+    );
   }
 
   if (!canManageSuggestions) {

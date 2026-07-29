@@ -15,6 +15,8 @@ import {
   isApplicableToType,
   type VehicleCategoryOption,
 } from './utils';
+import { NicknameUserCombobox } from '@/components/fleet/NicknameUserCombobox';
+import { buildAssignmentPayload } from '@/lib/fleet/nickname-assignment';
 
 interface AddVanDialogProps {
   open: boolean;
@@ -28,6 +30,7 @@ export function AddVanDialog({ open, onOpenChange, onSuccess }: AddVanDialogProp
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingCategories, setIsFetchingCategories] = useState(false);
   const [error, setError] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     reg_number: '',
     nickname: '',
@@ -58,6 +61,7 @@ export function AddVanDialog({ open, onOpenChange, onSuccess }: AddVanDialogProp
   useEffect(() => {
     if (open) return;
     setError('');
+    setSelectedUserId(null);
     setFormData({
       reg_number: '',
       nickname: '',
@@ -81,15 +85,24 @@ export function AddVanDialog({ open, onOpenChange, onSuccess }: AddVanDialogProp
 
     try {
       setIsLoading(true);
+      const payload: Record<string, unknown> = {
+        reg_number: formatRegistrationForStorage(formData.reg_number),
+        nickname: formData.nickname.trim() || null,
+        category_id: formData.category_id,
+        status: formData.status,
+      };
+      if (selectedUserId) {
+        payload.assignment = buildAssignmentPayload({
+          selectedUserId,
+          expectedAssignmentId: null,
+          clearAssignment: false,
+        });
+      }
+
       const response = await fetch('/api/admin/vans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reg_number: formatRegistrationForStorage(formData.reg_number),
-          nickname: formData.nickname.trim() || null,
-          category_id: formData.category_id,
-          status: formData.status,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(getErrorMessage(data.error, 'Failed to create van'));
@@ -127,12 +140,13 @@ export function AddVanDialog({ open, onOpenChange, onSuccess }: AddVanDialogProp
         </div>
         <div className="space-y-2">
           <Label htmlFor="van-nickname">Nickname</Label>
-          <Input
+          <NicknameUserCombobox
             id="van-nickname"
             value={formData.nickname}
-            onChange={(event) => setFormData((prev) => ({ ...prev, nickname: event.target.value }))}
-            placeholder="Optional"
-            className="bg-slate-900 text-white"
+            selectedUserId={selectedUserId}
+            onNicknameChange={(nickname) => setFormData((prev) => ({ ...prev, nickname }))}
+            onUserSelect={(user) => setSelectedUserId(user?.id || null)}
+            inputClassName="bg-slate-900"
           />
         </div>
         <div className="space-y-2">

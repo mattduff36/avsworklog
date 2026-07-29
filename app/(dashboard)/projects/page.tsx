@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Button } from '@/components/ui/button';
-import { PageLoader } from '@/components/ui/page-loader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -127,7 +127,18 @@ export default function RAMSPage() {
 
   // Show loading while checking auth
   if (authLoading || projectsPermissionLoading || loading) {
-    return <PageLoader message="Loading projects..." />;
+    return (
+      <AppPageLoadingShell
+        title="Projects"
+        description={
+          isManager || isAdmin
+            ? 'View and manage project documents'
+            : 'Review and acknowledge project documents'
+        }
+        message="Loading projects..."
+        accent="rams"
+      />
+    );
   }
 
   if (!canViewProjects) {

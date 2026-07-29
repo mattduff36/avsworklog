@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,7 +18,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
@@ -843,8 +844,46 @@ export default function InventoryPage() {
     });
   }
 
-  if (permissionLoading || loading) {
-    return <PageLoader message="Loading inventory..." />;
+  if (permissionLoading) {
+    return (
+      <AppPageLoadingShell
+        title="Inventory"
+        description="Track small tools, plant, signs, equipment, locations, and check status."
+        icon={<PackageSearch className="h-5 w-5" />}
+        message="Checking inventory access..."
+        accent="inventory"
+        width="wide"
+        className="inventory-mobile-ui"
+      />
+    );
+  }
+
+  if (!canViewInventory) {
+    return (
+      <AppPageLoadingShell
+        title="Inventory"
+        description="Track small tools, plant, signs, equipment, locations, and check status."
+        icon={<PackageSearch className="h-5 w-5" />}
+        message="Redirecting..."
+        accent="inventory"
+        width="wide"
+        className="inventory-mobile-ui"
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <AppPageShell width="wide" className="inventory-mobile-ui">
+        <AppPageHeader
+          title="Inventory"
+          titleMeta={<InventoryBetaBadge />}
+          description="Track small tools, plant, signs, equipment, locations, and check status."
+          icon={<PackageSearch className="h-5 w-5" />}
+        />
+        <PanelLoader message="Loading inventory..." accent="inventory" className="py-20" />
+      </AppPageShell>
+    );
   }
 
   const isManagerOrAdmin = inventoryContext?.is_manager_or_admin === true;

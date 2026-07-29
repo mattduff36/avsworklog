@@ -64,7 +64,7 @@ export function summarizeFleetAssignment(
     user_id: assignment.user_id,
     asset_type: 'plant',
     asset_id: assignment.linked_plant_id || '',
-    asset_label: plant?.reg_number || plant?.plant_id || null,
+    asset_label: plant?.plant_id || plant?.reg_number || null,
     asset_nickname: plant?.nickname || null,
     source_location_id: assignment.source_location_id,
     assigned_at: assignment.assigned_at,

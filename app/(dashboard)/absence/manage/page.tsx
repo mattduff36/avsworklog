@@ -7,11 +7,11 @@ import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { fetchEmployeeWorkShift, fetchWorkShiftMatrix } from '@/lib/client/work-shifts';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PageLoader } from '@/components/ui/page-loader';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -939,7 +939,15 @@ export default function AdminAbsencePage() {
   }
   
   if (authLoading || absencePermissionLoading || isAbsenceSecondaryContextLoading || isLoading) {
-    return <PageLoader message="Loading absence management..." />;
+    return (
+      <AppPageLoadingShell
+        title="Absence Management"
+        description="View and manage all employee absences"
+        message="Loading absence management..."
+        accent="absence"
+        width="wide"
+      />
+    );
   }
   
   if (!canAccessAbsenceModule || !canOpenManagePage) return null;

@@ -28,6 +28,7 @@ import type {
   VehicleMaintenanceWithStatus,
 } from '@/types/maintenance';
 import { notifyDisplayBoardDevice } from '@/lib/server/display-board-notify';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 export const WORKSHOP_DISPLAY_BOARD_KEY = 'workshop';
 export const DISPLAY_BOARD_PAIRING_WINDOW_MS = 5 * 60 * 1000;
@@ -249,8 +250,10 @@ export function normalizeDisplayBoardTextSizeStep(value: unknown): MobileTextSiz
 
 function getAssetLabel(asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null } | null) {
   if (!asset) return 'Unknown';
-  const identifier = asset.plant_id || asset.reg_number || 'Unknown';
-  return asset.nickname ? `${identifier} (${asset.nickname})` : identifier;
+  return formatFleetAssetLabel({
+    identifier: asset.plant_id || asset.reg_number || 'Unknown',
+    nickname: asset.nickname,
+  });
 }
 
 function singleRelation<T>(value: T | T[] | null | undefined): T | null {

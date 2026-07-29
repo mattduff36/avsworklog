@@ -18,12 +18,14 @@ import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 type Vehicle = {
   id: string;
   reg_number: string | null;
   plant_id: string | null;
   nickname: string | null;
+  category?: string | null;
   serial_number?: string | null;
   asset_type: 'van' | 'plant' | 'hgv' | 'tool';
 };
@@ -199,7 +201,7 @@ export function CreateWorkshopTaskDialog({
           // Fetch vans
           const { data: vehicleData, error: vehicleError } = await supabase
             .from('vans')
-            .select('id, reg_number, nickname')
+            .select('id, reg_number, nickname, van_categories(name)')
             .eq('status', 'active')
             .order('reg_number');
 
@@ -225,18 +227,26 @@ export function CreateWorkshopTaskDialog({
 
           // Combine both into a unified list with asset type indicators
           const combinedVehicles = [
-            ...(vehicleData || []).map((v: { id: string; reg_number: string | null; nickname: string | null }) => ({
-              id: v.id,
-              reg_number: v.reg_number,
-              plant_id: null,
-              nickname: v.nickname,
-              asset_type: 'van' as const
-            })),
+            ...(vehicleData || []).map((v) => {
+              const categories = v.van_categories;
+              const categoryName = Array.isArray(categories)
+                ? categories[0]?.name ?? null
+                : (categories as { name: string } | null)?.name ?? null;
+              return {
+                id: v.id,
+                reg_number: v.reg_number,
+                plant_id: null,
+                nickname: v.nickname,
+                category: categoryName,
+                asset_type: 'van' as const
+              };
+            }),
             ...(hgvData || []).map((v: { id: string; reg_number: string | null; nickname: string | null }) => ({
               id: v.id,
               reg_number: v.reg_number,
               plant_id: null,
               nickname: v.nickname,
+              category: null,
               asset_type: 'hgv' as const
             })),
             ...(plantData || []).map((p: { id: string; plant_id: string | null; nickname: string | null }) => ({
@@ -244,6 +254,7 @@ export function CreateWorkshopTaskDialog({
               reg_number: null,
               plant_id: p.plant_id,
               nickname: p.nickname,
+              category: null,
               asset_type: 'plant' as const
             }))
           ];
@@ -595,7 +606,11 @@ export function CreateWorkshopTaskDialog({
                           <SelectLabel>Recent</SelectLabel>
                           {recentVehicles.map((vehicle) => (
                             <SelectItem key={vehicle.id} value={vehicle.id}>
-                              {vehicle.reg_number || vehicle.plant_id}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                              {formatFleetAssetLabel({
+                                identifier: vehicle.plant_id || vehicle.reg_number || 'Unknown',
+                                nickname: vehicle.nickname,
+                                category: vehicle.asset_type === 'van' ? vehicle.category : undefined,
+                              })}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -610,7 +625,11 @@ export function CreateWorkshopTaskDialog({
                           )}
                           {otherVehicles.map((vehicle) => (
                             <SelectItem key={vehicle.id} value={vehicle.id}>
-                              {vehicle.reg_number || vehicle.plant_id}{vehicle.nickname ? ` (${vehicle.nickname})` : ''}
+                              {formatFleetAssetLabel({
+                                identifier: vehicle.plant_id || vehicle.reg_number || 'Unknown',
+                                nickname: vehicle.nickname,
+                                category: vehicle.asset_type === 'van' ? vehicle.category : undefined,
+                              })}
                             </SelectItem>
                           ))}
                         </SelectGroup>

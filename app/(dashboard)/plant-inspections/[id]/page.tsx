@@ -28,6 +28,7 @@ import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { formatReferenceId, getReferenceIdSuffix, getWorkshopTaskHref } from '@/lib/utils/reference-ids';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { toast } from 'sonner';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 interface PlantInspectionWithDetails {
   id: string;
@@ -611,7 +612,10 @@ export default function ViewPlantInspectionPage() {
                   </>
                 ) : (
                   <>
-                    {inspection.plant?.plant_id} {inspection.plant?.nickname && `(${inspection.plant.nickname})`} {inspection.plant?.serial_number && `(SN: ${inspection.plant.serial_number})`}
+                    {formatFleetAssetLabel({
+                      identifier: inspection.plant?.plant_id || 'Unknown Plant',
+                      nickname: inspection.plant?.nickname,
+                    })} {inspection.plant?.serial_number && `(SN: ${inspection.plant.serial_number})`}
                   </>
                 )}
                 {' • '}

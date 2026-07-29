@@ -17,6 +17,7 @@ import {
   getLolerPeriodLabel,
   type LolerMaintenanceCategory,
 } from '@/lib/utils/lolerMaintenance';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 const LOLER_THOROUGH_EXAMINATION = 'LOLER THOROUGH EXAMINATION';
 const LEGACY_LOLER_TYPO_PATTERN = new RegExp(`\\b${['LOLO', 'R'].join('')}\\b`, 'gi');
@@ -345,9 +346,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         .eq('id', task.van_id)
         .single();
       if (vehicle) {
-        assetName = (vehicle as { reg_number: string | null; nickname: string | null }).reg_number
-          || (vehicle as { reg_number: string | null; nickname: string | null }).nickname
-          || null;
+        const typedVehicle = vehicle as { reg_number: string | null; nickname: string | null };
+        assetName = formatFleetAssetLabel({
+          identifier: typedVehicle.reg_number || 'Unknown',
+          nickname: typedVehicle.nickname,
+        });
         assetType = 'van';
       }
     } else if (task?.plant_id) {
@@ -363,7 +366,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           serial_number: string | null;
           loler_due_date: string | null;
         };
-        assetName = `${p.plant_id}${p.nickname ? ` (${p.nickname})` : ''}${p.serial_number ? ` (SN: ${p.serial_number})` : ''}`;
+        assetName = `${formatFleetAssetLabel({
+          identifier: p.plant_id || 'Unknown Plant',
+          nickname: p.nickname,
+        })}${p.serial_number ? ` (SN: ${p.serial_number})` : ''}`;
         assetType = 'plant';
         lolerExpiryDate = p.loler_due_date;
       }
@@ -375,7 +381,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         .single();
       if (hgv) {
         const typedHgv = hgv as { reg_number: string | null; nickname: string | null };
-        assetName = typedHgv.reg_number || typedHgv.nickname || null;
+        assetName = formatFleetAssetLabel({
+          identifier: typedHgv.reg_number || 'Unknown',
+          nickname: typedHgv.nickname,
+        });
         assetType = 'hgv';
       }
     }

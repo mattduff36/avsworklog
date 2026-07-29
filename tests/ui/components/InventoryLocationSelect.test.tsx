@@ -70,7 +70,7 @@ describe('InventoryLocationSelect', () => {
     fireEvent.click(screen.getByRole('combobox'));
 
     expect(screen.getByRole('option', {
-      name: /\[FE24 TYH - Jeff Mark\] - Matt Duffill/i,
+      name: /\[FE24 TYH \(Jeff Mark\)\] - Matt Duffill/i,
     })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('Search locations...'), {
@@ -85,7 +85,7 @@ describe('InventoryLocationSelect', () => {
     });
     await waitFor(() => {
       expect(screen.getByRole('option', {
-        name: /\[FE24 TYH - Jeff Mark\] - Matt Duffill/i,
+        name: /\[FE24 TYH \(Jeff Mark\)\] - Matt Duffill/i,
       })).toBeInTheDocument();
     });
   });
@@ -95,7 +95,7 @@ describe('InventoryLocationSelect', () => {
 
     fireEvent.click(screen.getByRole('combobox'));
     const option = screen.getByRole('option', {
-      name: /\[FE24 TYH - Jeff Mark\] - Matt Duffill.*VAN.*FE24 TYH.*Matt Duffill/i,
+      name: /\[FE24 TYH \(Jeff Mark\)\] - Matt Duffill.*VAN.*FE24 TYH.*Matt Duffill/i,
     });
     expect(option).toBeInTheDocument();
     expect(option).toHaveAttribute('data-location-type', 'van');
@@ -180,7 +180,7 @@ describe('InventoryLocationSelect', () => {
 
     fireEvent.click(screen.getByRole('combobox'));
     const option = await screen.findByRole('option', {
-      name: /\[FE24 TYH - Jeff Mark\] - Matt Duffill.*VAN.*FE24 TYH.*Matt Duffill/i,
+      name: /\[FE24 TYH \(Jeff Mark\)\] - Matt Duffill.*VAN.*FE24 TYH.*Matt Duffill/i,
     });
 
     expect(fireEvent.pointerDown(option, { pointerType: 'touch' })).toBe(false);

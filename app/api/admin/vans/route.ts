@@ -13,6 +13,8 @@ import {
 } from '@/lib/services/fleet-dvla-sync';
 import type { Database } from '@/types/database';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { applyCreateFleetNicknameAssignment } from '@/lib/server/apply-create-fleet-nickname-assignment';
 
 interface ProfileNameShape {
   full_name?: string | null;
@@ -190,12 +192,31 @@ export async function POST(request: NextRequest) {
 
     console.log(`[INFO] Van created: ${data.reg_number} (ID: ${data.id})`);
 
+    const admin = createAdminClient();
+    const createAssignment = await applyCreateFleetNicknameAssignment({
+      admin,
+      body,
+      assetType: 'van',
+      assetId: data.id,
+      actorUserId: effectiveRole.user_id,
+      table: 'vans',
+    });
+    if (createAssignment.error) {
+      return NextResponse.json(
+        { error: createAssignment.error },
+        { status: createAssignment.status || 400 }
+      );
+    }
+
     // Automatically sync TAX and MOT data from APIs (non-blocking)
     const syncResult = await syncVanData(data.id, data.reg_number || cleanReg, effectiveRole.user_id, supabase);
 
+    const { data: refreshedVan } = await admin.from('vans').select().eq('id', data.id).maybeSingle();
+
     return NextResponse.json({ 
-      vehicle: data,
+      vehicle: refreshedVan || data,
       syncResult: syncResult,
+      assignment: createAssignment.result || null,
       message: syncResult.success 
         ? 'Van created and data synced successfully'
         : 'Van created. Note: ' + (syncResult.warning || 'API sync will retry automatically')

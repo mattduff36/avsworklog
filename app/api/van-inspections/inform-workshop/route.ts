@@ -7,6 +7,7 @@ import {
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 import { getVanInspectionsMaintenanceResponse } from '@/lib/server/van-inspections-maintenance';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 /**
  * POST /api/van-inspections/inform-workshop
@@ -101,11 +102,14 @@ export async function POST(request: NextRequest) {
     // Get vehicle registration for task title
     const { data: vehicle } = await supabaseAdmin
       .from('vans')
-      .select('reg_number')
+      .select('reg_number, nickname')
       .eq('id', vehicleId)
       .single();
 
-    const vehicleReg = vehicle?.reg_number || 'Unknown Van';
+    const vehicleReg = formatFleetAssetLabel({
+      identifier: vehicle?.reg_number || 'Unknown Van',
+      nickname: vehicle?.nickname,
+    });
 
     // Infer subcategory from comment keywords
     const subcategoryMatch = inferWorkshopSubcategoryFromComment(trimmedComment);

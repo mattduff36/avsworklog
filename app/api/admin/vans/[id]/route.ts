@@ -8,6 +8,7 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
+import { applyNicknameAssignmentFromBody } from '@/lib/server/apply-fleet-nickname-assignment-from-body';
 
 function normalizeRegistration(registrationNumber: string | null | undefined): string {
   return registrationNumber?.replace(/\s+/g, '').trim().toUpperCase() || '';
@@ -37,6 +38,8 @@ export async function PUT(
     const vanId = (await params).id;
     const body = await request.json();
     const { reg_number, category_id, status, nickname } = body;
+    const hasAssignmentIntent =
+      body && typeof body === 'object' && 'assignment' in body && body.assignment != null;
 
     const updates: Record<string, unknown> = {};
     
@@ -56,7 +59,8 @@ export async function PUT(
       updates.status = status;
     }
     
-    if (nickname !== undefined) {
+    // Nickname without assignment intent updates here; assignment RPC owns nickname otherwise.
+    if (nickname !== undefined && !hasAssignmentIntent) {
       updates.nickname = nickname?.trim() || null;
     }
 
@@ -112,27 +116,64 @@ export async function PUT(
       normalizeRegistration(previousRegNumber) !== normalizeRegistration(nextRegNumber)
     );
 
-    const { data, error } = await supabase
-      .from('vans')
-      .update(updates)
-      .eq('id', vanId)
-      .select()
-      .maybeSingle();
+    let data;
+    if (Object.keys(updates).length === 0) {
+      const { data: existingVan, error: existingError } = await supabase
+        .from('vans')
+        .select()
+        .eq('id', vanId)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      data = existingVan;
+    } else {
+      const { data: updatedVan, error } = await supabase
+        .from('vans')
+        .update(updates)
+        .eq('id', vanId)
+        .select()
+        .maybeSingle();
 
-    if (error) {
-      if (error.code === '23505') {
-        return NextResponse.json(
-          { error: 'Van with this registration already exists' },
-          { status: 400 }
-        );
+      if (error) {
+        if (error.code === '23505') {
+          return NextResponse.json(
+            { error: 'Van with this registration already exists' },
+            { status: 400 }
+          );
+        }
+        throw error;
       }
-      throw error;
+      data = updatedVan;
     }
+
     if (!data) {
       return NextResponse.json(
         { error: 'Van not found' },
         { status: 404 }
       );
+    }
+
+    const assignmentUpdate = await applyNicknameAssignmentFromBody({
+      admin: supabase,
+      body,
+      assetType: 'van',
+      assetId: vanId,
+      actorUserId: effectiveRole.user_id,
+      fallbackNickname: typeof nickname === 'string' ? nickname : nickname ?? null,
+    });
+    if (assignmentUpdate.error) {
+      return NextResponse.json(
+        { error: assignmentUpdate.error },
+        { status: assignmentUpdate.status || 400 }
+      );
+    }
+    if (assignmentUpdate.applied) {
+      const { data: refreshedVan, error: refreshError } = await supabase
+        .from('vans')
+        .select()
+        .eq('id', vanId)
+        .maybeSingle();
+      if (refreshError) throw refreshError;
+      if (refreshedVan) data = refreshedVan;
     }
 
     let syncResult: unknown = null;
@@ -178,7 +219,11 @@ export async function PUT(
       }
     }
 
-    return NextResponse.json({ vehicle: data, syncResult });
+    return NextResponse.json({
+      vehicle: data,
+      syncResult,
+      assignment: assignmentUpdate.result || null,
+    });
   } catch (error) {
     console.error('Error updating van:', error);
 

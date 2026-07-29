@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { OnceDialog } from '@/components/ui/once-ui';
 import { formatRegistrationForInput, formatRegistrationForStorage, type HgvCategoryOption } from './utils';
+import { NicknameUserCombobox } from '@/components/fleet/NicknameUserCombobox';
+import { buildAssignmentPayload } from '@/lib/fleet/nickname-assignment';
 
 interface AddHgvDialogProps {
   open: boolean;
@@ -37,6 +39,7 @@ export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProp
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingCategories, setIsFetchingCategories] = useState(false);
   const [error, setError] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState<HgvFormState>(INITIAL_STATE);
 
   useEffect(() => {
@@ -59,6 +62,7 @@ export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProp
   useEffect(() => {
     if (open) return;
     setError('');
+    setSelectedUserId(null);
     setFormData(INITIAL_STATE);
   }, [open]);
 
@@ -71,15 +75,24 @@ export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProp
 
     try {
       setIsLoading(true);
+      const payload: Record<string, unknown> = {
+        reg_number: formatRegistrationForStorage(formData.reg_number),
+        category_id: formData.category_id,
+        nickname: formData.nickname.trim() || null,
+        status: formData.status,
+      };
+      if (selectedUserId) {
+        payload.assignment = buildAssignmentPayload({
+          selectedUserId,
+          expectedAssignmentId: null,
+          clearAssignment: false,
+        });
+      }
+
       const createHgvResponse = await fetch('/api/admin/hgvs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reg_number: formatRegistrationForStorage(formData.reg_number),
-          category_id: formData.category_id,
-          nickname: formData.nickname.trim() || null,
-          status: formData.status,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const createHgvData = await createHgvResponse.json();
@@ -122,12 +135,13 @@ export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProp
         </div>
         <div className="space-y-2">
           <Label htmlFor="hgv-nickname">Nickname</Label>
-          <Input
+          <NicknameUserCombobox
             id="hgv-nickname"
             value={formData.nickname}
-            onChange={(event) => updateField('nickname', event.target.value)}
-            placeholder="Optional"
-            className="bg-slate-900 text-white"
+            selectedUserId={selectedUserId}
+            onNicknameChange={(nickname) => updateField('nickname', nickname)}
+            onUserSelect={(user) => setSelectedUserId(user?.id || null)}
+            inputClassName="bg-slate-900"
           />
         </div>
         <div className="space-y-2">

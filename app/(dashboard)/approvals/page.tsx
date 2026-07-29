@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useQueryState } from 'nuqs';
 import { createClient } from '@/lib/supabase/client';
 import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -42,7 +43,6 @@ import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
 import { AbsencesApprovalTable, ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_ABSENCE_COLUMN_VISIBILITY } from './components/AbsencesApprovalTable';
 import type { AbsenceColumnVisibility } from './components/AbsencesApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
-import { PageLoader } from '@/components/ui/page-loader';
 import { SectionLoader } from '@/components/ui/section-loader';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import {
@@ -747,7 +747,13 @@ function ApprovalsContent() {
   };
 
   if (permissionLoading || absenceSecondaryLoading || employeesLoading) {
-    return <PageLoader message="Loading approvals..." />;
+    return (
+      <AppPageLoadingShell
+        title="Approvals"
+        description="Review and manage submissions"
+        message="Loading approvals..."
+      />
+    );
   }
 
   if (!canViewApprovals) {
@@ -1678,7 +1684,15 @@ function AbsenceApprovalCard({
 export default function ApprovalsPage() {
   return (
     <NuqsClientAdapter>
-      <Suspense fallback={<PageLoader message="Loading approvals..." />}>
+      <Suspense
+        fallback={(
+          <AppPageLoadingShell
+            title="Approvals"
+            description="Review and manage submissions"
+            message="Loading approvals..."
+          />
+        )}
+      >
         <ApprovalsContent />
       </Suspense>
     </NuqsClientAdapter>

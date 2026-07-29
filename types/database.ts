@@ -10150,6 +10150,34 @@ export type Database = {
           location_id: string
         }[]
       }
+      clear_fleet_assignment_for_asset: {
+        Args: {
+          p_asset_type: string
+          p_asset_id: string
+          p_actor_user_id: string | null
+        }
+        Returns: number
+      }
+      ensure_fleet_inventory_location: {
+        Args: {
+          p_asset_type: string
+          p_asset_id: string
+          p_actor_user_id: string | null
+        }
+        Returns: string
+      }
+      admin_apply_fleet_asset_nickname_assignment: {
+        Args: {
+          p_asset_type: string
+          p_asset_id: string
+          p_manual_nickname: string | null
+          p_assignment_action: string
+          p_assigned_user_id: string | null
+          p_expected_assignment_id: string | null
+          p_actor_user_id: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       check__absences__half_day_session: 'AM' | 'PM'

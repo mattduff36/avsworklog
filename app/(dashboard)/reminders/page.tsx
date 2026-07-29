@@ -5,10 +5,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, BellRing, CalendarClock, CheckCircle2, ClipboardCheck, Loader2, UserRound } from 'lucide-react';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { TOOLBOX_TALK_MANUAL_REMINDER_WORKFLOW_KEY, VAN_DRAFT_SUBMISSION_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
@@ -149,11 +149,29 @@ export default function RemindersPage() {
   }
 
   if (permissionLoading) {
-    return <PageLoader message="Loading reminders..." />;
+    return (
+      <AppPageLoadingShell
+        title="Reminders"
+        description="Your assigned tasks stay here until the requested work has been completed."
+        icon={<BellRing className="h-5 w-5" />}
+        message="Loading reminders..."
+        accent="reminders"
+        width="medium"
+      />
+    );
   }
 
   if (!canViewReminders) {
-    return <PageLoader message="Redirecting..." />;
+    return (
+      <AppPageLoadingShell
+        title="Reminders"
+        description="Your assigned tasks stay here until the requested work has been completed."
+        icon={<BellRing className="h-5 w-5" />}
+        message="Redirecting..."
+        accent="reminders"
+        width="medium"
+      />
+    );
   }
 
   return (

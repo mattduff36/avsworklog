@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SlidersHorizontal } from 'lucide-react';
 import { AppPageShell } from '@/components/layout/AppPageShell';
-import { PageLoader } from '@/components/ui/page-loader';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -75,7 +75,14 @@ function AdminSettingsContent() {
   }
 
   if (permissionLoading) {
-    return <PageLoader message="Loading admin settings..." />;
+    return (
+      <AppPageLoadingShell
+        title="Admin Settings"
+        description="Configure admin-only tools, overrides, and system-level controls."
+        icon={<SlidersHorizontal className="h-6 w-6" />}
+        message="Loading admin settings..."
+      />
+    );
   }
 
   if (!canAccessSettings) {
@@ -147,7 +154,16 @@ function AdminSettingsContent() {
 
 export default function AdminSettingsPage() {
   return (
-    <Suspense fallback={<PageLoader message="Loading admin settings..." />}>
+    <Suspense
+      fallback={(
+        <AppPageLoadingShell
+          title="Admin Settings"
+          description="Configure admin-only tools, overrides, and system-level controls."
+          icon={<SlidersHorizontal className="h-6 w-6" />}
+          message="Loading admin settings..."
+        />
+      )}
+    >
       <AdminSettingsContent />
     </Suspense>
   );

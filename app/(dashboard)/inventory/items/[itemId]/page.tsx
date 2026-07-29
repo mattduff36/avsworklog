@@ -29,6 +29,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, CalendarCheck, Clock, Download, Loader2, MapPin, PackageSearch } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import {
   EMPTY_INVENTORY_ITEM_FORM,
   INVENTORY_CATEGORY_LABELS,
@@ -580,7 +581,15 @@ export default function InventoryItemDetailPage() {
                       </>
                     ) : null}
                     {item.location?.linked_asset_label ? (
-                      <DetailRow label="Linked Location Asset" value={`${item.location.linked_asset_label}${item.location.linked_asset_nickname ? ` · ${item.location.linked_asset_nickname}` : ''}`} />
+                      <DetailRow
+                        label="Linked Location Asset"
+                        value={item.location.linked_asset_label
+                          ? formatFleetAssetLabel({
+                              identifier: item.location.linked_asset_label,
+                              nickname: item.location.linked_asset_nickname,
+                            })
+                          : '-'}
+                      />
                     ) : null}
                   </div>
                 )}

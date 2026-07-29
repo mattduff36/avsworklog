@@ -88,6 +88,7 @@ export function PageLoadingScreen({
       className={cn(variant === 'fullscreen' ? styles.screen : styles.compact, className)}
       data-loader-accent={loaderAccent}
       data-loader-palette={palette}
+      data-loader-variant={variant}
       data-testid="page-loader"
       role="status"
       aria-live="polite"

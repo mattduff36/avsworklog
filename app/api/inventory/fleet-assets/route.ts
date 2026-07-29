@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryAccess } from '@/lib/server/inventory-auth';
 import type { FleetAssetOption } from '@/app/(dashboard)/inventory/types';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 export async function GET() {
   try {
@@ -37,20 +38,29 @@ export async function GET() {
       ...(vansResult.data || []).map((van) => ({
         id: van.id,
         type: 'van' as const,
-        label: `Van - ${van.reg_number}`,
+        label: `Van - ${formatFleetAssetLabel({
+          identifier: van.reg_number || 'Unknown',
+          nickname: van.nickname,
+        })}`,
         description: van.nickname || null,
       })),
       ...(hgvsResult.data || []).map((hgv) => ({
         id: hgv.id,
         type: 'hgv' as const,
-        label: `HGV - ${hgv.reg_number}`,
+        label: `HGV - ${formatFleetAssetLabel({
+          identifier: hgv.reg_number || 'Unknown',
+          nickname: hgv.nickname,
+        })}`,
         description: hgv.nickname || null,
       })),
       ...(plantResult.data || []).map((plant) => ({
         id: plant.id,
         type: 'plant' as const,
-        label: `Plant - ${plant.plant_id}`,
-        description: [plant.nickname, plant.make, plant.model, plant.reg_number].filter(Boolean).join(' ') || null,
+        label: `Plant - ${formatFleetAssetLabel({
+          identifier: plant.plant_id || 'Unknown Plant',
+          nickname: plant.nickname,
+        })}`,
+        description: [plant.make, plant.model, plant.reg_number].filter(Boolean).join(' ') || null,
       })),
     ];
 

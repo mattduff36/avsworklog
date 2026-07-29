@@ -21,7 +21,7 @@ describe('MultiSelectFilter', () => {
           },
           {
             value: 'van-location',
-            label: '[FE24 TYH - Jeff Mark]',
+            label: '[FE24 TYH (Jeff Mark)]',
             description: 'Unassigned',
             groupLabel: 'Vans',
             searchLabel: 'FE24 TYH Jeff Mark Vans',
@@ -66,7 +66,7 @@ describe('MultiSelectFilter', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /vans click to expand/i }));
 
-    expect(screen.getByText('[FE24 TYH - Jeff Mark]')).toBeInTheDocument();
+    expect(screen.getByText('[FE24 TYH (Jeff Mark)]')).toBeInTheDocument();
     expect(screen.queryByText('[4321-AB - Legacy Site]')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('Search locations...'), {

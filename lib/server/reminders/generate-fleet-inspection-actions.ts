@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import {
   isFleetInspectionAssetTypeEnabled,
   loadFleetInspectionWorkflowSettings,
@@ -119,13 +120,17 @@ function getJsonStringValue(metadata: Json | null | undefined, key: string): str
 }
 
 function buildVanLabel(row: VanAssetRow): string {
-  const registration = row.reg_number?.trim() || 'Unknown Van';
-  return row.nickname?.trim() ? `${registration} (${row.nickname.trim()})` : registration;
+  return formatFleetAssetLabel({
+    identifier: row.reg_number?.trim() || 'Unknown Van',
+    nickname: row.nickname,
+  });
 }
 
 function buildPlantLabel(row: PlantAssetRow): string {
-  const primary = row.plant_id?.trim() || row.reg_number?.trim() || 'Unknown Plant';
-  return row.nickname?.trim() ? `${primary} (${row.nickname.trim()})` : primary;
+  return formatFleetAssetLabel({
+    identifier: row.plant_id?.trim() || row.reg_number?.trim() || 'Unknown Plant',
+    nickname: row.nickname,
+  });
 }
 
 function buildAssetRoute(assetType: ReminderAssetType, assetId: string): string {

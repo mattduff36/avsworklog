@@ -26,10 +26,10 @@ import { fetchAbsenceMessage } from '@/lib/client/absence-message';
 import { fetchCurrentWorkShift, fetchWorkShiftMatrix } from '@/lib/client/work-shifts';
 import { canOpenAbsenceManageArea } from '@/types/absence-permissions';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { PageLoader } from '@/components/ui/page-loader';
 import { ServiceUnavailableState } from '@/components/ui/service-unavailable-state';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1145,7 +1145,13 @@ export default function AbsencePage() {
 
   if (!shouldPauseDataLoading && (permissionLoading || isSecondaryContextLoading || loadingAbsences || loadingSummary || isBookingWindowLoading)) {
     return (
-      <PageLoader
+      <AppPageLoadingShell
+        title="Absence & Leave"
+        description={
+          canOpenManageLink
+            ? 'Manage annual leave and view absence records'
+            : 'Request annual leave and view your absence records'
+        }
         message={
           permissionLoading || isSecondaryContextLoading
             ? 'Checking access...'
@@ -1153,6 +1159,7 @@ export default function AbsencePage() {
             ? 'Loading booking window...'
             : 'Loading absences...'
         }
+        accent="absence"
       />
     );
   }

@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils/date';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 export interface PlantInspectionsColumnVisibility {
   employeeId: boolean;
@@ -88,8 +89,10 @@ function getStatusIcon(inspection: PlantInspectionRow) {
 
 function getPlantLabel(inspection: PlantInspectionRow) {
   if (inspection.is_hired_plant) return `Hired - ${inspection.hired_plant_id_serial || 'Unknown'}`;
-  const base = inspection.plant?.plant_id || 'Unknown Plant';
-  return inspection.plant?.nickname ? `${base} - ${inspection.plant.nickname}` : base;
+  return formatFleetAssetLabel({
+    identifier: inspection.plant?.plant_id || 'Unknown Plant',
+    nickname: inspection.plant?.nickname,
+  });
 }
 
 function formatInspectionRange(startDate: string, endDate: string | null) {

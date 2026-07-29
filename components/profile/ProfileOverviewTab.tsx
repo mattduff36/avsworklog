@@ -5,6 +5,7 @@ import { AlertTriangle, CalendarDays, ClipboardCheck, Crown, PlaneTakeoff, Truck
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ProfileHelpShortcuts } from '@/components/profile/ProfileHelpShortcuts';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import type {
   ProfileAnnualLeaveSummary,
   ProfileIdentityPayload,
@@ -125,10 +126,10 @@ export function ProfileOverviewTab({
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {currentFleetAssignment
-                    ? `${currentFleetAssignment.asset_type.toUpperCase()} ${[
-                      currentFleetAssignment.asset_label,
-                      currentFleetAssignment.asset_nickname,
-                    ].filter(Boolean).join(' - ') || currentFleetAssignment.asset_id}`
+                    ? `${currentFleetAssignment.asset_type.toUpperCase()} ${formatFleetAssetLabel({
+                      identifier: currentFleetAssignment.asset_label || currentFleetAssignment.asset_id,
+                      nickname: currentFleetAssignment.asset_nickname,
+                    })}`
                     : 'No current fleet asset assignment'}
                 </p>
               </div>

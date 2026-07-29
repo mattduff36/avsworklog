@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQueryState } from 'nuqs';
 import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Clipboard, Clock, Download, Filter, Loader2, Plus, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
@@ -32,6 +32,7 @@ import {
   HGV_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY,
 } from './components/HgvInspectionsListTable';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 interface HgvInspectionWithRelations {
   id: string;
@@ -542,8 +543,10 @@ function HgvInspectionsContent() {
                     <SelectItem value="all">All HGVs</SelectItem>
                     {hgvs.map((hgv) => (
                       <SelectItem key={hgv.id} value={hgv.id}>
-                        {hgv.reg_number}
-                        {hgv.nickname ? ` - ${hgv.nickname}` : ''}
+                        {formatFleetAssetLabel({
+                          identifier: hgv.reg_number,
+                          nickname: hgv.nickname,
+                        })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -630,8 +633,10 @@ function HgvInspectionsContent() {
                     {getInspectionIcon(inspection)}
                     <div>
                       <CardTitle className="text-lg text-white">
-                        {inspection.hgv?.reg_number || 'Unknown HGV'}
-                        {inspection.hgv?.nickname ? ` - ${inspection.hgv.nickname}` : ''}
+                        {formatFleetAssetLabel({
+                          identifier: inspection.hgv?.reg_number || 'Unknown HGV',
+                          nickname: inspection.hgv?.nickname,
+                        })}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
                         {canViewCrossUserInspections && inspection.profile?.full_name ? `${inspection.profile.full_name} • ` : ''}
@@ -711,7 +716,16 @@ function HgvInspectionsContent() {
 export default function HgvInspectionsPage() {
   return (
     <NuqsClientAdapter>
-      <Suspense fallback={<PageLoader message="Loading HGV inspections..." />}>
+      <Suspense
+        fallback={
+          <AppPageLoadingShell
+            title="HGV Daily Checks"
+            description="Daily 26-point HGV safety checks"
+            message="Loading HGV inspections..."
+            accent="hgv-inspection"
+          />
+        }
+      >
         <HgvInspectionsContent />
       </Suspense>
     </NuqsClientAdapter>

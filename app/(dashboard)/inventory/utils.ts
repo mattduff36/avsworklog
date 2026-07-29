@@ -5,6 +5,7 @@ import type {
   InventoryLocation,
   InventoryLocationType,
 } from './types';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 const DAYS_PER_INVENTORY_CHECK_MONTH = 30;
 
@@ -207,12 +208,13 @@ export function formatInventoryUnknownLocationAge(
 }
 
 export function formatInventoryLocationLabel(location: InventoryLocation): string {
-  const linkedAssetLabel = [location.linked_asset_label, location.linked_asset_nickname]
-    .map((value) => value?.trim())
-    .filter(Boolean)
-    .join(' - ');
-
-  if (linkedAssetLabel) return `[${linkedAssetLabel}]`;
+  const linkedAssetIdentifier = location.linked_asset_label?.trim();
+  if (linkedAssetIdentifier) {
+    return `[${formatFleetAssetLabel({
+      identifier: linkedAssetIdentifier,
+      nickname: location.linked_asset_nickname,
+    })}]`;
+  }
 
   if (location.location_type === 'site' && location.external_reference) {
     const titlePrefix = location.source_type === 'legacy_quote'

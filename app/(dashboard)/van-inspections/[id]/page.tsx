@@ -28,10 +28,12 @@ import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { formatReferenceId, getReferenceIdSuffix, getWorkshopTaskHref } from '@/lib/utils/reference-ids';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { toast } from 'sonner';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 interface InspectionWithDetails extends VanInspection {
   vans: {
     reg_number: string;
+    nickname?: string | null;
     vehicle_type: string;
   };
 }
@@ -134,6 +136,7 @@ export default function ViewInspectionPage() {
           *,
           vans (
             reg_number,
+            nickname,
             vehicle_type
           )
         `)
@@ -752,7 +755,10 @@ export default function ViewInspectionPage() {
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">Van Daily Check</h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                {inspection.vans?.reg_number} • {formatDate(inspection.inspection_date)}
+                {formatFleetAssetLabel({
+                  identifier: inspection.vans?.reg_number || 'Unknown',
+                  nickname: inspection.vans?.nickname,
+                })} • {formatDate(inspection.inspection_date)}
               </p>
               {inspectionReference && (
                 <div className="mt-1 text-xs md:text-sm text-slate-500 dark:text-slate-400/80">
@@ -788,7 +794,7 @@ export default function ViewInspectionPage() {
                 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                 const pdfUrl = `/api/van-inspections/${inspection.id}/pdf`;
                 const vehicleReg = inspection.vans?.reg_number || 'Unknown';
-                
+
                 if (isStandalone || isMobile) {
                   router.push(`/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&title=${encodeURIComponent(`Inspection-${vehicleReg}`)}&return=${encodeURIComponent(`/van-inspections/${inspection.id}`)}`);
                 } else {

@@ -34,6 +34,12 @@ import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { formatRegistrationForInput } from './add-asset/utils';
+import { NicknameUserCombobox } from '@/components/fleet/NicknameUserCombobox';
+import {
+  buildAssignmentPayload,
+  shouldPromptClearAssignment,
+  type CurrentAssetFleetAssignment,
+} from '@/lib/fleet/nickname-assignment';
 
 // ============================================================================
 // Zod Validation Schema
@@ -158,6 +164,12 @@ export function EditMaintenanceDialog({
   const [pendingSubmitData, setPendingSubmitData] = useState<EditMaintenanceFormData | null>(null);
   const [vrnComparison, setVrnComparison] = useState<VrnChangeComparison | null>(null);
   const [vrnConfirmOpen, setVrnConfirmOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [hadSelectedUser, setHadSelectedUser] = useState(false);
+  const [currentAssignment, setCurrentAssignment] = useState<CurrentAssetFleetAssignment | null>(null);
+  const [initialNickname, setInitialNickname] = useState('');
+  const [unlinkConfirmOpen, setUnlinkConfirmOpen] = useState(false);
+  const [pendingUnlinkData, setPendingUnlinkData] = useState<EditMaintenanceFormData | null>(null);
   const dialogContentRef = useRef<HTMLDivElement>(null);
   const assetTypeLabel = vehicle?.vehicle?.asset_type === 'plant' ? 'Plant' : vehicle?.vehicle?.asset_type === 'hgv' ? 'HGV' : 'Van';
   const isHgvAsset = vehicle?.vehicle?.asset_type === 'hgv';
@@ -229,13 +241,22 @@ export function EditMaintenanceDialog({
   // Watch comment field for character count
   const commentValue = watch('comment') || '';
   const regNumberValue = watch('reg_number') || '';
+  const nicknameValue = watch('nickname') || '';
   const commentLength = commentValue.trim().length;
+  const fleetAssetType =
+    vehicle?.vehicle?.asset_type === 'hgv'
+      ? 'hgv'
+      : vehicle?.vehicle?.asset_type === 'plant'
+        ? 'plant'
+        : 'van';
+  const fleetAssetId = vehicle?.vehicle?.id || null;
 
   // Reset form when vehicle changes
   useEffect(() => {
     if (vehicle) {
+      const nickname = vehicle.vehicle?.nickname || '';
       reset({
-        nickname: vehicle.vehicle?.nickname || '',
+        nickname,
         reg_number: formatRegistrationForInput(vehicle.vehicle?.reg_number || ''),
         current_mileage: vehicle.current_mileage || undefined,
         tax_due_date: formatDateForInput(vehicle.tax_due_date),
@@ -253,6 +274,9 @@ export function EditMaintenanceDialog({
         tracker_id: vehicle.tracker_id || '',
         comment: '',
       });
+      setInitialNickname(nickname);
+      setSelectedUserId(null);
+      setHadSelectedUser(false);
       setCustomItemValues(
         effectiveMaintenanceItems
           .filter(item => item.source === 'custom')
@@ -271,6 +295,38 @@ export function EditMaintenanceDialog({
       setCustomItemsDirty(false);
     }
   }, [effectiveMaintenanceItems, vehicle, reset]);
+
+  useEffect(() => {
+    if (!open || !fleetAssetId) {
+      setCurrentAssignment(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/fleet-assignments?asset_type=${fleetAssetType}&asset_id=${encodeURIComponent(fleetAssetId)}`
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || cancelled) return;
+        const assignment = result.assignment
+          ? {
+              assignmentId: result.assignment.id as string,
+              userId: result.assignment.user_id as string,
+              fullName: (result.assignment.full_name as string | null) || null,
+            }
+          : null;
+        setCurrentAssignment(assignment);
+      } catch {
+        if (!cancelled) setCurrentAssignment(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, fleetAssetId, fleetAssetType]);
 
   // Handle modal close attempts
   const handleOpenChange = (newOpen: boolean) => {
@@ -350,40 +406,20 @@ export function EditMaintenanceDialog({
     }
   };
 
-  // Submit handler
-  const saveMaintenanceChanges = async (data: EditMaintenanceFormData) => {
+  const saveMaintenanceChanges = async (
+    data: EditMaintenanceFormData,
+    options?: { clearAssignment?: boolean }
+  ) => {
     if (!vehicle) return;
 
-    // If asset display details changed, update the asset record first.
-    const nicknameChanged = data.nickname?.trim() !== vehicle.vehicle?.nickname;
+    const nicknameChanged = (data.nickname?.trim() || '') !== (vehicle.vehicle?.nickname || '');
     const regNumberChanged = hasVrnChanged(data);
-    if ((nicknameChanged || regNumberChanged) && vehicle.vehicle?.id) {
-      try {
-        const endpoint = vehicle.vehicle.asset_type === 'hgv' ? 'hgvs' : 'vans';
-        const body: Record<string, string | null> = {
-          nickname: data.nickname?.trim() || null,
-        };
-
-        if (regNumberChanged) {
-          body.reg_number = data.reg_number?.trim() || null;
-        }
-
-        const response = await fetch(`/api/admin/${endpoint}/${vehicle.vehicle.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-        
-        if (!response.ok) {
-          const result = await response.json().catch(() => ({}));
-          throw new Error(result.error || 'Failed to update asset details');
-        }
-      } catch (error) {
-        console.error('Error updating asset details:', error);
-        toast.error(error instanceof Error ? error.message : 'Failed to update asset details');
-        return;
-      }
-    }
+    const selectionWasCleared = hadSelectedUser && !selectedUserId;
+    const assignmentTouched =
+      Boolean(selectedUserId) ||
+      nicknameChanged ||
+      selectionWasCleared ||
+      options?.clearAssignment !== undefined;
 
     // Convert empty strings to null for dates
     // Note: comment is included here for the API request body (used for audit logging),
@@ -417,25 +453,73 @@ export function EditMaintenanceDialog({
       comment: data.comment.trim(), // Mandatory comment for audit trail (not a DB column)
     };
 
-    if (!vehicle.id) {
-      const vanId = vehicle.van_id;
-      const hgvId = vehicle.hgv_id;
+    try {
+      if (!vehicle.id) {
+        const vanId = vehicle.van_id;
+        const hgvId = vehicle.hgv_id;
 
-      if (!vanId && !hgvId) {
-        throw new Error('Missing asset ID for new maintenance record');
+        if (!vanId && !hgvId) {
+          throw new Error('Missing asset ID for new maintenance record');
+        }
+
+        // Create new maintenance record
+        await createMutation.mutateAsync({
+          van_id: vanId ?? undefined,
+          hgv_id: hgvId ?? undefined,
+          data: updates,
+        });
+      } else {
+        // Update existing maintenance record
+        await updateMutation.mutateAsync({ id: vehicle.id, updates });
       }
-
-      // Create new maintenance record
-      await createMutation.mutateAsync({ 
-        van_id: vanId ?? undefined,
-        hgv_id: hgvId ?? undefined,
-        data: updates 
-      });
-    } else {
-      // Update existing maintenance record
-      await updateMutation.mutateAsync({ id: vehicle.id, updates });
+    } catch (error) {
+      console.error('Error saving maintenance changes:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save maintenance changes');
+      return;
     }
-    
+
+    // Nickname/assignment after maintenance succeeds so a failed maintenance save does not leave a partial assignment.
+    if ((nicknameChanged || regNumberChanged || assignmentTouched) && vehicle.vehicle?.id) {
+      try {
+        const endpoint =
+          vehicle.vehicle.asset_type === 'hgv'
+            ? 'hgvs'
+            : vehicle.vehicle.asset_type === 'plant'
+              ? 'plant'
+              : 'vans';
+        const body: Record<string, unknown> = {
+          nickname: data.nickname?.trim() || null,
+        };
+
+        if (regNumberChanged) {
+          body.reg_number = data.reg_number?.trim() || null;
+        }
+
+        if (assignmentTouched) {
+          body.assignment = buildAssignmentPayload({
+            selectedUserId,
+            expectedAssignmentId: currentAssignment?.assignmentId || null,
+            clearAssignment: options?.clearAssignment === true,
+          });
+        }
+
+        const response = await fetch(`/api/admin/${endpoint}/${vehicle.vehicle.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.error || 'Failed to update asset details');
+        }
+      } catch (error) {
+        console.error('Error updating asset details:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to update asset details');
+        return;
+      }
+    }
+
     onSuccess?.();
     setCustomItemsDirty(false);
   };
@@ -450,6 +534,21 @@ export function EditMaintenanceDialog({
         toast.error(error instanceof Error ? error.message : 'Failed to compare registration details');
         return;
       }
+    }
+
+    const selectionWasCleared = hadSelectedUser && !selectedUserId;
+    if (
+      shouldPromptClearAssignment({
+        currentAssignment,
+        selectedUserId,
+        nickname: data.nickname || '',
+        initialNickname,
+        selectionWasCleared,
+      })
+    ) {
+      setPendingUnlinkData(data);
+      setUnlinkConfirmOpen(true);
+      return;
     }
 
     await saveMaintenanceChanges(data);
@@ -512,15 +611,32 @@ export function EditMaintenanceDialog({
               <Label htmlFor="nickname" className="text-white">
                 {assetTypeLabel} Nickname <span className="text-slate-400 text-xs">(Optional)</span>
               </Label>
-              <Input
+              <NicknameUserCombobox
                 id="nickname"
-                {...register('nickname')}
-                placeholder="e.g., Andy's Van, Red Pickup, Main Truck"
-                className="bg-input border-border text-white"
+                value={nicknameValue}
+                selectedUserId={selectedUserId}
+                onNicknameChange={(nickname) => {
+                  setValue('nickname', nickname, { shouldDirty: true });
+                  if (selectedUserId) {
+                    setSelectedUserId(null);
+                  }
+                }}
+                onUserSelect={(user) => {
+                  if (user) {
+                    setSelectedUserId(user.id);
+                    setHadSelectedUser(true);
+                    setValue('nickname', user.fullName, { shouldDirty: true });
+                  } else {
+                    setSelectedUserId(null);
+                  }
+                }}
+                placeholder="e.g., Andy's Van, or pick a user"
               />
-              <p className="text-xs text-slate-400">
-                Helps identify this asset
-              </p>
+              {currentAssignment?.fullName ? (
+                <p className="text-xs text-slate-400">
+                  Currently linked user: {currentAssignment.fullName}
+                </p>
+              ) : null}
               {errors.nickname && (
                 <p className="text-sm text-red-400">{errors.nickname.message}</p>
               )}
@@ -1023,6 +1139,52 @@ export function EditMaintenanceDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+      <AlertDialog
+        open={unlinkConfirmOpen}
+        onOpenChange={(nextOpen) => {
+          setUnlinkConfirmOpen(nextOpen);
+          if (!nextOpen) setPendingUnlinkData(null);
+        }}
+      >
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update linked user assignment?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {currentAssignment?.fullName
+                ? `${currentAssignment.fullName} is currently linked to this asset. Keep that linked user, or clear the assignment?`
+                : 'Keep the current linked user assignment, or clear it?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-slate-600 text-white"
+              onClick={() => {
+                const data = pendingUnlinkData;
+                setUnlinkConfirmOpen(false);
+                setPendingUnlinkData(null);
+                if (data) void saveMaintenanceChanges(data, { clearAssignment: false });
+              }}
+            >
+              Keep linked user
+            </Button>
+            <AlertDialogAction
+              className="bg-red-700 text-white hover:bg-red-800"
+              onClick={(event) => {
+                event.preventDefault();
+                const data = pendingUnlinkData;
+                setUnlinkConfirmOpen(false);
+                setPendingUnlinkData(null);
+                if (data) void saveMaintenanceChanges(data, { clearAssignment: true });
+              }}
+            >
+              Clear linked user
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={vrnConfirmOpen} onOpenChange={handleVrnConfirmOpenChange}>
         <AlertDialogContent className="border-border text-white sm:max-w-2xl">
           <AlertDialogHeader>

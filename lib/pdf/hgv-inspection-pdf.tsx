@@ -3,6 +3,7 @@ import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@reac
 import { HGV_ARTIC_ONLY_START_ITEM, TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate } from '@/lib/utils/date';
 import type { EnrichedDefectItem } from '@/lib/utils/hgvDefectWorkshopDetails';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 7, fontFamily: 'Helvetica' },
@@ -256,7 +257,12 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWith
           <View style={styles.topRow}>
             <View style={[styles.topCell, { width: '40%' }]}>
               <Text style={styles.topLabel}>MACHINE</Text>
-              <Text style={styles.topValue}>{hgv.reg_number}</Text>
+              <Text style={styles.topValue}>
+                {formatFleetAssetLabel({
+                  identifier: hgv.reg_number || 'Unknown',
+                  nickname: hgv.nickname,
+                })}
+              </Text>
             </View>
             <View style={[styles.topCell, { width: '20%' }]}>
               <Text style={styles.topLabel}>HOURS / KM</Text>

@@ -391,7 +391,7 @@ export function useWorkshopTasksFetchers({
       try {
         const { data: vehicleData, error: vehicleError } = await supabase
           .from('vans')
-          .select('id, reg_number, nickname')
+          .select('id, reg_number, nickname, van_categories(name)')
           .eq('status', 'active')
           .order('reg_number');
 
@@ -414,18 +414,26 @@ export function useWorkshopTasksFetchers({
         if (hgvError) throw hgvError;
 
         const combinedVehicles = [
-          ...(vehicleData || []).map((v: { id: string; reg_number: string | null; nickname: string | null }) => ({
-            id: v.id,
-            reg_number: v.reg_number ?? '',
-            plant_id: null,
-            nickname: v.nickname,
-            asset_type: 'van' as const,
-          })),
+          ...(vehicleData || []).map((v) => {
+            const categories = v.van_categories as { name: string } | { name: string }[] | null;
+            const categoryName = Array.isArray(categories)
+              ? categories[0]?.name ?? null
+              : categories?.name ?? null;
+            return {
+              id: v.id,
+              reg_number: v.reg_number ?? '',
+              plant_id: null,
+              nickname: v.nickname,
+              category: categoryName,
+              asset_type: 'van' as const,
+            };
+          }),
           ...(plantData || []).map((p: { id: string; plant_id: string; nickname: string | null }) => ({
             id: p.id,
             reg_number: '',
             plant_id: p.plant_id,
             nickname: p.nickname,
+            category: null,
             asset_type: 'plant' as const,
           })),
           ...(hgvData || []).map((v: { id: string; reg_number: string | null; nickname: string | null }) => ({
@@ -433,6 +441,7 @@ export function useWorkshopTasksFetchers({
             reg_number: v.reg_number ?? '',
             plant_id: null,
             nickname: v.nickname,
+            category: null,
             asset_type: 'hgv' as const,
           })),
         ];

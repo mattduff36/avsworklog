@@ -6,6 +6,7 @@ import { sendMaintenanceReminderEmail } from '@/lib/utils/email';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getUsersWithPermission } from '@/lib/utils/permissions';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 // Helper to create service role client for bypassing RLS
 function getSupabaseServiceRole() {
@@ -150,9 +151,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
     }
 
     // Prepare message content
-    const vehicleDisplay = vehicle.nickname 
-      ? `${vehicle.reg_number} (${vehicle.nickname})`
-      : vehicle.reg_number;
+    const vehicleDisplay = formatFleetAssetLabel({
+      identifier: vehicle.reg_number || 'Unknown',
+      nickname: vehicle.nickname,
+    });
     
     const subject = subjectOverride || `${category.name}: ${vehicleDisplay} - ${dueInfo}`;
     const messageBody = bodyOverride || 
@@ -230,7 +232,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<SendRemin
           to: recipientEmails,
           senderName: senderProfile.full_name || 'SquiresApp',
           subject,
-          vehicleReg: vehicle.reg_number || 'Unknown',
+          vehicleReg: vehicleDisplay,
           categoryName: category.name,
           dueInfo,
         });

@@ -4,6 +4,7 @@ import { renderToStream } from '@react-pdf/renderer';
 import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 export const runtime = 'nodejs';
 
@@ -27,7 +28,8 @@ export async function GET(
       .select(`
         *,
         vehicle:vans(
-          reg_number, 
+          reg_number,
+          nickname,
           vehicle_type,
           van_categories(name)
         ),
@@ -89,9 +91,15 @@ export async function GET(
     }
 
     type InspectionWithVehicle = {
-      vehicle?: { van_categories?: { name: string } | null; vehicle_type?: string | null; reg_number?: string | null };
+      vehicle?: {
+        van_categories?: { name: string } | null;
+        vehicle_type?: string | null;
+        reg_number?: string | null;
+        nickname?: string | null;
+      };
       profile?: { full_name?: string | null };
     };
+    const vehicle = (inspection as InspectionWithVehicle).vehicle;
     const pdfComponent = VanInspectionPDF({
       inspection: {
         ...inspection,
@@ -107,7 +115,10 @@ export async function GET(
         status: item.status as 'ok' | 'attention' | 'defect' | 'na',
         created_at: item.created_at ?? '',
       })),
-      vehicleReg: (inspection as InspectionWithVehicle).vehicle?.reg_number || 'Unknown',
+      vehicleReg: formatFleetAssetLabel({
+        identifier: vehicle?.reg_number || 'Unknown',
+        nickname: vehicle?.nickname,
+      }),
       employeeName: (inspection as InspectionWithVehicle).profile?.full_name || 'Unknown',
     });
     

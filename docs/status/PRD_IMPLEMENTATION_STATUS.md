@@ -190,6 +190,8 @@
   - ✅ Empty states
   - ✅ Mobile responsive
   - ✅ Pending Management and Administration tasks surfaced as compact header shortcuts
+  - ✅ Subtle right-aligned Version link restored in a dashboard page footer
+  - ✅ Normal dashboard modules preserve navigation and page headers while content loads
 
 ### 9. ✅ Implement real-time sync using Supabase Realtime for cross-device updates
 - **Status**: Complete ✅
@@ -737,3 +739,11 @@ Complete, production-ready work log system with full reporting capabilities. All
 ---
 
 **For detailed file-by-file status, see `IMPLEMENTATION_STATUS.md`**
+
+---
+
+### Fleet nickname + user assignment (2026-07-29)
+
+- **PRD area:** Vehicle / Fleet maintenance admin tooling (nickname identity + inventory fleet assignment contract)
+- **Status:** Implemented
+- **Notes:** Admin Van/HGV/Plant create+edit nickname fields filter user directory; selecting a user sets nickname and updates `profile_fleet_assignments` via `admin_apply_fleet_asset_nickname_assignment`. Free text allowed. Unlink prompts keep/clear. Retire/archive clears assignment by trigger.

@@ -16,7 +16,6 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2, Archive } from 'lucide-react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/utils/logger';
-import { createClient } from '@/lib/supabase/client';
 
 interface DeletePlantDialogProps {
   open: boolean;
@@ -39,7 +38,6 @@ export function DeletePlantDialog({
   onSuccess
 }: DeletePlantDialogProps) {
   const queryClient = useQueryClient();
-  const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [reason, setReason] = useState<DeleteReason>('Sold');
   const [error, setError] = useState('');
@@ -55,42 +53,14 @@ export function DeletePlantDialog({
     try {
       setLoading(true);
 
-      // Check for open workshop tasks first
-      const { data: openTasks, error: tasksError } = await supabase
-        .from('actions')
-        .select('id, status')
-        .eq('plant_id', plant.id)
-        .neq('status', 'completed')
-        .limit(1);
-
-      if (tasksError) {
-        throw new Error(`Failed to check for open tasks: ${tasksError.message}`);
-      }
-
-      if (openTasks && openTasks.length > 0) {
-        setError('Cannot retire plant with open workshop tasks. Please complete or delete all open tasks first.');
-        toast.error('Cannot retire plant with open workshop tasks', {
-          description: 'Please complete or delete all open tasks before retiring this plant machinery.',
-          duration: 5000,
-        });
-        setLoading(false);
-        return;
-      }
-
-      // Update plant status to retired with reason and timestamp
-      const now = new Date().toISOString();
-      const { error: updateError } = await supabase
-        .from('plant')
-        .update({ 
-          status: 'retired',
-          retired_at: now,
-          retire_reason: reason,
-          updated_at: now,
-        })
-        .eq('id', plant.id);
-
-      if (updateError) {
-        throw new Error(`Failed to retire plant: ${updateError.message}`);
+      const response = await fetch(`/api/admin/plant/${plant.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to retire plant');
       }
 
       toast.success('Plant retired successfully', {

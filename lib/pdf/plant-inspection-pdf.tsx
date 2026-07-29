@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@react-pdf/renderer';
 import { PLANT_INSPECTION_ITEMS } from '@/lib/checklists/plant-checklists';
 import { formatDate } from '@/lib/utils/date';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 7, fontFamily: 'Helvetica' },
@@ -193,9 +194,10 @@ export function PlantInspectionPDF({
     return `${formatDate(signedAt)} ${time}`;
   };
 
-  const machineText = plant.isHired
-    ? `${plant.plant_id}${plant.nickname ? ` (${plant.nickname})` : ''}`
-    : `${plant.plant_id}${plant.nickname ? ` (${plant.nickname})` : ''}${plant.serial_number ? ` (SN: ${plant.serial_number})` : ''}`;
+  const machineText = `${formatFleetAssetLabel({
+    identifier: plant.plant_id || 'Unknown',
+    nickname: plant.nickname,
+  })}${!plant.isHired && plant.serial_number ? ` (SN: ${plant.serial_number})` : ''}`;
   const checklistItems = (() => {
     const itemByNumber = new Map<number, string>();
 

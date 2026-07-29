@@ -5,11 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, Archive, Download, Edit, GraduationCap, Loader2, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { PageLoader } from '@/components/ui/page-loader';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   Select,
   SelectContent,
@@ -367,8 +368,43 @@ function TrainingContent() {
     }
   }
 
-  if (permissionLoading || loading) {
-    return <PageLoader message="Loading training..." />;
+  if (permissionLoading) {
+    return (
+      <AppPageLoadingShell
+        title="Training"
+        description="Imported client training records with expiry tracking, source traceability, and manual admin updates."
+        icon={<GraduationCap className="h-6 w-6" />}
+        message="Checking training access..."
+        accent="brand"
+        width="full"
+      />
+    );
+  }
+
+  if (!hasPermission) {
+    return (
+      <AppPageLoadingShell
+        title="Training"
+        description="Imported client training records with expiry tracking, source traceability, and manual admin updates."
+        icon={<GraduationCap className="h-6 w-6" />}
+        message="Redirecting..."
+        accent="brand"
+        width="full"
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <AppPageShell width="full">
+        <AppPageHeader
+          title="Training"
+          description="Imported client training records with expiry tracking, source traceability, and manual admin updates."
+          icon={<GraduationCap className="h-6 w-6" />}
+        />
+        <PanelLoader message="Loading training..." accent="brand" className="py-20" />
+      </AppPageShell>
+    );
   }
 
   const summary = data.summary;
@@ -728,7 +764,18 @@ function TrainingContent() {
 
 export default function TrainingPage() {
   return (
-    <Suspense fallback={<PageLoader message="Loading training..." />}>
+    <Suspense
+      fallback={(
+        <AppPageLoadingShell
+          title="Training"
+          description="Imported client training records with expiry tracking, source traceability, and manual admin updates."
+          icon={<GraduationCap className="h-6 w-6" />}
+          message="Loading training..."
+          accent="brand"
+          width="full"
+        />
+      )}
+    >
       <TrainingContent />
     </Suspense>
   );

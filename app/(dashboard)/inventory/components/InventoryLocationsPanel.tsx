@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Link2, Loader2, MapPin, Pencil, Trash2 } from 'lucide-react';
 import type { FleetAssetOption, InventoryLocation } from '../types';
 import { getInventoryLocationTypePresentation } from '../utils';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { InventoryLocationTypeBadge } from './InventoryLocationTypeBadge';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
@@ -35,10 +36,12 @@ interface InventoryLocationsResponse {
 }
 
 function getLinkedAssetLabel(location: InventoryLocation, fleetAssets: FleetAssetOption[]): string | null {
-  const enrichedLabel = [location.linked_asset_label, location.linked_asset_nickname]
-    .filter(Boolean)
-    .join(' - ');
-  if (enrichedLabel) return enrichedLabel;
+  if (location.linked_asset_label?.trim()) {
+    return formatFleetAssetLabel({
+      identifier: location.linked_asset_label,
+      nickname: location.linked_asset_nickname,
+    });
+  }
 
   const linkedAssetId = location.linked_van_id || location.linked_hgv_id || location.linked_plant_id;
   if (!linkedAssetId) return null;

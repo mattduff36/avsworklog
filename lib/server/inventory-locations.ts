@@ -103,7 +103,7 @@ function getLinkedAssetDisplay(
     const asset = plantById.get(location.linked_plant_id);
     return {
       linked_asset_type: 'plant',
-      linked_asset_label: asset?.reg_number || asset?.plant_id || null,
+      linked_asset_label: asset?.plant_id || asset?.reg_number || null,
       linked_asset_nickname: asset?.nickname || null,
     };
   }

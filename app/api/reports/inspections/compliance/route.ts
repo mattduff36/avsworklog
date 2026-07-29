@@ -11,9 +11,11 @@ import {
   formatExcelStatus
 } from '@/lib/utils/excel';
 import type { ModuleName } from '@/types/roles';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 type VanVehicleRow = {
   reg_number?: string | null;
+  nickname?: string | null;
   vehicle_type?: string | null;
   van_categories?: { name: string } | null;
 };
@@ -172,6 +174,7 @@ export async function GET(request: NextRequest) {
                 reviewed_at,
                 vehicle:vans (
                   reg_number,
+                  nickname,
                   vehicle_type,
                   van_categories(name)
                 ),
@@ -269,7 +272,10 @@ export async function GET(request: NextRequest) {
     const unifiedRows: UnifiedDailyCheckRow[] = [
       ...((vanResult.data || []) as VanInspectionRow[]).map((inspection) => ({
         source: 'van' as const,
-        assetReference: inspection.vehicle?.reg_number || '-',
+        assetReference: formatFleetAssetLabel({
+          identifier: inspection.vehicle?.reg_number || '-',
+          nickname: inspection.vehicle?.nickname,
+        }),
         assetType: inspection.vehicle ? getVehicleCategoryName(inspection.vehicle) : 'Van',
         inspectorName: inspection.inspector?.full_name || 'Unknown',
         inspectorEmployeeId: inspection.inspector?.employee_id || '-',
@@ -284,7 +290,10 @@ export async function GET(request: NextRequest) {
         assetReference:
           inspection.is_hired_plant
             ? inspection.hired_plant_id_serial || inspection.hired_plant_description || 'Hired Plant'
-            : inspection.plant?.plant_id || 'Plant',
+            : formatFleetAssetLabel({
+                identifier: inspection.plant?.plant_id || 'Plant',
+                nickname: inspection.plant?.nickname,
+              }),
         assetType: inspection.plant?.van_categories?.name || 'Plant',
         inspectorName: inspection.inspector?.full_name || 'Unknown',
         inspectorEmployeeId: inspection.inspector?.employee_id || '-',
@@ -296,7 +305,10 @@ export async function GET(request: NextRequest) {
       })),
       ...((hgvResult.data || []) as HgvInspectionRow[]).map((inspection) => ({
         source: 'hgv' as const,
-        assetReference: inspection.hgv?.reg_number || 'HGV',
+        assetReference: formatFleetAssetLabel({
+          identifier: inspection.hgv?.reg_number || 'HGV',
+          nickname: inspection.hgv?.nickname,
+        }),
         assetType: inspection.hgv?.hgv_categories?.name || 'HGV',
         inspectorName: inspection.inspector?.full_name || 'Unknown',
         inspectorEmployeeId: inspection.inspector?.employee_id || '-',

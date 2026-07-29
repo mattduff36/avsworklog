@@ -70,7 +70,7 @@ interface WorkshopTasksOverviewTabProps {
   getStatusIcon: (status: string, task?: Action) => ReactNode;
   getVehicleReg: (task: Action) => string;
   getSourceLabel: (task: Action) => string;
-  getAssetDisplay: (vehicle: Vehicle) => string;
+  getAssetDisplay: (vehicle: Vehicle, options?: { forSelect?: boolean }) => string;
   onCreateTask: () => void;
   onOpenTaskModal: (task: Action) => void;
   onOpenComments: (task: Action) => void;
@@ -495,7 +495,7 @@ export function WorkshopTasksOverviewTab({
                     .filter(v => assetTab === 'all' ? true : assetTab === 'plant' ? v.asset_type === 'plant' : assetTab === 'hgv' ? v.asset_type === 'hgv' : v.asset_type === 'van')
                     .map((vehicle) => (
                     <SelectItem key={vehicle.id} value={vehicle.id}>
-                      {getAssetDisplay(vehicle)}
+                      {getAssetDisplay(vehicle, { forSelect: true })}
                     </SelectItem>
                   ))}
                 </SelectContent>

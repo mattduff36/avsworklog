@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PageLoader } from '@/components/ui/page-loader';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -664,7 +664,14 @@ export default function TimesheetsPage() {
   };
 
   if (!supabase || permissionLoading || isAbsenceSecondaryContextLoading) {
-    return <PageLoader message="Loading timesheets..." />;
+    return (
+      <AppPageLoadingShell
+        title="Timesheets"
+        description="Manage your weekly timesheets"
+        message="Loading timesheets..."
+        accent="timesheet"
+      />
+    );
   }
 
   // Don't render if no permission (hook will redirect)

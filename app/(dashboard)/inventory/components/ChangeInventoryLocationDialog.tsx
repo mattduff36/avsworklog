@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { InventoryLocation, InventoryUserLocation } from '../types';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 interface ChangeInventoryLocationDialogProps {
   open: boolean;
@@ -48,8 +49,11 @@ export function ChangeInventoryLocationDialog({
   const [selectedLocation, setSelectedLocation] = useState<InventoryLocation | null>(
     hasActiveExistingLocation ? userLocation?.location || null : null,
   );
-  const selectedFleetLabel = selectedLocation
-    ? [selectedLocation.linked_asset_label, selectedLocation.linked_asset_nickname].filter(Boolean).join(' - ')
+  const selectedFleetLabel = selectedLocation?.linked_asset_label
+    ? formatFleetAssetLabel({
+        identifier: selectedLocation.linked_asset_label,
+        nickname: selectedLocation.linked_asset_nickname,
+      })
     : '';
 
   useEffect(() => {

@@ -5,6 +5,16 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -30,6 +40,12 @@ import {
   getLolerPeriodLabel,
   type LolerMaintenanceCategory,
 } from '@/lib/utils/lolerMaintenance';
+import { NicknameUserCombobox } from '@/components/fleet/NicknameUserCombobox';
+import {
+  buildAssignmentPayload,
+  shouldPromptClearAssignment,
+  type CurrentAssetFleetAssignment,
+} from '@/lib/fleet/nickname-assignment';
 
 // ============================================================================
 // Types
@@ -133,6 +149,13 @@ export function EditPlantRecordDialog({
   const supabase = useMemo(() => createClient(), []);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lolerPeriodLabel, setLolerPeriodLabel] = useState(DEFAULT_LOLER_PERIOD_LABEL);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [hadSelectedUser, setHadSelectedUser] = useState(false);
+  const [currentAssignment, setCurrentAssignment] = useState<CurrentAssetFleetAssignment | null>(null);
+  const [initialNickname, setInitialNickname] = useState('');
+  const [unlinkConfirmOpen, setUnlinkConfirmOpen] = useState(false);
+  const [pendingUnlinkData, setPendingUnlinkData] = useState<EditPlantRecordFormData | null>(null);
+  const clearAssignmentOverrideRef = useRef<boolean | undefined>(undefined);
   const dialogContentRef = useRef<HTMLDivElement>(null);
   
   // Check if this is a new maintenance record
@@ -144,6 +167,7 @@ export function EditPlantRecordDialog({
     handleSubmit,
     formState: { errors, isDirty },
     reset,
+    setValue,
     watch,
   } = useForm<EditPlantRecordFormData>({
     resolver: zodResolver(editPlantRecordSchema) as never,
@@ -151,13 +175,15 @@ export function EditPlantRecordDialog({
 
   // Watch comment field for character count
   const commentValue = watch('comment') || '';
+  const nicknameValue = watch('nickname') || '';
   const commentLength = commentValue.trim().length;
 
   // Reset form when plant/maintenance changes
   useEffect(() => {
     if (plant) {
+      const nickname = plant.nickname || '';
       reset({
-        nickname: plant.nickname || '',
+        nickname,
         reg_number: plant.reg_number || '',
         serial_number: plant.serial_number || '',
         tax_due_date: formatDateForInput(maintenanceRecord?.tax_due_date),
@@ -172,8 +198,45 @@ export function EditPlantRecordDialog({
         tracker_id: maintenanceRecord?.tracker_id || '',
         comment: '',
       });
+      setInitialNickname(nickname);
+      setSelectedUserId(null);
+      setHadSelectedUser(false);
+      clearAssignmentOverrideRef.current = undefined;
     }
   }, [plant, maintenanceRecord, reset]);
+
+  useEffect(() => {
+    if (!open || !plant?.id) {
+      setCurrentAssignment(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/admin/fleet-assignments?asset_type=plant&asset_id=${encodeURIComponent(plant.id)}`
+        );
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || cancelled) return;
+        setCurrentAssignment(
+          result.assignment
+            ? {
+                assignmentId: result.assignment.id as string,
+                userId: result.assignment.user_id as string,
+                fullName: (result.assignment.full_name as string | null) || null,
+              }
+            : null
+        );
+      } catch {
+        if (!cancelled) setCurrentAssignment(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, plant?.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -226,8 +289,29 @@ export function EditPlantRecordDialog({
   };
 
   // Submit handler
-  const onSubmit = async (data: EditPlantRecordFormData) => {
+  const onSubmit = async (
+    data: EditPlantRecordFormData,
+    options?: { clearAssignment?: boolean; skipUnlinkPrompt?: boolean }
+  ) => {
     if (!plant) return;
+
+    const selectionWasCleared = hadSelectedUser && !selectedUserId;
+    if (
+      !options?.skipUnlinkPrompt &&
+      shouldPromptClearAssignment({
+        currentAssignment,
+        selectedUserId,
+        nickname: data.nickname || '',
+        initialNickname,
+        selectionWasCleared,
+      })
+    ) {
+      setPendingUnlinkData(data);
+      setUnlinkConfirmOpen(true);
+      return;
+    }
+
+    clearAssignmentOverrideRef.current = options?.clearAssignment;
 
     try {
       setIsSubmitting(true);
@@ -262,31 +346,6 @@ export function EditPlantRecordDialog({
         value_type: MaintenanceHistoryValueType;
       };
       const fieldChanges: FieldChange[] = [];
-
-      // Update plant nickname if changed
-      const newNickname = data.nickname?.trim() || null;
-      const oldNickname = plant.nickname;
-      if (newNickname !== oldNickname) {
-        const { error: nicknameError } = await supabase
-          .from('plant')
-          .update({ 
-            nickname: newNickname,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', plant.id);
-
-        if (nicknameError) {
-          console.error('Error updating plant nickname:', nicknameError);
-          // Continue with other updates even if nickname update fails
-        } else {
-          fieldChanges.push({
-            field_name: 'nickname',
-            old_value: oldNickname,
-            new_value: newNickname,
-            value_type: 'text'
-          });
-        }
-      }
 
       // Update plant serial number if changed
       const newSerialNumber = data.serial_number?.trim() || null;
@@ -577,6 +636,52 @@ export function EditPlantRecordDialog({
 
       // Create maintenance history entries (one per changed field for clarity).
       // Note: This writes with plant_id after the migration.
+      // Nickname/assignment last so earlier plant field failures do not leave a committed assignment.
+      const newNickname = data.nickname?.trim() || null;
+      const oldNickname = plant.nickname;
+      const nicknameChanged = newNickname !== (oldNickname || null);
+      const selectionWasCleared = hadSelectedUser && !selectedUserId;
+      const clearAssignmentOverride = clearAssignmentOverrideRef.current;
+      const assignmentTouched =
+        Boolean(selectedUserId) ||
+        nicknameChanged ||
+        selectionWasCleared ||
+        clearAssignmentOverride !== undefined;
+
+      if (assignmentTouched) {
+        const response = await fetch(`/api/admin/plant/${plant.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            nickname: newNickname,
+            assignment: buildAssignmentPayload({
+              selectedUserId,
+              expectedAssignmentId: currentAssignment?.assignmentId || null,
+              clearAssignment: clearAssignmentOverride === true,
+            }),
+          }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to update plant nickname/assignment');
+        }
+        const appliedNickname =
+          typeof result.assignment?.nickname === 'string' || result.assignment?.nickname === null
+            ? result.assignment.nickname
+            : typeof result.plant?.nickname === 'string' || result.plant?.nickname === null
+              ? result.plant.nickname
+              : newNickname;
+        if (appliedNickname !== oldNickname) {
+          fieldChanges.push({
+            field_name: 'nickname',
+            old_value: oldNickname,
+            new_value: appliedNickname,
+            value_type: 'text'
+          });
+        }
+        clearAssignmentOverrideRef.current = undefined;
+      }
+
       if (fieldChanges.length > 0) {
         const historyEntries = fieldChanges.map(change => ({
           plant_id: plant.id,
@@ -667,21 +772,36 @@ export function EditPlantRecordDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit((data) => onSubmit(data))} className="space-y-6">
           {/* Plant Nickname */}
           <div className="space-y-2">
             <Label htmlFor="nickname" className="text-white">
               Plant Nickname <span className="text-slate-400 text-xs">(Optional)</span>
             </Label>
-            <Input
+            <NicknameUserCombobox
               id="nickname"
-              {...register('nickname')}
-              placeholder="e.g., VOLVO ECR88D, Big Digger, Main Excavator"
-              className="bg-input border-border text-white"
+              value={nicknameValue}
+              selectedUserId={selectedUserId}
+              onNicknameChange={(nickname) => {
+                setValue('nickname', nickname, { shouldDirty: true });
+                if (selectedUserId) setSelectedUserId(null);
+              }}
+              onUserSelect={(user) => {
+                if (user) {
+                  setSelectedUserId(user.id);
+                  setHadSelectedUser(true);
+                  setValue('nickname', user.fullName, { shouldDirty: true });
+                } else {
+                  setSelectedUserId(null);
+                }
+              }}
+              placeholder="e.g., VOLVO ECR88D, or pick a user"
             />
-            <p className="text-xs text-muted-foreground">
-              A friendly name to help identify this plant machine quickly
-            </p>
+            {currentAssignment?.fullName ? (
+              <p className="text-xs text-slate-400">
+                Currently linked user: {currentAssignment.fullName}
+              </p>
+            ) : null}
             {errors.nickname && (
               <p className="text-sm text-red-400">{errors.nickname.message}</p>
             )}
@@ -1019,6 +1139,56 @@ export function EditPlantRecordDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+      <AlertDialog
+        open={unlinkConfirmOpen}
+        onOpenChange={(nextOpen) => {
+          setUnlinkConfirmOpen(nextOpen);
+          if (!nextOpen) setPendingUnlinkData(null);
+        }}
+      >
+        <AlertDialogContent className="border-border text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update linked user assignment?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {currentAssignment?.fullName
+                ? `${currentAssignment.fullName} is currently linked to this plant. Keep that linked user, or clear the assignment?`
+                : 'Keep the current linked user assignment, or clear it?'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-slate-600 text-white"
+              onClick={() => {
+                const data = pendingUnlinkData;
+                setUnlinkConfirmOpen(false);
+                setPendingUnlinkData(null);
+                if (data) {
+                  void onSubmit(data, { clearAssignment: false, skipUnlinkPrompt: true });
+                }
+              }}
+            >
+              Keep linked user
+            </Button>
+            <AlertDialogAction
+              className="bg-red-700 text-white hover:bg-red-800"
+              onClick={(event) => {
+                event.preventDefault();
+                const data = pendingUnlinkData;
+                setUnlinkConfirmOpen(false);
+                setPendingUnlinkData(null);
+                if (data) {
+                  void onSubmit(data, { clearAssignment: true, skipUnlinkPrompt: true });
+                }
+              }}
+            >
+              Clear linked user
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

@@ -56,7 +56,9 @@ When the selected location is linked to a fleet asset, the app also records a cu
 
 `inventory_user_site_locations` retains its legacy table name but stores supervisor-assigned secondary locations. Active Site and Manual locations are eligible. Secondary assignments do not replace the user's primary location or fleet assignment.
 
-The inventory location selection remains the source event for this assignment; profile fleet assignment history is used by admin/profile views and future tracking features.
+The inventory location selection remains a primary source event for this assignment; profile fleet assignment history is used by admin/profile views and future tracking features.
+
+Admins can also assign or clear a linked user from the Van / HGV / Plant nickname editor (create and edit dialogs). Selecting a user from the nickname filter sets the asset nickname to that user's name and applies the assignment through the same inventory-location RPCs (`admin_apply_fleet_asset_nickname_assignment`). Free-text nicknames remain allowed without auto-matching. Retiring or archiving an asset clears any current fleet assignment via database trigger.
 
 ## Movement Rules
 

@@ -29,6 +29,7 @@ import {
   getInspectionEnteredComment,
   type InspectionCommentTask,
 } from '@/lib/utils/inspection-item-comments';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 interface InspectionItemWithDay extends InspectionItem {
   day_of_week: number | null;
@@ -274,8 +275,10 @@ export default function ViewHgvInspectionPage() {
             <div>
               <h1 className="text-xl md:text-3xl font-bold text-foreground">HGV Daily Check</h1>
               <p className="text-sm md:text-base text-muted-foreground">
-                {inspection.hgv?.reg_number || 'Unknown HGV'}
-                {inspection.hgv?.nickname ? ` (${inspection.hgv.nickname})` : ''}
+                {formatFleetAssetLabel({
+                  identifier: inspection.hgv?.reg_number || 'Unknown HGV',
+                  nickname: inspection.hgv?.nickname,
+                })}
                 {' • '}
                 {formatDate(inspection.inspection_date)}
                 {inspection.profiles?.full_name ? ` • ${inspection.profiles.full_name}` : ''}

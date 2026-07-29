@@ -103,6 +103,7 @@ import {
   type PlantEntryDraft,
   type RecalculateEntryOptions,
 } from './plant-timesheet-v2-utils';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 interface PlantTimesheetV2Props {
   weekEnding: string;
@@ -1515,7 +1516,10 @@ export function PlantTimesheetV2({
                           <SelectLabel className="text-muted-foreground text-xs px-2 py-1.5">Recent</SelectLabel>
                           {recentPlants.map((plant) => (
                             <SelectItem key={plant.id} value={plant.id}>
-                              {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.van_categories?.name || 'Uncategorized'})
+                              {formatFleetAssetLabel({
+                                identifier: plant.plant_id,
+                                nickname: plant.nickname,
+                              })}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -1530,7 +1534,10 @@ export function PlantTimesheetV2({
                           )}
                           {otherVehicles.map((plant) => (
                             <SelectItem key={plant.id} value={plant.id}>
-                              {plant.plant_id} {plant.nickname ? `- ${plant.nickname}` : ''} ({plant.van_categories?.name || 'Uncategorized'})
+                              {formatFleetAssetLabel({
+                                identifier: plant.plant_id,
+                                nickname: plant.nickname,
+                              })}
                             </SelectItem>
                           ))}
                         </SelectGroup>
@@ -1542,7 +1549,10 @@ export function PlantTimesheetV2({
             </Select>
             {selectedPlant && !isHiredPlant && (
               <p className="text-xs text-muted-foreground">
-                Selected: {selectedPlant.plant_id} {selectedPlant.nickname ? `- ${selectedPlant.nickname}` : ''}
+                Selected: {formatFleetAssetLabel({
+                  identifier: selectedPlant.plant_id,
+                  nickname: selectedPlant.nickname,
+                })}
               </p>
             )}
           </div>

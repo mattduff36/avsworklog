@@ -35,6 +35,7 @@ import {
   getReferenceIdSuffix,
   type InspectionReferenceType,
 } from '@/lib/utils/reference-ids';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 type Task = Database['public']['Tables']['actions']['Row'] & {
   status_history?: unknown[] | null;
@@ -214,11 +215,10 @@ export function WorkshopTaskModal({
 
     const getAssetDisplay = (asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null }) => {
       if (!asset) return 'Unknown';
-      const idLabel = getAssetIdLabel(asset);
-      if (asset.nickname) {
-        return `${idLabel} (${asset.nickname})`;
-      }
-      return idLabel;
+      return formatFleetAssetLabel({
+        identifier: getAssetIdLabel(asset),
+        nickname: asset.nickname,
+      });
     };
 
     if (task.vans) {

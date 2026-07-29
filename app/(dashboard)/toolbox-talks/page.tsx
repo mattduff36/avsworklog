@@ -3,11 +3,11 @@
 import { Suspense, useEffect, useMemo } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageLoader } from '@/components/ui/page-loader';
 import { MessageSquare, Bell, BarChart3 } from 'lucide-react';
 import { CreateToolboxTalkForm } from '@/components/messages/CreateToolboxTalkForm';
 import { CreateReminderForm } from '@/components/messages/CreateReminderForm';
@@ -59,11 +59,27 @@ function ToolboxTalksContent() {
   }
 
   if (permissionLoading) {
-    return <PageLoader message="Loading toolbox talks..." />;
+    return (
+      <AppPageLoadingShell
+        title="Toolbox Talks"
+        description="Create safety toolbox talks, send reminders, and review message compliance."
+        icon={<MessageSquare className="h-5 w-5" />}
+        message="Loading toolbox talks..."
+        accent="brand"
+      />
+    );
   }
 
   if (!canViewToolboxTalks) {
-    return <PageLoader message="Redirecting..." />;
+    return (
+      <AppPageLoadingShell
+        title="Toolbox Talks"
+        description="Create safety toolbox talks, send reminders, and review message compliance."
+        icon={<MessageSquare className="h-5 w-5" />}
+        message="Redirecting..."
+        accent="brand"
+      />
+    );
   }
 
   return (
@@ -157,7 +173,17 @@ function ToolboxTalksContent() {
 
 export default function ToolboxTalksPage() {
   return (
-    <Suspense fallback={<PageLoader message="Loading toolbox talks..." />}>
+    <Suspense
+      fallback={(
+        <AppPageLoadingShell
+          title="Toolbox Talks"
+          description="Create safety toolbox talks, send reminders, and review message compliance."
+          icon={<MessageSquare className="h-5 w-5" />}
+          message="Loading toolbox talks..."
+          accent="brand"
+        />
+      )}
+    >
       <ToolboxTalksContent />
     </Suspense>
   );

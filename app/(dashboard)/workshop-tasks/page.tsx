@@ -10,7 +10,7 @@ import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PageLoader } from '@/components/ui/page-loader';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause } from 'lucide-react';
 import { ErrorDetailsResponse } from '@/types/error-details';
@@ -25,6 +25,7 @@ import { useWorkshopTaskCrudActions } from './hooks/useWorkshopTaskCrudActions';
 import type { Action, Category, Subcategory, Vehicle, WorkshopTaskTileFilter } from './types';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 import { useWorkshopActiveWakeLock } from '@/lib/hooks/useWorkshopActiveWakeLock';
+import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 function ModalChunkLoader({ message }: { message: string }) {
   return (
@@ -153,7 +154,23 @@ export default function WorkshopTasksPage() {
   const requestedTaskId = searchParams.get('taskId');
 
   const getAssetIdLabel = (asset?: { reg_number?: string | null; plant_id?: string | null }) => !asset ? 'Unknown' : asset.plant_id || asset.reg_number || 'Unknown';
-  const getAssetDisplay = (asset?: { reg_number?: string | null; plant_id?: string | null; nickname?: string | null }) => !asset ? 'Unknown' : asset.nickname ? `${getAssetIdLabel(asset)} (${asset.nickname})` : getAssetIdLabel(asset);
+  const getAssetDisplay = (
+    asset?: {
+      reg_number?: string | null;
+      plant_id?: string | null;
+      nickname?: string | null;
+      category?: string | null;
+      asset_type?: string | null;
+    },
+    options?: { forSelect?: boolean },
+  ) =>
+    !asset
+      ? 'Unknown'
+      : formatFleetAssetLabel({
+          identifier: getAssetIdLabel(asset),
+          nickname: asset.nickname,
+          category: options?.forSelect && asset.asset_type === 'van' ? asset.category : undefined,
+        });
   const getVehicleReg = (task: Action) => task.vans ? getAssetDisplay(task.vans) : task.hgvs ? getAssetDisplay(task.hgvs) : task.plant ? getAssetDisplay(task.plant) : 'Unknown';
   const getSourceLabel = (task: Action) => task.action_type === 'inspection_defect' ? 'Daily Check Defect Fix' : 'Workshop Task';
   const isHighPriorityHgvDefectTask = (task?: Action) => Boolean(task && task.action_type === 'inspection_defect' && task.hgv_id);
@@ -354,7 +371,17 @@ export default function WorkshopTasksPage() {
     return null;
   })();
 
-  if (!supabase || permissionLoading) return <PageLoader message="Checking permissions..." />;
+  if (!supabase || permissionLoading) {
+    return (
+      <AppPageLoadingShell
+        title="Workshop Tasks"
+        description="Track van, HGV, and plant repairs and workshop work"
+        icon={<Wrench className="h-5 w-5" />}
+        message="Checking permissions..."
+        accent="workshop"
+      />
+    );
+  }
   if (!hasPermission) return null;
 
   return (
