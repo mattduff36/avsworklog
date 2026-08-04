@@ -1,5 +1,21 @@
 [
   {
+    "version": "0826.1.0",
+    "updateKind": "major",
+    "title": "Workshop Attachments update",
+    "description": "Updated general app maintenance. Clone Basic Service HGV into A/B variants.",
+    "summary": "Updated general app maintenance. Clone Basic Service HGV into A/B variants.",
+    "details": [
+      "Updated data storage, with changes to automation scripts, automated tests, and data storage.",
+      "Updated workshop tasks, with changes to background routes, shared logic, automation scripts, automated tests, and data storage."
+    ],
+    "areas": [
+      "General app maintenance. Clone Basic Service HGV into A/B variants"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-08-04T15:04:35.194Z"
+  },
+  {
     "version": "0826.0.0",
     "updateKind": "minor",
     "title": "Inventory update",

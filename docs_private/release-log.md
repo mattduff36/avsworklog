@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.1.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop-attachments): clone Basic Service HGV into A/B variants`
+
+**PUSHED AT**
+2026-08-04T15:04:35.194Z
+
+**WHAT CHANGED**
+Update repository files. Clone Basic Service HGV into A/B variants.
+
+**VERSION HISTORY DETAILS**
+- Updated data storage, with changes to automation scripts, automated tests, and data storage.
+- Updated workshop tasks, with changes to background routes, shared logic, automation scripts, automated tests, and data storage.
+
+**COMMITS IN THIS RELEASE**
+- `chore(repo): update repository files`
+- `feat(workshop-attachments): clone Basic Service HGV into A/B variants`
+
 ## 0826.0.0
 
 **GIT COMMIT MESSAGE**
