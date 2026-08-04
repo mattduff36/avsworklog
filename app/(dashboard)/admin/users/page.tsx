@@ -52,6 +52,7 @@ import {
   Copy,
   CheckCircle2,
   Briefcase,
+  BookOpen,
 } from 'lucide-react';
 import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { fetchAdminTeamDirectory } from '@/lib/admin/team-directory-client';
@@ -78,6 +79,11 @@ import {
 const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
   ssr: false,
   loading: () => <PanelLoader message="Loading role management..." className="py-12" />
+});
+
+const PermissionsGuide = dynamic(() => import('@/components/admin/PermissionsGuide').then(m => ({ default: m.PermissionsGuide })), {
+  ssr: false,
+  loading: () => <PanelLoader message="Loading permission guide..." className="py-12" />
 });
 
 const JobRolesTab = dynamic(() => import('@/components/admin/JobRolesTab').then(m => ({ default: m.JobRolesTab })), {
@@ -119,7 +125,7 @@ type ProfileWithEmail = ProfileWithRole & UserActivitySummary & {
   current_fleet_assignment?: AdminFleetAssignmentSummary | null;
 };
 
-type TabType = 'users' | 'roles' | 'teams' | 'permissions';
+type TabType = 'users' | 'roles' | 'teams' | 'permissions' | 'permission-guide';
 type UserStatusTab = 'active' | 'deleted';
 type BinaryChoice = 'yes' | 'no' | '';
 
@@ -351,7 +357,7 @@ export default function UsersAdminPage() {
     const validTabs: TabType[] = [
       'users',
       ...(canManageRoleDefinitions ? (['roles', 'teams'] as const) : []),
-      ...(canEditRolePermissions ? (['permissions'] as const) : []),
+      ...(canEditRolePermissions ? (['permissions', 'permission-guide'] as const) : []),
     ];
     if (validTabs.includes(requestedTab)) {
       setActiveTab(requestedTab);
@@ -1387,7 +1393,7 @@ export default function UsersAdminPage() {
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabType)} className="space-y-6">
         <TabsList className={`grid w-full ${
           canEditRolePermissions
-              ? 'max-w-2xl grid-cols-2 sm:grid-cols-4'
+              ? 'max-w-4xl grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
               : canManageRoleDefinitions
                 ? 'max-w-xl grid-cols-1 sm:grid-cols-3'
                 : 'max-w-sm grid-cols-1'
@@ -1424,6 +1430,15 @@ export default function UsersAdminPage() {
             >
               <Shield className="h-4 w-4" />
               Permissions
+            </TabsTrigger>
+          )}
+          {canEditRolePermissions && (
+            <TabsTrigger
+              value="permission-guide"
+              className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
+            >
+              <BookOpen className="h-4 w-4" />
+              Permission Guide
             </TabsTrigger>
           )}
         </TabsList>
@@ -2675,6 +2690,12 @@ export default function UsersAdminPage() {
         {canEditRolePermissions && (
           <TabsContent value="permissions">
             <RoleManagement />
+          </TabsContent>
+        )}
+
+        {canEditRolePermissions && (
+          <TabsContent value="permission-guide">
+            <PermissionsGuide />
           </TabsContent>
         )}
       </Tabs>

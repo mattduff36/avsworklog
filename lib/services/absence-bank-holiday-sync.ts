@@ -922,90 +922,45 @@ interface RemoveGeneratedFinancialYearOptions {
 export async function removeLatestGeneratedFinancialYear(
   options: RemoveGeneratedFinancialYearOptions
 ): Promise<AbsenceGenerationRemoveResult> {
-  const { data: latestGeneration, error: latestError } = await options.supabase
-    .from('absence_financial_year_generations')
-    .select('id, financial_year_start_year')
-    .order('financial_year_start_year', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const shouldDeleteExistingBookings = options.deleteExistingBookings === true;
 
-  if (latestError) {
-    throw latestError;
+  const { data: undoDeleteResult, error: undoDeleteError } = await options.supabase.rpc(
+    'delete_latest_generated_financial_year_absences',
+    {
+      p_delete_user_entered: shouldDeleteExistingBookings,
+    }
+  );
+
+  if (undoDeleteError) {
+    throw undoDeleteError;
   }
 
-  if (!latestGeneration) {
+  const undoPayload =
+    undoDeleteResult && typeof undoDeleteResult === 'object'
+      ? (undoDeleteResult as {
+          removedGeneratedAbsences?: number;
+          removedExistingAbsences?: number;
+          financialYearStartYear?: number;
+          financialYearLabel?: string;
+        })
+      : {};
+
+  const removedFinancialYearStartYear = Number(undoPayload.financialYearStartYear || 0);
+  const removedFinancialYearLabel =
+    undoPayload.financialYearLabel ||
+    (removedFinancialYearStartYear
+      ? buildFinancialYearBounds(removedFinancialYearStartYear).label
+      : 'unknown');
+
+  if (!removedFinancialYearStartYear) {
     throw new Error('No generated financial year found to remove.');
   }
 
-  const financialYear = buildFinancialYearBounds(latestGeneration.financial_year_start_year);
-  const fyStartIso = formatIsoDate(financialYear.start);
-  const fyEndIso = formatIsoDate(financialYear.end);
-
-  const { data: userEnteredRows, error: userEnteredError } = await options.supabase
-    .from('absences')
-    .select('id')
-    .gte('date', fyStartIso)
-    .lte('date', fyEndIso)
-    .eq('auto_generated', false)
-    .neq('status', 'cancelled')
-    .limit(1);
-
-  if (userEnteredError) {
-    throw userEnteredError;
-  }
-
-  const existingRows = userEnteredRows || [];
-  const shouldDeleteExistingBookings = options.deleteExistingBookings === true;
-
-  if (existingRows.length > 0 && !shouldDeleteExistingBookings) {
-    throw new Error(
-      `Cannot remove ${financialYear.label}. User-entered leave requests already exist in this financial year. Enable booking deletion to continue.`
-    );
-  }
-
-  let removedExistingAbsences = 0;
-  if (existingRows.length > 0 && shouldDeleteExistingBookings) {
-    const { count: removedExistingCount, error: deleteExistingError } = await options.supabase
-      .from('absences')
-      .delete({ count: 'exact' })
-      .gte('date', fyStartIso)
-      .lte('date', fyEndIso)
-      .eq('auto_generated', false)
-      .neq('status', 'cancelled');
-
-    if (deleteExistingError) {
-      throw deleteExistingError;
-    }
-    removedExistingAbsences = removedExistingCount ?? 0;
-  }
-
-  const { count: removedCount, error: deleteGeneratedError } = await options.supabase
-    .from('absences')
-    .delete({ count: 'exact' })
-    .gte('date', fyStartIso)
-    .lte('date', fyEndIso)
-    .eq('auto_generated', true)
-    .eq('is_bank_holiday', true)
-    .eq('generation_source', getGenerationSource(financialYear.label));
-
-  if (deleteGeneratedError) {
-    throw deleteGeneratedError;
-  }
-
-  const { error: deleteGenerationError } = await options.supabase
-    .from('absence_financial_year_generations')
-    .delete()
-    .eq('id', latestGeneration.id);
-
-  if (deleteGenerationError) {
-    throw deleteGenerationError;
-  }
-
   return {
-    removedFinancialYearStartYear: latestGeneration.financial_year_start_year,
-    removedFinancialYearLabel: financialYear.label,
-    removedGeneratedAbsences: removedCount ?? 0,
-    removedExistingAbsences,
+    removedFinancialYearStartYear,
+    removedFinancialYearLabel,
+    removedGeneratedAbsences: Number(undoPayload.removedGeneratedAbsences || 0),
+    removedExistingAbsences: Number(undoPayload.removedExistingAbsences || 0),
     removedCarryovers: 0,
   };
 }
@@ -1638,14 +1593,15 @@ export async function undoBulkAbsenceBatch(
     throw new Error('Bulk absence batch not found');
   }
 
-  const { count: removedAbsences, error: deleteAbsencesError } = await supabase
-    .from('absences')
-    .delete({ count: 'exact' })
-    .eq('bulk_batch_id', batchId);
+  const { data: removedCount, error: deleteAbsencesError } = await supabase.rpc(
+    'delete_absences_for_bulk_batch',
+    { p_batch_id: batchId }
+  );
 
   if (deleteAbsencesError) {
     throw deleteAbsencesError;
   }
+  const removedAbsences = typeof removedCount === 'number' ? removedCount : Number(removedCount || 0);
 
   const { error: deleteBatchError } = await supabase
     .from('absence_bulk_batches')

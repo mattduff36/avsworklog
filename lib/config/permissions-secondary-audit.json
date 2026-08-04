@@ -76,9 +76,9 @@
       "byRole": {
         "Contractor": "No module access by rank in the current live matrix. If granted, absence secondary maps Contractor to the Employee tier.",
         "Employee": "Default secondary: see own bookings and add/edit own bookings.",
-        "Supervisor": "Default secondary: see all/team/own bookings; add/edit team bookings; view team work shifts; authorise team bookings. No allowance visibility, overview/reasons tabs, work-shift edit, own edit, or own authorise by default.",
-        "Manager": "Default secondary: see all/team/own bookings; add/edit team and own bookings; see team allowances; view/edit team work shifts; authorise team and own bookings. Manager-admin RLS also covers several archival/generation tables.",
-        "Admin": "All absence secondary permissions true by default, including all scopes, reasons, overview, work shifts, generation/closure/admin flows."
+        "Supervisor": "Default secondary: see all/team/own bookings; add/edit team bookings; view team work shifts; authorise team bookings. No allowance visibility, overview/reasons tabs, work-shift edit, own edit, or own authorise by default. May delete only future, non-approved/non-processed leave in edit scope; cannot delete past or taken leave to restore allowance.",
+        "Manager": "Default secondary: see all/team/own bookings; add/edit team and own bookings; see team allowances; view/edit team work shifts; authorise team and own bookings. Manager-admin RLS also covers several archival/generation tables. May delete only future, non-approved/non-processed leave in edit scope; cannot delete past or taken leave to restore allowance.",
+        "Admin": "All absence secondary permissions true by default, including all scopes, reasons, overview, work shifts, generation/closure/admin flows. Only full-access admins may delete past, approved, or processed leave when other protected-record rules allow."
       }
     },
     {

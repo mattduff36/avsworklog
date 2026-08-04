@@ -296,9 +296,18 @@ export async function declineTrainingBookings(
     throw new Error('Training bookings linked to processed or adjusted timesheets cannot be removed from the timesheet flow');
   }
 
-  const { error: deleteError } = await admin.from('absences').delete().in('id', uniqueAbsenceIds);
-  if (deleteError) {
-    throw new Error(deleteError.message || 'Failed to delete training booking');
+  // Cancel instead of hard-delete so service-role paths do not bypass historic delete guards
+  // and so allowance/history remains auditable.
+  const { error: cancelError } = await admin
+    .from('absences')
+    .update({
+      status: 'cancelled',
+      notes: 'Cancelled from timesheet training decline flow',
+    })
+    .in('id', uniqueAbsenceIds)
+    .neq('status', 'cancelled');
+  if (cancelError) {
+    throw new Error(cancelError.message || 'Failed to cancel training booking');
   }
 
   const returnedTimesheetIds = await returnSubmittedTrainingTimesheetsForAmendment(admin, {
@@ -313,7 +322,7 @@ export async function declineTrainingBookings(
   const recipients = await resolveNotificationRecipients(admin, profile);
 
   const subject = `Training booking removed for ${employeeName}`;
-  const body = `${employeeName} confirmed they did not attend their booked training on ${trainingDate}. The booking was deleted from the timesheet flow by ${actorName}.`;
+  const body = `${employeeName} confirmed they did not attend their booked training on ${trainingDate}. The booking was cancelled from the timesheet flow by ${actorName}.`;
 
   try {
     await createNotification(

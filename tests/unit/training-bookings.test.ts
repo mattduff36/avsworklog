@@ -89,11 +89,13 @@ describe('training booking decline helper', () => {
                 error: null,
               })),
             })),
-            delete: vi.fn(() => ({
-              in: vi.fn(async (_column: string, ids: string[]) => {
-                state.deletedAbsenceIds = ids;
-                return { error: null };
-              }),
+            update: vi.fn(() => ({
+              in: vi.fn((_column: string, ids: string[]) => ({
+                neq: vi.fn(async () => {
+                  state.deletedAbsenceIds = ids;
+                  return { error: null };
+                }),
+              })),
             })),
           };
         }
@@ -177,7 +179,7 @@ describe('training booking decline helper', () => {
     vi.mocked(createAdminClient).mockReturnValue(adminClient as never);
   });
 
-  it('deletes the booking and notifies the manager plus Sarah Hubbard', async () => {
+  it('cancels the booking and notifies the manager plus Sarah Hubbard', async () => {
     const { sendTrainingBookingDeclinedEmail } = await import('@/lib/utils/email');
 
     const result = await declineTrainingBookings('employee-1', ['absence-1']);
