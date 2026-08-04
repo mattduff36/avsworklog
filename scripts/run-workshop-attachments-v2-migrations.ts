@@ -16,6 +16,7 @@ const migrationFiles = [
   'supabase/migrations/20260422_publish_hgv_6_week_roadworthy_signature_restore.sql',
   'supabase/migrations/20260413_publish_trailer_6_week_template_v2.sql',
   'supabase/migrations/20260417_publish_hgv_service_templates_v2.sql',
+  'supabase/migrations/20260804_basic_service_hgv_a_b_clone.sql',
 ];
 
 if (!connectionString) {

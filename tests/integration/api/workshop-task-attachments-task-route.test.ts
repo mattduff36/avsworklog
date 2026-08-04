@@ -31,7 +31,8 @@ const VERSION_ID = '55555555-5555-4555-8555-555555555555';
 const SECTION_ID = '66666666-6666-4666-8666-666666666666';
 const FIELD_ID = '77777777-7777-4777-8777-777777777777';
 
-function createUserClient() {
+function createUserClient(options: { templateActive?: boolean } = {}) {
+  const templateActive = options.templateActive !== false;
   const taskSingle = vi.fn().mockResolvedValue({
     data: { id: TASK_ID, action_type: 'workshop_vehicle_task' },
     error: null,
@@ -41,7 +42,7 @@ function createUserClient() {
   }));
 
   const templateSingle = vi.fn().mockResolvedValue({
-    data: { id: TEMPLATE_ID },
+    data: { id: TEMPLATE_ID, is_active: templateActive },
     error: null,
   });
   const templateSelect = vi.fn(() => ({
@@ -257,5 +258,22 @@ describe('POST /api/workshop-tasks/attachments/task/[taskId]', () => {
     expect(payload.error).toBe('Internal server error');
     expect(userClient.attachmentDeleteEq).toHaveBeenCalledWith('id', ATTACHMENT_ID);
     expect(mockLogServerError).toHaveBeenCalledTimes(1);
+  });
+
+  it('WAT-INACTIVE-API-001: rejects attaching an inactive template', async () => {
+    const userClient = createUserClient({ templateActive: false });
+    const adminClient = createAdminSupabaseClient();
+    mockCreateClient.mockResolvedValue(userClient.client as never);
+    mockCreateAdminClient.mockReturnValue(adminClient.client as never);
+
+    const response = await callPost();
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error).toBe('Template is inactive and cannot be attached to new tasks');
+    expect(adminClient.snapshotInsert).not.toHaveBeenCalled();
+    expect(userClient.from.mock.calls.map(([table]) => table)).not.toContain(
+      'workshop_attachment_template_versions',
+    );
   });
 });

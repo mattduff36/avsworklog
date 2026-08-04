@@ -209,15 +209,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Verify template exists
+    // Verify template exists and is available for new attachments
     const { data: template, error: templateError } = await db
       .from('workshop_attachment_templates')
-      .select('id')
+      .select('id, is_active')
       .eq('id', template_id)
       .single();
 
     if (templateError || !template) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+    }
+
+    if ((template as { is_active: boolean }).is_active !== true) {
+      return NextResponse.json(
+        { error: 'Template is inactive and cannot be attached to new tasks' },
+        { status: 400 }
+      );
     }
 
     // Check if attachment already exists for this task+template
