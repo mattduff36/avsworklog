@@ -1,5 +1,33 @@
 [
   {
+    "version": "0826.0.0",
+    "updateKind": "minor",
+    "title": "Inventory update",
+    "description": "Updated Inventory, Absence & Leave, and Data storage. Preserve filters, align mobile text size, add detail Move. Lock historic leave deletes and add permission guide.",
+    "summary": "Updated Inventory, Absence & Leave, and Data storage. Preserve filters, align mobile text size, add detail Move. Lock historic leave deletes and add permission guide.",
+    "details": [
+      "Lock historic leave deletes and add permission guide, with changes to app screens, shared logic, automation scripts, automated tests, and data storage.",
+      "Updated Inventory, Absence & Leave, and Data storage, with changes to app screens, shared logic, and automated tests.",
+      "Updated data storage, with changes to automation scripts, automated tests, and data storage.",
+      "Updated navigation, with changes to app screens.",
+      "Updated training, with changes to shared logic and automated tests.",
+      "Updated user management, with changes to app screens."
+    ],
+    "areas": [
+      "Inventory",
+      "Absence & Leave",
+      "Data storage. Preserve filters",
+      "Align mobile text size",
+      "Detail Move. Lock historic leave deletes",
+      "Permission guide"
+    ],
+    "areaKeys": [
+      "inventory",
+      "absence"
+    ],
+    "pushedAt": "2026-08-04T14:26:55.697Z"
+  },
+  {
     "version": "0726.28.0",
     "updateKind": "major",
     "title": "App screens update",

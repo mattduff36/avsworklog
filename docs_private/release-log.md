@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.0.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory, Absence & Leave, and Data storage`
+
+**PUSHED AT**
+2026-08-04T14:26:55.697Z
+
+**WHAT CHANGED**
+Update Inventory, Absence & Leave, and Data storage. Preserve filters, align mobile text size, add detail Move. Lock historic leave deletes and add permission guide.
+
+**VERSION HISTORY DETAILS**
+- Lock historic leave deletes and add permission guide, with changes to app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated Inventory, Absence & Leave, and Data storage, with changes to app screens, shared logic, and automated tests.
+- Updated data storage, with changes to automation scripts, automated tests, and data storage.
+- Updated navigation, with changes to app screens.
+- Updated training, with changes to shared logic and automated tests.
+- Updated user management, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory, Absence & Leave, and Data storage`
+- `fix(inventory): preserve filters, align mobile text size, add detail Move`
+- `fix(absence): lock historic leave deletes and add permission guide`
+
 ## 0726.28.0
 
 **GIT COMMIT MESSAGE**
