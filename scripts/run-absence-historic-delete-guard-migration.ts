@@ -19,7 +19,7 @@ if (!connectionString) {
 async function runMigration() {
   console.log('Running absence historic delete guard migration...\n');
 
-  const url = new URL(connectionString);
+  const url = new URL(connectionString!);
   const client = new Client({
     host: url.hostname,
     port: parseInt(url.port, 10) || 5432,

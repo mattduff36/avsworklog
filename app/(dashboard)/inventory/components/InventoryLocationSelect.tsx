@@ -341,7 +341,7 @@ export function InventoryLocationSelect({
               }}
               placeholder={searchPlaceholder}
               containerClassName="h-11 border-slate-700 bg-slate-900 sm:h-9"
-              className="text-base text-white placeholder:text-slate-500 sm:text-sm"
+              className="text-[16px] text-white placeholder:text-slate-500 sm:text-sm"
               iconClassName="text-slate-500"
               aria-label={searchPlaceholder}
               aria-controls={listboxId}

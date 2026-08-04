@@ -161,7 +161,13 @@ export function ChangeInventoryLocationDialog({
           </div>
 
           <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-4 pt-4 sm:pb-6">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSaving || isUnsetting}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isSaving || isUnsetting}
+              className="min-h-[44px]"
+            >
               Cancel
             </Button>
             {allowUnset && hasSavedLocation ? (
@@ -170,14 +176,14 @@ export function ChangeInventoryLocationDialog({
                 variant="outline"
                 onClick={handleUnsetLocation}
                 disabled={isSaving || isUnsetting}
-                className="border-amber-500/30 text-amber-200 hover:bg-amber-500/10"
+                className="min-h-[44px] border-amber-500/30 text-amber-200 hover:bg-amber-500/10"
               >
                 Unset Location
               </Button>
             ) : null}
             <Button
               type="submit"
-              className="bg-inventory text-white hover:bg-inventory-dark"
+              className="min-h-[44px] bg-inventory text-white hover:bg-inventory-dark"
               disabled={isSaving || isUnsetting || !locationId || isSameLocation || (hasActiveExistingLocation && !reason.trim())}
             >
               Save Location

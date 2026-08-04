@@ -25,7 +25,8 @@ const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         <input
           type={type}
           className={cn(
-            "min-w-0 flex-1 bg-transparent p-0 text-base text-foreground outline-none placeholder:text-slate-400 disabled:cursor-not-allowed md:text-sm dark:placeholder:text-slate-400",
+            // Keep 16px on compact mobile roots so iOS does not zoom focused inputs.
+            "min-w-0 flex-1 bg-transparent p-0 text-[16px] text-foreground outline-none placeholder:text-slate-400 disabled:cursor-not-allowed md:text-sm dark:placeholder:text-slate-400",
             className
           )}
           disabled={disabled}
