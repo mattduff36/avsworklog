@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.2.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update inventory`
+
+**PUSHED AT**
+2026-08-04T18:01:59.312Z
+
+**WHAT CHANGED**
+Update inventory. Show location assignees in dropdown labels.
+
+**VERSION HISTORY DETAILS**
+- Updated inventory, with changes to background routes, app screens, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update inventory`
+- `fix(inventory): show location assignees in dropdown labels`
+
 ## 0826.1.1
 
 **GIT COMMIT MESSAGE**
