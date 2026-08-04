@@ -279,7 +279,85 @@ describe('automation logging helpers', () => {
     expect(review).toContain('standard: 1 run(s)');
     expect(review).toContain('dry-run: 1 run(s)');
     expect(review).toContain('Builds average 3.0m');
+    expect(review).toContain('Commit outcomes observed: 0');
+    expect(review).toContain('Push outcomes observed: 0');
     expect(review).toContain('## Copy/Paste Cursor Prompt');
+  });
+
+  it('does not re-suggest finalise upgrades when timing and outcome metadata are recorded', () => {
+    const review = renderAutomationAdvisorReview({
+      advisorDirectory: '/tmp/not-used',
+      scriptName: 'finalise',
+      generatedAt: '2026-08-04T00:00:00.000Z',
+      monthKey: '2026-08',
+      logs: [
+        createRunLog({
+          id: 'finalise-with-metadata',
+          scriptName: 'finalise',
+          mode: 'full + push',
+          args: ['--full', '--push'],
+          startedAt: '2026-08-04T00:00:00.000Z',
+          durationMs: 200_000,
+          steps: [
+            {
+              name: 'Run clean production build',
+              status: 'passed',
+              startedAt: '2026-08-04T00:00:00.000Z',
+              endedAt: '2026-08-04T00:03:00.000Z',
+              durationMs: 180_000,
+              command: 'npm run build',
+            },
+            {
+              name: 'Record commit outcome',
+              status: 'passed',
+              startedAt: '2026-08-04T00:03:00.000Z',
+              endedAt: '2026-08-04T00:03:00.000Z',
+              durationMs: 0,
+              metadata: {
+                commitOutcome: 'skipped',
+                commitMessage: null,
+              },
+            },
+            {
+              name: 'Record push outcome',
+              status: 'passed',
+              startedAt: '2026-08-04T00:03:00.000Z',
+              endedAt: '2026-08-04T00:03:00.000Z',
+              durationMs: 0,
+              metadata: {
+                pushOutcome: 'pushed',
+                pushRequested: true,
+                branch: 'main',
+              },
+            },
+            {
+              name: 'Record timing summary',
+              status: 'passed',
+              startedAt: '2026-08-04T00:03:00.000Z',
+              endedAt: '2026-08-04T00:03:00.000Z',
+              durationMs: 0,
+              metadata: {
+                timingSummary: true,
+                slowThresholdMs: 30_000,
+                lines: [
+                  'Timing summary (steps over 30.0s):',
+                  '- Run clean production build: 3.0m',
+                ],
+                slowSteps: [
+                  { label: 'Run clean production build', durationMs: 180_000, status: 'completed' },
+                ],
+              },
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(review).toContain('Commit outcomes observed: 1');
+    expect(review).toContain('Push outcomes observed: 1');
+    expect(review).not.toContain('Add targeted timing summaries around slow finalise steps');
+    expect(review).not.toContain('Record explicit commit created/skipped metadata');
+    expect(review).not.toContain('Record explicit push skipped/pushed metadata');
   });
 
   it('renders fixerrors advisor sections with fetch and pattern guidance', () => {

@@ -4,13 +4,13 @@ overview: Implement approved monthly automation advisor suggestions from docs_pr
 todos:
   - id: add-timing-summaries
     content: Add targeted timing summaries around slow finalise steps
-    status: pending
+    status: completed
   - id: record-commit-outcome-metadata
     content: Record explicit commit created/skipped metadata
-    status: pending
+    status: completed
   - id: record-push-outcome-metadata
     content: Record explicit push skipped/pushed metadata
-    status: pending
+    status: completed
 isProject: false
 ---
 

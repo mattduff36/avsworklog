@@ -41,13 +41,38 @@ export interface FinaliseTimingEntry {
   status?: 'completed' | 'failed' | 'reused' | 'skipped';
 }
 
+export type FinaliseCommitOutcome = 'created' | 'skipped';
+export type FinalisePushOutcome = 'pushed' | 'skipped';
+
+export interface FinaliseCommitOutcomeMetadata extends Record<string, unknown> {
+  commitOutcome: FinaliseCommitOutcome;
+  commitMessage: string | null;
+}
+
+export interface FinalisePushOutcomeMetadata extends Record<string, unknown> {
+  pushOutcome: FinalisePushOutcome;
+  pushRequested: boolean;
+  branch: string | null;
+}
+
+export interface FinaliseTimingSummaryMetadata extends Record<string, unknown> {
+  timingSummary: true;
+  slowThresholdMs: number;
+  lines: string[];
+  slowSteps: Array<{
+    label: string;
+    durationMs: number;
+    status?: FinaliseTimingEntry['status'];
+  }>;
+}
+
 interface FinaliseTimingSummaryOptions {
   limit?: number;
   slowThresholdMs?: number;
 }
 
 const SKIP_VERSION_MARKER = '[skip version]';
-const DEFAULT_SLOW_TIMING_THRESHOLD_MS = 30_000;
+export const DEFAULT_SLOW_TIMING_THRESHOLD_MS = 30_000;
 const DEFAULT_TIMING_SUMMARY_LIMIT = 5;
 const CONVENTIONAL_COMMIT_PATTERN =
   /^([a-z]+)(?:\(([^)]+)\))?(!)?:\s*(.+)$/iu;
@@ -313,16 +338,34 @@ export function formatFinaliseDuration(durationMs: number): string {
   return `${(seconds / 60).toFixed(1)}m`;
 }
 
+export function getFinaliseSlowTimingEntries(
+  entries: FinaliseTimingEntry[],
+  options: FinaliseTimingSummaryOptions = {}
+): FinaliseTimingEntry[] {
+  const slowThresholdMs = options.slowThresholdMs ?? DEFAULT_SLOW_TIMING_THRESHOLD_MS;
+  const limit = options.limit ?? DEFAULT_TIMING_SUMMARY_LIMIT;
+  return entries
+    .filter((entry) => entry.durationMs >= slowThresholdMs)
+    .sort((left, right) => right.durationMs - left.durationMs)
+    .slice(0, limit);
+}
+
+export function getFinaliseSlowStepNotice(
+  entry: FinaliseTimingEntry,
+  options: FinaliseTimingSummaryOptions = {}
+): string | null {
+  const slowThresholdMs = options.slowThresholdMs ?? DEFAULT_SLOW_TIMING_THRESHOLD_MS;
+  if (entry.durationMs < slowThresholdMs) return null;
+  const status = entry.status && entry.status !== 'completed' ? ` (${entry.status})` : '';
+  return `Slow step: ${entry.label} took ${formatFinaliseDuration(entry.durationMs)}${status}`;
+}
+
 export function getFinaliseTimingSummaryLines(
   entries: FinaliseTimingEntry[],
   options: FinaliseTimingSummaryOptions = {}
 ): string[] {
   const slowThresholdMs = options.slowThresholdMs ?? DEFAULT_SLOW_TIMING_THRESHOLD_MS;
-  const limit = options.limit ?? DEFAULT_TIMING_SUMMARY_LIMIT;
-  const slowEntries = entries
-    .filter((entry) => entry.durationMs >= slowThresholdMs)
-    .sort((left, right) => right.durationMs - left.durationMs)
-    .slice(0, limit);
+  const slowEntries = getFinaliseSlowTimingEntries(entries, options);
 
   if (slowEntries.length === 0) {
     return [`Timing summary: no finalise steps exceeded ${formatFinaliseDuration(slowThresholdMs)}.`];
@@ -335,4 +378,44 @@ export function getFinaliseTimingSummaryLines(
       return `- ${entry.label}: ${formatFinaliseDuration(entry.durationMs)}${status}`;
     }),
   ];
+}
+
+export function buildFinaliseTimingSummaryMetadata(
+  entries: FinaliseTimingEntry[],
+  options: FinaliseTimingSummaryOptions = {}
+): FinaliseTimingSummaryMetadata {
+  const slowThresholdMs = options.slowThresholdMs ?? DEFAULT_SLOW_TIMING_THRESHOLD_MS;
+  const slowEntries = getFinaliseSlowTimingEntries(entries, options);
+  return {
+    timingSummary: true,
+    slowThresholdMs,
+    lines: getFinaliseTimingSummaryLines(entries, options),
+    slowSteps: slowEntries.map((entry) => ({
+      label: entry.label,
+      durationMs: entry.durationMs,
+      status: entry.status,
+    })),
+  };
+}
+
+export function buildFinaliseCommitOutcomeMetadata(
+  committed: boolean,
+  commitMessage: string | null = null
+): FinaliseCommitOutcomeMetadata {
+  return {
+    commitOutcome: committed ? 'created' : 'skipped',
+    commitMessage: committed ? commitMessage : null,
+  };
+}
+
+export function buildFinalisePushOutcomeMetadata(options: {
+  pushRequested: boolean;
+  pushedBranch?: string | null;
+}): FinalisePushOutcomeMetadata {
+  const branch = options.pushedBranch || null;
+  return {
+    pushOutcome: branch ? 'pushed' : 'skipped',
+    pushRequested: options.pushRequested,
+    branch,
+  };
 }

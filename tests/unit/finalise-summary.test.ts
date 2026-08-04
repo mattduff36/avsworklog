@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildFinaliseCommitOutcomeMetadata,
+  buildFinalisePushOutcomeMetadata,
   buildFinaliseReleaseSummaryEvidence,
+  buildFinaliseTimingSummaryMetadata,
   buildReleaseDetailFallbackBullets,
   formatReleaseVersionCommitMessage,
+  getFinaliseSlowStepNotice,
   getFinaliseTimingSummaryLines,
   summarizeFinaliseChanges,
 } from '@/scripts/finalise-summary';
@@ -120,5 +124,61 @@ describe('finalise change summaries', () => {
     expect(getFinaliseTimingSummaryLines([
       { label: 'Commit workspace changes', durationMs: 1200 },
     ])).toEqual(['Timing summary: no finalise steps exceeded 30.0s.']);
+  });
+
+  it('emits a targeted slow-step notice only for slow finalise steps', () => {
+    expect(getFinaliseSlowStepNotice({
+      label: 'Run clean production build',
+      durationMs: 166_121,
+      status: 'failed',
+    })).toBe('Slow step: Run clean production build took 2.8m (failed)');
+    expect(getFinaliseSlowStepNotice({
+      label: 'Commit workspace changes',
+      durationMs: 1200,
+    })).toBeNull();
+  });
+
+  it('builds timing summary metadata for automation logs', () => {
+    expect(buildFinaliseTimingSummaryMetadata([
+      { label: 'Run clean production build', durationMs: 166_121, status: 'failed' },
+      { label: 'Commit workspace changes', durationMs: 1200 },
+    ])).toEqual({
+      timingSummary: true,
+      slowThresholdMs: 30_000,
+      lines: [
+        'Timing summary (steps over 30.0s):',
+        '- Run clean production build: 2.8m (failed)',
+      ],
+      slowSteps: [
+        { label: 'Run clean production build', durationMs: 166_121, status: 'failed' },
+      ],
+    });
+  });
+
+  it('builds explicit commit and push outcome metadata', () => {
+    expect(buildFinaliseCommitOutcomeMetadata(true, 'fix(inventory): polish UI')).toEqual({
+      commitOutcome: 'created',
+      commitMessage: 'fix(inventory): polish UI',
+    });
+    expect(buildFinaliseCommitOutcomeMetadata(false, 'unused')).toEqual({
+      commitOutcome: 'skipped',
+      commitMessage: null,
+    });
+    expect(buildFinalisePushOutcomeMetadata({
+      pushRequested: true,
+      pushedBranch: 'main',
+    })).toEqual({
+      pushOutcome: 'pushed',
+      pushRequested: true,
+      branch: 'main',
+    });
+    expect(buildFinalisePushOutcomeMetadata({
+      pushRequested: false,
+      pushedBranch: null,
+    })).toEqual({
+      pushOutcome: 'skipped',
+      pushRequested: false,
+      branch: null,
+    });
   });
 });

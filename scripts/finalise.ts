@@ -9,7 +9,11 @@ import { checkFinaliseBlockingActivity, formatBlockingActivity } from './finalis
 import { getSkippableFinaliseTasks, type RecentFinaliseTaskRun } from './finalise-recent-tasks';
 import {
   type FinaliseChangedFile,
+  buildFinaliseCommitOutcomeMetadata,
+  buildFinalisePushOutcomeMetadata,
+  buildFinaliseTimingSummaryMetadata,
   formatReleaseVersionCommitMessage,
+  getFinaliseSlowStepNotice,
   getFinaliseTimingSummaryLines,
   summarizeFinaliseChanges,
   type FinaliseTimingEntry,
@@ -297,6 +301,14 @@ function printProgress(message: string, percent: number): void {
   console.log(`- ${message} [${percent}% complete]`);
 }
 
+function recordFinaliseTimingEntry(timings: FinaliseTimingEntry[], entry: FinaliseTimingEntry): void {
+  timings.push(entry);
+  const slowNotice = getFinaliseSlowStepNotice(entry);
+  if (slowNotice) {
+    console.log(`- ${slowNotice}`);
+  }
+}
+
 async function timeFinaliseStep<T>(
   timings: FinaliseTimingEntry[],
   label: string,
@@ -305,20 +317,28 @@ async function timeFinaliseStep<T>(
   const startedAt = Date.now();
   try {
     const result = await action();
-    timings.push({
+    recordFinaliseTimingEntry(timings, {
       label,
       durationMs: Date.now() - startedAt,
       status: 'completed',
     });
     return result;
   } catch (error) {
-    timings.push({
+    recordFinaliseTimingEntry(timings, {
       label,
       durationMs: Date.now() - startedAt,
       status: 'failed',
     });
     throw error;
   }
+}
+
+async function recordFinaliseTimingSummary(
+  run: AutomationRun,
+  timings: FinaliseTimingEntry[]
+): Promise<void> {
+  const metadata = buildFinaliseTimingSummaryMetadata(timings);
+  await run.step('Record timing summary', () => undefined, metadata);
 }
 
 function formatRecentTask(run: RecentFinaliseTaskRun): string {
@@ -866,6 +886,7 @@ async function main(): Promise<void> {
     args: process.argv.slice(2),
   });
   automationRun = run;
+  let timingEntries: FinaliseTimingEntry[] = [];
 
   try {
     if (options.help) {
@@ -940,22 +961,36 @@ async function main(): Promise<void> {
             : 'skipped'
         }`
       );
+      const wouldCommit = hasUncommittedChanges();
       console.log(
         `Commit: ${
-          hasUncommittedChanges()
+          wouldCommit
             ? `would commit ${initialChangeSummary.fileCount} file(s) with "${initialChangeSummary.commitMessage}"`
             : 'no changes to commit'
         }`
       );
       console.log('Release version: would update locally before push if a bump is due');
       console.log(`Push: ${options.push ? 'would push current branch' : 'skipped'}`);
+      await run.step(
+        'Record commit outcome',
+        () => undefined,
+        buildFinaliseCommitOutcomeMetadata(false, null)
+      );
+      await run.step(
+        'Record push outcome',
+        () => undefined,
+        buildFinalisePushOutcomeMetadata({
+          pushRequested: options.push,
+          pushedBranch: null,
+        })
+      );
       await run.finish('passed');
       return;
     }
 
     console.log(`Starting finalise workflow (${getPushModeDescription(options)})`);
     printProgress('Workflow started.', 0);
-    const timingEntries: FinaliseTimingEntry[] = [];
+    timingEntries = [];
 
     if (devServerProcesses.length > 0) {
       console.log(`\n==> Stop dev server (${devServerProcesses.length} process${devServerProcesses.length === 1 ? '' : 'es'})`);
@@ -1100,6 +1135,11 @@ async function main(): Promise<void> {
     const committed = await timeFinaliseStep(timingEntries, 'Commit workspace changes', () =>
       commitAllChanges(changeSummary.commitMessage)
     );
+    await run.step(
+      'Record commit outcome',
+      () => undefined,
+      buildFinaliseCommitOutcomeMetadata(committed, changeSummary.commitMessage)
+    );
     printProgress(
       committed ? `Created commit: ${changeSummary.commitMessage}` : 'No uncommitted changes, so no commit was created.',
       92
@@ -1133,6 +1173,14 @@ async function main(): Promise<void> {
       console.log('\n==> Push current branch');
       printProgress('Skipped for non-push finalise.', 99);
     }
+    await run.step(
+      'Record push outcome',
+      () => undefined,
+      buildFinalisePushOutcomeMetadata({
+        pushRequested: options.push,
+        pushedBranch,
+      })
+    );
 
     console.log('\nFinalise complete.');
     console.log(`- Branch: ${branch || '(detached HEAD)'}`);
@@ -1152,9 +1200,19 @@ async function main(): Promise<void> {
     console.log(`- Push: ${pushedBranch ? `pushed ${pushedBranch}` : 'skipped'}`);
     console.log('\n==> Timing summary');
     getFinaliseTimingSummaryLines(timingEntries).forEach((line) => console.log(line));
+    await recordFinaliseTimingSummary(run, timingEntries);
     printProgress('Finalise workflow complete.', 100);
     await run.finish('passed');
   } catch (error) {
+    if (timingEntries.length > 0) {
+      try {
+        console.log('\n==> Timing summary');
+        getFinaliseTimingSummaryLines(timingEntries).forEach((line) => console.log(line));
+        await recordFinaliseTimingSummary(run, timingEntries);
+      } catch {
+        // Keep the original failure as the primary exit reason.
+      }
+    }
     await run.finish('failed', error);
     throw error;
   } finally {

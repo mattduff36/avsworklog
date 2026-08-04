@@ -106,6 +106,25 @@ function getMetadataArray(step: AutomationStepLog | undefined, key: string): unk
   return Array.isArray(value) ? value : [];
 }
 
+function getMetadataString(step: AutomationStepLog | undefined, key: string): string | null {
+  const value = step?.metadata?.[key];
+  return typeof value === 'string' ? value : null;
+}
+
+function hasTimingSummaryMetadata(step: AutomationStepLog): boolean {
+  return step.metadata?.timingSummary === true || step.name === 'Record timing summary';
+}
+
+function hasCommitOutcomeMetadata(step: AutomationStepLog): boolean {
+  const outcome = getMetadataString(step, 'commitOutcome');
+  return outcome === 'created' || outcome === 'skipped' || Boolean(step.command?.startsWith('git commit'));
+}
+
+function hasPushOutcomeMetadata(step: AutomationStepLog): boolean {
+  const outcome = getMetadataString(step, 'pushOutcome');
+  return outcome === 'pushed' || outcome === 'skipped' || Boolean(step.command?.startsWith('git push'));
+}
+
 function incrementCount(map: Map<string, number>, key: string, value = 1): void {
   map.set(key, (map.get(key) ?? 0) + value);
 }
@@ -154,8 +173,8 @@ function collectFinaliseMetrics(logs: AutomationRunLog[], monthKey: string): Fin
       return getMetadataArray(step, 'migrationFiles').length > 0;
     }).length,
     dbValidateRuns: steps.filter((step) => step.command === 'npm run db:validate').length,
-    commitCommands: steps.filter((step) => step.command?.startsWith('git commit')),
-    pushCommands: steps.filter((step) => step.command?.startsWith('git push')),
+    commitCommands: steps.filter((step) => hasCommitOutcomeMetadata(step)),
+    pushCommands: steps.filter((step) => hasPushOutcomeMetadata(step)),
   };
 }
 
@@ -427,7 +446,14 @@ function buildFinaliseSuggestions(options: AdvisorPackageOptions, metrics: Final
   const fullTestRatio = metrics.reviewedLogs.length > 0 ? metrics.fullTestRuns / metrics.reviewedLogs.length : 0;
   const suggestions: AutomationMemorySuggestion[] = [];
 
-  if (metrics.slowestSteps[0] && metrics.slowestSteps[0].durationMs > 120_000) {
+  const hasRecordedTimingSummaries = metrics.reviewedLogs.some((log) =>
+    log.steps.some((step) => hasTimingSummaryMetadata(step))
+  );
+  if (
+    !hasRecordedTimingSummaries
+    && metrics.slowestSteps[0]
+    && metrics.slowestSteps[0].durationMs > 120_000
+  ) {
     suggestions.push(createSuggestion({
       scriptName: options.scriptName,
       monthKey: options.monthKey,
@@ -467,7 +493,7 @@ function buildFinaliseSuggestions(options: AdvisorPackageOptions, metrics: Final
       id: 'record-commit-outcome-metadata',
       title: 'Record explicit commit created/skipped metadata',
       reason: 'Future reviews cannot distinguish healthy commit skips from commit failures.',
-      evidence: ['No git commit command steps found in reviewed logs.'],
+      evidence: ['No git commit command steps or commitOutcome metadata found in reviewed logs.'],
     }));
   }
 
@@ -478,7 +504,7 @@ function buildFinaliseSuggestions(options: AdvisorPackageOptions, metrics: Final
       id: 'record-push-outcome-metadata',
       title: 'Record explicit push skipped/pushed metadata',
       reason: 'Future reviews cannot distinguish healthy push skips from push failures.',
-      evidence: ['No git push command steps found in reviewed logs.'],
+      evidence: ['No git push command steps or pushOutcome metadata found in reviewed logs.'],
     }));
   }
 
@@ -546,8 +572,8 @@ function buildFinalisePackage(options: AdvisorPackageOptions): AutomationAdvisor
     `- Full test runs: ${metrics.fullTestRuns}`,
     `- Migration runs: ${metrics.migrationRuns}`,
     `- db:validate runs: ${metrics.dbValidateRuns}`,
-    `- Commit commands observed: ${metrics.commitCommands.length}`,
-    `- Push commands observed: ${metrics.pushCommands.length}`,
+    `- Commit outcomes observed: ${metrics.commitCommands.length}`,
+    `- Push outcomes observed: ${metrics.pushCommands.length}`,
     '',
     '## Risks Or Repeated Friction',
     '',
