@@ -16,7 +16,6 @@ interface InventoryItemRow {
   location?: InventoryLocationRow | InventoryLocationRow[] | null;
   minor_plant_detail?: unknown;
   unknown_location_entered_at?: string | null;
-  [key: string]: unknown;
 }
 
 interface InventoryMovementRow {

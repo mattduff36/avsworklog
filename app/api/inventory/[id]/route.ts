@@ -4,6 +4,7 @@ import { normalizeInventoryItemNumber, requireInventoryManagerAccess } from '@/l
 import { withEnrichedInventoryLocation } from '@/lib/server/inventory-locations';
 import { InventoryMoveError, moveInventoryItems, toInventoryMoveErrorResponse } from '@/lib/server/inventory-move';
 import { isInventoryRetireReason, type InventoryCategory, type InventoryRetireReason, type InventoryStatus } from '@/app/(dashboard)/inventory/types';
+import type { Database } from '@/types/database';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -20,9 +21,11 @@ interface InventoryItemUpdateBody {
   retire_reason?: InventoryRetireReason | null;
 }
 
+type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
+
 interface InventoryItemRow {
+  location?: InventoryLocationRow | InventoryLocationRow[] | null;
   minor_plant_detail?: unknown;
-  [key: string]: unknown;
 }
 
 function cleanOptionalDate(value: string | null | undefined): string | null {

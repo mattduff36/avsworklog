@@ -37,7 +37,6 @@ interface InventoryItemRow {
   created_at?: string | null;
   location?: InventoryLocationRow | InventoryLocationRow[] | null;
   minor_plant_detail?: unknown;
-  [key: string]: unknown;
 }
 
 interface InventoryMovementLocationRow {
