@@ -40,8 +40,11 @@ import {
   type InventoryItemFormData,
   type InventoryItemGroupSummary,
   type InventoryLocation,
+  type InventoryMovePayload,
 } from '../../types';
 import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from '../../components/InventoryCheckModal';
+import { InventoryMoveButton } from '../../components/InventoryMoveButton';
+import { MoveInventoryDialog } from '../../components/MoveInventoryDialog';
 import {
   INVENTORY_CHECKLIST_DEFINITIONS,
   INVENTORY_CHECK_OVERALL_STATUS_LABELS,
@@ -161,6 +164,7 @@ export default function InventoryItemDetailPage() {
   const [detailsSubmitError, setDetailsSubmitError] = useState('');
   const [downloadingCheckId, setDownloadingCheckId] = useState<string | null>(null);
   const [selectedEditLocation, setSelectedEditLocation] = useState<InventoryLocation | null>(null);
+  const [moveDialogOpen, setMoveDialogOpen] = useState(false);
 
   const fetchHistory = useCallback(async () => {
     try {
@@ -194,8 +198,34 @@ export default function InventoryItemDetailPage() {
 
   async function parseResponse(response: Response, fallbackMessage: string) {
     const data = await response.json();
-    if (!response.ok) throw new Error(data.error || fallbackMessage);
+    if (!response.ok) {
+      const error = new Error(data.error || fallbackMessage);
+      Object.assign(error, {
+        status: response.status,
+        payload: data,
+      });
+      throw error;
+    }
     return data;
+  }
+
+  async function handleMoveItem(movePayload: InventoryMovePayload) {
+    if (!payload?.item) return;
+    const response = await fetch('/api/inventory/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        item_ids: [payload.item.id],
+        location_id: movePayload.location_id,
+        note: movePayload.note,
+        scope: movePayload.scope || 'single',
+        group_id: movePayload.group_id || null,
+      }),
+    });
+    await parseResponse(response, 'Failed to move inventory item');
+    toast.success('Item moved');
+    setMoveDialogOpen(false);
+    await fetchHistory();
   }
 
   function updateEditField<K extends keyof InventoryItemFormData>(key: K, value: InventoryItemFormData[K]) {
@@ -301,7 +331,7 @@ export default function InventoryItemDetailPage() {
   if (loading) return <PageLoader message="Loading inventory item..." />;
   if (!payload) {
     return (
-      <AppPageShell width="wide" className="inventory-mobile-ui">
+      <AppPageShell width="wide">
         <BackButton fallbackHref="/inventory" />
         <Card className="border-slate-700 bg-slate-900/70">
           <CardContent className="py-12 text-center text-muted-foreground">Inventory item not found.</CardContent>
@@ -311,6 +341,8 @@ export default function InventoryItemDetailPage() {
   }
 
   const { item, movements, checks, group } = payload;
+  const moveItem: InventoryItem = { ...item, group: group || item.group || null };
+  const moveLocations = item.location ? [item.location] : [];
   const checkStatus = getInventoryCheckStatus(item);
   const intervalMonthsValue = getInventoryCheckIntervalMonths(item);
   const isRetired = item.status === 'retired';
@@ -329,7 +361,7 @@ export default function InventoryItemDetailPage() {
   const isUnknownLocationSelected = isInventoryUnknownLocation(selectedEditLocation);
 
   return (
-    <AppPageShell width="wide" className="inventory-mobile-ui">
+    <AppPageShell width="wide">
       <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-start">
         <div className="self-start">
           <BackButton fallbackHref="/inventory" />
@@ -339,9 +371,12 @@ export default function InventoryItemDetailPage() {
           description={`${item.item_number} · ${item.location?.name || 'No location assigned'}`}
           icon={<PackageSearch className="h-5 w-5" />}
           actions={(
-            <Badge variant="outline" className={`max-w-full whitespace-normal text-center ${getStatusBadgeClass(item)}`}>
-              {isRetired ? 'Retired' : getCheckStatusLabel(checkStatus)}
-            </Badge>
+            <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+              <InventoryMoveButton onMove={() => setMoveDialogOpen(true)} />
+              <Badge variant="outline" className={`max-w-full whitespace-normal text-center ${getStatusBadgeClass(item)}`}>
+                {isRetired ? 'Retired' : getCheckStatusLabel(checkStatus)}
+              </Badge>
+            </div>
           )}
           className="min-w-0 flex-1"
           titleClassName="text-2xl sm:text-3xl"
@@ -715,6 +750,14 @@ export default function InventoryItemDetailPage() {
         initialCheckedAt={checkedAt}
         saving={savingCheck}
         onSubmit={handleRecordCheck}
+      />
+
+      <MoveInventoryDialog
+        open={moveDialogOpen}
+        items={[moveItem]}
+        locations={moveLocations}
+        onClose={() => setMoveDialogOpen(false)}
+        onSubmit={handleMoveItem}
       />
     </AppPageShell>
   );

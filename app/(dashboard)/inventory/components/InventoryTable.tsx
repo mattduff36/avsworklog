@@ -48,11 +48,17 @@ import {
   type InventoryRetireReason,
 } from '../types';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
+import {
+  readInventoryTableFilters,
+  writeInventoryTableFilters,
+  type InventoryTableSortDir,
+  type InventoryTableSortField,
+} from '@/lib/utils/inventory-table-filters-storage';
 import { InventoryMoveButton } from './InventoryMoveButton';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
-type SortField = 'item_number' | 'serial_number' | 'name' | 'location' | 'last_checked_at';
-type SortDir = 'asc' | 'desc';
+type SortField = InventoryTableSortField;
+type SortDir = InventoryTableSortDir;
 const NO_LOCATION_FILTER = '__no_location__';
 const INVENTORY_STATUS_FILTER_ORDER: InventoryCheckStatus[] = ['overdue', 'due_soon', 'needs_check', 'not_required', 'ok'];
 const LOCATION_FILTER_GROUP_ORDER = ['manual', 'van', 'site', 'legacy_quote', 'hgv', 'plant', 'unknown'] as const;
@@ -77,6 +83,8 @@ interface InventoryTableProps {
   showMinorPlantDetails?: boolean;
   retiredMode?: boolean;
   quickFilter?: InventoryTableQuickFilter;
+  /** SessionStorage key segment; restores filters after detail navigation within /inventory. */
+  filterStorageKey?: string;
 }
 
 export interface InventoryTableQuickFilter {
@@ -84,6 +92,51 @@ export interface InventoryTableQuickFilter {
   statusFilters: InventoryCheckStatus[];
   locationFilters: string[];
   search: string;
+}
+
+interface InitialInventoryTableFilters {
+  search: string;
+  statusFilters: InventoryCheckStatus[];
+  categoryFilters: string[];
+  locationFilters: string[];
+  retireReasonFilters: InventoryRetireReason[];
+  sortField: SortField;
+  sortDir: SortDir;
+  includeLegacyQuotes: boolean;
+}
+
+export function resolveInitialInventoryTableFilters(options: {
+  retiredMode: boolean;
+  quickFilter?: InventoryTableQuickFilter;
+  filterStorageKey?: string;
+}): InitialInventoryTableFilters {
+  const { retiredMode, quickFilter, filterStorageKey } = options;
+  const stored = filterStorageKey ? readInventoryTableFilters(filterStorageKey) : null;
+  const hasQuickFilterSeed = Boolean(
+    quickFilter
+    && (
+      quickFilter.search
+      || quickFilter.statusFilters.length > 0
+      || quickFilter.locationFilters.length > 0
+    ),
+  );
+
+  return {
+    search: hasQuickFilterSeed ? (quickFilter?.search || '') : (stored?.search || ''),
+    statusFilters: retiredMode
+      ? []
+      : hasQuickFilterSeed
+        ? (quickFilter?.statusFilters || [])
+        : (stored?.statusFilters || []),
+    categoryFilters: hasQuickFilterSeed ? [] : (stored?.categoryFilters || []),
+    locationFilters: hasQuickFilterSeed
+      ? (quickFilter?.locationFilters || [])
+      : (stored?.locationFilters || []),
+    retireReasonFilters: stored?.retireReasonFilters || [],
+    sortField: stored?.sortField || 'name',
+    sortDir: stored?.sortDir || 'asc',
+    includeLegacyQuotes: stored?.includeLegacyQuotes || false,
+  };
 }
 
 function getStatusBadgeClass(status: InventoryCheckStatus, item?: InventoryItem): string {
@@ -222,17 +275,23 @@ export function InventoryTable({
   showMinorPlantDetails = false,
   retiredMode = false,
   quickFilter,
+  filterStorageKey,
 }: InventoryTableProps) {
-  const [search, setSearch] = useState(() => quickFilter?.search || '');
-  const [statusFilters, setStatusFilters] = useState<InventoryCheckStatus[]>(
-    () => retiredMode ? [] : quickFilter?.statusFilters || []
+  const [initialFilters] = useState(() => resolveInitialInventoryTableFilters({
+    retiredMode,
+    quickFilter,
+    filterStorageKey,
+  }));
+  const [search, setSearch] = useState(initialFilters.search);
+  const [statusFilters, setStatusFilters] = useState<InventoryCheckStatus[]>(initialFilters.statusFilters);
+  const [categoryFilters, setCategoryFilters] = useState<string[]>(initialFilters.categoryFilters);
+  const [locationFilters, setLocationFilters] = useState<string[]>(initialFilters.locationFilters);
+  const [retireReasonFilters, setRetireReasonFilters] = useState<InventoryRetireReason[]>(
+    initialFilters.retireReasonFilters,
   );
-  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
-  const [locationFilters, setLocationFilters] = useState<string[]>(() => quickFilter?.locationFilters || []);
-  const [retireReasonFilters, setRetireReasonFilters] = useState<InventoryRetireReason[]>([]);
-  const [sortField, setSortField] = useState<SortField>('name');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
+  const [sortField, setSortField] = useState<SortField>(initialFilters.sortField);
+  const [sortDir, setSortDir] = useState<SortDir>(initialFilters.sortDir);
+  const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(initialFilters.includeLegacyQuotes);
   const showLocationFilter = Boolean(locationFilterLocations?.length);
   const showSerialNumberColumn = showMinorPlantDetails && items.some((item) => Boolean(item.minor_plant_detail?.serial_number));
   const paginationKey = [
@@ -430,6 +489,30 @@ export function InventoryTable({
       onSelectedItemIdsChange(nextSelectedItemIds);
     }
   }, [onSelectedItemIdsChange, retiredMode, selectedItemIds, visibleItems]);
+
+  useEffect(() => {
+    if (!filterStorageKey) return;
+    writeInventoryTableFilters(filterStorageKey, {
+      search,
+      statusFilters,
+      categoryFilters,
+      locationFilters,
+      retireReasonFilters,
+      sortField,
+      sortDir,
+      includeLegacyQuotes,
+    });
+  }, [
+    categoryFilters,
+    filterStorageKey,
+    includeLegacyQuotes,
+    locationFilters,
+    retireReasonFilters,
+    search,
+    sortDir,
+    sortField,
+    statusFilters,
+  ]);
 
   function toggleSort(field: SortField) {
     if (sortField === field) {

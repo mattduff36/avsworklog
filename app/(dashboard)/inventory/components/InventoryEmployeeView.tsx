@@ -292,6 +292,7 @@ export function InventoryEmployeeView({
               onSelectedItemIdsChange={setSelectedItemIds}
               onMove={onOpenMoveDialog}
               categoryLabels={categoryLabels}
+              filterStorageKey="employee-primary"
             />
           )}
         </CardContent>
@@ -334,6 +335,7 @@ export function InventoryEmployeeView({
                       tableLabel={location.external_reference
                         ? `${locationTypeLabel} ${location.external_reference}`
                         : location.name}
+                      filterStorageKey={`employee-secondary:${location.id}`}
                     />
                   )}
                 </CardContent>

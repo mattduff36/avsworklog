@@ -11,7 +11,7 @@ export default async function InventoryKioskControlPage() {
   }
 
   return (
-    <div className="inventory-mobile-ui min-h-dvh min-w-0 bg-slate-950 px-2 py-3 sm:px-6 sm:py-5 lg:px-8">
+    <div className="min-h-dvh min-w-0 bg-slate-950 px-2 py-3 sm:px-6 sm:py-5 lg:px-8">
       <YardKioskController />
     </div>
   );

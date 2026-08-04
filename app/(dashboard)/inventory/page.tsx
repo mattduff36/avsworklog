@@ -853,7 +853,6 @@ export default function InventoryPage() {
         message="Checking inventory access..."
         accent="inventory"
         width="wide"
-        className="inventory-mobile-ui"
       />
     );
   }
@@ -867,14 +866,13 @@ export default function InventoryPage() {
         message="Redirecting..."
         accent="inventory"
         width="wide"
-        className="inventory-mobile-ui"
       />
     );
   }
 
   if (loading) {
     return (
-      <AppPageShell width="wide" className="inventory-mobile-ui">
+      <AppPageShell width="wide">
         <AppPageHeader
           title="Inventory"
           titleMeta={<InventoryBetaBadge />}
@@ -900,7 +898,7 @@ export default function InventoryPage() {
 
   if (inventoryLoadError && !inventoryContext) {
     return (
-      <AppPageShell width="wide" className="inventory-mobile-ui">
+      <AppPageShell width="wide">
         <AppPageHeader
           title="Inventory"
           titleMeta={<InventoryBetaBadge />}
@@ -917,7 +915,7 @@ export default function InventoryPage() {
 
   if (showEmployeeView) {
     return (
-      <AppPageShell width="wide" className="inventory-mobile-ui">
+      <AppPageShell width="wide">
         <AppPageHeader
           title="Inventory"
           titleMeta={<InventoryBetaBadge />}
@@ -986,7 +984,7 @@ export default function InventoryPage() {
   }
 
   return (
-    <AppPageShell width="wide" className="inventory-mobile-ui">
+    <AppPageShell width="wide">
       <AppPageHeader
         title="Inventory"
         titleMeta={<InventoryBetaBadge />}
@@ -1200,6 +1198,7 @@ export default function InventoryPage() {
                 categoryLabels={categoryLabels}
                 tableLabel="small tools"
                 quickFilter={inventoryTableQuickFilter}
+                filterStorageKey="small-tools"
               />
             </TabsContent>
 
@@ -1219,6 +1218,7 @@ export default function InventoryPage() {
                 tableLabel="minor plant"
                 showMinorPlantDetails
                 quickFilter={inventoryTableQuickFilter}
+                filterStorageKey="minor-plant"
               />
             </TabsContent>
 
@@ -1244,6 +1244,7 @@ export default function InventoryPage() {
                 tableLabel="retired inventory"
                 showMinorPlantDetails={retiredItems.some((item) => item.category === 'minor_plant')}
                 retiredMode
+                filterStorageKey="retired"
               />
             </TabsContent>
           </Tabs>
@@ -1490,7 +1491,7 @@ interface InventoryRoleViewToggleProps {
 function InventoryRoleViewToggle({ value, onValueChange }: InventoryRoleViewToggleProps) {
   return (
     <div
-      className="flex w-full items-center rounded-lg border border-slate-700 bg-slate-800/80 p-0.5 sm:w-auto"
+      className="flex w-auto items-center rounded-md border border-slate-700 bg-slate-800/80 p-0.5"
       role="group"
       aria-label="Inventory view mode"
     >
@@ -1499,30 +1500,34 @@ function InventoryRoleViewToggle({ value, onValueChange }: InventoryRoleViewTogg
         variant="ghost"
         size="sm"
         onClick={() => onValueChange('management')}
-        className={`h-9 min-h-9 flex-1 gap-1.5 px-2.5 sm:flex-none sm:px-3 ${
+        className={`h-8 min-h-8 gap-1.5 px-2 sm:px-3 ${
           value === 'management'
             ? 'bg-white text-slate-900 hover:bg-white hover:text-slate-900'
             : 'text-muted-foreground hover:bg-transparent hover:text-white'
         }`}
         aria-pressed={value === 'management'}
+        aria-label="Management"
+        title="Management"
       >
         <Settings className="h-3.5 w-3.5" />
-        <span className="text-xs font-medium sm:text-sm">Management</span>
+        <span className="sr-only sm:not-sr-only sm:text-sm sm:font-medium">Management</span>
       </Button>
       <Button
         type="button"
         variant="ghost"
         size="sm"
         onClick={() => onValueChange('employee')}
-        className={`h-9 min-h-9 flex-1 gap-1.5 px-2.5 sm:flex-none sm:px-3 ${
+        className={`h-8 min-h-8 gap-1.5 px-2 sm:px-3 ${
           value === 'employee'
             ? 'bg-white text-slate-900 hover:bg-white hover:text-slate-900'
             : 'text-muted-foreground hover:bg-transparent hover:text-white'
         }`}
         aria-pressed={value === 'employee'}
+        aria-label="My Location"
+        title="My Location"
       >
         <Users className="h-3.5 w-3.5" />
-        <span className="text-xs font-medium sm:text-sm">My Location</span>
+        <span className="sr-only sm:not-sr-only sm:text-sm sm:font-medium">My Location</span>
       </Button>
     </div>
   );
