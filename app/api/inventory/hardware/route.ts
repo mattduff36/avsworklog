@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import { getResponsibleHardwareLocationIds } from '@/lib/server/inventory-hardware';
+import {
+  enrichInventoryLocationRecords,
+  pickInventoryLocationRelation,
+} from '@/lib/server/inventory-locations';
+import type { Database } from '@/types/database';
+
+type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
+
+interface HardwareBalanceRow {
+  id: string;
+  hardware_item_id: string;
+  location_id: string;
+  quantity: number;
+  location?: InventoryLocationRow | InventoryLocationRow[] | null;
+}
 
 interface CreateHardwareItemBody {
   name?: string;
@@ -74,8 +89,21 @@ export async function GET() {
     if (balanceReferencesError) throw balanceReferencesError;
     if (transactionReferencesError) throw transactionReferencesError;
 
+    const typedBalances = (balances || []) as unknown as HardwareBalanceRow[];
+    const enrichedLocationsById = await enrichInventoryLocationRecords(
+      admin,
+      typedBalances.map((balance) => pickInventoryLocationRelation(balance.location)),
+    );
+    const enrichedBalances = typedBalances.map((balance) => {
+      const location = pickInventoryLocationRelation(balance.location);
+      return {
+        ...balance,
+        location: location ? enrichedLocationsById.get(location.id) || null : null,
+      };
+    });
+
     const totals = new Map<string, number>();
-    for (const balance of balances || []) {
+    for (const balance of enrichedBalances) {
       totals.set(
         balance.hardware_item_id,
         (totals.get(balance.hardware_item_id) || 0) + balance.quantity,
@@ -92,7 +120,7 @@ export async function GET() {
         total_quantity: totals.get(item.id) || 0,
         can_delete: access.isManagerOrAdmin && !referencedItemIds.has(item.id),
       })),
-      balances: balances || [],
+      balances: enrichedBalances,
       responsible_location_ids: responsibleLocationIds || [],
     });
   } catch (error) {

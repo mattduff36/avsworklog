@@ -138,6 +138,58 @@ export async function listInventoryLocations(
   return { locations, total };
 }
 
+export function pickInventoryLocationRelation(
+  location: InventoryLocationRow | InventoryLocationRow[] | null | undefined
+): InventoryLocationRow | null {
+  if (!location) return null;
+  return Array.isArray(location) ? location[0] ?? null : location;
+}
+
+export async function enrichInventoryLocationRecords(
+  admin: InventoryAdminClient,
+  locationRows: Array<InventoryLocationRow | InventoryLocationRow[] | null | undefined>
+): Promise<Map<string, EnrichedInventoryLocation>> {
+  const uniqueById = new Map<string, InventoryLocationRow>();
+  for (const location of locationRows) {
+    const normalized = pickInventoryLocationRelation(location);
+    if (!normalized?.id) continue;
+    uniqueById.set(normalized.id, normalized);
+  }
+
+  const enriched = await enrichInventoryLocations(admin, Array.from(uniqueById.values()));
+  return new Map(enriched.map((location) => [location.id, location]));
+}
+
+export async function withEnrichedInventoryLocations<T extends {
+  location?: InventoryLocationRow | InventoryLocationRow[] | null;
+}>(
+  admin: InventoryAdminClient,
+  items: T[]
+): Promise<Array<Omit<T, 'location'> & { location: EnrichedInventoryLocation | null }>> {
+  const enrichedById = await enrichInventoryLocationRecords(
+    admin,
+    items.map((item) => item.location),
+  );
+
+  return items.map((item) => {
+    const location = pickInventoryLocationRelation(item.location);
+    return {
+      ...item,
+      location: location ? enrichedById.get(location.id) || null : null,
+    };
+  });
+}
+
+export async function withEnrichedInventoryLocation<T extends {
+  location?: InventoryLocationRow | InventoryLocationRow[] | null;
+}>(
+  admin: InventoryAdminClient,
+  item: T
+): Promise<Omit<T, 'location'> & { location: EnrichedInventoryLocation | null }> {
+  const [enrichedItem] = await withEnrichedInventoryLocations(admin, [item]);
+  return enrichedItem;
+}
+
 export async function enrichInventoryLocations(
   admin: InventoryAdminClient,
   locationRows: InventoryLocationRow[]
@@ -276,4 +328,14 @@ export async function loadInventoryLocationById(
 
   if (error) throw error;
   return data;
+}
+
+export async function loadEnrichedInventoryLocationById(
+  admin: InventoryAdminClient,
+  locationId: string
+): Promise<EnrichedInventoryLocation | null> {
+  const location = await loadInventoryLocationById(admin, locationId);
+  if (!location) return null;
+  const [enriched] = await enrichInventoryLocations(admin, [location]);
+  return enriched || null;
 }

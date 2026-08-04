@@ -7,6 +7,7 @@ import {
   enrichInventoryLocations,
   getLocationTypeForLinkedAsset,
   listInventoryLocations,
+  loadEnrichedInventoryLocationById,
 } from '@/lib/server/inventory-locations';
 import type { Database } from '@/types/database';
 
@@ -42,8 +43,18 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
+    const admin = createAdminClient();
+    const lookupId = searchParams.get('id')?.trim() || '';
+    if (lookupId) {
+      const location = await loadEnrichedInventoryLocationById(admin, lookupId);
+      return NextResponse.json({
+        location,
+        locations: location ? [location] : [],
+      });
+    }
+
     if (searchParams.get('lookup') === 'yard') {
-      const { data, error } = await createAdminClient()
+      const { data, error } = await admin
         .from('inventory_locations')
         .select('*')
         .eq('name', 'Yard')
@@ -55,12 +66,13 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
       const matchingYards = (data || []) as InventoryLocationRow[];
-      return NextResponse.json({
-        location: matchingYards.length === 1 ? matchingYards[0] : null,
-      });
+      if (matchingYards.length !== 1) {
+        return NextResponse.json({ location: null });
+      }
+      const [location] = await enrichInventoryLocations(admin, matchingYards);
+      return NextResponse.json({ location: location || null });
     }
 
-    const admin = createAdminClient();
     const search = searchParams.get('search')?.trim() || '';
     const limit = normalizeLocationSearchLimit(searchParams.get('limit'));
     const offset = normalizeLocationSearchOffset(searchParams.get('offset'));
@@ -102,7 +114,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Location name is required' }, { status: 400 });
     }
 
-    const { data, error } = await createAdminClient()
+    const admin = createAdminClient();
+    const { data, error } = await admin
       .from('inventory_locations')
       .insert({
         name,
@@ -127,7 +140,8 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ location: { ...data, item_count: 0 } }, { status: 201 });
+    const [location] = await enrichInventoryLocations(admin, [data]);
+    return NextResponse.json({ location: location || { ...data, item_count: 0 } }, { status: 201 });
   } catch (error) {
     console.error('Error creating inventory location:', error);
     return NextResponse.json({ error: 'Failed to create inventory location' }, { status: 500 });

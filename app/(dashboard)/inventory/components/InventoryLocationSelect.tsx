@@ -124,6 +124,7 @@ export function InventoryLocationSelect({
   const [mobilePickerStyle, setMobilePickerStyle] = useState<CSSProperties>({});
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const hydratedSelectedLocationIdRef = useRef<string | null>(null);
   const listboxId = useId();
   const normalizedSearchQuery = searchQuery.trim();
 
@@ -189,12 +190,64 @@ export function InventoryLocationSelect({
 
   useEffect(() => {
     if (!value) {
+      hydratedSelectedLocationIdRef.current = null;
       setSelectedServerLocation(null);
       return;
     }
-    const knownSelectedLocation = locations.find((location) => location.id === value);
-    if (knownSelectedLocation) setSelectedServerLocation(knownSelectedLocation);
-  }, [locations, value]);
+
+    const knownSelectedLocation = locations.find((location) => location.id === value)
+      || searchResults.find((location) => location.id === value)
+      || null;
+    if (!knownSelectedLocation) return;
+
+    if (knownSelectedLocation.assigned_user_names !== undefined) {
+      hydratedSelectedLocationIdRef.current = value;
+    }
+
+    setSelectedServerLocation((current) => {
+      if (
+        current?.id === knownSelectedLocation.id
+        && current.assigned_user_names !== undefined
+        && knownSelectedLocation.assigned_user_names === undefined
+      ) {
+        return current;
+      }
+      return knownSelectedLocation;
+    });
+  }, [locations, searchResults, value]);
+
+  useEffect(() => {
+    if (!serverSearch || !value) return;
+
+    const knownSelectedLocation = locations.find((location) => location.id === value)
+      || searchResults.find((location) => location.id === value)
+      || null;
+    if (knownSelectedLocation?.assigned_user_names !== undefined) {
+      hydratedSelectedLocationIdRef.current = value;
+      return;
+    }
+    if (hydratedSelectedLocationIdRef.current === value) return;
+
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/inventory/locations?id=${encodeURIComponent(value)}`,
+          { cache: 'no-store', signal: controller.signal },
+        );
+        const payload = await response.json();
+        if (!response.ok) return;
+        const location = (payload.location || payload.locations?.[0] || null) as InventoryLocation | null;
+        if (location?.id !== value) return;
+        hydratedSelectedLocationIdRef.current = value;
+        setSelectedServerLocation(location);
+      } catch {
+        if (controller.signal.aborted) return;
+      }
+    })();
+
+    return () => controller.abort();
+  }, [locations, searchResults, serverSearch, value]);
 
   useEffect(() => {
     if (!serverSearch || !open || normalizedSearchQuery.length < MINIMUM_SERVER_SEARCH_CHARACTERS) {
@@ -238,12 +291,29 @@ export function InventoryLocationSelect({
   }, [includeLegacyQuotes, normalizedSearchQuery, open, serverSearch]);
 
   const options = useMemo<InventoryLocationSelectOption[]>(() => {
+    const mergeLocations = (
+      candidates: Array<InventoryLocation | null | undefined>,
+    ): InventoryLocation[] => Array.from(
+      candidates.reduce((locationsById, location) => {
+        if (!location) return locationsById;
+        const existing = locationsById.get(location.id);
+        if (
+          !existing
+          || (existing.assigned_user_names === undefined
+            && location.assigned_user_names !== undefined)
+        ) {
+          locationsById.set(location.id, location);
+        }
+        return locationsById;
+      }, new Map<string, InventoryLocation>()).values(),
+    );
+
     const sourceLocations = serverSearch
-      ? Array.from(
-        new Map(
-          [...locations, ...searchResults].map((location) => [location.id, location]),
-        ).values(),
-      )
+      ? mergeLocations([
+        ...locations,
+        ...searchResults,
+        selectedServerLocation,
+      ])
       : locations;
     const locationOptions = getInventoryLocationsWithYardFirst(sourceLocations)
       .filter((location) => includeLegacyQuotes || !isLegacyQuoteInventoryLocation(location))
@@ -275,11 +345,23 @@ export function InventoryLocationSelect({
     locationFilter,
     locations,
     searchResults,
+    selectedServerLocation,
     serverSearch,
   ]);
 
-  const selectedLocation = [...searchResults, ...locations].find((location) => location.id === value)
-    || (selectedServerLocation?.id === value ? selectedServerLocation : null);
+  const selectedLocationFromLists = [...searchResults, ...locations].find((location) => location.id === value)
+    || null;
+  const selectedLocation = (() => {
+    if (selectedServerLocation?.id === value) {
+      if (
+        selectedServerLocation.assigned_user_names !== undefined
+        || selectedLocationFromLists?.assigned_user_names === undefined
+      ) {
+        return selectedServerLocation;
+      }
+    }
+    return selectedLocationFromLists;
+  })();
   const selectedOption = options.find((option) => option.value === value) || (
     selectedLocation
       ? {

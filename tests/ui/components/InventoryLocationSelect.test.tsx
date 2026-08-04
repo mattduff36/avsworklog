@@ -51,6 +51,41 @@ describe('InventoryLocationSelect', () => {
     vi.unstubAllGlobals();
   });
 
+  it('hydrates an unenriched selected location so the closed trigger shows the assignee', async () => {
+    const unenrichedLocation: InventoryLocation = {
+      ...assignedLocation,
+      assigned_user_names: undefined,
+      linked_asset_label: undefined,
+      linked_asset_nickname: undefined,
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ location: assignedLocation, locations: [assignedLocation] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <InventoryLocationSelect
+        value={unenrichedLocation.id}
+        onValueChange={vi.fn()}
+        locations={[unenrichedLocation]}
+        serverSearch
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining(`id=${unenrichedLocation.id}`),
+        expect.objectContaining({ cache: 'no-store' }),
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('combobox')).toHaveTextContent(
+        /\[FE24 TYH \(Jeff Mark\)\] - Matt Duffill/i,
+      );
+    });
+  });
+
   it('keeps known locations searchable by assigned person during server search', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

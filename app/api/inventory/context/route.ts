@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isInventorySupervisorOrHigher, requireInventoryAccess } from '@/lib/server/inventory-auth';
+import {
+  enrichInventoryLocationRecords,
+  pickInventoryLocationRelation,
+} from '@/lib/server/inventory-locations';
 import { getCurrentFleetAssignmentSummary } from '@/lib/server/profile-fleet-assignments';
 import type { Database } from '@/types/database';
 
@@ -66,14 +70,14 @@ export async function GET() {
 
     if (error) throw error;
     if (siteLocationsError) throw siteLocationsError;
-    const userLocation = (data || null) as InventoryContextUserLocationRow | null;
-    const location = pickUserLocationRelation(userLocation?.location);
+    const rawUserLocation = (data || null) as InventoryContextUserLocationRow | null;
+    const location = pickUserLocationRelation(rawUserLocation?.location);
     const isUserLocationValid = Boolean(
-      userLocation?.location_id &&
+      rawUserLocation?.location_id &&
       location?.is_active !== false &&
       location?.location_type !== 'site'
     );
-    const secondarySiteLocations = ((siteLocationRows || []) as unknown as InventoryContextSiteLocationRow[])
+    const secondarySiteLocationRows = ((siteLocationRows || []) as unknown as InventoryContextSiteLocationRow[])
       .map((row) => ({
         ...row,
         location: pickSiteLocationRelation(row.location),
@@ -82,6 +86,30 @@ export async function GET() {
         row.location?.is_active === true
         && SECONDARY_LOCATION_TYPES.has(row.location.location_type)
       ));
+    const enrichedLocationsById = await enrichInventoryLocationRecords(
+      admin,
+      [
+        pickInventoryLocationRelation(
+          rawUserLocation?.location as InventoryLocationRow | InventoryLocationRow[] | null,
+        ),
+        ...secondarySiteLocationRows.map((row) => row.location),
+      ],
+    );
+    const userLocationLocation = pickInventoryLocationRelation(
+      rawUserLocation?.location as InventoryLocationRow | InventoryLocationRow[] | null,
+    );
+    const userLocation = rawUserLocation
+      ? {
+        ...rawUserLocation,
+        location: userLocationLocation
+          ? enrichedLocationsById.get(userLocationLocation.id) || null
+          : null,
+      }
+      : null;
+    const secondarySiteLocations = secondarySiteLocationRows.map((row) => ({
+      ...row,
+      location: row.location ? enrichedLocationsById.get(row.location.id) || null : null,
+    }));
 
     return NextResponse.json({
       user_id: access.userId,

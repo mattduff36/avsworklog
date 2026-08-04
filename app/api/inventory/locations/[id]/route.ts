@@ -6,6 +6,7 @@ import type { FleetAssetLinkType } from '@/app/(dashboard)/inventory/types';
 import {
   buildLinkedAssetColumns,
   canManuallyRelinkInventoryLocation,
+  enrichInventoryLocations,
   getLocationTypeForLinkedAsset,
   isGeneratedInventoryLocation,
 } from '@/lib/server/inventory-locations';
@@ -103,7 +104,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       throw error;
     }
 
-    return NextResponse.json({ location: data });
+    const [location] = await enrichInventoryLocations(admin, [data]);
+    return NextResponse.json({ location: location || data });
   } catch (error) {
     console.error('Error updating inventory location:', error);
     return NextResponse.json({ error: 'Failed to update inventory location' }, { status: 500 });

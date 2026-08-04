@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventorySupervisorAccess } from '@/lib/server/inventory-auth';
+import { enrichInventoryLocationRecords } from '@/lib/server/inventory-locations';
 import { getUsersWithPermission } from '@/lib/utils/permissions';
 import type { Database } from '@/types/database';
 
@@ -138,11 +139,25 @@ export async function GET(request?: NextRequest) {
     const assignments = ((assignmentsResult.data || []) as unknown as AssignmentRelationRow[])
       .map(normalizeAssignment)
       .filter((assignment) => isAssignableSecondaryLocation(assignment.location));
+    const enrichedLocationsById = await enrichInventoryLocationRecords(
+      admin,
+      [
+        ...activeLocations,
+        ...assignments.map((assignment) => assignment.location),
+      ],
+    );
 
     return NextResponse.json({
-      active_locations: activeLocations,
+      active_locations: activeLocations.map((location) => (
+        enrichedLocationsById.get(location.id) || location
+      )),
       users: users.data || [],
-      assignments,
+      assignments: assignments.map((assignment) => ({
+        ...assignment,
+        location: assignment.location
+          ? enrichedLocationsById.get(assignment.location.id) || assignment.location
+          : null,
+      })),
     });
   } catch (error) {
     console.error('Error fetching inventory site assignments:', error);

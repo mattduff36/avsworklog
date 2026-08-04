@@ -8,6 +8,7 @@ import {
   getCurrentFleetAssignmentSummary,
   setUserInventoryLocationWithFleetAssignment,
 } from '@/lib/server/profile-fleet-assignments';
+import { withEnrichedInventoryLocation } from '@/lib/server/inventory-locations';
 
 interface UpdateLocationBody {
   location_id?: string;
@@ -67,8 +68,12 @@ export async function GET() {
 
     if (error) throw error;
 
+    const userLocation = data
+      ? await withEnrichedInventoryLocation(admin, data)
+      : null;
+
     return NextResponse.json({
-      user_location: data || null,
+      user_location: userLocation,
       current_fleet_assignment: currentFleetAssignment,
     });
   } catch (error) {
@@ -197,8 +202,10 @@ export async function PATCH(request: NextRequest) {
 
     if (error) throw error;
 
+    const userLocation = await withEnrichedInventoryLocation(admin, data);
+
     return NextResponse.json({
-      user_location: data,
+      user_location: userLocation,
       current_fleet_assignment: currentFleetAssignment,
     });
   } catch (error) {

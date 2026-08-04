@@ -14,6 +14,32 @@ vi.mock('@/lib/server/inventory-hardware', () => ({
   getResponsibleHardwareLocationIds: vi.fn(),
 }));
 
+vi.mock('@/lib/server/inventory-locations', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/server/inventory-locations')>(
+    '@/lib/server/inventory-locations',
+  );
+  return {
+    ...actual,
+    enrichInventoryLocationRecords: vi.fn(async (_admin, locationRows) => {
+      const map = new Map();
+      for (const location of locationRows) {
+        const normalized = actual.pickInventoryLocationRelation(location);
+        if (normalized?.id) {
+          map.set(normalized.id, {
+            ...normalized,
+            assigned_user_names: [],
+            linked_asset_type: null,
+            linked_asset_label: null,
+            linked_asset_nickname: null,
+            item_count: 0,
+          });
+        }
+      }
+      return map;
+    }),
+  };
+});
+
 import { GET, POST } from '@/app/api/inventory/hardware/route';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import { createAdminClient } from '@/lib/supabase/admin';

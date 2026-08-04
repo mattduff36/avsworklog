@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { withEnrichedInventoryLocation } from '@/lib/server/inventory-locations';
 import { isUnknownInventoryLocationName } from '@/app/(dashboard)/inventory/utils';
+import type { Database } from '@/types/database';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
 }
 
+type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
+
 interface InventoryItemRow {
   created_at?: string | null;
-  location?: { name?: string | null } | null;
+  location?: InventoryLocationRow | InventoryLocationRow[] | null;
   minor_plant_detail?: unknown;
   unknown_location_entered_at?: string | null;
   [key: string]: unknown;
@@ -35,10 +39,13 @@ function pickMovementLocation(movement: InventoryMovementRow): { name: string | 
 }
 
 function getUnknownLocationEnteredAt(
-  item: InventoryItemRow,
+  item: Pick<InventoryItemRow, 'created_at' | 'location'>,
   movements: InventoryMovementRow[]
 ): string | null {
-  if (!isUnknownInventoryLocationName(item.location?.name)) return null;
+  const locationName = Array.isArray(item.location)
+    ? item.location[0]?.name
+    : item.location?.name;
+  if (!isUnknownInventoryLocationName(locationName)) return null;
 
   const latestUnknownMovement = movements.find((movement) =>
     isUnknownInventoryLocationName(pickMovementLocation(movement)?.name)
@@ -106,7 +113,10 @@ export async function GET(_request: Request, { params }: RouteParams) {
     if (groupResult.error) throw groupResult.error;
 
     const movements = (movementsResult.data || []) as unknown as InventoryMovementRow[];
-    const item = normalizeMinorPlantDetailRelation(itemResult.data as InventoryItemRow);
+    const item = await withEnrichedInventoryLocation(
+      admin,
+      normalizeMinorPlantDetailRelation(itemResult.data as InventoryItemRow),
+    );
 
     return NextResponse.json({
       item: {

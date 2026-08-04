@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryAccess } from '@/lib/server/inventory-auth';
+import { withEnrichedInventoryLocation } from '@/lib/server/inventory-locations';
 import {
   InventoryMoveError,
   moveInventoryItems,
@@ -26,8 +27,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const body = (await request.json()) as MoveInventoryItemBody;
     const destinationLocationId = body.location_id?.trim();
+    const admin = createAdminClient();
 
-    await moveInventoryItems(createAdminClient(), {
+    await moveInventoryItems(admin, {
       itemIds: [id],
       destinationLocationId: destinationLocationId || '',
       note: body.note,
@@ -35,7 +37,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       movedBy: access.userId,
     });
 
-    const { data: updatedItem, error: itemError } = await createAdminClient()
+    const { data: updatedItem, error: itemError } = await admin
       .from('inventory_items')
       .select(`
         *,
@@ -46,7 +48,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (itemError) throw itemError;
 
-    return NextResponse.json({ item: updatedItem });
+    const item = await withEnrichedInventoryLocation(admin, updatedItem);
+    return NextResponse.json({ item });
   } catch (error) {
     if (error instanceof InventoryMoveError) {
       const response = toInventoryMoveErrorResponse(error);

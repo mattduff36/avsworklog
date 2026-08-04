@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeInventoryItemNumber, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { withEnrichedInventoryLocation } from '@/lib/server/inventory-locations';
 import { InventoryMoveError, moveInventoryItems, toInventoryMoveErrorResponse } from '@/lib/server/inventory-move';
 import { isInventoryRetireReason, type InventoryCategory, type InventoryRetireReason, type InventoryStatus } from '@/app/(dashboard)/inventory/types';
 
@@ -148,7 +149,11 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       responseItem = movedData;
     }
 
-    return NextResponse.json({ item: normalizeMinorPlantDetailRelation(responseItem as InventoryItemRow) });
+    const item = await withEnrichedInventoryLocation(
+      admin,
+      normalizeMinorPlantDetailRelation(responseItem as InventoryItemRow),
+    );
+    return NextResponse.json({ item });
   } catch (error) {
     if (error instanceof InventoryMoveError) {
       const response = toInventoryMoveErrorResponse(error);

@@ -3,8 +3,14 @@ import { resolve } from 'path';
 import ExcelJS from 'exceljs';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeInventoryItemNumber, requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import {
+  pickInventoryLocationRelation,
+  withEnrichedInventoryLocation,
+  withEnrichedInventoryLocations,
+} from '@/lib/server/inventory-locations';
 import { isUnknownInventoryLocationName } from '@/app/(dashboard)/inventory/utils';
 import type { InventoryCategory, InventoryStatus } from '@/app/(dashboard)/inventory/types';
+import type { Database } from '@/types/database';
 
 const completeListPath = 'data/COMPLETE LIST 2023.xlsx';
 
@@ -23,17 +29,13 @@ interface SourceLocationHint {
   rows: number[];
 }
 
-interface InventoryLocationRow {
-  linked_van_id?: string | null;
-  name?: string | null;
-  [key: string]: unknown;
-}
+type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
 
 interface InventoryItemRow {
   id: string;
   item_number_normalized: string;
   created_at?: string | null;
-  location?: InventoryLocationRow | null;
+  location?: InventoryLocationRow | InventoryLocationRow[] | null;
   minor_plant_detail?: unknown;
   [key: string]: unknown;
 }
@@ -57,12 +59,6 @@ interface InventoryItemGroupSummary {
 interface InventoryItemGroupMemberRow {
   item_id: string;
   group?: InventoryItemGroupSummary | InventoryItemGroupSummary[] | null;
-}
-
-interface LinkedVanSummary {
-  id: string;
-  reg_number: string;
-  nickname: string | null;
 }
 
 function cleanOptionalDate(value: string | null | undefined): string | null {
@@ -116,45 +112,6 @@ async function readCompleteListLocationHints(): Promise<Map<string, SourceLocati
   return hints;
 }
 
-function getLinkedVanIds(items: InventoryItemRow[]): string[] {
-  return Array.from(new Set(items
-    .map((item) => item.location?.linked_van_id)
-    .filter((linkedVanId): linkedVanId is string => Boolean(linkedVanId))
-  ));
-}
-
-async function loadLinkedVans(
-  admin: ReturnType<typeof createAdminClient>,
-  linkedVanIds: string[]
-): Promise<Map<string, LinkedVanSummary>> {
-  if (linkedVanIds.length === 0) return new Map();
-
-  const { data, error } = await admin
-    .from('vans')
-    .select('id, reg_number, nickname')
-    .in('id', linkedVanIds);
-
-  if (error) throw error;
-
-  return new Map((data || []).map((van) => [van.id, van]));
-}
-
-function addLinkedVanDisplay(item: InventoryItemRow, vanById: Map<string, LinkedVanSummary>): InventoryItemRow {
-  const linkedVanId = item.location?.linked_van_id;
-  if (!linkedVanId) return item;
-
-  const van = vanById.get(linkedVanId);
-  return {
-    ...item,
-    location: {
-      ...item.location,
-      linked_asset_type: 'van',
-      linked_asset_label: van?.reg_number || null,
-      linked_asset_nickname: van?.nickname || null,
-    },
-  };
-}
-
 function normalizeMinorPlantDetailRelation(item: InventoryItemRow): InventoryItemRow {
   const relation = item.minor_plant_detail;
   return {
@@ -175,7 +132,7 @@ async function loadUnknownLocationEnteredAt(
   items: InventoryItemRow[]
 ): Promise<Map<string, string>> {
   const unknownLocationItemIds = items
-    .filter((item) => isUnknownInventoryLocationName(item.location?.name))
+    .filter((item) => isUnknownInventoryLocationName(pickInventoryLocationRelation(item.location)?.name))
     .map((item) => item.id);
 
   if (unknownLocationItemIds.length === 0) return new Map();
@@ -266,8 +223,11 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error;
     const items = (data || []) as InventoryItemRow[];
-    const [vanById, groupByItemId, unknownLocationEnteredAtByItemId] = await Promise.all([
-      loadLinkedVans(admin, getLinkedVanIds(items)),
+    const [enrichedItems, groupByItemId, unknownLocationEnteredAtByItemId] = await Promise.all([
+      withEnrichedInventoryLocations(
+        admin,
+        items.map((item) => normalizeMinorPlantDetailRelation(item)),
+      ),
       loadItemGroups(admin, items.map((item) => item.id)),
       loadUnknownLocationEnteredAt(admin, items),
     ]);
@@ -279,19 +239,19 @@ export async function GET(request: NextRequest) {
       console.warn('Unable to read inventory spreadsheet location hints:', hintError);
     }
 
-    const inventory = items.map((item) => {
-      const itemWithLinkedVan = {
-        ...normalizeMinorPlantDetailRelation(addLinkedVanDisplay(item, vanById)),
+    const inventory = enrichedItems.map((item) => {
+      const itemWithLocation = {
+        ...item,
         group: groupByItemId.get(item.id) || null,
         unknown_location_entered_at: unknownLocationEnteredAtByItemId.get(item.id) || null,
       };
-      if (itemWithLinkedVan.location) return itemWithLinkedVan;
+      if (itemWithLocation.location) return itemWithLocation;
 
-      const hint = sourceLocationHints.get(itemWithLinkedVan.item_number_normalized);
-      if (!hint) return itemWithLinkedVan;
+      const hint = sourceLocationHints.get(itemWithLocation.item_number_normalized);
+      if (!hint) return itemWithLocation;
 
       return {
-        ...itemWithLinkedVan,
+        ...itemWithLocation,
         source_location_hint: hint.locations.join(' | '),
         source_location_rows: hint.rows.join(', '),
       };
@@ -372,7 +332,11 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ item: normalizeMinorPlantDetailRelation(data as InventoryItemRow) }, { status: 201 });
+    const item = await withEnrichedInventoryLocation(
+      admin,
+      normalizeMinorPlantDetailRelation(data as InventoryItemRow),
+    );
+    return NextResponse.json({ item }, { status: 201 });
   } catch (error) {
     console.error('Error creating inventory item:', error);
     return NextResponse.json({ error: 'Failed to create inventory item' }, { status: 500 });

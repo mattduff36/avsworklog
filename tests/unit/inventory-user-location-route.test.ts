@@ -12,6 +12,32 @@ vi.mock('@/lib/supabase/admin', () => ({
 vi.mock('@/lib/utils/server-error-logger', () => ({
   logServerError: vi.fn(),
 }));
+vi.mock('@/lib/server/inventory-locations', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/server/inventory-locations')>(
+    '@/lib/server/inventory-locations',
+  );
+  return {
+    ...actual,
+    withEnrichedInventoryLocation: vi.fn(async (_admin, item) => {
+      const location = item?.location
+        ? (Array.isArray(item.location) ? item.location[0] : item.location)
+        : null;
+      return {
+        ...item,
+        location: location
+          ? {
+            ...location,
+            assigned_user_names: location.assigned_user_names || [],
+            linked_asset_type: location.linked_asset_type ?? null,
+            linked_asset_label: location.linked_asset_label ?? null,
+            linked_asset_nickname: location.linked_asset_nickname ?? null,
+            item_count: location.item_count ?? 0,
+          }
+          : null,
+      };
+    }),
+  };
+});
 
 import { requireInventoryAccess } from '@/lib/server/inventory-auth';
 import { createAdminClient } from '@/lib/supabase/admin';

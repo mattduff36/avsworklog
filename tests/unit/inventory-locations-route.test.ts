@@ -18,6 +18,7 @@ vi.mock('@/lib/server/inventory-locations', async () => {
     ...actual,
     listInventoryLocations: vi.fn(),
     enrichInventoryLocations: vi.fn(),
+    loadEnrichedInventoryLocationById: vi.fn(),
   };
 });
 
@@ -26,6 +27,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import {
   enrichInventoryLocations,
   listInventoryLocations,
+  loadEnrichedInventoryLocationById,
 } from '@/lib/server/inventory-locations';
 import { GET } from '@/app/api/inventory/locations/route';
 
@@ -151,6 +153,14 @@ describe('inventory locations route', () => {
     vi.mocked(createAdminClient).mockReturnValue({
       from: vi.fn(() => locationQuery),
     } as never);
+    vi.mocked(enrichInventoryLocations).mockResolvedValue([{
+      ...yard,
+      item_count: 0,
+      assigned_user_names: [],
+      linked_asset_type: null,
+      linked_asset_label: null,
+      linked_asset_nickname: null,
+    }]);
 
     const response = await GET(new NextRequest(
       'http://localhost/api/inventory/locations?lookup=yard',
@@ -164,11 +174,40 @@ describe('inventory locations route', () => {
     expect(locationQuery.order).toHaveBeenNthCalledWith(1, 'created_at', { ascending: true });
     expect(locationQuery.order).toHaveBeenNthCalledWith(2, 'id', { ascending: true });
     expect(locationQuery.limit).toHaveBeenCalledWith(2);
+    expect(enrichInventoryLocations).toHaveBeenCalled();
     expect(payload.location).toEqual(expect.objectContaining({
       id: 'yard-stable-id',
       name: 'Yard',
       is_active: true,
+      assigned_user_names: [],
     }));
+  });
+
+  it('returns an enriched location when looking up by id', async () => {
+    const van = buildLocation('van-location', 'Van - NU75 VGT');
+    const admin = {};
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(loadEnrichedInventoryLocationById).mockResolvedValue({
+      ...van,
+      item_count: 1,
+      assigned_user_names: ['Ben Smith'],
+      linked_asset_type: 'van',
+      linked_asset_label: 'NU75 VGT',
+      linked_asset_nickname: null,
+    });
+
+    const response = await GET(new NextRequest(
+      'http://localhost/api/inventory/locations?id=van-location',
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(loadEnrichedInventoryLocationById).toHaveBeenCalledWith(admin, 'van-location');
+    expect(payload.location).toEqual(expect.objectContaining({
+      id: 'van-location',
+      assigned_user_names: ['Ben Smith'],
+    }));
+    expect(payload.locations).toHaveLength(1);
   });
 
   it('leaves the Yard lookup unselected when matching rows are ambiguous', async () => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
+import { withEnrichedInventoryLocation } from '@/lib/server/inventory-locations';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -27,7 +28,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
     }
 
-    const { data, error } = await createAdminClient()
+    const admin = createAdminClient();
+    const { data, error } = await admin
       .from('inventory_items')
       .update({
         check_interval_days: intervalDays || null,
@@ -47,7 +49,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       throw error;
     }
 
-    return NextResponse.json({ item: data });
+    const item = await withEnrichedInventoryLocation(admin, data);
+    return NextResponse.json({ item });
   } catch (error) {
     console.error('Error updating inventory check interval:', error);
     return NextResponse.json({ error: 'Failed to update check interval' }, { status: 500 });

@@ -107,12 +107,30 @@ function getInventoryOverviewTab(requestedOverview: string | null): InventoryOve
   return requestedOverview ? tabByOverview[requestedOverview] || 'small_tools' : 'small_tools';
 }
 
+function prefersEnrichedInventoryLocation(
+  candidate: InventoryLocation,
+  existing: InventoryLocation | undefined,
+): boolean {
+  if (!existing) return true;
+  const candidateHasAssignees = candidate.assigned_user_names !== undefined;
+  const existingHasAssignees = existing.assigned_user_names !== undefined;
+  if (candidateHasAssignees !== existingHasAssignees) return candidateHasAssignees;
+  const candidateHasLinkedAsset = candidate.linked_asset_label !== undefined;
+  const existingHasLinkedAsset = existing.linked_asset_label !== undefined;
+  if (candidateHasLinkedAsset !== existingHasLinkedAsset) return candidateHasLinkedAsset;
+  return true;
+}
+
 function getUniqueInventoryLocations(
   candidates: Array<InventoryLocation | null | undefined>,
 ): InventoryLocation[] {
   const locationsById = new Map<string, InventoryLocation>();
   for (const location of candidates) {
-    if (location) locationsById.set(location.id, location);
+    if (!location) continue;
+    const existing = locationsById.get(location.id);
+    if (prefersEnrichedInventoryLocation(location, existing)) {
+      locationsById.set(location.id, location);
+    }
   }
   return Array.from(locationsById.values());
 }
