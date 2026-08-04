@@ -1,5 +1,25 @@
 [
   {
+    "version": "0826.1.1",
+    "updateKind": "minor",
+    "title": "Release automation maintenance update",
+    "description": "Updated Release automation and App reliability.",
+    "summary": "Updated Release automation and App reliability.",
+    "details": [
+      "Updated Release automation and App reliability, with changes to automation scripts.",
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [
+      "Release automation",
+      "App reliability"
+    ],
+    "areaKeys": [
+      "release-automation",
+      "app-reliability"
+    ],
+    "pushedAt": "2026-08-04T16:12:01.039Z"
+  },
+  {
     "version": "0826.1.0",
     "updateKind": "major",
     "title": "Workshop Attachments update",

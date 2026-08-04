@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.1.1
+
+**GIT COMMIT MESSAGE**
+`chore(finalise): update Release automation and App reliability`
+
+**PUSHED AT**
+2026-08-04T16:12:01.039Z
+
+**WHAT CHANGED**
+Update Release automation and App reliability.
+
+**VERSION HISTORY DETAILS**
+- Updated Release automation and App reliability, with changes to automation scripts.
+- Updated app reliability, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `chore(finalise): update Release automation and App reliability`
+
 ## 0826.1.0
 
 **GIT COMMIT MESSAGE**
