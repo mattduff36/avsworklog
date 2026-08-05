@@ -223,13 +223,19 @@ export function CivilsTimesheet({
     const loadBankHolidays = async () => {
       try {
         const holidays = await fetchUKBankHolidays('england-and-wales');
+        if (holidays.size === 0) {
+          toast.error('Unable to load UK bank holidays. Saving is blocked until the calendar is available.');
+          setBankHolidays(new Set());
+          return;
+        }
         setBankHolidays(holidays);
       } catch (error) {
         console.error('Failed to load bank holidays:', error);
-        // Continue without bank holidays - system will still work
+        toast.error('Unable to load UK bank holidays. Saving is blocked until the calendar is available.');
+        setBankHolidays(new Set());
       }
     };
-    
+
     loadBankHolidays();
   }, []);
 
@@ -898,6 +904,7 @@ export function CivilsTimesheet({
           job_numbers: [],
           working_in_yard: false,
           subsistence_payment_required: false,
+          night_shift: false,
           daily_total: 0,
           remarks: requiredReason ? formatDidNotWorkReasonRemark(requiredReason) : '',
         };
@@ -1303,15 +1310,6 @@ export function CivilsTimesheet({
     await saveTimesheet('submitted', sig);
   };
 
-  // Helper function to detect if a shift is a night shift
-  // Night shift: Any shift over 9.5 hours that starts after 15:00
-  const isNightShift = (timeStarted: string, dailyTotal: number | null): boolean => {
-    if (!timeStarted || !dailyTotal) return false;
-    
-    const [hours] = timeStarted.split(':').map(Number);
-    return dailyTotal > 9.5 && hours >= 15;
-  };
-
   // Helper function to check if a date is a UK bank holiday
   // Uses data from GOV.UK API: https://www.gov.uk/bank-holidays.json
   const isUKBankHoliday = (date: Date): boolean => {
@@ -1326,6 +1324,11 @@ export function CivilsTimesheet({
 
   const saveTimesheet = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId) return;
+    if (bankHolidays.size === 0) {
+      setError('Unable to verify UK bank holidays. Refresh the page and try again before saving.');
+      toast.error('Bank holiday calendar unavailable');
+      return;
+    }
 
     setError('');
     setSaving(true);
@@ -1429,8 +1432,8 @@ export function CivilsTimesheet({
           const offDay = offDayByDay.get(entry.day_of_week);
           const persistedJobNumbers = getNormalizedJobNumbers(entry.job_numbers);
           
-          // Automatically detect night shift and bank holiday
-          const isNight = !entry.did_not_work && isNightShift(entry.time_started, entry.daily_total);
+          // Night Shift is employee/editor selected; bank holidays remain calendar derived.
+          const isNight = !entry.did_not_work && entry.night_shift;
           const isBankHol = !entry.did_not_work && isUKBankHoliday(entryDate);
           const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(offDay);
           const normalizedRemarks =
@@ -1869,7 +1872,7 @@ export function CivilsTimesheet({
                     {/* Status Buttons */}
                     <div className="space-y-3">
                       <Label className="text-foreground text-xl">Status</Label>
-                      <div className={`grid gap-3 ${hasTrainingBooking ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                      <div className={`grid gap-3 ${hasTrainingBooking ? 'grid-cols-4' : 'grid-cols-3'}`}>
                         {/* Working in Yard Button */}
                         <button
                           type="button"
@@ -1901,6 +1904,23 @@ export function CivilsTimesheet({
                           <XCircle className={`h-8 w-8 mb-2 ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`} />
                           <span className={`text-lg font-medium ${entry.did_not_work ? 'text-amber-400' : 'text-muted-foreground'}`}>
                             Did Not Work
+                          </span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => updateEntry(index, 'night_shift', !entry.night_shift)}
+                          disabled={disableWorkingInputs}
+                          aria-pressed={entry.night_shift}
+                          className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
+                            entry.night_shift
+                              ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20'
+                              : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                          } disabled:opacity-30 disabled:cursor-not-allowed`}
+                        >
+                          <Moon className={`h-8 w-8 mb-2 ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`} />
+                          <span className={`text-lg font-medium ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`}>
+                            Night Shift
                           </span>
                         </button>
 
@@ -2122,6 +2142,21 @@ export function CivilsTimesheet({
                             <Moon className={`h-5 w-5 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                           </button>
 
+                          <button
+                            type="button"
+                            onClick={() => updateEntry(index, 'night_shift', !entry.night_shift)}
+                            disabled={disableWorkingInputs}
+                            aria-pressed={entry.night_shift}
+                            className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
+                              entry.night_shift
+                                ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20'
+                                : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                            } disabled:opacity-30 disabled:cursor-not-allowed`}
+                            title="Night Shift"
+                          >
+                            <Moon className={`h-5 w-5 ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`} />
+                          </button>
+
                           {hasTrainingBooking && (
                             <button
                               type="button"
@@ -2299,6 +2334,7 @@ export function CivilsTimesheet({
         onClose={() => setShowConfirmationModal(false)}
         onConfirm={handleConfirmSubmission}
         weekEnding={weekEnding}
+        userId={selectedEmployeeId}
         entries={entries}
         offDayStates={effectiveOffDayStates}
         regNumber={regNumber}

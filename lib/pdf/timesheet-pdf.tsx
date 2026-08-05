@@ -7,6 +7,10 @@ import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals } from '@/lib/utils/timesheet-leave-totals';
 import { formatEntryJobNumbers, getPrimaryJobNumber } from '@/lib/utils/timesheet-job-codes';
 import { addSubsistenceRemark } from '@/lib/utils/timesheet-subsistence';
+import {
+  PayrollSnapshotSummary,
+  type PayrollSnapshotPdfData,
+} from '@/lib/pdf/payroll-snapshot-summary';
 
 // Create styles for the PDF matching the scanned form
 const styles = StyleSheet.create({
@@ -186,9 +190,15 @@ interface TimesheetPDFProps {
   timesheet: Timesheet;
   employeeName?: string;
   offDayStates?: TimesheetOffDayState[];
+  payrollSnapshot?: PayrollSnapshotPdfData | null;
 }
 
-export function TimesheetPDF({ timesheet, employeeName, offDayStates = [] }: TimesheetPDFProps) {
+export function TimesheetPDF({
+  timesheet,
+  employeeName,
+  offDayStates = [],
+  payrollSnapshot = null,
+}: TimesheetPDFProps) {
   // Sort entries by day of week
   const sortedEntries = (timesheet.entries || []).sort((a, b) => a.day_of_week - b.day_of_week);
   
@@ -363,6 +373,8 @@ export function TimesheetPDF({ timesheet, employeeName, offDayStates = [] }: Tim
             </View>
           </View>
         </View>
+
+        {payrollSnapshot && <PayrollSnapshotSummary snapshot={payrollSnapshot} />}
 
         {/* Footer */}
         <View style={styles.footer}>

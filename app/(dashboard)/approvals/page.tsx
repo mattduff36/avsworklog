@@ -671,21 +671,22 @@ function ApprovalsContent() {
 
   const handleQuickApprove = async (_type: 'timesheet', id: string) => {
     try {
-      const { error } = await supabase
-        .from('timesheets')
-        .update({
-          status: 'approved',
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', id);
-      if (error) throw error;
+      const response = await fetch(`/api/timesheets/${id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'Failed to approve timesheet');
 
       // Refresh data
       await fetchApprovals();
     } catch (error) {
       const errorContextId = 'approvals-quick-approve-error';
       console.error('Error approving:', error, { errorContextId });
-      toast.error('Failed to approve timesheet', { id: errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to approve timesheet', {
+        id: errorContextId,
+      });
     }
   };
 

@@ -53,6 +53,7 @@ import {
   type TimesheetDidNotWorkReason,
   type TimesheetEntryLike,
   type TimesheetOffDayState,
+  formatLocalIsoDate,
   getTimesheetEntryDateFromWeekEnding,
   getTimesheetWeekIsoBounds,
   isTimeWithinWorkWindow,
@@ -104,6 +105,8 @@ import {
   type RecalculateEntryOptions,
 } from './plant-timesheet-v2-utils';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
+import { ConfirmationModal } from '../../components/ConfirmationModal';
 
 interface PlantTimesheetV2Props {
   weekEnding: string;
@@ -133,13 +136,6 @@ const QUARTER_HOUR_TIME_FIELDS: ReadonlySet<keyof PlantEntryDraft> = new Set([
 
 const createBlankPlantWeekEntries = (): PlantEntryDraft[] =>
   Array.from({ length: 7 }, (_, index) => createBlankEntry(index + 1));
-
-function formatLocalIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
 
 function formatDerivedHours(value: number | null): string {
   if (value === null) return '';
@@ -329,6 +325,7 @@ export function PlantTimesheetV2({
   const [entries, setEntries] = useState<PlantEntryDraft[]>(
     createBlankPlantWeekEntries()
   );
+  const [bankHolidays, setBankHolidays] = useState<Set<string>>(new Set());
   const [activeDay, setActiveDay] = useState('0');
 
   const [saving, setSaving] = useState(false);
@@ -337,6 +334,7 @@ export function PlantTimesheetV2({
   const [existingTimesheetLoaded, setExistingTimesheetLoaded] = useState(!initialExistingId);
   const [timeErrors, setTimeErrors] = useState<Record<number, string>>({});
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [showSignatureDialog, setShowSignatureDialog] = useState(false);
 
   const [offDayStates, setOffDayStates] = useState<TimesheetOffDayState[]>([]);
@@ -347,6 +345,17 @@ export function PlantTimesheetV2({
   const [decliningTraining, setDecliningTraining] = useState(false);
   const [didNotWorkReasonDayIndex, setDidNotWorkReasonDayIndex] = useState<number | null>(null);
   const [pendingDidNotWorkBookings, setPendingDidNotWorkBookings] = useState<PendingDidNotWorkBookingMap>({});
+
+  useEffect(() => {
+    void fetchUKBankHolidays().then((dates) => {
+      if (dates.size === 0) {
+        toast.error('Unable to load UK bank holidays. Saving is blocked until the calendar is available.');
+        setBankHolidays(new Set());
+        return;
+      }
+      setBankHolidays(dates);
+    });
+  }, []);
 
   const currentOffDayKey = selectedEmployeeId && weekEnding ? `${selectedEmployeeId}:${weekEnding}` : '';
   const effectiveOffDayStates = useMemo(
@@ -616,6 +625,7 @@ export function PlantTimesheetV2({
             job_numbers: getEntryJobNumbers(existingEntry),
             working_in_yard: existingEntry.working_in_yard || false,
             subsistence_payment_required: isSubsistencePaymentRequired(existingEntry),
+            night_shift: existingEntry.night_shift || false,
             time_started: existingEntry.time_started || '',
             time_finished: existingEntry.time_finished || '',
             operator_travel_hours: toHoursInput(existingEntry.operator_travel_hours),
@@ -963,6 +973,7 @@ export function PlantTimesheetV2({
         didNotWorkReason: trimmedReason ? didNotWorkReasonCategory : next[dayIndex].didNotWorkReason || 'Other',
         working_in_yard: false,
         subsistence_payment_required: false,
+        night_shift: false,
         time_started: '',
         time_finished: '',
         job_number: '',
@@ -1171,6 +1182,11 @@ export function PlantTimesheetV2({
   const saveTimesheet = async (status: 'draft' | 'submitted', signatureData?: string) => {
     if (!user || !selectedEmployeeId || !weekEnding) return;
     if (!validateBeforeSave()) return;
+    if (bankHolidays.size === 0) {
+      setError('Unable to verify UK bank holidays. Refresh the page and try again before saving.');
+      toast.error('Bank holiday calendar unavailable');
+      return;
+    }
 
     setSaving(true);
     setError('');
@@ -1294,8 +1310,12 @@ export function PlantTimesheetV2({
           working_in_yard: recalculated.working_in_yard,
           subsistence_payment_required: requiresSubsistence,
           did_not_work: recalculated.did_not_work,
-          night_shift: false,
-          bank_holiday: false,
+          night_shift: !recalculated.did_not_work && recalculated.night_shift,
+          bank_holiday: !recalculated.did_not_work && bankHolidays.has(
+            formatLocalIsoDate(
+              getTimesheetEntryDateFromWeekEnding(weekEnding, recalculated.day_of_week)
+            )
+          ),
           remarks: persistedRemarks || null,
         };
       });
@@ -1393,6 +1413,11 @@ export function PlantTimesheetV2({
 
   const handleSubmit = () => {
     if (!validateBeforeSave()) return;
+    setShowConfirmationModal(true);
+  };
+
+  const handleConfirmSubmission = () => {
+    setShowConfirmationModal(false);
     setShowSignatureDialog(true);
   };
 
@@ -1755,7 +1780,7 @@ export function PlantTimesheetV2({
                     ) : null}
 
                     <div className="space-y-4 max-w-full">
-                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem] gap-3 items-end">
+                      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4rem_4rem] gap-3 items-end">
                         <div className="space-y-2">
                           <Label className="text-foreground text-xl">Start Time</Label>
                           <MobileNumericTimeInput
@@ -1796,6 +1821,24 @@ export function PlantTimesheetV2({
                             } disabled:opacity-30 disabled:cursor-not-allowed`}
                           >
                             <Moon className={`h-7 w-7 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                          </button>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-foreground text-sm leading-tight">Night</Label>
+                          <button
+                            type="button"
+                            aria-pressed={entry.night_shift}
+                            aria-label={`${DAY_NAMES[index]} Night Shift`}
+                            title="Night Shift"
+                            onClick={() => updateEntry(index, { night_shift: !entry.night_shift })}
+                            disabled={disableInputs}
+                            className={`flex h-16 w-16 items-center justify-center rounded-lg border-2 transition-all ${
+                              entry.night_shift
+                                ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20'
+                                : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                            } disabled:opacity-30 disabled:cursor-not-allowed`}
+                          >
+                            <Moon className={`h-7 w-7 ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`} />
                           </button>
                         </div>
                       </div>
@@ -2204,6 +2247,21 @@ export function PlantTimesheetV2({
                                 <Moon className={`h-5 w-5 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                               </button>
 
+                              <button
+                                type="button"
+                                onClick={() => updateEntry(index, { night_shift: !entry.night_shift })}
+                                disabled={disableInputs}
+                                aria-pressed={entry.night_shift}
+                                className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
+                                  entry.night_shift
+                                    ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20'
+                                    : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
+                                } disabled:opacity-30 disabled:cursor-not-allowed`}
+                                title="Night Shift"
+                              >
+                                <Moon className={`h-5 w-5 ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`} />
+                              </button>
+
                               {hasTrainingBooking && (
                                 <button
                                   type="button"
@@ -2495,6 +2553,25 @@ export function PlantTimesheetV2({
           if (!open) setDidNotWorkReasonDayIndex(null);
         }}
         onConfirm={handleDidNotWorkReasonConfirm}
+      />
+
+      <ConfirmationModal
+        open={showConfirmationModal}
+        onClose={() => setShowConfirmationModal(false)}
+        onConfirm={handleConfirmSubmission}
+        weekEnding={weekEnding}
+        userId={selectedEmployeeId}
+        entries={entries.map((entry) => ({
+          ...entry,
+          bank_holiday: bankHolidays.has(
+            formatLocalIsoDate(
+              getTimesheetEntryDateFromWeekEnding(weekEnding, entry.day_of_week)
+            )
+          ),
+        }))}
+        offDayStates={effectiveOffDayStates}
+        regNumber={isHiredPlant ? hiredPlantIdSerial : selectedPlant?.plant_id || ''}
+        submitting={false}
       />
 
       <Dialog open={showSignatureDialog} onOpenChange={setShowSignatureDialog}>

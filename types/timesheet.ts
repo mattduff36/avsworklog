@@ -61,6 +61,7 @@ export interface Timesheet {
   adjusted_at: string | null;
   adjustment_recipients: string[] | null;
   processed_at: string | null;
+  current_payroll_snapshot_id?: string | null;
   created_at: string;
   updated_at: string;
   entries?: TimesheetEntry[];

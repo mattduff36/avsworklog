@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { sendTimesheetAdjustmentEmail } from '@/lib/utils/email';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { Database } from '@/types/database';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { notifyProcessedAbsenceTimesheetAdjustment } from '@/lib/server/processed-absence-notifications';
+import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
+import {
+  applyTimesheetAdjustmentMutation,
+  type AdjustableTimesheetEntryInput,
+} from '@/lib/server/timesheet-adjust';
 
 function getSupabaseAdmin() {
   return createSupabaseAdmin<Database>(
@@ -30,7 +36,16 @@ export async function POST(
     type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
     const db = supabase as unknown as DbClient;
     const { id: timesheetId } = await params;
-    const { comments, notifyManagerIds } = await request.json();
+    const body = (await request.json()) as {
+      comments?: unknown;
+      notifyManagerIds?: unknown;
+      entries?: AdjustableTimesheetEntryInput[];
+    };
+    const comments = body.comments;
+    const notifyManagerIds = Array.isArray(body.notifyManagerIds)
+      ? body.notifyManagerIds.filter((id): id is string => typeof id === 'string')
+      : [];
+    const entries = Array.isArray(body.entries) ? body.entries : null;
 
     if (!comments || typeof comments !== 'string' || comments.trim().length === 0) {
       return NextResponse.json(
@@ -39,7 +54,6 @@ export async function POST(
       );
     }
 
-    // Get current user and check effective role (respects View As mode)
     const effectiveRole = await getEffectiveRole();
     if (!effectiveRole.user_id) {
       return NextResponse.json(
@@ -56,17 +70,9 @@ export async function POST(
       );
     }
 
-    // Fetch profile for downstream use (name, etc.)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id, full_name')
-      .eq('id', effectiveRole.user_id)
-      .single();
-
-    const typedProfile = profile as { id: string; full_name: string } | null;
-
-    // Get timesheet details
-    const { data: timesheet, error: timesheetError } = await supabase
+    // Authorize employee scope before any payroll mutation.
+    const admin = createAdminClient();
+    const { data: target, error: targetError } = await admin
       .from('timesheets')
       .select(`
         id,
@@ -76,59 +82,76 @@ export async function POST(
         profiles:user_id (
           id,
           full_name
-        )
+        ),
+        employee:profiles!timesheets_user_id_fkey(team_id)
       `)
       .eq('id', timesheetId)
-      .single();
+      .maybeSingle();
 
-    const typedTimesheet = timesheet as unknown as {
+    const typedTimesheet = target as unknown as {
       id: string;
       user_id: string;
       week_ending: string;
       status: string;
       profiles: { id: string; full_name: string };
+      employee: { team_id?: string | null } | null;
     } | null;
 
-    if (timesheetError || !typedTimesheet) {
+    if (targetError || !typedTimesheet) {
       return NextResponse.json(
         { error: 'Timesheet not found' },
         { status: 404 }
       );
     }
 
-    // Get employee email from auth.users using admin client
-    const supabaseAdmin = getSupabaseAdmin();
-    const { data: { user: employeeUser }, error: employeeUserError } = await supabaseAdmin.auth.admin.getUserById(typedTimesheet.user_id);
-    
-    if (employeeUserError) {
-      console.error('Error fetching employee email:', employeeUserError);
+    const scoped = await filterTimesheetRowsForReportScope([{
+      id: typedTimesheet.id,
+      user_id: typedTimesheet.user_id,
+      employee: typedTimesheet.employee,
+    }]);
+    if (scoped.length !== 1) {
+      return NextResponse.json(
+        { error: 'You cannot adjust this employee’s timesheet' },
+        { status: 403 }
+      );
     }
 
-    const employeeEmail = employeeUser?.email || null;
-
-    if (typedTimesheet.status !== 'approved') {
+    if (typedTimesheet.status !== 'approved' && typedTimesheet.status !== 'adjusted') {
       return NextResponse.json(
-        { error: 'Only approved timesheets can be marked as adjusted' },
+        { error: 'Only approved or already-adjusted timesheets can be marked as adjusted' },
         { status: 400 }
       );
     }
 
-    // Update timesheet status
-    const { error: updateError } = await db
-      .from('timesheets')
-      .update({
-        status: 'adjusted',
-        adjusted_by: effectiveRole.user_id!,
-        adjusted_at: new Date().toISOString(),
-        adjustment_recipients: notifyManagerIds || [],
-        manager_comments: comments.trim(),
-      } as never)
-      .eq('id', timesheetId);
-
-    if (updateError) {
-      console.error('Error updating timesheet:', updateError);
-      throw updateError;
+    if (typedTimesheet.status === 'approved' && entries === null) {
+      return NextResponse.json(
+        { error: 'Entry payload is required when adjusting an approved timesheet' },
+        { status: 400 }
+      );
     }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .eq('id', effectiveRole.user_id)
+      .single();
+    const typedProfile = profile as { id: string; full_name: string } | null;
+
+    // Demote + rewrite entries in one DB transaction after auth/scope passed.
+    await applyTimesheetAdjustmentMutation({
+      timesheetId,
+      actorId: effectiveRole.user_id,
+      comments: comments.trim(),
+      notifyManagerIds,
+      entries,
+    });
+
+    const supabaseAdmin = getSupabaseAdmin();
+    const { data: { user: employeeUser }, error: employeeUserError } = await supabaseAdmin.auth.admin.getUserById(typedTimesheet.user_id);
+    if (employeeUserError) {
+      console.error('Error fetching employee email:', employeeUserError);
+    }
+    const employeeEmail = employeeUser?.email || null;
 
     const employeeProfile = typedTimesheet.profiles;
     const weekEnding = new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
@@ -138,7 +161,6 @@ export async function POST(
       year: 'numeric',
     });
 
-    // Send email to employee
     if (employeeEmail) {
       const emailResult = await sendTimesheetAdjustmentEmail({
         to: employeeEmail,
@@ -154,8 +176,7 @@ export async function POST(
       }
     }
 
-    // Send emails to selected managers
-    if (notifyManagerIds && notifyManagerIds.length > 0) {
+    if (notifyManagerIds.length > 0) {
       const { data: managers } = await db
         .from('profiles')
         .select('id, full_name')
@@ -163,12 +184,10 @@ export async function POST(
       const typedManagers = (managers || []) as Array<{ id: string; full_name: string }>;
 
       if (typedManagers.length > 0) {
-        // Get emails from auth.users for these managers
-        // Fetch each user by ID to avoid pagination limits of listUsers()
         for (const manager of typedManagers) {
           try {
             const { data: { user: managerUser }, error: managerUserError } = await supabaseAdmin.auth.admin.getUserById(manager.id);
-            
+
             if (!managerUserError && managerUser?.email) {
               await sendTimesheetAdjustmentEmail({
                 to: managerUser.email,
@@ -188,7 +207,6 @@ export async function POST(
       }
     }
 
-    // Create in-app notification for employee
     const { data: employeeMessage } = await db
       .from('messages')
       .insert({
@@ -219,8 +237,7 @@ export async function POST(
         });
     }
 
-    // Create in-app notifications for selected managers
-    if (notifyManagerIds && notifyManagerIds.length > 0) {
+    if (notifyManagerIds.length > 0) {
       const { data: managerMessage } = await db
         .from('messages')
         .insert({
@@ -288,4 +305,3 @@ export async function POST(
     );
   }
 }
-

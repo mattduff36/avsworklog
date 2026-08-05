@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
@@ -18,6 +19,8 @@ import { normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet
 import { collectUniqueJobNumbers } from '@/lib/utils/timesheet-job-codes';
 import { isSubsistencePaymentRequired } from '@/lib/utils/timesheet-subsistence';
 import type { TimesheetEntry } from '@/types/timesheet';
+import { calculateLegacyPayroll } from '@/lib/payroll/legacy';
+import type { LegacyPayrollDayInput } from '@/lib/payroll/types';
 
 type AbsenceReasonRow = {
   name?: string | null;
@@ -51,7 +54,23 @@ type EmployeeRow = {
   team_id?: string | null;
 };
 
+interface PayrollSnapshotRow {
+  revision: number;
+  basic_minutes: number;
+  overtime_minutes: number;
+  double_time_minutes: number;
+  payable_minutes: number;
+  paid_leave_units: number | string;
+  unpaid_leave_units: number | string;
+  operator_travel_minutes: number;
+  ipr_units: number | string;
+  subsistence_days: number;
+  subsistence_day_names: string[];
+  rule_set?: { name?: string | null; rule_key?: string | null } | null;
+}
+
 type TimesheetRow = {
+  id: string;
   user_id: string;
   week_ending: string;
   timesheet_type?: string | null;
@@ -59,6 +78,7 @@ type TimesheetRow = {
   reviewed_at?: string | null;
   employee?: EmployeeRow | null;
   timesheet_entries?: TimesheetEntryRow[] | null;
+  current_payroll_snapshot?: PayrollSnapshotRow | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -90,8 +110,9 @@ export async function GET(request: NextRequest) {
     }
     const { dateFrom, dateTo } = range;
 
-    // Build query for approved timesheets only
-    let query = supabase
+    // Candidate rows use the session client without payroll snapshots. Snapshot
+    // hydration uses the service role only for IDs that pass report scope.
+    let candidateQuery = supabase
       .from('timesheets')
       .select(`
         id,
@@ -130,13 +151,19 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (dateFrom) {
-      query = query.gte('week_ending', dateFrom);
+      candidateQuery = candidateQuery.gte('week_ending', dateFrom);
     }
     if (dateTo) {
-      query = query.lte('week_ending', dateTo);
+      candidateQuery = candidateQuery.lte('week_ending', dateTo);
     }
 
-    const { data: timesheets, error } = await query;
+    const [{ data: candidateTimesheets, error }, { data: rolloutRows, error: rolloutError }] = await Promise.all([
+      candidateQuery,
+      supabase
+        .from('payroll_rollout_activations')
+        .select('effective_week_ending')
+        .order('effective_week_ending', { ascending: true }),
+    ]);
 
     // Fetch approved paid absences in the date range
     let absenceQuery = supabase
@@ -182,10 +209,94 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching absences:', absenceError);
       // Continue without absences rather than fail completely
     }
+    if (rolloutError) {
+      return NextResponse.json({ error: 'Unable to verify payroll rollout configuration.' }, { status: 500 });
+    }
 
-    const scopedTimesheets = await filterTimesheetRowsForReportScope((timesheets || []) as TimesheetRow[]);
+    const scopedCandidates = await filterTimesheetRowsForReportScope(
+      (candidateTimesheets || []) as unknown as TimesheetRow[]
+    );
+    if (scopedCandidates.length === 0) {
+      return NextResponse.json({ error: 'No approved timesheets found for the specified criteria' }, { status: 404 });
+    }
+
+    const scopedIds = scopedCandidates.map((timesheet) => timesheet.id);
+    const admin = createAdminClient();
+    const { data: hydratedTimesheets, error: hydrateError } = await admin
+      .from('timesheets')
+      .select(`
+        id,
+        week_ending,
+        timesheet_type,
+        template_version,
+        submitted_at,
+        reviewed_at,
+        user_id,
+        current_payroll_snapshot:timesheet_payroll_snapshots!timesheets_current_payroll_snapshot_id_fkey (
+          revision,
+          basic_minutes,
+          overtime_minutes,
+          double_time_minutes,
+          payable_minutes,
+          paid_leave_units,
+          unpaid_leave_units,
+          operator_travel_minutes,
+          ipr_units,
+          subsistence_days,
+          subsistence_day_names,
+          rule_set:payroll_rule_sets!timesheet_payroll_snapshots_rule_set_id_fkey (
+            name,
+            rule_key
+          )
+        ),
+        employee:profiles!timesheets_user_id_fkey (
+          id,
+          full_name,
+          employee_id,
+          team_id
+        ),
+        timesheet_entries (
+          day_of_week,
+          time_started,
+          time_finished,
+          daily_total,
+          working_in_yard,
+          subsistence_payment_required,
+          did_not_work,
+          remarks,
+          job_number,
+          timesheet_entry_job_codes (
+            job_number,
+            display_order
+          ),
+          night_shift,
+          bank_holiday
+        )
+      `)
+      .in('id', scopedIds)
+      .eq('status', 'approved')
+      .order('week_ending', { ascending: false });
+    if (hydrateError) {
+      console.error('Error hydrating scoped payroll snapshots:', hydrateError);
+      return NextResponse.json({ error: hydrateError.message }, { status: 500 });
+    }
+
+    const scopedTimesheets = (hydratedTimesheets || []) as unknown as TimesheetRow[];
     if (scopedTimesheets.length === 0) {
       return NextResponse.json({ error: 'No approved timesheets found for the specified criteria' }, { status: 404 });
+    }
+    const rolloutWeeks = (rolloutRows || []).map((row) => row.effective_week_ending);
+    const missingPostCutoverSnapshot = scopedTimesheets.find((timesheet) =>
+      !timesheet.current_payroll_snapshot
+      && rolloutWeeks.some((week) => week <= timesheet.week_ending)
+    );
+    if (missingPostCutoverSnapshot) {
+      return NextResponse.json(
+        {
+          error: `Payroll snapshot missing for approved timesheet ${missingPostCutoverSnapshot.id}. Export is blocked to protect payroll history.`,
+        },
+        { status: 409 }
+      );
     }
 
     const scopedEmployeeIds = new Set(scopedTimesheets.map((timesheet) => timesheet.user_id));
@@ -226,6 +337,10 @@ export async function GET(request: NextRequest) {
     // Transform data for Excel - Payroll format
     const excelData: Array<Record<string, string>> = [];
     const dnwDetailsData: Array<Record<string, string>> = [];
+    const usesSnapshotPayroll = scopedTimesheets.some((timesheet) => Boolean(timesheet.current_payroll_snapshot));
+    const basicHoursKey = usesSnapshotPayroll ? 'Basic Hours' : 'Basic Hours (Mon-Fri)';
+    const overtimeHoursKey = usesSnapshotPayroll ? 'Overtime Hours' : 'Overtime 1.5x (Weekend)';
+    const doubleTimeHoursKey = usesSnapshotPayroll ? 'Double Time Hours' : 'Overtime 2x (Night/Bank Holiday)';
     const dayNameMap: Record<number, string> = {
       1: 'Monday',
       2: 'Tuesday',
@@ -265,6 +380,7 @@ export async function GET(request: NextRequest) {
         offDayStates
       );
       const leaveDaysBreakdown = buildLeaveDaysBreakdown(offDayStates);
+      const snapshot = timesheet.current_payroll_snapshot || null;
 
       // Calculate hours by category based on new payroll rules:
       // - Mon-Fri: All hours at basic rate (no limit)
@@ -277,6 +393,7 @@ export async function GET(request: NextRequest) {
       let overtime2Hours = 0; // Night shifts + Bank holidays at 2x
       let subsistenceDays = 0;
       const subsistenceDayNames: string[] = [];
+      const legacyPayrollDays: LegacyPayrollDayInput[] = [];
 
       entries.forEach((entry) => {
         const dnwReason = getDidNotWorkReasonInfo(entry.did_not_work, entry.remarks);
@@ -306,26 +423,38 @@ export async function GET(request: NextRequest) {
           subsistenceDayNames.push(dayNameMap[dayOfWeek] || String(dayOfWeek));
         }
 
-        // Priority: Night shift or Bank Holiday takes precedence (2x rate)
-        if (isNightShift || isBankHoliday) {
-          overtime2Hours += hours;
-        }
-        // Weekend work (Sat/Sun) at 1.5x rate - day 6 = Saturday, day 7 = Sunday
-        else if (dayOfWeek === 6 || dayOfWeek === 7) {
-          overtime15Hours += hours;
-        }
-        // Mon-Fri at basic rate (all hours, no cap) - days 1-5
-        else {
-          basicHours += hours;
-        }
+        legacyPayrollDays.push({
+          dayOfWeek,
+          workedHours: hours,
+          nightShift: isNightShift,
+          bankHoliday: isBankHoliday,
+        });
       });
 
-      const totalHours = basicHours + overtime15Hours + overtime2Hours;
+      const legacyBreakdown = calculateLegacyPayroll(legacyPayrollDays);
+      basicHours = legacyBreakdown.basicHours;
+      overtime15Hours = legacyBreakdown.overtimeHours;
+      overtime2Hours = legacyBreakdown.doubleTimeHours;
+      const totalHours = legacyBreakdown.totalHours;
 
       // Get absence data for this employee
       const employeeAbsences = absencesByEmployee.get(timesheet.user_id) || { paidDays: 0, unpaidDays: 0 };
-      const paidAbsenceHours = employeeAbsences.paidDays > 0 ? Number((employeeAbsences.paidDays * 9).toFixed(2)) : null;
-      const unpaidAbsenceHours = employeeAbsences.unpaidDays > 0 ? Number((employeeAbsences.unpaidDays * 9).toFixed(2)) : null;
+      const paidAbsenceHours = !snapshot && employeeAbsences.paidDays > 0
+        ? Number((employeeAbsences.paidDays * 9).toFixed(2))
+        : null;
+      const unpaidAbsenceHours = !snapshot && employeeAbsences.unpaidDays > 0
+        ? Number((employeeAbsences.unpaidDays * 9).toFixed(2))
+        : null;
+      const exportedBasicHours = snapshot ? snapshot.basic_minutes / 60 : basicHours;
+      const exportedOvertimeHours = snapshot ? snapshot.overtime_minutes / 60 : overtime15Hours;
+      const exportedDoubleTimeHours = snapshot ? snapshot.double_time_minutes / 60 : overtime2Hours;
+      const exportedWorkedHours = snapshot ? snapshot.payable_minutes / 60 : leaveAwareTotals.weekly.workedHours;
+      const exportedPaidLeaveDays = snapshot ? Number(snapshot.paid_leave_units) : leaveDaysBreakdown.paidLeaveDays;
+      const exportedUnpaidLeaveDays = snapshot ? Number(snapshot.unpaid_leave_units) : leaveDaysBreakdown.unpaidLeaveDays;
+      const exportedLeaveDays = exportedPaidLeaveDays + exportedUnpaidLeaveDays;
+      const exportedSubsistenceDays = snapshot ? snapshot.subsistence_days : subsistenceDays;
+      const exportedSubsistenceNames = snapshot ? snapshot.subsistence_day_names : subsistenceDayNames;
+      const exportedTotalHours = snapshot ? snapshot.payable_minutes / 60 : totalHours;
 
       excelData.push({
         'Employee Name': employee?.full_name || 'Unknown',
@@ -335,33 +464,41 @@ export async function GET(request: NextRequest) {
           excludeDidNotWork: true,
           excludeWorkingInYard: true,
         }).join(', ') || '-',
-        'Basic Hours (Mon-Fri)': formatExcelHours(basicHours),
-        'Overtime 1.5x (Weekend)': formatExcelHours(overtime15Hours),
-        'Overtime 2x (Night/Bank Holiday)': formatExcelHours(overtime2Hours),
-        'Worked Hours': formatExcelHours(leaveAwareTotals.weekly.workedHours),
-        'Leave Days': leaveDaysBreakdown.leaveDays > 0 ? leaveDaysBreakdown.leaveDays.toFixed(1) : '-',
-        'Paid Absence (Days)': leaveDaysBreakdown.paidLeaveDays > 0 ? leaveDaysBreakdown.paidLeaveDays.toFixed(1) : '-',
-        'Unpaid Absence (Days)': leaveDaysBreakdown.unpaidLeaveDays > 0 ? leaveDaysBreakdown.unpaidLeaveDays.toFixed(1) : '-',
-        'Weekly Total (Hours + Days)': leaveAwareTotals.weekly.display,
-        'Subsistence Days': subsistenceDays > 0 ? String(subsistenceDays) : '-',
-        'Subsistence Dates': subsistenceDayNames.join(', ') || '-',
+        'Payroll Rule': snapshot?.rule_set?.name || 'Legacy',
+        'Snapshot Revision': snapshot ? String(snapshot.revision) : '-',
+        [basicHoursKey]: formatExcelHours(exportedBasicHours),
+        [overtimeHoursKey]: formatExcelHours(exportedOvertimeHours),
+        [doubleTimeHoursKey]: formatExcelHours(exportedDoubleTimeHours),
+        'Worked Hours': formatExcelHours(exportedWorkedHours),
+        'Leave Days': exportedLeaveDays > 0 ? exportedLeaveDays.toFixed(1) : '-',
+        'Paid Absence (Days)': exportedPaidLeaveDays > 0 ? exportedPaidLeaveDays.toFixed(1) : '-',
+        'Unpaid Absence (Days)': exportedUnpaidLeaveDays > 0 ? exportedUnpaidLeaveDays.toFixed(1) : '-',
+        'Weekly Total (Hours + Days)': snapshot
+          ? `${exportedWorkedHours.toFixed(2)} hours + ${exportedLeaveDays.toFixed(1)} days`
+          : leaveAwareTotals.weekly.display,
+        'Operator Travel Hours': snapshot ? formatExcelHours(snapshot.operator_travel_minutes / 60) : '-',
+        'IPR Units': snapshot ? Number(snapshot.ipr_units).toFixed(1) : '-',
+        'Subsistence Days': exportedSubsistenceDays > 0 ? String(exportedSubsistenceDays) : '-',
+        'Subsistence Dates': exportedSubsistenceNames.join(', ') || '-',
         'Paid Absence Hours': formatExcelHours(paidAbsenceHours),
         'Unpaid Absence Hours': formatExcelHours(unpaidAbsenceHours),
-        'Total Hours': formatExcelHours(totalHours),
+        'Total Hours': formatExcelHours(exportedTotalHours),
         'Approved Date': timesheet.reviewed_at ? formatExcelDate(timesheet.reviewed_at) : '-',
       });
     });
 
     // Add summary totals
-    const totalBasic = excelData.reduce((sum, row) => sum + (parseFloat(row['Basic Hours (Mon-Fri)']) || 0), 0);
-    const totalOvertime15 = excelData.reduce((sum, row) => sum + (parseFloat(row['Overtime 1.5x (Weekend)']) || 0), 0);
-    const totalOvertime2 = excelData.reduce((sum, row) => sum + (parseFloat(row['Overtime 2x (Night/Bank Holiday)']) || 0), 0);
+    const totalBasic = excelData.reduce((sum, row) => sum + (parseFloat(row[basicHoursKey]) || 0), 0);
+    const totalOvertime15 = excelData.reduce((sum, row) => sum + (parseFloat(row[overtimeHoursKey]) || 0), 0);
+    const totalOvertime2 = excelData.reduce((sum, row) => sum + (parseFloat(row[doubleTimeHoursKey]) || 0), 0);
     const totalWorkedHours = excelData.reduce((sum, row) => sum + (parseFloat(row['Worked Hours']) || 0), 0);
     const totalLeaveDays = excelData.reduce((sum, row) => sum + (parseFloat(row['Leave Days']) || 0), 0);
     const totalPaidDays = excelData.reduce((sum, row) => sum + (parseFloat(row['Paid Absence (Days)']) || 0), 0);
     const totalUnpaidDays = excelData.reduce((sum, row) => sum + (parseFloat(row['Unpaid Absence (Days)']) || 0), 0);
     const totalPaidAbsence = excelData.reduce((sum, row) => sum + (parseFloat(row['Paid Absence Hours']) || 0), 0);
     const totalUnpaidAbsence = excelData.reduce((sum, row) => sum + (parseFloat(row['Unpaid Absence Hours']) || 0), 0);
+    const totalOperatorTravel = excelData.reduce((sum, row) => sum + (parseFloat(row['Operator Travel Hours']) || 0), 0);
+    const totalIprUnits = excelData.reduce((sum, row) => sum + (parseFloat(row['IPR Units']) || 0), 0);
     const totalSubsistenceDays = excelData.reduce((sum, row) => sum + (parseFloat(row['Subsistence Days']) || 0), 0);
     const totalHours = excelData.reduce((sum, row) => sum + (parseFloat(row['Total Hours']) || 0), 0);
 
@@ -370,14 +507,18 @@ export async function GET(request: NextRequest) {
       'Employee ID': '',
       'Week Ending': '',
       'Job Numbers': '',
-      'Basic Hours (Mon-Fri)': '',
-      'Overtime 1.5x (Weekend)': '',
-      'Overtime 2x (Night/Bank Holiday)': '',
+      'Payroll Rule': '',
+      'Snapshot Revision': '',
+      [basicHoursKey]: '',
+      [overtimeHoursKey]: '',
+      [doubleTimeHoursKey]: '',
       'Worked Hours': '',
       'Leave Days': '',
       'Paid Absence (Days)': '',
       'Unpaid Absence (Days)': '',
       'Weekly Total (Hours + Days)': '',
+      'Operator Travel Hours': '',
+      'IPR Units': '',
       'Subsistence Days': '',
       'Subsistence Dates': '',
       'Paid Absence Hours': '',
@@ -390,14 +531,18 @@ export async function GET(request: NextRequest) {
       'Employee Name': 'TOTALS',
       'Employee ID': `${scopedTimesheets.length} timesheets`,
       'Week Ending': '',
-      'Basic Hours (Mon-Fri)': totalBasic.toFixed(2),
-      'Overtime 1.5x (Weekend)': totalOvertime15.toFixed(2),
-      'Overtime 2x (Night/Bank Holiday)': totalOvertime2.toFixed(2),
+      'Payroll Rule': '',
+      'Snapshot Revision': '',
+      [basicHoursKey]: totalBasic.toFixed(2),
+      [overtimeHoursKey]: totalOvertime15.toFixed(2),
+      [doubleTimeHoursKey]: totalOvertime2.toFixed(2),
       'Worked Hours': totalWorkedHours.toFixed(2),
       'Leave Days': totalLeaveDays.toFixed(1),
       'Paid Absence (Days)': totalPaidDays.toFixed(1),
       'Unpaid Absence (Days)': totalUnpaidDays.toFixed(1),
       'Weekly Total (Hours + Days)': `${totalWorkedHours.toFixed(2)} hours + ${totalLeaveDays.toFixed(1)} days`,
+      'Operator Travel Hours': totalOperatorTravel.toFixed(2),
+      'IPR Units': totalIprUnits.toFixed(1),
       'Subsistence Days': totalSubsistenceDays > 0 ? totalSubsistenceDays.toFixed(0) : '-',
       'Subsistence Dates': '',
       'Paid Absence Hours': totalPaidAbsence.toFixed(2),
@@ -420,7 +565,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Generate Excel file
+    // Generate Excel file. A fully pre-cutover export retains the legacy column shape.
     const buffer = await generateExcelFile([
       {
         sheetName: 'Payroll Report',
@@ -428,14 +573,22 @@ export async function GET(request: NextRequest) {
           { header: 'Employee Name', key: 'Employee Name', width: 20 },
           { header: 'Employee ID', key: 'Employee ID', width: 12 },
           { header: 'Week Ending', key: 'Week Ending', width: 12 },
-          { header: 'Basic Hours (Mon-Fri)', key: 'Basic Hours (Mon-Fri)', width: 18 },
-          { header: 'Overtime 1.5x (Weekend)', key: 'Overtime 1.5x (Weekend)', width: 20 },
-          { header: 'Overtime 2x (Night/Bank Holiday)', key: 'Overtime 2x (Night/Bank Holiday)', width: 26 },
+          ...(usesSnapshotPayroll ? [
+            { header: 'Payroll Rule', key: 'Payroll Rule', width: 16 },
+            { header: 'Snapshot Revision', key: 'Snapshot Revision', width: 16 },
+          ] : []),
+          { header: basicHoursKey, key: basicHoursKey, width: 18 },
+          { header: overtimeHoursKey, key: overtimeHoursKey, width: 20 },
+          { header: doubleTimeHoursKey, key: doubleTimeHoursKey, width: 26 },
           { header: 'Worked Hours', key: 'Worked Hours', width: 14 },
           { header: 'Leave Days', key: 'Leave Days', width: 12 },
           { header: 'Paid Absence (Days)', key: 'Paid Absence (Days)', width: 18 },
           { header: 'Unpaid Absence (Days)', key: 'Unpaid Absence (Days)', width: 20 },
           { header: 'Weekly Total (Hours + Days)', key: 'Weekly Total (Hours + Days)', width: 26 },
+          ...(usesSnapshotPayroll ? [
+            { header: 'Operator Travel Hours', key: 'Operator Travel Hours', width: 20 },
+            { header: 'IPR Units', key: 'IPR Units', width: 12 },
+          ] : []),
           { header: 'Subsistence Days', key: 'Subsistence Days', width: 18 },
           { header: 'Subsistence Dates', key: 'Subsistence Dates', width: 30 },
           { header: 'Paid Absence Hours', key: 'Paid Absence Hours', width: 18 },

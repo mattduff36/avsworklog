@@ -198,6 +198,7 @@ export function PlantTimesheetV2({
             job_numbers: existingEntry.job_number ? [existingEntry.job_number] : [],
             working_in_yard: existingEntry.working_in_yard || false,
             subsistence_payment_required: isSubsistencePaymentRequired(existingEntry),
+            night_shift: existingEntry.night_shift || false,
             time_started: existingEntry.time_started || '',
             time_finished: existingEntry.time_finished || '',
             operator_travel_hours: toHoursInput(existingEntry.operator_travel_hours),

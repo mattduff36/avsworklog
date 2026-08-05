@@ -11,6 +11,7 @@ export interface PlantEntryDraft {
   job_numbers: string[];
   working_in_yard: boolean;
   subsistence_payment_required: boolean;
+  night_shift: boolean;
   time_started: string;
   time_finished: string;
   operator_travel_hours: string;
@@ -40,6 +41,7 @@ export const EMPTY_ENTRY: Omit<PlantEntryDraft, 'day_of_week'> = {
   job_numbers: [],
   working_in_yard: false,
   subsistence_payment_required: false,
+  night_shift: false,
   time_started: '',
   time_finished: '',
   operator_travel_hours: '',

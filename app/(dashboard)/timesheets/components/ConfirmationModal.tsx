@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -19,6 +20,8 @@ import { formatHours } from '@/lib/utils/time-calculations';
 import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import { collectUniqueJobNumbers, getEntryJobNumbers } from '@/lib/utils/timesheet-job-codes';
+import { minutesToHours } from '@/lib/payroll/calculate';
+import type { PayrollWeekBreakdown } from '@/lib/payroll/types';
 
 interface TimesheetEntry {
   day_of_week: number;
@@ -30,6 +33,7 @@ interface TimesheetEntry {
   subsistence_payment_required?: boolean;
   did_not_work: boolean;
   daily_total: number | null;
+  operator_travel_hours?: number | string | null;
   remarks: string;
   night_shift?: boolean;
   bank_holiday?: boolean;
@@ -40,6 +44,7 @@ interface ConfirmationModalProps {
   onClose: () => void;
   onConfirm: () => void;
   weekEnding: string;
+  userId: string;
   entries: TimesheetEntry[];
   offDayStates?: TimesheetOffDayState[];
   regNumber: string;
@@ -51,11 +56,14 @@ export function ConfirmationModal({
   onClose,
   onConfirm,
   weekEnding,
+  userId,
   entries,
   offDayStates = [],
   regNumber,
   submitting,
 }: ConfirmationModalProps) {
+  const [payrollPreview, setPayrollPreview] = useState<PayrollWeekBreakdown | null>(null);
+  const [payrollPreviewMessage, setPayrollPreviewMessage] = useState('');
   const leaveAwareTotals = buildLeaveAwareTotals(entries, offDayStates);
   const offDayByDay = new Map(offDayStates.map((state) => [state.day_of_week, state] as const));
   const weeklyTotalMultiline = formatLeaveAwareWeeklyDisplayMultiline(
@@ -85,6 +93,55 @@ export function ConfirmationModal({
       !offDayByDay.get(entry.day_of_week)?.hasTrainingBooking &&
       getEntryJobNumbers(entry).length === 0
   ).length;
+
+  useEffect(() => {
+    if (!open || !userId || !weekEnding) return;
+    const controller = new AbortController();
+    const offDayByDayForPreview = new Map(offDayStates.map((state) => [state.day_of_week, state]));
+    void fetch('/api/timesheets/payroll-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        userId,
+        weekEnding,
+        days: entries.map((entry) => {
+          const offDay = offDayByDayForPreview.get(entry.day_of_week);
+          return {
+            dayOfWeek: entry.day_of_week,
+            timeStarted: entry.time_started || null,
+            timeFinished: entry.time_finished || null,
+            workedMinutesOverride: Math.round((entry.daily_total || 0) * 60),
+            nightShift: entry.night_shift === true,
+            bankHoliday: entry.bank_holiday === true,
+            didNotWork: entry.did_not_work,
+            paidLeaveUnits: offDay?.paidLeaveUnits || 0,
+            unpaidLeaveUnits: offDay?.unpaidLeaveUnits || 0,
+            operatorTravelHours: Number(entry.operator_travel_hours || 0),
+            subsistence: entry.subsistence_payment_required === true,
+          };
+        }),
+      }),
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          legacy?: boolean;
+          breakdown?: PayrollWeekBreakdown | null;
+          error?: string;
+        };
+        if (!response.ok) throw new Error(payload.error || 'Payroll preview failed');
+        setPayrollPreview(payload.breakdown || null);
+        setPayrollPreviewMessage(payload.legacy
+          ? 'This week remains on the legacy payroll calculation because it is before the configured rollout.'
+          : '');
+      })
+      .catch((error) => {
+        if ((error as Error).name === 'AbortError') return;
+        setPayrollPreview(null);
+        setPayrollPreviewMessage(error instanceof Error ? error.message : 'Payroll preview unavailable');
+      });
+    return () => controller.abort();
+  }, [entries, offDayStates, open, userId, weekEnding]);
 
   // Generate warnings (Q9 requirements)
   const warnings: string[] = [];
@@ -183,6 +240,26 @@ export function ConfirmationModal({
                 </ul>
               </AlertDescription>
             </Alert>
+          )}
+
+          {(payrollPreview || payrollPreviewMessage) && (
+            <div className="rounded-lg border border-timesheet/40 bg-timesheet/10 p-4">
+              <h3 className="font-semibold text-foreground">Payroll Breakdown</h3>
+              {payrollPreview ? (
+                <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+                  <div><p className="text-xs text-muted-foreground">Basic</p><p className="font-bold">{minutesToHours(payrollPreview.basicMinutes).toFixed(2)}h</p></div>
+                  <div><p className="text-xs text-muted-foreground">Overtime</p><p className="font-bold">{minutesToHours(payrollPreview.overtimeMinutes).toFixed(2)}h</p></div>
+                  <div><p className="text-xs text-muted-foreground">Double Time</p><p className="font-bold">{minutesToHours(payrollPreview.doubleTimeMinutes).toFixed(2)}h</p></div>
+                  <div><p className="text-xs text-muted-foreground">Rule</p><p className="font-bold capitalize">{payrollPreview.ruleSetKey}</p></div>
+                  <div><p className="text-xs text-muted-foreground">Paid leave</p><p className="font-bold">{payrollPreview.paidLeaveUnits.toFixed(1)} days</p></div>
+                  <div><p className="text-xs text-muted-foreground">Unpaid leave</p><p className="font-bold">{payrollPreview.unpaidLeaveUnits.toFixed(1)} days</p></div>
+                  <div><p className="text-xs text-muted-foreground">Operator travel</p><p className="font-bold">{minutesToHours(payrollPreview.operatorTravelMinutes).toFixed(2)}h</p></div>
+                  <div><p className="text-xs text-muted-foreground">IPR</p><p className="font-bold">{payrollPreview.iprUnits.toFixed(1)}</p></div>
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-muted-foreground">{payrollPreviewMessage}</p>
+              )}
+            </div>
           )}
 
           {/* Day-by-Day Breakdown */}

@@ -7,6 +7,15 @@ import { mockSupabaseAuthUser, mockSupabaseQuery, mockFetch } from '../../utils/
 import type { EffectiveRoleInfo } from '@/lib/utils/view-as';
 
 vi.mock('@/lib/supabase/server');
+vi.mock('@/lib/supabase/admin', () => ({
+  createAdminClient: vi.fn(),
+}));
+vi.mock('@/lib/server/reports-timesheet-scope', () => ({
+  filterTimesheetRowsForReportScope: vi.fn(async <T>(rows: T[]) => rows),
+}));
+vi.mock('@/lib/server/timesheet-adjust', () => ({
+  applyTimesheetAdjustmentMutation: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock('@/lib/utils/view-as');
 vi.mock('@/lib/utils/rbac', () => ({
   canEffectiveRoleAccessModule: vi.fn(),
@@ -29,7 +38,20 @@ vi.mock('@supabase/supabase-js', async (importOriginal) => {
   };
 });
 
-async function setupAdminClientMock() {
+const sampleEntries = [
+  {
+    day_of_week: 1,
+    time_started: '08:00',
+    time_finished: '16:00',
+    daily_total: 8,
+    did_not_work: false,
+    working_in_yard: false,
+    remarks: null,
+    job_numbers: ['JOB-1'],
+  },
+];
+
+async function setupAuthAdminClientMock() {
   const sjs = await import('@supabase/supabase-js');
   vi.mocked(sjs.createClient).mockReturnValue({
     auth: {
@@ -60,17 +82,87 @@ async function mockEffectiveRole(overrides: Partial<EffectiveRoleInfo> = {}) {
   vi.mocked(getEffectiveRole).mockResolvedValue({ ...defaults, ...overrides });
 }
 
+async function mockScopedAdminTimesheet(options: {
+  timesheet: ReturnType<typeof createMockTimesheet>;
+}) {
+  const { createAdminClient } = await import('@/lib/supabase/admin');
+  vi.mocked(createAdminClient).mockReturnValue({
+    from: vi.fn((table: string) => {
+      if (table === 'timesheets') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue(mockSupabaseQuery({
+                ...options.timesheet,
+                profiles: { id: 'employee-id', full_name: 'Employee' },
+                employee: { team_id: 'team-1' },
+              })),
+            }),
+          }),
+        };
+      }
+      return {};
+    }),
+  } as never);
+}
+
+function mockSessionClient(actor: { id: string; full_name?: string }, extras?: {
+  managerRows?: Array<{ id: string; full_name: string; email?: string }>;
+  messageInsertMock?: ReturnType<typeof vi.fn>;
+  recipientInsertMock?: ReturnType<typeof vi.fn>;
+}) {
+  const messageInsertMock = extras?.messageInsertMock || vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      single: vi.fn().mockResolvedValue(mockSupabaseQuery({ id: 'message-id' })),
+    }),
+  });
+  const recipientInsertMock = extras?.recipientInsertMock || vi.fn().mockResolvedValue(mockSupabaseQuery({}));
+  return {
+    auth: {
+      getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: actor.id })),
+    },
+    from: vi.fn((table: string) => {
+      if (table === 'profiles') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue(mockSupabaseQuery({
+                id: actor.id,
+                full_name: actor.full_name || 'Actor',
+              })),
+            }),
+            in: vi.fn().mockResolvedValue(mockSupabaseQuery(extras?.managerRows || [])),
+          }),
+        };
+      }
+      if (table === 'messages') {
+        return { insert: messageInsertMock };
+      }
+      if (table === 'message_recipients') {
+        return { insert: recipientInsertMock };
+      }
+      return {};
+    }),
+    messageInsertMock,
+    recipientInsertMock,
+  };
+}
+
 describe('POST /api/timesheets/[id]/adjust', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     mockFetch({ id: 'mock-email-id' });
-    await setupAdminClientMock();
+    await setupAuthAdminClientMock();
     const rbac = await import('@/lib/utils/rbac');
     const email = await import('@/lib/utils/email');
     const processedAbsenceNotifications = await import('@/lib/server/processed-absence-notifications');
+    const scope = await import('@/lib/server/reports-timesheet-scope');
+    const adjustMutation = await import('@/lib/server/timesheet-adjust');
     vi.mocked(email.sendTimesheetAdjustmentEmail).mockResolvedValue({ success: true });
     vi.mocked(rbac.canEffectiveRoleAccessModule).mockResolvedValue(true);
     vi.mocked(processedAbsenceNotifications.notifyProcessedAbsenceTimesheetAdjustment).mockResolvedValue(['accounts-supervisor']);
+    vi.mocked(scope.filterTimesheetRowsForReportScope).mockImplementation(async (rows) => rows);
+    vi.mocked(adjustMutation.applyTimesheetAdjustmentMutation).mockResolvedValue(undefined);
     const logger = await import('@/lib/utils/server-error-logger');
     vi.mocked(logger.logServerError).mockResolvedValue(undefined);
   });
@@ -85,7 +177,7 @@ describe('POST /api/timesheets/[id]/adjust', () => {
 
       const request = new Request('http://localhost/api/timesheets/test-id/adjust', {
         method: 'POST',
-        body: JSON.stringify({ comments: 'Test', notifyManagerIds: [] }),
+        body: JSON.stringify({ comments: 'Test', notifyManagerIds: [], entries: sampleEntries }),
       });
 
       const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
@@ -99,69 +191,32 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const manager = createMockManager();
       const timesheet = createMockTimesheet({ status: 'approved' });
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
-      
+      await mockScopedAdminTimesheet({ timesheet });
+
       const { createClient } = await import('@/lib/supabase/server');
-      const mockClient = {
-        auth: {
-          getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
-        },
-        from: vi.fn((table: string) => {
-          if (table === 'profiles') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...manager,
-                    roles: { is_manager_admin: true },
-                  })),
-                }),
-                in: vi.fn().mockResolvedValue(mockSupabaseQuery([])),
-              }),
-            };
-          }
-          if (table === 'timesheets') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...timesheet,
-                    profiles: { id: 'employee-id', full_name: 'Employee', email: 'employee@test.com' },
-                  })),
-                }),
-              }),
-              update: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
-              }),
-            };
-          }
-          if (table === 'messages') {
-            return {
-              insert: vi.fn().mockReturnValue({
-                select: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({ id: 'message-id' })),
-                }),
-              }),
-            };
-          }
-          if (table === 'message_recipients') {
-            return {
-              insert: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
-            };
-          }
-        }),
-      };
+      vi.mocked(createClient).mockResolvedValueOnce(
+        mockSessionClient(manager) as unknown as SupabaseClient
+      );
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
+      const response = await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({ comments: 'Adjusted hours', notifyManagerIds: [], entries: sampleEntries }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
 
-      const request = new Request('http://localhost/api/timesheets/test-id/adjust', {
-        method: 'POST',
-        body: JSON.stringify({ comments: 'Adjusted hours', notifyManagerIds: [] }),
-      });
-
-      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
-      
       const processedAbsenceNotifications = await import('@/lib/server/processed-absence-notifications');
+      const adjustMutation = await import('@/lib/server/timesheet-adjust');
       expect(response.status).toBe(200);
+      expect(adjustMutation.applyTimesheetAdjustmentMutation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          timesheetId: 'test-id',
+          actorId: manager.id,
+          comments: 'Adjusted hours',
+          entries: sampleEntries,
+        })
+      );
       expect(processedAbsenceNotifications.notifyProcessedAbsenceTimesheetAdjustment).toHaveBeenCalledWith(
         expect.objectContaining({ auth: expect.any(Object) }),
         expect.objectContaining({
@@ -178,68 +233,48 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const admin = createMockAdmin();
       const timesheet = createMockTimesheet({ status: 'approved' });
       await mockEffectiveRole({ user_id: admin.id, is_manager_admin: true });
-      
+      await mockScopedAdminTimesheet({ timesheet });
       const { createClient } = await import('@/lib/supabase/server');
-      const mockClient = {
-        auth: {
-          getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: admin.id })),
-        },
-        from: vi.fn((table: string) => {
-          if (table === 'profiles') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...admin,
-                    roles: { is_manager_admin: true },
-                  })),
-                }),
-                in: vi.fn().mockResolvedValue(mockSupabaseQuery([])),
-              }),
-            };
-          }
-          if (table === 'timesheets') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...timesheet,
-                    profiles: { id: 'employee-id', full_name: 'Employee', email: 'employee@test.com' },
-                  })),
-                }),
-              }),
-              update: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
-              }),
-            };
-          }
-          if (table === 'messages') {
-            return {
-              insert: vi.fn().mockReturnValue({
-                select: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({ id: 'message-id' })),
-                }),
-              }),
-            };
-          }
-          if (table === 'message_recipients') {
-            return {
-              insert: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
-            };
-          }
-        }),
-      };
+      vi.mocked(createClient).mockResolvedValueOnce(
+        mockSessionClient(admin) as unknown as SupabaseClient
+      );
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
+      const response = await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({ comments: 'Adjusted hours', notifyManagerIds: [], entries: sampleEntries }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
 
-      const request = new Request('http://localhost/api/timesheets/test-id/adjust', {
-        method: 'POST',
-        body: JSON.stringify({ comments: 'Adjusted hours', notifyManagerIds: [] }),
-      });
-
-      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
-      
       expect(response.status).toBe(200);
+    });
+
+    it('PAY-AUTH-ADJUST-001 rejects out-of-scope employees before mutation', async () => {
+      const manager = createMockManager();
+      const timesheet = createMockTimesheet({ status: 'approved' });
+      await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
+      await mockScopedAdminTimesheet({ timesheet });
+      const scope = await import('@/lib/server/reports-timesheet-scope');
+      const adjustMutation = await import('@/lib/server/timesheet-adjust');
+      vi.mocked(scope.filterTimesheetRowsForReportScope).mockResolvedValueOnce([]);
+      const { createClient } = await import('@/lib/supabase/server');
+      vi.mocked(createClient).mockResolvedValueOnce(
+        mockSessionClient(manager) as unknown as SupabaseClient
+      );
+
+      const response = await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({ comments: 'Adjusted hours', notifyManagerIds: [], entries: sampleEntries }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(403);
+      expect(data.error).toContain('cannot adjust');
+      expect(adjustMutation.applyTimesheetAdjustmentMutation).not.toHaveBeenCalled();
     });
   });
 
@@ -248,19 +283,19 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const manager = createMockManager();
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
       const { createClient } = await import('@/lib/supabase/server');
-      
       vi.mocked(createClient).mockResolvedValueOnce({
         auth: {
           getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
         },
       } as unknown as SupabaseClient);
 
-      const request = new Request('http://localhost/api/timesheets/test-id/adjust', {
-        method: 'POST',
-        body: JSON.stringify({ notifyManagerIds: [] }),
-      });
-
-      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({ notifyManagerIds: [], entries: sampleEntries }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -271,19 +306,19 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const manager = createMockManager();
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
       const { createClient } = await import('@/lib/supabase/server');
-      
       vi.mocked(createClient).mockResolvedValueOnce({
         auth: {
           getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
         },
       } as unknown as SupabaseClient);
 
-      const request = new Request('http://localhost/api/timesheets/test-id/adjust', {
-        method: 'POST',
-        body: JSON.stringify({ comments: '', notifyManagerIds: [] }),
-      });
-
-      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({ comments: '', notifyManagerIds: [], entries: sampleEntries }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
       const data = await response.json();
 
       expect(response.status).toBe(400);
@@ -296,52 +331,76 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const manager = createMockManager();
       const timesheet = createMockTimesheet({ status: 'submitted' });
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
-      
+      await mockScopedAdminTimesheet({ timesheet });
       const { createClient } = await import('@/lib/supabase/server');
-      const mockClient = {
-        auth: {
-          getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
-        },
-        from: vi.fn((table: string) => {
-          if (table === 'profiles') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    id: manager.id,
-                    roles: { is_manager_admin: true },
-                  })),
-                }),
-              }),
-            };
-          }
-          if (table === 'timesheets') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...timesheet,
-                    profiles: { id: 'employee-id', full_name: 'Employee', email: 'employee@test.com' },
-                  })),
-                }),
-              }),
-            };
-          }
-        }),
-      };
+      vi.mocked(createClient).mockResolvedValueOnce(
+        mockSessionClient(manager) as unknown as SupabaseClient
+      );
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
-
-      const request = new Request('http://localhost/api/timesheets/test-id/adjust', {
-        method: 'POST',
-        body: JSON.stringify({ comments: 'Test', notifyManagerIds: [] }),
-      });
-
-      const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
+      const response = await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({ comments: 'Test', notifyManagerIds: [], entries: sampleEntries }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
       const data = await response.json();
 
       expect(response.status).toBe(400);
       expect(data.error).toContain('approved');
+    });
+
+    it('PAY-ADJUST-ADJUSTED-STATE accepts already-adjusted timesheets', async () => {
+      const manager = createMockManager();
+      const timesheet = createMockTimesheet({ status: 'adjusted' });
+      await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
+      await mockScopedAdminTimesheet({ timesheet });
+      const adjustMutation = await import('@/lib/server/timesheet-adjust');
+      const { createClient } = await import('@/lib/supabase/server');
+      vi.mocked(createClient).mockResolvedValueOnce(
+        mockSessionClient(manager) as unknown as SupabaseClient
+      );
+
+      const response = await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({ comments: 'Follow-up note', notifyManagerIds: [] }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
+
+      expect(response.status).toBe(200);
+      expect(adjustMutation.applyTimesheetAdjustmentMutation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          comments: 'Follow-up note',
+          entries: null,
+        })
+      );
+    });
+
+    it('requires entries when adjusting an approved timesheet', async () => {
+      const manager = createMockManager();
+      const timesheet = createMockTimesheet({ status: 'approved' });
+      await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
+      await mockScopedAdminTimesheet({ timesheet });
+      const adjustMutation = await import('@/lib/server/timesheet-adjust');
+      const { createClient } = await import('@/lib/supabase/server');
+      vi.mocked(createClient).mockResolvedValueOnce(
+        mockSessionClient(manager) as unknown as SupabaseClient
+      );
+
+      const response = await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({ comments: 'Missing entries', notifyManagerIds: [] }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data.error).toContain('Entry payload is required');
+      expect(adjustMutation.applyTimesheetAdjustmentMutation).not.toHaveBeenCalled();
     });
   });
 
@@ -351,82 +410,36 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const timesheet = createMockTimesheet({ status: 'approved' });
       const recipients = ['manager2-id', 'manager3-id'];
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
-      const updateMock = vi.fn().mockReturnValue({
-        eq: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
-      });
-      
+      await mockScopedAdminTimesheet({ timesheet });
+      const adjustMutation = await import('@/lib/server/timesheet-adjust');
       const { createClient } = await import('@/lib/supabase/server');
-      const mockClient = {
-        auth: {
-          getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
-        },
-        from: vi.fn((table: string) => {
-          if (table === 'profiles') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...manager,
-                    roles: { is_manager_admin: true },
-                  })),
-                }),
-                in: vi.fn().mockResolvedValue(mockSupabaseQuery([
-                  { id: 'manager2-id', full_name: 'Manager 2', email: 'manager2@test.com' },
-                  { id: 'manager3-id', full_name: 'Manager 3', email: 'manager3@test.com' },
-                ])),
-              }),
-            };
-          }
-          if (table === 'timesheets') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...timesheet,
-                    profiles: { id: 'employee-id', full_name: 'Employee', email: 'employee@test.com' },
-                  })),
-                }),
-              }),
-              update: updateMock,
-            };
-          }
-          if (table === 'messages') {
-            return {
-              insert: vi.fn().mockReturnValue({
-                select: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({ id: 'message-id' })),
-                }),
-              }),
-            };
-          }
-          if (table === 'message_recipients') {
-            return {
-              insert: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
-            };
-          }
-        }),
-      };
-
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
-
-      const request = new Request('http://localhost/api/timesheets/test-id/adjust', {
-        method: 'POST',
-        body: JSON.stringify({ comments: 'Corrected hours', notifyManagerIds: recipients }),
-      });
-
-      await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
-
-      expect(updateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          status: 'adjusted',
-          adjusted_by: manager.id,
-          adjustment_recipients: recipients,
-          manager_comments: 'Corrected hours',
-        })
+      vi.mocked(createClient).mockResolvedValueOnce(
+        mockSessionClient(manager, {
+          managerRows: [
+            { id: 'manager2-id', full_name: 'Manager 2', email: 'manager2@test.com' },
+            { id: 'manager3-id', full_name: 'Manager 3', email: 'manager3@test.com' },
+          ],
+        }) as unknown as SupabaseClient
       );
-      expect(updateMock).toHaveBeenCalledWith(
+
+      await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({
+            comments: 'Corrected hours',
+            notifyManagerIds: recipients,
+            entries: sampleEntries,
+          }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
+
+      expect(adjustMutation.applyTimesheetAdjustmentMutation).toHaveBeenCalledWith(
         expect.objectContaining({
-          adjusted_at: expect.any(String),
+          actorId: manager.id,
+          comments: 'Corrected hours',
+          notifyManagerIds: recipients,
+          entries: sampleEntries,
         })
       );
     });
@@ -437,69 +450,20 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const manager = createMockManager();
       const timesheet = createMockTimesheet({ status: 'approved', user_id: 'employee-id' });
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
-      const messageInsertMock = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue(mockSupabaseQuery({ id: 'message-id' })),
-        }),
-      });
-      
+      await mockScopedAdminTimesheet({ timesheet });
+      const session = mockSessionClient(manager);
       const { createClient } = await import('@/lib/supabase/server');
-      const mockClient = {
-        auth: {
-          getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
-        },
-        from: vi.fn((table: string) => {
-          if (table === 'profiles') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...manager,
-                    roles: { is_manager_admin: true },
-                  })),
-                }),
-                in: vi.fn().mockResolvedValue(mockSupabaseQuery([])),
-              }),
-            };
-          }
-          if (table === 'timesheets') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...timesheet,
-                    profiles: { id: 'employee-id', full_name: 'Employee', email: 'employee@test.com' },
-                  })),
-                }),
-              }),
-              update: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
-              }),
-            };
-          }
-          if (table === 'messages') {
-            return {
-              insert: messageInsertMock,
-            };
-          }
-          if (table === 'message_recipients') {
-            return {
-              insert: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
-            };
-          }
-        }),
-      };
+      vi.mocked(createClient).mockResolvedValueOnce(session as unknown as SupabaseClient);
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
+      await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({ comments: 'Adjusted', notifyManagerIds: [], entries: sampleEntries }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
 
-      const request = new Request('http://localhost/api/timesheets/test-id/adjust', {
-        method: 'POST',
-        body: JSON.stringify({ comments: 'Adjusted', notifyManagerIds: [] }),
-      });
-
-      await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
-
-      expect(messageInsertMock).toHaveBeenCalledWith(
+      expect(session.messageInsertMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'NOTIFICATION',
           subject: expect.stringContaining('Adjusted'),
@@ -514,75 +478,27 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const timesheet = createMockTimesheet({ status: 'approved' });
       const recipients = ['manager2-id'];
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
-      const messageInsertMock = vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue(mockSupabaseQuery({ id: 'message-id' })),
-        }),
+      await mockScopedAdminTimesheet({ timesheet });
+      const session = mockSessionClient(manager, {
+        managerRows: [{ id: 'manager2-id', full_name: 'Manager 2', email: 'manager2@test.com' }],
       });
-      const recipientInsertMock = vi.fn().mockResolvedValue(mockSupabaseQuery({}));
-      
       const { createClient } = await import('@/lib/supabase/server');
-      const mockClient = {
-        auth: {
-          getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
-        },
-        from: vi.fn((table: string) => {
-          if (table === 'profiles') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...manager,
-                    roles: { is_manager_admin: true },
-                  })),
-                }),
-                in: vi.fn().mockResolvedValue(mockSupabaseQuery([
-                  { id: 'manager2-id', full_name: 'Manager 2', email: 'manager2@test.com' },
-                ])),
-              }),
-            };
-          }
-          if (table === 'timesheets') {
-            return {
-              select: vi.fn().mockReturnValue({
-                eq: vi.fn().mockReturnValue({
-                  single: vi.fn().mockResolvedValue(mockSupabaseQuery({
-                    ...timesheet,
-                    profiles: { id: 'employee-id', full_name: 'Employee', email: 'employee@test.com' },
-                  })),
-                }),
-              }),
-              update: vi.fn().mockReturnValue({
-                eq: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
-              }),
-            };
-          }
-          if (table === 'messages') {
-            return {
-              insert: messageInsertMock,
-            };
-          }
-          if (table === 'message_recipients') {
-            return {
-              insert: recipientInsertMock,
-            };
-          }
-        }),
-      };
+      vi.mocked(createClient).mockResolvedValueOnce(session as unknown as SupabaseClient);
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
+      await POST(
+        new Request('http://localhost/api/timesheets/test-id/adjust', {
+          method: 'POST',
+          body: JSON.stringify({
+            comments: 'Adjusted',
+            notifyManagerIds: recipients,
+            entries: sampleEntries,
+          }),
+        }) as NextRequest,
+        { params: Promise.resolve({ id: 'test-id' }) }
+      );
 
-      const request = new Request('http://localhost/api/timesheets/test-id/adjust', {
-        method: 'POST',
-        body: JSON.stringify({ comments: 'Adjusted', notifyManagerIds: recipients }),
-      });
-
-      await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
-
-      // Should create notifications for managers
-      expect(messageInsertMock).toHaveBeenCalledTimes(2); // Once for employee, once for managers
-      expect(recipientInsertMock).toHaveBeenCalled();
+      expect(session.messageInsertMock).toHaveBeenCalledTimes(2);
+      expect(session.recipientInsertMock).toHaveBeenCalled();
     });
   });
 });
-

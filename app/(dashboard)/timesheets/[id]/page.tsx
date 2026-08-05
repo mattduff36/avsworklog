@@ -10,6 +10,10 @@ import { Button } from '@/components/ui/button';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Input } from '@/components/ui/input';
 import { JobCodeFields } from '@/components/timesheets/JobCodeFields';
+import {
+  PayrollSnapshotCard,
+  type PayrollSnapshotView,
+} from '@/components/timesheets/PayrollSnapshotCard';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -57,6 +61,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import type { PayrollWeekBreakdown } from '@/lib/payroll/types';
 
 export default function ViewTimesheetPage() {
   const router = useRouter();
@@ -85,6 +90,9 @@ export default function ViewTimesheetPage() {
   const [dataChanged, setDataChanged] = useState(false);
   const [manuallyEditedDays, setManuallyEditedDays] = useState<Set<number>>(new Set());
   const [offDayStates, setOffDayStates] = useState<TimesheetOffDayState[]>([]);
+  const [payrollSnapshot, setPayrollSnapshot] = useState<PayrollSnapshotView | null>(null);
+  const [payrollHistory, setPayrollHistory] = useState<PayrollSnapshotView[]>([]);
+  const [payrollPreview, setPayrollPreview] = useState<PayrollWeekBreakdown | null>(null);
   const [trainingDeclineDayOfWeek, setTrainingDeclineDayOfWeek] = useState<number | null>(null);
   const [decliningTraining, setDecliningTraining] = useState(false);
 
@@ -111,7 +119,7 @@ export default function ViewTimesheetPage() {
     try {
       setError(''); // Clear any previous errors
       
-      // Fetch timesheet
+      // Fetch timesheet without payroll joins; snapshots load through a scoped API.
       const { data: timesheetData, error: timesheetError } = await supabase
         .from('timesheets')
         .select('*')
@@ -123,6 +131,8 @@ export default function ViewTimesheetPage() {
           setTimesheet(null);
           setEntries([]);
           setOffDayStates([]);
+          setPayrollSnapshot(null);
+          setPayrollHistory([]);
           setSignature(null);
           setError('Timesheet not found. It may have been deleted.');
           setLoading(false);
@@ -130,12 +140,14 @@ export default function ViewTimesheetPage() {
         }
         throw timesheetError;
       }
-      
-      // Check if user has access
+
+      // Authorize before hydrating payroll snapshot history into client state.
       if (!isManager && !isAdmin && !isSuperAdmin && timesheetData.user_id !== user?.id) {
         setTimesheet(null);
         setEntries([]);
         setOffDayStates([]);
+        setPayrollSnapshot(null);
+        setPayrollHistory([]);
         setSignature(null);
         setError('You do not have permission to view this timesheet');
         setLoading(false);
@@ -148,6 +160,37 @@ export default function ViewTimesheetPage() {
         created_at: timesheetData.created_at ?? '',
         updated_at: timesheetData.updated_at ?? '',
       });
+
+      try {
+        const payrollResponse = await fetch(`/api/timesheets/${id}/payroll`);
+        const payrollPayload = (await payrollResponse.json()) as {
+          current?: PayrollSnapshotView | null;
+          history?: PayrollSnapshotView[];
+          error?: string;
+        };
+        if (!payrollResponse.ok) {
+          if (payrollResponse.status === 403) {
+            setTimesheet(null);
+            setEntries([]);
+            setOffDayStates([]);
+            setPayrollSnapshot(null);
+            setPayrollHistory([]);
+            setSignature(null);
+            setError(payrollPayload.error || 'You do not have permission to view this timesheet');
+            setLoading(false);
+            return;
+          }
+          throw new Error(payrollPayload.error || 'Failed to load payroll snapshots');
+        }
+        setPayrollSnapshot(payrollPayload.current || null);
+        setPayrollHistory(
+          (payrollPayload.history || []).sort((left, right) => right.revision - left.revision)
+        );
+      } catch (payrollError) {
+        console.warn('Failed to load scoped payroll snapshots:', payrollError);
+        setPayrollSnapshot(null);
+        setPayrollHistory([]);
+      }
       setSignature(timesheetData.signature_data);
 
       // Fetch entries
@@ -246,6 +289,56 @@ export default function ViewTimesheetPage() {
     () => normalizeTimesheetEntriesForDisplay(timesheet, entries, offDayStates),
     [timesheet, entries, offDayStates]
   );
+
+  useEffect(() => {
+    if (
+      !timesheet
+      || !['submitted', 'adjusted'].includes(timesheet.status)
+      || (payrollSnapshot && timesheet.status !== 'adjusted')
+    ) {
+      setPayrollPreview(null);
+      return;
+    }
+    const controller = new AbortController();
+    const offDayByDay = new Map(offDayStates.map((state) => [state.day_of_week, state]));
+    void fetch('/api/timesheets/payroll-preview', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        userId: timesheet.user_id,
+        weekEnding: timesheet.week_ending,
+        days: displayEntries.map((entry) => {
+          const offDay = offDayByDay.get(entry.day_of_week);
+          return {
+            dayOfWeek: entry.day_of_week,
+            timeStarted: entry.time_started,
+            timeFinished: entry.time_finished,
+            workedMinutesOverride: Math.round((entry.daily_total || 0) * 60),
+            nightShift: entry.night_shift === true,
+            bankHoliday: entry.bank_holiday === true,
+            didNotWork: entry.did_not_work,
+            paidLeaveUnits: offDay?.paidLeaveUnits || 0,
+            unpaidLeaveUnits: offDay?.unpaidLeaveUnits || 0,
+            operatorTravelHours: entry.operator_travel_hours || 0,
+            subsistence: entry.subsistence_payment_required === true,
+          };
+        }),
+      }),
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          breakdown?: PayrollWeekBreakdown | null;
+          error?: string;
+        };
+        if (!response.ok) throw new Error(payload.error || 'Payroll preview failed');
+        setPayrollPreview(payload.breakdown || null);
+      })
+      .catch((previewError) => {
+        if ((previewError as Error).name !== 'AbortError') setPayrollPreview(null);
+      });
+    return () => controller.abort();
+  }, [displayEntries, offDayStates, payrollSnapshot, timesheet]);
 
   const trimTrailingEmptyJobNumbers = (values: string[]): string[] => {
     const next = [...values];
@@ -465,12 +558,25 @@ export default function ViewTimesheetPage() {
         };
       }
 
-      // Update timesheet
+      // Approved dirty edits must use the scoped /adjust API so auth, employee
+      // scope, demotion, entry rewrite, and notifications happen server-side.
+      if (timesheet.status === 'approved' && dataChanged) {
+        const errorMessage =
+          'Approved timesheets with changes must be marked as Adjusted with a comment before saving.';
+        setError(errorMessage);
+        return {
+          success: false,
+          errorMessage,
+        };
+      }
+
+      const timesheetUpdate: Database['public']['Tables']['timesheets']['Update'] = {
+        updated_at: new Date().toISOString(),
+      };
+
       const { error: timesheetError } = await supabase
         .from('timesheets')
-        .update({
-          updated_at: new Date().toISOString(),
-        })
+        .update(timesheetUpdate)
         .eq('id', timesheet.id);
 
       if (timesheetError) throw timesheetError;
@@ -639,16 +745,13 @@ export default function ViewTimesheetPage() {
 
     setSaving(true);
     try {
-      const { error } = await supabase
-        .from('timesheets')
-        .update({
-          status: 'approved',
-          reviewed_by: user?.id,
-          reviewed_at: new Date().toISOString(),
-        })
-        .eq('id', timesheet.id);
-
-      if (error) throw error;
+      const response = await fetch(`/api/timesheets/${timesheet.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'Failed to approve');
       
       await fetchTimesheet(timesheet.id);
     } catch (err) {
@@ -745,16 +848,31 @@ export default function ViewTimesheetPage() {
     if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin) || !user) return;
 
     try {
-      // Save the entries first
-      const saveResult = await handleSave();
-      if (!saveResult.success) {
-        if (saveResult.errorMessage) {
-          toast.error(saveResult.errorMessage, { id: 'timesheet-details-adjust-save-validation' });
-        }
+      setSaving(true);
+      setError('');
+
+      const entriesToPersist = normalizeTimesheetEntriesForDisplay(timesheet, entries, offDayStates);
+      if (jobCodeOptionsLoading) {
+        const errorMessage = 'Job codes are still loading. Please wait a moment, then try again.';
+        setError(errorMessage);
+        toast.error(errorMessage, { id: 'timesheet-details-adjust-save-validation' });
         return;
       }
 
-      // Call API endpoint to handle adjustment with notifications
+      const invalidJobEntry = entriesToPersist.find((entry) => {
+        const hasHours = Boolean(entry.time_started && entry.time_finished);
+        if (!hasHours || entry.did_not_work || entry.working_in_yard) return false;
+        return !areCataloguedJobNumbers(entry.job_numbers, cataloguedJobNumbers);
+      });
+      if (invalidJobEntry) {
+        const errorMessage = `${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: select at least one valid Job Number from the job-code list and do not repeat the same code on a single day.`;
+        setError(errorMessage);
+        toast.error(errorMessage, { id: 'timesheet-details-adjust-save-validation' });
+        return;
+      }
+
+      // Auth, employee scope, demotion, entry rewrite, and notifications all run
+      // on the server. Do not mutate approved rows from the browser first.
       const response = await fetch(`/api/timesheets/${timesheet.id}/adjust`, {
         method: 'POST',
         headers: {
@@ -763,6 +881,7 @@ export default function ViewTimesheetPage() {
         body: JSON.stringify({
           comments,
           notifyManagerIds: selectedManagerIds,
+          entries: entriesToPersist,
         }),
       });
 
@@ -781,6 +900,8 @@ export default function ViewTimesheetPage() {
       console.error('Adjustment error:', err, { errorContextId });
       toast.error(err instanceof Error ? err.message : 'Failed to mark as adjusted', { id: errorContextId });
       throw err; // Re-throw to let modal handle it
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -864,7 +985,7 @@ export default function ViewTimesheetPage() {
   const hasElevatedAccess = isManager || isAdmin || isSuperAdmin;
   const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected' || (hasElevatedAccess && timesheet.status === 'approved'));
   const canSubmit = timesheet.user_id === user?.id && (timesheet.status === 'draft' || timesheet.status === 'rejected');
-  const canApprove = hasElevatedAccess && timesheet.status === 'submitted';
+  const canApprove = hasElevatedAccess && ['submitted', 'adjusted'].includes(timesheet.status);
   const canMarkAsProcessed = hasElevatedAccess && timesheet.status === 'approved';
   const canEditApproved = hasElevatedAccess && timesheet.status === 'approved';
   const isEndState = timesheet.status === 'processed' || timesheet.status === 'adjusted';
@@ -1352,6 +1473,39 @@ export default function ViewTimesheetPage() {
             </Card>
           </div>
 
+          {payrollSnapshot && <PayrollSnapshotCard snapshot={payrollSnapshot} />}
+          {payrollPreview && (
+            <PayrollSnapshotCard
+              title={`${timesheet.status === 'adjusted' ? 'Reapproval' : 'Provisional'} Payroll Breakdown — ${payrollPreview.ruleSetKey}`}
+              snapshot={{
+                revision: 0,
+                basic_minutes: payrollPreview.basicMinutes,
+                overtime_minutes: payrollPreview.overtimeMinutes,
+                double_time_minutes: payrollPreview.doubleTimeMinutes,
+                paid_leave_units: payrollPreview.paidLeaveUnits,
+                unpaid_leave_units: payrollPreview.unpaidLeaveUnits,
+                operator_travel_minutes: payrollPreview.operatorTravelMinutes,
+                ipr_units: payrollPreview.iprUnits,
+                subsistence_days: payrollPreview.subsistenceDays,
+                subsistence_day_names: payrollPreview.subsistenceDayNames,
+              }}
+            />
+          )}
+          {payrollHistory.filter((revision) => revision.id !== payrollSnapshot?.id).length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-lg font-semibold">Previous Payroll Revisions</h3>
+              {payrollHistory
+                .filter((revision) => revision.id !== payrollSnapshot?.id)
+                .map((revision) => (
+                  <PayrollSnapshotCard
+                    key={revision.id || revision.revision}
+                    title={`Superseded Payroll Revision ${revision.revision}${revision.approved_at ? ` — ${formatDate(revision.approved_at)}` : ''}`}
+                    snapshot={revision}
+                  />
+                ))}
+            </div>
+          )}
+
           {/* Signature Section */}
           {(signature || showSignaturePad) && (
             <div className="border-t pt-6">
@@ -1407,11 +1561,13 @@ export default function ViewTimesheetPage() {
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 justify-end">
-            {/* Save button for draft/rejected/approved editing */}
-            {canEdit && (
+            {/* Save button for draft/rejected editing. Approved dirty edits must use Mark as Adjusted. */}
+            {canEdit && !(timesheet.status === 'approved' && dataChanged) && (
               <Button
                 variant="outline"
-                onClick={handleSave}
+                onClick={() => {
+                  void handleSave();
+                }}
                 disabled={saving}
               >
                 <Save className="h-4 w-4 mr-2" />
@@ -1446,15 +1602,17 @@ export default function ViewTimesheetPage() {
             {/* Approve/Reject buttons for pending timesheets */}
             {canApprove && (
               <>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowRejectDialog(true)}
-                  disabled={saving}
-                  className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                >
-                  <XCircle className="h-4 w-4 mr-2" />
-                  Reject
-                </Button>
+                {timesheet.status === 'submitted' && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowRejectDialog(true)}
+                    disabled={saving}
+                    className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
+                  >
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Reject
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   onClick={handleApprove}
@@ -1462,7 +1620,7 @@ export default function ViewTimesheetPage() {
                   className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  Approve
+                  {timesheet.status === 'adjusted' ? 'Reapprove' : 'Approve'}
                 </Button>
               </>
             )}

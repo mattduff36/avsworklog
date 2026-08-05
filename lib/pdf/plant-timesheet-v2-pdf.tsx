@@ -8,6 +8,10 @@ import { buildLeaveAwareTotals } from '@/lib/utils/timesheet-leave-totals';
 import { normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
 import { formatEntryJobNumbers } from '@/lib/utils/timesheet-job-codes';
 import { addSubsistenceRemark } from '@/lib/utils/timesheet-subsistence';
+import {
+  PayrollSnapshotSummary,
+  type PayrollSnapshotPdfData,
+} from '@/lib/pdf/payroll-snapshot-summary';
 
 const styles = StyleSheet.create({
   page: {
@@ -284,6 +288,7 @@ interface PlantTimesheetV2PDFProps {
   timesheet: Timesheet;
   employeeName?: string | null;
   offDayStates?: TimesheetOffDayState[];
+  payrollSnapshot?: PayrollSnapshotPdfData | null;
 }
 
 function formatHours(value: number | null | undefined): string {
@@ -310,7 +315,12 @@ function formatPlantRemarks(entry: {
   return remarks || '';
 }
 
-export function PlantTimesheetV2PDF({ timesheet, employeeName, offDayStates = [] }: PlantTimesheetV2PDFProps) {
+export function PlantTimesheetV2PDF({
+  timesheet,
+  employeeName,
+  offDayStates = [],
+  payrollSnapshot = null,
+}: PlantTimesheetV2PDFProps) {
   const sortedEntries = (timesheet.entries || []).sort((a, b) => a.day_of_week - b.day_of_week);
   const allDays = normalizeTimesheetEntriesForDisplay(timesheet, [1, 2, 3, 4, 5, 6, 7].map((dayNum) => {
     const entry = sortedEntries.find((item) => item.day_of_week === dayNum);
@@ -510,6 +520,8 @@ export function PlantTimesheetV2PDF({ timesheet, employeeName, offDayStates = []
               </View>
             </View>
           </View>
+
+          {payrollSnapshot && <PayrollSnapshotSummary snapshot={payrollSnapshot} />}
 
           <View style={styles.declarationRow}>
             <Text style={styles.declarationText}>

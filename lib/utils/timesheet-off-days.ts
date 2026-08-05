@@ -48,6 +48,8 @@ export interface TimesheetOffDayState {
   hasPmLeave: boolean;
   workWindow: TimesheetWorkWindow | null;
   paidLeaveHours: number;
+  paidLeaveUnits: number;
+  unpaidLeaveUnits: number;
   leaveLabels: TimesheetLeaveLabel[];
   trainingLabels: TimesheetLeaveLabel[];
   pendingTrainingLabels: TimesheetLeaveLabel[];
@@ -78,7 +80,7 @@ export interface TimesheetEntryLike {
   remarks: string;
 }
 
-function formatLocalIsoDate(date: Date): string {
+export function formatLocalIsoDate(date: Date): string {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
@@ -271,6 +273,10 @@ export function resolveTimesheetOffDayStates(
       (label) => label.isPaid && (label.session === 'FULL' || label.session === 'PM')
     );
     const paidLeaveHours = roundHours((amPaid ? PAID_LEAVE_HALF_DAY_HOURS : 0) + (pmPaid ? PAID_LEAVE_HALF_DAY_HOURS : 0));
+    const paidLeaveUnits = (amPaid ? 0.5 : 0) + (pmPaid ? 0.5 : 0);
+    const unpaidLeaveUnits =
+      (hasAmCoverage && !amPaid ? 0.5 : 0)
+      + (hasPmCoverage && !pmPaid ? 0.5 : 0);
 
     let workWindow: TimesheetWorkWindow | null = null;
     if (!isLeaveLocked) {
@@ -310,6 +316,8 @@ export function resolveTimesheetOffDayStates(
       hasPmLeave,
       workWindow,
       paidLeaveHours,
+      paidLeaveUnits,
+      unpaidLeaveUnits,
       leaveLabels: effectiveLeaveLabels,
       trainingLabels: effectiveTrainingLabels,
       pendingTrainingLabels: effectivePendingTrainingLabels,

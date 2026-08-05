@@ -16,6 +16,7 @@ import {
 } from '@/lib/config/layout-preferences';
 import { TimesheetTypeExceptionsCard } from './components/TimesheetTypeExceptionsCard';
 import { DisplayBoardSettingsCard } from './components/DisplayBoardSettingsCard';
+import { PayrollRulesSettingsCard } from './components/PayrollRulesSettingsCard';
 
 const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
 
@@ -145,6 +146,7 @@ function AdminSettingsContent() {
         </TabsContent>
 
         <TabsContent value="timesheets" className="space-y-6">
+          <PayrollRulesSettingsCard />
           <TimesheetTypeExceptionsCard />
         </TabsContent>
       </Tabs>

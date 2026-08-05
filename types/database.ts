@@ -5042,6 +5042,267 @@ export type Database = {
           },
         ]
       }
+      payroll_profile_rule_assignments: {
+        Row: {
+          id: string
+          profile_id: string
+          rule_set_id: string | null
+          is_active: boolean
+          effective_week_ending: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          rule_set_id?: string | null
+          is_active?: boolean
+          effective_week_ending: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          rule_set_id?: string | null
+          is_active?: boolean
+          effective_week_ending?: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'payroll_profile_rule_assignments_profile_id_fkey'
+            columns: ['profile_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'payroll_profile_rule_assignments_rule_set_id_fkey'
+            columns: ['rule_set_id']
+            isOneToOne: false
+            referencedRelation: 'payroll_rule_sets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      payroll_rollout_activations: {
+        Row: {
+          id: string
+          effective_week_ending: string
+          activated_at: string
+          activated_by: string | null
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          effective_week_ending: string
+          activated_at?: string
+          activated_by?: string | null
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          effective_week_ending?: string
+          activated_at?: string
+          activated_by?: string | null
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'payroll_rollout_activations_activated_by_fkey'
+            columns: ['activated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      payroll_rule_day_bands: {
+        Row: {
+          id: string
+          rule_version_id: string
+          day_of_week: number
+          treatment: 'basic' | 'overtime' | 'double_time'
+          up_to_minutes: number | null
+          remainder_treatment: 'basic' | 'overtime' | 'double_time' | null
+        }
+        Insert: {
+          id?: string
+          rule_version_id: string
+          day_of_week: number
+          treatment: 'basic' | 'overtime' | 'double_time'
+          up_to_minutes?: number | null
+          remainder_treatment?: 'basic' | 'overtime' | 'double_time' | null
+        }
+        Update: {
+          id?: string
+          rule_version_id?: string
+          day_of_week?: number
+          treatment?: 'basic' | 'overtime' | 'double_time'
+          up_to_minutes?: number | null
+          remainder_treatment?: 'basic' | 'overtime' | 'double_time' | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'payroll_rule_day_bands_rule_version_id_fkey'
+            columns: ['rule_version_id']
+            isOneToOne: false
+            referencedRelation: 'payroll_rule_versions'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      payroll_rule_sets: {
+        Row: {
+          id: string
+          rule_key: 'lorries' | 'civils' | 'plant' | 'others'
+          name: string
+          status: 'draft' | 'active' | 'archived'
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          rule_key: 'lorries' | 'civils' | 'plant' | 'others'
+          name: string
+          status?: 'draft' | 'active' | 'archived'
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          rule_key?: 'lorries' | 'civils' | 'plant' | 'others'
+          name?: string
+          status?: 'draft' | 'active' | 'archived'
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      payroll_rule_versions: {
+        Row: {
+          id: string
+          rule_set_id: string
+          version_number: number
+          status: 'draft' | 'active' | 'archived'
+          effective_week_ending: string | null
+          config_schema_version: number
+          break_threshold_minutes: number
+          break_deduction_minutes: number
+          bank_holiday_treatment: 'basic' | 'overtime' | 'double_time'
+          night_shift_treatment: 'basic' | 'overtime' | 'double_time' | null
+          operator_travel_enabled: boolean
+          ipr_units_per_worked_day: number
+          ipr_weekly_cap: number
+          created_at: string
+          updated_at: string
+          created_by: string | null
+          updated_by: string | null
+          activated_at: string | null
+          activated_by: string | null
+        }
+        Insert: {
+          id?: string
+          rule_set_id: string
+          version_number: number
+          status?: 'draft' | 'active' | 'archived'
+          effective_week_ending?: string | null
+          config_schema_version?: number
+          break_threshold_minutes: number
+          break_deduction_minutes: number
+          bank_holiday_treatment: 'basic' | 'overtime' | 'double_time'
+          night_shift_treatment?: 'basic' | 'overtime' | 'double_time' | null
+          operator_travel_enabled?: boolean
+          ipr_units_per_worked_day?: number
+          ipr_weekly_cap?: number
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+          activated_at?: string | null
+          activated_by?: string | null
+        }
+        Update: {
+          id?: string
+          rule_set_id?: string
+          version_number?: number
+          status?: 'draft' | 'active' | 'archived'
+          effective_week_ending?: string | null
+          config_schema_version?: number
+          break_threshold_minutes?: number
+          break_deduction_minutes?: number
+          bank_holiday_treatment?: 'basic' | 'overtime' | 'double_time'
+          night_shift_treatment?: 'basic' | 'overtime' | 'double_time' | null
+          operator_travel_enabled?: boolean
+          ipr_units_per_worked_day?: number
+          ipr_weekly_cap?: number
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+          updated_by?: string | null
+          activated_at?: string | null
+          activated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'payroll_rule_versions_rule_set_id_fkey'
+            columns: ['rule_set_id']
+            isOneToOne: false
+            referencedRelation: 'payroll_rule_sets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      payroll_team_rule_assignments: {
+        Row: {
+          id: string
+          team_id: string
+          rule_set_id: string
+          effective_week_ending: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          team_id: string
+          rule_set_id: string
+          effective_week_ending: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          team_id?: string
+          rule_set_id?: string
+          effective_week_ending?: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'payroll_team_rule_assignments_team_id_fkey'
+            columns: ['team_id']
+            isOneToOne: false
+            referencedRelation: 'org_teams'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'payroll_team_rule_assignments_rule_set_id_fkey'
+            columns: ['rule_set_id']
+            isOneToOne: false
+            referencedRelation: 'payroll_rule_sets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       profiles: {
         Row: {
           id: string
@@ -7748,6 +8009,190 @@ export type Database = {
           },
         ]
       }
+      timesheet_payroll_snapshot_days: {
+        Row: {
+          id: string
+          snapshot_id: string
+          day_of_week: number
+          entry_date: string
+          rounded_time_started: string | null
+          rounded_time_finished: string | null
+          elapsed_minutes: number
+          break_minutes: number
+          payable_minutes: number
+          basic_minutes: number
+          overtime_minutes: number
+          double_time_minutes: number
+          paid_leave_units: number
+          unpaid_leave_units: number
+          operator_travel_minutes: number
+          ipr_units: number
+          subsistence: boolean
+          treatment_reason: 'did_not_work' | 'bank_holiday' | 'night_shift' | 'calendar'
+        }
+        Insert: {
+          id?: string
+          snapshot_id: string
+          day_of_week: number
+          entry_date: string
+          rounded_time_started?: string | null
+          rounded_time_finished?: string | null
+          elapsed_minutes: number
+          break_minutes: number
+          payable_minutes: number
+          basic_minutes: number
+          overtime_minutes: number
+          double_time_minutes: number
+          paid_leave_units?: number
+          unpaid_leave_units?: number
+          operator_travel_minutes?: number
+          ipr_units?: number
+          subsistence?: boolean
+          treatment_reason: 'did_not_work' | 'bank_holiday' | 'night_shift' | 'calendar'
+        }
+        Update: {
+          id?: string
+          snapshot_id?: string
+          day_of_week?: number
+          entry_date?: string
+          rounded_time_started?: string | null
+          rounded_time_finished?: string | null
+          elapsed_minutes?: number
+          break_minutes?: number
+          payable_minutes?: number
+          basic_minutes?: number
+          overtime_minutes?: number
+          double_time_minutes?: number
+          paid_leave_units?: number
+          unpaid_leave_units?: number
+          operator_travel_minutes?: number
+          ipr_units?: number
+          subsistence?: boolean
+          treatment_reason?: 'did_not_work' | 'bank_holiday' | 'night_shift' | 'calendar'
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'timesheet_payroll_snapshot_days_snapshot_id_fkey'
+            columns: ['snapshot_id']
+            isOneToOne: false
+            referencedRelation: 'timesheet_payroll_snapshots'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      timesheet_payroll_snapshots: {
+        Row: {
+          id: string
+          timesheet_id: string
+          revision: number
+          supersedes_snapshot_id: string | null
+          rule_set_id: string
+          rule_version_id: string
+          assignment_source: 'profile' | 'team' | 'fallback'
+          assignment_source_id: string | null
+          engine_version: number
+          input_hash: string
+          idempotency_key: string
+          basic_minutes: number
+          overtime_minutes: number
+          double_time_minutes: number
+          payable_minutes: number
+          paid_leave_units: number
+          unpaid_leave_units: number
+          operator_travel_minutes: number
+          ipr_units: number
+          subsistence_days: number
+          subsistence_day_names: string[]
+          source_evidence: Json
+          approved_by: string
+          approved_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          timesheet_id: string
+          revision: number
+          supersedes_snapshot_id?: string | null
+          rule_set_id: string
+          rule_version_id: string
+          assignment_source: 'profile' | 'team' | 'fallback'
+          assignment_source_id?: string | null
+          engine_version?: number
+          input_hash: string
+          idempotency_key: string
+          basic_minutes: number
+          overtime_minutes: number
+          double_time_minutes: number
+          payable_minutes: number
+          paid_leave_units?: number
+          unpaid_leave_units?: number
+          operator_travel_minutes?: number
+          ipr_units?: number
+          subsistence_days?: number
+          subsistence_day_names?: string[]
+          source_evidence: Json
+          approved_by: string
+          approved_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          timesheet_id?: string
+          revision?: number
+          supersedes_snapshot_id?: string | null
+          rule_set_id?: string
+          rule_version_id?: string
+          assignment_source?: 'profile' | 'team' | 'fallback'
+          assignment_source_id?: string | null
+          engine_version?: number
+          input_hash?: string
+          idempotency_key?: string
+          basic_minutes?: number
+          overtime_minutes?: number
+          double_time_minutes?: number
+          payable_minutes?: number
+          paid_leave_units?: number
+          unpaid_leave_units?: number
+          operator_travel_minutes?: number
+          ipr_units?: number
+          subsistence_days?: number
+          subsistence_day_names?: string[]
+          source_evidence?: Json
+          approved_by?: string
+          approved_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'timesheet_payroll_snapshots_timesheet_id_fkey'
+            columns: ['timesheet_id']
+            isOneToOne: false
+            referencedRelation: 'timesheets'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_payroll_snapshots_rule_set_id_fkey'
+            columns: ['rule_set_id']
+            isOneToOne: false
+            referencedRelation: 'payroll_rule_sets'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_payroll_snapshots_rule_version_id_fkey'
+            columns: ['rule_version_id']
+            isOneToOne: false
+            referencedRelation: 'payroll_rule_versions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_payroll_snapshots_supersedes_snapshot_id_fkey'
+            columns: ['supersedes_snapshot_id']
+            isOneToOne: false
+            referencedRelation: 'timesheet_payroll_snapshots'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       timesheets: {
         Row: {
           id: string
@@ -7775,6 +8220,7 @@ export type Database = {
           hired_plant_id_serial: string | null
           hired_plant_description: string | null
           hired_plant_hiring_company: string | null
+          current_payroll_snapshot_id: string | null
         }
         Insert: {
           id?: string
@@ -7802,6 +8248,7 @@ export type Database = {
           hired_plant_id_serial?: string | null
           hired_plant_description?: string | null
           hired_plant_hiring_company?: string | null
+          current_payroll_snapshot_id?: string | null
         }
         Update: {
           id?: string
@@ -7829,6 +8276,7 @@ export type Database = {
           hired_plant_id_serial?: string | null
           hired_plant_description?: string | null
           hired_plant_hiring_company?: string | null
+          current_payroll_snapshot_id?: string | null
         }
         Relationships: [
           {
@@ -7836,6 +8284,13 @@ export type Database = {
             columns: ['adjusted_by']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheets_current_payroll_snapshot_id_fkey'
+            columns: ['current_payroll_snapshot_id']
+            isOneToOne: false
+            referencedRelation: 'timesheet_payroll_snapshots'
             referencedColumns: ['id']
           },
           {
