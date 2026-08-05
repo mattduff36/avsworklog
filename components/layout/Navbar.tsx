@@ -46,6 +46,45 @@ import {
   managerNavItems, 
   adminNavItems 
 } from '@/lib/config/navigation';
+import { ReleaseVersionLink } from '@/components/layout/ReleaseVersionLink';
+import { cn } from '@/lib/utils/cn';
+
+interface NavbarBrandProps {
+  className?: string;
+  hideWordmarkOnNarrow?: boolean;
+  onNavigate?: () => void;
+}
+
+function NavbarBrand({ className, hideWordmarkOnNarrow = false, onNavigate }: NavbarBrandProps) {
+  return (
+    <div
+      className={cn(
+        'z-10 mr-4 flex flex-col items-start justify-center -translate-y-0.5',
+        className
+      )}
+    >
+      <Link
+        href="/dashboard"
+        onClick={onNavigate}
+        className="flex items-center gap-2 group leading-none"
+      >
+        <House className="h-4 w-4 text-avs-yellow transition-colors group-hover:text-white" aria-hidden="true" />
+        <div
+          className={cn(
+            'text-xl font-bold leading-none text-white transition-colors group-hover:text-avs-yellow',
+            hideWordmarkOnNarrow && 'max-[419px]:hidden'
+          )}
+        >
+          SQUIRES
+        </div>
+      </Link>
+      <ReleaseVersionLink
+        compact
+        className="ml-6 mt-0.5 text-[10px] leading-none text-slate-400 no-underline hover:text-slate-300 hover:underline focus-visible:ring-offset-slate-900"
+      />
+    </div>
+  );
+}
 
 /**
  * Get the module-specific active color classes for a nav item
@@ -609,15 +648,7 @@ export function Navbar() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {tabletModeEnabled ? (
             <div className="relative flex items-center h-16">
-              <Link
-                href="/dashboard"
-                className="z-10 flex items-center gap-2 group"
-              >
-                <House className="h-4 w-4 text-avs-yellow transition-colors group-hover:text-white" aria-hidden="true" />
-                <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
-                  SQUIRES
-                </div>
-              </Link>
+              <NavbarBrand />
               {isDashboardRoute && dashboardTopNavTaskLinks.length > 0 ? (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                   <DashboardTaskBadgeLinks
@@ -637,30 +668,15 @@ export function Navbar() {
             </div>
           ) : (
           <div className="relative flex items-center h-16">
-            {/* Mobile-only text logo */}
-            <Link 
-              href="/dashboard" 
-                className="z-10 mr-4 flex items-center gap-2 group md:hidden"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <House className="h-4 w-4 text-avs-yellow transition-colors group-hover:text-white" aria-hidden="true" />
-              <div className={`text-xl font-bold text-white group-hover:text-avs-yellow transition-colors ${
-                dashboardTopNavTaskLinks.length > 0 ? 'max-[419px]:hidden' : ''
-              }`}>
-                SQUIRES
-              </div>
-            </Link>
+            {/* Mobile-only brand */}
+            <NavbarBrand
+              className="md:hidden"
+              hideWordmarkOnNarrow={dashboardTopNavTaskLinks.length > 0}
+              onNavigate={() => setMobileMenuOpen(false)}
+            />
 
-            {/* Desktop text logo */}
-            <Link
-              href="/dashboard"
-              className="hidden md:flex flex-shrink-0 items-center gap-2 mr-4 group"
-            >
-              <House className="h-4 w-4 text-avs-yellow transition-colors group-hover:text-white" aria-hidden="true" />
-              <div className="text-xl font-bold text-white group-hover:text-avs-yellow transition-colors">
-                SQUIRES
-              </div>
-            </Link>
+            {/* Desktop brand */}
+            <NavbarBrand className="hidden md:flex flex-shrink-0" />
 
             {/* Desktop Navigation - Centered, auto-compacts to icon-only when space is tight */}
             <div

@@ -14,6 +14,7 @@ vi.mock('next/link', () => ({
 }));
 
 vi.mock('@/lib/config/release-version', () => ({
+  getPublicReleaseVersion: () => '0726.1.0',
   getPublicReleaseVersionLabel: () => 'Version 0726.1.0',
 }));
 
@@ -24,5 +25,13 @@ describe('ReleaseVersionLink', () => {
     const link = screen.getByRole('link', { name: 'Open version history' });
     expect(link).toHaveAttribute('href', '/help/version-history');
     expect(link).toHaveTextContent('Version 0726.1.0');
+  });
+
+  it('renders a compact bare version number when requested', () => {
+    render(<ReleaseVersionLink compact />);
+
+    const link = screen.getByRole('link', { name: 'Open version history' });
+    expect(link).toHaveTextContent('0726.1.0');
+    expect(link).not.toHaveTextContent('Version');
   });
 });

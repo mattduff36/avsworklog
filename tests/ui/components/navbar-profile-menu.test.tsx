@@ -95,6 +95,11 @@ vi.mock('@/components/messages/NotificationPanel', () => ({
     open ? <div data-testid="notification-panel-open">panel open</div> : null,
 }));
 
+vi.mock('@/lib/config/release-version', () => ({
+  getPublicReleaseVersion: () => '0826.3.0',
+  getPublicReleaseVersionLabel: () => 'Version 0826.3.0',
+}));
+
 describe('Navbar desktop burger menu', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -144,6 +149,22 @@ describe('Navbar desktop burger menu', () => {
         json: async () => ({ success: true, unread_count: 2 }),
       } as Response;
     }) as unknown as typeof fetch;
+  });
+
+  it('shows the release version under the brand logo without nesting links', async () => {
+    render(<Navbar />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('SQUIRES').length).toBeGreaterThan(0);
+    });
+
+    const versionLinks = screen.getAllByRole('link', { name: 'Open version history' });
+    expect(versionLinks.length).toBeGreaterThan(0);
+    expect(versionLinks[0]).toHaveAttribute('href', '/help/version-history');
+    expect(versionLinks[0]).toHaveTextContent('0826.3.0');
+
+    const nestedInsideDashboardLink = versionLinks[0].parentElement?.closest('a[href="/dashboard"]');
+    expect(nestedInsideDashboardLink).toBeNull();
   });
 
   it('renders expected desktop burger actions and opens notifications panel', async () => {

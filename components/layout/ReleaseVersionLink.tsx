@@ -1,12 +1,17 @@
 import Link from 'next/link';
-import { getPublicReleaseVersionLabel } from '@/lib/config/release-version';
+import {
+  getPublicReleaseVersion,
+  getPublicReleaseVersionLabel,
+} from '@/lib/config/release-version';
 import { cn } from '@/lib/utils/cn';
 
 interface ReleaseVersionLinkProps {
   className?: string;
+  /** Show bare version number (for compact placements such as the navbar brand). */
+  compact?: boolean;
 }
 
-export function ReleaseVersionLink({ className }: ReleaseVersionLinkProps) {
+export function ReleaseVersionLink({ className, compact = false }: ReleaseVersionLinkProps) {
   return (
     <Link
       href="/help/version-history"
@@ -16,7 +21,7 @@ export function ReleaseVersionLink({ className }: ReleaseVersionLinkProps) {
         className
       )}
     >
-      {getPublicReleaseVersionLabel()}
+      {compact ? getPublicReleaseVersion() : getPublicReleaseVersionLabel()}
     </Link>
   );
 }

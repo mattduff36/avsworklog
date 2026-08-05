@@ -6,16 +6,19 @@ export function getReleaseVersionState(): ReleaseVersionState {
   return releaseVersionState as ReleaseVersionState;
 }
 
-export function getPublicReleaseVersionLabel(): string {
+export function getPublicReleaseVersion(): string {
   const bakedVersion = process.env.NEXT_PUBLIC_APP_RELEASE_VERSION?.trim();
   if (bakedVersion) {
-    return `Version ${bakedVersion}`;
+    return bakedVersion;
   }
 
   if (process.env.NODE_ENV === 'development') {
-    const localVersion = formatReleaseVersion(getReleaseVersionState());
-    return `Version ${localVersion}`;
+    return formatReleaseVersion(getReleaseVersionState());
   }
 
-  return 'Version local';
+  return 'local';
+}
+
+export function getPublicReleaseVersionLabel(): string {
+  return `Version ${getPublicReleaseVersion()}`;
 }
