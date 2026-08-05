@@ -46,8 +46,8 @@ import {
   managerNavItems, 
   adminNavItems 
 } from '@/lib/config/navigation';
-import { ReleaseVersionLink } from '@/components/layout/ReleaseVersionLink';
 import { cn } from '@/lib/utils/cn';
+import { getPublicReleaseVersionLabel } from '@/lib/config/release-version';
 
 interface NavbarBrandProps {
   className?: string;
@@ -78,10 +78,9 @@ function NavbarBrand({ className, hideWordmarkOnNarrow = false, onNavigate }: Na
           SQUIRES
         </div>
       </Link>
-      <ReleaseVersionLink
-        compact
-        className="ml-6 mt-0.5 text-[10px] leading-none text-slate-400 no-underline hover:text-slate-300 hover:underline focus-visible:ring-offset-slate-900"
-      />
+      <span className="ml-6 mt-1.5 text-[10px] leading-none tabular-nums text-slate-400">
+        {getPublicReleaseVersionLabel()}
+      </span>
     </div>
   );
 }

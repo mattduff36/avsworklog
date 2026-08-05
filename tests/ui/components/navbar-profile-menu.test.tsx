@@ -151,20 +151,17 @@ describe('Navbar desktop burger menu', () => {
     }) as unknown as typeof fetch;
   });
 
-  it('shows the release version under the brand logo without nesting links', async () => {
+  it('shows a non-clickable Version label under the brand logo', async () => {
     render(<Navbar />);
 
     await waitFor(() => {
       expect(screen.getAllByText('SQUIRES').length).toBeGreaterThan(0);
     });
 
-    const versionLinks = screen.getAllByRole('link', { name: 'Open version history' });
-    expect(versionLinks.length).toBeGreaterThan(0);
-    expect(versionLinks[0]).toHaveAttribute('href', '/help/version-history');
-    expect(versionLinks[0]).toHaveTextContent('0826.3.0');
-
-    const nestedInsideDashboardLink = versionLinks[0].parentElement?.closest('a[href="/dashboard"]');
-    expect(nestedInsideDashboardLink).toBeNull();
+    const versionLabels = screen.getAllByText('Version 0826.3.0');
+    expect(versionLabels.length).toBeGreaterThan(0);
+    expect(versionLabels[0].tagName).toBe('SPAN');
+    expect(screen.queryByRole('link', { name: 'Open version history' })).toBeNull();
   });
 
   it('renders expected desktop burger actions and opens notifications panel', async () => {
