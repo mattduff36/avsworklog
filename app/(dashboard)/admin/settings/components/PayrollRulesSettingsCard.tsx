@@ -1,8 +1,23 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Archive, Calculator, Loader2, Save, ShieldCheck, Trash2 } from 'lucide-react';
+import type { ReactNode } from 'react';
+import {
+  Archive,
+  Calculator,
+  CalendarCheck,
+  CircleAlert,
+  FlaskConical,
+  Loader2,
+  Rocket,
+  Save,
+  Settings2,
+  ShieldCheck,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import { toast } from 'sonner';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +47,38 @@ const TREATMENTS: Array<{ value: PayrollTreatment; label: string }> = [
   { value: 'overtime', label: 'Overtime' },
   { value: 'double_time', label: 'Double Time' },
 ];
+const RULE_LABELS: Record<PayrollRuleSetKey, string> = {
+  lorries: 'Transport',
+  civils: 'Civils',
+  plant: 'Plant',
+  others: 'Others',
+};
+
+interface SectionHeadingProps {
+  step: number;
+  title: string;
+  description: string;
+  icon: ReactNode;
+}
+
+function SectionHeading({ step, title, description, icon }: SectionHeadingProps) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-avs-yellow/30 bg-avs-yellow/10 text-avs-yellow">
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="border-avs-yellow/30 text-avs-yellow">
+            Step {step}
+          </Badge>
+          <h4 className="font-semibold text-foreground">{title}</h4>
+        </div>
+        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
+      </div>
+    </div>
+  );
+}
 
 interface ApiResponse extends Partial<PayrollAdminMatrix> {
   success?: boolean;
@@ -120,17 +167,19 @@ function RuleEditor({
     .map((version) => version.effective_week_ending as string);
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-background/60 p-4">
+    <div className="space-y-5 rounded-lg border border-border bg-background/60 p-4 shadow-inner shadow-black/10">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h4 className="font-semibold text-foreground">{rule.name}</h4>
+          <h4 className="font-semibold text-foreground">Version history</h4>
           <p className="text-xs text-muted-foreground">
             {rule.versions.find((version) => version.status === 'draft')
               ? 'Editing draft version'
               : 'Creates the next draft version'}
           </p>
         </div>
-        <Badge variant={rule.status === 'active' ? 'default' : 'secondary'}>{rule.status}</Badge>
+        <span className="text-xs text-muted-foreground">
+          Activated versions are read-only; superseded versions can be archived.
+        </span>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -183,8 +232,10 @@ function RuleEditor({
 
       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-1">
-          <Label>Break threshold (minutes)</Label>
+          <Label htmlFor={`${rule.rule_key}-break-threshold`}>Break threshold</Label>
+          <p className="text-xs text-muted-foreground">Shift length before the deduction applies.</p>
           <Input
+            id={`${rule.rule_key}-break-threshold`}
             type="number"
             min={0}
             step={15}
@@ -196,8 +247,10 @@ function RuleEditor({
           />
         </div>
         <div className="space-y-1">
-          <Label>Break deduction (minutes)</Label>
+          <Label htmlFor={`${rule.rule_key}-break-deduction`}>Break deduction</Label>
+          <p className="text-xs text-muted-foreground">Minutes removed once the threshold is reached.</p>
           <Input
+            id={`${rule.rule_key}-break-deduction`}
             type="number"
             min={0}
             step={15}
@@ -209,7 +262,8 @@ function RuleEditor({
           />
         </div>
         <div className="space-y-1">
-          <Label>Bank holiday</Label>
+          <Label htmlFor={`${rule.rule_key}-bank-holiday-rate`}>Bank holiday</Label>
+          <p className="text-xs text-muted-foreground">Rate applied to all bank-holiday hours.</p>
           <Select
             value={configuration.bankHolidayTreatment}
             onValueChange={(value: PayrollTreatment) => setConfiguration((current) => ({
@@ -217,14 +271,15 @@ function RuleEditor({
               bankHolidayTreatment: value,
             }))}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger id={`${rule.rule_key}-bank-holiday-rate`}><SelectValue /></SelectTrigger>
             <SelectContent>
               {TREATMENTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1">
-          <Label>Night Shift</Label>
+          <Label htmlFor={`${rule.rule_key}-night-shift-rate`}>Night Shift</Label>
+          <p className="text-xs text-muted-foreground">Optional whole-shift premium selected on the timesheet.</p>
           <Select
             value={configuration.nightShiftTreatment || 'none'}
             onValueChange={(value) => setConfiguration((current) => ({
@@ -232,7 +287,7 @@ function RuleEditor({
               nightShiftTreatment: value === 'none' ? null : value as PayrollTreatment,
             }))}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger id={`${rule.rule_key}-night-shift-rate`}><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="none">No premium</SelectItem>
               {TREATMENTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
@@ -243,6 +298,12 @@ function RuleEditor({
 
       <div className="overflow-x-auto">
         <div className="min-w-[680px] space-y-2">
+          <div className="grid grid-cols-[120px_1fr_150px_1fr] gap-2 border-b border-border pb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <span>Day</span>
+            <span>Starting rate</span>
+            <span>Minutes at rate</span>
+            <span>Remaining rate</span>
+          </div>
           {DAY_NAMES.map((name, index) => {
             const day = index + 1;
             const band = configuration.dayBands[day];
@@ -250,12 +311,13 @@ function RuleEditor({
               <div key={name} className="grid grid-cols-[120px_1fr_150px_1fr] items-center gap-2">
                 <span className="text-sm font-medium">{name}</span>
                 <Select value={band.treatment} onValueChange={(value: PayrollTreatment) => updateBand(day, { treatment: value })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label={`${name} starting rate`}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {TREATMENTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Input
+                  aria-label={`${name} minutes at starting rate`}
                   type="number"
                   min={0}
                   step={15}
@@ -274,7 +336,7 @@ function RuleEditor({
                   value={band.remainderTreatment || band.treatment}
                   onValueChange={(value: PayrollTreatment) => updateBand(day, { remainderTreatment: value })}
                 >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger aria-label={`${name} remaining rate`}><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {TREATMENTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
                   </SelectContent>
@@ -285,10 +347,15 @@ function RuleEditor({
         </div>
       </div>
 
-      <Button onClick={saveDraft} disabled={saving}>
-        {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-        Save {rule.name} draft
-      </Button>
+      <div className="flex flex-col gap-2 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Saving updates the draft only. It does not change live payroll calculations.
+        </p>
+        <Button onClick={saveDraft} disabled={saving} className="shrink-0">
+          {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Save {rule.name} draft
+        </Button>
+      </div>
     </div>
   );
 }
@@ -421,121 +488,311 @@ export function PayrollRulesSettingsCard() {
   }
 
   return (
-    <Card className="border-border bg-slate-900/60">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-white">
-          <ShieldCheck className="h-5 w-5 text-avs-yellow" />
-          Timesheet Payroll Rules
-        </CardTitle>
-        <CardDescription>
-          Version, test and activate the signed Transport, Civils, Plant and Others payroll rules.
-          Activated versions and approved calculations are immutable.
-        </CardDescription>
+    <Card id="payroll-rules" className="scroll-mt-6 overflow-hidden border-border bg-slate-900/60">
+      <CardHeader className="border-b border-border bg-gradient-to-r from-avs-yellow/10 via-transparent to-transparent">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-white">
+              <ShieldCheck className="h-5 w-5 text-avs-yellow" />
+              Timesheet Payroll Rules
+            </CardTitle>
+            <CardDescription className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
+              Configure and test the signed Transport, Civils, Plant and Others rules before selecting
+              the Sunday they become active. Approved payroll snapshots cannot be edited later.
+            </CardDescription>
+          </div>
+          {matrix ? (
+            <Badge
+              variant="outline"
+              className={matrix.rolloutWeekEnding
+                ? 'w-fit border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                : 'w-fit border-amber-500/40 bg-amber-500/10 text-amber-200'}
+            >
+              {matrix.rolloutWeekEnding ? `Active from ${matrix.rolloutWeekEnding}` : 'Not activated'}
+            </Badge>
+          ) : null}
+        </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-8 pt-6">
+        <div className="grid gap-3 md:grid-cols-3">
+          {[
+            {
+              icon: <Settings2 className="h-4 w-4" />,
+              title: '1. Configure drafts',
+              description: 'Review each rule set and save any changes. Drafts do not affect payroll.',
+            },
+            {
+              icon: <FlaskConical className="h-4 w-4" />,
+              title: '2. Test a shift',
+              description: 'Check sample hours, premiums, and bank-holiday treatment before rollout.',
+            },
+            {
+              icon: <Rocket className="h-4 w-4" />,
+              title: '3. Assign and activate',
+              description: 'Confirm team mappings, exceptions, and the client-approved Sunday.',
+            },
+          ].map((item) => (
+            <div key={item.title} className="rounded-lg border border-border bg-background/60 p-4">
+              <div className="mb-2 flex items-center gap-2 font-semibold text-foreground">
+                <span className="text-avs-yellow">{item.icon}</span>
+                {item.title}
+              </div>
+              <p className="text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+            </div>
+          ))}
+        </div>
+
         {loading && <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Loading payroll configuration…</div>}
         {!loading && !matrix && <p className="text-sm text-destructive">Payroll configuration could not be loaded.</p>}
         {matrix && (
           <>
-            <div className="space-y-4">
-              {matrix.rules.map((rule) => <RuleEditor key={rule.id} rule={rule} onSaved={setMatrix} />)}
-            </div>
-
-            <div className="space-y-4 rounded-lg border border-border bg-background/60 p-4">
-              <div>
-                <h4 className="flex items-center gap-2 font-semibold"><Calculator className="h-4 w-4" />Test calculator</h4>
-                <p className="text-sm text-muted-foreground">Validate a draft against a single shift before activation.</p>
+            <section aria-labelledby="payroll-rule-drafts-heading" className="space-y-4">
+              <div id="payroll-rule-drafts-heading">
+                <SectionHeading
+                  step={1}
+                  title="Configure rule drafts"
+                  description="Open one rule set at a time. Save creates or updates a draft; live payroll remains unchanged until activation."
+                  icon={<Settings2 className="h-4 w-4" />}
+                />
               </div>
-              <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
-                <Select value={testRuleKey} onValueChange={(value: PayrollRuleSetKey) => setTestRuleKey(value)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{RULE_KEYS.map((key) => <SelectItem key={key} value={key}>{key}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={testDay} onValueChange={setTestDay}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>{DAY_NAMES.map((name, index) => <SelectItem key={name} value={String(index + 1)}>{name}</SelectItem>)}</SelectContent>
-                </Select>
-                <Input type="time" step={900} value={testStart} onChange={(event) => setTestStart(event.target.value)} />
-                <Input type="time" step={900} value={testFinish} onChange={(event) => setTestFinish(event.target.value)} />
-                <label className="flex items-center gap-2 text-sm"><Checkbox checked={testNight} onCheckedChange={(value) => setTestNight(value === true)} />Night Shift</label>
-                <label className="flex items-center gap-2 text-sm"><Checkbox checked={testBankHoliday} onCheckedChange={(value) => setTestBankHoliday(value === true)} />Bank holiday</label>
-              </div>
-              <Button variant="outline" onClick={runTestCalculator}>Run test</Button>
-              {testResult && (
-                <p className="text-sm text-foreground">
-                  Basic {minutesToHours(testResult.basicMinutes).toFixed(2)}h · Overtime {minutesToHours(testResult.overtimeMinutes).toFixed(2)}h · Double Time {minutesToHours(testResult.doubleTimeMinutes).toFixed(2)}h
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-4 rounded-lg border border-avs-yellow/30 bg-avs-yellow/5 p-4">
-              <div>
-                <h4 className="font-semibold text-foreground">Activation preflight</h4>
-                <p className="text-sm text-muted-foreground">
-                  Activation is inclusive from the selected Sunday. Earlier weeks retain legacy payroll behaviour.
-                </p>
-              </div>
-              <div className="space-y-1">
-                <Label>Effective week ending (Sunday)</Label>
-                <Input type="date" value={effectiveWeekEnding} onChange={(event) => setEffectiveWeekEnding(event.target.value)} className="max-w-xs" />
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                {matrix.teams.map((team) => {
-                  const assignment = teamAssignments.find((item) => item.teamId === team.id);
+              <Accordion type="single" collapsible defaultValue={matrix.rules[0]?.rule_key} className="space-y-3">
+                {matrix.rules.map((rule) => {
+                  const draft = rule.versions.find((version) => version.status === 'draft');
                   return (
-                    <div key={team.id} className="flex items-center justify-between gap-3 rounded border border-border p-3">
-                      <span className="text-sm font-medium">{team.name}</span>
-                      <Select
-                        value={assignment?.ruleSetKey || 'civils'}
-                        onValueChange={(value: PayrollRuleSetKey) => setTeamAssignments((current) => [
-                          ...current.filter((item) => item.teamId !== team.id),
-                          { teamId: team.id, ruleSetKey: value },
-                        ])}
-                      >
-                        <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                        <SelectContent>{RULE_KEYS.map((key) => <SelectItem key={key} value={key}>{key}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
+                    <AccordionItem
+                      key={rule.id}
+                      value={rule.rule_key}
+                      className="overflow-hidden rounded-lg border border-border bg-slate-950/40 px-4"
+                    >
+                      <AccordionTrigger className="gap-3 py-4 text-left hover:no-underline">
+                        <span className="flex flex-1 flex-wrap items-center gap-3">
+                          <span className="font-semibold text-foreground">{rule.name}</span>
+                          <Badge variant={rule.status === 'active' ? 'default' : 'secondary'}>
+                            {rule.status}
+                          </Badge>
+                          <span className="text-xs font-normal text-muted-foreground">
+                            {draft ? `Draft v${draft.version_number} ready to edit` : 'Open to create the next draft'}
+                          </span>
+                        </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-4">
+                        <RuleEditor rule={rule} onSaved={setMatrix} />
+                      </AccordionContent>
+                    </AccordionItem>
                   );
                 })}
+              </Accordion>
+            </section>
+
+            <section aria-labelledby="payroll-test-heading" className="space-y-4 rounded-xl border border-border bg-background/60 p-5">
+              <div id="payroll-test-heading">
+                <SectionHeading
+                  step={2}
+                  title="Test calculator"
+                  description="Run a single sample shift against the current draft. Tests are read-only and do not save or activate anything."
+                  icon={<Calculator className="h-4 w-4" />}
+                />
               </div>
-              <div className="space-y-2">
-                <Label>Profile payroll overrides (minimum three Others)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Assign any rule set per employee. Existing Transport/Civils/Plant overrides are preserved unless cleared.
-                </p>
-                <Input placeholder="Search employees…" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} />
-                <div className="max-h-56 space-y-1 overflow-y-auto rounded border border-border p-2">
-                  {filteredProfiles.map((profile) => {
-                    const assignment = profileAssignments.find((item) => item.profileId === profile.id);
-                    return (
-                      <div key={profile.id} className="flex items-center justify-between gap-2 rounded p-2 text-sm hover:bg-muted/50">
-                        <span>{profile.full_name}{profile.employee_id ? ` (${profile.employee_id})` : ''}</span>
-                        <Select
-                          value={assignment?.ruleSetKey || 'none'}
-                          onValueChange={(value: PayrollRuleSetKey | 'none') => setProfileRule(profile.id, value)}
-                        >
-                          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No override</SelectItem>
-                            {RULE_KEYS.map((key) => <SelectItem key={key} value={key}>{key}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    );
-                  })}
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="payroll-test-rule-set">Rule set</Label>
+                  <Select value={testRuleKey} onValueChange={(value: PayrollRuleSetKey) => setTestRuleKey(value)}>
+                    <SelectTrigger id="payroll-test-rule-set"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {RULE_KEYS.map((key) => <SelectItem key={key} value={key}>{RULE_LABELS[key]}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="payroll-test-day">Day worked</Label>
+                  <Select value={testDay} onValueChange={setTestDay}>
+                    <SelectTrigger id="payroll-test-day"><SelectValue /></SelectTrigger>
+                    <SelectContent>{DAY_NAMES.map((name, index) => <SelectItem key={name} value={String(index + 1)}>{name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="payroll-test-start">Start time</Label>
+                  <Input id="payroll-test-start" type="time" step={900} value={testStart} onChange={(event) => setTestStart(event.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="payroll-test-finish">Finish time</Label>
+                  <Input id="payroll-test-finish" type="time" step={900} value={testFinish} onChange={(event) => setTestFinish(event.target.value)} />
                 </div>
               </div>
-              {matrix.rolloutWeekEnding && (
-                <p className="text-sm text-muted-foreground">
-                  Current rollout: {matrix.rolloutWeekEnding}. Impacted unapproved timesheets: {matrix.impactedUnapprovedTimesheets}.
+              <div className="flex flex-wrap gap-3">
+                <label className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-slate-950/40 px-3 text-sm">
+                  <Checkbox checked={testNight} onCheckedChange={(value) => setTestNight(value === true)} />
+                  Night Shift
+                </label>
+                <label className="flex min-h-10 items-center gap-2 rounded-md border border-border bg-slate-950/40 px-3 text-sm">
+                  <Checkbox checked={testBankHoliday} onCheckedChange={(value) => setTestBankHoliday(value === true)} />
+                  Bank holiday
+                </label>
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Button variant="outline" onClick={runTestCalculator}>
+                  <FlaskConical className="mr-2 h-4 w-4" />
+                  Run test
+                </Button>
+                {testResult ? (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm text-emerald-100" aria-live="polite">
+                    <span>Basic <strong>{minutesToHours(testResult.basicMinutes).toFixed(2)}h</strong></span>
+                    <span>Overtime <strong>{minutesToHours(testResult.overtimeMinutes).toFixed(2)}h</strong></span>
+                    <span>Double Time <strong>{minutesToHours(testResult.doubleTimeMinutes).toFixed(2)}h</strong></span>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">The calculated rate split will appear here.</p>
+                )}
+              </div>
+            </section>
+
+            <section aria-labelledby="payroll-activation-heading" className="space-y-5 rounded-xl border border-avs-yellow/30 bg-avs-yellow/5 p-5">
+              <div id="payroll-activation-heading">
+                <SectionHeading
+                  step={3}
+                  title="Assign teams and activate"
+                  description="Complete this section only after the client confirms the cutover week and the draft test results are correct."
+                  icon={<Rocket className="h-4 w-4" />}
+                />
+              </div>
+
+              <div className="flex items-start gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-amber-100">
+                <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-300" />
+                <div>
+                  <p className="font-semibold">Activation changes payroll processing</p>
+                  <p className="mt-1 text-sm leading-relaxed text-amber-100/80">
+                    The selected Sunday is inclusive. That week and later weeks use the new rules; earlier
+                    weeks keep legacy behaviour. Confirm the date and assignments before activating.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="payroll-effective-week">Effective week ending</Label>
+                <p className="text-xs text-muted-foreground">
+                  Choose the client-approved Sunday. The system rejects dates that are not Sundays.
                 </p>
-              )}
-              <Button onClick={activate} disabled={activating || !effectiveWeekEnding}>
-                {activating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {matrix.rolloutWeekEnding ? 'Activate new payroll versions' : 'Activate signed payroll rules'}
-              </Button>
-            </div>
+                <Input
+                  id="payroll-effective-week"
+                  type="date"
+                  value={effectiveWeekEnding}
+                  onChange={(event) => setEffectiveWeekEnding(event.target.value)}
+                  className="max-w-xs bg-slate-950/60"
+                />
+              </div>
+
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="space-y-3 rounded-lg border border-border bg-background/70 p-4">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-sky-400" />
+                    <div>
+                      <h5 className="font-semibold text-foreground">Team rule assignments</h5>
+                      <p className="text-xs text-muted-foreground">
+                        Every employee inherits their team&apos;s rule unless they have an override.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {matrix.teams.map((team) => {
+                      const assignment = teamAssignments.find((item) => item.teamId === team.id);
+                      return (
+                        <div key={team.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-slate-950/40 p-3">
+                          <span className="text-sm font-medium">{team.name}</span>
+                          <Select
+                            value={assignment?.ruleSetKey || 'civils'}
+                            onValueChange={(value: PayrollRuleSetKey) => setTeamAssignments((current) => [
+                              ...current.filter((item) => item.teamId !== team.id),
+                              { teamId: team.id, ruleSetKey: value },
+                            ])}
+                          >
+                            <SelectTrigger
+                              aria-label={`Payroll rule for ${team.name}`}
+                              className="w-36"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {RULE_KEYS.map((key) => <SelectItem key={key} value={key}>{RULE_LABELS[key]}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-3 rounded-lg border border-border bg-background/70 p-4">
+                  <div className="flex items-center gap-2">
+                    <CalendarCheck className="h-4 w-4 text-emerald-400" />
+                    <div>
+                      <h5 className="font-semibold text-foreground">Individual payroll overrides</h5>
+                      <p className="text-xs text-muted-foreground">
+                        Use only for exceptions. At least three employees must be assigned to Others.
+                      </p>
+                    </div>
+                  </div>
+                  <Input
+                    aria-label="Search payroll profile overrides"
+                    placeholder="Search by employee name or ID…"
+                    value={profileSearch}
+                    onChange={(event) => setProfileSearch(event.target.value)}
+                    className="bg-slate-950/60"
+                  />
+                  <div className="max-h-64 space-y-1 overflow-y-auto rounded border border-border bg-slate-950/30 p-2">
+                    {filteredProfiles.map((profile) => {
+                      const assignment = profileAssignments.find((item) => item.profileId === profile.id);
+                      return (
+                        <div key={profile.id} className="flex items-center justify-between gap-2 rounded p-2 text-sm hover:bg-muted/50">
+                          <span>{profile.full_name}{profile.employee_id ? ` (${profile.employee_id})` : ''}</span>
+                          <Select
+                            value={assignment?.ruleSetKey || 'none'}
+                            onValueChange={(value: PayrollRuleSetKey | 'none') => setProfileRule(profile.id, value)}
+                          >
+                            <SelectTrigger
+                              aria-label={`Payroll override for ${profile.full_name}`}
+                              className="w-36"
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Use team rule</SelectItem>
+                              {RULE_KEYS.map((key) => <SelectItem key={key} value={key}>{RULE_LABELS[key]}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      );
+                    })}
+                    {filteredProfiles.length === 0 ? (
+                      <p className="p-4 text-center text-sm text-muted-foreground">No employees match this search.</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              {matrix.rolloutWeekEnding ? (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
+                  <p className="font-semibold text-emerald-200">Current rollout: {matrix.rolloutWeekEnding}</p>
+                  <p className="mt-1 text-sm text-emerald-100/75">
+                    {matrix.impactedUnapprovedTimesheets} unapproved timesheet(s) are currently within the rollout period.
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="flex flex-col gap-3 border-t border-avs-yellow/20 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="max-w-2xl text-xs leading-relaxed text-muted-foreground">
+                  Activation creates immutable versions and assignments. Review the Sunday, team rules,
+                  employee overrides, and calculator results before continuing.
+                </p>
+                <Button
+                  onClick={activate}
+                  disabled={activating || !effectiveWeekEnding}
+                  className="shrink-0 bg-avs-yellow text-slate-950 hover:bg-avs-yellow-hover"
+                >
+                  {activating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
+                  {matrix.rolloutWeekEnding ? 'Activate new payroll versions' : 'Activate signed payroll rules'}
+                </Button>
+              </div>
+            </section>
           </>
         )}
       </CardContent>

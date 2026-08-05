@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { SlidersHorizontal } from 'lucide-react';
+import { Calculator, FileSliders, SlidersHorizontal } from 'lucide-react';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -146,6 +146,49 @@ function AdminSettingsContent() {
         </TabsContent>
 
         <TabsContent value="timesheets" className="space-y-6">
+          <Card className="overflow-hidden border-avs-yellow/25 bg-slate-900/80">
+            <CardHeader className="border-b border-border bg-gradient-to-r from-avs-yellow/10 via-transparent to-transparent">
+              <CardTitle className="text-white">Timesheet configuration</CardTitle>
+              <CardDescription className={SETTINGS_HELPER_TEXT_CLASS}>
+                Start with payroll rules and rollout assignments. Use timesheet overrides only when an
+                individual needs a different form from their team default.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 pt-5 md:grid-cols-2">
+              <a
+                href="#payroll-rules"
+                className="group rounded-lg border border-border bg-background/70 p-4 transition-colors hover:border-avs-yellow/50 hover:bg-avs-yellow/5"
+              >
+                <div className="flex items-start gap-3">
+                  <Calculator className="mt-0.5 h-5 w-5 shrink-0 text-avs-yellow" />
+                  <div>
+                    <p className="font-semibold text-foreground group-hover:text-avs-yellow">
+                      Payroll rules and rollout
+                    </p>
+                    <p className={SETTINGS_HELPER_TEXT_CLASS}>
+                      Configure drafts, test calculations, assign teams, and activate from a confirmed Sunday.
+                    </p>
+                  </div>
+                </div>
+              </a>
+              <a
+                href="#timesheet-overrides"
+                className="group rounded-lg border border-border bg-background/70 p-4 transition-colors hover:border-sky-500/50 hover:bg-sky-500/5"
+              >
+                <div className="flex items-start gap-3">
+                  <FileSliders className="mt-0.5 h-5 w-5 shrink-0 text-sky-400" />
+                  <div>
+                    <p className="font-semibold text-foreground group-hover:text-sky-300">
+                      Individual timesheet overrides
+                    </p>
+                    <p className={SETTINGS_HELPER_TEXT_CLASS}>
+                      Change which timesheet form a specific employee uses without changing their team.
+                    </p>
+                  </div>
+                </div>
+              </a>
+            </CardContent>
+          </Card>
           <PayrollRulesSettingsCard />
           <TimesheetTypeExceptionsCard />
         </TabsContent>
