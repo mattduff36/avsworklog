@@ -53,6 +53,7 @@ const RULE_LABELS: Record<PayrollRuleSetKey, string> = {
   plant: 'Plant',
   others: 'Others',
 };
+const HELPER_TEXT_CLASS = 'text-xs leading-snug text-slate-400';
 
 interface SectionHeadingProps {
   step: number;
@@ -74,10 +75,74 @@ function SectionHeading({ step, title, description, icon }: SectionHeadingProps)
           </Badge>
           <h4 className="font-semibold text-foreground">{title}</h4>
         </div>
-        <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
+        <p className="mt-1 text-sm leading-relaxed text-slate-400">{description}</p>
       </div>
     </div>
   );
+}
+
+interface FieldControlProps {
+  label: string;
+  htmlFor: string;
+  helperText: string;
+  children: ReactNode;
+}
+
+function FieldControl({ label, htmlFor, helperText, children }: FieldControlProps) {
+  return (
+    <div className="flex h-full flex-col gap-1.5">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+      <p className={`min-h-[2.25rem] ${HELPER_TEXT_CLASS}`}>{helperText}</p>
+    </div>
+  );
+}
+
+function formatLocalIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getUpcomingSundays(count: number): string[] {
+  const today = new Date();
+  const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const daysUntilSunday = (7 - localToday.getDay()) % 7;
+  const firstSunday = new Date(localToday);
+  firstSunday.setDate(localToday.getDate() + daysUntilSunday);
+
+  return Array.from({ length: count }, (_, index) => {
+    const sunday = new Date(firstSunday);
+    sunday.setDate(firstSunday.getDate() + index * 7);
+    return formatLocalIsoDate(sunday);
+  });
+}
+
+function formatSundayLabel(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function minutesToDurationInput(minutes: number): string {
+  const safeMinutes = Math.max(0, Math.min(23 * 60 + 59, Math.round(minutes)));
+  const hours = Math.floor(safeMinutes / 60);
+  const remainder = safeMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
+
+function durationInputToMinutes(value: string): number | null {
+  if (!/^\d{2}:\d{2}$/.test(value)) return null;
+  const [hours, minutes] = value.split(':').map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return null;
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+  return hours * 60 + minutes;
 }
 
 interface ApiResponse extends Partial<PayrollAdminMatrix> {
@@ -230,40 +295,52 @@ function RuleEditor({
         })}
       </div>
 
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
-        <div className="space-y-1">
-          <Label htmlFor={`${rule.rule_key}-break-threshold`}>Break threshold</Label>
-          <p className="text-xs text-muted-foreground">Shift length before the deduction applies.</p>
+      <div className="grid items-stretch gap-3 md:grid-cols-2 lg:grid-cols-4">
+        <FieldControl
+          label="Break threshold"
+          htmlFor={`${rule.rule_key}-break-threshold`}
+          helperText="Shift length before the deduction applies."
+        >
           <Input
             id={`${rule.rule_key}-break-threshold`}
-            type="number"
-            min={0}
-            step={15}
-            value={configuration.breakThresholdMinutes}
-            onChange={(event) => setConfiguration((current) => ({
-              ...current,
-              breakThresholdMinutes: Number(event.target.value),
-            }))}
+            type="time"
+            step={900}
+            value={minutesToDurationInput(configuration.breakThresholdMinutes)}
+            onChange={(event) => {
+              const nextMinutes = durationInputToMinutes(event.target.value);
+              if (nextMinutes === null) return;
+              setConfiguration((current) => ({
+                ...current,
+                breakThresholdMinutes: nextMinutes,
+              }));
+            }}
           />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`${rule.rule_key}-break-deduction`}>Break deduction</Label>
-          <p className="text-xs text-muted-foreground">Minutes removed once the threshold is reached.</p>
+        </FieldControl>
+        <FieldControl
+          label="Break deduction"
+          htmlFor={`${rule.rule_key}-break-deduction`}
+          helperText="Time removed once the threshold is reached."
+        >
           <Input
             id={`${rule.rule_key}-break-deduction`}
-            type="number"
-            min={0}
-            step={15}
-            value={configuration.breakDeductionMinutes}
-            onChange={(event) => setConfiguration((current) => ({
-              ...current,
-              breakDeductionMinutes: Number(event.target.value),
-            }))}
+            type="time"
+            step={900}
+            value={minutesToDurationInput(configuration.breakDeductionMinutes)}
+            onChange={(event) => {
+              const nextMinutes = durationInputToMinutes(event.target.value);
+              if (nextMinutes === null) return;
+              setConfiguration((current) => ({
+                ...current,
+                breakDeductionMinutes: nextMinutes,
+              }));
+            }}
           />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`${rule.rule_key}-bank-holiday-rate`}>Bank holiday</Label>
-          <p className="text-xs text-muted-foreground">Rate applied to all bank-holiday hours.</p>
+        </FieldControl>
+        <FieldControl
+          label="Bank holiday"
+          htmlFor={`${rule.rule_key}-bank-holiday-rate`}
+          helperText="Rate applied to all bank-holiday hours."
+        >
           <Select
             value={configuration.bankHolidayTreatment}
             onValueChange={(value: PayrollTreatment) => setConfiguration((current) => ({
@@ -276,10 +353,12 @@ function RuleEditor({
               {TREATMENTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`${rule.rule_key}-night-shift-rate`}>Night Shift</Label>
-          <p className="text-xs text-muted-foreground">Optional whole-shift premium selected on the timesheet.</p>
+        </FieldControl>
+        <FieldControl
+          label="Night Shift"
+          htmlFor={`${rule.rule_key}-night-shift-rate`}
+          helperText="Optional whole-shift premium selected on the timesheet."
+        >
           <Select
             value={configuration.nightShiftTreatment || 'none'}
             onValueChange={(value) => setConfiguration((current) => ({
@@ -293,7 +372,7 @@ function RuleEditor({
               {TREATMENTS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
+        </FieldControl>
       </div>
 
       <div className="overflow-x-auto">
@@ -375,6 +454,13 @@ export function PayrollRulesSettingsCard() {
   const [testNight, setTestNight] = useState(false);
   const [testBankHoliday, setTestBankHoliday] = useState(false);
   const [testResult, setTestResult] = useState<PayrollWeekBreakdown | null>(null);
+  const upcomingSundays = useMemo(() => getUpcomingSundays(6), []);
+  const effectiveWeekOptions = useMemo(() => {
+    if (effectiveWeekEnding && !upcomingSundays.includes(effectiveWeekEnding)) {
+      return [effectiveWeekEnding, ...upcomingSundays];
+    }
+    return upcomingSundays;
+  }, [effectiveWeekEnding, upcomingSundays]);
 
   const load = useCallback(async () => {
     try {
@@ -388,6 +474,11 @@ export function PayrollRulesSettingsCard() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (effectiveWeekEnding || upcomingSundays.length === 0) return;
+    setEffectiveWeekEnding(upcomingSundays[0]);
+  }, [effectiveWeekEnding, upcomingSundays]);
 
   useEffect(() => {
     if (!matrix || teamAssignments.length > 0) return;
@@ -667,32 +758,40 @@ export function PayrollRulesSettingsCard() {
                 </div>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="max-w-md space-y-1.5">
                 <Label htmlFor="payroll-effective-week">Effective week ending</Label>
-                <p className="text-xs text-muted-foreground">
-                  Choose the client-approved Sunday. The system rejects dates that are not Sundays.
+                <Select
+                  value={effectiveWeekEnding || undefined}
+                  onValueChange={setEffectiveWeekEnding}
+                >
+                  <SelectTrigger id="payroll-effective-week" className="bg-slate-950/60">
+                    <SelectValue placeholder="Select a Sunday" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {effectiveWeekOptions.map((sunday) => (
+                      <SelectItem key={sunday} value={sunday}>
+                        {formatSundayLabel(sunday)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className={HELPER_TEXT_CLASS}>
+                  Choose the client-approved Sunday. Only the next six Sundays are listed.
                 </p>
-                <Input
-                  id="payroll-effective-week"
-                  type="date"
-                  value={effectiveWeekEnding}
-                  onChange={(event) => setEffectiveWeekEnding(event.target.value)}
-                  className="max-w-xs bg-slate-950/60"
-                />
               </div>
 
-              <div className="grid gap-4 xl:grid-cols-2">
-                <div className="space-y-3 rounded-lg border border-border bg-background/70 p-4">
+              <div className="grid items-stretch gap-4 xl:grid-cols-2">
+                <div className="flex h-full flex-col space-y-3 rounded-lg border border-border bg-background/70 p-4">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-sky-400" />
                     <div>
                       <h5 className="font-semibold text-foreground">Team rule assignments</h5>
-                      <p className="text-xs text-muted-foreground">
+                      <p className={HELPER_TEXT_CLASS}>
                         Every employee inherits their team&apos;s rule unless they have an override.
                       </p>
                     </div>
                   </div>
-                  <div className="space-y-2">
+                  <div className="flex min-h-0 flex-1 flex-col space-y-2">
                     {matrix.teams.map((team) => {
                       const assignment = teamAssignments.find((item) => item.teamId === team.id);
                       return (
@@ -721,12 +820,12 @@ export function PayrollRulesSettingsCard() {
                   </div>
                 </div>
 
-                <div className="space-y-3 rounded-lg border border-border bg-background/70 p-4">
+                <div className="flex h-full flex-col space-y-3 rounded-lg border border-border bg-background/70 p-4">
                   <div className="flex items-center gap-2">
                     <CalendarCheck className="h-4 w-4 text-emerald-400" />
                     <div>
                       <h5 className="font-semibold text-foreground">Individual payroll overrides</h5>
-                      <p className="text-xs text-muted-foreground">
+                      <p className={HELPER_TEXT_CLASS}>
                         Use only for exceptions. At least three employees must be assigned to Others.
                       </p>
                     </div>
@@ -738,7 +837,7 @@ export function PayrollRulesSettingsCard() {
                     onChange={(event) => setProfileSearch(event.target.value)}
                     className="bg-slate-950/60"
                   />
-                  <div className="max-h-64 space-y-1 overflow-y-auto rounded border border-border bg-slate-950/30 p-2">
+                  <div className="min-h-[16rem] flex-1 space-y-1 overflow-y-auto rounded border border-border bg-slate-950/30 p-2">
                     {filteredProfiles.map((profile) => {
                       const assignment = profileAssignments.find((item) => item.profileId === profile.id);
                       return (
