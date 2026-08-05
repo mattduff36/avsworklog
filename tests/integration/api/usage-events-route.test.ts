@@ -212,6 +212,31 @@ describe('POST /api/me/usage-events', () => {
     expect(logServerError).not.toHaveBeenCalled();
   });
 
+  it('treats transient fetch failures as accepted without logging a production error', async () => {
+    vi.mocked(getCurrentAuthenticatedProfile).mockRejectedValue(new TypeError('fetch failed'));
+
+    const response = await POST(
+      new NextRequest('http://localhost/api/me/usage-events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          origin: 'http://localhost',
+        },
+        body: JSON.stringify({ events: [] }),
+      })
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(202);
+    expect(payload).toEqual({
+      success: false,
+      inserted: 0,
+      transient: true,
+      error: 'Usage analytics temporarily unavailable',
+    });
+    expect(logServerError).not.toHaveBeenCalled();
+  });
+
   it('updates an existing usage session when a concurrent insert wins the client session race', async () => {
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const adminMock = createAdminClientMock({

@@ -39,6 +39,11 @@ function isTransientUsageAnalyticsError(error: unknown): boolean {
   const lowerMessage = message.toLowerCase();
 
   return (
+    lowerMessage.includes('fetch failed') ||
+    lowerMessage.includes('econnreset') ||
+    lowerMessage.includes('etimedout') ||
+    lowerMessage.includes('enotfound') ||
+    lowerMessage.includes('socket hang up') ||
     lowerMessage.includes('502 bad gateway') ||
     (lowerMessage.includes('cloudflare') && lowerMessage.includes('<html'))
   );
