@@ -124,7 +124,7 @@ describe('payroll rollout contract', () => {
     expect(server).toContain('FROM profile_assignment WHERE is_active');
     expect(admin).toContain('VALUES ($1, NULL, false, $2, $3)');
     expect(ui).toContain("value={assignment?.ruleSetKey || 'none'}");
-    expect(ui).toContain('<SelectItem value="none">No override</SelectItem>');
+    expect(ui).toContain('<SelectItem value="none">Use team rule</SelectItem>');
   });
 
   it('PAY-MIGRATION-001 is rerunnable after activation and protects snapshot pointers', () => {
