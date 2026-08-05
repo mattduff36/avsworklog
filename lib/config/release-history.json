@@ -1,5 +1,22 @@
 [
   {
+    "version": "0826.6.1",
+    "updateKind": "minor",
+    "title": "App reliability update",
+    "description": "Updated app reliability.",
+    "summary": "Updated app reliability.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [
+      "App reliability"
+    ],
+    "areaKeys": [
+      "app-reliability"
+    ],
+    "pushedAt": "2026-08-05T23:58:00.730Z"
+  },
+  {
     "version": "0826.6.0",
     "updateKind": "major",
     "title": "Admin Settings update",
