@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.5.0
+
+**GIT COMMIT MESSAGE**
+`feat(payroll): clarify timesheet settings workflow`
+
+**PUSHED AT**
+2026-08-05T23:10:34.067Z
+
+**WHAT CHANGED**
+Clarify timesheet settings workflow. Rename Lorries display to Transport and distinguish subsistence icon.
+
+**VERSION HISTORY DETAILS**
+- Updated admin settings, with changes to app screens.
+- Updated timesheets, with changes to app screens.
+- Updated data storage, with changes to automation scripts and data storage.
+
+**COMMITS IN THIS RELEASE**
+- `feat(payroll): clarify timesheet settings workflow`
+- `fix(payroll): rename Lorries display to Transport and distinguish subsistence icon`
+
 ## 0826.4.0
 
 **GIT COMMIT MESSAGE**

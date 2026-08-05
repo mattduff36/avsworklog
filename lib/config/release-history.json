@@ -1,5 +1,23 @@
 [
   {
+    "version": "0826.5.0",
+    "updateKind": "major",
+    "title": "Payroll update",
+    "description": "Clarify timesheet settings workflow. Rename Lorries display to Transport and distinguish subsistence icon.",
+    "summary": "Clarify timesheet settings workflow. Rename Lorries display to Transport and distinguish subsistence icon.",
+    "details": [
+      "Updated admin settings, with changes to app screens.",
+      "Updated timesheets, with changes to app screens.",
+      "Updated data storage, with changes to automation scripts and data storage."
+    ],
+    "areas": [
+      "Clarify timesheet settings workflow. Rename Lorries display to Transport",
+      "Distinguish subsistence icon"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-08-05T23:10:34.067Z"
+  },
+  {
     "version": "0826.4.0",
     "updateKind": "major",
     "title": "Payroll update",
