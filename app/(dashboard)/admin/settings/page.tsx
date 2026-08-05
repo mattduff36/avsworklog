@@ -157,12 +157,12 @@ function AdminSettingsContent() {
             <CardContent className="grid gap-3 pt-5 md:grid-cols-2">
               <a
                 href="#payroll-rules"
-                className="group rounded-lg border border-border bg-background/70 p-4 transition-colors hover:border-avs-yellow/50 hover:bg-avs-yellow/5"
+                className="group rounded-lg border border-border bg-background/70 p-4 transition-colors hover:border-[hsl(var(--avs-yellow)/0.5)] hover:bg-[hsl(var(--avs-yellow)/0.05)]"
               >
                 <div className="flex items-start gap-3">
                   <Calculator className="mt-0.5 h-5 w-5 shrink-0 text-avs-yellow" />
                   <div>
-                    <p className="font-semibold text-foreground group-hover:text-avs-yellow">
+                    <p className="font-semibold text-foreground group-hover:text-[hsl(var(--avs-yellow))]">
                       Payroll rules and rollout
                     </p>
                     <p className={SETTINGS_HELPER_TEXT_CLASS}>

@@ -780,8 +780,8 @@ export function PayrollRulesSettingsCard() {
                 </p>
               </div>
 
-              <div className="grid items-stretch gap-4 xl:grid-cols-2">
-                <div className="flex h-full flex-col space-y-3 rounded-lg border border-border bg-background/70 p-4">
+              <div className="grid gap-4 xl:grid-cols-2">
+                <div className="flex flex-col space-y-3 rounded-lg border border-border bg-background/70 p-4">
                   <div className="flex items-center gap-2">
                     <Users className="h-4 w-4 text-sky-400" />
                     <div>
@@ -791,7 +791,7 @@ export function PayrollRulesSettingsCard() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex min-h-0 flex-1 flex-col space-y-2">
+                  <div className="space-y-2">
                     {matrix.teams.map((team) => {
                       const assignment = teamAssignments.find((item) => item.teamId === team.id);
                       return (
@@ -820,50 +820,52 @@ export function PayrollRulesSettingsCard() {
                   </div>
                 </div>
 
-                <div className="flex h-full flex-col space-y-3 rounded-lg border border-border bg-background/70 p-4">
-                  <div className="flex items-center gap-2">
-                    <CalendarCheck className="h-4 w-4 text-emerald-400" />
-                    <div>
-                      <h5 className="font-semibold text-foreground">Individual payroll overrides</h5>
-                      <p className={HELPER_TEXT_CLASS}>
-                        Use only for exceptions. At least three employees must be assigned to Others.
-                      </p>
+                <div className="relative min-h-[22rem] xl:min-h-0">
+                  <div className="flex h-full flex-col space-y-3 rounded-lg border border-border bg-background/70 p-4 xl:absolute xl:inset-0">
+                    <div className="flex shrink-0 items-center gap-2">
+                      <CalendarCheck className="h-4 w-4 text-emerald-400" />
+                      <div>
+                        <h5 className="font-semibold text-foreground">Individual payroll overrides</h5>
+                        <p className={HELPER_TEXT_CLASS}>
+                          Use only for exceptions. At least three employees must be assigned to Others.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <Input
-                    aria-label="Search payroll profile overrides"
-                    placeholder="Search by employee name or ID…"
-                    value={profileSearch}
-                    onChange={(event) => setProfileSearch(event.target.value)}
-                    className="bg-slate-950/60"
-                  />
-                  <div className="min-h-[16rem] flex-1 space-y-1 overflow-y-auto rounded border border-border bg-slate-950/30 p-2">
-                    {filteredProfiles.map((profile) => {
-                      const assignment = profileAssignments.find((item) => item.profileId === profile.id);
-                      return (
-                        <div key={profile.id} className="flex items-center justify-between gap-2 rounded p-2 text-sm hover:bg-muted/50">
-                          <span>{profile.full_name}{profile.employee_id ? ` (${profile.employee_id})` : ''}</span>
-                          <Select
-                            value={assignment?.ruleSetKey || 'none'}
-                            onValueChange={(value: PayrollRuleSetKey | 'none') => setProfileRule(profile.id, value)}
-                          >
-                            <SelectTrigger
-                              aria-label={`Payroll override for ${profile.full_name}`}
-                              className="w-36"
+                    <Input
+                      aria-label="Search payroll profile overrides"
+                      placeholder="Search by employee name or ID…"
+                      value={profileSearch}
+                      onChange={(event) => setProfileSearch(event.target.value)}
+                      className="shrink-0 bg-slate-950/60"
+                    />
+                    <div className="min-h-0 flex-1 space-y-1 overflow-y-auto rounded border border-border bg-slate-950/30 p-2">
+                      {filteredProfiles.map((profile) => {
+                        const assignment = profileAssignments.find((item) => item.profileId === profile.id);
+                        return (
+                          <div key={profile.id} className="flex items-center justify-between gap-2 rounded p-2 text-sm hover:bg-muted/50">
+                            <span>{profile.full_name}{profile.employee_id ? ` (${profile.employee_id})` : ''}</span>
+                            <Select
+                              value={assignment?.ruleSetKey || 'none'}
+                              onValueChange={(value: PayrollRuleSetKey | 'none') => setProfileRule(profile.id, value)}
                             >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">Use team rule</SelectItem>
-                              {RULE_KEYS.map((key) => <SelectItem key={key} value={key}>{RULE_LABELS[key]}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      );
-                    })}
-                    {filteredProfiles.length === 0 ? (
-                      <p className="p-4 text-center text-sm text-muted-foreground">No employees match this search.</p>
-                    ) : null}
+                              <SelectTrigger
+                                aria-label={`Payroll override for ${profile.full_name}`}
+                                className="w-36"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">Use team rule</SelectItem>
+                                {RULE_KEYS.map((key) => <SelectItem key={key} value={key}>{RULE_LABELS[key]}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        );
+                      })}
+                      {filteredProfiles.length === 0 ? (
+                        <p className="p-4 text-center text-sm text-muted-foreground">No employees match this search.</p>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
               </div>
