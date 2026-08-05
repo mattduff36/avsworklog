@@ -164,9 +164,16 @@ export function parseStackTrace(stack: string | null): SourceFileRef[] {
   // Also match direct file references like:
   //   at /app/lib/utils/foo.ts:42:15
   //   at Object.<anonymous> (/app/components/Bar.tsx:88:3)
+  // Skip compiled Next bundle paths (`.next/...` / `_next/...`); those are handled by
+  // extractNextAppChunkSourceRefs / extractNextServerAppSourceRefs with existence checks.
   const directPattern = /(?:\/app\/|\.\/)((?:app|lib|components|hooks|utils|services)[^:)]*?)(?::(\d+))?(?::(\d+))?(?:\)|$)/g;
 
   while ((match = directPattern.exec(stack)) !== null) {
+    const lineStart = stack.lastIndexOf('\n', match.index) + 1;
+    const lineEndIndex = stack.indexOf('\n', match.index);
+    const currentLine = stack.slice(lineStart, lineEndIndex === -1 ? stack.length : lineEndIndex);
+    if (currentLine.includes('.next/') || currentLine.includes('_next/')) continue;
+
     const file = match[1];
     const line = match[2] ? parseInt(match[2], 10) : undefined;
     const column = match[3] ? parseInt(match[3], 10) : undefined;
@@ -233,7 +240,16 @@ function collectSourceFiles(repoRoot: string): string[] {
   return files;
 }
 
-function findExistingSourceFile(preferredFile: string, repoRoot: string): string {
+function safeDecodeURIComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+/** Resolve a preferred App Router path to an existing source file, or null if none exists. */
+function findExistingSourceFile(preferredFile: string, repoRoot: string): string | null {
   const normalizedPreferred = normalizeSourceFilePath(preferredFile);
   const extensionless = normalizedPreferred.replace(/\.[^.]+$/, '');
 
@@ -244,12 +260,12 @@ function findExistingSourceFile(preferredFile: string, repoRoot: string): string
     }
   }
 
-  return normalizedPreferred;
+  return null;
 }
 
-function routePathFromAppPageFile(file: string): string | null {
+function routePathFromAppFile(file: string): string | null {
   const normalized = normalizeSourceFilePath(file);
-  const match = normalized.match(/^app\/(.+)\/(?:page|layout)\.(?:tsx|ts|jsx|js)$/);
+  const match = normalized.match(/^app\/(.+)\/(?:page|layout|route)\.(?:tsx|ts|jsx|js)$/);
   if (!match) return null;
 
   const routeSegments = match[1]
@@ -261,6 +277,9 @@ function routePathFromAppPageFile(file: string): string | null {
 
 function getPagePath(pageUrl: string | null | undefined): string | null {
   if (!pageUrl) return null;
+  if (pageUrl.startsWith('/')) {
+    return normalizePath(`https://placeholder.local${pageUrl.split('?')[0]}`);
+  }
   const path = normalizePath(pageUrl);
   return path.startsWith('/') ? path : null;
 }
@@ -278,7 +297,7 @@ function getSharedRouteSegmentScore(file: string, pagePath: string | null): numb
 function sourceFileRouteScore(file: string, pagePath: string | null): number {
   if (!pagePath) return 0;
 
-  const appRoute = routePathFromAppPageFile(file);
+  const appRoute = routePathFromAppFile(file);
   if (appRoute === pagePath) return 100;
 
   const normalized = normalizeSourceFilePath(file);
@@ -295,8 +314,28 @@ function extractNextAppChunkSourceRefs(text: string, repoRoot: string): SourceFi
   let match: RegExpExecArray | null;
 
   while ((match = nextAppChunkPattern.exec(text)) !== null) {
-    const routePath = decodeURIComponent(match[1]);
+    const routePath = safeDecodeURIComponent(match[1]);
     const sourceFile = findExistingSourceFile(`app/${routePath}/${match[2]}.tsx`, repoRoot);
+    if (!sourceFile) continue;
+    addSourceRef(refs, seen, { file: sourceFile });
+  }
+
+  return refs;
+}
+
+/** Map Vercel/server production stacks like `/var/task/.next/server/app/api/foo/route.js` to repo sources. */
+function extractNextServerAppSourceRefs(text: string, repoRoot: string): SourceFileRef[] {
+  const refs: SourceFileRef[] = [];
+  const seen = new Set<string>();
+  // Capture optional :line:column for pattern matching only — compiled coords are not source maps.
+  const nextServerAppPattern =
+    /(?:\/var\/task)?\/\.next\/server\/app\/(.+?)\/(page|layout|route)\.js(?::\d+)?(?::\d+)?/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = nextServerAppPattern.exec(text)) !== null) {
+    const routePath = safeDecodeURIComponent(match[1]);
+    const sourceFile = findExistingSourceFile(`app/${routePath}/${match[2]}.tsx`, repoRoot);
+    if (!sourceFile) continue;
     addSourceRef(refs, seen, { file: sourceFile });
   }
 
@@ -349,13 +388,40 @@ function findSourceRefsByConsoleTerm(message: string, pageUrl: string, repoRoot:
   return filtered.slice(0, 5).map(({ score: _score, ...ref }) => ref);
 }
 
-function inferSourceRefsFromPageRoute(pageUrl: string, repoRoot: string): SourceFileRef[] {
-  const pagePath = getPagePath(pageUrl);
-  if (!pagePath) return [];
+function collectCandidateRoutePaths(pageUrl: string, componentName?: string | null): string[] {
+  const paths = new Set<string>();
 
-  return collectSourceFiles(repoRoot)
-    .filter((file) => routePathFromAppPageFile(file) === pagePath)
-    .map((file) => ({ file }));
+  const pagePath = getPagePath(pageUrl);
+  if (pagePath) paths.add(pagePath);
+
+  if (componentName) {
+    const componentPath = getPagePath(componentName.trim());
+    if (componentPath) paths.add(componentPath);
+  }
+
+  return Array.from(paths);
+}
+
+function inferSourceRefsFromPageRoute(
+  pageUrl: string,
+  repoRoot: string,
+  componentName?: string | null
+): SourceFileRef[] {
+  const routePaths = collectCandidateRoutePaths(pageUrl, componentName);
+  if (routePaths.length === 0) return [];
+
+  const sourceFiles = collectSourceFiles(repoRoot);
+  const refs: SourceFileRef[] = [];
+  const seen = new Set<string>();
+
+  for (const routePath of routePaths) {
+    for (const file of sourceFiles) {
+      if (routePathFromAppFile(file) !== routePath) continue;
+      addSourceRef(refs, seen, { file });
+    }
+  }
+
+  return refs;
 }
 
 function buildSourceSearchText(error: ErrorLogEntry): string {
@@ -392,7 +458,17 @@ export function extractSourceFilesForError(error: ErrorLogEntry, repoRoot = proc
   }
 
   if (refs.length === 0) {
-    for (const ref of inferSourceRefsFromPageRoute(error.page_url || '', repoRoot)) {
+    for (const ref of extractNextServerAppSourceRefs(searchText, repoRoot)) {
+      addSourceRef(refs, seen, ref);
+    }
+  }
+
+  if (refs.length === 0) {
+    for (const ref of inferSourceRefsFromPageRoute(
+      error.page_url || '',
+      repoRoot,
+      error.component_name
+    )) {
       addSourceRef(refs, seen, ref);
     }
   }

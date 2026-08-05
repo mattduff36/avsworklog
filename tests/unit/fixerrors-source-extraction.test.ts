@@ -107,4 +107,157 @@ describe('fixerrors source extraction', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
+  it('maps Vercel server App Router stacks to route source files', () => {
+    const root = createFixture({
+      'app/api/me/usage-events/route.ts': 'export async function POST() { return null; }\n',
+    });
+
+    try {
+      const refs = extractSourceFilesForError(makeError({
+        error_message: 'Error in /api/me/usage-events POST /api/me/usage-events - TypeError: fetch failed',
+        error_stack: [
+          'Error: TypeError: fetch failed',
+          '    at t (/var/task/.next/server/chunks/2141.js:13:1499)',
+          '    at async z (/var/task/.next/server/app/api/me/usage-events/route.js:2:1783)',
+          '    at async rH.do (/var/task/node_modules/next/dist/compiled/next-server/app-route.runtime.prod.js:5:21048)',
+        ].join('\n'),
+        page_url: '/api/me/usage-events',
+        component_name: '/api/me/usage-events',
+      }), root);
+
+      // Compiled :line:column are bundle coordinates, not TypeScript source maps.
+      expect(refs).toContainEqual({ file: 'app/api/me/usage-events/route.ts' });
+      expect(refs.find((ref) => ref.file === 'app/api/me/usage-events/route.ts')).toEqual({
+        file: 'app/api/me/usage-events/route.ts',
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('skips compiled server-app stacks when no corresponding source file exists', () => {
+    const root = createFixture({});
+
+    try {
+      const refs = extractSourceFilesForError(makeError({
+        error_message: 'Error in /api/me/missing-route - TypeError: fetch failed',
+        error_stack: [
+          'Error: TypeError: fetch failed',
+          '    at async z (/var/task/.next/server/app/api/me/missing-route/route.js:2:1783)',
+        ].join('\n'),
+        page_url: '',
+        component_name: null,
+      }), root);
+
+      expect(refs).toEqual([]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('infers API route source files from component path when stack has no app sources', () => {
+    const root = createFixture({
+      'app/api/me/permissions/route.ts': 'export async function GET() { return null; }\n',
+    });
+
+    try {
+      const refs = extractSourceFilesForError(makeError({
+        error_message: 'Error in /api/me/permissions - TypeError: fetch failed',
+        error_stack: 'Error: TypeError: fetch failed\n    at t (/var/task/.next/server/chunks/2141.js:13:1499)',
+        page_url: '',
+        component_name: '/api/me/permissions',
+      }), root);
+
+      expect(refs).toContainEqual({ file: 'app/api/me/permissions/route.ts' });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('tolerates malformed percent-encoding in Next chunk paths without throwing', () => {
+    const root = createFixture({
+      'app/(dashboard)/fleet/page.tsx': 'export default function FleetPage() { return null; }\n',
+    });
+
+    try {
+      expect(() => extractSourceFilesForError(makeError({
+        error_message: [
+          'Console Error: Example',
+          '@/https://www.squiresapp.com/_next/static/chunks/app/%E0%A4%A/page-67ff4a7213f5a4ef.js:1:100',
+        ].join('\n'),
+        error_stack: null,
+        page_url: '',
+        component_name: null,
+      }), root)).not.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not let generic stack parsing claim compiled Next server paths under app/*', () => {
+    const root = createFixture({
+      'app/app/settings/route.ts': 'export async function GET() { return null; }\n',
+    });
+
+    try {
+      const refs = extractSourceFilesForError(makeError({
+        error_message: 'Error in /app/settings',
+        error_stack: 'Error: boom\n    at async z (/var/task/.next/server/app/app/settings/route.js:2:1783)',
+        page_url: '',
+        component_name: null,
+      }), root);
+
+      expect(refs).toEqual([{ file: 'app/app/settings/route.ts' }]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not let generic stack parsing claim compiled Next client chunk paths under components/*', () => {
+    const root = createFixture({
+      'app/components/widget/page.tsx': 'export default function Page() { return null; }\n',
+    });
+
+    try {
+      const refs = extractSourceFilesForError(makeError({
+        error_message: 'Console Error: Example',
+        error_stack: [
+          'Error: Example',
+          '    at https://www.squiresapp.com/_next/static/chunks/app/components/widget/page-67ff4a7213f5a4ef.js:1:99',
+        ].join('\n'),
+        page_url: '',
+        component_name: null,
+      }), root);
+
+      expect(refs).toEqual([{ file: 'app/components/widget/page.tsx' }]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('still extracts a valid direct source frame that follows a compiled Next frame', () => {
+    const root = createFixture({});
+
+    try {
+      const refs = extractSourceFilesForError(makeError({
+        error_message: 'Error: boom',
+        error_stack: [
+          'Error: boom',
+          '    at async z (/var/task/.next/server/app/api/me/usage-events/route.js:2:1783)',
+          '    at run (/app/lib/utils/helper.ts:10:5)',
+        ].join('\n'),
+        page_url: '',
+        component_name: null,
+      }), root);
+
+      expect(refs).toContainEqual({
+        file: 'lib/utils/helper.ts',
+        line: 10,
+        column: 5,
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
 });
