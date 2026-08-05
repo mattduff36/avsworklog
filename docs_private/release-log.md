@@ -2,6 +2,32 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.4.0
+
+**GIT COMMIT MESSAGE**
+`feat(payroll): add Squires timesheet payroll rules and immutable snapshots`
+
+**PUSHED AT**
+2026-08-05T22:37:29.663Z
+
+**WHAT CHANGED**
+Add Squires timesheet payroll rules and immutable snapshots. Make navbar brand version a non-clickable label. Show release version under navbar brand.
+
+**VERSION HISTORY DETAILS**
+- Updated timesheets, with changes to background routes, app screens, interface components, shared logic, shared typing, and automated tests.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated admin settings, with changes to background routes and app screens.
+- Updated approvals, with changes to app screens and automated tests.
+- Updated PDF documents, with changes to background routes and shared logic.
+- Updated reports, with changes to background routes.
+- Make navbar brand version a non-clickable label, with changes to interface components.
+- Updated profile, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(payroll): add Squires timesheet payroll rules and immutable snapshots`
+- `fix(layout): make navbar brand version a non-clickable label`
+- `feat(layout): show release version under navbar brand`
+
 ## 0826.3.0
 
 **GIT COMMIT MESSAGE**

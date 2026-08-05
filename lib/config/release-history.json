@@ -1,5 +1,30 @@
 [
   {
+    "version": "0826.4.0",
+    "updateKind": "major",
+    "title": "Payroll update",
+    "description": "Added Squires timesheet payroll rules and immutable snapshots. Make navbar brand version a non-clickable label. Show release version under navbar brand.",
+    "summary": "Added Squires timesheet payroll rules and immutable snapshots. Make navbar brand version a non-clickable label. Show release version under navbar brand.",
+    "details": [
+      "Updated timesheets, with changes to background routes, app screens, interface components, shared logic, shared typing, and automated tests.",
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Updated admin settings, with changes to background routes and app screens.",
+      "Updated approvals, with changes to app screens and automated tests.",
+      "Updated PDF document documents, with changes to background routes and shared logic.",
+      "Updated reports, with changes to background routes.",
+      "Make navbar brand version a non-clickable label, with changes to interface components.",
+      "Updated profile, with changes to automated tests."
+    ],
+    "areas": [
+      "Navigation",
+      "Squires timesheet payroll rules"
+    ],
+    "areaKeys": [
+      "navigation"
+    ],
+    "pushedAt": "2026-08-05T22:37:29.663Z"
+  },
+  {
     "version": "0826.3.0",
     "updateKind": "major",
     "title": "Actions update",
