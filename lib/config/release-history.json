@@ -1,5 +1,21 @@
 [
   {
+    "version": "0826.5.1",
+    "updateKind": "minor",
+    "title": "Payroll improvements",
+    "description": "Polish payroll settings field layout and inputs.",
+    "summary": "Polish payroll settings field layout and inputs.",
+    "details": [
+      "Updated admin settings, with changes to app screens."
+    ],
+    "areas": [
+      "Polish payroll settings field layout",
+      "Inputs"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-08-05T23:31:07.107Z"
+  },
+  {
     "version": "0826.5.0",
     "updateKind": "major",
     "title": "Payroll update",

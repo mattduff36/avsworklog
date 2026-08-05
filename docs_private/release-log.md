@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.5.1
+
+**GIT COMMIT MESSAGE**
+`fix(payroll): polish payroll settings field layout and inputs`
+
+**PUSHED AT**
+2026-08-05T23:31:07.107Z
+
+**WHAT CHANGED**
+Polish payroll settings field layout and inputs.
+
+**VERSION HISTORY DETAILS**
+- Updated admin settings, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(payroll): polish payroll settings field layout and inputs`
+
 ## 0826.5.0
 
 **GIT COMMIT MESSAGE**
