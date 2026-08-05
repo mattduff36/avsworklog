@@ -619,7 +619,7 @@ CREATE POLICY "Payroll snapshot days scoped read" ON public.timesheet_payroll_sn
 
 INSERT INTO public.payroll_rule_sets (rule_key, name, status)
 VALUES
-  ('lorries', 'Lorries', 'draft'),
+  ('lorries', 'Transport', 'draft'),
   ('civils', 'Civils', 'draft'),
   ('plant', 'Plant', 'draft'),
   ('others', 'Others', 'draft')

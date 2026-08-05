@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PanelLoader } from '@/components/ui/panel-loader';
-import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, Moon } from 'lucide-react';
+import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, Moon, BedDouble } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
 import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
@@ -1838,7 +1838,7 @@ export function CivilsTimesheet({
                               : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                           } disabled:opacity-30 disabled:cursor-not-allowed`}
                         >
-                          <Moon className={`h-7 w-7 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                          <BedDouble className={`h-7 w-7 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                         </button>
                       </div>
                     </div>
@@ -2139,7 +2139,7 @@ export function CivilsTimesheet({
                             } disabled:opacity-30 disabled:cursor-not-allowed`}
                             title="Subsistence Payment"
                           >
-                            <Moon className={`h-5 w-5 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                            <BedDouble className={`h-5 w-5 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                           </button>
 
                           <button

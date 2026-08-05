@@ -428,7 +428,7 @@ export function PayrollRulesSettingsCard() {
           Timesheet Payroll Rules
         </CardTitle>
         <CardDescription>
-          Version, test and activate the signed Lorries, Civils, Plant and Others payroll rules.
+          Version, test and activate the signed Transport, Civils, Plant and Others payroll rules.
           Activated versions and approved calculations are immutable.
         </CardDescription>
       </CardHeader>
@@ -502,7 +502,7 @@ export function PayrollRulesSettingsCard() {
               <div className="space-y-2">
                 <Label>Profile payroll overrides (minimum three Others)</Label>
                 <p className="text-xs text-muted-foreground">
-                  Assign any rule set per employee. Existing Lorries/Civils/Plant overrides are preserved unless cleared.
+                  Assign any rule set per employee. Existing Transport/Civils/Plant overrides are preserved unless cleared.
                 </p>
                 <Input placeholder="Search employees…" value={profileSearch} onChange={(event) => setProfileSearch(event.target.value)} />
                 <div className="max-h-56 space-y-1 overflow-y-auto rounded border border-border p-2">

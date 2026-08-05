@@ -24,7 +24,7 @@ function allWeekdays(band: PayrollDayBand): Record<number, PayrollDayBand> {
 const SIGNED_RULES: Record<PayrollRuleSetKey, PayrollRuleConfiguration> = {
   lorries: {
     key: 'lorries',
-    name: 'Lorries',
+    name: 'Transport',
     breakThresholdMinutes: 360,
     breakDeductionMinutes: 30,
     bankHolidayTreatment: DOUBLE_TIME,

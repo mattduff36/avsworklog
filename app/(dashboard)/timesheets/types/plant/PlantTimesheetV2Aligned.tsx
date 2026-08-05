@@ -29,7 +29,7 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageLoader } from '@/components/ui/page-loader';
-import { AlertCircle, ArrowLeft, Check, Home, Moon, Save, User, Wrench, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft, BedDouble, Check, Home, Moon, Save, User, Wrench, XCircle } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
 import { formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import { SignaturePad } from '@/components/forms/SignaturePad';
@@ -1820,7 +1820,7 @@ export function PlantTimesheetV2({
                                 : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                             } disabled:opacity-30 disabled:cursor-not-allowed`}
                           >
-                            <Moon className={`h-7 w-7 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                            <BedDouble className={`h-7 w-7 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                           </button>
                         </div>
                         <div className="space-y-2">
@@ -2244,7 +2244,7 @@ export function PlantTimesheetV2({
                                 } disabled:opacity-30 disabled:cursor-not-allowed`}
                                 title="Subsistence Payment"
                               >
-                                <Moon className={`h-5 w-5 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
+                                <BedDouble className={`h-5 w-5 ${entry.subsistence_payment_required ? 'text-emerald-400' : 'text-muted-foreground'}`} />
                               </button>
 
                               <button

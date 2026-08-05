@@ -7,12 +7,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { 
   AlertTriangle, 
+  BedDouble,
   CheckCircle2, 
   Clock, 
   Calendar, 
   Briefcase, 
   Home, 
-  Moon,
   XCircle
 } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
@@ -220,7 +220,7 @@ export function ConfirmationModal({
 
             <div className="bg-slate-50 dark:bg-slate-800/50 border border-border rounded-lg p-4">
               <div className="flex items-center gap-2 mb-2">
-                <Moon className="h-4 w-4 text-emerald-500" />
+                <BedDouble className="h-4 w-4 text-emerald-500" />
                 <p className="text-xs text-muted-foreground dark:text-muted-foreground font-medium">Subsistence</p>
               </div>
               <p className="text-2xl font-bold text-foreground">{subsistenceDays}</p>
@@ -319,7 +319,7 @@ export function ConfirmationModal({
                           )}
                           {entry.subsistence_payment_required && !entry.did_not_work && (
                             <Badge className="text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
-                              <Moon className="h-3 w-3 mr-1" />
+                              <BedDouble className="h-3 w-3 mr-1" />
                               Subsistence
                             </Badge>
                           )}
