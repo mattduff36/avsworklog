@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.6.0
+
+**GIT COMMIT MESSAGE**
+`feat(admin-settings): update admin settings`
+
+**PUSHED AT**
+2026-08-05T23:44:30.086Z
+
+**WHAT CHANGED**
+Update admin settings.
+
+**VERSION HISTORY DETAILS**
+- Updated admin settings, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(admin-settings): update admin settings`
+
 ## 0826.5.1
 
 **GIT COMMIT MESSAGE**

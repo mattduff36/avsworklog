@@ -1,5 +1,22 @@
 [
   {
+    "version": "0826.6.0",
+    "updateKind": "major",
+    "title": "Admin Settings update",
+    "description": "Updated admin settings.",
+    "summary": "Updated admin settings.",
+    "details": [
+      "Updated admin settings, with changes to app screens."
+    ],
+    "areas": [
+      "Admin Settings"
+    ],
+    "areaKeys": [
+      "admin-settings"
+    ],
+    "pushedAt": "2026-08-05T23:44:30.086Z"
+  },
+  {
     "version": "0826.5.1",
     "updateKind": "minor",
     "title": "Payroll improvements",
