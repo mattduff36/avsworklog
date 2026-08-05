@@ -1,5 +1,22 @@
 [
   {
+    "version": "0826.3.0",
+    "updateKind": "major",
+    "title": "Actions update",
+    "description": "Updated actions. Ignore temporary usage fetch failures.",
+    "summary": "Updated actions. Ignore temporary usage fetch failures.",
+    "details": [
+      "Updated actions, with changes to automated tests."
+    ],
+    "areas": [
+      "Actions. Ignore temporary usage fetch failures"
+    ],
+    "areaKeys": [
+      "actions"
+    ],
+    "pushedAt": "2026-08-05T19:13:31.847Z"
+  },
+  {
     "version": "0826.2.1",
     "updateKind": "minor",
     "title": "Inventory improvements",

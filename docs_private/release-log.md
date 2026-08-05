@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.3.0
+
+**GIT COMMIT MESSAGE**
+`feat(actions): update actions`
+
+**PUSHED AT**
+2026-08-05T19:13:31.847Z
+
+**WHAT CHANGED**
+Update actions. Ignore transient usage fetch failures.
+
+**VERSION HISTORY DETAILS**
+- Updated actions, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(actions): update actions`
+- `fix(analytics): ignore transient usage fetch failures`
+
 ## 0826.2.1
 
 **GIT COMMIT MESSAGE**
