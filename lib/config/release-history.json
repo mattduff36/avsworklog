@@ -1,5 +1,23 @@
 [
   {
+    "version": "0826.2.1",
+    "updateKind": "minor",
+    "title": "Inventory improvements",
+    "description": "Stop false Yard kiosk DEVICE_REVOKED after session rotation.",
+    "summary": "Stop false Yard kiosk DEVICE_REVOKED after session rotation.",
+    "details": [
+      "Stop false Yard kiosk DEVICE_REVOKED after session rotation, with changes to background routes, shared logic, and automated tests.",
+      "Updated sign in, with changes to shared logic and automated tests."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-08-05T15:38:42.431Z"
+  },
+  {
     "version": "0826.2.0",
     "updateKind": "major",
     "title": "Inventory update",

@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.2.1
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): stop false Yard kiosk DEVICE_REVOKED after session rotation`
+
+**PUSHED AT**
+2026-08-05T15:38:42.431Z
+
+**WHAT CHANGED**
+Stop false Yard kiosk DEVICE_REVOKED after session rotation.
+
+**VERSION HISTORY DETAILS**
+- Stop false Yard kiosk DEVICE_REVOKED after session rotation, with changes to background routes, shared logic, and automated tests.
+- Updated sign in, with changes to shared logic and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): stop false Yard kiosk DEVICE_REVOKED after session rotation`
+
 ## 0826.2.0
 
 **GIT COMMIT MESSAGE**
