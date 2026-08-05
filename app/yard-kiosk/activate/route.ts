@@ -37,6 +37,14 @@ export async function GET(request: NextRequest) {
   const currentSession = await validateAppSession();
   if (currentSession.status === 'active') {
     const response = redirectTo(request, '/yard-kiosk');
+    // Deliver a rotated app-session cookie before returning to the kiosk shell.
+    if (currentSession.cookieValue && currentSession.cookieExpiresAt) {
+      setAppSessionCookieInResponse(
+        response,
+        currentSession.cookieValue,
+        currentSession.cookieExpiresAt,
+      );
+    }
     if (rawDeviceToken) setKioskDeviceCookie(response, rawDeviceToken);
     return response;
   }

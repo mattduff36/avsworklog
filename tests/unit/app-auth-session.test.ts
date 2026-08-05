@@ -17,6 +17,7 @@ const {
   getSupabaseUserMock,
   randomTokenMock,
   kioskDeviceMaybeSingleMock,
+  updateEqMock,
 } = vi.hoisted(() => ({
   maybeSingleMock: vi.fn(),
   singleMock: vi.fn(),
@@ -28,6 +29,7 @@ const {
   getSupabaseUserMock: vi.fn(),
   randomTokenMock: vi.fn(),
   kioskDeviceMaybeSingleMock: vi.fn(),
+  updateEqMock: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -59,13 +61,19 @@ vi.mock('@/lib/supabase/admin', () => ({
             single: singleMock,
           })),
         })),
-        update: vi.fn(() => ({
-          eq: vi.fn(() => ({
+        update: vi.fn(() => {
+          const chain: {
+            eq: ReturnType<typeof vi.fn>;
+            select: ReturnType<typeof vi.fn>;
+          } = {
+            eq: updateEqMock.mockImplementation(() => chain),
             select: vi.fn(() => ({
               single: singleMock,
+              maybeSingle: singleMock,
             })),
-          })),
-        })),
+          };
+          return chain;
+        }),
       };
     }),
     auth: {
@@ -191,7 +199,7 @@ describe('app auth session helpers', () => {
     expect(getAppAuthProfileMock).toHaveBeenCalledWith('user-1', null);
   });
 
-  it('returns the refreshed session row after activity updates', async () => {
+  it('returns the refreshed session row after activity updates without secret rotation', async () => {
     maybeSingleMock.mockResolvedValueOnce({
       data: {
         id: 'session-1',
@@ -248,7 +256,102 @@ describe('app auth session helpers', () => {
     expect(validation.session?.last_seen_at).toBe('2026-04-04T12:00:00.000Z');
     expect(validation.session?.updated_at).toBe('2026-04-04T12:00:00.000Z');
     expect(validation.cookieValue).toBe('unused-cookie');
+    expect(validation.secretRotated).toBe(false);
     expect(getUserByIdMock).not.toHaveBeenCalled();
+  });
+
+  it('sets secretRotated only when the session secret is rotated', async () => {
+    maybeSingleMock.mockResolvedValueOnce({
+      data: {
+        id: 'session-1',
+        profile_id: 'user-1',
+        device_id: null,
+        session_secret_hash: 'hashed-secret',
+        session_source: 'password_login',
+        remember_me: true,
+        last_seen_at: '2026-04-04T10:00:00.000Z',
+        idle_expires_at: '2026-04-05T12:00:00.000Z',
+        absolute_expires_at: '2026-04-30T12:00:00.000Z',
+        revoked_at: null,
+        revoked_reason: null,
+        replaced_by_session_id: null,
+        user_agent: null,
+        ip_hash: null,
+        created_at: '2026-04-04T10:00:00.000Z',
+        updated_at: '2026-04-04T10:00:00.000Z',
+      },
+      error: null,
+    });
+    sha256HexMock.mockImplementation(async (value: string) => {
+      if (value === 'app-session:raw-secret') return 'hashed-secret';
+      if (value === 'app-session:new-raw-secret') return 'hashed-new-secret';
+      return `hash:${value}`;
+    });
+    singleMock.mockResolvedValueOnce({
+      data: {
+        id: 'session-1',
+        profile_id: 'user-1',
+        device_id: null,
+        session_secret_hash: 'hashed-new-secret',
+        session_source: 'password_login',
+        remember_me: true,
+        last_seen_at: '2026-04-04T12:00:00.000Z',
+        idle_expires_at: '2026-05-04T12:00:00.000Z',
+        absolute_expires_at: '2026-04-30T12:00:00.000Z',
+        revoked_at: null,
+        revoked_reason: null,
+        replaced_by_session_id: null,
+        user_agent: null,
+        ip_hash: null,
+        created_at: '2026-04-04T10:00:00.000Z',
+        updated_at: '2026-04-04T12:00:00.000Z',
+      },
+      error: null,
+    });
+    buildAppSessionCookieValueMock.mockResolvedValueOnce('rotated-cookie');
+
+    const validation = await validateAppSession();
+
+    expect(validation.status).toBe('active');
+    expect(validation.secretRotated).toBe(true);
+    expect(validation.cookieValue).toBe('rotated-cookie');
+    expect(updateEqMock).toHaveBeenCalledWith('id', 'session-1');
+    expect(updateEqMock).toHaveBeenCalledWith('session_secret_hash', 'hashed-secret');
+  });
+
+  it('rejects a losing concurrent rotation without issuing a stale cookie', async () => {
+    maybeSingleMock.mockResolvedValueOnce({
+      data: {
+        id: 'session-1',
+        profile_id: 'user-1',
+        device_id: null,
+        session_secret_hash: 'hashed-secret',
+        session_source: 'password_login',
+        remember_me: true,
+        last_seen_at: '2026-04-04T10:00:00.000Z',
+        idle_expires_at: '2026-04-05T12:00:00.000Z',
+        absolute_expires_at: '2026-04-30T12:00:00.000Z',
+        revoked_at: null,
+        revoked_reason: null,
+        replaced_by_session_id: null,
+        user_agent: null,
+        ip_hash: null,
+        created_at: '2026-04-04T10:00:00.000Z',
+        updated_at: '2026-04-04T10:00:00.000Z',
+      },
+      error: null,
+    });
+    singleMock.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    const validation = await validateAppSession();
+
+    expect(validation.status).toBe('invalid');
+    expect(validation.failureReason).toBe('rotation_conflict');
+    expect(validation.cookieValue).toBeNull();
+    expect(validation.secretRotated).toBe(false);
   });
 
   it('returns the active profile with email when requested', async () => {
@@ -258,6 +361,37 @@ describe('app auth session helpers', () => {
     expect(current?.profile.id).toBe('user-1');
     expect(getAppAuthProfileMock).toHaveBeenCalledWith('user-1', 'user-1@example.com');
     expect(getUserByIdMock).toHaveBeenCalledWith('user-1');
+  });
+
+  it('keeps a kiosk device hint when the app session itself was revoked', async () => {
+    maybeSingleMock.mockResolvedValueOnce({
+      data: {
+        id: 'session-1',
+        profile_id: 'user-1',
+        device_id: null,
+        kiosk_device_id: 'kiosk-device-1',
+        session_secret_hash: 'hashed-secret',
+        session_source: 'kiosk_device',
+        remember_me: true,
+        last_seen_at: '2026-04-04T12:00:00.000Z',
+        idle_expires_at: '2026-04-05T12:00:00.000Z',
+        absolute_expires_at: '2026-04-30T12:00:00.000Z',
+        revoked_at: '2026-04-04T12:05:00.000Z',
+        revoked_reason: 'kiosk_device_revoked',
+        replaced_by_session_id: null,
+        user_agent: null,
+        ip_hash: null,
+        created_at: '2026-04-04T10:00:00.000Z',
+        updated_at: '2026-04-04T12:05:00.000Z',
+      },
+      error: null,
+    });
+
+    const validation = await validateAppSession();
+
+    expect(validation.status).toBe('invalid');
+    expect(validation.failureReason).toBe('session_revoked');
+    expect(validation.kioskDeviceIdHint).toBe('kiosk-device-1');
   });
 
   it('rejects a kiosk device session as soon as its device is revoked', async () => {
@@ -292,6 +426,8 @@ describe('app auth session helpers', () => {
 
     expect(validation.status).toBe('invalid');
     expect(validation.session).toBeNull();
+    expect(validation.failureReason).toBe('kiosk_device_inactive');
+    expect(validation.kioskDeviceIdHint).toBe('kiosk-device-1');
   });
 
   it('falls back to the Supabase SSR user when no app-session cookie exists', async () => {

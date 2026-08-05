@@ -44,6 +44,15 @@ export interface AppAuthSessionRow {
   updated_at: string;
 }
 
+export type AppSessionFailureReason =
+  | 'missing_cookie'
+  | 'session_not_found'
+  | 'session_revoked'
+  | 'session_expired'
+  | 'secret_mismatch'
+  | 'kiosk_device_inactive'
+  | 'rotation_conflict';
+
 export interface AppSessionValidationResult {
   status: 'missing' | 'invalid' | 'active';
   session: AppAuthSessionRow | null;
@@ -51,6 +60,30 @@ export interface AppSessionValidationResult {
   email: string | null;
   cookieValue: string | null;
   cookieExpiresAt: Date | null;
+  /** True only when the session secret was rotated on this validation. */
+  secretRotated: boolean;
+  /** Server-only discriminator for invalid/missing outcomes. */
+  failureReason: AppSessionFailureReason | null;
+  /** Present when failureReason is kiosk_device_inactive so callers can classify revoke vs session. */
+  kioskDeviceIdHint: string | null;
+}
+
+function inactiveSessionResult(
+  status: 'missing' | 'invalid',
+  failureReason: AppSessionFailureReason,
+  options: { kioskDeviceIdHint?: string | null } = {},
+): AppSessionValidationResult {
+  return {
+    status,
+    session: null,
+    profileId: null,
+    email: null,
+    cookieValue: null,
+    cookieExpiresAt: null,
+    secretRotated: false,
+    failureReason,
+    kioskDeviceIdHint: options.kioskDeviceIdHint ?? null,
+  };
 }
 
 export interface IssueAppSessionOptions {
@@ -205,7 +238,13 @@ function getNextIdleExpiry(row: AppAuthSessionRow, now: Date): Date {
 async function updateSessionActivity(
   row: AppAuthSessionRow,
   options: { rotate: boolean; now: Date }
-): Promise<{ row: AppAuthSessionRow; cookieValue: string | null; cookieExpiresAt: Date | null }> {
+): Promise<{
+  row: AppAuthSessionRow;
+  cookieValue: string | null;
+  cookieExpiresAt: Date | null;
+  secretRotated: boolean;
+  conflict: boolean;
+}> {
   const admin = createAdminClient();
   const nextIdleExpiry = getNextIdleExpiry(row, options.now);
   let nextSecret = row.session_secret_hash;
@@ -225,15 +264,33 @@ async function updateSessionActivity(
     updatePayload.session_secret_hash = nextSecret;
   }
 
-  const { data, error } = await admin
+  let updateQuery = admin
     .from('app_auth_sessions')
     .update(updatePayload)
-    .eq('id', row.id)
-    .select('*')
-    .single();
+    .eq('id', row.id);
 
-  if (error || !data) {
-    throw new Error(error?.message || 'Failed to refresh app session');
+  // Compare-and-set: a concurrent rotator must not let a loser mint a stale cookie.
+  if (options.rotate) {
+    updateQuery = updateQuery.eq('session_secret_hash', row.session_secret_hash);
+  }
+
+  const { data, error } = await updateQuery.select('*').maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Failed to refresh app session');
+  }
+
+  if (!data) {
+    if (options.rotate) {
+      return {
+        row,
+        cookieValue: null,
+        cookieExpiresAt: null,
+        secretRotated: false,
+        conflict: true,
+      };
+    }
+    throw new Error('Failed to refresh app session');
   }
 
   const nextRow = data as AppAuthSessionRow;
@@ -242,6 +299,8 @@ async function updateSessionActivity(
       row: nextRow,
       cookieValue: null,
       cookieExpiresAt: null,
+      secretRotated: false,
+      conflict: false,
     };
   }
 
@@ -253,6 +312,8 @@ async function updateSessionActivity(
       expiresAt: nextIdleExpiry,
     }),
     cookieExpiresAt: nextIdleExpiry,
+    secretRotated: true,
+    conflict: false,
   };
 }
 
@@ -345,50 +406,40 @@ export async function validateAppSession(
 ): Promise<AppSessionValidationResult> {
   const cookiePayload = await getCurrentAppSessionCookiePayload();
   if (!cookiePayload || cookiePayload.v !== APP_SESSION_COOKIE_VERSION) {
-    return {
-      status: 'missing',
-      session: null,
-      profileId: null,
-      email: null,
-      cookieValue: null,
-      cookieExpiresAt: null,
-    };
+    return inactiveSessionResult('missing', 'missing_cookie');
   }
 
   const row = await getSessionRow(cookiePayload.sid);
   if (!row) {
-    return {
-      status: 'invalid',
-      session: null,
-      profileId: null,
-      email: null,
-      cookieValue: null,
-      cookieExpiresAt: null,
-    };
+    return inactiveSessionResult('invalid', 'session_not_found');
   }
 
   const now = new Date();
+  if (row.revoked_at) {
+    return inactiveSessionResult('invalid', 'session_revoked', {
+      kioskDeviceIdHint: row.kiosk_device_id,
+    });
+  }
   if (
-    row.revoked_at ||
-    new Date(row.absolute_expires_at) <= now ||
-    new Date(row.idle_expires_at) <= now ||
-    row.session_secret_hash !== (await hashSessionSecret(cookiePayload.secret)) ||
-    !(await isKioskDeviceSessionActive(row))
+    new Date(row.absolute_expires_at) <= now
+    || new Date(row.idle_expires_at) <= now
   ) {
-    return {
-      status: 'invalid',
-      session: null,
-      profileId: null,
-      email: null,
-      cookieValue: null,
-      cookieExpiresAt: null,
-    };
+    return inactiveSessionResult('invalid', 'session_expired');
+  }
+  if (row.session_secret_hash !== (await hashSessionSecret(cookiePayload.secret))) {
+    return inactiveSessionResult('invalid', 'secret_mismatch');
+  }
+  if (!(await isKioskDeviceSessionActive(row))) {
+    return inactiveSessionResult('invalid', 'kiosk_device_inactive', {
+      kioskDeviceIdHint: row.kiosk_device_id,
+    });
   }
 
   let currentRow = row;
   const email = options.includeEmail ? await getAuthUserEmail(currentRow.profile_id) : null;
   let nextCookieValue: string | null = null;
   let nextCookieExpiresAt: Date | null = null;
+  let secretRotated = false;
 
   const needsRotation = shouldRotateSession(currentRow, now);
   const needsSeenUpdate = now.getTime() - new Date(currentRow.last_seen_at).getTime() >= 60 * 1000;
@@ -398,7 +449,11 @@ export async function validateAppSession(
       rotate: needsRotation,
       now,
     });
+    if (refreshed.conflict) {
+      return inactiveSessionResult('invalid', 'rotation_conflict');
+    }
     currentRow = refreshed.row;
+    secretRotated = refreshed.secretRotated;
 
     nextCookieExpiresAt = refreshed.cookieExpiresAt ?? getNextIdleExpiry(currentRow, now);
     nextCookieValue =
@@ -417,6 +472,9 @@ export async function validateAppSession(
     email,
     cookieValue: nextCookieValue,
     cookieExpiresAt: nextCookieExpiresAt,
+    secretRotated,
+    failureReason: null,
+    kioskDeviceIdHint: null,
   };
 }
 
@@ -460,6 +518,9 @@ export async function getCurrentAuthenticatedProfileFromSupabase(
       email,
       cookieValue: null,
       cookieExpiresAt: null,
+      secretRotated: false,
+      failureReason: null,
+      kioskDeviceIdHint: null,
     },
     profile,
   };

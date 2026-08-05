@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildYardKioskRecoverPath,
   buildYardKioskUserError,
   listYardKioskErrorCatalogue,
   mapPairingStatusToYardKioskErrorCode,
@@ -39,5 +40,22 @@ describe('Yard kiosk error catalogue', () => {
     expect(error.title.toLowerCase()).not.toContain('jwt');
     expect(error.title.toLowerCase()).not.toContain('cookie');
     expect(error.whatToDoNext.toLowerCase()).toContain('pair');
+  });
+
+  it('offers Try again before re-pairing for DEVICE_REVOKED', () => {
+    const error = buildYardKioskUserError('DEVICE_REVOKED');
+    expect(error.actions[0]).toBe('retry');
+    expect(error.actions).toContain('return_to_pairing');
+    expect(error.actions).toContain('contact_manager');
+    expect(error.retryable).toBe(true);
+  });
+
+  it('preserves server diagnostic ids in recovery paths', () => {
+    expect(buildYardKioskRecoverPath('DEVICE_REVOKED', 'YK-ABC-1234')).toBe(
+      '/yard-kiosk/recover?code=DEVICE_REVOKED&ref=YK-ABC-1234',
+    );
+    expect(buildYardKioskRecoverPath('SESSION_EXPIRED')).toBe(
+      '/yard-kiosk/recover?code=SESSION_EXPIRED',
+    );
   });
 });

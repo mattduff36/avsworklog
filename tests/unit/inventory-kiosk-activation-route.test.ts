@@ -147,6 +147,9 @@ describe('Yard kiosk trusted-device activation route', () => {
     validateAppSession.mockResolvedValue({
       status: 'active',
       session: { id: 'existing-session' },
+      secretRotated: false,
+      cookieValue: null,
+      cookieExpiresAt: null,
     });
 
     const response = await activateKiosk(
@@ -161,6 +164,9 @@ describe('Yard kiosk trusted-device activation route', () => {
     validateAppSession.mockResolvedValue({
       status: 'active',
       session: { id: 'existing-session' },
+      secretRotated: false,
+      cookieValue: null,
+      cookieExpiresAt: null,
     });
     const request = new NextRequest('http://localhost/yard-kiosk/activate', {
       headers: {
@@ -172,6 +178,30 @@ describe('Yard kiosk trusted-device activation route', () => {
 
     expect(response.cookies.get(KIOSK_DEVICE_COOKIE_NAME)?.value).toBe(
       'stable-device-secret',
+    );
+    expect(activateInventoryKioskDevice).not.toHaveBeenCalled();
+  });
+
+  it('delivers a rotated app-session cookie when the active session was rotated', async () => {
+    validateAppSession.mockResolvedValue({
+      status: 'active',
+      session: { id: 'existing-session' },
+      secretRotated: true,
+      cookieValue: 'rotated-app-session',
+      cookieExpiresAt: new Date('2026-10-01T00:00:00.000Z'),
+    });
+    const request = new NextRequest('http://localhost/yard-kiosk/activate', {
+      headers: {
+        Cookie: `${KIOSK_DEVICE_COOKIE_NAME}=stable-device-secret`,
+      },
+    });
+
+    const response = await activateKiosk(request);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('http://localhost/yard-kiosk');
+    expect(response.cookies.get(APP_SESSION_COOKIE_NAME)?.value).toBe(
+      'rotated-app-session',
     );
     expect(activateInventoryKioskDevice).not.toHaveBeenCalled();
   });

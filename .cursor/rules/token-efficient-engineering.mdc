@@ -20,3 +20,18 @@ Project rules take precedence for commit, push, migration, build, and PRD handli
 - For high-risk economical/unknown-parent work, run `architecture-gate` before implementation and `final-diff-reviewer` after deterministic verification. A premium parent may use structured parent passes only where the global skill permits; mandatory-independent categories always use both subagents.
 
 If `Pending monthly follow-up artifact:` or a workflow-review pending artifact path is printed, resolve suggestions with the existing approve/reject/skip chat flow and `npm run automation:followup:resolve`.
+
+## CreatePlan / planning artifacts (mandatory)
+
+For any substantive planning handoff (`CreatePlan`, plan iteration, or equivalent planning document), the plan itself is incomplete unless it structurally embeds the TEE contract. Feature steps alone are not a valid TEE plan.
+
+Every such plan must include:
+
+1. **Classification:** `taskType`, `risk` (`high`|`routine`), parent tier (`premium`|`economical`|`unknown`), and `routingDecision`.
+2. **Architecture gate:** whether the gate runs, source (`independent_subagent`|`parent_structured`|`skipped`|`not_applicable`), and whether independent review is mandatory with reasons (`persistence`|`migration`|`security`|`auth`|`permissions`|`money`|`concurrency`|`irreversible`|`production-data`|`broad-regression`|`user-request`).
+3. **Implementation contract:** invariants, boundaries, and rollback (required for high-risk work; for routine work, a short pattern/verification note is enough).
+4. **Required tests:** stable test IDs that can be marked completed or unresolved at handoff.
+5. **Final review:** whether required, source, and escalation reasons when applicable.
+6. **Commit / handoff:** local commit expectation and that the versioned workflow completion marker will be emitted.
+
+Do not present a CreatePlan for substantive work that omits these sections. If the user asks to apply token-efficient-engineering, the plan artifact is the first place compliance must be visible.

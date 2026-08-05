@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import {
+  buildYardKioskRecoverPath,
   buildYardKioskUserError,
   createYardKioskDiagnosticId,
   type YardKioskUserError,
@@ -118,11 +119,18 @@ export function useYardKioskRemoteControl({
         });
 
         if (response.status === 401) {
-          const payload = await response.json().catch(() => ({})) as { code?: string };
-          const code = payload.code === 'DEVICE_REVOKED'
+          const payload = await response.json().catch(() => ({})) as {
+            code?: string;
+            diagnostic_id?: string;
+            revoked?: boolean;
+            sessionExpired?: boolean;
+          };
+          const code = payload.code === 'DEVICE_REVOKED' || payload.revoked === true
             ? 'DEVICE_REVOKED'
             : 'SESSION_EXPIRED';
-          window.location.replace(`/yard-kiosk/recover?code=${code}`);
+          window.location.replace(
+            buildYardKioskRecoverPath(code, payload.diagnostic_id),
+          );
           return;
         }
 
@@ -130,11 +138,21 @@ export function useYardKioskRemoteControl({
         const payload = await response.json() as {
           commands?: YardKioskRemoteCommandView[];
           revoked?: boolean;
+          sessionExpired?: boolean;
+          diagnostic_id?: string;
           control_lease?: YardKioskControlLeaseView | null;
         };
 
         if (payload.revoked) {
-          window.location.replace('/yard-kiosk/recover?code=DEVICE_REVOKED');
+          window.location.replace(
+            buildYardKioskRecoverPath('DEVICE_REVOKED', payload.diagnostic_id),
+          );
+          return;
+        }
+        if (payload.sessionExpired) {
+          window.location.replace(
+            buildYardKioskRecoverPath('SESSION_EXPIRED', payload.diagnostic_id),
+          );
           return;
         }
 

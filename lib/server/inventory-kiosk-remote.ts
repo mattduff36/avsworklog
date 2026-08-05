@@ -18,7 +18,11 @@ import {
   type YardKioskRemoteCommandView,
   type YardKioskWorkflowSnapshot,
 } from '@/lib/inventory/kiosk-remote-types';
-import { getYardKioskErrorDefinition, listYardKioskErrorCatalogue } from '@/lib/inventory/kiosk-errors';
+import {
+  createYardKioskDiagnosticId,
+  getYardKioskErrorDefinition,
+  listYardKioskErrorCatalogue,
+} from '@/lib/inventory/kiosk-errors';
 import type { Database } from '@/types/database';
 
 type DeviceRow = Database['public']['Tables']['inventory_kiosk_devices']['Row'];
@@ -278,17 +282,153 @@ export async function resolveActiveKioskDeviceFromSession(): Promise<DeviceRow |
   return (data as DeviceRow | null) || null;
 }
 
-export async function recordInventoryKioskDeviceHeartbeat(
-  input: YardKioskHeartbeatInput,
-): Promise<{
+export interface InventoryKioskHeartbeatResult {
   device: DeviceRow | null;
   commands: YardKioskRemoteCommandView[];
   revoked: boolean;
+  sessionExpired: boolean;
   controlLease: YardKioskControlLeaseView | null;
-}> {
-  const device = await resolveActiveKioskDeviceFromSession();
-  if (!device) {
-    return { device: null, commands: [], revoked: true, controlLease: null };
+  diagnosticId: string;
+  /** Present when the app session secret rotated and the cookie must be written on the response. */
+  sessionValidation: Awaited<ReturnType<typeof validateAppSession>> | null;
+}
+
+async function persistHeartbeatAuthFailure(input: {
+  deviceId: string | null;
+  errorCode: 'DEVICE_REVOKED' | 'SESSION_EXPIRED';
+  diagnosticId: string;
+  message: string;
+}): Promise<void> {
+  try {
+    await recordInventoryKioskDeviceEvent({
+      deviceId: input.deviceId,
+      eventType: 'heartbeat_auth_failure',
+      errorCode: input.errorCode,
+      diagnosticId: input.diagnosticId,
+      message: input.message,
+    });
+  } catch {
+    // Diagnostics must never change auth outcomes.
+  }
+
+  if (!input.deviceId) return;
+  try {
+    await createAdminClient()
+      .from('inventory_kiosk_devices')
+      .update({
+        last_error_code: input.errorCode,
+        last_diagnostic_id: input.diagnosticId,
+      })
+      .eq('id', input.deviceId);
+  } catch {
+    // Diagnostics must never change auth outcomes.
+  }
+}
+
+export async function recordInventoryKioskDeviceHeartbeat(
+  input: YardKioskHeartbeatInput,
+): Promise<InventoryKioskHeartbeatResult> {
+  const diagnosticId = createYardKioskDiagnosticId();
+  const validation = await validateAppSession();
+
+  const failSession = async (
+    deviceId: string | null,
+    message: string,
+  ): Promise<InventoryKioskHeartbeatResult> => {
+    await persistHeartbeatAuthFailure({
+      deviceId,
+      errorCode: 'SESSION_EXPIRED',
+      diagnosticId,
+      message,
+    });
+    return {
+      device: null,
+      commands: [],
+      revoked: false,
+      sessionExpired: true,
+      controlLease: null,
+      diagnosticId,
+      sessionValidation: validation,
+    };
+  };
+
+  const failRevoked = async (
+    deviceId: string | null,
+    message: string,
+  ): Promise<InventoryKioskHeartbeatResult> => {
+    await persistHeartbeatAuthFailure({
+      deviceId,
+      errorCode: 'DEVICE_REVOKED',
+      diagnosticId,
+      message,
+    });
+    return {
+      device: null,
+      commands: [],
+      revoked: true,
+      sessionExpired: false,
+      controlLease: null,
+      diagnosticId,
+      sessionValidation: validation,
+    };
+  };
+
+  // Undeliverable rotation must not continue as a healthy heartbeat.
+  if (validation.status === 'active' && validation.secretRotated && !validation.cookieValue) {
+    return failSession(
+      validation.session?.kiosk_device_id || null,
+      'Session secret rotated without a deliverable cookie.',
+    );
+  }
+
+  if (validation.status !== 'active') {
+    const deviceHint = validation.kioskDeviceIdHint;
+    const shouldInspectDevice = Boolean(
+      deviceHint
+      && (
+        validation.failureReason === 'kiosk_device_inactive'
+        || validation.failureReason === 'session_revoked'
+      ),
+    );
+    if (shouldInspectDevice && deviceHint) {
+      const { data: deviceRow, error: deviceError } = await createAdminClient()
+        .from('inventory_kiosk_devices')
+        .select('*')
+        .eq('id', deviceHint)
+        .maybeSingle();
+      if (deviceError) throw new InventoryKioskDeviceError(deviceError.message, 500);
+      const device = deviceRow as DeviceRow | null;
+      if (!device || device.revoked_at) {
+        return failRevoked(
+          deviceHint,
+          'Trusted Yard kiosk device is missing or revoked.',
+        );
+      }
+      return failSession(
+        deviceHint,
+        'Kiosk session is inactive for an otherwise present device.',
+      );
+    }
+    return failSession(deviceHint, 'Yard kiosk app session is missing or invalid.');
+  }
+
+  const kioskDeviceId = validation.session?.kiosk_device_id || null;
+  if (!kioskDeviceId) {
+    return failSession(null, 'App session is not linked to a Yard kiosk device.');
+  }
+
+  const { data: deviceRow, error: loadError } = await createAdminClient()
+    .from('inventory_kiosk_devices')
+    .select('*')
+    .eq('id', kioskDeviceId)
+    .maybeSingle();
+  if (loadError) throw new InventoryKioskDeviceError(loadError.message, 500);
+  const device = deviceRow as DeviceRow | null;
+  if (!device || device.revoked_at) {
+    return failRevoked(kioskDeviceId, 'Trusted Yard kiosk device is missing or revoked.');
+  }
+  if (device.kiosk_user_id !== validation.profileId) {
+    return failSession(kioskDeviceId, 'Kiosk device profile does not match the app session.');
   }
 
   await Promise.all([
@@ -330,7 +470,7 @@ export async function recordInventoryKioskDeviceHeartbeat(
 
   if (error) throw new InventoryKioskDeviceError(error.message, 500);
   if (!updated) {
-    return { device, commands: [], revoked: true, controlLease: null };
+    return failRevoked(device.id, 'Yard kiosk device was revoked during heartbeat.');
   }
 
   const { data: commands, error: commandError } = await admin
@@ -348,7 +488,10 @@ export async function recordInventoryKioskDeviceHeartbeat(
     device: updated as DeviceRow,
     commands: ((commands || []) as CommandRow[]).map(toCommandView),
     revoked: false,
+    sessionExpired: false,
     controlLease: controlLeaseForDevice(updated as DeviceRow),
+    diagnosticId,
+    sessionValidation: validation,
   };
 }
 

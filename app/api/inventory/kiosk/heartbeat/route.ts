@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { applyValidationCookieIfNeeded } from '@/lib/server/app-auth/response';
 import { InventoryKioskDeviceError } from '@/lib/server/inventory-kiosk-devices';
 import {
   acknowledgeInventoryKioskDeviceCommand,
@@ -13,6 +14,8 @@ function errorResponse(error: unknown) {
     {
       error: error instanceof Error ? error.message : 'Heartbeat failed',
       code: status === 401 ? 'SESSION_EXPIRED' : 'SERVICE_UNAVAILABLE',
+      revoked: false,
+      sessionExpired: status === 401,
     },
     { status, headers: { 'Cache-Control': 'no-store' } },
   );
@@ -49,8 +52,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           revoked: true,
+          sessionExpired: false,
           commands: [],
           code: 'DEVICE_REVOKED',
+          diagnostic_id: heartbeat.diagnosticId,
+        },
+        { status: 401, headers: { 'Cache-Control': 'no-store' } },
+      );
+    }
+
+    if (heartbeat.sessionExpired) {
+      return NextResponse.json(
+        {
+          revoked: false,
+          sessionExpired: true,
+          commands: [],
+          code: 'SESSION_EXPIRED',
+          diagnostic_id: heartbeat.diagnosticId,
         },
         { status: 401, headers: { 'Cache-Control': 'no-store' } },
       );
@@ -75,16 +93,24 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         success: true,
         revoked: false,
+        sessionExpired: false,
         device_id: heartbeat.device?.id || null,
         commands: heartbeat.commands,
         control_lease: heartbeat.controlLease,
+        diagnostic_id: heartbeat.diagnosticId,
       },
       { headers: { 'Cache-Control': 'no-store' } },
     );
+
+    if (heartbeat.sessionValidation) {
+      applyValidationCookieIfNeeded(response, heartbeat.sessionValidation);
+    }
+
+    return response;
   } catch (error) {
     return errorResponse(error);
   }

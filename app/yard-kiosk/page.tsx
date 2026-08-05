@@ -3,6 +3,7 @@ import {
   getYardKioskBootstrap,
   requireInventoryKioskAccess,
 } from '@/lib/server/inventory-kiosk';
+import { validateAppSession } from '@/lib/server/app-auth/session';
 import {
   buildYardKioskUserError,
   createYardKioskDiagnosticId,
@@ -13,6 +14,13 @@ import { YardKioskRecoveryScreen } from './components/YardKioskRecoveryScreen';
 export const dynamic = 'force-dynamic';
 
 export default async function YardKioskPage() {
+  // Detect secret rotation / inactive session before other access work so a
+  // rotated DB secret is never left without a browser cookie write-back.
+  const session = await validateAppSession();
+  if (session.status !== 'active' || session.secretRotated) {
+    redirect('/yard-kiosk/activate');
+  }
+
   const access = await requireInventoryKioskAccess();
   if (!access.allowed && access.status === 401) {
     redirect('/yard-kiosk/activate');

@@ -141,10 +141,10 @@ const CATALOGUE: Record<YardKioskErrorCode, Omit<YardKioskErrorDefinition, 'code
     severity: 'blocking',
     title: 'Tablet access revoked',
     whatHappened: 'Trusted access for this tablet was revoked.',
-    whatToDoNext: 'Ask an Inventory manager to pair this tablet again before using Yard Inventory.',
-    actions: ['return_to_pairing', 'contact_manager'],
+    whatToDoNext: 'Tap Try again so the tablet can restore its saved login. If that fails, ask an Inventory manager to pair this tablet again.',
+    actions: ['retry', 'return_to_pairing', 'contact_manager'],
     preservesBasket: false,
-    retryable: false,
+    retryable: true,
   },
   DEVICE_CREDENTIAL_USED: {
     severity: 'warning',
@@ -350,6 +350,16 @@ export function createYardKioskDiagnosticId(): string {
   const stamp = Date.now().toString(36).toUpperCase();
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
   return `YK-${stamp}-${rand}`;
+}
+
+export function buildYardKioskRecoverPath(
+  code: YardKioskErrorCode,
+  diagnosticId?: string | null,
+): string {
+  const ref = typeof diagnosticId === 'string' && diagnosticId.trim()
+    ? `&ref=${encodeURIComponent(diagnosticId.trim())}`
+    : '';
+  return `/yard-kiosk/recover?code=${code}${ref}`;
 }
 
 export function getYardKioskErrorDefinition(code: YardKioskErrorCode): YardKioskErrorDefinition {
