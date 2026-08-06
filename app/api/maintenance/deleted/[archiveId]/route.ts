@@ -1,39 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logger } from '@/lib/utils/logger';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { requireMaintenanceLevel } from '@/lib/server/fleet-maintenance-auth';
 
 /**
  * DELETE /api/maintenance/deleted/[archiveId]
  * Permanently removes an archived vehicle record
- * RESTRICTED: Admin/Manager only
+ * FLEET-TIERS: permanent archive delete requires maintenance Level 5
  */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ archiveId: string }> }
 ) {
   try {
+    const auth = await requireMaintenanceLevel(
+      5,
+      'Forbidden: Maintenance Level 5 required for permanent archive delete'
+    );
+    if (auth.response) {
+      return auth.response;
+    }
+    const user = auth.user;
+    
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    // Check if user is admin or manager
-    const profile = await getProfileWithRole(user.id);
-    
-    if (!profile?.role || profile.role.role_class === 'employee') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin or Manager access required' },
-        { status: 403 }
-      );
-    }
-    
     const archiveId = (await params).archiveId;
     
     // Get archive record before deleting (for logging and van_id)

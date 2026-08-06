@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { requireMaintenanceLevel } from '@/lib/server/fleet-maintenance-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,17 +51,13 @@ export async function GET(
   { params }: { params: Promise<{ vehicleId: string }> }
 ) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // FLEET-TIERS: MOT history read requires Level 3+
+    const auth = await requireMaintenanceLevel(3);
+    if (auth.response) {
+      return auth.response;
     }
 
+    const supabase = await createClient();
     const { vehicleId } = await params;
 
     // Resolve asset from vans first, then hgvs

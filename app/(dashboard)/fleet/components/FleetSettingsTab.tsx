@@ -6,8 +6,8 @@ import { PanelLoader } from '@/components/ui/panel-loader';
 import type { Category, HgvAsset, HgvCategory, PlantAsset, Vehicle } from '../types';
 
 interface FleetSettingsTabProps {
-  isAdmin: boolean;
-  isManager: boolean;
+  canManageSettings: boolean;
+  canManageCategories: boolean;
   categories: Category[];
   categoriesLoading: boolean;
   vehicles: Vehicle[];
@@ -33,8 +33,8 @@ interface FleetSettingsTabProps {
 }
 
 export function FleetSettingsTab({
-  isAdmin,
-  isManager,
+  canManageSettings,
+  canManageCategories,
   categories,
   categoriesLoading,
   vehicles,
@@ -58,11 +58,12 @@ export function FleetSettingsTab({
   onEditHgvCategory,
   onDeleteHgvCategory,
 }: FleetSettingsTabProps) {
-  if (!isAdmin && !isManager) return null;
+  // FLEET-TIERS: settings tab Level 4+; category CRUD Level 5+
+  if (!canManageSettings) return null;
 
   return (
     <TabsContent value="settings" className="space-y-6 mt-0">
-      {isAdmin && (
+      {canManageCategories && (
         <>
           <Card className="border-border">
             <CardHeader

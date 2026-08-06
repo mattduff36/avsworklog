@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
@@ -27,10 +27,11 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    // FLEET-TIERS: VRN change is an asset edit path — Level 4+
+    const canManageFleet = await canEffectiveRoleUseModuleLevel('admin-vans', 4);
     if (!canManageFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Fleet admin access required' },
+        { error: 'Forbidden: Fleet Level 4 required' },
         { status: 403 }
       );
     }

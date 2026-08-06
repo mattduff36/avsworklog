@@ -1,32 +1,21 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
-import { userHasPermission } from '@/lib/utils/permissions';
+import { requireMaintenanceLevel } from '@/lib/server/fleet-maintenance-auth';
 
 /**
  * GET /api/maintenance/deleted
  * Returns all archived (deleted) vehicles from van_archive
+ * FLEET-TIERS: archive list requires maintenance Level 4+
  */
 export async function GET() {
   try {
-    // Auth check
+    const auth = await requireMaintenanceLevel(4);
+    if (auth.response) {
+      return auth.response;
+    }
+    
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const hasPermission = await userHasPermission(user.id, 'maintenance');
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Forbidden' },
-        { status: 403 }
-      );
-    }
     
     // Fetch all archived vehicles ordered by most recently archived first
     const { data: archivedVehicles, error: archiveError } = await supabase
@@ -75,4 +64,3 @@ export async function GET() {
     );
   }
 }
-

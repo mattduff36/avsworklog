@@ -3,7 +3,6 @@
 import { useEffect, Suspense, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -15,6 +14,7 @@ import { useMaintenance } from '@/lib/hooks/useMaintenance';
 import { MaintenanceSettings } from '@/app/(dashboard)/maintenance/components/MaintenanceSettings';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 
 const MaintenanceOverview = dynamic(
   () => import('@/app/(dashboard)/maintenance/components/MaintenanceOverview').then(mod => ({ default: mod.MaintenanceOverview })),
@@ -27,11 +27,13 @@ const MaintenanceOverview = dynamic(
 function MaintenanceContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canViewMaintenance, loading: maintenancePermissionLoading } = usePermissionCheck('maintenance', false);
+  const { canUseLevel, isLoading: moduleLevelLoading } = useModuleAccessLevel('maintenance');
   const { tabletModeEnabled } = useTabletMode();
 
-  const canManage = isManager || isAdmin || isSuperAdmin;
+  const authLoading = maintenancePermissionLoading || moduleLevelLoading;
+  // FLEET-TIERS: settings tab requires maintenance Level 4+
+  const canManage = canUseLevel(4);
   const lastAssetFilterRef = useRef<'both' | 'van' | 'hgv' | 'plant'>('both');
 
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
@@ -218,7 +220,7 @@ function MaintenanceContent() {
 
         {canManage && (
           <TabsContent value="settings" className="space-y-6 mt-0">
-            <MaintenanceSettings isAdmin={isAdmin} isManager={isManager} />
+            <MaintenanceSettings />
           </TabsContent>
         )}
       </Tabs>

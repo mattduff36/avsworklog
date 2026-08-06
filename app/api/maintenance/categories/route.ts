@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { requireMaintenanceLevel } from '@/lib/server/fleet-maintenance-auth';
 import { normalizePeriodUnit } from '@/lib/utils/maintenancePeriods';
 import type {
   CreateCategoryRequest,
@@ -14,15 +14,13 @@ import type {
  */
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // FLEET-TIERS: category list requires maintenance Level 3+
+    const auth = await requireMaintenanceLevel(3);
+    if (auth.response) {
+      return auth.response;
     }
+
+    const supabase = await createClient();
     
     // Get all categories ordered alphabetically (RLS handles permission check)
     const { data: categories, error } = await supabase
@@ -69,23 +67,16 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    // FLEET-TIERS: category create requires maintenance Level 4+
+    const auth = await requireMaintenanceLevel(
+      4,
+      'Maintenance Level 4 required to create categories'
+    );
+    if (auth.response) {
+      return auth.response;
+    }
+
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
-    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
-    if (!canManageMaintenance) {
-      return NextResponse.json(
-        { error: 'Maintenance access required to create categories' },
-        { status: 403 }
-      );
-    }
     
     // Parse request body
     const body: CreateCategoryRequest = await request.json();

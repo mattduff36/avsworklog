@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { requireManualDvlaSyncAccess } from '@/lib/server/fleet-maintenance-auth';
 import {
   isRoadEligibleRegistration,
   runFleetDvlaSync,
@@ -62,16 +63,13 @@ function getErrorMessage(error: unknown): string {
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // FLEET-DVLA: manual sync requires maintenance>=4 AND admin-vans>=4
+    const auth = await requireManualDvlaSyncAccess();
+    if (auth.response) {
+      return auth.response;
     }
+
+    const supabase = await createClient();
 
     // Check if DVLA API is configured
     const dvlaService = createDVLAApiService();

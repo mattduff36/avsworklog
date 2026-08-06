@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { logger } from '@/lib/utils/logger';
+import { requireMaintenanceLevel } from '@/lib/server/fleet-maintenance-auth';
 
 // Helper to create service role client for bypassing RLS
 function getSupabaseServiceRole() {
@@ -26,12 +27,13 @@ export async function GET(
   { params }: { params: Promise<{ plantId: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // FLEET-TIERS: plant maintenance history read requires Level 3+
+    const auth = await requireMaintenanceLevel(3);
+    if (auth.response) {
+      return auth.response;
     }
+
+    const supabase = await createClient();
     
     // Await params (Next.js 15 requirement)
     const { plantId } = await params;

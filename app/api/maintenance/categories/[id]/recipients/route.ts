@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { requireMaintenanceLevel } from '@/lib/server/fleet-maintenance-auth';
 
 /**
  * GET /api/maintenance/categories/[id]/recipients
@@ -13,20 +13,14 @@ export async function GET(
 ) {
   try {
     const { id: categoryId } = await params;
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // FLEET-TIERS: recipients settings require maintenance Level 4+
+    const auth = await requireMaintenanceLevel(4, 'Maintenance Level 4 required');
+    if (auth.response) {
+      return auth.response;
     }
 
-    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
-    if (!canManageMaintenance) {
-      return NextResponse.json(
-        { error: 'Maintenance access required' },
-        { status: 403 }
-      );
-    }
+    const supabase = await createClient();
     
     // Get recipients with profile info
     const { data: recipients, error } = await supabase
@@ -67,20 +61,14 @@ export async function POST(
 ) {
   try {
     const { id: categoryId } = await params;
-    const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    // FLEET-TIERS: recipients settings require maintenance Level 4+
+    const auth = await requireMaintenanceLevel(4, 'Maintenance Level 4 required');
+    if (auth.response) {
+      return auth.response;
     }
 
-    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
-    if (!canManageMaintenance) {
-      return NextResponse.json(
-        { error: 'Maintenance access required' },
-        { status: 403 }
-      );
-    }
+    const supabase = await createClient();
     
     // Parse request body
     const body = await request.json();

@@ -1,19 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { requireFleetLevel } from '@/lib/server/fleet-maintenance-auth';
 
-// GET - List all categories
+// GET - List all categories (FLEET-TIERS: Level 3+)
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireFleetLevel(3);
+    if (auth.response) {
+      return auth.response;
     }
+
+    const supabase = await createServerClient();
 
     // Fetch categories
     const { data: categories, error } = await supabase
@@ -42,27 +40,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST - Create new category
+// POST - Create new category (FLEET-TIERS: Level 5 category admin)
 export async function POST(request: NextRequest) {
   try {
+    const auth = await requireFleetLevel(5, 'Forbidden: Fleet Level 5 required for category admin');
+    if (auth.response) {
+      return auth.response;
+    }
+
     const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const profile = await getProfileWithRole(user.id);
-
-    if (!profile || profile.role?.name !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
 
     const body = await request.json();
     const { name, description, applies_to } = body;
@@ -124,4 +110,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

@@ -12,7 +12,7 @@ import {
   runFleetDvlaSync,
 } from '@/lib/services/fleet-dvla-sync';
 import type { Database } from '@/types/database';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { applyCreateFleetNicknameAssignment } from '@/lib/server/apply-create-fleet-nickname-assignment';
 
@@ -43,10 +43,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
-    if (!canManageFleet) {
+    // FLEET-TIERS: list/read assets requires admin-vans Level 3+
+    const canReadFleet = await canEffectiveRoleUseModuleLevel('admin-vans', 3);
+    if (!canReadFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Fleet admin access required' },
+        { error: 'Forbidden: Fleet Level 3 required' },
         { status: 403 }
       );
     }
@@ -130,10 +131,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    // FLEET-TIERS: add/edit assets requires admin-vans Level 4+
+    const canManageFleet = await canEffectiveRoleUseModuleLevel('admin-vans', 4);
     if (!canManageFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Fleet admin access required' },
+        { error: 'Forbidden: Fleet Level 4 required' },
         { status: 403 }
       );
     }

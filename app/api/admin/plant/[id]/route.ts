@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getEffectiveRole } from '@/lib/utils/view-as';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { validateAndNormalizePlantSerialNumber } from '@/lib/utils/plant-serial-number';
 import { applyNicknameAssignmentFromBody } from '@/lib/server/apply-fleet-nickname-assignment-from-body';
@@ -16,9 +16,10 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    // FLEET-TIERS: edit/retire plant requires admin-vans Level 4+
+    const canManageFleet = await canEffectiveRoleUseModuleLevel('admin-vans', 4);
     if (!canManageFleet) {
-      return NextResponse.json({ error: 'Forbidden: Fleet admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden: Fleet Level 4 required' }, { status: 403 });
     }
 
     const plantId = (await params).id;
@@ -122,9 +123,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    // FLEET-TIERS: edit/retire plant requires admin-vans Level 4+
+    const canManageFleet = await canEffectiveRoleUseModuleLevel('admin-vans', 4);
     if (!canManageFleet) {
-      return NextResponse.json({ error: 'Forbidden: Fleet admin access required' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden: Fleet Level 4 required' }, { status: 403 });
     }
 
     const plantId = (await params).id;

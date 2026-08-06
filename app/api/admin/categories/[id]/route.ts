@@ -1,33 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { requireFleetLevel } from '@/lib/server/fleet-maintenance-auth';
 
-// PUT - Update category
+// PUT - Update category (FLEET-TIERS: Level 5)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireFleetLevel(5, 'Forbidden: Fleet Level 5 required for category admin');
+    if (auth.response) {
+      return auth.response;
+    }
+
     const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const profile = await getProfileWithRole(user.id);
-
-    if (!profile || profile.role?.name !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
-
     const categoryId = (await params).id;
     const body = await request.json();
     const { name, description, applies_to } = body;
@@ -95,31 +82,18 @@ export async function PUT(
   }
 }
 
-// DELETE - Delete category
+// DELETE - Delete category (FLEET-TIERS: Level 5)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const auth = await requireFleetLevel(5, 'Forbidden: Fleet Level 5 required for category admin');
+    if (auth.response) {
+      return auth.response;
+    }
+
     const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check if user is admin
-    const profile = await getProfileWithRole(user.id);
-
-    if (!profile || profile.role?.name !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
-
     const categoryId = (await params).id;
 
     // Check if category is in use by any vans or plant

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logger } from '@/lib/utils/logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import type {
   VehicleMaintenanceWithStatus,
   MaintenanceCategory,
@@ -260,7 +260,8 @@ export async function GET() {
       );
     }
 
-    const hasPermission = await canEffectiveRoleAccessModule('maintenance');
+    // FLEET-TIERS: overview/read requires maintenance Level 3+
+    const hasPermission = await canEffectiveRoleUseModuleLevel('maintenance', 3);
     if (!hasPermission) {
       return NextResponse.json(
         { error: 'Forbidden' },
@@ -622,7 +623,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
+    // FLEET-TIERS: operational create requires maintenance Level 3+
+    const canManageMaintenance = await canEffectiveRoleUseModuleLevel('maintenance', 3);
     if (!canManageMaintenance) {
       return NextResponse.json(
         { error: 'Forbidden' },

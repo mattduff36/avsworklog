@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { validateRegistrationNumber, formatRegistrationForStorage } from '@/lib/utils/registration';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { createDVLAApiService } from '@/lib/services/dvla-api';
 import { createMotHistoryService } from '@/lib/services/mot-history-api';
 import { isRoadEligibleRegistration, runFleetDvlaSync } from '@/lib/services/fleet-dvla-sync';
@@ -26,10 +26,11 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    // FLEET-TIERS: edit assets requires admin-vans Level 4+
+    const canManageFleet = await canEffectiveRoleUseModuleLevel('admin-vans', 4);
     if (!canManageFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Fleet admin access required' },
+        { error: 'Forbidden: Fleet Level 4 required' },
         { status: 403 }
       );
     }
@@ -254,10 +255,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
+    // FLEET-TIERS: retire/archive assets requires admin-vans Level 4+
+    const canManageFleet = await canEffectiveRoleUseModuleLevel('admin-vans', 4);
     if (!canManageFleet) {
       return NextResponse.json(
-        { error: 'Forbidden: Fleet admin access required' },
+        { error: 'Forbidden: Fleet Level 4 required' },
         { status: 403 }
       );
     }

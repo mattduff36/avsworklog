@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useSearchParams, useRouter as useNextRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Wrench, Truck, Settings, HardHat, Plus } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import { PanelLoader } from '@/components/ui/panel-loader';
 
 // Dynamic import for PlantTable
@@ -50,10 +50,15 @@ function isExpectedFleetLoadError(error: unknown): boolean {
 function FleetContent() {
   const searchParams = useSearchParams();
   const router = useNextRouter();
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canViewFleet, loading: fleetPermissionLoading } = usePermissionCheck('admin-vans', false);
+  const { canUseLevel, isLoading: moduleLevelLoading } = useModuleAccessLevel('admin-vans');
   const supabase = useBrowserSupabaseClient();
   const { tabletModeEnabled } = useTabletMode();
+
+  const authLoading = fleetPermissionLoading || moduleLevelLoading;
+  // FLEET-TIERS: settings tab Level 4+; category admin Level 5+
+  const canManageSettings = canUseLevel(4);
+  const canManageCategories = canUseLevel(5);
   
   // Two-level tab state matching Maintenance/Workshop pages
   const [pageTab, setPageTab] = useState<'overview' | 'settings'>('overview');
@@ -95,7 +100,7 @@ function FleetContent() {
     }
     
     if (requestedTab === 'settings') {
-      if (isAdmin || isManager) {
+      if (canManageSettings) {
         setPageTab('settings');
       } else {
         setPageTab('overview');
@@ -110,7 +115,7 @@ function FleetContent() {
       setPageTab('overview');
       router.push('/fleet?tab=vans', { scroll: false });
     }
-  }, [searchParams, authLoading, isManager, isAdmin, router, validAssetTabs]);
+  }, [searchParams, authLoading, canManageSettings, router, validAssetTabs]);
   // Fetch maintenance data
   const { data: maintenanceData, isLoading: maintenanceLoading, error: maintenanceError } = useMaintenance();
   
@@ -430,7 +435,7 @@ function FleetContent() {
       </div>
 
       <Tabs value={pageTab} onValueChange={handlePageTabChange}>
-        {(isAdmin || isManager) && (
+        {canManageSettings && (
           <TabsList className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5' : undefined}>
             <TabsTrigger value="overview" className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2'}>
               <Wrench className="h-4 w-4" />
@@ -543,8 +548,8 @@ function FleetContent() {
         </TabsContent>
 
         <FleetSettingsTab
-          isAdmin={isAdmin}
-          isManager={isManager}
+          canManageSettings={canManageSettings}
+          canManageCategories={canManageCategories}
           categories={categories}
           categoriesLoading={categoriesLoading}
           vehicles={vehicles}

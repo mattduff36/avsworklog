@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { requireFleetLevel } from '@/lib/server/fleet-maintenance-auth';
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // FLEET-TIERS: category list requires Level 3+
+    const auth = await requireFleetLevel(3);
+    if (auth.response) {
+      return auth.response;
     }
+
+    const supabase = await createServerClient();
 
     const { data: categories, error } = await supabase
       .from('hgv_categories')
@@ -40,23 +39,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // FLEET-TIERS: category create requires Level 5
+    const auth = await requireFleetLevel(5, 'Forbidden: Fleet Level 5 required for category admin');
+    if (auth.response) {
+      return auth.response;
+    }
+
     const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const profile = await getProfileWithRole(user.id);
-
-    if (!profile || profile.role?.name !== 'admin') {
-      return NextResponse.json(
-        { error: 'Forbidden: Admin access required' },
-        { status: 403 }
-      );
-    }
 
     const body = await request.json();
     const { name, description } = body;

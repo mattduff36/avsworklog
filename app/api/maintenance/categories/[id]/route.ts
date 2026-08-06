@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
 import type { UpdateCategoryRequest } from '@/types/maintenance';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { requireMaintenanceLevel } from '@/lib/server/fleet-maintenance-auth';
 import { normalizePeriodUnit } from '@/lib/utils/maintenancePeriods';
 
 interface CategoryProtectionRow {
@@ -21,20 +21,17 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+
+    // FLEET-TIERS: category update requires maintenance Level 4+
+    const auth = await requireMaintenanceLevel(
+      4,
+      'Maintenance Level 4 required to update categories'
+    );
+    if (auth.response) {
+      return auth.response;
+    }
+
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
-    if (!canManageMaintenance) {
-      return NextResponse.json(
-        { error: 'Maintenance access required to update categories' },
-        { status: 403 }
-      );
-    }
     
     const body: UpdateCategoryRequest = await request.json();
 
@@ -99,20 +96,17 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+
+    // FLEET-TIERS: category delete requires maintenance Level 4+
+    const auth = await requireMaintenanceLevel(
+      4,
+      'Maintenance Level 4 required to delete categories'
+    );
+    if (auth.response) {
+      return auth.response;
+    }
+
     const supabase = await createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
-    const canManageMaintenance = await canEffectiveRoleAccessModule('maintenance');
-    if (!canManageMaintenance) {
-      return NextResponse.json(
-        { error: 'Maintenance access required to delete categories' },
-        { status: 403 }
-      );
-    }
     
     const { data: category, error: categoryError } = await (supabase as never as { from: (table: string) => { select: (columns: string) => { eq: (column: string, value: string) => { single: () => Promise<{ data: CategoryProtectionRow | null; error: unknown }> } } } })
       .from('maintenance_categories')

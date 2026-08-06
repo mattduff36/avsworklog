@@ -1,32 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { requireMaintenanceLevel } from '@/lib/server/fleet-maintenance-auth';
 import type { Database } from '@/types/database';
 
 // PUT - Restore an archived vehicle back to active status
+// FLEET-TIERS: archive restore requires maintenance Level 4+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ archiveId: string }> }
 ) {
   try {
+    const auth = await requireMaintenanceLevel(
+      4,
+      'Forbidden: Maintenance Level 4 required to restore archived vehicles'
+    );
+    if (auth.response) {
+      return auth.response;
+    }
+
     const supabase = await createServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const canManageFleet = await canEffectiveRoleAccessModule('admin-vans');
-    if (!canManageFleet) {
-      return NextResponse.json(
-        { error: 'Forbidden: Fleet admin access required' },
-        { status: 403 }
-      );
-    }
-
     const archiveId = (await params).archiveId;
 
     // Get the archived vehicle data

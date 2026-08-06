@@ -23,15 +23,12 @@ import { CategoryRecipientsDialog } from './CategoryRecipientsDialog';
 import type { MaintenanceCategory } from '@/types/maintenance';
 import { formatCategoryPeriod } from '@/lib/utils/maintenancePeriods';
 import { getDistanceTypeLabel } from '@/lib/utils/maintenanceCategoryRules';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 
-interface MaintenanceSettingsProps {
-  isAdmin: boolean;
-  isManager: boolean;
-}
-
-export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsProps) {
+export function MaintenanceSettings() {
   const { data: categoriesData } = useMaintenanceCategories();
   const deleteMutation = useDeleteCategory();
+  const { canUseLevel } = useModuleAccessLevel('maintenance');
   
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -39,7 +36,8 @@ export function MaintenanceSettings({ isAdmin, isManager }: MaintenanceSettingsP
   const [recipientsDialogOpen, setRecipientsDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<MaintenanceCategory | null>(null);
   const categories = categoriesData?.categories || [];
-  const canModifySettings = isAdmin || isManager;
+  // FLEET-TIERS: category/settings mutations require maintenance Level 4+
+  const canModifySettings = canUseLevel(4);
   
   // Open dialogs
   const openEditDialog = (category: MaintenanceCategory) => {
