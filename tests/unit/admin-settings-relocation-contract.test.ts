@@ -37,10 +37,12 @@ describe('Admin Settings relocation contract', () => {
     expect(sidebar).toContain('{adminLinks.length > 0 && (');
   });
 
-  it('UI-USERS-MOVED-01 leaves an exact disabled notice in User Management', () => {
+  it('UI-USERS-MOVED-01 links Permissions from User Management to Admin Settings', () => {
     const usersPage = readSource('app/(dashboard)/admin/users/page.tsx');
-    expect(usersPage).toContain('Permissions moved to Admin Settings');
-    expect(usersPage).toMatch(/value="permissions-moved"\s+disabled/);
+    expect(usersPage).toContain('href="/admin/settings?tab=permissions"');
+    expect(usersPage).toContain('Permissions');
+    expect(usersPage).not.toContain('Permissions moved to Admin Settings');
+    expect(usersPage).not.toContain('value="permissions-moved"');
     expect(usersPage).not.toContain('<RoleManagement');
     expect(usersPage).not.toContain('<PermissionsGuide');
   });

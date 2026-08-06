@@ -51,13 +51,18 @@ function AdminSettingsContent() {
     }
   }, [canAccessSettings, permissionLoading, router]);
 
+  useEffect(() => {
+    if (!permissionLoading && canAccessSettings && !isAdminSettingsTab(tabParam)) {
+      const nextParams = new URLSearchParams(searchParams.toString());
+      nextParams.set('tab', 'permissions');
+      const nextQuery = nextParams.toString();
+      router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+    }
+  }, [canAccessSettings, pathname, permissionLoading, router, searchParams, tabParam]);
+
   function handleSettingsTabChange(nextTab: AdminSettingsTab) {
     const nextParams = new URLSearchParams(searchParams.toString());
-    if (nextTab === 'permissions') {
-      nextParams.delete('tab');
-    } else {
-      nextParams.set('tab', nextTab);
-    }
+    nextParams.set('tab', nextTab);
 
     const nextQuery = nextParams.toString();
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });

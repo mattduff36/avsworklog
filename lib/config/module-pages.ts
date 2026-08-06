@@ -312,7 +312,7 @@ export function getPageUrl(value: string): string {
     'admin-users-roles': '/admin/users?tab=roles',
 
     // Admin - Settings
-    'admin-settings-permissions': '/admin/settings',
+    'admin-settings-permissions': '/admin/settings?tab=permissions',
     'admin-settings-permission-guide': '/admin/settings?tab=permission-guide',
     'admin-settings-timesheets': '/admin/settings?tab=timesheets',
     

@@ -3,8 +3,10 @@
 import { Fragment, useState, useEffect, useMemo, useCallback, useLayoutEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
+import { cn } from '@/lib/utils/cn';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import {
   formatFleetAssetBadgeAccessibleLabel,
@@ -118,7 +120,7 @@ type ProfileWithEmail = ProfileWithRole & UserActivitySummary & {
   current_fleet_assignment?: AdminFleetAssignmentSummary | null;
 };
 
-type TabType = 'users' | 'roles' | 'teams' | 'permissions-moved';
+type TabType = 'users' | 'roles' | 'teams';
 type UserStatusTab = 'active' | 'deleted';
 type BinaryChoice = 'yes' | 'no' | '';
 
@@ -1411,14 +1413,16 @@ export default function UsersAdminPage() {
               Teams
             </TabsTrigger>
           )}
-          <TabsTrigger
-            value="permissions-moved"
-            disabled
-            className="gap-2 text-xs sm:text-sm"
+          <Link
+            href="/admin/settings?tab=permissions"
+            className={cn(
+              'inline-flex min-h-8 items-center justify-center gap-2 whitespace-normal rounded-md px-3 py-1 text-center text-sm font-medium leading-tight text-muted-foreground ring-offset-background transition-all',
+              'hover:bg-background/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+            )}
           >
             <Shield className="h-4 w-4" />
-            Permissions moved to Admin Settings
-          </TabsTrigger>
+            Permissions
+          </Link>
         </TabsList>
 
         {/* Users Tab Content */}

@@ -19,7 +19,7 @@ describe('permissions guide', () => {
     expect(adminSettingsSource).toContain("useSensitiveModuleAccess('admin-settings'");
     expect(adminSettingsSource).toContain('value="permission-guide"');
     expect(adminSettingsSource).toContain('<PermissionsGuide');
-    expect(usersSource).toContain('Permissions moved to Admin Settings');
+    expect(usersSource).toContain('href="/admin/settings?tab=permissions"');
     expect(usersSource).not.toContain('<PermissionsGuide');
   });
 
