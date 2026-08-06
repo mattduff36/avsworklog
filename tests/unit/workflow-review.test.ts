@@ -278,9 +278,14 @@ describe('workflow-privacy', () => {
         note: 'Bearer abcdefghijklmnopqr',
       })
     ).toContain('bearer token must not be persisted');
+    const syntheticJwt = [
+      Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url'),
+      Buffer.from(JSON.stringify({ sub: 'synthetic-test-subject' })).toString('base64url'),
+      'synthetic-signature',
+    ].join('.');
     expect(
       assertNoForbiddenPayload({
-        note: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signaturevaluehere',
+        note: syntheticJwt,
       })
     ).toContain('JWT token must not be persisted');
     expect(
