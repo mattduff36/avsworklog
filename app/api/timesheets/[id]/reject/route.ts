@@ -13,8 +13,6 @@ export async function POST(
 ) {
   try {
     const supabase = await createClient();
-    type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
-    const db = supabase as unknown as DbClient;
     const { id: timesheetId } = await params;
     const { comments } = await request.json();
 
@@ -139,8 +137,9 @@ export async function POST(
       }
     }
 
-    // Create in-app notification
-    const { data: message, error: messageInsertError } = await db
+    // Create in-app notification via admin client so Approvals L3 authors
+    // are not blocked by Toolbox Talks Level 4 message INSERT RLS.
+    const { data: message, error: messageInsertError } = await adminClient
       .from('messages')
       .insert({
         type: 'NOTIFICATION',
@@ -160,7 +159,7 @@ export async function POST(
     let messageError = messageInsertError;
     const typedMessage = message as { id: string } | null;
     if (!messageError && typedMessage) {
-      const { error: recipientError } = await db
+      const { error: recipientError } = await adminClient
         .from('message_recipients')
         .insert({
           message_id: typedMessage.id,

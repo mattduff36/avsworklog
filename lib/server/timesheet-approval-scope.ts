@@ -3,6 +3,7 @@ import {
   canActorAuthoriseTimesheetTarget,
   hasAccountsTimesheetFullVisibilityOverride,
 } from '@/lib/utils/timesheet-visibility';
+import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
 import { getEffectiveRole, type EffectiveRoleInfo } from '@/lib/utils/view-as';
 import type { PermissionAccessLevel } from '@/types/roles';
@@ -52,10 +53,14 @@ export async function canCurrentActorAuthoriseTimesheetTarget(
       actorProfileId: effectiveRole.user_id,
       actorTeamId: effectiveRole.team_id,
       approvalsAccessLevel,
-      hasAccountsOverride: hasAccountsTimesheetFullVisibilityOverride(
-        effectiveRole.role_name,
-        effectiveRole.team_name
-      ),
+      // Admin tier keeps global access even if secondary exceptions strip authorise_*.
+      // Self-approval remains denied inside canActorAuthoriseTimesheetTarget.
+      hasAccountsOverride:
+        hasEffectiveRoleFullAccess(effectiveRole) ||
+        hasAccountsTimesheetFullVisibilityOverride(
+          effectiveRole.role_name,
+          effectiveRole.team_name
+        ),
       permissions: actorPermissions.effective,
     },
     target,

@@ -200,7 +200,9 @@ export async function POST(
       }
     }
 
-    const { data: employeeMessage } = await db
+    // Notification writes use the admin client so Approvals L3 authors are not
+    // blocked by Toolbox Talks Level 4 message INSERT RLS.
+    const { data: employeeMessage } = await admin
       .from('messages')
       .insert({
         type: 'NOTIFICATION',
@@ -221,7 +223,7 @@ export async function POST(
     const typedEmployeeMessage = employeeMessage as unknown as { id: string } | null;
 
     if (typedEmployeeMessage) {
-      await db
+      await admin
         .from('message_recipients')
         .insert({
           message_id: typedEmployeeMessage.id,
@@ -231,7 +233,7 @@ export async function POST(
     }
 
     if (notifyManagerIds.length > 0) {
-      const { data: managerMessage } = await db
+      const { data: managerMessage } = await admin
         .from('messages')
         .insert({
           type: 'NOTIFICATION',
@@ -258,7 +260,7 @@ export async function POST(
           status: 'PENDING' as const,
         }));
 
-        await db
+        await admin
           .from('message_recipients')
           .insert(recipients);
       }
