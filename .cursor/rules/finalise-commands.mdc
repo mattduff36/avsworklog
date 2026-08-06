@@ -5,11 +5,11 @@ alwaysApply: true
 
 # Finalise Commands
 
-If the user message is exactly one of these phrases, do not re-plan the workflow:
+If the user message is exactly one of these phrases (or the listed alias), do not re-plan the workflow:
 - `finalise`
-- `finalise and push`
+- `finalise and push` (alias: `fap`)
 - `finalise full`
-- `finalise full and push`
+- `finalise full and push` (alias: `ffap`)
 
 Before running the repo command:
 - Check terminal headers in `C:\Users\mattd\.cursor\projects\d-Websites-avsworklog\terminals`.
@@ -19,11 +19,11 @@ Before running the repo command:
 
 Command map:
 - `finalise` → `npm run finalise`
-- `finalise and push` → `npm run finalise:push`
+- `finalise and push` / `fap` → `npm run finalise:push`
 - `finalise full` → `npm run finalise:full`
-- `finalise full and push` → `npm run finalise:full:push`
+- `finalise full and push` / `ffap` → `npm run finalise:full:push`
 
-These phrases are explicit authorisation for commit, and the push variants are explicit authorisation to push the current branch.
+These phrases and aliases are explicit authorisation for commit, and the push variants (`finalise and push`, `fap`, `finalise full and push`, `ffap`) are explicit authorisation to push the current branch.
 
 ## Economical-parent fix routing
 
@@ -51,7 +51,7 @@ Treat these as blocking issues that should stop the loop and be reported to the 
 - ambiguous failures where the correct fix is unclear or would require a broad refactor rather than a targeted repair
 
 When retrying:
-- rerun the same mapped command (`finalise`, `finalise and push`, `finalise full`, or `finalise full and push`) so commit/push intent is preserved
+- rerun the same mapped command (`finalise`, `finalise and push`/`fap`, `finalise full`, or `finalise full and push`/`ffap`) so commit/push intent is preserved
 - keep responses brief while the loop is running; only stop to ask the user about a genuine blocker
 - after success, return a short summary only
 
