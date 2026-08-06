@@ -40,6 +40,7 @@ describe('permissions guide', () => {
     expect(guideSource).not.toContain('bg-muted/30');
     expect(guideSource).not.toContain('bg-background');
     expect(guideSource).not.toContain('Min: {module.minimumRole}');
+    expect(guideSource).not.toContain('module.matrixGate');
     expect(guideSource).toMatch(/getModuleBrandSurfaceClasses\(module\.moduleName\)/);
     expect(guideSource).toContain('ROLE_ORDER');
     expect(guideSource).toContain('Accordion');

@@ -127,7 +127,6 @@ export function PermissionsGuide() {
                     >
                       {minRoleBadge.label}
                     </Badge>
-                    <Badge variant="secondary">{module.matrixGate}</Badge>
                   </div>
                 </div>
               </AccordionTrigger>
