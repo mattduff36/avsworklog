@@ -10,6 +10,7 @@ BEGIN;
 -- Actions: preserve defect/workshop inserts; require Actions Level 4 otherwise
 -- ---------------------------------------------------------------------------
 DROP POLICY IF EXISTS "Authenticated users can create actions" ON public.actions;
+DROP POLICY IF EXISTS "Workshop users can create workshop tasks" ON public.actions;
 DROP POLICY IF EXISTS "Actions level four can create actions" ON public.actions;
 DROP POLICY IF EXISTS "Authenticated users can create constrained defect actions" ON public.actions;
 

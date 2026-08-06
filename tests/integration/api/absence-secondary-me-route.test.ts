@@ -75,8 +75,11 @@ describe('absence secondary me route', () => {
           name: 'supervisor',
           display_name: 'Supervisor',
         }),
+        role_id: 'role-supervisor',
         team_id: 'team-b',
         team_name: 'Team B',
+        include_user_overrides: false,
+        include_secondary_overrides: false,
       })
     );
     expect(payload.team_id).toBe('team-b');

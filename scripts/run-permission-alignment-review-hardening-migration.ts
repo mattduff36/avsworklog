@@ -52,21 +52,37 @@ async function runMigration(): Promise<void> {
     `);
 
     const actionInserts = policies.rows.filter((row) => row.tablename === 'actions');
-    const hasLevelFour = actionInserts.some((row) =>
-      row.policyname.includes('Actions level four')
+    const expectedActionInsertPolicies = new Set([
+      'Actions level four can create actions',
+      'Authenticated users can create constrained defect actions',
+    ]);
+    const unexpectedActionInserts = actionInserts.filter(
+      (row) => !expectedActionInsertPolicies.has(row.policyname)
     );
-    const hasConstrained = actionInserts.some((row) =>
-      row.policyname.includes('constrained defect')
+    const levelFourPolicy = actionInserts.find(
+      (row) => row.policyname === 'Actions level four can create actions'
     );
-    const hasOpenInsert = actionInserts.some(
-      (row) =>
-        row.policyname === 'Authenticated users can create actions' &&
-        (row.with_check || '').includes('auth.uid()') &&
-        !(row.with_check || '').includes('action_type')
+    const constrainedPolicy = actionInserts.find(
+      (row) => row.policyname === 'Authenticated users can create constrained defect actions'
     );
 
-    if (!hasLevelFour || !hasConstrained || hasOpenInsert) {
-      throw new Error('Actions INSERT policies were not hardened as expected');
+    if (
+      !levelFourPolicy ||
+      !(levelFourPolicy.with_check || '').includes('effective_has_module_level') ||
+      !constrainedPolicy ||
+      !(constrainedPolicy.with_check || '').includes('action_type') ||
+      !(constrainedPolicy.with_check || '').includes('created_by') ||
+      unexpectedActionInserts.length > 0
+    ) {
+      throw new Error(
+        `Actions INSERT policies were not hardened as expected${
+          unexpectedActionInserts.length > 0
+            ? `; unexpected policies: ${unexpectedActionInserts
+                .map((row) => row.policyname)
+                .join(', ')}`
+            : ''
+        }`
+      );
     }
 
     const forbiddenTimesheetPolicies = policies.rows.filter((row) => row.tablename === 'timesheets');

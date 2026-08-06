@@ -17,6 +17,7 @@ describe('Permission alignment review hardening', () => {
     const sql = readMigration();
 
     expect(sql).toContain('DROP POLICY IF EXISTS "Authenticated users can create actions"');
+    expect(sql).toContain('DROP POLICY IF EXISTS "Workshop users can create workshop tasks"');
     expect(sql).toContain('Actions level four can create actions');
     expect(sql).toContain('Authenticated users can create constrained defect actions');
     expect(sql).toContain("action_type = ANY (ARRAY['inspection_defect'::text, 'workshop_vehicle_task'::text])");

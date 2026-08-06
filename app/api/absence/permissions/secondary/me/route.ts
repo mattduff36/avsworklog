@@ -36,12 +36,15 @@ export async function GET() {
 
     const snapshot = await getActorAbsenceSecondaryPermissions(user.id, {
       role: roleOverride,
+      role_id: effectiveRole.role_id,
       ...(hasTeamOverride
         ? {
             team_id: effectiveRole.team_id,
             team_name: effectiveRole.team_name,
           }
         : {}),
+      include_user_overrides: effectiveRole.is_viewing_as !== true,
+      include_secondary_overrides: effectiveRole.is_viewing_as !== true,
     });
     const permissions = snapshot.effective;
 
