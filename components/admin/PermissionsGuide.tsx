@@ -131,7 +131,7 @@ export function PermissionsGuide() {
                   </div>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="bg-slate-900 px-4 pb-4">
+              <AccordionContent className="px-4 pb-4">
                 <div className="space-y-3">
                   {ROLE_ORDER.map((role) => {
                     const detail = module.byRole[role];
@@ -140,7 +140,7 @@ export function PermissionsGuide() {
                     return (
                       <div
                         key={`${module.moduleName}-${role}`}
-                        className="rounded-md border border-border bg-slate-900 p-3"
+                        className="rounded-md border border-border bg-[#0f172a] p-3"
                       >
                         <Badge
                           variant={roleBadge.variant}
