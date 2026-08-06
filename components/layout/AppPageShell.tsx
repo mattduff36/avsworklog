@@ -13,6 +13,7 @@ interface AppPageHeaderProps {
   leading?: ReactNode;
   icon?: ReactNode;
   actions?: ReactNode;
+  footer?: ReactNode;
   className?: string;
   contentClassName?: string;
   headingClassName?: string;
@@ -20,6 +21,7 @@ interface AppPageHeaderProps {
   descriptionClassName?: string;
   iconContainerClassName?: string;
   actionsClassName?: string;
+  footerClassName?: string;
 }
 
 const SHELL_WIDTH_CLASSNAME: Record<NonNullable<AppPageShellProps['width']>, string> = {
@@ -53,6 +55,7 @@ export function AppPageHeader({
   leading,
   icon,
   actions,
+  footer,
   className,
   contentClassName,
   headingClassName,
@@ -60,10 +63,23 @@ export function AppPageHeader({
   descriptionClassName,
   iconContainerClassName,
   actionsClassName,
+  footerClassName,
 }: AppPageHeaderProps) {
   return (
-    <div className={cn('rounded-lg border border-border bg-white p-6 dark:bg-slate-900', className)}>
-      <div className={cn('flex flex-col gap-4 md:flex-row md:items-start md:justify-between', contentClassName)}>
+    <div
+      className={cn(
+        'overflow-hidden rounded-lg border border-border bg-white dark:bg-slate-900',
+        !footer && 'p-6',
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          'flex flex-col gap-4 md:flex-row md:items-start md:justify-between',
+          footer && 'p-4',
+          contentClassName,
+        )}
+      >
         <div className="flex min-w-0 items-start gap-3">
           {leading}
           {icon ? (
@@ -85,6 +101,11 @@ export function AppPageHeader({
           </div>
         ) : null}
       </div>
+      {footer ? (
+        <div className={cn('border-t border-border px-3 py-2 sm:px-4', footerClassName)}>
+          {footer}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -17,11 +17,14 @@ export const INVENTORY_SECONDARY_TABS_LIST_CLASSNAME =
   'grid w-full grid-cols-2 gap-1 md:inline-flex md:w-auto';
 
 export const INVENTORY_TAB_TRIGGER_CLASSNAME =
-  'min-h-11 w-full gap-2 px-2 md:w-auto md:px-3';
+  'min-h-11 w-full gap-2 px-2 data-[state=active]:bg-inventory data-[state=active]:text-white md:min-h-8 md:w-auto md:px-3';
+
+export const INVENTORY_HEADER_CTA_CLASSNAME =
+  'w-auto bg-inventory text-white shadow-md transition-all duration-200 hover:bg-inventory-dark hover:shadow-lg active:scale-95';
 
 /** Wrap secondary tab rows: left on mobile, right on tablet/desktop. */
 export const INVENTORY_SECONDARY_TABS_ROW_CLASSNAME =
-  'mt-3 flex justify-start md:justify-end';
+  'flex justify-start md:justify-end';
 
 interface InventoryRoleViewToggleProps {
   value: InventoryRoleViewMode;
@@ -92,24 +95,24 @@ export function InventoryContextToolbar({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-lg border border-border bg-slate-900/40 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+      className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
       data-testid="inventory-context-toolbar"
     >
-      <div className="min-w-0 space-y-1">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="min-w-0">
+        <p className="hidden text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:block">
           Working context
         </p>
-        <p className="truncate text-sm text-white">
+        <p className="truncate text-sm text-foreground">
           {locationLabel ? `Current location: ${locationLabel}` : 'No location set'}
         </p>
       </div>
-      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+      <div className="grid w-full grid-cols-1 items-center gap-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
         {roleViewToggle}
         {showLocationAction ? (
           <Button
             variant="outline"
             onClick={onChangeLocation}
-            className="min-h-11 w-full border-slate-600 sm:w-auto"
+            className="w-full border-slate-600 sm:w-auto"
           >
             <MapPin className="mr-2 h-4 w-4" />
             {locationLabel ? 'Change My Location' : 'Set My Location'}

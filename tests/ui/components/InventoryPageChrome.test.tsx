@@ -3,18 +3,21 @@
 
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { AppPageHeader } from '@/components/layout/AppPageShell';
 import {
   InventoryContextToolbar,
   InventoryRoleViewToggle,
   InventorySummaryCards,
+  INVENTORY_HEADER_CTA_CLASSNAME,
   INVENTORY_PRIMARY_TABS_LIST_CLASSNAME,
   INVENTORY_SECONDARY_TABS_LIST_CLASSNAME,
   INVENTORY_SECONDARY_TABS_ROW_CLASSNAME,
+  INVENTORY_TAB_TRIGGER_CLASSNAME,
 } from '@/app/(dashboard)/inventory/components/InventoryPageChrome';
 import { PackageSearch } from 'lucide-react';
 
 describe('InventoryPageChrome', () => {
-  it('renders labelled view and location controls in the context toolbar', () => {
+  it('renders the compact working-context footer controls', () => {
     const onChangeLocation = vi.fn();
     const onValueChange = vi.fn();
 
@@ -28,7 +31,9 @@ describe('InventoryPageChrome', () => {
       />,
     );
 
-    expect(screen.getByTestId('inventory-context-toolbar')).toBeInTheDocument();
+    const controls = screen.getByTestId('inventory-context-toolbar');
+    expect(controls).toBeInTheDocument();
+    expect(controls).toHaveClass('flex', 'sm:flex-row');
     expect(screen.getByText('Working context')).toBeInTheDocument();
     expect(screen.getByText('Current location: Van - TE57 VAN')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Management' })).toHaveTextContent('Management');
@@ -70,22 +75,36 @@ describe('InventoryPageChrome', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps location and view controls out of the Add Item header slot', () => {
+  it('uses the standard module CTA interaction treatment', () => {
+    expect(INVENTORY_HEADER_CTA_CLASSNAME).toContain('bg-inventory');
+    expect(INVENTORY_HEADER_CTA_CLASSNAME).toContain('shadow-md');
+    expect(INVENTORY_HEADER_CTA_CLASSNAME).toContain('hover:shadow-lg');
+    expect(INVENTORY_HEADER_CTA_CLASSNAME).toContain('active:scale-95');
+  });
+
+  it('keeps Add Item and working context inside one bordered header surface', () => {
     render(
-      <div>
-        <button type="button">Add Item</button>
-        <InventoryContextToolbar
-          roleViewToggle={<InventoryRoleViewToggle value="management" onValueChange={vi.fn()} />}
-          locationLabel="Van - TE57 VAN"
-          onChangeLocation={vi.fn()}
-        />
-      </div>,
+      <AppPageHeader
+        title="Inventory"
+        description="Track inventory."
+        actions={<button type="button">Add Item</button>}
+        footer={(
+          <InventoryContextToolbar
+            roleViewToggle={<InventoryRoleViewToggle value="management" onValueChange={vi.fn()} />}
+            locationLabel="Van - TE57 VAN"
+            onChangeLocation={vi.fn()}
+          />
+        )}
+      />,
     );
 
-    const toolbar = screen.getByTestId('inventory-context-toolbar');
-    expect(toolbar).toContainElement(screen.getByRole('button', { name: 'Management' }));
-    expect(toolbar).toContainElement(screen.getByRole('button', { name: /Change My Location/i }));
-    expect(toolbar).not.toContainElement(screen.getByRole('button', { name: 'Add Item' }));
+    const headingSurface = screen.getByRole('heading', { name: 'Inventory' }).closest('.rounded-lg');
+    const toolbarSurface = screen.getByTestId('inventory-context-toolbar').closest('.rounded-lg');
+    const actionSurface = screen.getByRole('button', { name: 'Add Item' }).closest('.rounded-lg');
+
+    expect(headingSurface).toBe(toolbarSurface);
+    expect(headingSurface).toBe(actionSurface);
+    expect(toolbarSurface).toHaveTextContent('Working context');
   });
 
   it('exports the management tab alignment contract', () => {
@@ -95,5 +114,8 @@ describe('InventoryPageChrome', () => {
     expect(INVENTORY_SECONDARY_TABS_LIST_CLASSNAME).toContain('md:inline-flex');
     expect(INVENTORY_SECONDARY_TABS_ROW_CLASSNAME).toContain('justify-start');
     expect(INVENTORY_SECONDARY_TABS_ROW_CLASSNAME).toContain('md:justify-end');
+    expect(INVENTORY_SECONDARY_TABS_ROW_CLASSNAME).not.toContain('mt-3');
+    expect(INVENTORY_TAB_TRIGGER_CLASSNAME).toContain('md:min-h-8');
+    expect(INVENTORY_TAB_TRIGGER_CLASSNAME).toContain('data-[state=active]:bg-inventory');
   });
 });

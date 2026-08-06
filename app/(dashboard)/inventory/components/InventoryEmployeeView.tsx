@@ -35,7 +35,11 @@ import {
   isLegacyQuoteInventoryLocation,
 } from '../utils';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
-import { InventorySummaryCards } from './InventoryPageChrome';
+import {
+  InventorySummaryCards,
+  INVENTORY_SECONDARY_TABS_LIST_CLASSNAME,
+  INVENTORY_TAB_TRIGGER_CLASSNAME,
+} from './InventoryPageChrome';
 import { InventoryTable, type InventoryTableQuickFilter } from './InventoryTable';
 import { HardwareQuantityRow } from './HardwareQuantityRow';
 import { HardwareTransferDialog } from './HardwareTransferDialog';
@@ -347,7 +351,7 @@ export function InventoryEmployeeView({
         className="space-y-4"
       >
         <TabsList
-          className="grid h-auto w-full grid-cols-2 gap-1 md:inline-flex md:w-auto"
+          className={INVENTORY_SECONDARY_TABS_LIST_CLASSNAME}
           data-testid="inventory-employee-tabs"
         >
           {EMPLOYEE_NAV_ITEMS.map((item) => {
@@ -356,7 +360,7 @@ export function InventoryEmployeeView({
               <TabsTrigger
                 key={item.value}
                 value={item.value}
-                className="min-h-11 w-full gap-2 px-2 md:w-auto md:px-3"
+                className={INVENTORY_TAB_TRIGGER_CLASSNAME}
               >
                 <Icon className="h-4 w-4" />
                 {item.label}

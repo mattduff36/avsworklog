@@ -1369,11 +1369,11 @@ export default function UsersAdminPage() {
         headingClassName="space-y-0"
         titleClassName="mb-2 text-white"
         descriptionClassName="text-base"
-        actionsClassName="sm:w-auto"
+        actionsClassName="sm:w-auto sm:self-center"
         actions={activeTab === 'users' && userStatusTab === 'active' ? (
           <Button
             onClick={openAddDialog}
-            className="w-full bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900 sm:w-auto"
+            className="w-full bg-avs-yellow text-slate-900 shadow-md transition-all duration-200 hover:bg-avs-yellow-hover hover:shadow-lg active:scale-95 sm:w-auto"
           >
             <UserPlus className="h-4 w-4 mr-2" />
             Add User

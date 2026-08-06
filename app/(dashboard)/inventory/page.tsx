@@ -38,6 +38,7 @@ import {
   InventoryContextToolbar,
   InventoryRoleViewToggle,
   InventorySummaryCards,
+  INVENTORY_HEADER_CTA_CLASSNAME,
   INVENTORY_PRIMARY_TABS_LIST_CLASSNAME,
   INVENTORY_SECONDARY_TABS_LIST_CLASSNAME,
   INVENTORY_SECONDARY_TABS_ROW_CLASSNAME,
@@ -947,13 +948,15 @@ export default function InventoryPage() {
           titleMeta={<InventoryBetaBadge />}
           description="Set your location, view assigned inventory, and claim or move items."
           icon={<PackageSearch className="h-5 w-5" />}
-        />
-
-        <InventoryContextToolbar
-          roleViewToggle={roleViewToggle}
-          locationLabel={employeeLocationName}
-          onChangeLocation={() => setChangeLocationDialogOpen(true)}
-          showLocationAction={Boolean(roleViewToggle || employeeLocationName)}
+          footer={(roleViewToggle || employeeLocationName) ? (
+            <InventoryContextToolbar
+              roleViewToggle={roleViewToggle}
+              locationLabel={employeeLocationName}
+              onChangeLocation={() => setChangeLocationDialogOpen(true)}
+              showLocationAction={Boolean(roleViewToggle || employeeLocationName)}
+            />
+          ) : null}
+          footerClassName="bg-slate-950/20"
         />
 
         {inventoryLoadError ? (
@@ -1013,21 +1016,25 @@ export default function InventoryPage() {
         titleMeta={<InventoryBetaBadge />}
         description="Track small tools, plant, signs, equipment, locations, and check status."
         icon={<PackageSearch className="h-5 w-5" />}
+        contentClassName="flex-row items-start justify-between"
+        actionsClassName="w-auto shrink-0 justify-end"
         actions={(
           <Button
             onClick={() => setItemDialogOpen(true)}
-            className="min-h-11 w-full bg-inventory text-white hover:bg-inventory-dark md:w-auto"
+            className={INVENTORY_HEADER_CTA_CLASSNAME}
           >
             <Plus className="mr-2 h-4 w-4" />
             Add Item
           </Button>
         )}
-      />
-
-      <InventoryContextToolbar
-        roleViewToggle={roleViewToggle}
-        locationLabel={employeeLocationName}
-        onChangeLocation={() => setChangeLocationDialogOpen(true)}
+        footer={(
+          <InventoryContextToolbar
+            roleViewToggle={roleViewToggle}
+            locationLabel={employeeLocationName}
+            onChangeLocation={() => setChangeLocationDialogOpen(true)}
+          />
+        )}
+        footerClassName="bg-slate-950/20"
       />
 
       {inventoryLoadError ? (
