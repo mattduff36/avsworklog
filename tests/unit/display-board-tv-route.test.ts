@@ -109,7 +109,7 @@ describe('legacy display board TV route', () => {
     expect(html).toContain('height: 1080px;');
     expect(html).toContain("app.className.indexOf('board') === -1 && app.className.indexOf('boot') === -1");
     expect(html).toContain("app.className = 'boot';\n        scaleBoardToViewport();");
-    expect(html).toContain('Confirm this code in Admin Settings');
+    expect(html).toContain('Confirm this code in Workshop Tasks Settings');
     expect(html).toContain('<div class="pair-code">');
   });
 

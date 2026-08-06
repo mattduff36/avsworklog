@@ -241,10 +241,11 @@ describe('@permissions API Endpoint Access Control', () => {
       const adminSettings = matrix.modules.find((permissionModule) => permissionModule.module_name === 'admin-settings');
 
       expect(toolboxTalks?.enforced_minimum_access_level).toBe(4);
-      expect(adminSettings?.enforced_minimum_access_level).toBe(4);
+      expect(adminSettings?.enforced_minimum_access_level).toBe(5);
       expect(toolboxTalks && isPermissionLevelAllowedForModule(toolboxTalks, 3, { hasFullAccessRole: false })).toBe(false);
       expect(toolboxTalks && isPermissionLevelAllowedForModule(toolboxTalks, 4, { hasFullAccessRole: false })).toBe(true);
-      expect(adminSettings && isPermissionLevelAllowedForModule(adminSettings, 4, { hasFullAccessRole: false })).toBe(true);
+      expect(adminSettings && isPermissionLevelAllowedForModule(adminSettings, 4, { hasFullAccessRole: false })).toBe(false);
+      expect(adminSettings && isPermissionLevelAllowedForModule(adminSettings, 5, { hasFullAccessRole: false })).toBe(true);
     });
 
     it('exposes sensitive PIN metadata for matrix header toggles', async () => {
