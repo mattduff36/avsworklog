@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.7.0
+
+**GIT COMMIT MESSAGE**
+`feat(admin-settings): relocate permission and display controls`
+
+**PUSHED AT**
+2026-08-06T10:41:43.780Z
+
+**WHAT CHANGED**
+Update app reliability. Relocate permission and display controls.
+
+**VERSION HISTORY DETAILS**
+- Relocate permission and display controls, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated workshop tasks, with changes to background routes, app screens, automated tests, and documentation.
+- Updated profile, with changes to background routes, app screens, interface components, and automated tests.
+- Updated timesheets, with changes to background routes and automated tests.
+- Updated help and FAQ, with changes to automation scripts and documentation.
+- Updated user management, with changes to app screens.
+- Updated navigation, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `test(tests): update app reliability`
+- `feat(admin-settings): relocate permission and display controls`
+
 ## 0826.6.1
 
 **GIT COMMIT MESSAGE**
