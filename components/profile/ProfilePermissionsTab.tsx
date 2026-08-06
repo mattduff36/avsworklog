@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getModuleBrandSurfaceClasses } from '@/lib/utils/module-brand-presentation';
 import type { ProfileOverviewPayload } from '@/types/profile';
 import type { ModuleName } from '@/types/roles';
 
@@ -16,77 +17,6 @@ function getAccessBadgeClass(accessLevel: number): string {
   if (accessLevel >= 3) return 'border-sky-500/40 bg-sky-500/15 text-sky-300';
   if (accessLevel >= 2) return 'border-green-500/40 bg-green-500/15 text-green-300';
   return 'border-slate-500/40 bg-slate-500/15 text-slate-200';
-}
-
-function getPermissionTileClasses(moduleName: string): {
-  card: string;
-  cardHover: string;
-  thumbnail: string;
-} {
-  const normalized = moduleName.toLowerCase();
-
-  if (normalized.includes('timesheet')) {
-    return {
-      card: 'border-[hsl(var(--timesheet-primary)/0.35)] bg-[hsl(var(--timesheet-primary)/0.10)]',
-      cardHover: 'hover:bg-[hsl(var(--timesheet-primary)/0.16)]',
-      thumbnail: 'border-[hsl(var(--timesheet-primary)/0.35)] bg-[hsl(var(--timesheet-primary)/0.40)] text-timesheet',
-    };
-  }
-  if (normalized.includes('inspection') || normalized.includes('van') || normalized.includes('hgv')) {
-    return {
-      card: 'border-[hsl(var(--inspection-primary)/0.35)] bg-[hsl(var(--inspection-primary)/0.10)]',
-      cardHover: 'hover:bg-[hsl(var(--inspection-primary)/0.16)]',
-      thumbnail: 'border-[hsl(var(--inspection-primary)/0.35)] bg-[hsl(var(--inspection-primary)/0.40)] text-inspection',
-    };
-  }
-  if (normalized.includes('plant')) {
-    return {
-      card: 'border-[hsl(var(--plant-inspection-primary)/0.35)] bg-[hsl(var(--plant-inspection-primary)/0.10)]',
-      cardHover: 'hover:bg-[hsl(var(--plant-inspection-primary)/0.16)]',
-      thumbnail: 'border-[hsl(var(--plant-inspection-primary)/0.35)] bg-[hsl(var(--plant-inspection-primary)/0.40)] text-plant-inspection',
-    };
-  }
-  if (normalized.includes('project') || normalized.includes('rams')) {
-    return {
-      card: 'border-[hsl(var(--rams-primary)/0.35)] bg-[hsl(var(--rams-primary)/0.10)]',
-      cardHover: 'hover:bg-[hsl(var(--rams-primary)/0.16)]',
-      thumbnail: 'border-[hsl(var(--rams-primary)/0.35)] bg-[hsl(var(--rams-primary)/0.40)] text-rams',
-    };
-  }
-  if (normalized.includes('absence') || normalized.includes('leave')) {
-    return {
-      card: 'border-[hsl(var(--absence-primary)/0.35)] bg-[hsl(var(--absence-primary)/0.10)]',
-      cardHover: 'hover:bg-[hsl(var(--absence-primary)/0.16)]',
-      thumbnail: 'border-[hsl(var(--absence-primary)/0.35)] bg-[hsl(var(--absence-primary)/0.40)] text-absence',
-    };
-  }
-  if (normalized.includes('maintenance') || normalized.includes('fleet')) {
-    return {
-      card: 'border-[hsl(var(--maintenance-primary)/0.35)] bg-[hsl(var(--maintenance-primary)/0.10)]',
-      cardHover: 'hover:bg-[hsl(var(--maintenance-primary)/0.16)]',
-      thumbnail: 'border-[hsl(var(--maintenance-primary)/0.35)] bg-[hsl(var(--maintenance-primary)/0.40)] text-maintenance',
-    };
-  }
-  if (normalized.includes('inventory')) {
-    return {
-      card: 'border-[hsl(var(--inventory-primary)/0.35)] bg-[hsl(var(--inventory-primary)/0.10)]',
-      cardHover: 'hover:bg-[hsl(var(--inventory-primary)/0.16)]',
-      thumbnail: 'border-[hsl(var(--inventory-primary)/0.35)] bg-[hsl(var(--inventory-primary)/0.40)] text-inventory',
-    };
-  }
-  if (normalized.includes('workshop')) {
-    return {
-      card: 'border-[hsl(var(--workshop-primary)/0.35)] bg-[hsl(var(--workshop-primary)/0.10)]',
-      cardHover: 'hover:bg-[hsl(var(--workshop-primary)/0.16)]',
-      thumbnail: 'border-[hsl(var(--workshop-primary)/0.35)] bg-[hsl(var(--workshop-primary)/0.40)] text-workshop',
-    };
-  }
-
-  return {
-    card: 'border-[hsl(var(--avs-yellow)/0.35)] bg-[hsl(var(--avs-yellow)/0.10)]',
-    cardHover: 'hover:bg-[hsl(var(--avs-yellow)/0.16)]',
-    thumbnail: 'border-[hsl(var(--avs-yellow)/0.35)] bg-[hsl(var(--avs-yellow)/0.40)] text-avs-yellow',
-  };
 }
 
 function getPermissionModuleHref(moduleName: ModuleName): string {
@@ -154,7 +84,7 @@ export function ProfilePermissionsTab({ permissionSummary }: ProfilePermissionsT
           ) : (
             <div className="grid gap-3 lg:grid-cols-2">
               {modules.map((module) => {
-                const tileClasses = getPermissionTileClasses(module.module_name);
+                const tileClasses = getModuleBrandSurfaceClasses(module.module_name);
                 const href = getPermissionModuleHref(module.module_name);
                 return (
                 <Link

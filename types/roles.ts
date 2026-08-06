@@ -217,7 +217,7 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'timesheets': '--timesheet-primary',
   'inspections': '--inspection-primary',
   'plant-inspections': '--plant-inspection-primary',
-  'hgv-inspections': '--inspection-primary',
+  'hgv-inspections': '--hgv-inspection-primary',
   'rams': '--rams-primary',
   'absence': '--absence-primary',
   'maintenance': '--maintenance-primary',

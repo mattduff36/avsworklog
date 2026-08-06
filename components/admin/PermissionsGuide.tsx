@@ -4,6 +4,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import permissionsAudit from '@/lib/config/permissions-secondary-audit.json';
+import { getModuleBrandSurfaceClasses } from '@/lib/utils/module-brand-presentation';
+import { cn } from '@/lib/utils/cn';
 import { BookOpen } from 'lucide-react';
 
 const ROLE_ORDER = ['Contractor', 'Employee', 'Supervisor', 'Manager', 'Admin'] as const;
@@ -72,13 +74,14 @@ export function PermissionsGuide() {
       <Accordion type="multiple" className="space-y-3">
         {modules.map((module) => {
           const moduleMismatches = mismatchByModule.get(module.moduleName) || [];
+          const brandSurface = getModuleBrandSurfaceClasses(module.moduleName);
           return (
             <AccordionItem
               key={module.moduleName}
               value={module.moduleName}
-              className="rounded-lg border border-border bg-card px-4"
+              className={cn('rounded-lg border px-4', brandSurface.card)}
             >
-              <AccordionTrigger className="py-4 hover:no-underline">
+              <AccordionTrigger className={cn('py-4 hover:no-underline', brandSurface.cardHover)}>
                 <div className="flex flex-col items-start gap-2 text-left sm:flex-row sm:items-center sm:gap-3">
                   <span className="font-semibold text-foreground">{module.displayName}</span>
                   <div className="flex flex-wrap gap-2">

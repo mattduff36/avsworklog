@@ -30,6 +30,10 @@ describe('permissions guide', () => {
     );
 
     expect(guideSource).toContain("import permissionsAudit from '@/lib/config/permissions-secondary-audit.json'");
+    expect(guideSource).toContain('getModuleBrandSurfaceClasses');
+    expect(guideSource).toContain('brandSurface.card');
+    expect(guideSource).toContain('brandSurface.cardHover');
+    expect(guideSource).toMatch(/getModuleBrandSurfaceClasses\(module\.moduleName\)/);
     expect(guideSource).toContain('ROLE_ORDER');
     expect(guideSource).toContain('Accordion');
     expect(guideSource).not.toContain('HIDDEN_GUIDE_MODULES');
