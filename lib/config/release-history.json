@@ -1,5 +1,34 @@
 [
   {
+    "version": "0826.9.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated inventory. Finish module chrome and muted legacy opt-ins. Align inventory and admin page chrome. Brand Permission Guide module cards. Clarify users page loading message. Link User Management Permissions to settings. Standardise management chrome and My Location tabs. Hide Employee ID from users table. Keep fleet VRN badges on one line. Make asset labels context-aware. Create quote site locations on quote creation.",
+    "summary": "Updated inventory. Finish module chrome and muted legacy opt-ins. Align inventory and admin page chrome. Brand Permission Guide module cards. Clarify users page loading message. Link User Management Permissions to settings. Standardise management chrome and My Location tabs. Hide Employee ID from users table. Keep fleet VRN badges on one line. Make asset labels context-aware. Create quote site locations on quote creation.",
+    "details": [
+      "Updated inventory, with changes to app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated quotes, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to automation scripts and data storage.",
+      "Updated daily tasks, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Make asset labels context-aware, with changes to shared logic and automated tests.",
+      "Updated PDF document documents, with changes to background routes, shared logic, and automated tests.",
+      "Updated profile, with changes to interface components and automated tests.",
+      "Updated projects, with changes to background routes, automated tests, and documentation."
+    ],
+    "areas": [
+      "App screens",
+      "Fleet",
+      "Inventory. Finish module chrome",
+      "Muted legacy opt-ins. Align inventory"
+    ],
+    "areaKeys": [
+      "inventory",
+      "app-screens",
+      "fleet"
+    ],
+    "pushedAt": "2026-08-06T20:26:18.304Z"
+  },
+  {
     "version": "0826.8.0",
     "updateKind": "major",
     "title": "Quotes update",

@@ -2,6 +2,40 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.9.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update inventory`
+
+**PUSHED AT**
+2026-08-06T20:26:18.304Z
+
+**WHAT CHANGED**
+Update inventory. Finish module chrome and muted legacy opt-ins. Align inventory and admin page chrome. Brand Permission Guide module cards. Clarify users page loading message. Link User Management Permissions to settings. Standardise management chrome and My Location tabs. Hide Employee ID from users table. Keep fleet VRN badges on one line. Make asset labels context-aware. Create quote site locations on quote creation.
+
+**VERSION HISTORY DETAILS**
+- Updated inventory, with changes to app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated quotes, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated data storage, with changes to automation scripts and data storage.
+- Updated daily tasks, with changes to background routes, app screens, shared logic, and automated tests.
+- Make asset labels context-aware, with changes to shared logic and automated tests.
+- Updated PDF documents, with changes to background routes, shared logic, and automated tests.
+- Updated profile, with changes to interface components and automated tests.
+- Updated projects, with changes to background routes, automated tests, and documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update inventory`
+- `fix(inventory): finish module chrome and muted legacy opt-ins`
+- `fix(ui): align inventory and admin page chrome`
+- `fix(admin): brand Permission Guide module cards`
+- `fix(admin): clarify users page loading message`
+- `fix(admin): link User Management Permissions to settings`
+- `fix(inventory): standardise management chrome and My Location tabs`
+- `fix(admin): hide Employee ID from users table`
+- `fix(admin): keep fleet VRN badges on one line`
+- `fix(fleet): make asset labels context-aware`
+- `feat(inventory): create quote site locations on quote creation`
+
 ## 0826.8.0
 
 **GIT COMMIT MESSAGE**
