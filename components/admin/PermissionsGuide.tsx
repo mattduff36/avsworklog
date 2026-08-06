@@ -26,6 +26,28 @@ interface PermissionsAuditDocument {
   prdRelevantMismatches: string[];
 }
 
+interface GuideRoleBadgeProps {
+  variant: 'destructive' | 'outline' | 'warning';
+  className?: string;
+}
+
+/** Aligns with Permissions tab role badges; Contractor/Employee use a white outline pill. */
+function getGuideRoleBadge(role: (typeof ROLE_ORDER)[number]): GuideRoleBadgeProps {
+  if (role === 'Contractor' || role === 'Employee') {
+    return { variant: 'outline', className: 'border-white/70 text-foreground' };
+  }
+  if (role === 'Supervisor') {
+    return {
+      variant: 'outline',
+      className: 'border-sky-400/50 bg-sky-500/20 text-sky-200',
+    };
+  }
+  if (role === 'Manager') {
+    return { variant: 'warning' };
+  }
+  return { variant: 'destructive' };
+}
+
 const auditDocument = permissionsAudit as PermissionsAuditDocument;
 
 export function PermissionsGuide() {
@@ -79,9 +101,13 @@ export function PermissionsGuide() {
             <AccordionItem
               key={module.moduleName}
               value={module.moduleName}
-              className={cn('rounded-lg border px-4', brandSurface.card)}
+              className={cn(
+                'rounded-lg border px-4 transition-colors',
+                brandSurface.card,
+                brandSurface.cardHover
+              )}
             >
-              <AccordionTrigger className={cn('py-4 hover:no-underline', brandSurface.cardHover)}>
+              <AccordionTrigger className="py-4 hover:no-underline">
                 <div className="flex flex-col items-start gap-2 text-left sm:flex-row sm:items-center sm:gap-3">
                   <span className="font-semibold text-foreground">{module.displayName}</span>
                   <div className="flex flex-wrap gap-2">
@@ -95,12 +121,18 @@ export function PermissionsGuide() {
                   {ROLE_ORDER.map((role) => {
                     const detail = module.byRole[role];
                     if (!detail) return null;
+                    const roleBadge = getGuideRoleBadge(role);
                     return (
                       <div
                         key={`${module.moduleName}-${role}`}
-                        className="rounded-md border border-border bg-muted/30 p-3"
+                        className="rounded-md border border-border bg-background p-3"
                       >
-                        <p className="text-sm font-semibold text-foreground">{role}</p>
+                        <Badge
+                          variant={roleBadge.variant}
+                          className={cn('text-[10px]', roleBadge.className)}
+                        >
+                          {role}
+                        </Badge>
                         <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
                       </div>
                     );
