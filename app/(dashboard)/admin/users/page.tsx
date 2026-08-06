@@ -1712,7 +1712,7 @@ export default function UsersAdminPage() {
                           {user.current_fleet_assignment ? (
                             <Badge
                               variant="outline"
-                              className={getFleetAssetBadgeClassName(user.current_fleet_assignment.asset_type)}
+                              className={`${getFleetAssetBadgeClassName(user.current_fleet_assignment.asset_type)} whitespace-nowrap`}
                               aria-label={formatFleetAssetBadgeAccessibleLabel(
                                 user.current_fleet_assignment.asset_type,
                                 formatAdminFleetAssignment(user.current_fleet_assignment)
