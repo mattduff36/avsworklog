@@ -1619,12 +1619,11 @@ export default function UsersAdminPage() {
               </div>
             ) : (
               <div className="border border-slate-700 rounded-lg overflow-x-auto overflow-y-hidden">
-                <Table className="min-w-[1120px]">
+                <Table className="min-w-[1040px]">
                   <TableHeader>
                     <TableRow className="border-slate-700 hover:bg-slate-800/50">
                       <TableHead className="text-muted-foreground">Name</TableHead>
                       <TableHead className="text-muted-foreground">Email</TableHead>
-                      <TableHead className="text-muted-foreground">Employee ID</TableHead>
                       <TableHead className="text-muted-foreground">Role</TableHead>
                       <TableHead className="text-muted-foreground">Team</TableHead>
                       <TableHead className="text-muted-foreground">Line Manager(s)</TableHead>
@@ -1644,7 +1643,7 @@ export default function UsersAdminPage() {
                       <Fragment key={user.id}>
                         {startsNewTeam && (
                           <TableRow key={`${currentTeamKey}-divider`} className="border-slate-600 bg-slate-950/40 hover:bg-slate-950/40">
-                            <TableCell colSpan={9} className="py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                            <TableCell colSpan={8} className="py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
                               {teamLabel}
                             </TableCell>
                           </TableRow>
@@ -1665,7 +1664,6 @@ export default function UsersAdminPage() {
                             {user.email}
                           </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{user.employee_id || '-'}</TableCell>
                         <TableCell>
                           <button
                             type="button"
