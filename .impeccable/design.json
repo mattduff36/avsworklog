@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-06T13:51:00+01:00",
+  "title": "Design System: Squires",
+  "extensions": {
+    "colorMeta": {
+      "avs-yellow": {
+        "role": "primary",
+        "displayName": "AVS Signal Yellow",
+        "canonical": "hsl(48 87% 69%)",
+        "tonalRamp": ["#3d3405", "#65560a", "#8d7810", "#b59a17", "#d9bb2b", "#f1d64a", "#f8e887", "#fff8cf"]
+      },
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Night Canvas",
+        "canonical": "hsl(222 47% 11%)",
+        "tonalRamp": ["#080d18", "#0f172a", "#17233e", "#253454", "#40516e", "#65758e", "#9aa7b9", "#e5e9ef"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Slate Work Surface",
+        "canonical": "hsl(217 33% 17%)",
+        "tonalRamp": ["#101722", "#1e293b", "#2b394d", "#3a4b61", "#52657c", "#73849a", "#a8b3c0", "#edf0f4"]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Signal White",
+        "canonical": "hsl(210 40% 98%)",
+        "tonalRamp": ["#19232c", "#334451", "#526674", "#738896", "#96aab7", "#bacbd4", "#dce7ec", "#f8fafc"]
+      },
+      "timesheets": {
+        "role": "secondary",
+        "displayName": "Timesheet Blue",
+        "canonical": "hsl(210 90% 50%)",
+        "tonalRamp": ["#052647", "#07437b", "#0961b0", "#0b7fe5", "#2b9cfa", "#66b8fc", "#a2d4fd", "#e1f1ff"]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Application Title",
+        "purpose": "Page identity and primary workflow context."
+      },
+      "body": {
+        "displayName": "Operational Body",
+        "purpose": "Instructions, values, and supporting content."
+      },
+      "label": {
+        "displayName": "Control Label",
+        "purpose": "Controls, metadata, table headings, and compact status."
+      }
+    },
+    "shadows": [
+      {
+        "name": "overlay",
+        "value": "0 20px 48px rgba(2, 6, 23, 0.42)",
+        "purpose": "Dialogs, menus, and surfaces that must visibly escape the workspace."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state",
+        "value": "180ms cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "Hover, selection, expansion, and compact state transitions."
+      }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Compact high-priority action using the current surface accent.",
+      "html": "<button class=\"ds-button-primary\">Save changes</button>",
+      "css": ".ds-button-primary { height: 36px; padding: 0 16px; border: 0; border-radius: 6px; background: hsl(48 87% 69%); color: hsl(222 47% 11%); font: 500 14px/1 Inter, system-ui, sans-serif; transition: background 180ms, box-shadow 180ms; } .ds-button-primary:hover { background: hsl(48 73% 56%); } .ds-button-primary:focus-visible { outline: 2px solid hsl(48 87% 69%); outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Supporting action on a slate surface.",
+      "html": "<button class=\"ds-button-secondary\">View details</button>",
+      "css": ".ds-button-secondary { height: 36px; padding: 0 16px; border: 1px solid hsl(217 33% 25%); border-radius: 6px; background: hsl(217 33% 17%); color: hsl(210 40% 98%); font: 500 14px/1 Inter, system-ui, sans-serif; transition: background 180ms, border-color 180ms; } .ds-button-secondary:hover { background: hsl(217 33% 22%); } .ds-button-secondary:focus-visible { outline: 2px solid hsl(48 87% 69%); outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "description": "Dark operational field with a high-visibility module-aware focus state.",
+      "html": "<label class=\"ds-field\"><span>Search records</span><input placeholder=\"Name, week or status\" /></label>",
+      "css": ".ds-field { display: grid; gap: 6px; color: hsl(215 20% 65%); font: 500 13px/1.2 Inter, system-ui, sans-serif; } .ds-field input { height: 40px; padding: 0 12px; border: 1px solid hsl(217 33% 25%); border-radius: 8px; background: hsl(217 33% 17%); color: hsl(210 40% 98%); font: 400 14px/1 Inter, system-ui, sans-serif; } .ds-field input:focus { border-color: hsl(48 87% 69%); outline: 2px solid hsl(48 87% 69% / 0.28); outline-offset: 1px; }"
+    },
+    {
+      "name": "Status Chip",
+      "kind": "chip",
+      "description": "Compact state label with tint, text, and border carrying the same meaning.",
+      "html": "<span class=\"ds-status\">Approved</span>",
+      "css": ".ds-status { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 9px; border: 1px solid hsl(142 71% 45% / 0.35); border-radius: 999px; background: hsl(142 71% 45% / 0.12); color: hsl(142 65% 75%); font: 600 12px/1 Inter, system-ui, sans-serif; }"
+    },
+    {
+      "name": "Operational Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat, bordered record group on the dark canvas.",
+      "html": "<section class=\"ds-card\"><strong>Weekly timesheet</strong><span>Ready for review</span></section>",
+      "css": ".ds-card { display: grid; gap: 8px; padding: 20px; border: 1px solid hsl(217 33% 24%); border-radius: 10px; background: hsl(222 47% 11%); color: hsl(210 40% 98%); font-family: Inter, system-ui, sans-serif; } .ds-card strong { font-size: 16px; } .ds-card span { color: hsl(215 20% 65%); font-size: 14px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Operational Control Room",
+    "overview": "A dark, role-aware workspace where AVS yellow identifies the product and module colours provide functional wayfinding. Familiar controls, compact density, and high-contrast slate surfaces keep the interface focused on work.",
+    "keyCharacteristics": [
+      "Dark-only slate canvas",
+      "Rare high-contrast AVS yellow",
+      "Module-aware contextual accents",
+      "Inter typography",
+      "Flat bordered operational surfaces"
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "A screen has one dominant accent: AVS yellow for brand surfaces or the active module colour for module surfaces.",
+        "section": "colors"
+      },
+      {
+        "name": "The Readable Baseline Rule",
+        "body": "Responsive layouts restructure before typography shrinks.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-by-Default Rule",
+        "body": "Shadows are reserved for overlays, menus, and active elevation.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do reserve AVS yellow for brand identity, focus, and high-priority action.",
+      "Do use the active module colour consistently across navigation and workflow state.",
+      "Do expose clear loading, empty, error, and disabled states."
+    ],
+    "donts": [
+      "Don't nest decorative cards merely to create spacing.",
+      "Don't use several saturated module colours at equal strength on one screen.",
+      "Don't globally shrink mobile typography to make a desktop layout fit."
+    ]
+  }
+}

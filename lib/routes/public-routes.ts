@@ -8,6 +8,8 @@ const PUBLIC_BROWSER_ROUTE_PREFIXES = [
   '/yard-kiosk',
 ] as const;
 
+const PUBLIC_BROWSER_EXACT_ROUTES = ['/demo/login'] as const;
+
 const PUBLIC_API_ROUTE_PREFIXES = [
   '/api/display-board/',
   '/api/inventory/kiosk/pairing',
@@ -28,7 +30,11 @@ export function pathMatchesRoutePrefix(path: string, prefix: string): boolean {
 }
 
 export function isPublicBrowserPath(path: string): boolean {
-  return PUBLIC_BROWSER_ROUTE_PREFIXES.some((prefix) => pathMatchesRoutePrefix(path, prefix));
+  const pathname = getPathname(path);
+  return (
+    PUBLIC_BROWSER_EXACT_ROUTES.some((route) => pathname === route) ||
+    PUBLIC_BROWSER_ROUTE_PREFIXES.some((prefix) => pathMatchesRoutePrefix(pathname, prefix))
+  );
 }
 
 export function isPublicRequestPath(path: string): boolean {
