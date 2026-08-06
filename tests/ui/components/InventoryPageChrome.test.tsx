@@ -5,11 +5,15 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppPageHeader } from '@/components/layout/AppPageShell';
 import {
-  InventoryContextToolbar,
+  InventoryLocationAction,
+  InventoryLocationLabel,
   InventoryRoleViewToggle,
   InventorySummaryCards,
+  INVENTORY_EMPLOYEE_TABS_LIST_CLASSNAME,
   INVENTORY_HEADER_CTA_CLASSNAME,
+  INVENTORY_PAGE_HEADER_CLASSNAME,
   INVENTORY_PRIMARY_TABS_LIST_CLASSNAME,
+  INVENTORY_PRIMARY_TABS_ROW_CLASSNAME,
   INVENTORY_SECONDARY_TABS_LIST_CLASSNAME,
   INVENTORY_SECONDARY_TABS_ROW_CLASSNAME,
   INVENTORY_TAB_TRIGGER_CLASSNAME,
@@ -17,27 +21,26 @@ import {
 import { PackageSearch } from 'lucide-react';
 
 describe('InventoryPageChrome', () => {
-  it('renders the compact working-context footer controls', () => {
+  it('renders compact location controls and a separate view toggle', () => {
     const onChangeLocation = vi.fn();
     const onValueChange = vi.fn();
 
     render(
-      <InventoryContextToolbar
-        roleViewToggle={(
-          <InventoryRoleViewToggle value="management" onValueChange={onValueChange} />
-        )}
-        locationLabel="Van - TE57 VAN"
-        onChangeLocation={onChangeLocation}
-      />,
+      <>
+        <InventoryLocationLabel locationLabel="Van - TE57 VAN" />
+        <InventoryLocationAction
+          locationLabel="Van - TE57 VAN"
+          onChangeLocation={onChangeLocation}
+        />
+        <InventoryRoleViewToggle value="management" onValueChange={onValueChange} />
+      </>,
     );
 
-    const controls = screen.getByTestId('inventory-context-toolbar');
-    expect(controls).toBeInTheDocument();
-    expect(controls).toHaveClass('flex', 'sm:flex-row');
-    expect(screen.getByText('Working context')).toBeInTheDocument();
+    expect(screen.queryByText('Working context')).not.toBeInTheDocument();
     expect(screen.getByText('Current location: Van - TE57 VAN')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Management' })).toHaveTextContent('Management');
-    expect(screen.getByRole('button', { name: 'My Location' })).toHaveTextContent('My Location');
+    expect(screen.getByText('View')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Management' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'My Location' })).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(screen.getByRole('button', { name: 'My Location' }));
     expect(onValueChange).toHaveBeenCalledWith('employee');
@@ -82,40 +85,51 @@ describe('InventoryPageChrome', () => {
     expect(INVENTORY_HEADER_CTA_CLASSNAME).toContain('active:scale-95');
   });
 
-  it('keeps Add Item and working context inside one bordered header surface', () => {
+  it('keeps Add Item and location context inside one clean header surface', () => {
     render(
       <AppPageHeader
         title="Inventory"
         description="Track inventory."
-        actions={<button type="button">Add Item</button>}
-        footer={(
-          <InventoryContextToolbar
-            roleViewToggle={<InventoryRoleViewToggle value="management" onValueChange={vi.fn()} />}
-            locationLabel="Van - TE57 VAN"
-            onChangeLocation={vi.fn()}
-          />
+        details={<InventoryLocationLabel locationLabel="Van - TE57 VAN" />}
+        className={INVENTORY_PAGE_HEADER_CLASSNAME}
+        actions={(
+          <>
+            <button type="button">Add Item</button>
+            <InventoryLocationAction
+              locationLabel="Van - TE57 VAN"
+              onChangeLocation={vi.fn()}
+            />
+          </>
         )}
       />,
     );
 
     const headingSurface = screen.getByRole('heading', { name: 'Inventory' }).closest('.rounded-lg');
-    const toolbarSurface = screen.getByTestId('inventory-context-toolbar').closest('.rounded-lg');
+    const locationActionSurface = screen.getByTestId('inventory-location-action').closest('.rounded-lg');
     const actionSurface = screen.getByRole('button', { name: 'Add Item' }).closest('.rounded-lg');
 
-    expect(headingSurface).toBe(toolbarSurface);
+    expect(headingSurface).toBe(locationActionSurface);
     expect(headingSurface).toBe(actionSurface);
-    expect(toolbarSurface).toHaveTextContent('Working context');
+    expect(headingSurface).toHaveTextContent('Current location: Van - TE57 VAN');
+    expect(headingSurface).not.toHaveTextContent('Working context');
+    expect(headingSurface).toHaveClass('p-4');
   });
 
-  it('exports the management tab alignment contract', () => {
+  it('exports the contiguous tab alignment contract', () => {
     expect(INVENTORY_PRIMARY_TABS_LIST_CLASSNAME).toContain('grid-cols-3');
+    expect(INVENTORY_PRIMARY_TABS_LIST_CLASSNAME).toContain('gap-0');
     expect(INVENTORY_PRIMARY_TABS_LIST_CLASSNAME).toContain('md:inline-flex');
+    expect(INVENTORY_EMPLOYEE_TABS_LIST_CLASSNAME).toContain('grid-cols-2');
+    expect(INVENTORY_EMPLOYEE_TABS_LIST_CLASSNAME).toContain('gap-0');
+    expect(INVENTORY_PRIMARY_TABS_ROW_CLASSNAME).toContain('md:justify-between');
     expect(INVENTORY_SECONDARY_TABS_LIST_CLASSNAME).toContain('grid-cols-2');
+    expect(INVENTORY_SECONDARY_TABS_LIST_CLASSNAME).toContain('gap-0');
     expect(INVENTORY_SECONDARY_TABS_LIST_CLASSNAME).toContain('md:inline-flex');
     expect(INVENTORY_SECONDARY_TABS_ROW_CLASSNAME).toContain('justify-start');
     expect(INVENTORY_SECONDARY_TABS_ROW_CLASSNAME).toContain('md:justify-end');
     expect(INVENTORY_SECONDARY_TABS_ROW_CLASSNAME).not.toContain('mt-3');
     expect(INVENTORY_TAB_TRIGGER_CLASSNAME).toContain('md:min-h-8');
     expect(INVENTORY_TAB_TRIGGER_CLASSNAME).toContain('data-[state=active]:bg-inventory');
+    expect(INVENTORY_PAGE_HEADER_CLASSNAME).toBe('p-4');
   });
 });

@@ -140,9 +140,9 @@ describe('Yard kiosk touch controls', () => {
       'h-14',
       'rounded-2xl',
       'border',
-      'border-white/10',
-      'bg-transparent',
-      'text-slate-500',
+      'border-slate-600/40',
+      'bg-slate-800/30',
+      'text-slate-400',
     );
 
     locationRender.unmount();

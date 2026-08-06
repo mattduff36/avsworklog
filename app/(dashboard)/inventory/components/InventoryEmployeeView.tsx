@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,7 +38,8 @@ import {
 import { InventoryLocationSelect } from './InventoryLocationSelect';
 import {
   InventorySummaryCards,
-  INVENTORY_SECONDARY_TABS_LIST_CLASSNAME,
+  INVENTORY_EMPLOYEE_TABS_LIST_CLASSNAME,
+  INVENTORY_PRIMARY_TABS_ROW_CLASSNAME,
   INVENTORY_TAB_TRIGGER_CLASSNAME,
 } from './InventoryPageChrome';
 import { InventoryTable, type InventoryTableQuickFilter } from './InventoryTable';
@@ -73,6 +75,8 @@ interface InventoryEmployeeViewProps {
   onRequestLocation: (payload: { suggested_name: string; note: string }) => Promise<void>;
   onOpenMoveDialog: (items: InventoryItem[]) => void;
   onTransferHardware?: (payload: InventoryHardwareTransferPayload) => Promise<void>;
+  /** Desktop-only View control; mobile uses the Navbar portal. */
+  desktopViewToggle?: ReactNode;
 }
 
 export function InventoryEmployeeView({
@@ -88,6 +92,7 @@ export function InventoryEmployeeView({
   onRequestLocation,
   onOpenMoveDialog,
   onTransferHardware,
+  desktopViewToggle,
 }: InventoryEmployeeViewProps) {
   const initialLocationId = userLocation?.location?.is_active === false ? '' : userLocation?.location_id || '';
   const [selectedLocationId, setSelectedLocationId] = useState(initialLocationId);
@@ -300,6 +305,9 @@ export function InventoryEmployeeView({
   if (!activeLocation) {
     return (
       <div className="mx-auto max-w-2xl space-y-6 py-8">
+        {desktopViewToggle ? (
+          <div className="hidden justify-end md:flex">{desktopViewToggle}</div>
+        ) : null}
         <Card className="border-slate-700 bg-slate-900/70">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-white">
@@ -350,24 +358,32 @@ export function InventoryEmployeeView({
         onValueChange={(value) => setActiveTab(value as InventoryEmployeeTab)}
         className="space-y-4"
       >
-        <TabsList
-          className={INVENTORY_SECONDARY_TABS_LIST_CLASSNAME}
-          data-testid="inventory-employee-tabs"
+        <div
+          className={INVENTORY_PRIMARY_TABS_ROW_CLASSNAME}
+          data-testid="inventory-employee-tabs-row"
         >
-          {EMPLOYEE_NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            return (
-              <TabsTrigger
-                key={item.value}
-                value={item.value}
-                className={INVENTORY_TAB_TRIGGER_CLASSNAME}
-              >
-                <Icon className="h-4 w-4" />
-                {item.label}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
+          <TabsList
+            className={INVENTORY_EMPLOYEE_TABS_LIST_CLASSNAME}
+            data-testid="inventory-employee-tabs"
+          >
+            {EMPLOYEE_NAV_ITEMS.map((item) => {
+              const Icon = item.icon;
+              return (
+                <TabsTrigger
+                  key={item.value}
+                  value={item.value}
+                  className={INVENTORY_TAB_TRIGGER_CLASSNAME}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+          {desktopViewToggle ? (
+            <div className="hidden md:block">{desktopViewToggle}</div>
+          ) : null}
+        </div>
 
         <TabsContent value="overview" className="mt-0 space-y-4">
           {overviewStats ? (

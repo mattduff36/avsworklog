@@ -270,10 +270,7 @@ export function YardKioskLocationPager({
             size="default"
             label="Include legacy locations"
             className={[
-              'border px-4 text-sm font-black',
-              includeLegacyQuotes
-                ? 'border-amber-300/50 bg-amber-300/10 text-amber-100 hover:bg-amber-300/15'
-                : 'border-white/10 bg-transparent text-slate-500 hover:bg-white/5 hover:text-slate-300',
+              'px-4 text-sm font-black',
               YARD_KIOSK_INLINE_CONTROL_HEIGHT,
               YARD_KIOSK_INLINE_CONTROL_RADIUS,
             ].join(' ')}

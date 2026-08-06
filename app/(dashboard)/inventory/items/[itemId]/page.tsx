@@ -30,6 +30,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, CalendarCheck, Clock, Download, Loader2, MapPin, PackageSearch } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import { cn } from '@/lib/utils/cn';
+import {
+  INVENTORY_PAGE_HEADER_CLASSNAME,
+  INVENTORY_PRIMARY_TABS_LIST_CLASSNAME,
+  INVENTORY_TAB_TRIGGER_CLASSNAME,
+} from '../../components/InventoryPageChrome';
 import {
   EMPTY_INVENTORY_ITEM_FORM,
   INVENTORY_CATEGORY_LABELS,
@@ -378,8 +384,8 @@ export default function InventoryItemDetailPage() {
               </Badge>
             </div>
           )}
-          className="min-w-0 flex-1"
-          titleClassName="text-2xl sm:text-3xl"
+          className={cn(INVENTORY_PAGE_HEADER_CLASSNAME, 'min-w-0 flex-1')}
+          titleClassName="text-2xl"
           descriptionClassName="break-words"
         />
       </div>
@@ -447,11 +453,11 @@ export default function InventoryItemDetailPage() {
       ) : null}
 
       <Tabs defaultValue="overview" className="min-w-0">
-        <div className="-mx-1 overflow-x-auto px-1 pb-1">
-          <TabsList className="w-max max-w-none flex-nowrap justify-start">
-            <TabsTrigger value="overview" className="min-h-11">Overview</TabsTrigger>
-            <TabsTrigger value="movements" className="min-h-11">Movements</TabsTrigger>
-            <TabsTrigger value="checks" className="min-h-11">Checks</TabsTrigger>
+        <div className="-mx-1 overflow-x-auto px-1 pb-1" data-testid="inventory-item-detail-tabs">
+          <TabsList className={`${INVENTORY_PRIMARY_TABS_LIST_CLASSNAME} w-max max-w-none flex-nowrap justify-start`}>
+            <TabsTrigger value="overview" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>Overview</TabsTrigger>
+            <TabsTrigger value="movements" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>Movements</TabsTrigger>
+            <TabsTrigger value="checks" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>Checks</TabsTrigger>
           </TabsList>
         </div>
 

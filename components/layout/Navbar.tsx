@@ -670,9 +670,19 @@ export function Navbar() {
             {/* Mobile-only brand */}
             <NavbarBrand
               className="md:hidden"
-              hideWordmarkOnNarrow={dashboardTopNavTaskLinks.length > 0}
+              hideWordmarkOnNarrow={
+                dashboardTopNavTaskLinks.length > 0
+                || (pathname === '/inventory' && (effectiveIsManager || effectiveIsAdmin))
+              }
               onNavigate={() => setMobileMenuOpen(false)}
             />
+
+            {pathname === '/inventory' && (effectiveIsManager || effectiveIsAdmin) ? (
+              <div
+                id="inventory-mobile-view-toggle-slot"
+                className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center md:hidden"
+              />
+            ) : null}
 
             {/* Desktop brand */}
             <NavbarBrand className="hidden md:flex flex-shrink-0" />

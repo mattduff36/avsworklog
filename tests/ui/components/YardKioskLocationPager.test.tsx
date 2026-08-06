@@ -252,9 +252,9 @@ describe('Yard kiosk location selection', () => {
     const toggle = screen.getByRole('button', { name: 'Include legacy locations' });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
     expect(toggle).toHaveClass(
-      'border-white/10',
-      'bg-transparent',
-      'text-slate-500',
+      'border-slate-600/40',
+      'bg-slate-800/30',
+      'text-slate-400',
     );
     expect(screen.queryByRole('button', { name: /^Historic Site/ }))
       .not.toBeInTheDocument();
@@ -273,9 +273,9 @@ describe('Yard kiosk location selection', () => {
     });
     expect(toggle).toHaveAttribute('aria-pressed', 'true');
     expect(toggle).toHaveClass(
-      'border-amber-300/50',
-      'bg-amber-300/10',
-      'text-amber-100',
+      'border-slate-500/50',
+      'bg-slate-700/40',
+      'text-slate-200',
     );
     expect(screen.getByRole('button', { name: /^Historic Site/ })).toBeInTheDocument();
     expect(within(navigation).getByRole('button', { name: 'Previous location page' }))
@@ -291,7 +291,7 @@ describe('Yard kiosk location selection', () => {
       fireEvent.click(toggle);
     });
     expect(toggle).toHaveAttribute('aria-pressed', 'false');
-    expect(toggle).toHaveClass('bg-transparent', 'text-slate-500');
+    expect(toggle).toHaveClass('bg-slate-800/30', 'text-slate-400');
     expect(screen.queryByRole('button', { name: /^Historic Site/ }))
       .not.toBeInTheDocument();
   });

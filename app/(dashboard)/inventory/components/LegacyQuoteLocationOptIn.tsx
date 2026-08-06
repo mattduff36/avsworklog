@@ -27,12 +27,13 @@ export function LegacyQuoteLocationOptIn({
       aria-pressed={enabled}
       onClick={() => onEnabledChange(!enabled)}
       className={cn(
-        'border-slate-600',
-        enabled && 'border-amber-400/50 bg-amber-400/10 text-amber-100 hover:bg-amber-400/15',
+        'border-slate-600/40 bg-slate-800/30 text-slate-400 shadow-none hover:bg-slate-800/50 hover:text-slate-300',
+        enabled && 'border-slate-500/50 bg-slate-700/40 text-slate-200 hover:bg-slate-700/50 hover:text-slate-100',
         className,
       )}
+      data-testid="legacy-quote-location-opt-in"
     >
-      <History className="mr-2 h-4 w-4" />
+      <History className="mr-2 h-4 w-4 opacity-70" />
       {label ?? (enabled ? 'Legacy locations included' : 'Include legacy locations')}
     </Button>
   );

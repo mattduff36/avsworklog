@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { createPortal } from 'react-dom';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import {
@@ -35,11 +36,14 @@ import { HardwareStockPanel } from './components/HardwareStockPanel';
 import { InventoryLocationDialog } from './components/InventoryLocationDialog';
 import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import {
-  InventoryContextToolbar,
+  InventoryLocationAction,
+  InventoryLocationLabel,
   InventoryRoleViewToggle,
   InventorySummaryCards,
   INVENTORY_HEADER_CTA_CLASSNAME,
+  INVENTORY_PAGE_HEADER_CLASSNAME,
   INVENTORY_PRIMARY_TABS_LIST_CLASSNAME,
+  INVENTORY_PRIMARY_TABS_ROW_CLASSNAME,
   INVENTORY_SECONDARY_TABS_LIST_CLASSNAME,
   INVENTORY_SECONDARY_TABS_ROW_CLASSNAME,
   INVENTORY_TAB_TRIGGER_CLASSNAME,
@@ -151,6 +155,7 @@ function getInventoryItemLocations(inventoryItems: InventoryItem[]): InventoryLo
 export default function InventoryPage() {
   const { hasPermission: canViewInventory, loading: permissionLoading } = usePermissionCheck('inventory', false);
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -187,11 +192,21 @@ export default function InventoryPage() {
     search: '',
   });
   const [roleViewMode, setRoleViewMode] = useState<InventoryRoleViewMode>(getStoredInventoryRoleViewMode);
+  const [mobileViewToggleSlot, setMobileViewToggleSlot] = useState<HTMLElement | null>(null);
 
   const handleRoleViewModeChange = useCallback((nextViewMode: InventoryRoleViewMode) => {
     setRoleViewMode(nextViewMode);
     window.localStorage.setItem(INVENTORY_ROLE_VIEW_STORAGE_KEY, nextViewMode);
   }, []);
+
+  useEffect(() => {
+    const syncMobileViewToggleSlot = () => {
+      setMobileViewToggleSlot(document.getElementById('inventory-mobile-view-toggle-slot'));
+    };
+    syncMobileViewToggleSlot();
+    const frame = window.requestAnimationFrame(syncMobileViewToggleSlot);
+    return () => window.cancelAnimationFrame(frame);
+  }, [pathname]);
 
   const fetchInventoryData = useCallback(async () => {
     try {
@@ -905,6 +920,8 @@ export default function InventoryPage() {
           titleMeta={<InventoryBetaBadge />}
           description="Track small tools, plant, signs, equipment, locations, and check status."
           icon={<PackageSearch className="h-5 w-5" />}
+          className={INVENTORY_PAGE_HEADER_CLASSNAME}
+          titleClassName="text-2xl"
         />
         <PanelLoader message="Loading inventory..." accent="inventory" className="py-20" />
       </AppPageShell>
@@ -919,9 +936,21 @@ export default function InventoryPage() {
   const employeeLocationName = employeeUserLocation?.location?.is_active === false
     ? null
     : employeeUserLocation?.location?.name || null;
-  const roleViewToggle = isManagerOrAdmin ? (
+  const desktopRoleViewToggle = isManagerOrAdmin ? (
     <InventoryRoleViewToggle value={roleViewMode} onValueChange={handleRoleViewModeChange} />
   ) : null;
+  const mobileRoleViewToggle = isManagerOrAdmin && mobileViewToggleSlot
+    ? createPortal(
+        <div className="pointer-events-auto">
+          <InventoryRoleViewToggle
+            value={roleViewMode}
+            onValueChange={handleRoleViewModeChange}
+            showLabel={false}
+          />
+        </div>,
+        mobileViewToggleSlot,
+      )
+    : null;
 
   if (inventoryLoadError && !inventoryContext) {
     return (
@@ -931,6 +960,8 @@ export default function InventoryPage() {
           titleMeta={<InventoryBetaBadge />}
           description="Set your location, view assigned inventory, and claim or move items."
           icon={<PackageSearch className="h-5 w-5" />}
+          className={INVENTORY_PAGE_HEADER_CLASSNAME}
+          titleClassName="text-2xl"
         />
 
         <div className="mx-auto max-w-2xl">
@@ -942,21 +973,25 @@ export default function InventoryPage() {
 
   if (showEmployeeView) {
     return (
-      <AppPageShell width="wide">
+      <>
+        {mobileRoleViewToggle}
+        <AppPageShell width="wide">
         <AppPageHeader
           title="Inventory"
           titleMeta={<InventoryBetaBadge />}
           description="Set your location, view assigned inventory, and claim or move items."
+          details={employeeLocationName ? <InventoryLocationLabel locationLabel={employeeLocationName} /> : null}
           icon={<PackageSearch className="h-5 w-5" />}
-          footer={(roleViewToggle || employeeLocationName) ? (
-            <InventoryContextToolbar
-              roleViewToggle={roleViewToggle}
+          className={INVENTORY_PAGE_HEADER_CLASSNAME}
+          contentClassName="flex-row items-start justify-between"
+          titleClassName="text-2xl"
+          actionsClassName="w-auto shrink-0 flex-col items-end justify-start"
+          actions={employeeLocationName ? (
+            <InventoryLocationAction
               locationLabel={employeeLocationName}
               onChangeLocation={() => setChangeLocationDialogOpen(true)}
-              showLocationAction={Boolean(roleViewToggle || employeeLocationName)}
             />
           ) : null}
-          footerClassName="bg-slate-950/20"
         />
 
         {inventoryLoadError ? (
@@ -976,18 +1011,8 @@ export default function InventoryPage() {
           onRequestLocation={handleRequestLocation}
           onOpenMoveDialog={setMovingItems}
           onTransferHardware={handleHardwareTransfer}
+          desktopViewToggle={desktopRoleViewToggle}
         />
-
-        {inventoryContext?.can_manage_site_locations ? (
-          <InventorySiteAssignmentsPanel
-            users={siteAssignmentUsers}
-            assignableLocations={assignableLocations}
-            assignments={siteAssignments}
-            onAssign={handleAssignLocation}
-            onRemove={handleRemoveLocationAssignment}
-            onIncludeLegacyQuotesChange={handleSiteAssignmentLegacyQuoteOptIn}
-          />
-        ) : null}
 
         <MoveInventoryDialog
           open={movingItems.length > 0}
@@ -1005,36 +1030,41 @@ export default function InventoryPage() {
           onClose={() => setChangeLocationDialogOpen(false)}
           onSubmit={({ locationId, reason }) => handleSetUserLocation(locationId, reason)}
         />
-      </AppPageShell>
+        </AppPageShell>
+      </>
     );
   }
 
   return (
-    <AppPageShell width="wide">
+    <>
+      {mobileRoleViewToggle}
+      <AppPageShell width="wide">
       <AppPageHeader
         title="Inventory"
         titleMeta={<InventoryBetaBadge />}
         description="Track small tools, plant, signs, equipment, locations, and check status."
+        details={<InventoryLocationLabel locationLabel={employeeLocationName} />}
         icon={<PackageSearch className="h-5 w-5" />}
+        className={INVENTORY_PAGE_HEADER_CLASSNAME}
         contentClassName="flex-row items-start justify-between"
-        actionsClassName="w-auto shrink-0 justify-end"
+        titleClassName="text-2xl"
+        actionsClassName="w-auto shrink-0 flex-col items-end justify-start"
         actions={(
-          <Button
-            onClick={() => setItemDialogOpen(true)}
-            className={INVENTORY_HEADER_CTA_CLASSNAME}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Item
-          </Button>
+          <>
+            <Button
+              size="sm"
+              onClick={() => setItemDialogOpen(true)}
+              className={INVENTORY_HEADER_CTA_CLASSNAME}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Item
+            </Button>
+            <InventoryLocationAction
+              locationLabel={employeeLocationName}
+              onChangeLocation={() => setChangeLocationDialogOpen(true)}
+            />
+          </>
         )}
-        footer={(
-          <InventoryContextToolbar
-            roleViewToggle={roleViewToggle}
-            locationLabel={employeeLocationName}
-            onChangeLocation={() => setChangeLocationDialogOpen(true)}
-          />
-        )}
-        footerClassName="bg-slate-950/20"
       />
 
       {inventoryLoadError ? (
@@ -1107,7 +1137,10 @@ export default function InventoryPage() {
           router.push(getInventoryOverviewHref(overviewTab), { scroll: false });
         }}
       >
-        <div className="-mx-1 px-1 pb-1" data-testid="inventory-primary-tabs">
+        <div
+          className={`${INVENTORY_PRIMARY_TABS_ROW_CLASSNAME} -mx-1 px-1 pb-1`}
+          data-testid="inventory-primary-tabs"
+        >
           <TabsList className={INVENTORY_PRIMARY_TABS_LIST_CLASSNAME}>
             <TabsTrigger value="overview" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
               <PackageSearch className="h-4 w-4" />
@@ -1122,6 +1155,9 @@ export default function InventoryPage() {
               Settings
             </TabsTrigger>
           </TabsList>
+          {desktopRoleViewToggle ? (
+            <div className="hidden md:block">{desktopRoleViewToggle}</div>
+          ) : null}
         </div>
 
         {pageTab === 'settings' ? (
@@ -1403,7 +1439,8 @@ export default function InventoryPage() {
         onSubmit={({ locationId, reason }) => handleSetUserLocation(locationId, reason)}
         onUnset={handleUnsetUserLocation}
       />
-    </AppPageShell>
+      </AppPageShell>
+    </>
   );
 }
 

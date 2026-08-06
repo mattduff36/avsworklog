@@ -8,118 +8,124 @@ import { MapPin, Settings, Users } from 'lucide-react';
 
 export type InventoryRoleViewMode = 'management' | 'employee';
 
-/** Primary module tabs: 3-up grid on mobile, left-aligned row from md. */
+/** Primary module tabs: 3-up grid on mobile, left-aligned row from md. Contiguous (no gaps). */
 export const INVENTORY_PRIMARY_TABS_LIST_CLASSNAME =
-  'grid w-full grid-cols-3 gap-1 md:inline-flex md:w-auto';
+  'grid w-full grid-cols-3 gap-0 md:inline-flex md:w-auto';
 
-/** Secondary tabs: 2-up grid on mobile, compact row from md. */
+/** Employee My Location tabs: 2×2 grid on mobile, left-aligned contiguous row from md. */
+export const INVENTORY_EMPLOYEE_TABS_LIST_CLASSNAME =
+  'grid w-full grid-cols-2 gap-0 md:inline-flex md:w-auto';
+
+/** Keep primary navigation left and the compact view switcher right. */
+export const INVENTORY_PRIMARY_TABS_ROW_CLASSNAME =
+  'flex flex-col items-center gap-2 md:flex-row md:items-center md:justify-between';
+
+/** Secondary tabs: 2-up grid on mobile, compact contiguous row from md. */
 export const INVENTORY_SECONDARY_TABS_LIST_CLASSNAME =
-  'grid w-full grid-cols-2 gap-1 md:inline-flex md:w-auto';
+  'grid w-full grid-cols-2 gap-0 md:inline-flex md:w-auto';
 
 export const INVENTORY_TAB_TRIGGER_CLASSNAME =
-  'min-h-11 w-full gap-2 px-2 data-[state=active]:bg-inventory data-[state=active]:text-white md:min-h-8 md:w-auto md:px-3';
+  'min-h-11 w-full gap-2 rounded-md px-2 data-[state=active]:bg-inventory data-[state=active]:text-white md:min-h-8 md:w-auto md:px-3';
 
 export const INVENTORY_HEADER_CTA_CLASSNAME =
-  'w-auto bg-inventory text-white shadow-md transition-all duration-200 hover:bg-inventory-dark hover:shadow-lg active:scale-95';
+  'h-11 w-auto bg-inventory text-white shadow-md transition-all duration-200 hover:bg-inventory-dark hover:shadow-lg active:scale-95 sm:h-8';
 
 /** Wrap secondary tab rows: left on mobile, right on tablet/desktop. */
 export const INVENTORY_SECONDARY_TABS_ROW_CLASSNAME =
   'flex justify-start md:justify-end';
 
+/** Compact header surface used across Inventory list/detail shells. */
+export const INVENTORY_PAGE_HEADER_CLASSNAME = 'p-4';
+
 interface InventoryRoleViewToggleProps {
   value: InventoryRoleViewMode;
   onValueChange: (value: InventoryRoleViewMode) => void;
+  showLabel?: boolean;
 }
 
-export function InventoryRoleViewToggle({ value, onValueChange }: InventoryRoleViewToggleProps) {
+export function InventoryRoleViewToggle({
+  value,
+  onValueChange,
+  showLabel = true,
+}: InventoryRoleViewToggleProps) {
   return (
-    <div
-      className="flex w-full items-center rounded-md border border-slate-700 bg-slate-800/80 p-0.5 sm:w-auto"
-      role="group"
-      aria-label="Inventory view mode"
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => onValueChange('management')}
-        className={cn(
-          'h-9 min-h-9 flex-1 gap-1.5 px-3 sm:flex-none',
-          value === 'management'
-            ? 'bg-white text-slate-900 hover:bg-white hover:text-slate-900'
-            : 'text-muted-foreground hover:bg-transparent hover:text-white',
-        )}
-        aria-pressed={value === 'management'}
-        aria-label="Management"
-        title="Management"
+    <div className="flex shrink-0 items-center gap-2" data-testid="inventory-view-toggle">
+      {showLabel ? <span className="text-xs font-medium text-muted-foreground">View</span> : null}
+      <div
+        className="flex items-center rounded-md border border-slate-700 bg-slate-800/80 p-0.5"
+        role="group"
+        aria-label="Inventory view mode"
       >
-        <Settings className="h-3.5 w-3.5" />
-        <span className="text-sm font-medium">Management</span>
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={() => onValueChange('employee')}
-        className={cn(
-          'h-9 min-h-9 flex-1 gap-1.5 px-3 sm:flex-none',
-          value === 'employee'
-            ? 'bg-white text-slate-900 hover:bg-white hover:text-slate-900'
-            : 'text-muted-foreground hover:bg-transparent hover:text-white',
-        )}
-        aria-pressed={value === 'employee'}
-        aria-label="My Location"
-        title="My Location"
-      >
-        <Users className="h-3.5 w-3.5" />
-        <span className="text-sm font-medium">My Location</span>
-      </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onValueChange('management')}
+          className={cn(
+            'h-11 w-12 md:h-8 md:w-10',
+            value === 'management'
+              ? 'bg-white text-slate-900 hover:bg-white hover:text-slate-900'
+              : 'text-muted-foreground hover:bg-transparent hover:text-white',
+          )}
+          aria-pressed={value === 'management'}
+          aria-label="Management"
+          title="Management"
+        >
+          <Settings className="h-3.5 w-3.5" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          onClick={() => onValueChange('employee')}
+          className={cn(
+            'h-11 w-12 md:h-8 md:w-10',
+            value === 'employee'
+              ? 'bg-white text-slate-900 hover:bg-white hover:text-slate-900'
+              : 'text-muted-foreground hover:bg-transparent hover:text-white',
+          )}
+          aria-pressed={value === 'employee'}
+          aria-label="My Location"
+          title="My Location"
+        >
+          <Users className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }
 
-interface InventoryContextToolbarProps {
-  roleViewToggle?: ReactNode;
+interface InventoryLocationLabelProps {
   locationLabel: string | null;
-  onChangeLocation: () => void;
-  showLocationAction?: boolean;
 }
 
-export function InventoryContextToolbar({
-  roleViewToggle,
+export function InventoryLocationLabel({ locationLabel }: InventoryLocationLabelProps) {
+  return locationLabel ? `Current location: ${locationLabel}` : 'No location set';
+}
+
+interface InventoryLocationActionProps {
+  locationLabel: string | null;
+  onChangeLocation: () => void;
+}
+
+export function InventoryLocationAction({
   locationLabel,
   onChangeLocation,
-  showLocationAction = true,
-}: InventoryContextToolbarProps) {
-  if (!roleViewToggle && !showLocationAction) return null;
-
+}: InventoryLocationActionProps) {
   return (
-    <div
-      className="flex min-w-0 flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
-      data-testid="inventory-context-toolbar"
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={onChangeLocation}
+      className="h-11 shrink-0 border-slate-600 sm:h-8"
+      data-testid="inventory-location-action"
     >
-      <div className="min-w-0">
-        <p className="hidden text-[11px] font-semibold uppercase tracking-wide text-muted-foreground sm:block">
-          Working context
-        </p>
-        <p className="truncate text-sm text-foreground">
-          {locationLabel ? `Current location: ${locationLabel}` : 'No location set'}
-        </p>
-      </div>
-      <div className="grid w-full grid-cols-1 items-center gap-1 sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
-        {roleViewToggle}
-        {showLocationAction ? (
-          <Button
-            variant="outline"
-            onClick={onChangeLocation}
-            className="w-full border-slate-600 sm:w-auto"
-          >
-            <MapPin className="mr-2 h-4 w-4" />
-            {locationLabel ? 'Change My Location' : 'Set My Location'}
-          </Button>
-        ) : null}
-      </div>
-    </div>
+      <MapPin className="mr-2 h-4 w-4" />
+      <span className="sm:hidden">{locationLabel ? 'Change' : 'Set'}</span>
+      <span className="hidden sm:inline">
+        {locationLabel ? 'Change My Location' : 'Set My Location'}
+      </span>
+    </Button>
   );
 }
 

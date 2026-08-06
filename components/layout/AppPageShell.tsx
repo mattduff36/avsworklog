@@ -10,6 +10,7 @@ interface AppPageHeaderProps {
   title: string;
   titleMeta?: ReactNode;
   description?: string;
+  details?: ReactNode;
   leading?: ReactNode;
   icon?: ReactNode;
   actions?: ReactNode;
@@ -19,6 +20,7 @@ interface AppPageHeaderProps {
   headingClassName?: string;
   titleClassName?: string;
   descriptionClassName?: string;
+  detailsClassName?: string;
   iconContainerClassName?: string;
   actionsClassName?: string;
   footerClassName?: string;
@@ -52,6 +54,7 @@ export function AppPageHeader({
   title,
   titleMeta,
   description,
+  details,
   leading,
   icon,
   actions,
@@ -61,6 +64,7 @@ export function AppPageHeader({
   headingClassName,
   titleClassName,
   descriptionClassName,
+  detailsClassName,
   iconContainerClassName,
   actionsClassName,
   footerClassName,
@@ -93,6 +97,7 @@ export function AppPageHeader({
               {titleMeta}
             </div>
             {description ? <p className={cn('text-sm text-muted-foreground', descriptionClassName)}>{description}</p> : null}
+            {details ? <div className={cn('text-sm text-foreground', detailsClassName)}>{details}</div> : null}
           </div>
         </div>
         {actions ? (

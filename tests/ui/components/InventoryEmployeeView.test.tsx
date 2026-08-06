@@ -177,6 +177,7 @@ describe('InventoryEmployeeView', () => {
         onRequestLocation={vi.fn()}
         onOpenMoveDialog={vi.fn()}
         onTransferHardware={vi.fn()}
+        desktopViewToggle={<div data-testid="employee-view-toggle">View toggle</div>}
       />,
     );
 
@@ -184,7 +185,12 @@ describe('InventoryEmployeeView', () => {
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('data-state', 'active');
     expect(screen.getByRole('button', { name: 'Open inventory items' })).toBeInTheDocument();
     expect(screen.getByTestId('inventory-employee-tabs').className).toContain('grid-cols-2');
+    expect(screen.getByTestId('inventory-employee-tabs').className).toContain('gap-0');
     expect(screen.getByTestId('inventory-employee-tabs').className).toContain('md:inline-flex');
+    expect(screen.getByTestId('inventory-employee-tabs-row')).toContainElement(
+      screen.getByTestId('employee-view-toggle'),
+    );
+    expect(screen.getByTestId('inventory-employee-tabs-row').className).toContain('md:justify-between');
 
     openEmployeeTab('Inventory Items');
     expect(screen.getByRole('tab', { name: 'Inventory Items' })).toHaveAttribute('data-state', 'active');
