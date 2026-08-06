@@ -1328,7 +1328,7 @@ export default function UsersAdminPage() {
 
   // Show loading while auth is being checked
   if (!supabase || authLoading || permissionLoading || sensitiveAccess.loading) {
-    return <PageLoader message="Loading user admin..." />;
+    return <PageLoader message="Loading users..." />;
   }
 
   // Check authorization
