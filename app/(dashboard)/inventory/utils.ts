@@ -356,3 +356,90 @@ function getInventoryLocationTypeLabel(location: Pick<InventoryLocation, 'locati
 export function formatInventoryLocationTypeLabel(location: Pick<InventoryLocation, 'location_type'>): string {
   return getInventoryLocationTypeLabel(location);
 }
+
+export interface InventoryEmployeeOverviewStats {
+  responsibleItemCount: number;
+  overdue: number;
+  dueSoon: number;
+  needsCheck: number;
+  hardwareSkuCount: number;
+  hardwareQuantityTotal: number;
+  claimableItemCount: number;
+  secondaryLocationCount: number;
+}
+
+interface InventoryEmployeeOverviewHardwareBalance {
+  hardware_item_id: string;
+  location_id: string;
+  quantity: number;
+}
+
+interface InventoryEmployeeOverviewHardwareItem {
+  id: string;
+  is_active: boolean;
+}
+
+/**
+ * My Location overview metrics.
+ * Health/item/hardware totals are scoped to responsible locations only.
+ * `claimableItemCount` intentionally uses the Claim tab domain: active items outside the
+ * primary location (same eligibility filter as claim search, without the text query).
+ */
+export function getInventoryEmployeeOverviewStats(params: {
+  items: InventoryItem[];
+  primaryLocationId: string;
+  responsibleLocationIds: string[];
+  hardwareItems: InventoryEmployeeOverviewHardwareItem[];
+  hardwareBalances: InventoryEmployeeOverviewHardwareBalance[];
+  secondaryLocationCount: number;
+}): InventoryEmployeeOverviewStats {
+  const responsibleLocationIdSet = new Set(params.responsibleLocationIds);
+  const activeHardwareIds = new Set(
+    params.hardwareItems.filter((item) => item.is_active).map((item) => item.id),
+  );
+
+  const responsibleItemsById = new Map<string, InventoryItem>();
+  let claimableItemCount = 0;
+
+  for (const item of params.items) {
+    if (item.status !== 'active') continue;
+    if (responsibleLocationIdSet.has(item.location_id)) {
+      responsibleItemsById.set(item.id, item);
+    }
+    // Claim domain: not a responsible-location health metric.
+    if (item.location_id !== params.primaryLocationId) {
+      claimableItemCount += 1;
+    }
+  }
+
+  let overdue = 0;
+  let dueSoon = 0;
+  let needsCheck = 0;
+  for (const item of responsibleItemsById.values()) {
+    const status = getInventoryCheckStatus(item);
+    if (status === 'overdue') overdue += 1;
+    if (status === 'due_soon') dueSoon += 1;
+    if (status === 'needs_check') needsCheck += 1;
+  }
+
+  const hardwareSkuIds = new Set<string>();
+  let hardwareQuantityTotal = 0;
+  for (const balance of params.hardwareBalances) {
+    if (balance.quantity <= 0) continue;
+    if (!activeHardwareIds.has(balance.hardware_item_id)) continue;
+    if (!responsibleLocationIdSet.has(balance.location_id)) continue;
+    hardwareSkuIds.add(balance.hardware_item_id);
+    hardwareQuantityTotal += balance.quantity;
+  }
+
+  return {
+    responsibleItemCount: responsibleItemsById.size,
+    overdue,
+    dueSoon,
+    needsCheck,
+    hardwareSkuCount: hardwareSkuIds.size,
+    hardwareQuantityTotal,
+    claimableItemCount,
+    secondaryLocationCount: params.secondaryLocationCount,
+  };
+}

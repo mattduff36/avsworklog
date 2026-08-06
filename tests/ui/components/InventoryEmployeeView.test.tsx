@@ -80,6 +80,14 @@ const yardLocation: InventoryLocation = {
   source_id: null,
 };
 
+const elsewhereLocation: InventoryLocation = {
+  ...primaryLocation,
+  id: 'elsewhere-location',
+  name: 'Other Van',
+  linked_van_id: 'van-2',
+  source_id: 'van-2',
+};
+
 const cones: InventoryHardwareItem = {
   id: 'hardware-cones',
   name: 'Cones',
@@ -91,7 +99,12 @@ const cones: InventoryHardwareItem = {
   updated_by: null,
 };
 
-function makeItem(id: string, name: string, location: InventoryLocation): InventoryItem {
+function makeItem(
+  id: string,
+  name: string,
+  location: InventoryLocation,
+  overrides: Partial<InventoryItem> = {},
+): InventoryItem {
   return {
     id,
     item_number: id,
@@ -112,10 +125,107 @@ function makeItem(id: string, name: string, location: InventoryLocation): Invent
     updated_at: '2026-07-05T00:00:00.000Z',
     created_by: null,
     updated_by: null,
+    ...overrides,
   };
 }
 
+function openEmployeeTab(label: string) {
+  // Radix Tabs activates on pointer/mouse down in happy-dom.
+  fireEvent.mouseDown(screen.getByRole('tab', { name: label }), { button: 0 });
+}
+
 describe('InventoryEmployeeView', () => {
+  it('keeps the location-unset flow outside tabs', () => {
+    render(
+      <InventoryEmployeeView
+        items={[]}
+        locations={[primaryLocation]}
+        userLocation={null}
+        onSetUserLocation={vi.fn()}
+        onRequestLocation={vi.fn()}
+        onOpenMoveDialog={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Set Your Inventory Location')).toBeInTheDocument();
+    expect(screen.queryByTestId('inventory-employee-tabs')).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Overview' })).not.toBeInTheDocument();
+  });
+
+  it('defaults to Overview and navigates to Inventory Items / Hardware / Claim Item', () => {
+    render(
+      <InventoryEmployeeView
+        items={[
+          makeItem('tool-1', 'Primary Drill', primaryLocation),
+          makeItem('tool-2', 'Elsewhere Saw', elsewhereLocation),
+        ]}
+        locations={[primaryLocation]}
+        userLocation={{
+          user_id: 'user-1',
+          location_id: primaryLocation.id,
+          location: primaryLocation,
+        }}
+        hardwareItems={[cones]}
+        hardwareBalances={[{
+          id: 'balance-1',
+          hardware_item_id: cones.id,
+          location_id: primaryLocation.id,
+          quantity: 4,
+          location: primaryLocation,
+        }]}
+        onSetUserLocation={vi.fn()}
+        onRequestLocation={vi.fn()}
+        onOpenMoveDialog={vi.fn()}
+        onTransferHardware={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Showing inventory for/)).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByRole('button', { name: 'Open inventory items' })).toBeInTheDocument();
+    expect(screen.getByTestId('inventory-employee-tabs').className).toContain('grid-cols-2');
+    expect(screen.getByTestId('inventory-employee-tabs').className).toContain('md:inline-flex');
+
+    openEmployeeTab('Inventory Items');
+    expect(screen.getByRole('tab', { name: 'Inventory Items' })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByText('My Inventory Items')).toBeInTheDocument();
+    expect(screen.getByText(/Primary Drill/)).toBeInTheDocument();
+
+    openEmployeeTab('Hardware');
+    expect(screen.getByRole('tab', { name: 'Hardware' })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByText('Quantity stock held at locations you are responsible for.')).toBeInTheDocument();
+    expect(screen.getByText('Cones')).toBeInTheDocument();
+
+    openEmployeeTab('Claim Item');
+    expect(screen.getByRole('tab', { name: 'Claim Item' })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByText('Claim An Item')).toBeInTheDocument();
+  });
+
+  it('opens Inventory Items from overview section and status actions', () => {
+    render(
+      <InventoryEmployeeView
+        items={[makeItem('tool-1', 'Primary Drill', primaryLocation)]}
+        locations={[primaryLocation]}
+        userLocation={{
+          user_id: 'user-1',
+          location_id: primaryLocation.id,
+          location: primaryLocation,
+        }}
+        onSetUserLocation={vi.fn()}
+        onRequestLocation={vi.fn()}
+        onOpenMoveDialog={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open inventory items' }));
+    expect(screen.getByText('My Inventory Items')).toBeInTheDocument();
+
+    openEmployeeTab('Overview');
+    fireEvent.click(screen.getByRole('button', { name: 'Filter inventory by Overdue' }));
+    expect(screen.getByRole('tab', { name: 'Inventory Items' })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByText('My Inventory Items')).toBeInTheDocument();
+  });
+
   it('renders assigned Site locations as separate secondary sections', () => {
     render(
       <InventoryEmployeeView
@@ -143,6 +253,7 @@ describe('InventoryEmployeeView', () => {
       />
     );
 
+    openEmployeeTab('Inventory Items');
     expect(screen.getByText('My Inventory Items')).toBeInTheDocument();
     expect(screen.getByText('Site: Site - 12345 - Yard Entrance')).toBeInTheDocument();
     expect(screen.getByText('Secondary Location')).toBeInTheDocument();
@@ -173,6 +284,7 @@ describe('InventoryEmployeeView', () => {
       />,
     );
 
+    openEmployeeTab('Inventory Items');
     expect(screen.getByText('Manual: Storage Container')).toBeInTheDocument();
     expect(screen.getByText(/Storage Container: Stored Saw/)).toBeInTheDocument();
   });
@@ -222,7 +334,8 @@ describe('InventoryEmployeeView', () => {
       />,
     );
 
-    expect(screen.getByText('Hardware')).toBeInTheDocument();
+    openEmployeeTab('Hardware');
+    expect(screen.getByText('Quantity stock held at locations you are responsible for.')).toBeInTheDocument();
     expect(screen.getByText('Cones')).toBeInTheDocument();
     expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.queryByText('Tamp')).not.toBeInTheDocument();
@@ -254,6 +367,7 @@ describe('InventoryEmployeeView', () => {
       />,
     );
 
+    openEmployeeTab('Hardware');
     fireEvent.click(screen.getByRole('button', { name: /transfer/i }));
 
     expect(screen.getByRole('heading', { name: 'Transfer Hardware' })).toBeInTheDocument();

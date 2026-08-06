@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { InventoryLocation } from '@/app/(dashboard)/inventory/types';
+import type { InventoryItem, InventoryLocation } from '@/app/(dashboard)/inventory/types';
 import {
   canSelectInventoryPrimaryLocation,
   canShareInventoryPrimaryLocation,
@@ -14,6 +14,7 @@ import {
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
+  getInventoryEmployeeOverviewStats,
   getInventoryLocationSearchLabel,
   getInventoryLocationTypePresentation,
   hasInventoryCheckLapsed,
@@ -258,5 +259,83 @@ describe('inventory utils', () => {
     expect(presentation.optionClassName).toContain(token);
     expect(presentation.badgeClassName).toBeTruthy();
     expect(presentation.iconClassName).toBeTruthy();
+  });
+
+  it('scopes My Location overview stats to responsible locations and active hardware stock', () => {
+    const primary: InventoryLocation = {
+      id: 'primary',
+      name: 'Van A',
+      description: null,
+      is_active: true,
+      linked_van_id: null,
+      linked_hgv_id: null,
+      linked_plant_id: null,
+      location_type: 'van',
+      source_type: 'manual',
+      source_id: null,
+      external_reference: null,
+      sync_status: 'manual',
+      source_synced_at: null,
+      created_at: '2026-07-05T00:00:00.000Z',
+      updated_at: '2026-07-05T00:00:00.000Z',
+      created_by: null,
+      updated_by: null,
+    };
+    const secondary: InventoryLocation = { ...primary, id: 'secondary', name: 'Site A', location_type: 'site' };
+    const elsewhere: InventoryLocation = { ...primary, id: 'elsewhere', name: 'Van B' };
+
+    const makeItem = (id: string, location: InventoryLocation): InventoryItem => ({
+      id,
+      item_number: id,
+      item_number_normalized: id,
+      name: id,
+      category: 'tools',
+      location_id: location.id,
+      location,
+      last_checked_at: null,
+      check_interval_days: 30,
+      status: 'active',
+      retired_at: null,
+      retire_reason: null,
+      retired_by: null,
+      source: null,
+      source_reference: null,
+      created_at: '2026-07-05T00:00:00.000Z',
+      updated_at: '2026-07-05T00:00:00.000Z',
+      created_by: null,
+      updated_by: null,
+    });
+
+    const stats = getInventoryEmployeeOverviewStats({
+      items: [
+        makeItem('primary-tool', primary),
+        makeItem('secondary-tool', secondary),
+        makeItem('elsewhere-tool', elsewhere),
+        { ...makeItem('duplicate-id', primary), id: 'primary-tool' },
+      ],
+      primaryLocationId: primary.id,
+      responsibleLocationIds: [primary.id, secondary.id],
+      hardwareItems: [
+        { id: 'sku-a', is_active: true },
+        { id: 'sku-b', is_active: false },
+        { id: 'sku-c', is_active: true },
+      ],
+      hardwareBalances: [
+        { hardware_item_id: 'sku-a', location_id: primary.id, quantity: 5 },
+        { hardware_item_id: 'sku-a', location_id: secondary.id, quantity: 2 },
+        { hardware_item_id: 'sku-b', location_id: primary.id, quantity: 9 },
+        { hardware_item_id: 'sku-c', location_id: elsewhere.id, quantity: 4 },
+        { hardware_item_id: 'sku-c', location_id: primary.id, quantity: 0 },
+      ],
+      secondaryLocationCount: 1,
+    });
+
+    expect(stats.responsibleItemCount).toBe(2);
+    expect(stats.needsCheck).toBe(2);
+    // Claim pool is outside primary (secondary + elsewhere), not responsible-location health.
+    expect(stats.claimableItemCount).toBe(2);
+    expect(stats.hardwareSkuCount).toBe(1);
+    expect(stats.hardwareQuantityTotal).toBe(7);
+    expect(stats.secondaryLocationCount).toBe(1);
   });
 });
