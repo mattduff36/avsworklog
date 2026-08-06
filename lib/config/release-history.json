@@ -1,5 +1,27 @@
 [
   {
+    "version": "0826.8.0",
+    "updateKind": "major",
+    "title": "Demo Ui update",
+    "description": "Added parallel fresh interface preview.",
+    "summary": "Added parallel fresh interface preview.",
+    "details": [
+      "Updated sign in across 14 changed files.",
+      "Updated navigation across 2 changed files.",
+      "Updated timesheets across 2 changed files.",
+      "Updated inventory across 1 changed file.",
+      "Updated daily tasks across 1 changed file.",
+      "Updated absence and leave across 1 changed file.",
+      "Updated workshop tasks across 1 changed file.",
+      "Updated fleet across 1 changed file."
+    ],
+    "areas": [
+      "Parallel fresh interface preview"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-08-06T14:10:01.745Z"
+  },
+  {
     "version": "0826.7.0",
     "updateKind": "major",
     "title": "Admin Settings update",

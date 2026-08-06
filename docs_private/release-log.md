@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.8.0
+
+**GIT COMMIT MESSAGE**
+`feat(demo-ui): add parallel fresh interface preview`
+
+**PUSHED AT**
+2026-08-06T14:10:01.745Z
+
+**WHAT CHANGED**
+Add parallel fresh interface preview.
+
+**VERSION HISTORY DETAILS**
+- Updated sign in across 14 changed files.
+- Updated navigation across 2 changed files.
+- Updated timesheets across 2 changed files.
+- Updated inventory across 1 changed file.
+- Updated daily tasks across 1 changed file.
+- Updated absence and leave across 1 changed file.
+- Updated workshop tasks across 1 changed file.
+- Updated fleet across 1 changed file.
+
+**COMMITS IN THIS RELEASE**
+- `feat(demo-ui): add parallel fresh interface preview`
+
 ## 0826.7.0
 
 **GIT COMMIT MESSAGE**
