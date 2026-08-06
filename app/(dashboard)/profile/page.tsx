@@ -76,7 +76,7 @@ const SETTINGS_NAV_ITEMS: Array<{
   },
   {
     value: 'security',
-    label: 'Security',
+    label: 'Security & Display',
     icon: ShieldCheck,
     tileClassName: 'bg-emerald-500/[0.06] hover:bg-emerald-500/[0.12]',
     activeClassName: 'bg-emerald-500/30',

@@ -56,10 +56,10 @@ describe('payroll rollout contract', () => {
     expect(route).toContain('filterTimesheetRowsForReportScope');
   });
 
-  it('PAY-AUTH-ADMIN-001 requires settings permission and full admin access', () => {
+  it('AUTH-PAYROLL-LEVEL5-01 requires delegated Admin Settings access', () => {
     const route = readProjectFile('app/api/admin/settings/payroll-rules/route.ts');
-    expect(route).toContain("canEffectiveRoleAccessModule('admin-settings')");
-    expect(route).toContain('hasEffectiveRoleFullAccess');
+    expect(route).toContain('requireAdminSettingsAccess');
+    expect(route).not.toContain('hasEffectiveRoleFullAccess');
     const service = readProjectFile('lib/server/payroll-admin.ts');
     expect(service).toContain('BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE');
     expect(service).toContain('must be assigned to the');

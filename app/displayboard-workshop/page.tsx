@@ -593,7 +593,7 @@ export default function WorkshopDisplayBoardPage() {
           <h1 className="text-5xl font-black tracking-tight">Workshop Display Board</h1>
           {state === 'pairing' && pairing ? (
             <div className="mt-8 space-y-5">
-              <p className="text-xl text-white/75">Confirm this code in Admin Settings</p>
+              <p className="text-xl text-white/75">Confirm this code in Workshop Tasks Settings</p>
               <p className="rounded-3xl border border-workshop/40 bg-workshop/20 px-8 py-6 text-7xl font-black tracking-[0.22em] text-white">
                 {pairing.confirmationCode}
               </p>
@@ -603,7 +603,7 @@ export default function WorkshopDisplayBoardPage() {
             <div className="mt-8 space-y-4">
               <p className="text-2xl font-semibold text-white/80">{message}</p>
               <p className="text-white/55">
-                Start “Search for display board” from Admin Settings, then reload or leave this screen open.
+                Start “Search for display board” from Workshop Tasks Settings, then reload or leave this screen open.
               </p>
             </div>
           )}

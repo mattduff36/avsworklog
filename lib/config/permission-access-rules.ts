@@ -2,7 +2,7 @@ import type { ModuleName, PermissionAccessLevel, PermissionModuleMatrixColumn } 
 
 const MODULE_ENFORCED_MINIMUM_ACCESS_LEVELS: Partial<Record<ModuleName, PermissionAccessLevel>> = {
   'toolbox-talks': 4,
-  'admin-settings': 4,
+  'admin-settings': 5,
 };
 
 const FULL_ACCESS_ROLE_ONLY_MODULES = new Set<ModuleName>();

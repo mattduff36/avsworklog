@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
-import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { requireAdminUsersModuleAccess } from '@/lib/server/admin-users-module-access';
+import { requireAdminSettingsAccess } from '@/lib/server/admin-settings-access';
 import { ALL_MODULES, type ModuleName, type ShiftPermissionModuleRequest } from '@/types/roles';
 import {
   isMissingTeamPermissionSchemaError,
@@ -17,24 +14,8 @@ export async function PATCH(
   { params }: { params: Promise<{ moduleName: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const sensitiveAccessResponse = await requireAdminUsersModuleAccess();
-    if (sensitiveAccessResponse) return sensitiveAccessResponse;
-
-    const effectiveRole = await getEffectiveRole();
-    const actorIsAdmin = hasEffectiveRoleFullAccess(effectiveRole);
-    if (!actorIsAdmin) {
-      return NextResponse.json({ error: 'Forbidden - admin access required' }, { status: 403 });
-    }
+    const access = await requireAdminSettingsAccess();
+    if (access.response) return access.response;
 
     const { moduleName } = await params;
     if (!ALL_MODULES.includes(moduleName as ModuleName)) {

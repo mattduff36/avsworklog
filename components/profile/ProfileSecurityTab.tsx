@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProfileBiometricsCard } from '@/components/profile/ProfileBiometricsCard';
 import { ProfileSensitivePinCard } from '@/components/profile/ProfileSensitivePinCard';
+import { ProfileWidescreenPreferenceCard } from '@/components/profile/ProfileWidescreenPreferenceCard';
 import type { ProfilePermissionSummaryItem } from '@/types/profile';
 
 interface ProfileSecurityTabProps {
@@ -60,6 +61,7 @@ export function ProfileSecurityTab({ sensitiveModules }: ProfileSecurityTabProps
       )}
 
       <ProfileBiometricsCard />
+      <ProfileWidescreenPreferenceCard />
     </div>
   );
 }

@@ -1232,6 +1232,14 @@
       "sort_order": 6
     },
     {
+      "category_slug": "workshop-tasks",
+      "slug": "display-board-settings",
+      "title": "How do Workshop Display Board settings work?",
+      "summary": "Pairing and configuring the shared Workshop Display Board.",
+      "content_md": "# How do Workshop Display Board settings work?\n\nManagers and admins can open **Workshop Tasks → Settings** to configure refresh behaviour, enable or disable the board, pair a workshop TV browser, adjust device text size, or revoke a paired display.\n\nSave changes carefully because they affect shared workshop screens used by the team.",
+      "sort_order": 7
+    },
+    {
       "category_slug": "approvals",
       "slug": "approvals-overview",
       "title": "What is Approvals?",
@@ -1524,7 +1532,7 @@
       "slug": "manage-roles",
       "title": "How do I manage roles?",
       "summary": "Creating and editing roles and module permissions.",
-      "content_md": "# How do I manage roles?\n\nOpen Roles & Permissions from admin navigation, edit the role, and set module access levels. Keep employee roles narrow and grant manager/admin modules only where needed.",
+      "content_md": "# How do I manage roles?\n\nUse **User Management** for role definitions and teams. Use **Admin Settings → Permissions** to assign module access levels, and open **Permission Guide** there when you need the detailed access model. Keep employee roles narrow and delegate Level 5 Admin Settings access carefully.",
       "sort_order": 1
     },
     {
@@ -1556,16 +1564,8 @@
       "slug": "admin-settings-overview",
       "title": "What is Admin Settings?",
       "summary": "Overview of admin-only configuration tools.",
-      "content_md": "# What is Admin Settings?\n\n**Admin Settings** contains configuration that affects the wider app.\n\nCurrent examples include display-board settings and timesheet type exceptions. Only admins with the Admin Settings permission can change these values.",
+      "content_md": "# What is Admin Settings?\n\n**Admin Settings** contains configuration that affects the wider app.\n\nIt contains Permissions, the Permission Guide, payroll rules, and timesheet exceptions. Access requires effective Level 5 for Admin Settings, plus a sensitive access PIN when that protection is enabled.",
       "sort_order": 0
-    },
-    {
-      "category_slug": "admin-settings",
-      "slug": "display-board-settings",
-      "title": "How do display board settings work?",
-      "summary": "Configuring the admin display board settings.",
-      "content_md": "# How do display board settings work?\n\nOpen **Admin Settings** and use the display board configuration card to control what the display board shows.\n\nSave changes carefully because they can affect shared screens used by the team.",
-      "sort_order": 1
     },
     {
       "category_slug": "admin-settings",
@@ -1573,7 +1573,7 @@
       "title": "How do timesheet type exceptions work?",
       "summary": "Giving selected users a non-default timesheet type.",
       "content_md": "# How do timesheet type exceptions work?\n\nOpen **Admin Settings** and use the timesheet type exceptions controls to assign a non-default timesheet form to specific people.\n\nUse this when one employee needs a different timesheet type from the normal role default.",
-      "sort_order": 2
+      "sort_order": 1
     },
     {
       "category_slug": "faq-editor",

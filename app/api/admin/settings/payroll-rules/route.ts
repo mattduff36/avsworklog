@@ -8,37 +8,16 @@ import {
   loadPayrollAdminMatrix,
   savePayrollRuleDraft,
 } from '@/lib/server/payroll-admin';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
-import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
-import { getEffectiveRole } from '@/lib/utils/view-as';
+import { requireAdminSettingsAccess } from '@/lib/server/admin-settings-access';
 import type {
   PayrollProfileAssignmentInput,
   PayrollTeamAssignmentInput,
 } from '@/types/payroll-admin';
 
-async function authorizePayrollAdmin() {
-  const [effectiveRole, canAccessSettings] = await Promise.all([
-    getEffectiveRole(),
-    canEffectiveRoleAccessModule('admin-settings'),
-  ]);
-  return {
-    effectiveRole,
-    allowed: Boolean(
-      effectiveRole.user_id
-      && canAccessSettings
-      && hasEffectiveRoleFullAccess(effectiveRole)
-    ),
-  };
-}
-
 export async function GET() {
-  const auth = await authorizePayrollAdmin();
-  if (!auth.effectiveRole.user_id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (!auth.allowed) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const access = await requireAdminSettingsAccess();
+  if (access.response) return access.response;
+
   try {
     return NextResponse.json({ success: true, ...(await loadPayrollAdminMatrix()) });
   } catch (error) {
@@ -50,19 +29,15 @@ export async function GET() {
 }
 
 export async function PUT(request: NextRequest) {
-  const auth = await authorizePayrollAdmin();
-  if (!auth.effectiveRole.user_id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (!auth.allowed) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const access = await requireAdminSettingsAccess();
+  if (access.response) return access.response;
+
   try {
     const body = (await request.json()) as { configuration?: PayrollRuleConfiguration };
     if (!body.configuration) {
       return NextResponse.json({ error: 'configuration is required' }, { status: 400 });
     }
-    await savePayrollRuleDraft(body.configuration, auth.effectiveRole.user_id);
+    await savePayrollRuleDraft(body.configuration, access.userId);
     return NextResponse.json({ success: true, ...(await loadPayrollAdminMatrix()) });
   } catch (error) {
     return NextResponse.json(
@@ -73,13 +48,9 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await authorizePayrollAdmin();
-  if (!auth.effectiveRole.user_id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (!auth.allowed) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const access = await requireAdminSettingsAccess();
+  if (access.response) return access.response;
+
   try {
     const body = (await request.json()) as {
       action?: 'test' | 'activate' | 'archive_version' | 'delete_draft';
@@ -110,7 +81,7 @@ export async function POST(request: NextRequest) {
       }
       await activatePayrollRollout({
         effectiveWeekEnding: body.effectiveWeekEnding,
-        actorId: auth.effectiveRole.user_id,
+        actorId: access.userId,
         teamAssignments: body.teamAssignments || [],
         profileAssignments: body.profileAssignments || [],
       });
@@ -127,7 +98,7 @@ export async function POST(request: NextRequest) {
       if (!body.versionId) {
         return NextResponse.json({ error: 'versionId is required' }, { status: 400 });
       }
-      await archivePayrollRuleVersion(body.versionId, auth.effectiveRole.user_id);
+      await archivePayrollRuleVersion(body.versionId, access.userId);
       return NextResponse.json({ success: true, ...(await loadPayrollAdminMatrix()) });
     }
     return NextResponse.json({ error: 'Unknown payroll action' }, { status: 400 });

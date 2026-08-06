@@ -10,7 +10,7 @@ function readSource(relativePath: string): string {
 }
 
 describe('shouldGrantFullAccessSnapshot', () => {
-  it('does not grant full access while actual superadmin is viewing as another role', () => {
+  it('AUTH-ADMINSET-VIEWAS-01 does not grant full access while actual superadmin is viewing as another role', () => {
     expect(
       shouldGrantFullAccessSnapshot({
         role_name: 'employee',
@@ -182,11 +182,18 @@ describe('module guard alignment checks', () => {
     expect(source).not.toContain("buildLockPathWithReturnTo");
   });
 
-  it('keeps biometric settings but removes account switcher settings from profile hub', () => {
+  it('UI-PROFILE-DISPLAY-01 keeps security and display preferences together in profile', () => {
     const profileSource = readSource('app/(dashboard)/profile/page.tsx');
     const securityTabSource = readSource('components/profile/ProfileSecurityTab.tsx');
+    const widescreenSource = readSource('components/profile/ProfileWidescreenPreferenceCard.tsx');
+    const adminSettingsSource = readSource('app/(dashboard)/admin/settings/page.tsx');
 
     expect(securityTabSource).toContain('ProfileBiometricsCard');
+    expect(securityTabSource).toContain('ProfileWidescreenPreferenceCard');
+    expect(profileSource).toContain("label: 'Security & Display'");
+    expect(widescreenSource).toContain('readAppWidescreenPreference');
+    expect(widescreenSource).toContain('writeAppWidescreenPreference');
+    expect(adminSettingsSource).not.toContain('Layout Preferences');
     expect(profileSource).not.toContain('AccountSwitcherSettingsCard');
     expect(securityTabSource).not.toContain('AccountSwitcherSettingsCard');
   });

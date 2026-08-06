@@ -648,9 +648,11 @@ You can currently:
     - Priority levels and status tracking
     - Mark actions as complete
     - Statistics dashboard
-19. ✅ **Admin User Management** (admin-only)
+19. ✅ **Admin User and Permission Management**
     - Create/edit/delete users
-    - Assign roles
+    - Define roles and teams in User Management
+    - Assign roles and module access levels from Admin Settings (effective Level 5)
+    - Permission Guide and optional sensitive-PIN protection
     - Search functionality
 
 ---

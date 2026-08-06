@@ -27,6 +27,7 @@ interface DisplayBoardSettingsResponse extends DisplayBoardAdminState {
 
 const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
 const SETTINGS_COMPACT_HELPER_TEXT_CLASS = 'text-xs leading-relaxed text-slate-400';
+const DISPLAY_BOARD_SETTINGS_ENDPOINT = '/api/workshop-tasks/settings/display-board';
 
 function formatDateTime(value: string | null | undefined) {
   if (!value) return 'Never';
@@ -66,7 +67,7 @@ export function DisplayBoardSettingsCard() {
   const loadSettings = useCallback(async (quiet = false) => {
     if (!quiet) setLoading(true);
     try {
-      const response = await fetch('/api/admin/settings/display-board', { cache: 'no-store' });
+      const response = await fetch(DISPLAY_BOARD_SETTINGS_ENDPOINT, { cache: 'no-store' });
       const payload = await response.json() as DisplayBoardSettingsResponse;
       if (!response.ok) throw new Error(payload.error || 'Unable to load display board settings');
       syncState(payload);
@@ -93,7 +94,7 @@ export function DisplayBoardSettingsCard() {
   const saveSettings = async () => {
     setSaving(true);
     try {
-      const response = await fetch('/api/admin/settings/display-board', {
+      const response = await fetch(DISPLAY_BOARD_SETTINGS_ENDPOINT, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -116,7 +117,7 @@ export function DisplayBoardSettingsCard() {
   const runAction = async (action: string, extra: Record<string, unknown> = {}) => {
     setSaving(true);
     try {
-      const response = await fetch('/api/admin/settings/display-board', {
+      const response = await fetch(DISPLAY_BOARD_SETTINGS_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...extra }),
@@ -151,7 +152,7 @@ export function DisplayBoardSettingsCard() {
     setSavingTextSizeDeviceId(deviceId);
 
     try {
-      const response = await fetch('/api/admin/settings/display-board', {
+      const response = await fetch(DISPLAY_BOARD_SETTINGS_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -259,7 +260,12 @@ export function DisplayBoardSettingsCard() {
           </div>
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2">
-              <Switch checked={enabled} onCheckedChange={setEnabled} disabled={loading || saving} />
+              <Switch
+                checked={enabled}
+                onCheckedChange={setEnabled}
+                disabled={loading || saving}
+                aria-label="Enable Workshop Display Board"
+              />
               <span className="text-sm text-foreground">Board enabled</span>
             </div>
             <Button

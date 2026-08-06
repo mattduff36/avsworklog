@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { getEffectiveRole } from '@/lib/utils/view-as';
-import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { requireAdminSettingsAccess } from '@/lib/server/admin-settings-access';
 import {
   deleteTimesheetTypeExceptionRow,
   getTimesheetTypeExceptionMatrix,
@@ -13,34 +10,12 @@ import {
   type TimesheetExceptionOverrideType,
 } from '@/types/timesheet-type-exceptions';
 
-function isActorAdmin(effectiveRole: {
-  is_actual_super_admin: boolean;
-  is_super_admin: boolean;
-  role_class?: 'admin' | 'manager' | 'employee' | null;
-  role_name: string | null;
-}): boolean {
-  return hasEffectiveRoleFullAccess(effectiveRole);
-}
-
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ profileId: string }> }
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const canAccessSettings = await canEffectiveRoleAccessModule('admin-settings');
-  const effectiveRole = await getEffectiveRole();
-  if (!canAccessSettings || !isActorAdmin(effectiveRole)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const access = await requireAdminSettingsAccess();
+  if (access.response) return access.response;
 
   const { profileId } = await params;
   if (!profileId) {
@@ -69,7 +44,7 @@ export async function PATCH(
     await upsertTimesheetTypeException({
       profile_id: profileId,
       timesheet_type: nextTimesheetType,
-      actor_id: user.id,
+      actor_id: access.userId,
     });
     const matrix = await getTimesheetTypeExceptionMatrix();
     return NextResponse.json({ success: true, ...matrix });
@@ -85,21 +60,8 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ profileId: string }> }
 ) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const canAccessSettings = await canEffectiveRoleAccessModule('admin-settings');
-  const effectiveRole = await getEffectiveRole();
-  if (!canAccessSettings || !isActorAdmin(effectiveRole)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const access = await requireAdminSettingsAccess();
+  if (access.response) return access.response;
 
   const { profileId } = await params;
   if (!profileId) {

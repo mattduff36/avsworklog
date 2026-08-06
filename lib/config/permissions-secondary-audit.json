@@ -208,20 +208,20 @@
         "Employee": "No module access by rank.",
         "Supervisor": "No module access by rank.",
         "Manager": "Can access user admin if team-enabled. Can create/update users, but can only assign employee-class non-super roles; role creation is limited to employee roles and no new permission tiers. Role edit/delete UI is admin-only.",
-        "Admin": "Full user, role, hierarchy, team, and permission administration."
+        "Admin": "Full user, role, hierarchy, and team administration. Permission levels and the Permission Guide are managed in Admin Settings."
       }
     },
     {
       "displayName": "Admin Settings",
       "moduleName": "admin-settings",
-      "matrixGate": "Manager+ and team-enabled",
-      "minimumRole": "Manager",
+      "matrixGate": "Effective Level 5 only",
+      "minimumRole": "Admin",
       "byRole": {
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
         "Supervisor": "No module access by rank.",
-        "Manager": "Can access Admin Settings when the module is enabled. Manager-level access covers layout preferences and module-gated settings surfaces; admin-only tools remain reserved for Admin/Super Admin where separately guarded.",
-        "Admin": "Admin settings UI, layout preferences, timesheet exception settings, and admin-only settings tools."
+        "Manager": "No access by rank. A specifically delegated effective Level 5 override grants Admin Settings access, including non-admin role assignment, permission levels, and timesheet configuration, but cannot alter or assign Admin/Super Admin roles.",
+        "Admin": "Full Admin Settings access for permission levels, Permission Guide, payroll rules, and timesheet exceptions. A sensitive access PIN is also required when enabled for this module."
       }
     },
     {

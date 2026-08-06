@@ -18,6 +18,7 @@ import { WorkshopTasksOverviewTab } from './components/WorkshopTasksOverviewTab'
 import { WorkshopTaskStatusDialogs } from './components/WorkshopTaskStatusDialogs';
 import { WorkshopTaskFormDialogs } from './components/WorkshopTaskFormDialogs';
 import { WorkshopTaskAdminDialogs } from './components/WorkshopTaskAdminDialogs';
+import { DisplayBoardSettingsCard } from './components/DisplayBoardSettingsCard';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { useWorkshopTasksFetchers } from './hooks/useWorkshopTasksFetchers';
 import { useWorkshopTaskLifecycleActions } from './hooks/useWorkshopTaskLifecycleActions';
@@ -496,6 +497,7 @@ export default function WorkshopTasksPage() {
               onDeleteSubcategory={crud.handleDeleteSubcategory}
             />
             <AttachmentManagementPanel taxonomyMode={categoryTaxonomyMode} />
+            <DisplayBoardSettingsCard />
           </TabsContent>
         )}
       </Tabs>

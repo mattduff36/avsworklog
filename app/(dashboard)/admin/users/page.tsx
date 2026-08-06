@@ -52,7 +52,6 @@ import {
   Copy,
   CheckCircle2,
   Briefcase,
-  BookOpen,
 } from 'lucide-react';
 import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { fetchAdminTeamDirectory } from '@/lib/admin/team-directory-client';
@@ -75,16 +74,6 @@ import {
   computeQuickEditFloatingPosition,
   type FloatingPositionResult,
 } from '@/lib/ui/quick-edit-floating-position';
-
-const RoleManagement = dynamic(() => import('@/components/admin/RoleManagement').then(m => ({ default: m.RoleManagement })), { 
-  ssr: false,
-  loading: () => <PanelLoader message="Loading role management..." className="py-12" />
-});
-
-const PermissionsGuide = dynamic(() => import('@/components/admin/PermissionsGuide').then(m => ({ default: m.PermissionsGuide })), {
-  ssr: false,
-  loading: () => <PanelLoader message="Loading permission guide..." className="py-12" />
-});
 
 const JobRolesTab = dynamic(() => import('@/components/admin/JobRolesTab').then(m => ({ default: m.JobRolesTab })), {
   ssr: false,
@@ -125,7 +114,7 @@ type ProfileWithEmail = ProfileWithRole & UserActivitySummary & {
   current_fleet_assignment?: AdminFleetAssignmentSummary | null;
 };
 
-type TabType = 'users' | 'roles' | 'teams' | 'permissions' | 'permission-guide';
+type TabType = 'users' | 'roles' | 'teams' | 'permissions-moved';
 type UserStatusTab = 'active' | 'deleted';
 type BinaryChoice = 'yes' | 'no' | '';
 
@@ -324,7 +313,6 @@ export default function UsersAdminPage() {
   const isAdminActor = isAdmin || isSuperAdmin || isActualSuperAdmin;
   const isManagerActor = !isAdminActor && profile?.role?.is_manager_admin === true;
   const canManageRoleDefinitions = isAdminActor || isManagerActor;
-  const canEditRolePermissions = isAdminActor;
   const canQuickEditAssignments = isAdminActor;
   const canAccessUserAdmin = canManageUsers && sensitiveAccess.canAccess;
 
@@ -357,7 +345,6 @@ export default function UsersAdminPage() {
     const validTabs: TabType[] = [
       'users',
       ...(canManageRoleDefinitions ? (['roles', 'teams'] as const) : []),
-      ...(canEditRolePermissions ? (['permissions', 'permission-guide'] as const) : []),
     ];
     if (validTabs.includes(requestedTab)) {
       setActiveTab(requestedTab);
@@ -370,7 +357,6 @@ export default function UsersAdminPage() {
     permissionLoading,
     currentUser,
     profile,
-    canEditRolePermissions,
     canManageRoleDefinitions,
     searchParams,
     router,
@@ -1371,7 +1357,7 @@ export default function UsersAdminPage() {
       <SensitiveModuleSessionManager moduleLabel="User Management" access={sensitiveAccess} />
       <AppPageHeader
         title="User Management"
-        description="Manage users, roles, and permissions"
+        description="Manage users, roles, and teams"
         className="bg-slate-900"
         contentClassName="sm:flex-row sm:items-center sm:justify-between"
         headingClassName="space-y-0"
@@ -1392,11 +1378,9 @@ export default function UsersAdminPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => handleTabChange(v as TabType)} className="space-y-6">
         <TabsList className={`grid w-full ${
-          canEditRolePermissions
-              ? 'max-w-4xl grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
-              : canManageRoleDefinitions
-                ? 'max-w-xl grid-cols-1 sm:grid-cols-3'
-                : 'max-w-sm grid-cols-1'
+          canManageRoleDefinitions
+            ? 'max-w-3xl grid-cols-2 sm:grid-cols-4'
+            : 'max-w-xl grid-cols-2'
         } bg-slate-100 dark:bg-slate-800 p-0`}>
           <TabsTrigger 
             value="users" 
@@ -1423,24 +1407,14 @@ export default function UsersAdminPage() {
               Teams
             </TabsTrigger>
           )}
-          {canEditRolePermissions && (
-            <TabsTrigger 
-              value="permissions" 
-              className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
-            >
-              <Shield className="h-4 w-4" />
-              Permissions
-            </TabsTrigger>
-          )}
-          {canEditRolePermissions && (
-            <TabsTrigger
-              value="permission-guide"
-              className="gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900"
-            >
-              <BookOpen className="h-4 w-4" />
-              Permission Guide
-            </TabsTrigger>
-          )}
+          <TabsTrigger
+            value="permissions-moved"
+            disabled
+            className="gap-2 text-xs sm:text-sm"
+          >
+            <Shield className="h-4 w-4" />
+            Permissions moved to Admin Settings
+          </TabsTrigger>
         </TabsList>
 
         {/* Users Tab Content */}
@@ -2686,18 +2660,6 @@ export default function UsersAdminPage() {
           </TabsContent>
         )}
 
-        {/* Permissions Tab Content */}
-        {canEditRolePermissions && (
-          <TabsContent value="permissions">
-            <RoleManagement />
-          </TabsContent>
-        )}
-
-        {canEditRolePermissions && (
-          <TabsContent value="permission-guide">
-            <PermissionsGuide />
-          </TabsContent>
-        )}
       </Tabs>
     </AppPageShell>
   );

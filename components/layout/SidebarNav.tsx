@@ -290,12 +290,20 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const draftRole = allRoles.find((r) => r.id === draftRoleId) ?? null;
   const draftTeam = allTeams.find((team) => team.id === draftTeamId) ?? null;
   
-  // Show sidebar for managers/admins or superadmins (who need View As feature)
-  if (!isManager && !isAdmin && !isSuperAdmin) return null;
-
   const managerLinks = getFilteredNavByPermissions(managerNavItems, userPermissions, isAdmin);
   const sidebarManagerLinks = managerLinks.filter((link) => link.href !== '/absence/manage');
   const adminLinks = getFilteredNavByPermissions(adminNavItems, userPermissions, isAdmin);
+  // Delegated module access can expose management links without changing the user's job-role class.
+  if (
+    !isManager
+    && !isAdmin
+    && !isSuperAdmin
+    && sidebarManagerLinks.length === 0
+    && adminLinks.length === 0
+  ) {
+    return null;
+  }
+
   const hasAnyManagementLinks = sidebarManagerLinks.length > 0 || adminLinks.length > 0;
   const showSidebar = hasAnyManagementLinks || showDeveloperTools;
 
@@ -535,7 +543,9 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
           <h2 className={`text-lg font-semibold text-white transition-opacity duration-200 ${
             isExpanded ? 'opacity-100 delay-300' : 'opacity-0 w-0 overflow-hidden'
           }`}>
-            {isManager ? 'Manager Menu' : 'Admin Tools'}
+            {isManager || (sidebarManagerLinks.length > 0 && adminLinks.length === 0)
+              ? 'Manager Menu'
+              : 'Admin Tools'}
           </h2>
           <Button
             variant="ghost"
@@ -551,7 +561,7 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
         {/* Navigation */}
         <div className={`scrollbar-hidden overflow-y-auto overflow-x-hidden py-4 ${isSuperAdmin ? 'h-[calc(100dvh-10rem)]' : 'h-[calc(100dvh-8.25rem)]'}`}>
           {/* Manager Links */}
-          {(isManager || isAdmin) && sidebarManagerLinks.length > 0 && (
+          {sidebarManagerLinks.length > 0 && (
           <div className="px-3 mb-6">
             <div className={`px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider transition-opacity duration-200 ${
               isExpanded ? 'opacity-100 delay-300' : 'opacity-0 pointer-events-none'

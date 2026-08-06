@@ -156,7 +156,7 @@ The Workshop Tasks module provides a dedicated interface for workshop staff to l
 - **FR-4.4** Timestamps: `created_at`, `logged_at`, `actioned_at` (completed)
 - **FR-4.5** Audit: `created_by`, `logged_by`, `actioned_by`
 
-### FR-5: Category Management (Manager/Admin)
+### FR-5: Workshop Settings (Manager/Admin)
 - **FR-5.1** Access: Manager/admin only (UI + RLS enforced)
 - **FR-5.2** CRUD operations:
   - Create category (name, applies_to='vehicle')
@@ -165,6 +165,7 @@ The Workshop Tasks module provides a dedicated interface for workshop staff to l
   - Delete category (if no tasks reference it)
 - **FR-5.3** Ordering: `sort_order` field (manual numeric entry, drag-drop deferred)
 - **FR-5.4** Default category: "Uncategorised" (system-generated, cannot delete)
+- **FR-5.5** Workshop Display Board: Managers/admins with Workshop Tasks access can configure refresh behaviour, pair/revoke display devices, and adjust device text size from the existing Settings tab.
 
 ### FR-6: Inspection Defect Integration
 - **FR-6.1** When inspection submitted with failed items:

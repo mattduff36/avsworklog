@@ -303,6 +303,7 @@ export function RoleManagement() {
   const [modules, setModules] = useState<PermissionModuleMatrixColumn[]>([]);
   const [userTeams, setUserTeams] = useState<UserPermissionTeamDefaultRow[]>([]);
   const [assignableRoles, setAssignableRoles] = useState<UserPermissionAssignableRole[]>([]);
+  const [canManageAdminRoles, setCanManageAdminRoles] = useState(false);
   const [users, setUsers] = useState<UserPermissionMatrixRow[]>([]);
   const [audit, setAudit] = useState<PermissionsAuditInfo | null>(null);
   const [userMatrixLoading, setUserMatrixLoading] = useState(true);
@@ -343,6 +344,7 @@ export function RoleManagement() {
       setUsers(data.users ?? []);
       setUserTeams(data.teams ?? []);
       setAssignableRoles(data.assignable_roles ?? []);
+      setCanManageAdminRoles(data.can_manage_admin_roles === true);
       setAudit(data.audit ?? null);
       setPendingUserChanges({});
       setPendingTeamDefaultChanges({});
@@ -738,16 +740,11 @@ export function RoleManagement() {
 
     try {
       setQuickRoleSaving(true);
-      const response = await fetch(`/api/admin/users/${quickRoleUser.id}`, {
-        method: 'PUT',
+      const response = await fetch(`/api/admin/permissions/users/${quickRoleUser.id}/role`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          full_name: quickRoleUser.full_name,
-          phone_number: quickRoleUser.phone_number,
-          employee_id: quickRoleUser.employee_id,
           role_id: quickRoleValue || null,
-          line_manager_id: quickRoleUser.line_manager_id || null,
-          team_id: quickRoleUser.team_id || null,
         }),
       });
       const result = await response.json();
@@ -1431,7 +1428,11 @@ export function RoleManagement() {
                                           <button
                                             type="button"
                                             onClick={(event) => openQuickRoleEdit(user, event.currentTarget)}
-                                            className="cursor-pointer"
+                                            disabled={user.is_locked_admin && !canManageAdminRoles}
+                                            className={cn(
+                                              'cursor-pointer',
+                                              user.is_locked_admin && !canManageAdminRoles && 'cursor-not-allowed opacity-60'
+                                            )}
                                           >
                                             <Badge
                                               variant={roleBadge.variant}

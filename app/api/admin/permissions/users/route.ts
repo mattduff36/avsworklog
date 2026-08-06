@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { requireAdminUsersModuleAccess } from '@/lib/server/admin-users-module-access';
+import { requireAdminSettingsAccess } from '@/lib/server/admin-settings-access';
 import {
   ALL_MODULES,
   EDITABLE_PERMISSION_ACCESS_LEVELS,
@@ -18,9 +17,8 @@ import {
   getUserPermissionMatrix,
   InvalidPermissionLevelError,
   isMissingTeamPermissionSchemaError,
-  updateTeamModulePermissionDefaults,
-  updateUserModulePermissionLevels,
 } from '@/lib/server/team-permissions';
+import { applyPermissionMatrixUpdatesAtomically } from '@/lib/server/permission-matrix-mutations';
 import permissionsAudit from '@/lib/config/permissions-secondary-audit.json';
 
 type RawAuditModule = {
@@ -53,41 +51,23 @@ function toAuditInfo(): PermissionsAuditInfo {
   };
 }
 
-async function assertAdminPermission(): Promise<NextResponse | null> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const sensitiveAccessResponse = await requireAdminUsersModuleAccess();
-  if (sensitiveAccessResponse) return sensitiveAccessResponse;
-
-  const effectiveRole = await getEffectiveRole();
-  const actorIsAdmin = hasEffectiveRoleFullAccess(effectiveRole);
-  if (!actorIsAdmin) {
-    return NextResponse.json({ error: 'Forbidden - admin access required' }, { status: 403 });
-  }
-
-  return null;
-}
-
 export async function GET(request: NextRequest) {
   try {
-    const forbidden = await assertAdminPermission();
-    if (forbidden) return forbidden;
+    const access = await requireAdminSettingsAccess();
+    if (access.response) return access.response;
 
+    const effectiveRole = await getEffectiveRole();
+    const canManageAdminRoles = hasEffectiveRoleFullAccess(effectiveRole);
     const matrix = await getUserPermissionMatrix(createAdminClient());
     return NextResponse.json({
       success: true,
       roles: matrix.roles,
       modules: matrix.modules,
       teams: matrix.teams,
-      assignable_roles: matrix.assignableRoles,
+      assignable_roles: canManageAdminRoles
+        ? matrix.assignableRoles
+        : matrix.assignableRoles.filter((role) => role.role_class !== 'admin'),
+      can_manage_admin_roles: canManageAdminRoles,
       users: matrix.users,
       audit: toAuditInfo(),
     });
@@ -121,10 +101,9 @@ export async function GET(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const forbidden = await assertAdminPermission();
-    if (forbidden) return forbidden;
+    const access = await requireAdminSettingsAccess();
+    if (access.response) return access.response;
 
-    const effectiveRole = await getEffectiveRole();
     const body = (await request.json()) as UpdateUserPermissionLevelsRequest;
     const updates = body.updates ?? [];
     const teamDefaultUpdates = body.team_default_updates ?? [];
@@ -155,9 +134,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid user permission level payload' }, { status: 400 });
     }
 
-    const admin = createAdminClient();
-    await updateTeamModulePermissionDefaults(admin, normalizedTeamDefaultUpdates, effectiveRole.user_id);
-    await updateUserModulePermissionLevels(admin, normalizedUpdates, effectiveRole.user_id);
+    await applyPermissionMatrixUpdatesAtomically({
+      actorUserId: access.userId,
+      userUpdates: normalizedUpdates,
+      teamDefaultUpdates: normalizedTeamDefaultUpdates,
+    });
 
     return NextResponse.json({
       success: true,

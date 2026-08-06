@@ -208,6 +208,18 @@ Use the defect comments from the check as the starting point, then track repair 
     6
   ),
   article(
+    'workshop-tasks',
+    'display-board-settings',
+    'How do Workshop Display Board settings work?',
+    'Pairing and configuring the shared Workshop Display Board.',
+    `# How do Workshop Display Board settings work?
+
+Managers and admins can open **Workshop Tasks → Settings** to configure refresh behaviour, enable or disable the board, pair a workshop TV browser, adjust device text size, or revoke a paired display.
+
+Save changes carefully because they affect shared workshop screens used by the team.`,
+    7
+  ),
+  article(
     'approvals',
     'approvals-overview',
     'What is Approvals?',

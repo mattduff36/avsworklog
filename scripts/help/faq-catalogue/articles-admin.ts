@@ -181,7 +181,7 @@ FAQ categories use the same module names, so restricted FAQ content is only show
     'Creating and editing roles and module permissions.',
     `# How do I manage roles?
 
-Open Roles & Permissions from admin navigation, edit the role, and set module access levels. Keep employee roles narrow and grant manager/admin modules only where needed.`,
+Use **User Management** for role definitions and teams. Use **Admin Settings → Permissions** to assign module access levels, and open **Permission Guide** there when you need the detailed access model. Keep employee roles narrow and delegate Level 5 Admin Settings access carefully.`,
     1
   ),
   article(
@@ -229,20 +229,8 @@ A user only sees navigation, pages, and FAQ content for modules they can access.
 
 **Admin Settings** contains configuration that affects the wider app.
 
-Current examples include display-board settings and timesheet type exceptions. Only admins with the Admin Settings permission can change these values.`,
+It contains Permissions, the Permission Guide, payroll rules, and timesheet exceptions. Access requires effective Level 5 for Admin Settings, plus a sensitive access PIN when that protection is enabled.`,
     0
-  ),
-  article(
-    'admin-settings',
-    'display-board-settings',
-    'How do display board settings work?',
-    'Configuring the admin display board settings.',
-    `# How do display board settings work?
-
-Open **Admin Settings** and use the display board configuration card to control what the display board shows.
-
-Save changes carefully because they can affect shared screens used by the team.`,
-    1
   ),
   article(
     'admin-settings',
@@ -254,7 +242,7 @@ Save changes carefully because they can affect shared screens used by the team.`
 Open **Admin Settings** and use the timesheet type exceptions controls to assign a non-default timesheet form to specific people.
 
 Use this when one employee needs a different timesheet type from the normal role default.`,
-    2
+    1
   ),
   article(
     'faq-editor',

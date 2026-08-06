@@ -1,38 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { getEffectiveRole } from '@/lib/utils/view-as';
-import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { requireAdminSettingsAccess } from '@/lib/server/admin-settings-access';
 import {
   addTimesheetTypeExceptionRow,
   getTimesheetTypeExceptionMatrix,
 } from '@/lib/server/timesheet-type-exceptions';
 
-function isActorAdmin(effectiveRole: {
-  is_actual_super_admin: boolean;
-  is_super_admin: boolean;
-  role_class?: 'admin' | 'manager' | 'employee' | null;
-  role_name: string | null;
-}): boolean {
-  return hasEffectiveRoleFullAccess(effectiveRole);
-}
-
 export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const canAccessSettings = await canEffectiveRoleAccessModule('admin-settings');
-  const effectiveRole = await getEffectiveRole();
-  if (!canAccessSettings || !isActorAdmin(effectiveRole)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const access = await requireAdminSettingsAccess();
+  if (access.response) return access.response;
 
   try {
     const matrix = await getTimesheetTypeExceptionMatrix();
@@ -46,21 +21,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-
-  if (userError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const canAccessSettings = await canEffectiveRoleAccessModule('admin-settings');
-  const effectiveRole = await getEffectiveRole();
-  if (!canAccessSettings || !isActorAdmin(effectiveRole)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
+  const access = await requireAdminSettingsAccess();
+  if (access.response) return access.response;
 
   let profileId = '';
   try {
@@ -75,7 +37,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await addTimesheetTypeExceptionRow(profileId, user.id);
+    await addTimesheetTypeExceptionRow(profileId, access.userId);
     const matrix = await getTimesheetTypeExceptionMatrix();
     return NextResponse.json({ success: true, ...matrix });
   } catch (error) {

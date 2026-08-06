@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import {
+  canEffectiveRoleAccessModule,
+  isEffectiveRoleManagerOrHigher,
+} from '@/lib/utils/rbac';
 import {
   WORKSHOP_DISPLAY_BOARD_KEY,
   cancelDisplayBoardPairing,
@@ -12,7 +15,7 @@ import {
   updateDisplayBoardDeviceTextSize,
 } from '@/lib/server/display-board';
 
-async function requireAdminSettingsUser() {
+async function requireWorkshopDisplaySettingsUser() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -26,8 +29,11 @@ async function requireAdminSettingsUser() {
     };
   }
 
-  const canAccessSettings = await canEffectiveRoleAccessModule('admin-settings');
-  if (!canAccessSettings) {
+  const [canAccessWorkshop, isManagerOrHigher] = await Promise.all([
+    canEffectiveRoleAccessModule('workshop-tasks'),
+    isEffectiveRoleManagerOrHigher(),
+  ]);
+  if (!canAccessWorkshop || !isManagerOrHigher) {
     return {
       userId: user.id,
       response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
@@ -38,7 +44,7 @@ async function requireAdminSettingsUser() {
 }
 
 export async function GET() {
-  const context = await requireAdminSettingsUser();
+  const context = await requireWorkshopDisplaySettingsUser();
   if (context.response) return context.response;
 
   try {
@@ -53,7 +59,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
-  const context = await requireAdminSettingsUser();
+  const context = await requireWorkshopDisplaySettingsUser();
   if (context.response) return context.response;
 
   try {
@@ -74,7 +80,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const context = await requireAdminSettingsUser();
+  const context = await requireWorkshopDisplaySettingsUser();
   if (context.response) return context.response;
   if (!context.userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

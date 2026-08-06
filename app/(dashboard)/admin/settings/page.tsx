@@ -1,29 +1,39 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Calculator, FileSliders, SlidersHorizontal } from 'lucide-react';
+import { BookOpen, Calculator, FileSliders, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import {
-  APP_WIDESCREEN_CHANGED_EVENT,
-  readAppWidescreenPreference,
-  writeAppWidescreenPreference,
-} from '@/lib/config/layout-preferences';
+  SensitiveModuleGate,
+  SensitiveModuleSessionManager,
+  useSensitiveModuleAccess,
+} from '@/components/security/SensitiveModuleGate';
 import { TimesheetTypeExceptionsCard } from './components/TimesheetTypeExceptionsCard';
-import { DisplayBoardSettingsCard } from './components/DisplayBoardSettingsCard';
 import { PayrollRulesSettingsCard } from './components/PayrollRulesSettingsCard';
 
 const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
 
-type AdminSettingsTab = 'general' | 'timesheets';
+const RoleManagement = dynamic(
+  () => import('@/components/admin/RoleManagement').then((module) => ({ default: module.RoleManagement })),
+  { ssr: false, loading: () => <PanelLoader message="Loading permission management..." className="py-12" /> }
+);
+
+const PermissionsGuide = dynamic(
+  () => import('@/components/admin/PermissionsGuide').then((module) => ({ default: module.PermissionsGuide })),
+  { ssr: false, loading: () => <PanelLoader message="Loading permission guide..." className="py-12" /> }
+);
+
+type AdminSettingsTab = 'permissions' | 'permission-guide' | 'timesheets';
 
 function isAdminSettingsTab(value: string | null): value is AdminSettingsTab {
-  return value === 'general' || value === 'timesheets';
+  return value === 'permissions' || value === 'permission-guide' || value === 'timesheets';
 }
 
 function AdminSettingsContent() {
@@ -31,9 +41,9 @@ function AdminSettingsContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { hasPermission: canAccessSettings, loading: permissionLoading } = usePermissionCheck('admin-settings', false);
+  const sensitiveAccess = useSensitiveModuleAccess('admin-settings', { enabled: canAccessSettings });
   const tabParam = searchParams.get('tab');
-  const settingsTab: AdminSettingsTab = isAdminSettingsTab(tabParam) ? tabParam : 'general';
-  const [appWidescreenEnabled, setAppWidescreenEnabled] = useState(false);
+  const settingsTab: AdminSettingsTab = isAdminSettingsTab(tabParam) ? tabParam : 'permissions';
 
   useEffect(() => {
     if (!permissionLoading && !canAccessSettings) {
@@ -41,31 +51,9 @@ function AdminSettingsContent() {
     }
   }, [canAccessSettings, permissionLoading, router]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const syncPreference = () => {
-      setAppWidescreenEnabled(readAppWidescreenPreference());
-    };
-
-    syncPreference();
-    window.addEventListener('storage', syncPreference);
-    window.addEventListener(APP_WIDESCREEN_CHANGED_EVENT, syncPreference);
-
-    return () => {
-      window.removeEventListener('storage', syncPreference);
-      window.removeEventListener(APP_WIDESCREEN_CHANGED_EVENT, syncPreference);
-    };
-  }, []);
-
-  function handleAppWidescreenToggle(checked: boolean) {
-    setAppWidescreenEnabled(checked);
-    writeAppWidescreenPreference(checked);
-  }
-
   function handleSettingsTabChange(nextTab: AdminSettingsTab) {
     const nextParams = new URLSearchParams(searchParams.toString());
-    if (nextTab === 'general') {
+    if (nextTab === 'permissions') {
       nextParams.delete('tab');
     } else {
       nextParams.set('tab', nextTab);
@@ -75,7 +63,7 @@ function AdminSettingsContent() {
     router.replace(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
   }
 
-  if (permissionLoading) {
+  if (permissionLoading || sensitiveAccess.loading) {
     return (
       <AppPageLoadingShell
         title="Admin Settings"
@@ -90,8 +78,17 @@ function AdminSettingsContent() {
     return null;
   }
 
+  if (!sensitiveAccess.canAccess) {
+    return (
+      <AppPageShell width="wide">
+        <SensitiveModuleGate moduleLabel="Admin Settings" access={sensitiveAccess} />
+      </AppPageShell>
+    );
+  }
+
   return (
-    <AppPageShell>
+    <AppPageShell width="wide">
+      <SensitiveModuleSessionManager moduleLabel="Admin Settings" access={sensitiveAccess} />
       <div className="bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex items-start gap-3">
           <div className="shrink-0 p-3 bg-avs-yellow/20 rounded-lg">
@@ -112,37 +109,24 @@ function AdminSettingsContent() {
           if (isAdminSettingsTab(value)) handleSettingsTabChange(value);
         }}
       >
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="general">General</TabsTrigger>
+        <TabsList className="grid w-full max-w-2xl grid-cols-3">
+          <TabsTrigger value="permissions" className="gap-2">
+            <ShieldCheck className="h-4 w-4" />
+            Permissions
+          </TabsTrigger>
+          <TabsTrigger value="permission-guide" className="gap-2">
+            <BookOpen className="h-4 w-4" />
+            Permission Guide
+          </TabsTrigger>
           <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="general" className="space-y-6">
-          <Card className="border-border bg-slate-900/60">
-            <CardHeader>
-              <CardTitle className="text-white">Layout Preferences</CardTitle>
-              <CardDescription className={SETTINGS_HELPER_TEXT_CLASS}>
-                Apply a wider desktop content layout across the dashboard app.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-col gap-4 rounded-lg border border-border bg-background/80 p-4 md:flex-row md:items-center md:justify-between">
-                <div className="space-y-1">
-                  <p className="font-medium text-foreground">Global Widescreen View</p>
-                  <p className={SETTINGS_HELPER_TEXT_CLASS}>
-                    When enabled, dashboard pages use a wider content area on desktop screens.
-                  </p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground">
-                    {appWidescreenEnabled ? 'Enabled' : 'Default width'}
-                  </span>
-                  <Switch checked={appWidescreenEnabled} onCheckedChange={handleAppWidescreenToggle} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <DisplayBoardSettingsCard />
+        <TabsContent value="permissions" className="space-y-6">
+          <RoleManagement />
+        </TabsContent>
+
+        <TabsContent value="permission-guide" className="space-y-6">
+          <PermissionsGuide />
         </TabsContent>
 
         <TabsContent value="timesheets" className="space-y-6">

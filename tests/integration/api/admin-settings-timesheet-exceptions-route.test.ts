@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NextResponse } from 'next/server';
 import { GET, POST } from '@/app/api/admin/settings/timesheet-exceptions/route';
 
-vi.mock('@/lib/supabase/server');
-vi.mock('@/lib/utils/view-as');
-vi.mock('@/lib/utils/rbac');
+vi.mock('@/lib/server/admin-settings-access');
 vi.mock('@/lib/server/timesheet-type-exceptions');
 
 describe('admin settings timesheet exceptions collection route', () => {
@@ -12,64 +11,35 @@ describe('admin settings timesheet exceptions collection route', () => {
   });
 
   it('returns 401 when unauthenticated', async () => {
-    const { createClient } = await import('@/lib/supabase/server');
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: null },
-          error: new Error('Unauthorized'),
-        }),
-      },
-    } as never);
+    const { requireAdminSettingsAccess } = await import('@/lib/server/admin-settings-access');
+    vi.mocked(requireAdminSettingsAccess).mockResolvedValue({
+      userId: null,
+      response: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+    });
 
     const response = await GET();
     expect(response.status).toBe(401);
   });
 
-  it('returns 403 for non-admin actor', async () => {
-    const { createClient } = await import('@/lib/supabase/server');
-    const { getEffectiveRole } = await import('@/lib/utils/view-as');
-    const { canEffectiveRoleAccessModule } = await import('@/lib/utils/rbac');
-
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'user-1' } },
-          error: null,
-        }),
-      },
-    } as never);
-    vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(true);
-    vi.mocked(getEffectiveRole).mockResolvedValue({
-      is_actual_super_admin: false,
-      is_super_admin: false,
-      role_name: 'manager',
-    } as never);
+  it('AUTH-TIMESHEET-LEVEL5-01 returns 403 below effective Admin Settings level 5', async () => {
+    const { requireAdminSettingsAccess } = await import('@/lib/server/admin-settings-access');
+    vi.mocked(requireAdminSettingsAccess).mockResolvedValue({
+      userId: null,
+      response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
+    });
 
     const response = await GET();
     expect(response.status).toBe(403);
   });
 
-  it('returns matrix payload for authorized admins', async () => {
-    const { createClient } = await import('@/lib/supabase/server');
-    const { getEffectiveRole } = await import('@/lib/utils/view-as');
-    const { canEffectiveRoleAccessModule } = await import('@/lib/utils/rbac');
+  it('AUTH-TIMESHEET-LEVEL5-01 returns matrix payload for authorized level-5 delegates', async () => {
+    const { requireAdminSettingsAccess } = await import('@/lib/server/admin-settings-access');
     const { getTimesheetTypeExceptionMatrix } = await import('@/lib/server/timesheet-type-exceptions');
 
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'admin-1' } },
-          error: null,
-        }),
-      },
-    } as never);
-    vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(true);
-    vi.mocked(getEffectiveRole).mockResolvedValue({
-      is_actual_super_admin: false,
-      is_super_admin: false,
-      role_name: 'admin',
-    } as never);
+    vi.mocked(requireAdminSettingsAccess).mockResolvedValue({
+      userId: 'delegate-1',
+      response: null,
+    });
     vi.mocked(getTimesheetTypeExceptionMatrix).mockResolvedValue({
       rows: [
         {
@@ -96,26 +66,14 @@ describe('admin settings timesheet exceptions collection route', () => {
     expect(payload.rows).toHaveLength(1);
   });
 
-  it('adds a row through POST for authorized admins', async () => {
-    const { createClient } = await import('@/lib/supabase/server');
-    const { getEffectiveRole } = await import('@/lib/utils/view-as');
-    const { canEffectiveRoleAccessModule } = await import('@/lib/utils/rbac');
+  it('adds a row through POST for authorized level-5 delegates', async () => {
+    const { requireAdminSettingsAccess } = await import('@/lib/server/admin-settings-access');
     const { addTimesheetTypeExceptionRow, getTimesheetTypeExceptionMatrix } = await import('@/lib/server/timesheet-type-exceptions');
 
-    vi.mocked(createClient).mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'admin-1' } },
-          error: null,
-        }),
-      },
-    } as never);
-    vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(true);
-    vi.mocked(getEffectiveRole).mockResolvedValue({
-      is_actual_super_admin: false,
-      is_super_admin: true,
-      role_name: 'admin',
-    } as never);
+    vi.mocked(requireAdminSettingsAccess).mockResolvedValue({
+      userId: 'delegate-1',
+      response: null,
+    });
     vi.mocked(addTimesheetTypeExceptionRow).mockResolvedValue();
     vi.mocked(getTimesheetTypeExceptionMatrix).mockResolvedValue({ rows: [] });
 
@@ -127,6 +85,6 @@ describe('admin settings timesheet exceptions collection route', () => {
 
     const response = await POST(request as never);
     expect(response.status).toBe(200);
-    expect(addTimesheetTypeExceptionRow).toHaveBeenCalledWith('user-2', 'admin-1');
+    expect(addTimesheetTypeExceptionRow).toHaveBeenCalledWith('user-2', 'delegate-1');
   });
 });

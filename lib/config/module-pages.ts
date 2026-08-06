@@ -78,6 +78,8 @@ export const MODULE_PAGES: ModulePage[] = [
       { value: 'workshop-tasks-list', label: 'Workshop Tasks List' },
       { value: 'workshop-tasks-new', label: 'New Task' },
       { value: 'workshop-tasks-view', label: 'View/Edit Task' },
+      { value: 'workshop-tasks-settings', label: 'Settings' },
+      { value: 'workshop-display-board', label: 'Display Board Settings' },
     ],
   },
   {
@@ -153,6 +155,15 @@ export const MODULE_PAGES: ModulePage[] = [
     subPages: [
       { value: 'admin-users-list', label: 'User Management' },
       { value: 'admin-users-roles', label: 'Role Management' },
+    ],
+  },
+  {
+    module: 'admin-settings',
+    displayName: 'Admin Settings',
+    subPages: [
+      { value: 'admin-settings-permissions', label: 'Permissions' },
+      { value: 'admin-settings-permission-guide', label: 'Permission Guide' },
+      { value: 'admin-settings-timesheets', label: 'Timesheets' },
     ],
   },
   {
@@ -262,6 +273,8 @@ export function getPageUrl(value: string): string {
     'workshop-tasks-list': '/workshop-tasks',
     'workshop-tasks-new': '/workshop-tasks',
     'workshop-tasks-view': '/workshop-tasks?taskId=[id]',
+    'workshop-tasks-settings': '/workshop-tasks?tab=settings',
+    'workshop-display-board': '/workshop-tasks?tab=settings',
     
     // Approvals
     'approvals-list': '/approvals',
@@ -297,6 +310,11 @@ export function getPageUrl(value: string): string {
     // Admin - Users
     'admin-users-list': '/admin/users',
     'admin-users-roles': '/admin/users?tab=roles',
+
+    // Admin - Settings
+    'admin-settings-permissions': '/admin/settings',
+    'admin-settings-permission-guide': '/admin/settings?tab=permission-guide',
+    'admin-settings-timesheets': '/admin/settings?tab=timesheets',
     
     // Admin - Vans
     'admin-vans-list': '/fleet?tab=vans',

@@ -4,16 +4,23 @@ import { describe, expect, it } from 'vitest';
 import permissionsAudit from '@/lib/config/permissions-secondary-audit.json';
 
 describe('permissions guide', () => {
-  it('PERM-GUIDE-01: permission-guide tab is gated with permissions tab visibility', () => {
-    const pageSource = fs.readFileSync(
+  it('PERM-GUIDE-01: permission-guide tab is relocated to protected Admin Settings', () => {
+    const adminSettingsSource = fs.readFileSync(
+      path.join(process.cwd(), 'app/(dashboard)/admin/settings/page.tsx'),
+      'utf-8'
+    );
+    const usersSource = fs.readFileSync(
       path.join(process.cwd(), 'app/(dashboard)/admin/users/page.tsx'),
       'utf-8'
     );
 
-    expect(pageSource).toContain("'permission-guide'");
-    expect(pageSource).toContain('canEditRolePermissions');
-    expect(pageSource).toContain('value="permission-guide"');
-    expect(pageSource).toContain('<PermissionsGuide');
+    expect(adminSettingsSource).toContain("'permission-guide'");
+    expect(adminSettingsSource).toContain("usePermissionCheck('admin-settings', false)");
+    expect(adminSettingsSource).toContain("useSensitiveModuleAccess('admin-settings'");
+    expect(adminSettingsSource).toContain('value="permission-guide"');
+    expect(adminSettingsSource).toContain('<PermissionsGuide');
+    expect(usersSource).toContain('Permissions moved to Admin Settings');
+    expect(usersSource).not.toContain('<PermissionsGuide');
   });
 
   it('PERM-GUIDE-02: guide component renders every audit module/role from JSON source', () => {
@@ -29,12 +36,12 @@ describe('permissions guide', () => {
 
     expect(permissionsAudit.modules.length).toBeGreaterThan(0);
     expect(permissionsAudit.modules.some((module) => module.moduleName === 'reminders')).toBe(true);
-    for (const module of permissionsAudit.modules) {
-      expect(module.byRole.Contractor).toBeTruthy();
-      expect(module.byRole.Employee).toBeTruthy();
-      expect(module.byRole.Supervisor).toBeTruthy();
-      expect(module.byRole.Manager).toBeTruthy();
-      expect(module.byRole.Admin).toBeTruthy();
+    for (const auditModule of permissionsAudit.modules) {
+      expect(auditModule.byRole.Contractor).toBeTruthy();
+      expect(auditModule.byRole.Employee).toBeTruthy();
+      expect(auditModule.byRole.Supervisor).toBeTruthy();
+      expect(auditModule.byRole.Manager).toBeTruthy();
+      expect(auditModule.byRole.Admin).toBeTruthy();
     }
   });
 });

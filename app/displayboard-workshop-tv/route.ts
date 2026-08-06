@@ -626,7 +626,7 @@ const legacyDisplayBoardHtml = String.raw`<!doctype html>
         stopClock();
         app.className = 'boot';
         scaleBoardToViewport();
-        app.innerHTML = '<div class="boot-card"><h1>Workshop Display Board</h1><div class="boot-message">Confirm this code in Admin Settings</div><div class="pair-code">' + escapeHtml(code) + '</div><p class="muted">Pairing expires at ' + escapeHtml(formatTime(expiresAt)) + '</p></div>';
+        app.innerHTML = '<div class="boot-card"><h1>Workshop Display Board</h1><div class="boot-message">Confirm this code in Workshop Tasks Settings</div><div class="pair-code">' + escapeHtml(code) + '</div><p class="muted">Pairing expires at ' + escapeHtml(formatTime(expiresAt)) + '</p></div>';
         schedulePairing(3000);
       }
 
