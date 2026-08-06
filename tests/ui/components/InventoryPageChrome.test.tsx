@@ -45,7 +45,7 @@ describe('InventoryPageChrome', () => {
     fireEvent.click(screen.getByRole('button', { name: 'My Location' }));
     expect(onValueChange).toHaveBeenCalledWith('employee');
 
-    fireEvent.click(screen.getByRole('button', { name: /Change My Location/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Change My Location' }));
     expect(onChangeLocation).toHaveBeenCalledTimes(1);
   });
 

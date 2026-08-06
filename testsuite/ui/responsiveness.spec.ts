@@ -113,7 +113,11 @@ test.describe('@inventory Inventory mobile dialogs', () => {
   test('keeps location selection and dialog actions reachable', async ({ page }) => {
     await gotoWithInfraSkip(page, '/inventory', 'Inventory', '375px mobile dialog');
 
-    await page.getByRole('button', { name: /change my location|set my location/i }).first().click();
+    const locationAction = page
+      .getByRole('button', { name: /change my location|set my location/i })
+      .first();
+    await expect(locationAction).toBeVisible({ timeout: 20_000 });
+    await locationAction.click();
     const locationDialog = page.getByRole('dialog', {
       name: /change inventory location|set inventory location/i,
     });

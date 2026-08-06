@@ -117,6 +117,7 @@ export function InventoryLocationAction({
       variant="outline"
       size="sm"
       onClick={onChangeLocation}
+      aria-label={locationLabel ? 'Change My Location' : 'Set My Location'}
       className="h-11 shrink-0 border-slate-600 sm:h-8"
       data-testid="inventory-location-action"
     >
