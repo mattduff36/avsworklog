@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 
 export async function POST(
   request: NextRequest,
@@ -28,10 +28,10 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    const canManageRams = await canEffectiveRoleAccessModule('rams');
+    const canManageRams = await canEffectiveRoleUseModuleLevel('rams', 4);
     if (!canManageRams) {
       return NextResponse.json(
-        { error: 'RAMS access required to assign documents' },
+        { error: 'Manager-level RAMS access required to assign documents' },
         { status: 403 }
       );
     }
@@ -219,10 +219,10 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    const canManageRams = await canEffectiveRoleAccessModule('rams');
+    const canManageRams = await canEffectiveRoleUseModuleLevel('rams', 4);
     if (!canManageRams) {
       return NextResponse.json(
-        { error: 'RAMS access required to view assignments' },
+        { error: 'Manager-level RAMS access required to view assignments' },
         { status: 403 }
       );
     }

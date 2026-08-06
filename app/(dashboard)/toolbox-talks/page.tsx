@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useMemo } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -25,6 +26,8 @@ function isValidToolboxTalksTab(value: string): value is (typeof VALID_TABS)[num
 
 function ToolboxTalksContent() {
   const { hasPermission: canViewToolboxTalks, loading: permissionLoading } = usePermissionCheck('toolbox-talks', false);
+  const { canUseLevel, isLoading: levelLoading } = useModuleAccessLevel('toolbox-talks');
+  const canManageToolboxTalks = canUseLevel(4);
   const router = useRouter();
   const searchParams = useSearchParams();
   const { tabletModeEnabled } = useTabletMode();
@@ -32,12 +35,14 @@ function ToolboxTalksContent() {
   const activeTab = useMemo(() => {
     return isValidToolboxTalksTab(requestedTab) ? requestedTab : DEFAULT_TAB;
   }, [requestedTab]);
+  const accessLoading = permissionLoading || levelLoading;
 
   useEffect(() => {
-    if (!permissionLoading && !canViewToolboxTalks) {
+    if (accessLoading) return;
+    if (!canViewToolboxTalks || !canManageToolboxTalks) {
       router.replace('/dashboard');
     }
-  }, [canViewToolboxTalks, permissionLoading, router]);
+  }, [canViewToolboxTalks, canManageToolboxTalks, accessLoading, router]);
 
   useEffect(() => {
     if (requestedTab === LEGACY_REPORTS_TAB) {
@@ -58,7 +63,7 @@ function ToolboxTalksContent() {
     router.replace('/toolbox-talks?tab=overview', { scroll: false });
   }
 
-  if (permissionLoading) {
+  if (accessLoading) {
     return (
       <AppPageLoadingShell
         title="Toolbox Talks"
@@ -70,7 +75,7 @@ function ToolboxTalksContent() {
     );
   }
 
-  if (!canViewToolboxTalks) {
+  if (!canViewToolboxTalks || !canManageToolboxTalks) {
     return (
       <AppPageLoadingShell
         title="Toolbox Talks"

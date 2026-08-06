@@ -33,11 +33,14 @@ import { Loader2, Plus, Pencil, Trash2, FileCheck2 } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ProjectDocumentType } from '@/types/rams';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 
 export default function ProjectsSettingsPage() {
   const router = useRouter();
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const { hasPermission: canAccessProjectsModule, loading: projectsPermissionLoading } = usePermissionCheck('rams', false);
+  const { canUseLevel, isLoading: permissionLevelsLoading } = useModuleAccessLevel('rams');
+  const canManageProjects = canUseLevel(4);
   const [types, setTypes] = useState<ProjectDocumentType[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,17 +56,17 @@ export default function ProjectsSettingsPage() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    if (authLoading || projectsPermissionLoading) return;
+    if (authLoading || projectsPermissionLoading || permissionLevelsLoading) return;
 
     if (!canAccessProjectsModule) {
       router.push('/dashboard');
       return;
     }
 
-    if (!isManager && !isAdmin) {
+    if (!canManageProjects) {
       router.push('/projects');
     }
-  }, [isManager, isAdmin, authLoading, projectsPermissionLoading, canAccessProjectsModule, router]);
+  }, [canManageProjects, authLoading, projectsPermissionLoading, permissionLevelsLoading, canAccessProjectsModule, router]);
 
   const fetchTypes = useCallback(async () => {
     setLoading(true);
@@ -83,10 +86,10 @@ export default function ProjectsSettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && !projectsPermissionLoading && canAccessProjectsModule && (isManager || isAdmin)) {
+    if (!authLoading && !projectsPermissionLoading && !permissionLevelsLoading && canAccessProjectsModule && canManageProjects) {
       fetchTypes();
     }
-  }, [authLoading, projectsPermissionLoading, canAccessProjectsModule, isManager, isAdmin, fetchTypes]);
+  }, [authLoading, projectsPermissionLoading, permissionLevelsLoading, canAccessProjectsModule, canManageProjects, fetchTypes]);
 
   const openCreateDialog = () => {
     setEditingType(null);
@@ -190,7 +193,7 @@ export default function ProjectsSettingsPage() {
     }
   };
 
-  if (authLoading || projectsPermissionLoading || (!isManager && !isAdmin)) {
+  if (authLoading || projectsPermissionLoading || permissionLevelsLoading || !canManageProjects) {
     return <PageLoader message="Loading project settings..." />;
   }
 

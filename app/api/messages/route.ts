@@ -6,7 +6,7 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { CreateMessageInput, CreateMessageResponse, MessagePriority, MessageType } from '@/types/messages';
 import { normalizeRoleInternalName } from '@/lib/utils/role-name';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 
 type StoredMessagePriority = Exclude<MessagePriority, 'MEDIUM'>;
@@ -47,11 +47,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No role assigned to user' }, { status: 403 });
     }
 
-    const canManageToolboxTalks = await canEffectiveRoleAccessModule('toolbox-talks');
+    const canManageToolboxTalks = await canEffectiveRoleUseModuleLevel('toolbox-talks', 4);
     if (!canManageToolboxTalks) {
-      console.error('User lacks toolbox-talks access:', user.id, profile.role);
+      console.error('User lacks toolbox-talks Level 4 access:', user.id, profile.role);
       return NextResponse.json(
-        { error: 'Forbidden: Toolbox Talks access required' },
+        { error: 'Forbidden: Manager-level Toolbox Talks access required' },
         { status: 403 }
       );
     }

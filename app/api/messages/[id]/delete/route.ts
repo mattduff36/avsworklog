@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 
 /**
  * DELETE /api/messages/[id]/delete
  * Soft-delete a message (sets deleted_at timestamp)
- * Only users with Toolbox Talks access can delete messages
+ * Only users with Toolbox Talks Level 4+ can delete messages
  * Deleted messages immediately disappear from unsigned users' queues
  */
 export async function DELETE(
@@ -23,10 +23,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canDeleteMessages = await canEffectiveRoleAccessModule('toolbox-talks');
+    const canDeleteMessages = await canEffectiveRoleUseModuleLevel('toolbox-talks', 4);
     if (!canDeleteMessages) {
       return NextResponse.json(
-        { error: 'Forbidden: Toolbox Talks access required' },
+        { error: 'Forbidden: Manager-level Toolbox Talks access required' },
         { status: 403 }
       );
     }

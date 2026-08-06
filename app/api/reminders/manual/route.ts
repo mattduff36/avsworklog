@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { TOOLBOX_TALK_MANUAL_REMINDER_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 function getUniqueIds(values: string[]): string[] {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canManageToolboxTalks = await canEffectiveRoleAccessModule('toolbox-talks');
+    const canManageToolboxTalks = await canEffectiveRoleUseModuleLevel('toolbox-talks', 4);
     if (!canManageToolboxTalks) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

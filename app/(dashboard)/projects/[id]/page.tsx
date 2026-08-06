@@ -34,6 +34,7 @@ import { formatDate } from '@/lib/utils/date';
 import { AssignEmployeesModal } from '@/components/rams/AssignEmployeesModal';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 
 interface RAMSDocument {
   id: string;
@@ -77,8 +78,10 @@ export default function RAMSDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { isAdmin, loading: authLoading } = useAuth();
   const { hasPermission: canAccessProjectsModule, loading: projectsPermissionLoading } = usePermissionCheck('rams', false);
+  const { canUseLevel, isLoading: permissionLevelsLoading } = useModuleAccessLevel('rams');
+  const canManageProjects = canUseLevel(4);
   const documentId = params.id as string;
 
   const [ramsDocument, setRamsDocument] = useState<RAMSDocument | null>(null);
@@ -93,19 +96,19 @@ export default function RAMSDetailsPage() {
 
   const supabase = createClient();
 
-  // Redirect non-managers/admins
+  // Redirect users without Level 4 manage access
   useEffect(() => {
-    if (authLoading || projectsPermissionLoading) return;
+    if (authLoading || projectsPermissionLoading || permissionLevelsLoading) return;
 
     if (!canAccessProjectsModule) {
       router.push('/dashboard');
       return;
     }
 
-    if (!isManager && !isAdmin) {
+    if (!canManageProjects) {
       router.push('/projects');
     }
-  }, [isManager, isAdmin, authLoading, projectsPermissionLoading, canAccessProjectsModule, router]);
+  }, [canManageProjects, authLoading, projectsPermissionLoading, permissionLevelsLoading, canAccessProjectsModule, router]);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab') || 'employees';
@@ -227,10 +230,10 @@ export default function RAMSDetailsPage() {
   }, [documentId, supabase]);
 
   useEffect(() => {
-    if (!authLoading && !projectsPermissionLoading && canAccessProjectsModule && (isManager || isAdmin) && documentId) {
+    if (!authLoading && !projectsPermissionLoading && !permissionLevelsLoading && canAccessProjectsModule && canManageProjects && documentId) {
       fetchDocumentDetails();
     }
-  }, [documentId, authLoading, projectsPermissionLoading, canAccessProjectsModule, isManager, isAdmin, fetchDocumentDetails]);
+  }, [documentId, authLoading, projectsPermissionLoading, permissionLevelsLoading, canAccessProjectsModule, canManageProjects, fetchDocumentDetails]);
 
   const handleAssignSuccess = () => {
     setAssignModalOpen(false);
@@ -342,7 +345,7 @@ export default function RAMSDetailsPage() {
   };
 
   // Show loading while checking auth or redirecting
-  if (authLoading || projectsPermissionLoading || (!isManager && !isAdmin)) {
+  if (authLoading || projectsPermissionLoading || permissionLevelsLoading || !canManageProjects) {
     return <PageLoader message="Loading project details..." />;
   }
 
@@ -364,7 +367,7 @@ export default function RAMSDetailsPage() {
           <p className="text-muted-foreground mb-4">
             This document may have been deleted or you don&apos;t have permission to view it.
           </p>
-          <BackButton userRole={{ isManager, isAdmin }} />
+          <BackButton userRole={{ isManager: canManageProjects, isAdmin }} />
           </CardContent>
         </Card>
       </div>
@@ -384,7 +387,7 @@ export default function RAMSDetailsPage() {
       <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <BackButton userRole={{ isManager, isAdmin }} />
+            <BackButton userRole={{ isManager: canManageProjects, isAdmin }} />
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">{ramsDocument.title}</h1>
               <p className="text-muted-foreground">

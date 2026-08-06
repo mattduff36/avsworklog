@@ -5,7 +5,7 @@ import { TOOLBOX_TALK_MANUAL_REMINDER_WORKFLOW_KEY } from '@/lib/config/reminder
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { parseReportDateRange } from '@/lib/server/report-date-range';
 import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import type { GetReportsResponse, MessageDisplayPriority, MessageRecipientStatus, MessageReportData } from '@/types/messages';
 import type { MessageType } from '@/types/messages';
 import type { NotificationModuleKey } from '@/types/notifications';
@@ -121,12 +121,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [canAccessReports, canAccessToolboxTalks] = await Promise.all([
-      canEffectiveRoleAccessModule('reports'),
-      canEffectiveRoleAccessModule('toolbox-talks'),
-    ]);
-
-    if (!canAccessReports || !canAccessToolboxTalks) {
+    const canManageToolboxTalks = await canEffectiveRoleUseModuleLevel('toolbox-talks', 4);
+    if (!canManageToolboxTalks) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleAccessModule, canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,14 +25,22 @@ export async function GET(request: NextRequest) {
     }
 
     const canAccessRams = await canEffectiveRoleAccessModule('rams');
+    if (!canAccessRams) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
 
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const status = searchParams.get('status'); // 'pending' | 'signed' | 'all'
     const showAll = searchParams.get('all') === 'true'; // For manage page
 
-    // Managers/Admins requesting all documents (for /projects/manage page)
-    if (canAccessRams && showAll) {
+    // Level 4+ manage listing (for /projects/manage page)
+    if (showAll) {
+      const canManageRams = await canEffectiveRoleUseModuleLevel('rams', 4);
+      if (!canManageRams) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+
       const q = searchParams.get('q')?.trim() || '';
       const typeFilter = searchParams.get('type') || '';
       const signatureFilter = searchParams.get('signature') || '';

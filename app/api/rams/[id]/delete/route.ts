@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 
 export async function DELETE(
   request: NextRequest,
@@ -19,10 +19,10 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const canManageRams = await canEffectiveRoleAccessModule('rams');
+    const canManageRams = await canEffectiveRoleUseModuleLevel('rams', 4);
     if (!canManageRams) {
       return NextResponse.json(
-        { error: 'Forbidden: RAMS access required' },
+        { error: 'Forbidden: Manager-level RAMS access required' },
         { status: 403 }
       );
     }

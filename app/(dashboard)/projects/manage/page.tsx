@@ -49,6 +49,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 
 export interface UploadingDoc {
   id: string;
@@ -64,8 +65,10 @@ export interface UploadingDoc {
 export default function ProjectsManagePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { isManager, isAdmin, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const { hasPermission: canAccessProjectsModule, loading: projectsPermissionLoading } = usePermissionCheck('rams', false);
+  const { canUseLevel, isLoading: permissionLevelsLoading } = useModuleAccessLevel('rams');
+  const canManageProjects = canUseLevel(4);
 
   // Search / filter / sort state
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,19 +133,19 @@ export default function ProjectsManagePage() {
   const addFav = useAddFavourite();
   const removeFav = useRemoveFavourite();
 
-  // Redirect non-managers
+  // Redirect users without Level 4 manage access
   useEffect(() => {
-    if (authLoading || projectsPermissionLoading) return;
+    if (authLoading || projectsPermissionLoading || permissionLevelsLoading) return;
 
     if (!canAccessProjectsModule) {
       router.push('/dashboard');
       return;
     }
 
-    if (!isManager && !isAdmin) {
+    if (!canManageProjects) {
       router.push('/projects');
     }
-  }, [isManager, isAdmin, authLoading, projectsPermissionLoading, canAccessProjectsModule, router]);
+  }, [canManageProjects, authLoading, projectsPermissionLoading, permissionLevelsLoading, canAccessProjectsModule, router]);
 
   // Derived data
   const allDocuments = useMemo(() => docsData?.documents ?? [], [docsData?.documents]);
@@ -312,7 +315,7 @@ export default function ProjectsManagePage() {
   }, [supabase]);
 
   // Auth guard loading
-  if (authLoading || projectsPermissionLoading || (!isManager && !isAdmin)) {
+  if (authLoading || projectsPermissionLoading || permissionLevelsLoading || !canManageProjects) {
     return (
       <AppPageLoadingShell
         title="Manage Projects"

@@ -1,21 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 
-export async function GET() {
+async function requireRamsAccess() {
   const supabase = await createClient();
-
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    return { supabase, user: null, error: NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 }) };
   }
 
   const profile = await getProfileWithRole(user.id);
-  if (!profile?.role || profile.role.role_class === 'employee') {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
+  if (!profile) {
+    return { supabase, user: null, error: NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 }) };
   }
 
-  const { data: favourites, error } = await supabase
+  const canAccessRams = await canEffectiveRoleAccessModule('rams');
+  if (!canAccessRams) {
+    return { supabase, user: null, error: NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 }) };
+  }
+
+  return { supabase, user, error: null as null };
+}
+
+export async function GET() {
+  const { supabase, user, error } = await requireRamsAccess();
+  if (error || !user) return error!;
+
+  const { data: favourites, error: fetchError } = await supabase
     .from('project_favourites')
     .select(`
       *,
@@ -28,26 +40,17 @@ export async function GET() {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching favourites:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (fetchError) {
+    console.error('Error fetching favourites:', fetchError);
+    return NextResponse.json({ success: false, error: fetchError.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, favourites });
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const profile = await getProfileWithRole(user.id);
-  if (!profile?.role || profile.role.role_class === 'employee') {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-  }
+  const { supabase, user, error } = await requireRamsAccess();
+  if (error || !user) return error!;
 
   const body = await request.json();
   const { document_id } = body;
@@ -56,30 +59,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'document_id is required' }, { status: 400 });
   }
 
-  const { data: favourite, error } = await supabase
+  const { data: favourite, error: insertError } = await supabase
     .from('project_favourites')
     .insert({ document_id, user_id: user.id })
     .select()
     .single();
 
-  if (error) {
-    if (error.code === '23505') {
+  if (insertError) {
+    if (insertError.code === '23505') {
       return NextResponse.json({ success: false, error: 'Already in favourites' }, { status: 409 });
     }
-    console.error('Error adding favourite:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('Error adding favourite:', insertError);
+    return NextResponse.json({ success: false, error: insertError.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, favourite }, { status: 201 });
 }
 
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
+  const { supabase, user, error } = await requireRamsAccess();
+  if (error || !user) return error!;
 
   const { searchParams } = new URL(request.url);
   const documentId = searchParams.get('document_id');
@@ -88,15 +87,15 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'document_id is required' }, { status: 400 });
   }
 
-  const { error } = await supabase
+  const { error: deleteError } = await supabase
     .from('project_favourites')
     .delete()
     .eq('document_id', documentId)
     .eq('user_id', user.id);
 
-  if (error) {
-    console.error('Error removing favourite:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (deleteError) {
+    console.error('Error removing favourite:', deleteError);
+    return NextResponse.json({ success: false, error: deleteError.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

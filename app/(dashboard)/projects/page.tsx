@@ -15,6 +15,7 @@ import { formatFileSize } from '@/lib/utils/file-validation';
 import { RecordVisitorSignatureModal } from '@/components/rams/RecordVisitorSignatureModal';
 import { RAMSErrorBoundary } from '@/components/rams/RAMSErrorBoundary';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import { isNetworkFetchError } from '@/lib/utils/http-error';
 
 interface RAMSDocument {
@@ -44,8 +45,10 @@ function isDocumentComplete(doc: RAMSDocument): boolean {
 }
 
 export default function RAMSPage() {
-  const { user, isManager, isAdmin, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { hasPermission: canViewProjects, loading: projectsPermissionLoading } = usePermissionCheck('rams');
+  const { canUseLevel } = useModuleAccessLevel('rams');
+  const canManageProjects = canUseLevel(4);
   const [documents, setDocuments] = useState<RAMSDocument[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<RAMSDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -131,7 +134,7 @@ export default function RAMSPage() {
       <AppPageLoadingShell
         title="Projects"
         description={
-          isManager || isAdmin
+          canManageProjects
             ? 'View and manage project documents'
             : 'Review and acknowledge project documents'
         }
@@ -154,7 +157,7 @@ export default function RAMSPage() {
           <div className="min-w-0">
             <h1 className="text-3xl font-bold text-foreground mb-2">Projects</h1>
             <p className="text-muted-foreground">
-              {isManager || isAdmin 
+              {canManageProjects
                 ? 'View and manage project documents'
                 : 'Review and acknowledge project documents'
               }
@@ -162,8 +165,8 @@ export default function RAMSPage() {
           </div>
 
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
-            {/* Manage Projects link for managers/admins */}
-            {(isManager || isAdmin) && (
+            {/* Manage Projects link for Level 4+ */}
+            {canManageProjects && (
               <Link href="/projects/manage" className="w-full sm:w-auto">
                 <Button className="w-full bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95 shadow-md hover:shadow-lg sm:w-auto">
                   <Settings className="h-4 w-4 mr-2" />
@@ -172,8 +175,8 @@ export default function RAMSPage() {
               </Link>
             )}
 
-            {/* Pending count badge for employees */}
-            {!isManager && !isAdmin && pendingCount > 0 && (
+            {/* Pending count badge for non-manage users */}
+            {!canManageProjects && pendingCount > 0 && (
               <Badge variant="destructive" className="w-fit text-lg px-4 py-2">
                 {pendingCount} pending
               </Badge>
@@ -235,7 +238,7 @@ export default function RAMSPage() {
                 : 'No documents have been assigned to you yet'
               }
             </p>
-            {(isManager || isAdmin) && !searchQuery && statusFilter === 'all' && (
+            {canManageProjects && !searchQuery && statusFilter === 'all' && (
               <Link href="/projects/manage">
                 <Button className="bg-rams hover:bg-rams-dark text-white transition-all duration-200 active:scale-95">
                   <Settings className="h-4 w-4 mr-2" />

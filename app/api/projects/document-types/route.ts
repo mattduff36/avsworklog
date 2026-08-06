@@ -1,40 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 
-export async function GET() {
+async function requireDocumentTypesAdmin() {
   const supabase = await createClient();
-
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    return { supabase, error: NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 }) };
   }
 
-  const { data: types, error } = await supabase
+  const profile = await getProfileWithRole(user.id);
+  if (!profile) {
+    return { supabase, error: NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 }) };
+  }
+
+  const canManage = await canEffectiveRoleUseModuleLevel('rams', 4);
+  if (!canManage) {
+    return { supabase, error: NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 }) };
+  }
+
+  return { supabase, user, error: null as null };
+}
+
+export async function GET() {
+  const { supabase, error } = await requireDocumentTypesAdmin();
+  if (error) return error;
+
+  const { data: types, error: fetchError } = await supabase
     .from('project_document_types')
     .select('*')
     .order('sort_order', { ascending: true });
 
-  if (error) {
-    console.error('Error fetching document types:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (fetchError) {
+    console.error('Error fetching document types:', fetchError);
+    return NextResponse.json({ success: false, error: fetchError.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, types });
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const profile = await getProfileWithRole(user.id);
-  if (!profile?.role || profile.role.role_class === 'employee') {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-  }
+  const { supabase, user, error } = await requireDocumentTypesAdmin();
+  if (error || !user) return error!;
 
   const body = await request.json();
   const { name, description, required_signature } = body;
@@ -52,7 +60,7 @@ export async function POST(request: NextRequest) {
 
   const nextSort = (maxSort?.sort_order ?? -1) + 1;
 
-  const { data: newType, error } = await supabase
+  const { data: newType, error: insertError } = await supabase
     .from('project_document_types')
     .insert({
       name: name.trim(),
@@ -64,29 +72,20 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) {
-    if (error.code === '23505') {
+  if (insertError) {
+    if (insertError.code === '23505') {
       return NextResponse.json({ success: false, error: 'A document type with this name already exists' }, { status: 409 });
     }
-    console.error('Error creating document type:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('Error creating document type:', insertError);
+    return NextResponse.json({ success: false, error: insertError.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, type: newType }, { status: 201 });
 }
 
 export async function PUT(request: NextRequest) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const profile = await getProfileWithRole(user.id);
-  if (!profile?.role || profile.role.role_class === 'employee') {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-  }
+  const { supabase, error } = await requireDocumentTypesAdmin();
+  if (error) return error;
 
   const body = await request.json();
   const { id, name, description, required_signature, is_active } = body;
@@ -101,36 +100,27 @@ export async function PUT(request: NextRequest) {
   if (required_signature !== undefined) updateData.required_signature = required_signature;
   if (is_active !== undefined) updateData.is_active = is_active;
 
-  const { data: updated, error } = await supabase
+  const { data: updated, error: updateError } = await supabase
     .from('project_document_types')
     .update(updateData)
     .eq('id', id)
     .select()
     .single();
 
-  if (error) {
-    if (error.code === '23505') {
+  if (updateError) {
+    if (updateError.code === '23505') {
       return NextResponse.json({ success: false, error: 'A document type with this name already exists' }, { status: 409 });
     }
-    console.error('Error updating document type:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('Error updating document type:', updateError);
+    return NextResponse.json({ success: false, error: updateError.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true, type: updated });
 }
 
 export async function DELETE(request: NextRequest) {
-  const supabase = await createClient();
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const profile = await getProfileWithRole(user.id);
-  if (!profile?.role || profile.role.role_class === 'employee') {
-    return NextResponse.json({ success: false, error: 'Forbidden' }, { status: 403 });
-  }
+  const { supabase, error } = await requireDocumentTypesAdmin();
+  if (error) return error;
 
   const { searchParams } = new URL(request.url);
   const id = searchParams.get('id');
@@ -152,14 +142,14 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const { error } = await supabase
+  const { error: deleteError } = await supabase
     .from('project_document_types')
     .delete()
     .eq('id', id);
 
-  if (error) {
-    console.error('Error deleting document type:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (deleteError) {
+    console.error('Error deleting document type:', deleteError);
+    return NextResponse.json({ success: false, error: deleteError.message }, { status: 500 });
   }
 
   return NextResponse.json({ success: true });

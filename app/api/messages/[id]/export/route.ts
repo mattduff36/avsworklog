@@ -4,7 +4,7 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { ToolboxTalkExportDocument } from '@/lib/pdf/ToolboxTalkExportDocument';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 
 interface SenderProfileShape {
   full_name?: string | null;
@@ -39,10 +39,10 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to verify user role' }, { status: 403 });
     }
 
-    const canExportToolboxTalks = await canEffectiveRoleAccessModule('toolbox-talks');
+    const canExportToolboxTalks = await canEffectiveRoleUseModuleLevel('toolbox-talks', 4);
     if (!canExportToolboxTalks) {
       return NextResponse.json(
-        { error: 'Toolbox Talks access required' },
+        { error: 'Manager-level Toolbox Talks access required' },
         { status: 403 }
       );
     }
