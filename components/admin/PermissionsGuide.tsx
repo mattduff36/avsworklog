@@ -102,12 +102,12 @@ export function PermissionsGuide() {
               key={module.moduleName}
               value={module.moduleName}
               className={cn(
-                'rounded-lg border px-4 transition-colors',
+                'overflow-hidden rounded-lg border transition-colors',
                 brandSurface.card,
                 brandSurface.cardHover
               )}
             >
-              <AccordionTrigger className="py-4 hover:no-underline">
+              <AccordionTrigger className="px-4 py-4 hover:no-underline">
                 <div className="flex flex-col items-start gap-2 text-left sm:flex-row sm:items-center sm:gap-3">
                   <span className="font-semibold text-foreground">{module.displayName}</span>
                   <div className="flex flex-wrap gap-2">
@@ -116,7 +116,7 @@ export function PermissionsGuide() {
                   </div>
                 </div>
               </AccordionTrigger>
-              <AccordionContent className="pb-4">
+              <AccordionContent className="bg-slate-900 px-4 pb-4">
                 <div className="space-y-3">
                   {ROLE_ORDER.map((role) => {
                     const detail = module.byRole[role];
@@ -125,7 +125,7 @@ export function PermissionsGuide() {
                     return (
                       <div
                         key={`${module.moduleName}-${role}`}
-                        className="rounded-md border border-border bg-background p-3"
+                        className="rounded-md border border-border bg-slate-900 p-3"
                       >
                         <Badge
                           variant={roleBadge.variant}

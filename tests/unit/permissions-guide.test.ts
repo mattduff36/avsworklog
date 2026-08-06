@@ -34,8 +34,10 @@ describe('permissions guide', () => {
     expect(guideSource).toContain('brandSurface.card');
     expect(guideSource).toContain('brandSurface.cardHover');
     expect(guideSource).toContain('getGuideRoleBadge');
-    expect(guideSource).toContain('bg-background');
+    expect(guideSource).toContain('bg-slate-900 px-4 pb-4');
+    expect(guideSource).toContain('border-border bg-slate-900 p-3');
     expect(guideSource).not.toContain('bg-muted/30');
+    expect(guideSource).not.toContain('bg-background');
     expect(guideSource).toMatch(/getModuleBrandSurfaceClasses\(module\.moduleName\)/);
     expect(guideSource).toContain('ROLE_ORDER');
     expect(guideSource).toContain('Accordion');
