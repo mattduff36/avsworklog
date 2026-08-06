@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.10.0
+
+**GIT COMMIT MESSAGE**
+`feat(automation): add TEE telemetry v3 and build-model guidance`
+
+**PUSHED AT**
+2026-08-06T21:59:23.461Z
+
+**WHAT CHANGED**
+Add TEE telemetry v3 and build-model guidance.
+
+**VERSION HISTORY DETAILS**
+- Updated app reliability, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(automation): add TEE telemetry v3 and build-model guidance`
+
 ## 0826.9.1
 
 **GIT COMMIT MESSAGE**

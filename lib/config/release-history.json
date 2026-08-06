@@ -1,5 +1,24 @@
 [
   {
+    "version": "0826.10.0",
+    "updateKind": "major",
+    "title": "Release automation update",
+    "description": "Added TEE telemetry v3 and build-model guidance.",
+    "summary": "Added TEE telemetry v3 and build-model guidance.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [
+      "Release automation",
+      "TEE telemetry v3",
+      "Build-model guidance"
+    ],
+    "areaKeys": [
+      "release-automation"
+    ],
+    "pushedAt": "2026-08-06T21:59:23.461Z"
+  },
+  {
     "version": "0826.9.1",
     "updateKind": "minor",
     "title": "Cursor maintenance update",
