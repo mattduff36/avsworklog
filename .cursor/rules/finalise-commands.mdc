@@ -25,9 +25,22 @@ Command map:
 
 These phrases are explicit authorisation for commit, and the push variants are explicit authorisation to push the current branch.
 
+## Economical-parent fix routing
+
+When Cursor Grok or another economical parent runs a finalise command:
+- Keep ownership of the finalise command, output monitoring, retries, commit, and authorised push in the parent.
+- Fix only clearly trivial failures directly: a one-line type/import/lint correction or an obvious test assertion update.
+- For an important or ambiguous failure that is not a blocker category below, launch a `generalPurpose` subagent using `gpt-5.6-sol-high`.
+- Treat a failure as important when it needs design judgment, touches auth/permissions/shared layout or multiple modules, requires a non-obvious refactor, or the correct fix is uncertain.
+- Give the subagent the failing step, complete relevant error output, involved files, expected result, and: `Fix only what is needed to unblock finalise, then stop. Do not push or run finalise.`
+- After the subagent returns, inspect its changes and rerun the exact same mapped finalise command.
+- Apply all architecture and final-review gates required by `token-efficient-engineering`; model escalation does not replace mandatory independent review.
+- If the subagent is interrupted before returning, relaunch it once with the same evidence. Do not treat interruption alone as a blocker.
+- Never infer or claim that the parent model changed; this routing applies only when the user selected an economical parent for the chat.
+
 If the mapped repo command fails:
 - Do not stop at the first failure if the issue is local and safely fixable.
-- Inspect the command output, diagnose the failing step, fix the code/config/test issue directly, and then rerun the exact same finalise command automatically.
+- Inspect the command output, diagnose the failing step, route any fix as above, and then rerun the exact same finalise command automatically.
 - Keep looping through fix → retry until the command succeeds or you hit a real blocker.
 - Use `npm run fixerrors` when the failure is tied to known runtime/production error patterns; otherwise fix the reported local build/lint/type/test/finalise issue directly.
 
