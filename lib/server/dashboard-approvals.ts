@@ -2,7 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { canActorUseScopedAbsencePermission, getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
 import { getApprovalsDefaultStatusFilters } from '@/lib/utils/approvals-filters';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
-import { hasAccountsTimesheetFullVisibilityOverride } from '@/lib/utils/timesheet-visibility';
+import {
+  canActorAuthoriseTimesheetTarget,
+  hasAccountsTimesheetFullVisibilityOverride,
+} from '@/lib/utils/timesheet-visibility';
+import { getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
 import type { Database } from '@/types/database';
 import type { EffectiveRoleInfo } from '@/lib/utils/view-as';
 
@@ -73,6 +77,7 @@ export async function getDashboardApprovalsMetrics(params: {
   );
   const isAdminTier = hasEffectiveRoleFullAccess(effectiveRole);
   const isTimesheetAdminTier = isAdminTier || hasAccountsVisibilityOverride;
+  const approvalsAccessLevel = await getEffectiveModuleAccessLevel('approvals');
   const actorPermissions = await getActorAbsenceSecondaryPermissions(actorProfileId, {
     role: {
       name: effectiveRole.role_name,
@@ -81,8 +86,11 @@ export async function getDashboardApprovalsMetrics(params: {
       is_manager_admin: effectiveRole.is_manager_admin,
       is_super_admin: effectiveRole.is_super_admin,
     },
+    role_id: effectiveRole.role_id,
     team_id: effectiveRole.team_id,
     team_name: effectiveRole.team_name,
+    include_user_overrides: effectiveRole.is_viewing_as !== true,
+    include_secondary_overrides: effectiveRole.is_viewing_as !== true,
   });
   const canAuthoriseBookings = Boolean(
     actorPermissions.effective.authorise_bookings_all ||
@@ -119,17 +127,20 @@ export async function getDashboardApprovalsMetrics(params: {
   if (absencesResult.error) throw absencesResult.error;
 
   const scopedTimesheets = ((timesheetsResult.data || []) as DashboardApprovalTimesheetRow[]).filter((row) => {
-    if (isTimesheetAdminTier) return true;
-
-    return canActorUseScopedAbsencePermission({
-      actorPermissions,
-      target: {
-        profile_id: row.user_id,
-        team_id: getRelatedTeamId(row.employee),
+    return canActorAuthoriseTimesheetTarget({
+      actor: {
+        actorProfileId,
+        actorTeamId: actorPermissions.team_id,
+        approvalsAccessLevel,
+        // Admin tier keeps global visibility; Accounts Supervisor override remains explicit.
+        // Self-approval is still blocked inside canActorAuthoriseTimesheetTarget.
+        hasAccountsOverride: hasAccountsVisibilityOverride || isAdminTier,
+        permissions: actorPermissions.effective,
       },
-      allKey: 'authorise_bookings_all',
-      teamKey: 'authorise_bookings_team',
-      ownKey: 'authorise_bookings_own',
+      target: {
+        profileId: row.user_id,
+        teamId: getRelatedTeamId(row.employee),
+      },
     });
   });
 

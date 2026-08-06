@@ -85,6 +85,8 @@ describe('Fleet/Maintenance Level 3-5 permission gates', () => {
     const authHelper = readRepoFile('lib/server/fleet-maintenance-auth.ts');
 
     expect(syncDvla).toContain('requireManualDvlaSyncAccess');
+    expect(syncDvla).toContain('triggeredBy: auth.user.id');
+    expect(syncDvla).not.toContain('triggeredBy: user.id');
     expect(authHelper).toContain("canEffectiveRoleUseModuleLevel('maintenance', 4)");
     expect(authHelper).toContain("canEffectiveRoleUseModuleLevel('admin-vans', 4)");
     expect(scheduled).toContain('CRON_SECRET');

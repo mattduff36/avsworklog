@@ -36,7 +36,10 @@ import {
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
-import { hasAccountsTimesheetFullVisibilityOverride } from '@/lib/utils/timesheet-visibility';
+import {
+  canActorAuthoriseTimesheetTarget,
+  hasAccountsTimesheetFullVisibilityOverride,
+} from '@/lib/utils/timesheet-visibility';
 import { toast } from 'sonner';
 import { TimesheetsApprovalTable, COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_COLUMN_VISIBILITY } from './components/TimesheetsApprovalTable';
 import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
@@ -418,33 +421,35 @@ function ApprovalsContent() {
 
   const getScopedTimesheetsForCurrentActor = useCallback((rows: TimesheetWithProfile[]) => {
     if (rows.length === 0) return [] as TimesheetWithProfile[];
-    if (isTimesheetAdminTier) return rows;
-    if (!canAuthoriseTimesheets || !actorProfileId || !absenceSecondarySnapshot) return [] as TimesheetWithProfile[];
+    if (!canAuthoriseTimesheets || !actorProfileId || !absenceSecondarySnapshot) {
+      return [] as TimesheetWithProfile[];
+    }
 
     return rows.filter((timesheet) =>
-      canUseScopedAbsencePermission(
-        {
+      canActorAuthoriseTimesheetTarget({
+        actor: {
+          actorProfileId,
+          actorTeamId: absenceSecondarySnapshot.team_id,
+          approvalsAccessLevel: canViewApprovals ? 3 : 0,
+          // Admin tier keeps global visibility; Accounts Supervisor override remains explicit.
+          // Self-approval is still blocked inside canActorAuthoriseTimesheetTarget.
+          hasAccountsOverride: hasAccountsVisibilityOverride || isAdminTier,
           permissions: absenceSecondarySnapshot.permissions,
-          team_id: absenceSecondarySnapshot.team_id,
         },
-        actorProfileId,
-        {
-          profile_id: timesheet.user_id,
-          team_id: employeeById.get(timesheet.user_id)?.team_id || null,
+        target: {
+          profileId: timesheet.user_id,
+          teamId: employeeById.get(timesheet.user_id)?.team_id || null,
         },
-        {
-          all: 'authorise_bookings_all',
-          team: 'authorise_bookings_team',
-          own: 'authorise_bookings_own',
-        }
-      )
+      })
     );
   }, [
-    isTimesheetAdminTier,
     canAuthoriseTimesheets,
     actorProfileId,
     absenceSecondarySnapshot,
     employeeById,
+    canViewApprovals,
+    hasAccountsVisibilityOverride,
+    isAdminTier,
   ]);
 
   const getCurrentFilteredTimesheets = useCallback((rows: TimesheetWithProfile[]) => {

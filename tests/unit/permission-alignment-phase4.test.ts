@@ -137,6 +137,20 @@ describe('Permission Alignment Phase 4', () => {
     }
   });
 
+  it('APPROVAL-CONSUMER-001 applies the no-self decision in UI and dashboard metrics', () => {
+    const approvalsPage = readProjectFile('app/(dashboard)/approvals/page.tsx');
+    const dashboardApprovals = readProjectFile('lib/server/dashboard-approvals.ts');
+
+    expect(approvalsPage).toContain('canActorAuthoriseTimesheetTarget');
+    expect(approvalsPage).toContain('profileId: timesheet.user_id');
+    expect(approvalsPage).toContain('hasAccountsOverride: hasAccountsVisibilityOverride || isAdminTier');
+    expect(dashboardApprovals).toContain('canActorAuthoriseTimesheetTarget');
+    expect(dashboardApprovals).toContain('profileId: row.user_id');
+    expect(dashboardApprovals).toContain('hasAccountsOverride: hasAccountsVisibilityOverride || isAdminTier');
+    expect(dashboardApprovals).toContain('include_user_overrides: effectiveRole.is_viewing_as !== true');
+    expect(dashboardApprovals).toContain('include_secondary_overrides: effectiveRole.is_viewing_as !== true');
+  });
+
   it('REPORT-DATA-001 scopes IDs before service-role report hydration', () => {
     const reportRoutes = [
       'app/api/reports/timesheets/summary/route.ts',

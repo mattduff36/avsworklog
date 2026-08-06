@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
       motService,
       targets,
       triggerType: bulkRequested ? 'bulk' : 'manual',
-      triggeredBy: user.id,
+      triggeredBy: auth.user.id,
     });
 
     return NextResponse.json({
