@@ -4,7 +4,10 @@ import { renderToStream } from '@react-pdf/renderer';
 import { VanInspectionPDF } from '@/lib/pdf/van-inspection-pdf';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import {
+  formatFleetAssetLabel,
+  getFleetAssetLabelContext,
+} from '@/lib/utils/fleet-asset-label';
 
 export const runtime = 'nodejs';
 
@@ -118,6 +121,9 @@ export async function GET(
       vehicleReg: formatFleetAssetLabel({
         identifier: vehicle?.reg_number || 'Unknown',
         nickname: vehicle?.nickname,
+        context: getFleetAssetLabelContext(
+          (inspection as InspectionWithVehicle).profile?.full_name
+        ),
       }),
       employeeName: (inspection as InspectionWithVehicle).profile?.full_name || 'Unknown',
     });

@@ -3,7 +3,10 @@ import { Document, Page, Text, View, StyleSheet, Image as PdfImage } from '@reac
 import { HGV_ARTIC_ONLY_START_ITEM, TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { formatDate } from '@/lib/utils/date';
 import type { EnrichedDefectItem } from '@/lib/utils/hgvDefectWorkshopDetails';
-import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import {
+  formatFleetAssetLabel,
+  getFleetAssetLabelContext,
+} from '@/lib/utils/fleet-asset-label';
 
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 7, fontFamily: 'Helvetica' },
@@ -176,6 +179,7 @@ interface HgvInspectionPDFProps {
 
 export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWithWorkshop = [] }: HgvInspectionPDFProps) {
   const formNumber = inspection.id ? inspection.id.slice(-5).toUpperCase() : '00000';
+  const assetLabelContext = getFleetAssetLabelContext(operator.full_name);
   const inspectionDay = (() => {
     const date = new Date(inspection.inspection_date);
     const jsDay = date.getDay();
@@ -261,6 +265,7 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWith
                 {formatFleetAssetLabel({
                   identifier: hgv.reg_number || 'Unknown',
                   nickname: hgv.nickname,
+                  context: assetLabelContext,
                 })}
               </Text>
             </View>
@@ -402,7 +407,7 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWith
         <View style={styles.legendSection}>
           <Text style={styles.legendText}>USE THE FOLLOWING: PASS = IN ORDER   FAIL = REQUIRES ATTENTION   N/A = NOT APPLICABLE</Text>
           <Text style={styles.legendNote}>Inspection Date: {formatDate(inspection.inspection_date)}</Text>
-          <Text style={styles.legendNote}>Category: {hgv.hgv_categories?.name || 'Uncategorised'}{hgv.nickname ? ` | Nickname: ${hgv.nickname}` : ''}</Text>
+          <Text style={styles.legendNote}>Category: {hgv.hgv_categories?.name || 'Uncategorised'}</Text>
         </View>
       </Page>
     </Document>

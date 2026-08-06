@@ -6,6 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ProfileHelpShortcuts } from '@/components/profile/ProfileHelpShortcuts';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import {
+  formatFleetAssetBadgeAccessibleLabel,
+  getFleetAssetBadgeClassName,
+} from '@/lib/utils/fleet-asset-presentation';
 import type {
   ProfileAnnualLeaveSummary,
   ProfileIdentityPayload,
@@ -124,14 +128,30 @@ export function ProfileOverviewTab({
                   <Truck className="h-4 w-4 text-sky-300" />
                   Current fleet asset
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {currentFleetAssignment
-                    ? `${currentFleetAssignment.asset_type.toUpperCase()} ${formatFleetAssetLabel({
-                      identifier: currentFleetAssignment.asset_label || currentFleetAssignment.asset_id,
-                      nickname: currentFleetAssignment.asset_nickname,
-                    })}`
-                    : 'No current fleet asset assignment'}
-                </p>
+                <div className="mt-1">
+                  {currentFleetAssignment ? (
+                    <Badge
+                      variant="outline"
+                      className={getFleetAssetBadgeClassName(currentFleetAssignment.asset_type)}
+                      aria-label={formatFleetAssetBadgeAccessibleLabel(
+                        currentFleetAssignment.asset_type,
+                        currentFleetAssignment.asset_label || currentFleetAssignment.asset_id
+                      )}
+                      title={formatFleetAssetBadgeAccessibleLabel(
+                        currentFleetAssignment.asset_type,
+                        currentFleetAssignment.asset_label || currentFleetAssignment.asset_id
+                      )}
+                    >
+                      {formatFleetAssetLabel({
+                        identifier: currentFleetAssignment.asset_label || currentFleetAssignment.asset_id,
+                        nickname: currentFleetAssignment.asset_nickname,
+                        context: 'with-assignee',
+                      })}
+                    </Badge>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No current fleet asset assignment</p>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-[repeat(auto-fit,minmax(6.25rem,1fr))] gap-3 sm:grid-cols-1 md:grid-cols-3 xl:mt-4">

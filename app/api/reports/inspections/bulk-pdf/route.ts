@@ -13,7 +13,10 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { getReportDateRangeSpanDays } from '@/lib/server/report-date-range';
-import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import {
+  formatFleetAssetLabel,
+  getFleetAssetLabelContext,
+} from '@/lib/utils/fleet-asset-label';
 
 const MAX_INSPECTIONS_PER_PDF = 80;
 
@@ -128,6 +131,7 @@ function resolveVanTemplate(inspection: VanInspectionWithRelations, items: Inspe
     vehicleReg: formatFleetAssetLabel({
       identifier: inspection.vehicle?.reg_number || 'Unknown',
       nickname: inspection.vehicle?.nickname,
+      context: getFleetAssetLabelContext(inspection.profile?.full_name),
     }),
     employeeName: inspection.profile?.full_name || undefined,
   });

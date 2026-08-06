@@ -51,7 +51,10 @@ import {
   VAN_INSPECTIONS_MAINTENANCE_MESSAGE,
   VAN_INSPECTIONS_MAINTENANCE_TITLE,
 } from '@/lib/config/van-inspections-maintenance';
-import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import {
+  formatFleetAssetLabel,
+  getFleetAssetLabelContext,
+} from '@/lib/utils/fleet-asset-label';
 
 interface InspectionWithVehicle extends VanInspection {
   vans: {
@@ -886,6 +889,10 @@ function InspectionsContent() {
 
           <div className={canViewCrossUserInspections && viewMode === 'table' ? 'md:hidden grid gap-4' : 'grid gap-4'}>
             {inspections.map((inspection) => {
+              const inspectionProfileName = (
+                inspection as { profile?: { full_name?: string } | null }
+              ).profile?.full_name;
+
               return (
             <Card 
               key={inspection.id} 
@@ -903,12 +910,16 @@ function InspectionsContent() {
                         {formatFleetAssetLabel({
                           identifier: inspection.vans?.reg_number || 'Unknown Van',
                           nickname: inspection.vans?.nickname,
+                          context: getFleetAssetLabelContext(
+                            inspectionProfileName,
+                            canViewCrossUserInspections
+                          ),
                         })}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">
-                        {canViewCrossUserInspections && (inspection as { profile?: { full_name?: string } | null }).profile?.full_name && (
+                        {canViewCrossUserInspections && inspectionProfileName && (
                           <span className="font-medium text-white">
-                            {(inspection as { profile?: { full_name?: string } | null }).profile?.full_name}
+                            {inspectionProfileName}
                             {' • '}
                           </span>
                         )}

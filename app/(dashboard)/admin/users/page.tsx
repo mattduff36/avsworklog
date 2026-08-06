@@ -6,6 +6,10 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import {
+  formatFleetAssetBadgeAccessibleLabel,
+  getFleetAssetBadgeClassName,
+} from '@/lib/utils/fleet-asset-presentation';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -243,11 +247,11 @@ function isDeletedUserProfile(user: { full_name?: string | null }): boolean {
 
 function formatAdminFleetAssignment(assignment: AdminFleetAssignmentSummary | null | undefined): string {
   if (!assignment) return '-';
-  const assetLabel = formatFleetAssetLabel({
+  return formatFleetAssetLabel({
     identifier: assignment.asset_label || 'Fleet asset',
     nickname: assignment.asset_nickname,
+    context: 'with-assignee',
   });
-  return `${assignment.asset_type.toUpperCase()} ${assetLabel}`;
 }
 
 function UserTableAvatar({ user }: { user: ProfileWithEmail }) {
@@ -1706,7 +1710,18 @@ export default function UsersAdminPage() {
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {user.current_fleet_assignment ? (
-                            <Badge variant="outline" className="border-blue-500/30 bg-blue-500/10 text-blue-300">
+                            <Badge
+                              variant="outline"
+                              className={getFleetAssetBadgeClassName(user.current_fleet_assignment.asset_type)}
+                              aria-label={formatFleetAssetBadgeAccessibleLabel(
+                                user.current_fleet_assignment.asset_type,
+                                formatAdminFleetAssignment(user.current_fleet_assignment)
+                              )}
+                              title={formatFleetAssetBadgeAccessibleLabel(
+                                user.current_fleet_assignment.asset_type,
+                                formatAdminFleetAssignment(user.current_fleet_assignment)
+                              )}
+                            >
                               {formatAdminFleetAssignment(user.current_fleet_assignment)}
                             </Badge>
                           ) : (

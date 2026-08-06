@@ -32,7 +32,10 @@ import {
   HGV_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY,
 } from './components/HgvInspectionsListTable';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
-import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import {
+  formatFleetAssetLabel,
+  getFleetAssetLabelContext,
+} from '@/lib/utils/fleet-asset-label';
 
 interface HgvInspectionWithRelations {
   id: string;
@@ -588,7 +591,6 @@ function HgvInspectionsContent() {
                 <ColumnVisibilityMenu
                   options={[
                     { id: 'employeeId', label: 'Employee ID', checked: columnVisibility.employeeId },
-                    { id: 'nickname', label: 'Nickname', checked: columnVisibility.nickname },
                     { id: 'status', label: 'Status', checked: columnVisibility.status },
                     { id: 'submittedAt', label: 'Submitted', checked: columnVisibility.submittedAt },
                   ]}
@@ -636,6 +638,10 @@ function HgvInspectionsContent() {
                         {formatFleetAssetLabel({
                           identifier: inspection.hgv?.reg_number || 'Unknown HGV',
                           nickname: inspection.hgv?.nickname,
+                          context: getFleetAssetLabelContext(
+                            inspection.profile?.full_name,
+                            canViewCrossUserInspections
+                          ),
                         })}
                       </CardTitle>
                       <CardDescription className="text-muted-foreground">

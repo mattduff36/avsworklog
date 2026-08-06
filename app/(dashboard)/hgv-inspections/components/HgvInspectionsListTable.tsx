@@ -7,10 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils/date';
+import {
+  formatFleetAssetLabel,
+  getFleetAssetLabelContext,
+} from '@/lib/utils/fleet-asset-label';
 
 export interface HgvInspectionsColumnVisibility {
   employeeId: boolean;
-  nickname: boolean;
   status: boolean;
   submittedAt: boolean;
 }
@@ -19,7 +22,6 @@ export const HGV_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY = 'hgv-inspections-ta
 
 export const DEFAULT_HGV_INSPECTIONS_COLUMN_VISIBILITY: HgvInspectionsColumnVisibility = {
   employeeId: false,
-  nickname: true,
   status: true,
   submittedAt: true,
 };
@@ -152,11 +154,6 @@ export function HgvInspectionsListTable({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
-            {columnVisibility.nickname && (
-              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                Nickname
-              </TableHead>
-            )}
             <TableHead
               className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
               onClick={() => handleSort('date')}
@@ -209,13 +206,12 @@ export function HgvInspectionsListTable({
                 </TableCell>
               )}
               <TableCell className="text-white">
-                {inspection.hgv?.reg_number || 'Unknown HGV'}
+                {formatFleetAssetLabel({
+                  identifier: inspection.hgv?.reg_number || 'Unknown HGV',
+                  nickname: inspection.hgv?.nickname,
+                  context: getFleetAssetLabelContext(inspection.profile?.full_name),
+                })}
               </TableCell>
-              {columnVisibility.nickname && (
-                <TableCell className="text-muted-foreground">
-                  {inspection.hgv?.nickname || '-'}
-                </TableCell>
-              )}
               <TableCell className="text-muted-foreground">
                 {formatInspectionRange(inspection.inspection_date, inspection.inspection_end_date)}
               </TableCell>

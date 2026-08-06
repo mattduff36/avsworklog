@@ -29,7 +29,10 @@ import {
   getInspectionEnteredComment,
   type InspectionCommentTask,
 } from '@/lib/utils/inspection-item-comments';
-import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import {
+  formatFleetAssetLabel,
+  getFleetAssetLabelContext,
+} from '@/lib/utils/fleet-asset-label';
 
 interface InspectionItemWithDay extends InspectionItem {
   day_of_week: number | null;
@@ -278,6 +281,7 @@ export default function ViewHgvInspectionPage() {
                 {formatFleetAssetLabel({
                   identifier: inspection.hgv?.reg_number || 'Unknown HGV',
                   nickname: inspection.hgv?.nickname,
+                  context: getFleetAssetLabelContext(inspection.profiles?.full_name),
                 })}
                 {' • '}
                 {formatDate(inspection.inspection_date)}
