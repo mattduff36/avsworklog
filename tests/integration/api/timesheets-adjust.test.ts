@@ -84,6 +84,12 @@ async function mockScopedAdminTimesheet(options: {
   timesheet: ReturnType<typeof createMockTimesheet>;
 }) {
   const { createAdminClient } = await import('@/lib/supabase/admin');
+  const messageInsertMock = vi.fn().mockReturnValue({
+    select: vi.fn().mockReturnValue({
+      single: vi.fn().mockResolvedValue(mockSupabaseQuery({ id: 'message-id' })),
+    }),
+  });
+  const recipientInsertMock = vi.fn().mockResolvedValue(mockSupabaseQuery({}));
   vi.mocked(createAdminClient).mockReturnValue({
     from: vi.fn((table: string) => {
       if (table === 'timesheets') {
@@ -99,9 +105,16 @@ async function mockScopedAdminTimesheet(options: {
           }),
         };
       }
+      if (table === 'messages') {
+        return { insert: messageInsertMock };
+      }
+      if (table === 'message_recipients') {
+        return { insert: recipientInsertMock };
+      }
       return {};
     }),
   } as never);
+  return { messageInsertMock, recipientInsertMock };
 }
 
 function mockSessionClient(actor: { id: string; full_name?: string }, extras?: {
@@ -446,7 +459,7 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const manager = createMockManager();
       const timesheet = createMockTimesheet({ status: 'approved', user_id: 'employee-id' });
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
-      await mockScopedAdminTimesheet({ timesheet });
+      const admin = await mockScopedAdminTimesheet({ timesheet });
       const session = mockSessionClient(manager);
       const { createClient } = await import('@/lib/supabase/server');
       vi.mocked(createClient).mockResolvedValueOnce(session as unknown as SupabaseClient);
@@ -459,7 +472,7 @@ describe('POST /api/timesheets/[id]/adjust', () => {
         { params: Promise.resolve({ id: 'test-id' }) }
       );
 
-      expect(session.messageInsertMock).toHaveBeenCalledWith(
+      expect(admin.messageInsertMock).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'NOTIFICATION',
           subject: expect.stringContaining('Adjusted'),
@@ -474,7 +487,7 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const timesheet = createMockTimesheet({ status: 'approved' });
       const recipients = ['manager2-id'];
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
-      await mockScopedAdminTimesheet({ timesheet });
+      const admin = await mockScopedAdminTimesheet({ timesheet });
       const session = mockSessionClient(manager, {
         managerRows: [{ id: 'manager2-id', full_name: 'Manager 2', email: 'manager2@test.com' }],
       });
@@ -493,8 +506,8 @@ describe('POST /api/timesheets/[id]/adjust', () => {
         { params: Promise.resolve({ id: 'test-id' }) }
       );
 
-      expect(session.messageInsertMock).toHaveBeenCalledTimes(2);
-      expect(session.recipientInsertMock).toHaveBeenCalled();
+      expect(admin.messageInsertMock).toHaveBeenCalledTimes(2);
+      expect(admin.recipientInsertMock).toHaveBeenCalled();
     });
   });
 });
