@@ -126,6 +126,7 @@ async function main(): Promise<void> {
     knowledgeDirectory: pending.knowledgeDirectory,
     repoRoot: pending.repoRoot,
     reviewWindowId: pending.reviewWindowId,
+    sourceWorkstreamIds: pending.sourceWorkstreamIds,
     decisionProvider: (suggestion) => decisionsById.get(suggestion.id) ?? {
       suggestionId: suggestion.id,
       action: 'skip',

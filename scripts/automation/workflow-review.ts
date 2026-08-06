@@ -1,21 +1,27 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
+import { spawnSync } from 'child_process';
 import path from 'path';
 import { updateAutomationMemory, loadAutomationMemory, saveAutomationMemory } from './memory';
 import { writeMonthlyAutomationPendingFollowUp } from './monthly-follow-up';
 import {
   WORKFLOW_REVIEW_THRESHOLD,
   WORKFLOW_SCRIPT_NAME,
+  attachEventToReviewWindow,
   getWorkflowPaths,
   listWorkflowEvents,
   loadWorkflowReviewState,
   saveWorkflowReviewState,
+  upsertWorkstreamRecord,
   withWorkflowLock,
   writeWorkflowEvent,
   type WorkflowPaths,
 } from './workflow-events';
 import { buildWorkflowFindings, estimatePremiumTokenReduction, ESTIMATE_FORMULA_VERSION } from './workflow-findings';
 import { extractWorkflowCompletionMarker } from './workflow-marker';
-import { classifyWorkflowModelTier } from './workflow-model-tier';
+import {
+  classifyWorkflowModelTier,
+  resolveWorkflowModelRoleKey,
+} from './workflow-model-tier';
 import { assertNoForbiddenPayload, hashIdentifier } from './workflow-privacy';
 import { parseWorkflowTranscript } from './workflow-transcript';
 import type {
@@ -23,6 +29,7 @@ import type {
   WorkflowReviewMetrics,
   WorkflowReviewState,
   WorkflowStopEvent,
+  WorkflowPlanRecommendationAdherence,
 } from './types';
 
 export interface WorkflowStopHookInput {
@@ -66,6 +73,31 @@ function isQualifyingStatus(status: string | undefined, loopCount: number): bool
   return status === 'completed' && loopCount === 0;
 }
 
+function readGitValue(repoRoot: string, args: string[]): string | undefined {
+  const result = spawnSync('git', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    shell: false,
+    maxBuffer: 1024 * 1024,
+  });
+  const value = typeof result.stdout === 'string' ? result.stdout.trim() : '';
+  return result.status === 0 && value ? value : undefined;
+}
+
+export function computePlanRecommendationAdherence(
+  marker: WorkflowStopEvent['marker'],
+  observedTier: WorkflowStopEvent['selectedModelTier']
+): WorkflowPlanRecommendationAdherence {
+  const recommendedTier = marker?.recommendedBuildModel?.implementation.tier;
+  if (!recommendedTier) {
+    return marker?.planRecommendationAdherence === 'not_applicable'
+      ? 'not_applicable'
+      : 'unknown';
+  }
+  if (recommendedTier === 'unknown' || observedTier === 'unknown') return 'unknown';
+  return recommendedTier === observedTier ? 'matched' : 'deviated';
+}
+
 function buildSuggestionsFromFindings(
   events: WorkflowStopEvent[],
   monthKey: string,
@@ -98,11 +130,32 @@ function buildSuggestionsFromFindings(
   return [...byId.values()];
 }
 
-function buildMetrics(events: WorkflowStopEvent[]): WorkflowReviewMetrics {
+export function buildWorkflowReviewMetrics(events: WorkflowStopEvent[]): WorkflowReviewMetrics {
   const estimate = estimatePremiumTokenReduction(events);
   const selectedModelCounts: Record<string, number> = {};
   for (const event of events) {
     selectedModelCounts[event.selectedModel] = (selectedModelCounts[event.selectedModel] ?? 0) + 1;
+  }
+  const planningEvents = events.filter((event) => event.marker?.taskType === 'planning');
+  const recommendationAdherenceCounts: Record<WorkflowPlanRecommendationAdherence, number> = {
+    matched: 0,
+    deviated: 0,
+    not_applicable: 0,
+    unknown: 0,
+  };
+  const registryVersionCounts: Record<string, number> = {};
+  let premiumReReviewFlagCount = 0;
+  for (const event of events) {
+    const adherence = event.planRecommendationAdherence ?? 'unknown';
+    recommendationAdherenceCounts[adherence] += 1;
+    const registryVersion = event.registryVersion ?? 'unknown';
+    registryVersionCounts[registryVersion] = (registryVersionCounts[registryVersion] ?? 0) + 1;
+    const premiumReReviewCount = new Set(
+      (event.reviewPasses ?? [])
+        .filter((pass) => pass.tier === 'premium' && pass.iteration > 1)
+        .map((pass) => pass.passId)
+    ).size;
+    if (premiumReReviewCount > 2) premiumReReviewFlagCount += 1;
   }
 
   return {
@@ -122,6 +175,15 @@ function buildMetrics(events: WorkflowStopEvent[]): WorkflowReviewMetrics {
       event.findings.some((finding) => finding.id === 'incomplete-handoff' && finding.status !== 'passed')
     ).length,
     selectedModelCounts,
+    planContractPresentCount: planningEvents.filter(
+      (event) => event.transcriptSignals?.planContractPresent
+    ).length,
+    planContractMissingCount: planningEvents.filter(
+      (event) => !event.transcriptSignals?.planContractPresent
+    ).length,
+    recommendationAdherenceCounts,
+    registryVersionCounts,
+    premiumReReviewFlagCount,
     estimatedPremiumTokenReductionLowPercent: estimate.lowPercent,
     estimatedPremiumTokenReductionHighPercent: estimate.highPercent,
     estimateFormulaVersion: ESTIMATE_FORMULA_VERSION,
@@ -191,7 +253,7 @@ function writeReviewArtifacts(params: {
   );
   mkdirSync(reviewDirectory, { recursive: true });
 
-  const metrics = buildMetrics(params.windowEvents);
+  const metrics = buildWorkflowReviewMetrics(params.windowEvents);
   const suggestions = buildSuggestionsFromFindings(params.windowEvents, monthKey, reviewWindowId);
   const estimate = estimatePremiumTokenReduction(params.windowEvents);
 
@@ -290,7 +352,7 @@ function writeReviewArtifacts(params: {
 
 export async function buildWorkflowStopEvent(
   input: WorkflowStopHookInput,
-  options?: { now?: () => Date }
+  options?: { now?: () => Date; repoRoot?: string }
 ): Promise<WorkflowStopEvent> {
   const now = options?.now?.() ?? new Date();
   const loopCount = typeof input.loop_count === 'number' ? input.loop_count : 0;
@@ -300,6 +362,7 @@ export async function buildWorkflowStopEvent(
       : 'unknown';
   const { selectedModel, selectedModelSource } = selectModel(input);
   const selectedModelTier = classifyWorkflowModelTier(selectedModel);
+  const selectedModelRole = resolveWorkflowModelRoleKey(selectedModel);
   const conversationHash = hashIdentifier(input.conversation_id);
   const generationHash = hashIdentifier(input.generation_id || `${input.conversation_id}:${now.toISOString()}`);
   const qualifies = isQualifyingStatus(status, loopCount);
@@ -311,11 +374,17 @@ export async function buildWorkflowStopEvent(
   }
 
   let transcriptSignals = null;
+  let planValidationStatus: WorkflowStopEvent['planValidationStatus'] = 'unknown';
+  let planSourceWorkstreamIds: string[] | undefined;
   let assistantText = '';
   if (qualifies) {
-    const parsed = await parseWorkflowTranscript(input.transcript_path ?? null);
+    const parsed = await parseWorkflowTranscript(input.transcript_path ?? null, {
+      repoRoot: options?.repoRoot,
+    });
     transcriptSignals = parsed.signals;
     assistantText = parsed.assistantText;
+    planValidationStatus = parsed.planValidationStatus;
+    planSourceWorkstreamIds = parsed.planContract?.sourceWorkstreamIds;
   }
 
   const markerParse = assistantText
@@ -335,16 +404,33 @@ export async function buildWorkflowStopEvent(
       Boolean(transcriptSignals?.skillRead) ||
       Boolean(transcriptSignals?.architectureGateTask) ||
       Boolean(transcriptSignals?.finalDiffReviewerTask));
+  const planRecommendationAdherence = computePlanRecommendationAdherence(
+    markerParse.marker,
+    selectedModelTier
+  );
+  const repoRoot = options?.repoRoot ?? process.cwd();
+  const branchName = readGitValue(repoRoot, ['branch', '--show-current']);
+  const headCommit = readGitValue(repoRoot, ['rev-parse', 'HEAD']);
+  const sourceWorkstreamIds = [
+    ...new Set(
+      [
+        ...(markerParse.marker?.sourceWorkstreamIds ?? []),
+        ...(planSourceWorkstreamIds ?? []),
+      ].filter((id) => id.trim())
+    ),
+  ];
 
   const findings = buildWorkflowFindings({
     marker: markerParse.marker,
     markerStatus: markerParse.status,
     transcriptSignals,
     observedParentTier: selectedModelTier,
+    planValidationStatus,
+    planRecommendationAdherence,
   });
 
   return {
-    schemaVersion: '1',
+    schemaVersion: '2',
     eventId: generationHash,
     recordedAt: now.toISOString(),
     conversationHash,
@@ -352,6 +438,7 @@ export async function buildWorkflowStopEvent(
     selectedModel,
     selectedModelSource,
     selectedModelTier,
+    selectedModelRole,
     status,
     loopCount,
     qualifies: stronglyQualified,
@@ -363,6 +450,14 @@ export async function buildWorkflowStopEvent(
     transcriptSignals,
     findings,
     monthKey: monthKeyFromIso(now.toISOString()),
+    workstreamId: markerParse.marker?.workstreamId,
+    sourceWorkstreamIds: sourceWorkstreamIds.length > 0 ? sourceWorkstreamIds : undefined,
+    planValidationStatus,
+    planRecommendationAdherence,
+    registryVersion: markerParse.marker?.registryVersion,
+    branchName,
+    headCommit,
+    reviewPasses: markerParse.marker?.reviewPasses,
   };
 }
 
@@ -381,7 +476,10 @@ export async function processWorkflowStopEvent(
     };
   }
 
-  const event = await buildWorkflowStopEvent(input, { now: () => now });
+  const event = await buildWorkflowStopEvent(input, {
+    now: () => now,
+    repoRoot: paths.repoRoot,
+  });
   const privacyViolations = assertNoForbiddenPayload(event);
   if (privacyViolations.length > 0) {
     throw new Error(`Workflow event privacy violation: ${privacyViolations.join('; ')}`);
@@ -398,13 +496,25 @@ export async function processWorkflowStopEvent(
     }
 
     const written = writeWorkflowEvent(paths.eventsDirectory, event);
-    const nextState: WorkflowReviewState = {
+    let nextState: WorkflowReviewState = {
       ...state,
       processedGenerationHashes: [...state.processedGenerationHashes, event.generationHash].slice(-500),
       unreviewedEventIds: written.created && event.qualifies
         ? [...state.unreviewedEventIds, event.eventId]
         : state.unreviewedEventIds,
     };
+    if (written.created && event.workstreamId) {
+      nextState = upsertWorkstreamRecord(nextState, {
+        workstreamId: event.workstreamId,
+        branchName: event.branchName ?? null,
+        headCommit: event.headCommit ?? null,
+        taskIds: event.marker?.taskId ? [event.marker.taskId] : [],
+        eventIds: [event.eventId],
+        status: 'open',
+        sourceWorkstreamIds: event.sourceWorkstreamIds,
+        updatedAt: event.recordedAt,
+      });
+    }
 
     if (!event.qualifies) {
       saveWorkflowReviewState(paths.statePath, nextState);
@@ -464,7 +574,7 @@ export async function processWorkflowStopEvent(
         ).length,
         averageDurationMs: 0,
         modeCounts: { workflow: selection.windowEvents.length },
-        workflowReview: buildMetrics(selection.windowEvents),
+        workflowReview: buildWorkflowReviewMetrics(selection.windowEvents),
       },
       prompt: {
         month: artifacts.monthKey,
@@ -487,6 +597,13 @@ export async function processWorkflowStopEvent(
         knowledgeDirectory: paths.knowledgeDirectory,
         repoRoot: paths.repoRoot,
         reviewWindowId: artifacts.reviewWindowId,
+        sourceWorkstreamIds: [
+          ...new Set(
+            selection.windowEvents
+              .map((windowEvent) => windowEvent.workstreamId)
+              .filter((id): id is string => Boolean(id?.trim()))
+          ),
+        ],
         promptMode: 'skip',
       });
       pendingPath = pending.pendingPath;
@@ -494,7 +611,7 @@ export async function processWorkflowStopEvent(
 
     // Event files remain immutable. Reviewed membership is tracked only in state.
     const reviewedIds = new Set(selection.windowEvents.map((item) => item.eventId));
-    const reviewedState: WorkflowReviewState = {
+    let reviewedState: WorkflowReviewState = {
       ...nextState,
       lastReviewAt: now.toISOString(),
       lastReviewWindowId: artifacts.reviewWindowId,
@@ -502,6 +619,13 @@ export async function processWorkflowStopEvent(
       unreviewedEventIds: nextState.unreviewedEventIds.filter((id) => !reviewedIds.has(id)),
       pendingFollowUpPath: pendingPath ?? null,
     };
+    for (const eventId of reviewedIds) {
+      reviewedState = attachEventToReviewWindow(
+        reviewedState,
+        eventId,
+        artifacts.reviewWindowId
+      );
+    }
     saveWorkflowReviewState(paths.statePath, reviewedState);
 
     return {

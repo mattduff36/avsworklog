@@ -23,6 +23,7 @@
     "automation:followup:resolve": "tsx scripts/automation/resolve-monthly-follow-up.ts",
     "workflow-review": "tsx scripts/workflow-review.ts diagnostics",
     "workflow-review:process": "tsx scripts/workflow-review.ts process-json",
+    "workflow-plan:validate": "tsx scripts/workflow-plan-validate.ts",
     "fix:contrast": "tsx scripts/fix-input-contrast.ts",
     "fixerrors": "tsx scripts/fixerrors.ts",
     "version:bump": "tsx scripts/bump-release-version.ts",

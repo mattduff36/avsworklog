@@ -49,6 +49,8 @@ export interface AutomationRunLog {
   steps: AutomationStepLog[];
   review?: AutomationReviewSummary;
   error?: string;
+  /** Optional TEE workstream correlation for finalise runs. */
+  workflowCorrelation?: WorkflowFinaliseCorrelation;
 }
 
 export interface AutomationReviewSuggestion {
@@ -183,6 +185,20 @@ export type WorkflowFinalReviewStatus =
   | 'skipped'
   | 'not_applicable'
   | 'unknown';
+export type WorkflowPlanRecommendationAdherence =
+  | 'matched'
+  | 'deviated'
+  | 'not_applicable'
+  | 'unknown';
+export type WorkflowReviewPassStage =
+  | 'architecture-gate'
+  | 'final-diff-reviewer'
+  | 'local-review'
+  | 'other';
+export type WorkflowSwitchTiming =
+  | 'before_substantive_implementation'
+  | 'after_plan_approval'
+  | 'not_applicable';
 
 export interface WorkflowRequiredTest {
   id: string;
@@ -195,11 +211,40 @@ export interface WorkflowUnresolvedRisk {
   note: string;
 }
 
+export interface WorkflowRecommendedBuildModel {
+  implementation: {
+    role: string;
+    tier: WorkflowParentTier;
+    family?: string;
+  };
+  premiumGates: Array<{
+    phase: string;
+    role: string;
+    tier: WorkflowParentTier;
+    mandatory: boolean;
+  }>;
+  switchTiming: WorkflowSwitchTiming;
+  rationale: string;
+  fallbackEscalation: string;
+}
+
+export interface WorkflowReviewPassRecord {
+  passId: string;
+  stage: WorkflowReviewPassStage;
+  source: WorkflowReviewSource;
+  tier: WorkflowParentTier;
+  iteration: number;
+  result: 'passed' | 'failed' | 'blocked' | 'unknown';
+}
+
 export interface WorkflowCompletionMarker {
-  schemaVersion: '1' | '2';
+  schemaVersion: '1' | '2' | '3';
   taskId: string;
   taskType: WorkflowTaskType;
   risk: WorkflowRisk;
+  workstreamId?: string;
+  /** v3: opaque lineage for follow-up workstreams derived from earlier work. */
+  sourceWorkstreamIds?: string[];
   initialParentTier?: WorkflowParentTier;
   executionParentTier?: WorkflowParentTier;
   routingDecision?: WorkflowRoutingDecision;
@@ -218,6 +263,39 @@ export interface WorkflowCompletionMarker {
   finalReviewSource?: WorkflowReviewSource;
   commit: WorkflowCommitStatus;
   handoff: WorkflowHandoffStatus;
+  /** v3: plan recommendation echo and adherence. */
+  registryVersion?: string;
+  recommendedBuildModel?: WorkflowRecommendedBuildModel;
+  planRecommendationAdherence?: WorkflowPlanRecommendationAdherence;
+  reviewPasses?: WorkflowReviewPassRecord[];
+}
+
+export interface WorkflowPlanContract {
+  schemaVersion: '1';
+  registryVersion: string;
+  workstreamId: string;
+  sourceWorkstreamIds?: string[];
+  taskId: string;
+  taskType: WorkflowTaskType;
+  risk: WorkflowRisk;
+  initialParentTier: WorkflowParentTier;
+  routingDecision: WorkflowRoutingDecision;
+  recommendedBuildModel: WorkflowRecommendedBuildModel;
+  architectureGate: WorkflowGateDecision;
+  architectureReviewSource: WorkflowReviewSource;
+  independentReviewRequired: boolean;
+  independentReviewReasons: string[];
+  requiredTests: WorkflowRequiredTest[];
+  unresolvedRisks: WorkflowUnresolvedRisk[];
+  finalReviewRequired: boolean;
+  finalReviewSource: WorkflowReviewSource;
+  commit: WorkflowCommitStatus;
+  handoff: WorkflowHandoffStatus;
+  implementationContract?: {
+    invariants?: string[];
+    boundaries?: string[];
+    rollback?: string;
+  };
 }
 
 export interface WorkflowFinding {
@@ -240,11 +318,15 @@ export interface WorkflowTranscriptSignals {
   duplicateBroadSearchAfterExplore: boolean;
   gitCommitEvidence: boolean;
   markerPresent: boolean;
+  planContractPresent: boolean;
+  planPathSource: 'repo_relative' | 'external_hashed' | 'unavailable';
+  planPathRef: string | null;
   parseErrors: string[];
 }
 
 export interface WorkflowStopEvent {
-  schemaVersion: '1';
+  /** Writers emit '2'; readers accept '1' | '2'. */
+  schemaVersion: '1' | '2';
   eventId: string;
   recordedAt: string;
   conversationHash: string;
@@ -252,6 +334,7 @@ export interface WorkflowStopEvent {
   selectedModel: string;
   selectedModelSource: 'model_id' | 'model' | 'unavailable';
   selectedModelTier: WorkflowParentTier;
+  selectedModelRole?: string;
   status: 'completed' | 'aborted' | 'error' | 'unknown';
   loopCount: number;
   qualifies: boolean;
@@ -261,11 +344,35 @@ export interface WorkflowStopEvent {
   transcriptSignals: WorkflowTranscriptSignals | null;
   findings: WorkflowFinding[];
   monthKey: string;
+  /** Legacy v1 field; not written by v2 event writers. */
   reviewedInWindowId?: string;
+  workstreamId?: string;
+  sourceWorkstreamIds?: string[];
+  planValidationStatus?: 'present' | 'missing' | 'malformed' | 'not_applicable' | 'unknown';
+  planRecommendationAdherence?: WorkflowPlanRecommendationAdherence;
+  registryVersion?: string;
+  branchName?: string;
+  headCommit?: string;
+  reviewPasses?: WorkflowReviewPassRecord[];
+}
+
+export interface WorkflowWorkstreamRecord {
+  workstreamId: string;
+  branchName: string | null;
+  headCommit: string | null;
+  taskIds: string[];
+  eventIds: string[];
+  status: 'open' | 'finalised' | 'abandoned' | 'unknown';
+  finaliseRunId?: string;
+  finaliseOutcome?: 'passed' | 'failed' | 'unknown';
+  finaliseCommit?: string;
+  sourceWorkstreamIds?: string[];
+  updatedAt: string;
 }
 
 export interface WorkflowReviewState {
-  schemaVersion: '1';
+  /** Writers emit '2'; readers accept '1' | '2'. */
+  schemaVersion: '1' | '2';
   scriptName: 'workflow-review';
   updatedAt: string;
   lastReviewAt: string | null;
@@ -274,6 +381,9 @@ export interface WorkflowReviewState {
   unreviewedEventIds: string[];
   pendingFollowUpPath: string | null;
   processedGenerationHashes: string[];
+  /** State-side review membership; never rewrite immutable events. */
+  reviewWindowByEventId?: Record<string, string>;
+  workstreams?: Record<string, WorkflowWorkstreamRecord>;
 }
 
 export interface WorkflowReviewMetrics {
@@ -289,6 +399,19 @@ export interface WorkflowReviewMetrics {
   estimatedPremiumTokenReductionHighPercent: number;
   estimateFormulaVersion: string;
   estimateConfidence: 'low';
+  planContractPresentCount?: number;
+  planContractMissingCount?: number;
+  recommendationAdherenceCounts?: Record<WorkflowPlanRecommendationAdherence, number>;
+  registryVersionCounts?: Record<string, number>;
+  premiumReReviewFlagCount?: number;
+}
+
+export interface WorkflowFinaliseCorrelation {
+  workstreamIds: string[];
+  matchedBy: 'branch_ancestry' | 'none' | 'multiple';
+  branchName: string | null;
+  headCommit: string | null;
+  resultingCommit: string | null;
 }
 
 export interface AutomationMemory {

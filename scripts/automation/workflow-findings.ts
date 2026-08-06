@@ -1,8 +1,10 @@
 import { sanitizeEvidenceLabel } from './workflow-privacy';
+import { WORKFLOW_MODEL_TIER_REGISTRY_VERSION } from './workflow-model-tier';
 import type {
   WorkflowCompletionMarker,
   WorkflowFinding,
   WorkflowParentTier,
+  WorkflowPlanRecommendationAdherence,
   WorkflowTranscriptSignals,
 } from './types';
 
@@ -29,8 +31,17 @@ export function buildWorkflowFindings(params: {
   markerStatus: 'present' | 'missing' | 'malformed';
   transcriptSignals: WorkflowTranscriptSignals | null;
   observedParentTier?: WorkflowParentTier;
+  planValidationStatus?: 'present' | 'missing' | 'malformed' | 'not_applicable' | 'unknown';
+  planRecommendationAdherence?: WorkflowPlanRecommendationAdherence;
 }): WorkflowFinding[] {
-  const { marker, markerStatus, transcriptSignals, observedParentTier } = params;
+  const {
+    marker,
+    markerStatus,
+    transcriptSignals,
+    observedParentTier,
+    planValidationStatus,
+    planRecommendationAdherence,
+  } = params;
   const findings: WorkflowFinding[] = [];
 
   if (markerStatus === 'missing') {
@@ -40,7 +51,7 @@ export function buildWorkflowFindings(params: {
         'action',
         'unknown',
         'Missing workflow completion marker',
-        'Substantive tasks must emit the versioned workflow-completion-marker:v2 block. Missing markers are unknown, never passes.',
+        'Substantive tasks must emit the versioned workflow-completion-marker:v3 block. Missing markers are unknown, never passes.',
         ['marker:missing']
       )
     );
@@ -86,10 +97,94 @@ export function buildWorkflowFindings(params: {
     );
   }
 
+  if (marker.taskType === 'planning') {
+    if (planValidationStatus === 'malformed') {
+      findings.push(
+        finding(
+          'malformed-plan-contract-marker',
+          'action',
+          'failed',
+          'Malformed plan contract marker',
+          'The plan contract marker was detected but failed validation.',
+          ['plan-contract:malformed']
+        )
+      );
+    } else if (
+      planValidationStatus !== 'present' &&
+      !transcriptSignals?.planContractPresent
+    ) {
+      findings.push(
+        finding(
+          'missing-plan-contract-marker',
+          'action',
+          'failed',
+          'Planning task missing plan contract marker',
+          'Substantive planning handoffs must include a valid plan-contract-marker:v1 block.',
+          [`plan-contract:${planValidationStatus ?? 'unknown'}`]
+        )
+      );
+    }
+  }
+
+  if (
+    marker.schemaVersion === '3' &&
+    marker.registryVersion !== WORKFLOW_MODEL_TIER_REGISTRY_VERSION
+  ) {
+    findings.push(
+      finding(
+        'stale-model-registry',
+        'warning',
+        'failed',
+        'Completion marker uses a stale model registry',
+        'Model recommendations should be produced from the current versioned role registry.',
+        [
+          `marker:registryVersion=${marker.registryVersion ?? 'unknown'}`,
+          `registry:current=${WORKFLOW_MODEL_TIER_REGISTRY_VERSION}`,
+        ]
+      )
+    );
+  }
+
+  const effectivePlanRecommendationAdherence =
+    planRecommendationAdherence ?? marker.planRecommendationAdherence ?? 'unknown';
+  if (effectivePlanRecommendationAdherence === 'deviated') {
+    findings.push(
+      finding(
+        'plan-model-mismatch',
+        'action',
+        'failed',
+        'Observed model tier differs from the plan recommendation',
+        'The selected implementation model tier did not match the recommended build model tier.',
+        [
+          `plan:recommendedTier=${marker.recommendedBuildModel?.implementation.tier ?? 'unknown'}`,
+          `event:selectedModelTier=${observedParentTier ?? 'unknown'}`,
+        ]
+      )
+    );
+  }
+
+  const premiumReReviewCount = new Set(
+    (marker.reviewPasses ?? [])
+      .filter((pass) => pass.tier === 'premium' && pass.iteration > 1)
+      .map((pass) => pass.passId)
+  ).size;
+  if (premiumReReviewCount > 2) {
+    findings.push(
+      finding(
+        'excessive-premium-rereviews',
+        'warning',
+        'unknown',
+        'Excessive premium re-review passes recorded',
+        'More than two unique premium re-review passes were recorded. This is advisory and never blocks handoff.',
+        [`marker:premiumReReviewCount=${premiumReReviewCount}`]
+      )
+    );
+  }
+
   const effectiveParentTier =
     observedParentTier === undefined ? marker.executionParentTier ?? 'unknown' : observedParentTier;
   if (
-    marker.schemaVersion === '2' &&
+    (marker.schemaVersion === '2' || marker.schemaVersion === '3') &&
     observedParentTier !== undefined &&
     observedParentTier !== 'unknown' &&
     marker.executionParentTier !== observedParentTier
@@ -107,7 +202,10 @@ export function buildWorkflowFindings(params: {
         ]
       )
     );
-  } else if (marker.schemaVersion === '2' && observedParentTier === 'unknown') {
+  } else if (
+    (marker.schemaVersion === '2' || marker.schemaVersion === '3') &&
+    observedParentTier === 'unknown'
+  ) {
     findings.push(
       finding(
         'parent-tier-unavailable',
@@ -169,7 +267,7 @@ export function buildWorkflowFindings(params: {
     );
   }
 
-  if (marker.schemaVersion === '2' && marker.risk === 'high') {
+  if ((marker.schemaVersion === '2' || marker.schemaVersion === '3') && marker.risk === 'high') {
     const source = marker.architectureReviewSource ?? 'unknown';
     const parentCanSelfReview = effectiveParentTier === 'premium';
     const sourceIsValid = marker.independentReviewRequired
@@ -243,7 +341,7 @@ export function buildWorkflowFindings(params: {
     );
   }
 
-  if (marker.schemaVersion === '2' && finalReviewRequired) {
+  if ((marker.schemaVersion === '2' || marker.schemaVersion === '3') && finalReviewRequired) {
     const source = marker.finalReviewSource ?? 'unknown';
     const parentCanSelfReview = effectiveParentTier === 'premium';
     const sourceIsValid = marker.independentReviewRequired

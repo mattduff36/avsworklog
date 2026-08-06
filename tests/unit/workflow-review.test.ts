@@ -4,9 +4,14 @@ import { tmpdir } from 'os';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { spawnSync } from 'child_process';
-import { writeMonthlyAutomationPendingFollowUp } from '@/scripts/automation/monthly-follow-up';
+import {
+  runMonthlyAutomationFollowUp,
+  writeMonthlyAutomationPendingFollowUp,
+  type PendingMonthlyFollowUp,
+} from '@/scripts/automation/monthly-follow-up';
 import {
   WORKFLOW_REVIEW_THRESHOLD,
+  createEmptyWorkflowReviewState,
   getWorkflowPaths,
   listWorkflowEvents,
   loadWorkflowReviewState,
@@ -27,7 +32,14 @@ import {
 } from '@/scripts/automation/workflow-model-tier';
 import { assertNoForbiddenPayload, hashIdentifier, sanitizeEvidenceLabel } from '@/scripts/automation/workflow-privacy';
 import { parseWorkflowTranscript } from '@/scripts/automation/workflow-transcript';
-import { processWorkflowStopEvent } from '@/scripts/automation/workflow-review';
+import {
+  extractPlanContractMarker,
+} from '@/scripts/automation/workflow-plan-contract';
+import {
+  buildWorkflowReviewMetrics,
+  computePlanRecommendationAdherence,
+  processWorkflowStopEvent,
+} from '@/scripts/automation/workflow-review';
 import type { WorkflowCompletionMarker, WorkflowStopEvent, WorkflowTranscriptSignals } from '@/scripts/automation/types';
 
 const tempRoots: string[] = [];
@@ -47,7 +59,6 @@ afterEach(() => {
     }
   }
 });
-
 function marker(overrides: Partial<WorkflowCompletionMarker> = {}): WorkflowCompletionMarker {
   const risk = overrides.risk ?? 'routine';
   return {
@@ -55,6 +66,8 @@ function marker(overrides: Partial<WorkflowCompletionMarker> = {}): WorkflowComp
     taskId: overrides.taskId ?? 'task-1',
     taskType: overrides.taskType ?? 'change',
     risk,
+    workstreamId: overrides.workstreamId,
+    sourceWorkstreamIds: overrides.sourceWorkstreamIds,
     exploreCanonical: overrides.exploreCanonical ?? true,
     architectureGate: overrides.architectureGate ?? 'skipped',
     requiredTests: overrides.requiredTests ?? [],
@@ -90,6 +103,29 @@ function markerV2(overrides: Partial<WorkflowCompletionMarker> = {}): WorkflowCo
   };
 }
 
+function markerV3(overrides: Partial<WorkflowCompletionMarker> = {}): WorkflowCompletionMarker {
+  return {
+    ...markerV2(overrides),
+    ...overrides,
+    schemaVersion: '3',
+    workstreamId: overrides.workstreamId ?? 'ws_test',
+    registryVersion: overrides.registryVersion ?? '2',
+    recommendedBuildModel: overrides.recommendedBuildModel ?? {
+      implementation: {
+        role: 'premium-planning',
+        tier: 'premium',
+        family: 'gpt-sol',
+      },
+      premiumGates: [],
+      switchTiming: 'not_applicable',
+      rationale: 'Test recommendation.',
+      fallbackEscalation: 'Escalate if verification fails.',
+    },
+    planRecommendationAdherence: overrides.planRecommendationAdherence ?? 'matched',
+    reviewPasses: overrides.reviewPasses ?? [],
+  };
+}
+
 function writeJsonl(filePath: string, records: unknown[]): void {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${records.map((record) => JSON.stringify(record)).join('\n')}\n`, 'utf8');
@@ -113,6 +149,27 @@ describe('workflow-marker', () => {
     const parsedV1 = extractWorkflowCompletionMarker(renderWorkflowCompletionMarker(marker()));
     expect(parsedV1.status).toBe('present');
     expect(parsedV1.marker?.schemaVersion).toBe('1');
+  });
+
+  it('MARKER-003 validates and selects v3 completion markers', () => {
+    const v3 = markerV3({
+      taskId: 'route-3',
+      sourceWorkstreamIds: ['ws-source-a', 'ws-source-b'],
+    });
+    const parsedV3 = extractWorkflowCompletionMarker(renderWorkflowCompletionMarker(v3));
+    expect(parsedV3.status).toBe('present');
+    expect(parsedV3.marker?.schemaVersion).toBe('3');
+    expect(parsedV3.marker?.workstreamId).toBe('ws_test');
+    expect(parsedV3.marker?.sourceWorkstreamIds).toEqual(['ws-source-a', 'ws-source-b']);
+
+    const incomplete = markerV3();
+    delete incomplete.reviewPasses;
+    expect(validateWorkflowCompletionMarker(incomplete).status).toBe('malformed');
+
+    const latest = extractWorkflowCompletionMarker(
+      `${renderWorkflowCompletionMarker(v3)}\n${renderWorkflowCompletionMarker(markerV2({ taskId: 'latest-v2' }))}`
+    );
+    expect(latest.marker?.taskId).toBe('latest-v2');
   });
 
   it('requires complete v2 routing and independent-review evidence', () => {
@@ -186,16 +243,52 @@ describe('workflow-marker', () => {
     expect(invalidReason.status).toBe('malformed');
   });
 });
-
 describe('workflow-privacy', () => {
-  it('hashes identifiers and redacts sensitive labels', () => {
+  it('PRIVACY-002: hashes identifiers and rejects emails, transcripts, and secrets', () => {
     expect(hashIdentifier('conversation-a')).toBe(
       createHash('sha256').update('conversation-a').digest('hex').slice(0, 32)
     );
     expect(sanitizeEvidenceLabel('email user@example.com path C:\\Users\\mattd\\secret')).not.toContain(
       'user@example.com'
     );
+    expect(sanitizeEvidenceLabel('token=supersecretvalue123 Bearer abcdefghijklmnop')).toContain(
+      '[REDACTED'
+    );
     expect(assertNoForbiddenPayload({ user_email: 'x@y.com' })).toContain('user_email must not be persisted');
+    expect(assertNoForbiddenPayload({ note: 'see agent-transcripts/abc.jsonl' })).toContain(
+      'raw transcript path must not be persisted'
+    );
+    expect(assertNoForbiddenPayload({ note: 'API_KEY=abcd1234efgh5678' })).toContain(
+      'environment secret assignment must not be persisted'
+    );
+    expect(assertNoForbiddenPayload({ note: 'access_token=abcdefghijklmnop' })).toContain(
+      'secret assignment must not be persisted'
+    );
+    expect(assertNoForbiddenPayload({ note: 'refresh_token=abcdefghijklmnop' })).toContain(
+      'secret assignment must not be persisted'
+    );
+    expect(assertNoForbiddenPayload({ note: 'client_secret=abcdefghijklmnop' })).toContain(
+      'secret assignment must not be persisted'
+    );
+    expect(assertNoForbiddenPayload({ note: 'password=hunter22secret' })).toContain(
+      'secret assignment must not be persisted'
+    );
+    expect(
+      assertNoForbiddenPayload({
+        note: 'Bearer abcdefghijklmnopqr',
+      })
+    ).toContain('bearer token must not be persisted');
+    expect(
+      assertNoForbiddenPayload({
+        note: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signaturevaluehere',
+      })
+    ).toContain('JWT token must not be persisted');
+    expect(
+      assertNoForbiddenPayload({
+        note: '-----BEGIN PRIVATE KEY-----\nABC\n-----END PRIVATE KEY-----',
+      })
+    ).toContain('private key material must not be persisted');
+    expect(assertNoForbiddenPayload({ workstreamId: 'ws_safe', taskId: 'task-1' })).toEqual([]);
   });
 });
 
@@ -308,6 +401,7 @@ describe('workflow-transcript adapter', () => {
     );
 
     const parsed = await parseWorkflowTranscript(transcriptPath);
+    expect(parsed.signals.adapterVersion).toBe('2');
     expect(parsed.signals.skillRead).toBe(true);
     expect(parsed.signals.architectureGateTask).toBe(true);
     expect(parsed.signals.finalDiffReviewerTask).toBe(true);
@@ -336,11 +430,49 @@ describe('workflow-transcript adapter', () => {
     expect(parsed.signals.finalDiffReviewerTask).toBe(false);
     expect(parsed.signals.markerPresent).toBe(false);
   });
+
+  it('PLAN-PATH-001: rejects distinct ambiguous plan candidates after stable deduplication', async () => {
+    const root = makeTempRoot('ambiguous-plans');
+    const plansDirectory = path.join(root, 'plans');
+    mkdirSync(plansDirectory, { recursive: true });
+    writeFileSync(path.join(plansDirectory, 'one.plan.md'), '# One\n', 'utf8');
+    writeFileSync(path.join(plansDirectory, 'two.plan.md'), '# Two\n', 'utf8');
+    const transcriptPath = path.join(root, 'chat.jsonl');
+    writeJsonl(transcriptPath, [
+      {
+        role: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'CreatePlan',
+              input: { path: 'plans/one.plan.md' },
+            },
+            {
+              type: 'tool_use',
+              name: 'CreatePlan',
+              input: { path: path.join(root, 'plans', '.', 'one.plan.md') },
+            },
+            {
+              type: 'tool_use',
+              name: 'CreatePlan',
+              input: { path: 'plans/two.plan.md' },
+            },
+          ],
+        },
+      },
+    ]);
+
+    const parsed = await parseWorkflowTranscript(transcriptPath, { repoRoot: root });
+    expect(parsed.signals.planPathSource).toBe('unavailable');
+    expect(parsed.signals.planPathRef).toBeNull();
+    expect(parsed.signals.parseErrors).toContain('ambiguous plan candidates');
+  });
 });
 
 describe('workflow-findings', () => {
   const emptySignals = (): WorkflowTranscriptSignals => ({
-    adapterVersion: '1',
+    adapterVersion: '2',
     skillRead: false,
     architectureGateTask: false,
     finalDiffReviewerTask: false,
@@ -350,6 +482,9 @@ describe('workflow-findings', () => {
     duplicateBroadSearchAfterExplore: false,
     gitCommitEvidence: false,
     markerPresent: false,
+    planContractPresent: false,
+    planPathSource: 'unavailable',
+    planPathRef: null,
     parseErrors: [],
   });
 
@@ -435,7 +570,7 @@ describe('workflow-findings', () => {
       transcriptSignals: emptySignals(),
     });
     expect(findings.some((finding) => finding.id === 'incomplete-commit')).toBe(false);
-    expect(findings.some((finding) => finding.id === 'no-issues')).toBe(true);
+    expect(findings.some((finding) => finding.id === 'missing-plan-contract-marker')).toBe(true);
 
     const estimate = estimatePremiumTokenReduction([
       { marker: marker({ risk: 'high' }) },
@@ -548,6 +683,40 @@ describe('workflow-findings', () => {
 });
 
 describe('workflow events and lock', () => {
+  it('STATE-002 creates v2 state and migrates v1 state defaults', () => {
+    expect(createEmptyWorkflowReviewState()).toMatchObject({
+      schemaVersion: '2',
+      reviewWindowByEventId: {},
+      workstreams: {},
+    });
+
+    const root = makeTempRoot('state-migration');
+    const paths = getWorkflowPaths(root);
+    mkdirSync(path.dirname(paths.statePath), { recursive: true });
+    writeFileSync(
+      paths.statePath,
+      JSON.stringify({
+        schemaVersion: '1',
+        scriptName: 'workflow-review',
+        updatedAt: '2026-07-01T00:00:00.000Z',
+        lastReviewAt: null,
+        lastReviewWindowId: null,
+        lastReviewedEventId: null,
+        unreviewedEventIds: ['event-1'],
+        pendingFollowUpPath: null,
+        processedGenerationHashes: ['generation-1'],
+      }),
+      'utf8'
+    );
+
+    expect(loadWorkflowReviewState(paths.statePath)).toMatchObject({
+      schemaVersion: '2',
+      unreviewedEventIds: ['event-1'],
+      reviewWindowByEventId: {},
+      workstreams: {},
+    });
+  });
+
   it('deduplicates generation events and recovers stale locks', () => {
     const root = makeTempRoot('events');
     const paths = getWorkflowPaths(root);
@@ -653,6 +822,8 @@ describe('workflow-review cadence', () => {
     generationId: string;
     now: Date;
     risk?: 'high' | 'routine';
+    workstreamId?: string;
+    commit?: WorkflowCompletionMarker['commit'];
   }) {
     const transcriptPath = path.join(params.repoRoot, 'transcripts', `${params.generationId}.jsonl`);
     writeJsonl(transcriptPath, [
@@ -670,9 +841,11 @@ describe('workflow-review cadence', () => {
               text: renderWorkflowCompletionMarker(
                 marker({
                   taskId: params.generationId,
+                  workstreamId: params.workstreamId,
                   risk: params.risk ?? 'routine',
                   architectureGate: params.risk === 'high' ? 'approved' : 'skipped',
                   finalReview: params.risk === 'high' ? 'passed' : 'skipped',
+                  commit: params.commit,
                 })
               ),
             },
@@ -721,6 +894,7 @@ describe('workflow-review cadence', () => {
     const paths = getWorkflowPaths(root);
     const state = loadWorkflowReviewState(paths.statePath);
     expect(state.unreviewedEventIds).toHaveLength(0);
+    expect(Object.keys(state.reviewWindowByEventId ?? {})).toHaveLength(5);
   });
 
   it('reviews previous-month remainder on month-boundary backstop', async () => {
@@ -845,6 +1019,95 @@ describe('workflow-review cadence', () => {
     const pendingJson = JSON.parse(readFileSync(pending.pendingPath!, 'utf8')) as Record<string, unknown>;
     expect(pendingJson.reviewWindowId).toBe('202607-window1');
     expect(assertNoForbiddenPayload(pendingJson)).toEqual([]);
+  });
+
+  it('WORKSTREAM-001: carries reviewed workstreams through pending follow-up, plan, and completion state', async () => {
+    const root = makeTempRoot('workstream-lineage');
+    const sourceWorkstreamIds = ['ws-source-a', 'ws-source-a', 'ws-source-b', 'ws-source-c', 'ws-source-d'];
+    let reviewResult: Awaited<ReturnType<typeof seedQualifyingEvent>> | undefined;
+    for (const [index, workstreamId] of sourceWorkstreamIds.entries()) {
+      reviewResult = await seedQualifyingEvent({
+        repoRoot: root,
+        conversationId: `lineage-${index}`,
+        generationId: `lineage-g-${index}`,
+        workstreamId,
+        commit: 'pending',
+        now: new Date(`2026-07-29T0${index + 1}:00:00.000Z`),
+      });
+    }
+
+    expect(reviewResult?.reviewTriggered).toBe(true);
+    expect(reviewResult?.pendingPath).toBeTruthy();
+    const pending = JSON.parse(
+      readFileSync(reviewResult!.pendingPath!, 'utf8')
+    ) as PendingMonthlyFollowUp;
+    expect(pending.sourceWorkstreamIds).toEqual([
+      'ws-source-a',
+      'ws-source-b',
+      'ws-source-c',
+      'ws-source-d',
+    ]);
+
+    const followUp = await runMonthlyAutomationFollowUp({
+      ...pending,
+      decisionProvider: (suggestion) => ({
+        suggestionId: suggestion.id,
+        action: 'approve',
+      }),
+    });
+    expect(followUp.planPath).toBeTruthy();
+    const planContract = extractPlanContractMarker(
+      readFileSync(followUp.planPath!, 'utf8')
+    ).contract;
+    expect(planContract?.sourceWorkstreamIds).toEqual(pending.sourceWorkstreamIds);
+
+    const paths = getWorkflowPaths(root);
+    saveWorkflowReviewState(paths.statePath, {
+      ...loadWorkflowReviewState(paths.statePath),
+      pendingFollowUpPath: null,
+    });
+    rmSync(reviewResult!.pendingPath!, { force: true });
+    const completionTranscript = path.join(root, 'transcripts', 'follow-up.jsonl');
+    writeJsonl(completionTranscript, [
+      {
+        role: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'Read',
+              input: { path: 'token-efficient-engineering/SKILL.md' },
+            },
+            {
+              type: 'text',
+              text: renderWorkflowCompletionMarker(
+                markerV3({
+                  taskId: planContract!.taskId,
+                  workstreamId: planContract!.workstreamId,
+                  sourceWorkstreamIds: planContract!.sourceWorkstreamIds,
+                })
+              ),
+            },
+          ],
+        },
+      },
+    ]);
+    await processWorkflowStopEvent(
+      {
+        conversation_id: 'follow-up-lineage',
+        generation_id: 'follow-up-lineage-generation',
+        model_id: 'gpt-5.6-sol-high',
+        transcript_path: completionTranscript,
+        status: 'completed',
+        loop_count: 0,
+      },
+      { repoRoot: root, now: () => new Date('2026-07-30T01:00:00.000Z') }
+    );
+
+    expect(
+      loadWorkflowReviewState(paths.statePath).workstreams?.[planContract!.workstreamId]
+        ?.sourceWorkstreamIds
+    ).toEqual(pending.sourceWorkstreamIds);
   });
 
   it('keeps event files immutable and clears stale pending follow-up blockers', async () => {
@@ -1026,5 +1289,259 @@ describe('workflow-review cadence', () => {
     expect(existsSync(pending.pendingPath!)).toBe(false);
     expect(existsSync(`${pending.pendingPath!}.resolved`)).toBe(true);
     expect(loadWorkflowReviewState(paths.statePath).pendingFollowUpPath).toBeNull();
+  });
+});
+
+describe('TEE telemetry v3 coverage', () => {
+  function emptySignals(): WorkflowTranscriptSignals {
+    return {
+      adapterVersion: '2',
+      skillRead: false,
+      architectureGateTask: false,
+      finalDiffReviewerTask: false,
+      exploreTask: false,
+      truncatedShellEvidence: false,
+      bulkInsertionScriptEvidence: false,
+      duplicateBroadSearchAfterExplore: false,
+      gitCommitEvidence: false,
+      markerPresent: true,
+      planContractPresent: false,
+      planPathSource: 'unavailable',
+      planPathRef: null,
+      parseErrors: [],
+    };
+  }
+
+  it('EVENT-002: event v2 writes are additive and leave existing event bytes immutable', () => {
+    const root = makeTempRoot('event-v2');
+    const paths = getWorkflowPaths(root);
+    const v1: WorkflowStopEvent = {
+      schemaVersion: '1',
+      eventId: 'event-v1',
+      recordedAt: '2026-08-01T00:00:00.000Z',
+      conversationHash: 'c1',
+      generationHash: 'gen-v1',
+      selectedModel: 'composer-2.5',
+      selectedModelSource: 'model',
+      selectedModelTier: 'economical',
+      status: 'completed',
+      loopCount: 0,
+      qualifies: true,
+      qualificationReasons: ['marker'],
+      marker: marker({ taskId: 'legacy' }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+      findings: [],
+      monthKey: '2026-08',
+    };
+    const first = writeWorkflowEvent(paths.eventsDirectory, v1);
+    expect(first.created).toBe(true);
+    const before = readFileSync(first.path, 'utf8');
+
+    const v2: WorkflowStopEvent = {
+      ...v1,
+      schemaVersion: '2',
+      eventId: 'event-v2',
+      generationHash: 'gen-v2',
+      workstreamId: 'ws_event',
+      planRecommendationAdherence: 'unknown',
+      registryVersion: '2',
+    };
+    writeWorkflowEvent(paths.eventsDirectory, v2);
+    const secondWrite = writeWorkflowEvent(paths.eventsDirectory, {
+      ...v1,
+      marker: marker({ taskId: 'mutated' }),
+    });
+    expect(secondWrite.created).toBe(false);
+    expect(readFileSync(first.path, 'utf8')).toBe(before);
+    expect(listWorkflowEvents(paths.eventsDirectory).map((event) => event.schemaVersion).sort()).toEqual([
+      '1',
+      '2',
+    ]);
+  });
+
+  it('MODEL-ADHERENCE-001: matched, deviated, mismatch, and unknown routing are distinguished', () => {
+    const recommendedEconomical = markerV3({
+      recommendedBuildModel: {
+        implementation: {
+          role: 'economical-default',
+          tier: 'economical',
+          family: 'cursor-grok',
+        },
+        premiumGates: [],
+        switchTiming: 'after_plan_approval',
+        rationale: 'Use economical implementation.',
+        fallbackEscalation: 'Escalate on repeated failure.',
+      },
+    });
+    expect(computePlanRecommendationAdherence(recommendedEconomical, 'economical')).toBe('matched');
+    expect(computePlanRecommendationAdherence(recommendedEconomical, 'premium')).toBe('deviated');
+    expect(computePlanRecommendationAdherence(recommendedEconomical, 'unknown')).toBe('unknown');
+
+    const mismatchFindings = buildWorkflowFindings({
+      marker: markerV3({
+        executionParentTier: 'premium',
+        recommendedBuildModel: recommendedEconomical.recommendedBuildModel,
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+      observedParentTier: 'economical',
+      planRecommendationAdherence: 'matched',
+    });
+    expect(mismatchFindings.map((finding) => finding.id)).toEqual(
+      expect.arrayContaining(['parent-tier-mismatch'])
+    );
+
+    const deviationFindings = buildWorkflowFindings({
+      marker: recommendedEconomical,
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+      observedParentTier: 'premium',
+      planRecommendationAdherence: 'deviated',
+    });
+    expect(deviationFindings.map((finding) => finding.id)).toEqual(
+      expect.arrayContaining(['plan-model-mismatch'])
+    );
+  });
+
+  it('REVIEW-CHURN-001: deduplicates premium re-review passes and flags more than two advisories', () => {
+    const findings = buildWorkflowFindings({
+      marker: markerV3({
+        reviewPasses: [
+          {
+            passId: 'final-1',
+            stage: 'final-diff-reviewer',
+            source: 'independent_subagent',
+            tier: 'premium',
+            iteration: 2,
+            result: 'failed',
+          },
+          {
+            passId: 'final-1',
+            stage: 'final-diff-reviewer',
+            source: 'independent_subagent',
+            tier: 'premium',
+            iteration: 2,
+            result: 'failed',
+          },
+          {
+            passId: 'final-2',
+            stage: 'final-diff-reviewer',
+            source: 'independent_subagent',
+            tier: 'premium',
+            iteration: 3,
+            result: 'failed',
+          },
+          {
+            passId: 'final-3',
+            stage: 'final-diff-reviewer',
+            source: 'independent_subagent',
+            tier: 'premium',
+            iteration: 4,
+            result: 'failed',
+          },
+        ],
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+      observedParentTier: 'economical',
+    });
+    const churn = findings.find((finding) => finding.id === 'excessive-premium-rereviews');
+    expect(churn).toBeTruthy();
+    expect(churn?.severity).toBe('warning');
+    expect(churn?.detail).toMatch(/advisory/i);
+  });
+
+  it('MONTHLY-002: metrics report adherence and churn while treating legacy evidence as unknown', () => {
+    const legacy: WorkflowStopEvent = {
+      schemaVersion: '1',
+      eventId: 'legacy',
+      recordedAt: '2026-08-01T00:00:00.000Z',
+      conversationHash: 'c',
+      generationHash: 'g-legacy',
+      selectedModel: 'composer-2.5',
+      selectedModelSource: 'model',
+      selectedModelTier: 'economical',
+      status: 'completed',
+      loopCount: 0,
+      qualifies: true,
+      qualificationReasons: ['marker'],
+      marker: marker({ taskType: 'planning', taskId: 'legacy-plan' }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+      findings: [],
+      monthKey: '2026-08',
+    };
+    const modern: WorkflowStopEvent = {
+      ...legacy,
+      schemaVersion: '2',
+      eventId: 'modern',
+      generationHash: 'g-modern',
+      planRecommendationAdherence: 'matched',
+      registryVersion: '2',
+      reviewPasses: [
+        {
+          passId: 'a',
+          stage: 'final-diff-reviewer',
+          source: 'independent_subagent',
+          tier: 'premium',
+          iteration: 2,
+          result: 'failed',
+        },
+        {
+          passId: 'b',
+          stage: 'final-diff-reviewer',
+          source: 'independent_subagent',
+          tier: 'premium',
+          iteration: 3,
+          result: 'failed',
+        },
+        {
+          passId: 'c',
+          stage: 'final-diff-reviewer',
+          source: 'independent_subagent',
+          tier: 'premium',
+          iteration: 4,
+          result: 'failed',
+        },
+      ],
+      marker: markerV3({ taskType: 'planning', taskId: 'modern-plan' }),
+      transcriptSignals: {
+        ...emptySignals(),
+        planContractPresent: true,
+      },
+    };
+
+    const metrics = buildWorkflowReviewMetrics([legacy, modern]);
+    expect(metrics.recommendationAdherenceCounts?.unknown).toBe(1);
+    expect(metrics.recommendationAdherenceCounts?.matched).toBe(1);
+    expect(metrics.premiumReReviewFlagCount).toBe(1);
+    expect(metrics.registryVersionCounts?.unknown).toBe(1);
+    expect(metrics.registryVersionCounts?.['2']).toBe(1);
+    expect(metrics.planContractPresentCount).toBe(1);
+    expect(metrics.planContractMissingCount).toBe(1);
+  });
+
+  it('FINAL-REVIEW-001: high-risk markers without independent final review remain failed findings', () => {
+    const findings = buildWorkflowFindings({
+      marker: markerV3({
+        risk: 'high',
+        finalReviewRequired: true,
+        finalReview: 'skipped',
+        finalReviewSource: 'independent_subagent',
+        architectureGate: 'approved',
+        architectureReviewSource: 'independent_subagent',
+        independentReviewRequired: true,
+        independentReviewReasons: ['broad-regression'],
+        requiredTests: [{ id: 'FINAL-REVIEW-001', status: 'completed' }],
+        executionParentTier: 'economical',
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+      observedParentTier: 'economical',
+    });
+    expect(findings.map((finding) => finding.id)).toEqual(
+      expect.arrayContaining(['missing-final-review'])
+    );
   });
 });

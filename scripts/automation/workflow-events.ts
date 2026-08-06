@@ -12,7 +12,11 @@ import {
   unlinkSync,
 } from 'fs';
 import path from 'path';
-import type { WorkflowReviewState, WorkflowStopEvent } from './types';
+import type {
+  WorkflowReviewState,
+  WorkflowStopEvent,
+  WorkflowWorkstreamRecord,
+} from './types';
 
 export const WORKFLOW_SCRIPT_NAME = 'workflow-review' as const;
 export const WORKFLOW_REVIEW_THRESHOLD = 5;
@@ -45,7 +49,7 @@ export function getWorkflowPaths(repoRoot = process.cwd()): WorkflowPaths {
 
 export function createEmptyWorkflowReviewState(): WorkflowReviewState {
   return {
-    schemaVersion: '1',
+    schemaVersion: '2',
     scriptName: WORKFLOW_SCRIPT_NAME,
     updatedAt: new Date(0).toISOString(),
     lastReviewAt: null,
@@ -54,14 +58,16 @@ export function createEmptyWorkflowReviewState(): WorkflowReviewState {
     unreviewedEventIds: [],
     pendingFollowUpPath: null,
     processedGenerationHashes: [],
+    reviewWindowByEventId: {},
+    workstreams: {},
   };
 }
 
-function isWorkflowReviewState(value: unknown): value is WorkflowReviewState {
+export function isWorkflowReviewState(value: unknown): value is WorkflowReviewState {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<WorkflowReviewState>;
   return (
-    candidate.schemaVersion === '1' &&
+    (candidate.schemaVersion === '1' || candidate.schemaVersion === '2') &&
     candidate.scriptName === WORKFLOW_SCRIPT_NAME &&
     Array.isArray(candidate.unreviewedEventIds) &&
     Array.isArray(candidate.processedGenerationHashes)
@@ -73,15 +79,92 @@ export function loadWorkflowReviewState(statePath: string): WorkflowReviewState 
   try {
     const parsed = JSON.parse(readFileSync(statePath, 'utf8')) as unknown;
     if (isWorkflowReviewState(parsed)) {
+      const defaults = createEmptyWorkflowReviewState();
       return {
-        ...createEmptyWorkflowReviewState(),
+        ...defaults,
         ...parsed,
+        schemaVersion: '2',
+        reviewWindowByEventId:
+          parsed.reviewWindowByEventId &&
+          typeof parsed.reviewWindowByEventId === 'object' &&
+          !Array.isArray(parsed.reviewWindowByEventId)
+            ? parsed.reviewWindowByEventId
+            : {},
+        workstreams:
+          parsed.workstreams &&
+          typeof parsed.workstreams === 'object' &&
+          !Array.isArray(parsed.workstreams)
+            ? parsed.workstreams
+            : {},
       };
     }
   } catch {
     // Keep collector fail-open when state is human-edited or corrupted.
   }
   return createEmptyWorkflowReviewState();
+}
+
+export function upsertWorkstreamRecord(
+  state: WorkflowReviewState,
+  record: WorkflowWorkstreamRecord
+): WorkflowReviewState {
+  const workstreams = state.workstreams ?? {};
+  const existing = workstreams[record.workstreamId];
+  return {
+    ...state,
+    schemaVersion: '2',
+    workstreams: {
+      ...workstreams,
+      [record.workstreamId]: existing
+        ? {
+            ...existing,
+            ...record,
+            branchName: record.branchName ?? existing.branchName,
+            headCommit: record.headCommit ?? existing.headCommit,
+            taskIds: [...new Set([...existing.taskIds, ...record.taskIds])],
+            eventIds: [...new Set([...existing.eventIds, ...record.eventIds])],
+            sourceWorkstreamIds:
+              existing.sourceWorkstreamIds || record.sourceWorkstreamIds
+                ? [
+                    ...new Set([
+                      ...(existing.sourceWorkstreamIds ?? []),
+                      ...(record.sourceWorkstreamIds ?? []),
+                    ]),
+                  ]
+                : undefined,
+          }
+        : record,
+    },
+  };
+}
+
+export function attachEventToReviewWindow(
+  state: WorkflowReviewState,
+  eventId: string,
+  reviewWindowId: string
+): WorkflowReviewState {
+  return {
+    ...state,
+    schemaVersion: '2',
+    reviewWindowByEventId: {
+      ...(state.reviewWindowByEventId ?? {}),
+      [eventId]: reviewWindowId,
+    },
+  };
+}
+
+export function listOpenWorkstreamsForBranch(
+  state: WorkflowReviewState,
+  branchName: string
+): WorkflowWorkstreamRecord[] {
+  return Object.values(state.workstreams ?? {})
+    .filter(
+      (record) =>
+        record.status === 'open' &&
+        record.branchName !== null &&
+        record.branchName === branchName
+    )
+    .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
 }
 
 export function writeJsonAtomic(filePath: string, value: unknown): void {

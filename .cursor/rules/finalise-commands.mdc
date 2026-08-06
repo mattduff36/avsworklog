@@ -30,7 +30,7 @@ These phrases and aliases are explicit authorisation for commit, and the push va
 When Cursor Grok or another economical parent runs a finalise command:
 - Keep ownership of the finalise command, output monitoring, retries, commit, and authorised push in the parent.
 - Fix only clearly trivial failures directly: a one-line type/import/lint correction or an obvious test assertion update.
-- For an important or ambiguous failure that is not a blocker category below, launch a `generalPurpose` subagent using `gpt-5.6-sol-high`.
+- For an important or ambiguous failure that is not a blocker category below, launch a `generalPurpose` subagent using the registry role `premium-fix-routing` (current binding: GPT-5.6 Sol high).
 - Treat a failure as important when it needs design judgment, touches auth/permissions/shared layout or multiple modules, requires a non-obvious refactor, or the correct fix is uncertain.
 - Give the subagent the failing step, complete relevant error output, involved files, expected result, and: `Fix only what is needed to unblock finalise, then stop. Do not push or run finalise.`
 - After the subagent returns, inspect its changes and rerun the exact same mapped finalise command.

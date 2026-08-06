@@ -7,6 +7,11 @@ import {
   saveAutomationMemory,
 } from './memory';
 import type { AutomationMemorySuggestion } from './types';
+import {
+  createDefaultPlanContract,
+  createWorkflowWorkstreamId,
+  renderPlanContractMarker,
+} from './workflow-plan-contract';
 
 type FollowUpAction = 'approve' | 'reject' | 'skip';
 type TerminalReadableStream = NodeJS.ReadableStream & { isTTY?: boolean };
@@ -35,6 +40,8 @@ export interface MonthlyFollowUpParams {
   repoRoot?: string;
   /** Optional unique window under the month for multi-review scripts such as workflow-review. */
   reviewWindowId?: string;
+  /** Opaque workstreams whose reviewed events produced this follow-up. */
+  sourceWorkstreamIds?: string[];
   input?: TerminalReadableStream;
   output?: TerminalWritableStream;
   isInteractive?: boolean;
@@ -55,6 +62,7 @@ export interface PendingMonthlyFollowUp {
   repoRoot: string;
   suggestions: AutomationMemorySuggestion[];
   reviewWindowId?: string;
+  sourceWorkstreamIds?: string[];
 }
 
 const DECISION_REASON: Record<FollowUpAction, string> = {
@@ -227,6 +235,9 @@ export function writeMonthlyAutomationPendingFollowUp(params: MonthlyFollowUpPar
     repoRoot,
     suggestions: params.suggestions,
     reviewWindowId: params.reviewWindowId,
+    sourceWorkstreamIds: params.sourceWorkstreamIds
+      ? [...new Set(params.sourceWorkstreamIds.filter((id) => id.trim()))]
+      : undefined,
   };
 
   mkdirSync(path.dirname(pendingPath), { recursive: true });
@@ -245,6 +256,7 @@ function renderPlan(params: {
   planPath: string;
   suggestions: AutomationMemorySuggestion[];
   repoRoot: string;
+  sourceWorkstreamIds?: string[];
 }): string {
   const planRelativePath = formatRelativePath(params.repoRoot, params.planPath);
   const reviewRelativePath = formatRelativePath(params.repoRoot, params.reviewPath);
@@ -253,6 +265,25 @@ function renderPlan(params: {
     id: suggestion.id.replace(new RegExp(`^${params.scriptName}-`, 'u'), ''),
     content: suggestion.title,
   }));
+  const workstreamId = createWorkflowWorkstreamId('followup');
+  const taskId = `${params.scriptName}-${params.monthKey}-automation-upgrade`;
+  const contract = createDefaultPlanContract({
+    workstreamId,
+    sourceWorkstreamIds: params.sourceWorkstreamIds,
+    taskId,
+    taskType: 'change',
+    risk: 'routine',
+    initialParentTier: 'economical',
+    routingDecision: 'economical_default',
+    rationale:
+      'Monthly automation upgrades are scoped script/test edits that follow an approved suggestion list.',
+    fallbackEscalation:
+      'Escalate to premium-final-review if the change expands into shared workflow architecture or verification fails twice.',
+    requiredTests: [
+      { id: 'AUTO-PLAN-001', status: 'unresolved' },
+      { id: 'REGRESSION-001', status: 'unresolved' },
+    ],
+  });
 
   return [
     '---',
@@ -267,7 +298,50 @@ function renderPlan(params: {
     'isProject: false',
     '---',
     '',
+    renderPlanContractMarker(contract),
+    '',
     `# ${params.scriptName} ${params.monthKey} Automation Upgrade Plan`,
+    '',
+    '## Classification',
+    '',
+    `- taskType: change`,
+    `- risk: routine`,
+    `- parent tier: economical`,
+    `- routingDecision: economical_default`,
+    `- workstreamId: ${workstreamId}`,
+    ...(contract.sourceWorkstreamIds?.length
+      ? [`- sourceWorkstreamIds: ${contract.sourceWorkstreamIds.join(', ')}`]
+      : []),
+    '',
+    '## Recommended build model',
+    '',
+    '- Implementation: Cursor Grok / economical-default',
+    '- Premium gates: none mandatory for routine automation upgrades',
+    '- Switch timing: after_plan_approval',
+    '- Fallback: escalate to premium-final-review if scope expands or verification fails twice',
+    '',
+    '## Architecture gate',
+    '',
+    '- skipped for routine scoped automation upgrades',
+    '',
+    '## Implementation contract',
+    '',
+    '- Pattern: implement only approved suggestions with focused tests',
+    '- Verification: run focused automation tests covering changed behavior',
+    '',
+    '## Required tests',
+    '',
+    '- AUTO-PLAN-001',
+    '- REGRESSION-001',
+    '',
+    '## Final review',
+    '',
+    '- local review unless escalation triggers apply',
+    '',
+    '## Commit and handoff',
+    '',
+    '- Do not commit or push unless the user explicitly asks',
+    '- Emit workflow-completion-marker:v3 at handoff',
     '',
     '## Source Artifacts',
     '',
@@ -508,6 +582,7 @@ export async function runMonthlyAutomationFollowUp(params: MonthlyFollowUpParams
       planPath,
       suggestions: approvedSuggestions,
       repoRoot,
+      sourceWorkstreamIds: params.sourceWorkstreamIds,
     }), 'utf8');
   }
 

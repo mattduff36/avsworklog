@@ -1,15 +1,23 @@
-import { createReadStream, existsSync, statSync } from 'fs';
+import { createReadStream, existsSync, readFileSync, statSync } from 'fs';
+import path from 'path';
 import { createInterface } from 'readline';
 import { extractWorkflowCompletionMarker } from './workflow-marker';
-import type { WorkflowTranscriptSignals } from './types';
+import {
+  PLAN_CONTRACT_MARKER_PREFIX,
+  extractPlanContractMarker,
+  resolvePlanPath,
+} from './workflow-plan-contract';
+import type { WorkflowPlanContract, WorkflowTranscriptSignals } from './types';
 
-export const WORKFLOW_TRANSCRIPT_ADAPTER_VERSION = '1';
+export const WORKFLOW_TRANSCRIPT_ADAPTER_VERSION = '2';
 const MAX_TRANSCRIPT_BYTES = 8_000_000;
 const MAX_LINE_LENGTH = 500_000;
 
 export interface TranscriptParseResult {
   signals: WorkflowTranscriptSignals;
   assistantText: string;
+  planValidationStatus: 'present' | 'missing' | 'malformed' | 'unknown';
+  planContract: WorkflowPlanContract | null;
 }
 
 function emptySignals(parseErrors: string[] = []): WorkflowTranscriptSignals {
@@ -24,6 +32,9 @@ function emptySignals(parseErrors: string[] = []): WorkflowTranscriptSignals {
     duplicateBroadSearchAfterExplore: false,
     gitCommitEvidence: false,
     markerPresent: false,
+    planContractPresent: false,
+    planPathSource: 'unavailable',
+    planPathRef: null,
     parseErrors,
   };
 }
@@ -46,17 +57,70 @@ function collectText(content: unknown): string {
     .join('\n');
 }
 
+function collectStringValues(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(collectStringValues);
+  const record = asRecord(value);
+  return record ? Object.values(record).flatMap(collectStringValues) : [];
+}
+
+function normalizePlanCandidatePath(candidatePath: string, repoRoot: string): string {
+  const absolute = path.isAbsolute(candidatePath)
+    ? path.normalize(candidatePath.trim())
+    : path.resolve(repoRoot, candidatePath.trim());
+  const normalized = absolute.replace(/\\/gu, '/');
+  return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+}
+
 function inspectToolUse(
   part: Record<string, unknown>,
   signals: WorkflowTranscriptSignals,
   counters: {
     exploreSeen: boolean;
     broadSearchSignatures: Set<string>;
+    planToolSeen: boolean;
+    planCandidatePaths: string[];
+    planPayloads: string[];
   }
 ): void {
   if (part.type !== 'tool_use') return;
   const name = typeof part.name === 'string' ? part.name : '';
   const input = asRecord(part.input) ?? {};
+  const normalizedName = name.toLowerCase();
+
+  const serializedInput = JSON.stringify(input);
+  const isCreatePlan = normalizedName === 'createplan' || normalizedName === 'create_plan';
+  const isWriteTool =
+    normalizedName === 'write' ||
+    normalizedName === 'writefile' ||
+    normalizedName === 'write_file' ||
+    normalizedName === 'editfile' ||
+    normalizedName === 'edit_file' ||
+    normalizedName === 'applypatch' ||
+    normalizedName === 'apply_patch';
+  const pathValues = [
+    input.path,
+    input.filePath,
+    input.file_path,
+    input.targetFile,
+    input.target_file,
+    input.planPath,
+    input.plan_path,
+  ].filter((value): value is string => typeof value === 'string' && value.trim().length > 0);
+  const patchPaths = [...serializedInput.matchAll(/\*{3}\s+(?:Add|Update) File:\s*([^\\r\\n"]+\.md)\b/giu)]
+    .map((match) => match[1]?.trim())
+    .filter((value): value is string => Boolean(value));
+  const planPaths = [...pathValues, ...patchPaths].filter(
+    (candidate) => /\.md$/iu.test(candidate) && (isCreatePlan || /(?:^|[\\/_.-])plans?(?:[\\/_.-]|$)/iu.test(candidate))
+  );
+  if (isCreatePlan || (isWriteTool && planPaths.length > 0)) {
+    counters.planToolSeen = true;
+    counters.planCandidatePaths.push(...planPaths);
+    counters.planPayloads.push(...collectStringValues(input));
+    if (serializedInput.includes(PLAN_CONTRACT_MARKER_PREFIX)) {
+      signals.planContractPresent = true;
+    }
+  }
 
   if (name === 'Read' || name === 'ReadFile') {
     const filePath = typeof input.path === 'string' ? input.path : '';
@@ -109,11 +173,16 @@ function inspectToolUse(
   }
 }
 
-export async function parseWorkflowTranscript(transcriptPath: string | null): Promise<TranscriptParseResult> {
+export async function parseWorkflowTranscript(
+  transcriptPath: string | null,
+  options?: { repoRoot?: string }
+): Promise<TranscriptParseResult> {
   if (!transcriptPath) {
     return {
       signals: emptySignals(['transcript_path was null']),
       assistantText: '',
+      planValidationStatus: 'unknown',
+      planContract: null,
     };
   }
 
@@ -121,6 +190,8 @@ export async function parseWorkflowTranscript(transcriptPath: string | null): Pr
     return {
       signals: emptySignals(['transcript file not found']),
       assistantText: '',
+      planValidationStatus: 'unknown',
+      planContract: null,
     };
   }
 
@@ -129,11 +200,19 @@ export async function parseWorkflowTranscript(transcriptPath: string | null): Pr
     return {
       signals: emptySignals([`transcript exceeds ${MAX_TRANSCRIPT_BYTES} bytes`]),
       assistantText: '',
+      planValidationStatus: 'unknown',
+      planContract: null,
     };
   }
 
   const signals = emptySignals();
-  const counters = { exploreSeen: false, broadSearchSignatures: new Set<string>() };
+  const counters = {
+    exploreSeen: false,
+    broadSearchSignatures: new Set<string>(),
+    planToolSeen: false,
+    planCandidatePaths: [] as string[],
+    planPayloads: [] as string[],
+  };
   const assistantChunks: string[] = [];
   let sawBom = false;
 
@@ -180,6 +259,51 @@ export async function parseWorkflowTranscript(transcriptPath: string | null): Pr
   const assistantText = assistantChunks.join('\n');
   const marker = extractWorkflowCompletionMarker(assistantText);
   signals.markerPresent = marker.status === 'present';
+  let planValidationStatus: TranscriptParseResult['planValidationStatus'] = counters.planToolSeen
+    ? 'missing'
+    : 'unknown';
+  let planContract: WorkflowPlanContract | null = null;
 
-  return { signals, assistantText };
+  for (const payload of counters.planPayloads) {
+    if (!payload.includes(PLAN_CONTRACT_MARKER_PREFIX)) continue;
+    const parsedPlan = extractPlanContractMarker(payload);
+    planValidationStatus = parsedPlan.status;
+    signals.planContractPresent = parsedPlan.status === 'present';
+    planContract = parsedPlan.contract;
+  }
+
+  const repoRoot = options?.repoRoot ?? process.cwd();
+  const distinctPlanPaths = new Map<string, string>();
+  for (const candidatePath of counters.planCandidatePaths) {
+    const normalized = normalizePlanCandidatePath(candidatePath, repoRoot);
+    if (!distinctPlanPaths.has(normalized)) distinctPlanPaths.set(normalized, candidatePath);
+  }
+  const planPaths = [...distinctPlanPaths.values()];
+  if (planPaths.length > 1) {
+    signals.planPathSource = 'unavailable';
+    signals.planPathRef = null;
+    signals.parseErrors.push('ambiguous plan candidates');
+  } else if (planPaths[0]) {
+    const resolution = resolvePlanPath({
+      candidatePath: planPaths[0],
+      repoRoot,
+    });
+    signals.planPathSource = resolution.source;
+    signals.planPathRef = resolution.pathRef;
+    if (resolution.status === 'ok' && resolution.absolutePath) {
+      try {
+        const parsedPlan = extractPlanContractMarker(
+          readFileSync(resolution.absolutePath, 'utf8')
+        );
+        planValidationStatus = parsedPlan.status;
+        signals.planContractPresent = parsedPlan.status === 'present';
+        planContract = parsedPlan.contract;
+      } catch {
+        signals.parseErrors.push('unable to inspect resolved plan file');
+        planValidationStatus = 'unknown';
+      }
+    }
+  }
+
+  return { signals, assistantText, planValidationStatus, planContract };
 }

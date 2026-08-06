@@ -6,7 +6,10 @@ import type {
   WorkflowGateDecision,
   WorkflowHandoffStatus,
   WorkflowParentTier,
+  WorkflowPlanRecommendationAdherence,
+  WorkflowRecommendedBuildModel,
   WorkflowRequiredTest,
+  WorkflowReviewPassRecord,
   WorkflowRisk,
   WorkflowReviewSource,
   WorkflowRoutingDecision,
@@ -17,7 +20,8 @@ import { isWorkflowRoutingDecisionCoherent } from './workflow-model-tier';
 
 export const WORKFLOW_MARKER_PREFIX_V1 = '<!-- workflow-completion-marker:v1';
 export const WORKFLOW_MARKER_PREFIX_V2 = '<!-- workflow-completion-marker:v2';
-export const WORKFLOW_MARKER_PREFIX = WORKFLOW_MARKER_PREFIX_V2;
+export const WORKFLOW_MARKER_PREFIX_V3 = '<!-- workflow-completion-marker:v3';
+export const WORKFLOW_MARKER_PREFIX = WORKFLOW_MARKER_PREFIX_V3;
 export const WORKFLOW_MARKER_SUFFIX = '-->';
 
 const TASK_TYPES = new Set<WorkflowTaskType>(['change', 'planning', 'review']);
@@ -56,6 +60,24 @@ const REVIEW_SOURCES = new Set<WorkflowReviewSource>([
   'not_applicable',
   'unknown',
 ]);
+const PLAN_ADHERENCE_STATES = new Set<WorkflowPlanRecommendationAdherence>([
+  'matched',
+  'deviated',
+  'not_applicable',
+  'unknown',
+]);
+const REVIEW_PASS_STAGES = new Set<WorkflowReviewPassRecord['stage']>([
+  'architecture-gate',
+  'final-diff-reviewer',
+  'local-review',
+  'other',
+]);
+const REVIEW_PASS_RESULTS = new Set<WorkflowReviewPassRecord['result']>([
+  'passed',
+  'failed',
+  'blocked',
+  'unknown',
+]);
 
 export interface ParsedWorkflowMarker {
   status: 'present' | 'missing' | 'malformed';
@@ -70,6 +92,24 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function parseOptionalStringArray(
+  value: unknown,
+  fieldName: string
+): { values: string[] | undefined; errors: string[] } {
+  if (value === undefined) return { values: undefined, errors: [] };
+  if (!Array.isArray(value)) {
+    return { values: undefined, errors: [`${fieldName} must be an array when provided`] };
+  }
+  const values = value.map(asString).filter((entry): entry is string => Boolean(entry));
+  if (values.length !== value.length) {
+    return {
+      values: undefined,
+      errors: [`${fieldName} must contain only non-empty strings`],
+    };
+  }
+  return { values: [...new Set(values)], errors: [] };
 }
 
 function parseRequiredTests(value: unknown): { tests: WorkflowRequiredTest[]; errors: string[] } {
@@ -123,6 +163,127 @@ function parseUnresolvedRisks(value: unknown): { risks: WorkflowUnresolvedRisk[]
   return { risks, errors };
 }
 
+function parseRecommendedBuildModel(value: unknown): {
+  model: WorkflowRecommendedBuildModel | null;
+  errors: string[];
+} {
+  if (!isObject(value)) {
+    return { model: null, errors: ['recommendedBuildModel must be an object'] };
+  }
+  const implementation = isObject(value.implementation) ? value.implementation : null;
+  const role = implementation ? asString(implementation.role) : null;
+  const tier = implementation
+    ? (asString(implementation.tier) as WorkflowParentTier | null)
+    : null;
+  const family = implementation ? asString(implementation.family) : null;
+  const switchTiming = asString(value.switchTiming);
+  const rationale = asString(value.rationale);
+  const fallbackEscalation = asString(value.fallbackEscalation);
+  const errors: string[] = [];
+
+  if (!role) errors.push('recommendedBuildModel.implementation.role is required');
+  if (!tier || !PARENT_TIERS.has(tier)) {
+    errors.push('recommendedBuildModel.implementation.tier is invalid');
+  }
+  if (!Array.isArray(value.premiumGates)) {
+    errors.push('recommendedBuildModel.premiumGates must be an array');
+  }
+  const premiumGates: WorkflowRecommendedBuildModel['premiumGates'] = [];
+  if (Array.isArray(value.premiumGates)) {
+    for (const [index, entry] of value.premiumGates.entries()) {
+      if (!isObject(entry)) {
+        errors.push(`recommendedBuildModel.premiumGates[${index}] must be an object`);
+        continue;
+      }
+      const phase = asString(entry.phase);
+      const gateRole = asString(entry.role);
+      const gateTier = asString(entry.tier) as WorkflowParentTier | null;
+      if (
+        !phase ||
+        !gateRole ||
+        !gateTier ||
+        !PARENT_TIERS.has(gateTier) ||
+        typeof entry.mandatory !== 'boolean'
+      ) {
+        errors.push(
+          `recommendedBuildModel.premiumGates[${index}] requires phase, role, tier, mandatory`
+        );
+        continue;
+      }
+      premiumGates.push({
+        phase,
+        role: gateRole,
+        tier: gateTier,
+        mandatory: entry.mandatory,
+      });
+    }
+  }
+  if (
+    switchTiming !== 'before_substantive_implementation' &&
+    switchTiming !== 'after_plan_approval' &&
+    switchTiming !== 'not_applicable'
+  ) {
+    errors.push('recommendedBuildModel.switchTiming is invalid');
+  }
+  if (!rationale) errors.push('recommendedBuildModel.rationale is required');
+  if (!fallbackEscalation) errors.push('recommendedBuildModel.fallbackEscalation is required');
+
+  if (errors.length > 0 || !role || !tier || !switchTiming || !rationale || !fallbackEscalation) {
+    return { model: null, errors };
+  }
+  return {
+    model: {
+      implementation: { role, tier, family: family ?? undefined },
+      premiumGates,
+      switchTiming: switchTiming as WorkflowRecommendedBuildModel['switchTiming'],
+      rationale,
+      fallbackEscalation,
+    },
+    errors: [],
+  };
+}
+
+function parseReviewPasses(value: unknown): {
+  passes: WorkflowReviewPassRecord[];
+  errors: string[];
+} {
+  if (!Array.isArray(value)) return { passes: [], errors: ['reviewPasses must be an array'] };
+  const passes: WorkflowReviewPassRecord[] = [];
+  const errors: string[] = [];
+  for (const [index, entry] of value.entries()) {
+    if (!isObject(entry)) {
+      errors.push(`reviewPasses[${index}] must be an object`);
+      continue;
+    }
+    const passId = asString(entry.passId);
+    const stage = asString(entry.stage) as WorkflowReviewPassRecord['stage'] | null;
+    const source = asString(entry.source) as WorkflowReviewSource | null;
+    const tier = asString(entry.tier) as WorkflowParentTier | null;
+    const result = asString(entry.result) as WorkflowReviewPassRecord['result'] | null;
+    const iteration = entry.iteration;
+    if (
+      !passId ||
+      !stage ||
+      !REVIEW_PASS_STAGES.has(stage) ||
+      !source ||
+      !REVIEW_SOURCES.has(source) ||
+      !tier ||
+      !PARENT_TIERS.has(tier) ||
+      !Number.isInteger(iteration) ||
+      (iteration as number) < 1 ||
+      !result ||
+      !REVIEW_PASS_RESULTS.has(result)
+    ) {
+      errors.push(
+        `reviewPasses[${index}] requires valid passId, stage, source, tier, iteration, result`
+      );
+      continue;
+    }
+    passes.push({ passId, stage, source, tier, iteration: iteration as number, result });
+  }
+  return { passes, errors };
+}
+
 export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflowMarker {
   if (!isObject(value)) {
     return { status: 'malformed', marker: null, errors: ['marker must be a JSON object'] };
@@ -165,8 +326,8 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   const independentReviewRequired =
     value.independentReviewRequired === true || independentReviewReasons.length > 0;
 
-  if (schemaVersion !== '1' && schemaVersion !== '2') {
-    errors.push('schemaVersion must be "1" or "2"');
+  if (schemaVersion !== '1' && schemaVersion !== '2' && schemaVersion !== '3') {
+    errors.push('schemaVersion must be "1", "2", or "3"');
   }
   if (!taskId) errors.push('taskId is required');
   if (!taskType || !TASK_TYPES.has(taskType)) errors.push('taskType must be change|planning|review');
@@ -208,7 +369,7 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   ) {
     errors.push('independentReviewRequired must be boolean when provided');
   }
-  if (schemaVersion === '2') {
+  if (schemaVersion === '2' || schemaVersion === '3') {
     if (typeof value.finalReviewRequired !== 'boolean') {
       errors.push('finalReviewRequired is required for schemaVersion 2');
     }
@@ -263,25 +424,25 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   const requiredTests = parseRequiredTests(value.requiredTests);
   const unresolvedRisks = parseUnresolvedRisks(value.unresolvedRisks);
   errors.push(...requiredTests.errors, ...unresolvedRisks.errors);
-  if (schemaVersion === '2' && risk === 'high' && requiredTests.tests.length === 0) {
-    errors.push('high-risk schemaVersion 2 markers require stable requiredTests IDs');
+  if ((schemaVersion === '2' || schemaVersion === '3') && risk === 'high' && requiredTests.tests.length === 0) {
+    errors.push('high-risk schemaVersion 2/3 markers require stable requiredTests IDs');
   }
   if (
-    schemaVersion === '2' &&
+    (schemaVersion === '2' || schemaVersion === '3') &&
     architectureReviewSource === 'parent_structured' &&
     executionParentTier !== 'premium'
   ) {
     errors.push('parent_structured architecture review requires a premium execution parent');
   }
   if (
-    schemaVersion === '2' &&
+    (schemaVersion === '2' || schemaVersion === '3') &&
     finalReviewSource === 'parent_structured' &&
     executionParentTier !== 'premium'
   ) {
     errors.push('parent_structured final review requires a premium execution parent');
   }
   if (
-    schemaVersion === '2' &&
+    (schemaVersion === '2' || schemaVersion === '3') &&
     independentReviewRequired &&
     risk === 'high' &&
     architectureReviewSource !== 'independent_subagent'
@@ -289,12 +450,53 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
     errors.push('independent architecture review must use independent_subagent');
   }
   if (
-    schemaVersion === '2' &&
+    (schemaVersion === '2' || schemaVersion === '3') &&
     independentReviewRequired &&
     finalReviewRequired &&
     finalReviewSource !== 'independent_subagent'
   ) {
     errors.push('independent final review must use independent_subagent');
+  }
+
+  const workstreamId = asString(value.workstreamId);
+  const sourceWorkstreamIds = parseOptionalStringArray(
+    value.sourceWorkstreamIds,
+    'sourceWorkstreamIds'
+  );
+  const registryVersion = asString(value.registryVersion);
+  const planRecommendationAdherence = asString(
+    value.planRecommendationAdherence
+  ) as WorkflowPlanRecommendationAdherence | null;
+  const recommendedBuildModel =
+    value.recommendedBuildModel === undefined
+      ? { model: null, errors: [] }
+      : parseRecommendedBuildModel(value.recommendedBuildModel);
+  const reviewPasses =
+    value.reviewPasses === undefined
+      ? { passes: [], errors: [] }
+      : parseReviewPasses(value.reviewPasses);
+  if (schemaVersion === '3') {
+    if (!workstreamId) errors.push('workstreamId is required for schemaVersion 3');
+    errors.push(...sourceWorkstreamIds.errors);
+    if (!registryVersion) errors.push('registryVersion is required for schemaVersion 3');
+    if (
+      !planRecommendationAdherence ||
+      !PLAN_ADHERENCE_STATES.has(planRecommendationAdherence)
+    ) {
+      errors.push('planRecommendationAdherence is invalid for schemaVersion 3');
+    }
+    if (
+      value.recommendedBuildModel === undefined &&
+      planRecommendationAdherence !== 'not_applicable'
+    ) {
+      errors.push(
+        'recommendedBuildModel is required unless planRecommendationAdherence is not_applicable'
+      );
+    }
+    if (!Array.isArray(value.reviewPasses)) {
+      errors.push('reviewPasses is required for schemaVersion 3');
+    }
+    errors.push(...recommendedBuildModel.errors, ...reviewPasses.errors);
   }
 
   if (errors.length > 0) {
@@ -304,7 +506,7 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   return {
     status: 'present',
     marker: {
-      schemaVersion: schemaVersion as '1' | '2',
+      schemaVersion: schemaVersion as '1' | '2' | '3',
       taskId: taskId!,
       taskType: taskType!,
       risk: risk!,
@@ -325,20 +527,30 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
       finalReviewSource: finalReviewSource ?? undefined,
       commit: commit!,
       handoff: handoff!,
+      workstreamId: workstreamId ?? undefined,
+      sourceWorkstreamIds: sourceWorkstreamIds.values,
+      registryVersion: registryVersion ?? undefined,
+      recommendedBuildModel: recommendedBuildModel.model ?? undefined,
+      planRecommendationAdherence: planRecommendationAdherence ?? undefined,
+      reviewPasses: schemaVersion === '3' ? reviewPasses.passes : undefined,
     },
     errors: [],
   };
 }
 
 export function extractWorkflowCompletionMarker(text: string): ParsedWorkflowMarker {
-  const v1Start = text.lastIndexOf(WORKFLOW_MARKER_PREFIX_V1);
-  const v2Start = text.lastIndexOf(WORKFLOW_MARKER_PREFIX_V2);
-  const start = Math.max(v1Start, v2Start);
+  const candidates = [
+    { version: 1, prefix: WORKFLOW_MARKER_PREFIX_V1, start: text.lastIndexOf(WORKFLOW_MARKER_PREFIX_V1) },
+    { version: 2, prefix: WORKFLOW_MARKER_PREFIX_V2, start: text.lastIndexOf(WORKFLOW_MARKER_PREFIX_V2) },
+    { version: 3, prefix: WORKFLOW_MARKER_PREFIX_V3, start: text.lastIndexOf(WORKFLOW_MARKER_PREFIX_V3) },
+  ].sort((left, right) => right.start - left.start || right.version - left.version);
+  const selected = candidates[0]!;
+  const start = selected.start;
   if (start < 0) {
     return { status: 'missing', marker: null, errors: ['workflow completion marker not found'] };
   }
 
-  const prefix = start === v2Start ? WORKFLOW_MARKER_PREFIX_V2 : WORKFLOW_MARKER_PREFIX_V1;
+  const prefix = selected.prefix;
   const afterPrefix = text.slice(start + prefix.length);
   const end = afterPrefix.indexOf(WORKFLOW_MARKER_SUFFIX);
   if (end < 0) {
@@ -361,6 +573,10 @@ export function extractWorkflowCompletionMarker(text: string): ParsedWorkflowMar
 
 export function renderWorkflowCompletionMarker(marker: WorkflowCompletionMarker): string {
   const prefix =
-    marker.schemaVersion === '2' ? WORKFLOW_MARKER_PREFIX_V2 : WORKFLOW_MARKER_PREFIX_V1;
+    marker.schemaVersion === '3'
+      ? WORKFLOW_MARKER_PREFIX_V3
+      : marker.schemaVersion === '2'
+        ? WORKFLOW_MARKER_PREFIX_V2
+        : WORKFLOW_MARKER_PREFIX_V1;
   return `${prefix}\n${JSON.stringify(marker, null, 2)}\n${WORKFLOW_MARKER_SUFFIX}`;
 }
