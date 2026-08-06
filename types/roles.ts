@@ -50,6 +50,8 @@ export interface PermissionTierRole {
   is_manager_admin: boolean;
 }
 
+export type PermissionAccessMode = 'team' | 'universal';
+
 export interface PermissionModuleDefinition {
   module_name: ModuleName;
   display_name: string;
@@ -65,6 +67,7 @@ export interface PermissionModuleMatrixColumn extends PermissionModuleDefinition
   enforced_minimum_access_level: PermissionAccessLevel;
   requires_full_access_role: boolean;
   requires_sensitive_pin: boolean;
+  access_mode: PermissionAccessMode;
   sort_order: number;
 }
 

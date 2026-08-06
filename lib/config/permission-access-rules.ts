@@ -1,8 +1,17 @@
-import type { ModuleName, PermissionAccessLevel, PermissionModuleMatrixColumn } from '@/types/roles';
+import type {
+  ModuleName,
+  PermissionAccessLevel,
+  PermissionAccessMode,
+  PermissionModuleMatrixColumn,
+} from '@/types/roles';
 
 const MODULE_ENFORCED_MINIMUM_ACCESS_LEVELS: Partial<Record<ModuleName, PermissionAccessLevel>> = {
   'toolbox-talks': 4,
   'admin-settings': 5,
+};
+
+const MODULE_DEFAULT_ACCESS_MODES: Partial<Record<ModuleName, PermissionAccessMode>> = {
+  reminders: 'universal',
 };
 
 const FULL_ACCESS_ROLE_ONLY_MODULES = new Set<ModuleName>();
@@ -23,6 +32,20 @@ export function getModuleEnforcedMinimumAccessLevel(
   const configuredLevel = normalizeAccessLevel(configuredMinimumLevel);
   const hardRuleLevel = MODULE_ENFORCED_MINIMUM_ACCESS_LEVELS[moduleName] ?? 0;
   return normalizeAccessLevel(Math.max(configuredLevel, hardRuleLevel));
+}
+
+export function getModuleAccessMode(
+  moduleName: ModuleName,
+  configuredAccessMode?: PermissionAccessMode | string | null
+): PermissionAccessMode {
+  if (configuredAccessMode === 'universal' || configuredAccessMode === 'team') {
+    return configuredAccessMode;
+  }
+  return MODULE_DEFAULT_ACCESS_MODES[moduleName] ?? 'team';
+}
+
+export function isUniversalPermissionAccessMode(accessMode: PermissionAccessMode): boolean {
+  return accessMode === 'universal';
 }
 
 export function moduleRequiresFullAccessRole(moduleName: ModuleName): boolean {

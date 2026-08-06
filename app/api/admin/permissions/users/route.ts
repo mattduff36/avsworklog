@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
     const effectiveRole = await getEffectiveRole();
     const canManageAdminRoles = hasEffectiveRoleFullAccess(effectiveRole);
     const matrix = await getUserPermissionMatrix(createAdminClient());
+    // modules include live enforced minima, PIN flags, and access_mode for PermissionsGuide.
     return NextResponse.json({
       success: true,
       roles: matrix.roles,

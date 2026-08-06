@@ -4,9 +4,11 @@ import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
 import { hasRoleFullAccess } from '@/lib/utils/role-access';
 import {
+  getModuleAccessMode,
   getModuleEnforcedMinimumAccessLevel,
   getUsablePermissionAccessLevel,
   isPermissionLevelAllowedForModule,
+  isUniversalPermissionAccessMode,
   moduleRequiresFullAccessRole,
 } from '@/lib/config/permission-access-rules';
 import {
@@ -18,6 +20,7 @@ import {
   MODULE_SHORT_NAMES,
   type ModuleName,
   type PermissionAccessLevel,
+  type PermissionAccessMode,
   type PermissionModuleMatrixColumn,
   type PermissionTierRole,
   type UserPermissionAssignableRole,
@@ -42,6 +45,7 @@ type PermissionModuleRow = {
   module_name: ModuleName;
   minimum_role_id: string;
   requires_sensitive_pin?: boolean | null;
+  access_mode?: PermissionAccessMode | string | null;
   sort_order: number;
 };
 
@@ -64,8 +68,11 @@ type UserModulePermissionRow = {
   access_level: number;
 };
 
-const UNIVERSAL_PERMISSION_MODULES = new Set<ModuleName>(['reminders']);
 const UNIVERSAL_PERMISSION_ACCESS_LEVEL: PermissionAccessLevel = 5;
+
+function isUniversalPermissionModule(moduleName: ModuleName, accessMode?: PermissionAccessMode | string | null): boolean {
+  return isUniversalPermissionAccessMode(getModuleAccessMode(moduleName, accessMode));
+}
 
 type ProfilePermissionRow = {
   id: string;
@@ -117,10 +124,22 @@ export function createEmptyModuleLevelRecord(): Record<ModuleName, PermissionAcc
 }
 
 function applyUniversalModuleLevels(
-  levels: Record<ModuleName, PermissionAccessLevel>
+  levels: Record<ModuleName, PermissionAccessLevel>,
+  modules?: Array<
+    Pick<PermissionModuleMatrixColumn, 'module_name'> &
+      Partial<Pick<PermissionModuleMatrixColumn, 'access_mode'>>
+  >
 ): Record<ModuleName, PermissionAccessLevel> {
-  UNIVERSAL_PERMISSION_MODULES.forEach((moduleName) => {
-    levels[moduleName] = UNIVERSAL_PERMISSION_ACCESS_LEVEL;
+  const accessModeByModule = new Map<ModuleName, PermissionAccessMode | undefined>();
+  modules?.forEach((module) => {
+    accessModeByModule.set(module.module_name, module.access_mode);
+  });
+
+  // Always apply configured/default universal modules, even when they are absent from the matrix row set.
+  ALL_MODULES.forEach((moduleName) => {
+    if (isUniversalPermissionModule(moduleName, accessModeByModule.get(moduleName))) {
+      levels[moduleName] = UNIVERSAL_PERMISSION_ACCESS_LEVEL;
+    }
   });
 
   return levels;
@@ -135,7 +154,10 @@ export function getAccessLevelForRole(
 }
 
 export function buildUserPermissionLevelRecord(
-  modules: Array<Pick<PermissionModuleMatrixColumn, 'module_name'>>,
+  modules: Array<
+    Pick<PermissionModuleMatrixColumn, 'module_name'> &
+      Partial<Pick<PermissionModuleMatrixColumn, 'access_mode'>>
+  >,
   levelMap?: Map<ModuleName, number>
 ): Record<ModuleName, PermissionAccessLevel> {
   const permissionRecord = createEmptyModuleLevelRecord();
@@ -144,7 +166,7 @@ export function buildUserPermissionLevelRecord(
     permissionRecord[module.module_name] = normalizePermissionAccessLevel(levelMap?.get(module.module_name));
   });
 
-  return applyUniversalModuleLevels(permissionRecord);
+  return applyUniversalModuleLevels(permissionRecord, modules);
 }
 
 export function isFullAccessRole(role: Pick<RoleRow, 'name' | 'role_class' | 'is_super_admin'>): boolean {
@@ -305,7 +327,7 @@ async function getPermissionModulesForRoles(
 ): Promise<PermissionModuleMatrixColumn[]> {
   const modulesResult = await supabaseAdmin
     .from('permission_modules')
-    .select('module_name, minimum_role_id, requires_sensitive_pin, sort_order')
+    .select('module_name, minimum_role_id, requires_sensitive_pin, access_mode, sort_order')
     .order('sort_order', { ascending: true });
 
   if (modulesResult.error) {
@@ -323,6 +345,7 @@ async function getPermissionModulesForRoles(
       }
 
       const enforcedMinimum = getModuleEnforcedMinimumAccessLevel(row.module_name, role.hierarchy_rank);
+      const accessMode = getModuleAccessMode(row.module_name, row.access_mode);
 
       return {
         module_name: row.module_name,
@@ -336,6 +359,7 @@ async function getPermissionModulesForRoles(
         enforced_minimum_access_level: enforcedMinimum,
         requires_full_access_role: moduleRequiresFullAccessRole(row.module_name),
         requires_sensitive_pin: row.requires_sensitive_pin === true,
+        access_mode: accessMode,
         sort_order: row.sort_order,
       };
     });
@@ -1128,7 +1152,7 @@ export async function getUsersWithModuleAccess(
     (profile) => !hiddenIds.has(profile.id) && !isHiddenSystemTestAccountProfile(profile) && !isDeletedProfile(profile)
   );
 
-  if (UNIVERSAL_PERMISSION_MODULES.has(moduleName)) {
+  if (isUniversalPermissionModule(moduleName)) {
     return new Set<string>(visibleProfiles.map((profile) => profile.id));
   }
 

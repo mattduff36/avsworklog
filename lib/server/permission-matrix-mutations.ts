@@ -351,6 +351,39 @@ export async function applyPermissionMatrixUpdatesAtomically(
       );
     }
 
+    // Minimum audit trail for permission matrix changes (includes Admin Settings Level 5 grants).
+    await client.query(
+      `
+        INSERT INTO public.audit_log (
+          table_name,
+          record_id,
+          user_id,
+          action,
+          changes
+        )
+        VALUES (
+          'user_module_permissions',
+          $1::text,
+          $2::uuid,
+          'permission_matrix_update',
+          $3::jsonb
+        )
+      `,
+      [
+        input.actorUserId,
+        input.actorUserId,
+        JSON.stringify({
+          user_updates: input.userUpdates,
+          team_default_updates: input.teamDefaultUpdates,
+          cascaded_user_updates: cascadeRows.map((row) => ({
+            user_id: row.userId,
+            module_name: row.moduleName,
+            access_level: row.accessLevel,
+          })),
+        }),
+      ]
+    );
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK').catch(() => undefined);

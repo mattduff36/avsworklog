@@ -88,6 +88,10 @@ describe('atomic permission matrix mutations', () => {
       call.text.includes('INSERT INTO public.user_module_permissions')
       && call.values?.[2] === 5
     ))).toBe(true);
+    expect(client.calls.some((call) => (
+      call.text.includes('INSERT INTO public.audit_log')
+      && call.text.includes('permission_matrix_update')
+    ))).toBe(true);
     expect(client.calls.at(-1)?.text).toBe('COMMIT');
   });
 

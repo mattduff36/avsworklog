@@ -65,6 +65,7 @@ const modules: PermissionModuleMatrixColumn[] = [
     enforced_minimum_access_level: 1,
     requires_full_access_role: false,
     requires_sensitive_pin: false,
+    access_mode: 'team',
     sort_order: 10,
   },
   {
@@ -79,6 +80,7 @@ const modules: PermissionModuleMatrixColumn[] = [
     enforced_minimum_access_level: 2,
     requires_full_access_role: false,
     requires_sensitive_pin: false,
+    access_mode: 'team',
     sort_order: 20,
   },
   {
@@ -93,6 +95,7 @@ const modules: PermissionModuleMatrixColumn[] = [
     enforced_minimum_access_level: 3,
     requires_full_access_role: false,
     requires_sensitive_pin: false,
+    access_mode: 'team',
     sort_order: 30,
   },
   {
@@ -107,6 +110,7 @@ const modules: PermissionModuleMatrixColumn[] = [
     enforced_minimum_access_level: 4,
     requires_full_access_role: false,
     requires_sensitive_pin: false,
+    access_mode: 'team',
     sort_order: 40,
   },
 ];
@@ -247,6 +251,7 @@ describe('team permission helpers', () => {
                   module_name: module.module_name,
                   minimum_role_id: module.minimum_role_id,
                   requires_sensitive_pin: false,
+                  access_mode: module.access_mode,
                   sort_order: module.sort_order,
                 })),
                 error: null,
@@ -360,6 +365,7 @@ describe('team permission helpers', () => {
                   module_name: module.module_name,
                   minimum_role_id: module.minimum_role_id,
                   requires_sensitive_pin: false,
+                  access_mode: module.access_mode,
                   sort_order: module.sort_order,
                 })),
                 error: null,
@@ -438,11 +444,18 @@ describe('team permission helpers', () => {
 
   it('ignores notification-only module keys when resolving permission modules', async () => {
     const permissionModules = [
-      { module_name: 'training', minimum_role_id: 'manager', requires_sensitive_pin: false, sort_order: 50 },
+      {
+        module_name: 'training',
+        minimum_role_id: 'manager',
+        requires_sensitive_pin: false,
+        access_mode: 'team',
+        sort_order: 50,
+      },
       {
         module_name: 'processed_absence',
         minimum_role_id: 'missing-notification-role',
         requires_sensitive_pin: false,
+        access_mode: 'team',
         sort_order: 51,
       },
     ];
