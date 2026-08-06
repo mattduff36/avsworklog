@@ -52,4 +52,15 @@ describe('Permission alignment absence and admin auth hardening', () => {
     expect(sql).toContain('IF public.effective_has_admin_full_access() THEN');
     expect(scope).toContain('hasEffectiveRoleFullAccess(effectiveRole)');
   });
+
+  it('RLS-POLICY-001 locks absence ownership against pivot self-approval', () => {
+    const sql = readProjectFile(
+      'supabase/migrations/20260806_permission_alignment_absence_profile_lock.sql'
+    );
+
+    expect(sql).toContain('prevent_absence_profile_reassignment');
+    expect(sql).toContain('absences.profile_id is immutable for authenticated updates');
+    expect(sql).toContain('owner_id UUID := OLD.profile_id');
+    expect(sql).toContain('can_actor_approve_absence_request(actor_id, owner_id)');
+  });
 });
