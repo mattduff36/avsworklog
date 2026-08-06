@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { sendTimesheetRejectionEmail } from '@/lib/utils/email';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import type { Database } from '@/types/database';
 
 export async function POST(
@@ -33,16 +34,14 @@ export async function POST(
       );
     }
 
-    const canManageTimesheets = await canEffectiveRoleAccessModule('approvals');
-    if (!canManageTimesheets) {
-      return NextResponse.json(
-        { error: 'Approvals access required to reject timesheets' },
-        { status: 403 }
-      );
+    const effectiveRole = await getEffectiveRole();
+    if (!effectiveRole.user_id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get timesheet details
-    const { data: timesheet, error: timesheetError } = await db
+    const adminClient = createAdminClient();
+    const { data: timesheet, error: timesheetError } = await adminClient
       .from('timesheets')
       .select(`
         id,
@@ -52,7 +51,8 @@ export async function POST(
         profiles:user_id (
           id,
           full_name
-        )
+        ),
+        employee:profiles!timesheets_user_id_fkey(team_id)
       `)
       .eq('id', timesheetId)
       .single();
@@ -62,6 +62,7 @@ export async function POST(
       week_ending: string;
       status: string;
       profiles: { id: string; full_name: string } | null;
+      employee: { team_id?: string | null } | null;
     } | null;
 
     if (timesheetError || !typedTimesheet) {
@@ -78,12 +79,26 @@ export async function POST(
       );
     }
 
+    const canAuthoriseTarget = await canCurrentActorAuthoriseTimesheetTarget(
+      {
+        profileId: typedTimesheet.user_id,
+        teamId: typedTimesheet.employee?.team_id || null,
+      },
+      { effectiveRole }
+    );
+    if (!canAuthoriseTarget) {
+      return NextResponse.json(
+        { error: 'You cannot reject this employee’s timesheet' },
+        { status: 403 }
+      );
+    }
+
     // Update timesheet status
-    const { error: updateError } = await db
+    const { error: updateError } = await adminClient
       .from('timesheets')
       .update({
         status: 'rejected',
-        reviewed_by: user.id,
+        reviewed_by: effectiveRole.user_id,
         reviewed_at: new Date().toISOString(),
         manager_comments: comments.trim(),
       } as never)
@@ -95,7 +110,6 @@ export async function POST(
     }
 
     // Email addresses live in auth.users, not public.profiles.
-    const adminClient = createAdminClient();
     const { data: employeeUserResult, error: employeeUserError } =
       await adminClient.auth.admin.getUserById(typedTimesheet.user_id);
 

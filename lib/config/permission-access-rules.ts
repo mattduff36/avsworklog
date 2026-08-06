@@ -6,6 +6,7 @@ import type {
 } from '@/types/roles';
 
 const MODULE_ENFORCED_MINIMUM_ACCESS_LEVELS: Partial<Record<ModuleName, PermissionAccessLevel>> = {
+  approvals: 3,
   'toolbox-talks': 4,
   'admin-settings': 5,
 };

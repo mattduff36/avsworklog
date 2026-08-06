@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { buildSafeReportFilename, parseReportDateRange, validateRequiredReportDateRange } from '@/lib/server/report-date-range';
-import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
+import { getTimesheetReportScopedProfileIds } from '@/lib/server/reports-timesheet-scope';
 import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import { 
   generateExcelFile, 
@@ -65,10 +66,11 @@ type TimesheetRow = {
 
 // Helper function to build timesheet query with filters
 function buildTimesheetQuery(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   dateFrom: string | null,
   dateTo: string | null,
-  employeeId: string | null
+  employeeId: string | null,
+  scopedProfileIds: Set<string> | null
 ) {
   let query = supabase
     .from('timesheets')
@@ -108,16 +110,18 @@ function buildTimesheetQuery(
   if (dateFrom) query = query.gte('week_ending', dateFrom);
   if (dateTo) query = query.lte('week_ending', dateTo);
   if (employeeId) query = query.eq('user_id', employeeId);
+  if (scopedProfileIds) query = query.in('user_id', Array.from(scopedProfileIds));
 
   return query;
 }
 
 // Helper function to build absence query with filters
 function buildAbsenceQuery(
-  supabase: Awaited<ReturnType<typeof createClient>>,
+  supabase: ReturnType<typeof createAdminClient>,
   dateFrom: string | null,
   dateTo: string | null,
-  employeeId: string | null
+  employeeId: string | null,
+  scopedProfileIds: Set<string> | null
 ) {
   let query = supabase
     .from('absences')
@@ -146,6 +150,7 @@ function buildAbsenceQuery(
   if (dateFrom) query = query.gte('date', dateFrom);
   if (dateTo) query = query.lte('date', dateTo);
   if (employeeId) query = query.eq('profile_id', employeeId);
+  if (scopedProfileIds) query = query.in('profile_id', Array.from(scopedProfileIds));
   
   return query;
 }
@@ -321,9 +326,28 @@ export async function GET(request: NextRequest) {
     const { dateFrom, dateTo } = range;
     const employeeId = searchParams.get('employeeId');
 
-    // Fetch data
-    const { data: timesheets, error } = await buildTimesheetQuery(supabase, dateFrom, dateTo, employeeId);
-    const { data: absences, error: absenceError } = await buildAbsenceQuery(supabase, dateFrom, dateTo, employeeId);
+    const scopedProfileIds = await getTimesheetReportScopedProfileIds();
+    if (scopedProfileIds?.size === 0) {
+      return NextResponse.json({ error: 'No timesheets found for the specified criteria' }, { status: 404 });
+    }
+
+    // Service-role reads are constrained before hydration so report-level team
+    // scope is not accidentally narrowed by Approvals RLS.
+    const admin = createAdminClient();
+    const { data: timesheets, error } = await buildTimesheetQuery(
+      admin,
+      dateFrom,
+      dateTo,
+      employeeId,
+      scopedProfileIds
+    );
+    const { data: absences, error: absenceError } = await buildAbsenceQuery(
+      admin,
+      dateFrom,
+      dateTo,
+      employeeId,
+      scopedProfileIds
+    );
 
     if (error) {
       console.error('Error fetching timesheets:', error);
@@ -334,7 +358,7 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching absences:', absenceError);
     }
 
-    const scopedTimesheets = await filterTimesheetRowsForReportScope((timesheets || []) as TimesheetRow[]);
+    const scopedTimesheets = (timesheets || []) as TimesheetRow[];
     if (scopedTimesheets.length === 0) {
       return NextResponse.json({ error: 'No timesheets found for the specified criteria' }, { status: 404 });
     }
@@ -342,7 +366,7 @@ export async function GET(request: NextRequest) {
     const scopedEmployeeIds = new Set(scopedTimesheets.map((timesheet) => timesheet.user_id));
     const scopedAbsences = (absences || []).filter((absence) => scopedEmployeeIds.has(absence.profile_id)) as AbsenceRow[];
     const shiftPatternByEmployee = await loadEmployeeWorkShiftPatternMap(
-      supabase,
+      admin,
       Array.from(scopedEmployeeIds),
       { ensureRecords: false }
     );

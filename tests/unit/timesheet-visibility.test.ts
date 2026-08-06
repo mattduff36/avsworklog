@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getAbsenceSecondaryDefaultMap } from '@/types/absence-permissions';
 import {
+  canActorAuthoriseTimesheetTarget,
   canShowTimesheetInList,
   hasAccountsTimesheetFullVisibilityOverride,
 } from '@/lib/utils/timesheet-visibility';
@@ -104,5 +105,118 @@ describe('hasAccountsTimesheetFullVisibilityOverride', () => {
 
   it('returns false for Accounts employee', () => {
     expect(hasAccountsTimesheetFullVisibilityOverride('employee', 'Accounts')).toBe(false);
+  });
+});
+
+describe('canActorAuthoriseTimesheetTarget', () => {
+  const supervisorPermissions = getAbsenceSecondaryDefaultMap('supervisor');
+
+  it('APPROVAL-SCOPE-001 allows Level 3 team scope and denies self or out-of-team', () => {
+    const actor = {
+      actorProfileId: 'supervisor-1',
+      actorTeamId: 'team-a',
+      approvalsAccessLevel: 3,
+      hasAccountsOverride: false,
+      permissions: supervisorPermissions,
+    };
+
+    expect(
+      canActorAuthoriseTimesheetTarget({
+        actor,
+        target: { profileId: 'employee-1', teamId: 'team-a' },
+      })
+    ).toBe(true);
+    expect(
+      canActorAuthoriseTimesheetTarget({
+        actor,
+        target: { profileId: 'supervisor-1', teamId: 'team-a' },
+      })
+    ).toBe(false);
+    expect(
+      canActorAuthoriseTimesheetTarget({
+        actor,
+        target: { profileId: 'employee-2', teamId: 'team-b' },
+      })
+    ).toBe(false);
+    expect(
+      canActorAuthoriseTimesheetTarget({
+        actor: { ...actor, actorTeamId: null },
+        target: { profileId: 'employee-3', teamId: null },
+      })
+    ).toBe(false);
+  });
+
+  it('APPROVAL-SCOPE-002 allows ALL cross-team but never Reports-only or self', () => {
+    const allPermissions = {
+      ...supervisorPermissions,
+      authorise_bookings_all: true,
+      authorise_bookings_team: false,
+    };
+
+    expect(
+      canActorAuthoriseTimesheetTarget({
+        actor: {
+          actorProfileId: 'authoriser-1',
+          actorTeamId: 'team-a',
+          approvalsAccessLevel: 3,
+          hasAccountsOverride: false,
+          permissions: allPermissions,
+        },
+        target: { profileId: 'employee-1', teamId: 'team-b' },
+      })
+    ).toBe(true);
+    expect(
+      canActorAuthoriseTimesheetTarget({
+        actor: {
+          actorProfileId: 'authoriser-1',
+          actorTeamId: 'team-a',
+          approvalsAccessLevel: 0,
+          hasAccountsOverride: false,
+          permissions: allPermissions,
+        },
+        target: { profileId: 'employee-1', teamId: 'team-b' },
+      })
+    ).toBe(false);
+    expect(
+      canActorAuthoriseTimesheetTarget({
+        actor: {
+          actorProfileId: 'authoriser-1',
+          actorTeamId: 'team-a',
+          approvalsAccessLevel: 5,
+          hasAccountsOverride: true,
+          permissions: allPermissions,
+        },
+        target: { profileId: 'authoriser-1', teamId: 'team-a' },
+      })
+    ).toBe(false);
+  });
+
+  it('ACCOUNTS-SCOPE-001 grants Accounts override only with Approvals Level 3+', () => {
+    const target = { profileId: 'employee-1', teamId: 'team-b' };
+
+    expect(
+      canActorAuthoriseTimesheetTarget({
+        actor: {
+          actorProfileId: 'accounts-supervisor',
+          actorTeamId: 'accounts',
+          approvalsAccessLevel: 3,
+          hasAccountsOverride: true,
+          permissions: null,
+        },
+        target,
+      })
+    ).toBe(true);
+    expect(
+      canActorAuthoriseTimesheetTarget({
+        actor: {
+          actorProfileId: 'accounts-supervisor',
+          actorTeamId: 'accounts',
+          approvalsAccessLevel: 2,
+          hasAccountsOverride: true,
+          permissions: null,
+        },
+        target,
+      })
+    ).toBe(false);
   });
 });

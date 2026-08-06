@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { approveTimesheetWithPayrollSnapshot } from '@/lib/server/timesheet-payroll';
-import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
@@ -21,11 +20,8 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const [canApprove, effectiveRole] = await Promise.all([
-      canEffectiveRoleAccessModule('approvals'),
-      getEffectiveRole(),
-    ]);
-    if (!canApprove || !effectiveRole.user_id) {
+    const effectiveRole = await getEffectiveRole();
+    if (!effectiveRole.user_id) {
       return NextResponse.json({ error: 'Approvals access required' }, { status: 403 });
     }
 
@@ -50,12 +46,19 @@ export async function POST(
       return NextResponse.json({ error: 'Timesheet not found' }, { status: 404 });
     }
 
-    const scoped = await filterTimesheetRowsForReportScope([target as unknown as {
+    const typedTarget = target as unknown as {
       id: string;
       user_id: string;
       employee: { team_id?: string | null } | null;
-    }]);
-    if (scoped.length !== 1) {
+    };
+    const canAuthoriseTarget = await canCurrentActorAuthoriseTimesheetTarget(
+      {
+        profileId: typedTarget.user_id,
+        teamId: typedTarget.employee?.team_id || null,
+      },
+      { effectiveRole }
+    );
+    if (!canAuthoriseTarget) {
       return NextResponse.json({ error: 'You cannot approve this employee’s timesheet' }, { status: 403 });
     }
 

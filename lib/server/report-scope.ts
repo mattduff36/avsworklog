@@ -14,6 +14,31 @@ export interface ReportScopeContext {
   shouldScopeToTeam: boolean;
 }
 
+interface ReportScopeAccessArgs {
+  reportAccessLevel: number;
+  hasFullAccessRole: boolean;
+  hasAccountsVisibilityOverride: boolean;
+}
+
+export function resolveReportScopeAccess({
+  reportAccessLevel,
+  hasFullAccessRole,
+  hasAccountsVisibilityOverride,
+}: ReportScopeAccessArgs): Pick<
+  ReportScopeContext,
+  'isAdminTier' | 'isManagerLike' | 'shouldScopeToTeam'
+> {
+  const isAdminTier =
+    hasFullAccessRole || reportAccessLevel >= 5 || hasAccountsVisibilityOverride;
+  const isManagerLike = reportAccessLevel >= 4;
+
+  return {
+    isAdminTier,
+    isManagerLike,
+    shouldScopeToTeam: isManagerLike && !isAdminTier,
+  };
+}
+
 function isInspectionModule(moduleName: ModuleName): boolean {
   return (
     moduleName === 'inspections' ||
@@ -33,14 +58,15 @@ export async function getReportScopeContext(): Promise<ReportScopeContext> {
     effectiveRole.role_name,
     effectiveRole.team_name
   );
-  const isAdminTier = isAdminTierRole(effectiveRole) || reportAccessLevel >= 5 || hasAccountsVisibilityOverride;
-  const isManagerLike = reportAccessLevel >= 3;
+  const scopeAccess = resolveReportScopeAccess({
+    reportAccessLevel,
+    hasFullAccessRole: isAdminTierRole(effectiveRole),
+    hasAccountsVisibilityOverride,
+  });
 
   return {
     effectiveRole,
-    isAdminTier,
-    isManagerLike,
-    shouldScopeToTeam: isManagerLike && !isAdminTier,
+    ...scopeAccess,
   };
 }
 

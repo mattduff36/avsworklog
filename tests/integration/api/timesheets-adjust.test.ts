@@ -10,16 +10,13 @@ vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(),
 }));
-vi.mock('@/lib/server/reports-timesheet-scope', () => ({
-  filterTimesheetRowsForReportScope: vi.fn(async <T>(rows: T[]) => rows),
+vi.mock('@/lib/server/timesheet-approval-scope', () => ({
+  canCurrentActorAuthoriseTimesheetTarget: vi.fn().mockResolvedValue(true),
 }));
 vi.mock('@/lib/server/timesheet-adjust', () => ({
   applyTimesheetAdjustmentMutation: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/utils/view-as');
-vi.mock('@/lib/utils/rbac', () => ({
-  canEffectiveRoleAccessModule: vi.fn(),
-}));
 vi.mock('@/lib/server/processed-absence-notifications', () => ({
   notifyProcessedAbsenceTimesheetAdjustment: vi.fn().mockResolvedValue(['accounts-supervisor']),
 }));
@@ -70,6 +67,7 @@ async function mockEffectiveRole(overrides: Partial<EffectiveRoleInfo> = {}) {
     role_id: null,
     role_name: null,
     display_name: null,
+    role_class: null,
     is_manager_admin: false,
     is_super_admin: false,
     is_viewing_as: false,
@@ -153,15 +151,13 @@ describe('POST /api/timesheets/[id]/adjust', () => {
     vi.clearAllMocks();
     mockFetch({ id: 'mock-email-id' });
     await setupAuthAdminClientMock();
-    const rbac = await import('@/lib/utils/rbac');
     const email = await import('@/lib/utils/email');
     const processedAbsenceNotifications = await import('@/lib/server/processed-absence-notifications');
-    const scope = await import('@/lib/server/reports-timesheet-scope');
+    const approvalScope = await import('@/lib/server/timesheet-approval-scope');
     const adjustMutation = await import('@/lib/server/timesheet-adjust');
     vi.mocked(email.sendTimesheetAdjustmentEmail).mockResolvedValue({ success: true });
-    vi.mocked(rbac.canEffectiveRoleAccessModule).mockResolvedValue(true);
     vi.mocked(processedAbsenceNotifications.notifyProcessedAbsenceTimesheetAdjustment).mockResolvedValue(['accounts-supervisor']);
-    vi.mocked(scope.filterTimesheetRowsForReportScope).mockImplementation(async (rows) => rows);
+    vi.mocked(approvalScope.canCurrentActorAuthoriseTimesheetTarget).mockResolvedValue(true);
     vi.mocked(adjustMutation.applyTimesheetAdjustmentMutation).mockResolvedValue(undefined);
     const logger = await import('@/lib/utils/server-error-logger');
     vi.mocked(logger.logServerError).mockResolvedValue(undefined);
@@ -255,9 +251,9 @@ describe('POST /api/timesheets/[id]/adjust', () => {
       const timesheet = createMockTimesheet({ status: 'approved' });
       await mockEffectiveRole({ user_id: manager.id, is_manager_admin: true });
       await mockScopedAdminTimesheet({ timesheet });
-      const scope = await import('@/lib/server/reports-timesheet-scope');
+      const approvalScope = await import('@/lib/server/timesheet-approval-scope');
       const adjustMutation = await import('@/lib/server/timesheet-adjust');
-      vi.mocked(scope.filterTimesheetRowsForReportScope).mockResolvedValueOnce([]);
+      vi.mocked(approvalScope.canCurrentActorAuthoriseTimesheetTarget).mockResolvedValueOnce(false);
       const { createClient } = await import('@/lib/supabase/server');
       vi.mocked(createClient).mockResolvedValueOnce(
         mockSessionClient(manager) as unknown as SupabaseClient

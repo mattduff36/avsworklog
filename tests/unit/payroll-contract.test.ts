@@ -52,8 +52,8 @@ describe('payroll rollout contract', () => {
 
   it('PAY-AUTH-APPROVAL-001 requires module permission and employee scope', () => {
     const route = readProjectFile('app/api/timesheets/[id]/approve/route.ts');
-    expect(route).toContain("canEffectiveRoleAccessModule('approvals')");
-    expect(route).toContain('filterTimesheetRowsForReportScope');
+    expect(route).toContain('canCurrentActorAuthoriseTimesheetTarget');
+    expect(route).not.toContain('filterTimesheetRowsForReportScope');
   });
 
   it('AUTH-PAYROLL-LEVEL5-01 requires delegated Admin Settings access', () => {
@@ -68,7 +68,8 @@ describe('payroll rollout contract', () => {
 
   it('PAY-REPORT-SCOPE-001 retains scoped payroll report filtering', () => {
     const route = readProjectFile('app/api/reports/timesheets/payroll/route.ts');
-    expect(route).toContain('filterTimesheetRowsForReportScope');
+    expect(route).toContain('getTimesheetReportScopedProfileIds');
+    expect(route).toContain("candidateQuery.in('user_id', Array.from(scopedProfileIds))");
     expect(route).toContain("canEffectiveRoleAccessModule('reports')");
     expect(route).toContain("canEffectiveRoleAccessModule('timesheets')");
   });
@@ -86,7 +87,8 @@ describe('payroll rollout contract', () => {
     expect(detail).toContain('entries: entriesToPersist');
     expect(detail).not.toContain('allowApprovedAdjustment');
     expect(detail).toContain("!(timesheet.status === 'approved' && dataChanged)");
-    expect(adjustApi).toContain('filterTimesheetRowsForReportScope');
+    expect(adjustApi).toContain('canCurrentActorAuthoriseTimesheetTarget');
+    expect(adjustApi).not.toContain('filterTimesheetRowsForReportScope');
     expect(adjustApi).toContain('applyTimesheetAdjustmentMutation');
     expect(adjustApi).toContain("typedTimesheet.status === 'approved' && entries === null");
     expect(readProjectFile('lib/server/timesheet-adjust.ts')).toContain("await client.query('BEGIN')");
@@ -95,7 +97,7 @@ describe('payroll rollout contract', () => {
     expect(payrollApi).toContain('filterTimesheetRowsForReportScope');
     expect(pdf).toContain("createAdminClient");
     expect(excel).toContain("createAdminClient");
-    expect(excel.indexOf('filterTimesheetRowsForReportScope')).toBeLessThan(
+    expect(excel.indexOf('getTimesheetReportScopedProfileIds')).toBeLessThan(
       excel.indexOf('const admin = createAdminClient()')
     );
     expect(excel.indexOf('const admin = createAdminClient()')).toBeLessThan(

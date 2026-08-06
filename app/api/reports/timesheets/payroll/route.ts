@@ -5,7 +5,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { buildSafeReportFilename, parseReportDateRange, validateRequiredReportDateRange } from '@/lib/server/report-date-range';
-import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
+import { getTimesheetReportScopedProfileIds } from '@/lib/server/reports-timesheet-scope';
 import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import {
   generateExcelFile,
@@ -110,9 +110,15 @@ export async function GET(request: NextRequest) {
     }
     const { dateFrom, dateTo } = range;
 
-    // Candidate rows use the session client without payroll snapshots. Snapshot
-    // hydration uses the service role only for IDs that pass report scope.
-    let candidateQuery = supabase
+    const scopedProfileIds = await getTimesheetReportScopedProfileIds();
+    if (scopedProfileIds?.size === 0) {
+      return NextResponse.json({ error: 'No approved timesheets found for the specified criteria' }, { status: 404 });
+    }
+
+    // Scope profile IDs before service-role hydration so Reports Level 4/5 is
+    // independent from the narrower Approvals RLS policies.
+    const admin = createAdminClient();
+    let candidateQuery = admin
       .from('timesheets')
       .select(`
         id,
@@ -156,17 +162,20 @@ export async function GET(request: NextRequest) {
     if (dateTo) {
       candidateQuery = candidateQuery.lte('week_ending', dateTo);
     }
+    if (scopedProfileIds) {
+      candidateQuery = candidateQuery.in('user_id', Array.from(scopedProfileIds));
+    }
 
     const [{ data: candidateTimesheets, error }, { data: rolloutRows, error: rolloutError }] = await Promise.all([
       candidateQuery,
-      supabase
+      admin
         .from('payroll_rollout_activations')
         .select('effective_week_ending')
         .order('effective_week_ending', { ascending: true }),
     ]);
 
     // Fetch approved paid absences in the date range
-    let absenceQuery = supabase
+    let absenceQuery = admin
       .from('absences')
       .select(`
         id,
@@ -197,6 +206,9 @@ export async function GET(request: NextRequest) {
     if (dateTo) {
       absenceQuery = absenceQuery.lte('date', dateTo);
     }
+    if (scopedProfileIds) {
+      absenceQuery = absenceQuery.in('profile_id', Array.from(scopedProfileIds));
+    }
 
     const { data: absences, error: absenceError } = await absenceQuery;
 
@@ -213,15 +225,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unable to verify payroll rollout configuration.' }, { status: 500 });
     }
 
-    const scopedCandidates = await filterTimesheetRowsForReportScope(
-      (candidateTimesheets || []) as unknown as TimesheetRow[]
-    );
+    const scopedCandidates = (candidateTimesheets || []) as unknown as TimesheetRow[];
     if (scopedCandidates.length === 0) {
       return NextResponse.json({ error: 'No approved timesheets found for the specified criteria' }, { status: 404 });
     }
 
     const scopedIds = scopedCandidates.map((timesheet) => timesheet.id);
-    const admin = createAdminClient();
     const { data: hydratedTimesheets, error: hydrateError } = await admin
       .from('timesheets')
       .select(`
@@ -302,7 +311,7 @@ export async function GET(request: NextRequest) {
     const scopedEmployeeIds = new Set(scopedTimesheets.map((timesheet) => timesheet.user_id));
     const scopedAbsences = ((absences || []) as AbsenceRow[]).filter((absence) => scopedEmployeeIds.has(absence.profile_id));
     const employeeShiftPatternMap = await loadEmployeeWorkShiftPatternMap(
-      supabase,
+      admin,
       Array.from(scopedEmployeeIds),
       { ensureRecords: false }
     );

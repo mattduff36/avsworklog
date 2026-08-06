@@ -11,8 +11,8 @@
       "byRole": {
         "Contractor": "No module access by rank. Legacy direct RLS has own-user policies, but normal app module gates should block access.",
         "Employee": "Own timesheets only: create, view, update own rows, entries, and job codes. No employee/team filters.",
-        "Supervisor": "Same as Employee in timesheet RLS because Supervisor is role_class employee and not is_manager_admin. In reports, helper code can treat Supervisor as manager-like if Reports access exists.",
-        "Manager": "Elevated timesheet user: employee/team filters, create for others, view/update/delete all timesheets and entries via is_manager_admin RLS.",
+        "Supervisor": "Own timesheets plus scoped team visibility when Approvals Level 3+ and absence secondary authorise_bookings_team is effective. Self-approval and out-of-team approval are denied.",
+        "Manager": "Own timesheets plus Approvals-scoped team/all visibility from absence secondary permissions. Timesheet approval mutations run through scoped server APIs rather than broad manager UPDATE RLS.",
         "Admin": "Full access and unscoped report/admin behavior."
       }
     },
@@ -102,8 +102,8 @@
       "byRole": {
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
-        "Supervisor": "Can pass the module gate, but message creation/reporting/export still hit manager-admin RLS or API checks. This is a current mismatch.",
-        "Manager": "Create toolbox talks/reminders, manage recipients, and view reports/export compliance data.",
+        "Supervisor": "Module access exists, but management actions require Toolbox Talks Level 4; recipient self-service remains separate.",
+        "Manager": "Level 4 management can create toolbox talks/reminders, manage recipients, and view reports/export compliance data.",
         "Admin": "Full access. Strict admin notification audit tools remain admin-only."
       }
     },
@@ -123,14 +123,14 @@
     {
       "displayName": "Approvals",
       "moduleName": "approvals",
-      "matrixGate": "Manager+ and team-enabled",
-      "minimumRole": "Manager",
+      "matrixGate": "Supervisor+ and team-enabled",
+      "minimumRole": "Supervisor",
       "byRole": {
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
-        "Supervisor": "No module access by rank in the live matrix, even though Absence secondary defaults include authorise_bookings_team. This is a current matrix mismatch.",
-        "Manager": "Approvals page for timesheets and absences. Absence approval scope follows secondary absence permissions, typically team and own by default.",
-        "Admin": "All approvals scopes; admin/super tier bypasses team scoping."
+        "Supervisor": "Approvals Level 3 access. Timesheet and absence authorisation follows effective absence secondary scope, normally TEAM; self-approval and out-of-team approval are denied.",
+        "Manager": "Approvals page for timesheets and absences. Authorisation follows effective absence secondary permissions; TEAM and ALL are enforced consistently in APIs and timesheet RLS.",
+        "Admin": "All non-self approval scopes through Level 5 plus effective ALL secondary permission."
       }
     },
     {
@@ -154,8 +154,8 @@
       "byRole": {
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
-        "Supervisor": "No module access by rank in the live matrix. Report scope helper treats Supervisor as manager-like if access is ever granted, but current module minimum is Manager.",
-        "Manager": "Can run reports. Scope is team-limited for manager-like users unless admin tier or Accounts override applies; reports also require source module access.",
+        "Supervisor": "No module access by rank in the live matrix. A delegated Reports Level 3 remains own-only and is not manager-like.",
+        "Manager": "Can run reports. Reports Level 4 is team-scoped regardless of job role; Level 5 is global. Accounts Supervisor/Manager retains the explicit global override.",
         "Admin": "All report scopes and settings; admin tier bypasses report team scoping."
       }
     },
@@ -279,10 +279,10 @@
     {
       "displayName": "Reminders",
       "moduleName": "reminders",
-      "matrixGate": "Contractor+ and team-enabled",
+      "matrixGate": "Universal authenticated access",
       "minimumRole": "Contractor",
       "byRole": {
-        "Contractor": "View/action reminders assigned to self. No reminder-action creation or assignment management.",
+        "Contractor": "Universal Reminders access for assigned reminders. No reminder-action creation or assignment management.",
         "Employee": "Same as Contractor.",
         "Supervisor": "Same assigned-reminder workflow. No Actions module by rank in the live matrix, so cannot create/update reminder_actions or assign reminders.",
         "Manager": "Assigned-reminder workflow plus Actions-based manager creation/update/assignment of reminder actions and workflow settings.",
@@ -291,12 +291,10 @@
     }
   ],
   "prdRelevantMismatches": [
-    "Approvals: Supervisor has absence authorise_team by default, but cannot access the Approvals module because the live module minimum is Manager.",
-    "Toolbox Talks: Supervisor can pass the module gate, but message creation/reports still rely on manager-admin RLS/API paths.",
+    "Toolbox Talks: Level 4 management policies are aligned, while recipient self-service remains separate.",
     "Fleet and Maintenance: several write/settings actions mix module checks, isManager UI flags, admin-only UI, and manager-admin RLS.",
     "Projects: some APIs are module-gated, but UI and RLS still preserve Manager/Admin management semantics.",
-    "Work shifts: absence secondary grants Supervisor team-view intent, but work-shift RLS remains manager-admin for some team rows/templates.",
-    "Actions vs Reminders: reminders use the Actions module for manager workflow, while legacy actions-table RLS still relies on is_manager_admin.",
+    "Actions vs Reminders: Reminders access is universal for assigned work, while reminder creation and assignment continue to use Actions Level 4.",
     "Team overrides: Workshop affects inspection read/write scope; Accounts can elevate timesheet/report visibility for manager-like roles."
   ]
 }

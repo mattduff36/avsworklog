@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { previewTimesheetPayroll } from '@/lib/server/timesheet-payroll';
-import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
 import type { PayrollDayInput } from '@/lib/payroll/types';
 
 export async function POST(request: NextRequest) {
@@ -23,8 +22,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (body.userId !== user.id) {
-      const canApprove = await canEffectiveRoleAccessModule('approvals');
-      if (!canApprove) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       const admin = createAdminClient();
       const { data: profile } = await admin
         .from('profiles')
@@ -32,11 +29,11 @@ export async function POST(request: NextRequest) {
         .eq('id', body.userId)
         .maybeSingle();
       if (!profile) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
-      const scoped = await filterTimesheetRowsForReportScope([{
-        user_id: profile.id,
-        employee: { team_id: profile.team_id },
-      }]);
-      if (scoped.length !== 1) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      const canAuthoriseTarget = await canCurrentActorAuthoriseTimesheetTarget({
+        profileId: profile.id,
+        teamId: profile.team_id,
+      });
+      if (!canAuthoriseTarget) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     return NextResponse.json({

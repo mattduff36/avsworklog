@@ -202,7 +202,7 @@ describe('transactional payroll approval', () => {
     expect(sql).toContain('reject_approved_timesheet_entry_mutation');
     expect(sql).toContain('Approved timesheet entries are immutable');
     expect(readFileSync(resolve(process.cwd(), 'app/api/timesheets/[id]/payroll/route.ts'), 'utf8')).toContain(
-      'filterTimesheetRowsForReportScope'
+      'canCurrentActorAuthoriseTimesheetTarget'
     );
   });
 });

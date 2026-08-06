@@ -5,6 +5,19 @@ interface TimesheetTargetScope {
   teamId: string | null;
 }
 
+export interface TimesheetApprovalActorScope {
+  actorProfileId: string;
+  actorTeamId: string | null;
+  approvalsAccessLevel: number;
+  hasAccountsOverride: boolean;
+  permissions: AbsenceSecondaryPermissionMap | null;
+}
+
+export interface TimesheetApprovalScopeArgs {
+  actor: TimesheetApprovalActorScope;
+  target: TimesheetTargetScope;
+}
+
 interface TimesheetActorScope {
   isElevatedUser: boolean;
   isAdminTier: boolean;
@@ -33,10 +46,27 @@ export function hasAccountsTimesheetFullVisibilityOverride(
   );
 }
 
+export function canActorAuthoriseTimesheetTarget({
+  actor,
+  target,
+}: TimesheetApprovalScopeArgs): boolean {
+  if (actor.approvalsAccessLevel < 3 || !actor.actorProfileId) return false;
+  if (target.profileId === actor.actorProfileId) return false;
+  if (actor.hasAccountsOverride) return true;
+  if (!actor.permissions) return false;
+  if (actor.permissions.authorise_bookings_all) return true;
+
+  return Boolean(
+    actor.permissions.authorise_bookings_team &&
+      actor.actorTeamId &&
+      target.teamId &&
+      actor.actorTeamId === target.teamId
+  );
+}
+
 function canActorAuthoriseTarget(actor: TimesheetActorScope, target: TimesheetTargetScope): boolean {
   if (!actor.permissions || !actor.actorProfileId || !actor.canAuthoriseBookings) return false;
   if (actor.permissions.authorise_bookings_all) return true;
-  if (target.profileId === actor.actorProfileId && actor.permissions.authorise_bookings_own) return true;
 
   return Boolean(
     actor.permissions.authorise_bookings_team &&

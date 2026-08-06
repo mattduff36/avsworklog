@@ -87,8 +87,11 @@ export interface UpsertAbsenceSecondaryExceptionInput {
 
 export interface AbsenceSecondaryActorContextOverride {
   role?: RoleShape | null;
+  role_id?: string | null;
   team_id?: string | null;
   team_name?: string | null;
+  include_user_overrides?: boolean;
+  include_secondary_overrides?: boolean;
 }
 
 export function resolveAbsenceSecondaryRoleTier(role: RoleShape | null | undefined): AbsenceSecondaryRoleTier {
@@ -213,16 +216,21 @@ export async function getActorAbsenceSecondaryPermissions(
 
   const permissionLevels = await getPermissionLevelsForUser(
     profile.id,
-    profile.role ? undefined : profile.role_id,
+    contextOverride && Object.prototype.hasOwnProperty.call(contextOverride, 'role_id')
+      ? (contextOverride.role_id ?? null)
+      : (profile.role ? undefined : profile.role_id),
     createAdminClient(),
-    resolvedTeamId
+    resolvedTeamId,
+    { includeUserOverrides: contextOverride?.include_user_overrides !== false }
   );
   const roleTier =
     permissionLevels.absence > 0
       ? resolveAbsenceSecondaryRoleTierFromLevel(permissionLevels.absence)
       : resolveAbsenceSecondaryRoleTier(resolvedRole);
   const defaults = getAbsenceSecondaryDefaultMap(roleTier);
-  const overrides = normalizeExceptionOverrides(exceptionRow.data || undefined);
+  const effectiveExceptionRow =
+    contextOverride?.include_secondary_overrides === false ? null : exceptionRow.data;
+  const overrides = normalizeExceptionOverrides(effectiveExceptionRow || undefined);
   const effective = applyAbsenceSecondaryOverrides(defaults, overrides);
 
   return {
@@ -235,7 +243,7 @@ export async function getActorAbsenceSecondaryPermissions(
     defaults,
     overrides,
     effective,
-    has_exception_row: Boolean(exceptionRow.data?.profile_id),
+    has_exception_row: Boolean(effectiveExceptionRow?.profile_id),
   };
 }
 

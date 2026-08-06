@@ -132,7 +132,8 @@ function ApprovalsContent() {
     canViewApprovals,
     absenceSecondarySnapshot?.role_tier
   );
-  const isAdminTier = Boolean(isAdmin || isSuperAdmin || hasAccountsVisibilityOverride);
+  const isAdminTier = Boolean(isAdmin || isSuperAdmin);
+  const isTimesheetAdminTier = Boolean(isAdminTier || hasAccountsVisibilityOverride);
   const activeTab: ApprovalsTab = tabParam === 'absences' ? 'absences' : 'timesheets';
   const defaultStatusFilters = useMemo(
     () => getApprovalsDefaultStatusFilters(actorTeamName),
@@ -224,15 +225,18 @@ function ApprovalsContent() {
   const processAbsence = useProcessAbsence();
   const rejectAbsence = useRejectAbsence();
   useAbsenceRealtimeQueryInvalidation();
-  const canAuthoriseBookings = Boolean(
-    absenceSecondarySnapshot?.flags.can_authorise_bookings ||
-      isAdmin ||
-      isSuperAdmin ||
-      hasAccountsVisibilityOverride
+  const canAuthoriseAbsences = Boolean(
+    absenceSecondarySnapshot?.flags.can_authorise_bookings || isAdminTier
   );
+  const canAuthoriseTimesheets = Boolean(
+    absenceSecondarySnapshot?.flags.can_authorise_bookings || isTimesheetAdminTier
+  );
+  const activeCanAuthoriseBookings =
+    activeTab === 'timesheets' ? canAuthoriseTimesheets : canAuthoriseAbsences;
+  const activeIsAdminTier = activeTab === 'timesheets' ? isTimesheetAdminTier : isAdminTier;
   const scopeTeamOnly = Boolean(
-    !isAdminTier &&
-      canAuthoriseBookings &&
+    !activeIsAdminTier &&
+      activeCanAuthoriseBookings &&
       absenceSecondarySnapshot &&
       !absenceSecondarySnapshot.permissions.authorise_bookings_all &&
       absenceSecondarySnapshot.permissions.authorise_bookings_team
@@ -365,7 +369,7 @@ function ApprovalsContent() {
   }, [canLoadFilterDirectory]);
 
   const scopedAbsences = useMemo(() => {
-    if (!canAuthoriseBookings) return [] as AbsenceWithRelations[];
+    if (!canAuthoriseAbsences) return [] as AbsenceWithRelations[];
     if (!absences || absences.length === 0) return [] as AbsenceWithRelations[];
     if (isAdminTier) return absences;
     if (!actorProfileId || !absenceSecondarySnapshot) return [] as AbsenceWithRelations[];
@@ -388,7 +392,7 @@ function ApprovalsContent() {
         }
       )
     );
-  }, [absences, canAuthoriseBookings, isAdminTier, actorProfileId, absenceSecondarySnapshot]);
+  }, [absences, canAuthoriseAbsences, isAdminTier, actorProfileId, absenceSecondarySnapshot]);
 
   const filteredAbsences = useMemo(() => {
     return scopedAbsences.filter((absence) => {
@@ -414,8 +418,8 @@ function ApprovalsContent() {
 
   const getScopedTimesheetsForCurrentActor = useCallback((rows: TimesheetWithProfile[]) => {
     if (rows.length === 0) return [] as TimesheetWithProfile[];
-    if (isAdminTier) return rows;
-    if (!canAuthoriseBookings || !actorProfileId || !absenceSecondarySnapshot) return [] as TimesheetWithProfile[];
+    if (isTimesheetAdminTier) return rows;
+    if (!canAuthoriseTimesheets || !actorProfileId || !absenceSecondarySnapshot) return [] as TimesheetWithProfile[];
 
     return rows.filter((timesheet) =>
       canUseScopedAbsencePermission(
@@ -435,7 +439,13 @@ function ApprovalsContent() {
         }
       )
     );
-  }, [isAdminTier, canAuthoriseBookings, actorProfileId, absenceSecondarySnapshot, employeeById]);
+  }, [
+    isTimesheetAdminTier,
+    canAuthoriseTimesheets,
+    actorProfileId,
+    absenceSecondarySnapshot,
+    employeeById,
+  ]);
 
   const getCurrentFilteredTimesheets = useCallback((rows: TimesheetWithProfile[]) => {
     return getScopedTimesheetsForCurrentActor(rows).filter((timesheet) => {
@@ -695,15 +705,13 @@ function ApprovalsContent() {
     if (!comments) return;
 
     try {
-      const { error } = await supabase
-        .from('timesheets')
-        .update({
-          status: 'rejected',
-          reviewed_at: new Date().toISOString(),
-          manager_comments: comments,
-        })
-        .eq('id', id);
-      if (error) throw error;
+      const response = await fetch(`/api/timesheets/${id}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comments }),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'Failed to reject timesheet');
 
       // Refresh data
       await fetchApprovals();
@@ -724,15 +732,11 @@ function ApprovalsContent() {
 
     try {
       setProcessingInProgress(true);
-      const { error } = await supabase
-        .from('timesheets')
-        .update({
-          status: 'processed',
-          processed_at: new Date().toISOString(),
-        })
-        .eq('id', processingTimesheetId);
-
-      if (error) throw error;
+      const response = await fetch(`/api/timesheets/${processingTimesheetId}/process`, {
+        method: 'POST',
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(payload.error || 'Failed to process timesheet');
 
       toast.success('Timesheet marked as Manager Approved');
       setProcessModalOpen(false);
@@ -1267,7 +1271,7 @@ function ApprovalsContent() {
           <TabsContent value="absences" className="mt-4 space-y-4">
             {absencesLoading ? (
               <SectionLoader message="Loading absence approvals..." />
-            ) : !canAuthoriseBookings || filteredAbsences.length === 0 ? (
+            ) : !canAuthoriseAbsences || filteredAbsences.length === 0 ? (
               <Card className="border-border">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <CheckCircle2 className="h-12 w-12 text-green-400 mb-3" />

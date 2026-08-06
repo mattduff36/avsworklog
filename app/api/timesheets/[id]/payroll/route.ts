@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
+import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import type { PayrollSnapshotView } from '@/components/timesheets/PayrollSnapshotCard';
 
@@ -29,20 +30,25 @@ export async function GET(
 
     const isOwner = target.user_id === user.id;
     if (!isOwner) {
-      const [canApprove, canAccessTimesheets] = await Promise.all([
-        canEffectiveRoleAccessModule('approvals'),
-        canEffectiveRoleAccessModule('timesheets'),
-      ]);
-      if (!canApprove && !canAccessTimesheets) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-      const scoped = await filterTimesheetRowsForReportScope([target as {
+      const typedTarget = target as {
         id: string;
         user_id: string;
         employee: { team_id?: string | null } | null;
-      }]);
-      if (scoped.length !== 1) {
-        return NextResponse.json({ error: 'You cannot view this employee’s payroll data' }, { status: 403 });
+      };
+      const canAuthoriseTarget = await canCurrentActorAuthoriseTimesheetTarget({
+        profileId: typedTarget.user_id,
+        teamId: typedTarget.employee?.team_id || null,
+      });
+
+      if (!canAuthoriseTarget) {
+        const canAccessTimesheets = await canEffectiveRoleAccessModule('timesheets');
+        if (!canAccessTimesheets) {
+          return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        }
+        const scoped = await filterTimesheetRowsForReportScope([typedTarget]);
+        if (scoped.length !== 1) {
+          return NextResponse.json({ error: 'You cannot view this employee’s payroll data' }, { status: 403 });
+        }
       }
     }
 

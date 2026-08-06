@@ -6,9 +6,8 @@ import { sendTimesheetAdjustmentEmail } from '@/lib/utils/email';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { Database } from '@/types/database';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { notifyProcessedAbsenceTimesheetAdjustment } from '@/lib/server/processed-absence-notifications';
-import { filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
+import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
 import {
   applyTimesheetAdjustmentMutation,
   type AdjustableTimesheetEntryInput,
@@ -62,14 +61,6 @@ export async function POST(
       );
     }
 
-    const canAdjustTimesheets = await canEffectiveRoleAccessModule('approvals');
-    if (!canAdjustTimesheets) {
-      return NextResponse.json(
-        { error: 'Approvals access required to adjust timesheets' },
-        { status: 403 }
-      );
-    }
-
     // Authorize employee scope before any payroll mutation.
     const admin = createAdminClient();
     const { data: target, error: targetError } = await admin
@@ -104,12 +95,14 @@ export async function POST(
       );
     }
 
-    const scoped = await filterTimesheetRowsForReportScope([{
-      id: typedTimesheet.id,
-      user_id: typedTimesheet.user_id,
-      employee: typedTimesheet.employee,
-    }]);
-    if (scoped.length !== 1) {
+    const canAuthoriseTarget = await canCurrentActorAuthoriseTimesheetTarget(
+      {
+        profileId: typedTimesheet.user_id,
+        teamId: typedTimesheet.employee?.team_id || null,
+      },
+      { effectiveRole }
+    );
+    if (!canAuthoriseTarget) {
       return NextResponse.json(
         { error: 'You cannot adjust this employee’s timesheet' },
         { status: 403 }
