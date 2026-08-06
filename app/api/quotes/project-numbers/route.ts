@@ -481,23 +481,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const projectsToSync = 'projects' in result && Array.isArray(result.projects)
-      ? result.projects
-      : 'project' in result && result.project
-        ? [result.project]
-        : [];
-    const syncResults = await Promise.allSettled(projectsToSync.map(project =>
-      syncProjectNumberSiteLocation(admin, project as QuoteProjectNumberRow, user.id)
-    ));
-    syncResults.forEach((syncResult, index) => {
-      if (syncResult.status === 'rejected') {
-        console.error('Project-number location sync failed after quote update:', {
-          projectNumberId: (projectsToSync[index] as { id?: string } | undefined)?.id,
-          error: syncResult.reason,
-        });
-      }
-    });
-
+    // Conversion/link inventory reconciliation is owned by deferred database triggers.
     return NextResponse.json(result);
   } catch (error) {
     console.error('Error updating quote project number:', error);

@@ -34,7 +34,6 @@ import {
 } from '@/lib/server/quote-recipient-contacts';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { canManageQuoteSage } from '@/lib/server/quote-sage-access';
-import { syncQuoteSiteLocation } from '@/lib/server/inventory-site-location-sync';
 import { isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
 
 type QuoteFieldErrors = Record<string, string>;
@@ -152,7 +151,6 @@ export async function GET(_request: NextRequest, { params }: RouteParams) {
       if (canonicalError || !canonicalQuote) throw canonicalError || new Error('Merged quote survivor not found');
       bundle = await fetchQuoteBundle(admin, canonicalQuote.id);
     }
-    await syncQuoteSiteLocation(admin, bundle.quote, user.id);
     const [canManageSage, canManagePurchaseOrders] = await Promise.all([
       canManageQuoteSage(),
       isEffectiveRoleManagerOrHigher(),

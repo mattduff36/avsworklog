@@ -42,11 +42,15 @@ Every active van returned by the inventory fleet-assets API must have exactly on
 Site locations are created or kept active for:
 
 - open project numbers;
-- quotes that have reached operational status, beginning at PO received or in progress.
+- every commercially open quote that is not `lost` or `closed`, beginning as soon as the quote row is created and assigned its quote/job number (`draft`, approval, `sent`, `won`, PO, progress, completion, and invoicing states included).
 
-Site locations are archived when their quote is closed or lost, or when their project number is cancelled. They are reactivated if the source is reopened.
+Site locations are archived when their quote is closed or lost, or when their project number is cancelled/merged. They are reactivated if the source is reopened. Quote revisions share one location keyed by `base_quote_reference`; address and subject are display metadata only.
 
-Generated van and site locations are maintained by sync services. Normal manager UI may edit display metadata where allowed, but should not casually relink generated locations to different source records.
+Requirement `QUOTE-INVENTORY-SITE-001`: PostgreSQL deferred triggers are authoritative for quote site locations. Quote detail GET endpoints are read-only with respect to inventory and must not create or archive locations. Application project-number sync may still create open project sites, but must not overwrite or archive quote-owned survivors. Closing/loss fails when archiving would strand active serialized stock or positive hardware balances.
+
+Generated van and site locations are maintained by those sync services / database reconciler. Normal manager UI may edit display metadata where allowed, but should not casually relink generated locations to different source records.
+
+PRD gap note: there is no standalone quotes-workflow PRD section for inventory site creation beyond this contract and the merge PRDs below; `QUOTE-INVENTORY-SITE-001` is recorded here as the current requirement identifier.
 
 ## User Location And Fleet Assignment
 

@@ -38,6 +38,10 @@ and every retired number remains a permanent alias of it.
 - Retired base and version references remain permanent aliases. Searches,
   overview links, job-code lookup, inventory, calendar, and reports resolve or
   aggregate them under the survivor.
+- Inventory site locations reconcile atomically inside the merge transaction:
+  only the survivor reference remains active, retired aliases archive when
+  empty of protected stock, and application post-merge best-effort sync must
+  not own this behaviour.
 - Existing timesheet and immutable audit text is not rewritten. Future
   timesheet writes using a retired reference are canonicalised to the survivor.
 - The database operation is locked, atomic, idempotent, and rejects stale

@@ -146,6 +146,47 @@ vi.mock('@/lib/server/quote-workflow', async () => {
   };
 });
 
+describe('GET /api/quotes/[id]', () => {
+  it('loads quote details without mutating inventory locations (QSL-014)', async () => {
+    vi.clearAllMocks();
+    mockCanManageQuoteSage.mockResolvedValue(false);
+    mockIsEffectiveRoleManagerOrHigher.mockResolvedValue(true);
+    mockFetchQuoteBundle.mockResolvedValue({
+      quote: {
+        id: 'quote-1',
+        quote_reference: '40106-GH',
+        base_quote_reference: '40106-GH',
+        quote_thread_id: 'quote-1',
+        status: 'sent',
+        total: 100,
+      },
+      mergeInfo: null,
+    });
+
+    const adminFrom = vi.fn(() => {
+      throw new Error('GET /api/quotes/[id] must not query inventory tables');
+    });
+    mockCreateAdminClient.mockReturnValue({ from: adminFrom });
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'user-1' } },
+          error: null,
+        }),
+      },
+    });
+
+    const { GET } = await import('@/app/api/quotes/[id]/route');
+    const response = await GET(
+      new NextRequest('http://localhost/api/quotes/quote-1'),
+      { params: Promise.resolve({ id: 'quote-1' }) }
+    );
+
+    expect(response.status).toBe(200);
+    expect(adminFrom).not.toHaveBeenCalled();
+  });
+});
+
 describe('PATCH /api/quotes/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();

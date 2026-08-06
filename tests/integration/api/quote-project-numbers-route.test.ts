@@ -246,7 +246,7 @@ describe('POST /api/quotes/project-numbers', () => {
     });
   });
 
-  it('dispatches multi-project conversion and syncs every resulting project', async () => {
+  it('dispatches multi-project conversion without application inventory sync', async () => {
     mockCreateAdminClient.mockReturnValue({ from: vi.fn() });
 
     const body = {
@@ -271,7 +271,7 @@ describe('POST /api/quotes/project-numbers', () => {
       body,
       'user-1',
     );
-    expect(mockSyncProjectNumberSiteLocation).toHaveBeenCalledTimes(2);
+    expect(mockSyncProjectNumberSiteLocation).not.toHaveBeenCalled();
     expect(payload).toEqual(expect.objectContaining({
       quote_id: 'quote-1',
       aliases: ['60002-LC'],

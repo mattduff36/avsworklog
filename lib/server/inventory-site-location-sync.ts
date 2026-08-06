@@ -1,4 +1,3 @@
-import { getQuoteLocationSegment } from '@/lib/quotes/quote-display-name';
 import type { Database } from '@/types/database';
 import {
   normalizeExternalReference,
@@ -6,11 +5,7 @@ import {
   type InventoryLocationRow,
 } from './inventory-locations';
 
-type QuoteRow = Database['public']['Tables']['quotes']['Row'];
 type QuoteProjectNumberRow = Database['public']['Tables']['quote_project_numbers']['Row'];
-
-const OPERATIONAL_QUOTE_STATUSES = new Set<QuoteRow['status']>(['po_received', 'in_progress']);
-const ARCHIVED_QUOTE_STATUSES = new Set<QuoteRow['status']>(['lost', 'closed']);
 
 export interface SiteLocationSyncResult {
   action: 'created' | 'updated' | 'archived' | 'unchanged' | 'skipped';
@@ -19,7 +14,7 @@ export interface SiteLocationSyncResult {
 }
 
 interface SiteLocationSyncInput {
-  sourceType: 'quote' | 'project_number';
+  sourceType: 'project_number';
   sourceId: string;
   externalReference: string | null;
   name: string;
@@ -30,10 +25,6 @@ interface SiteLocationSyncInput {
 
 function buildSiteLocationName(reference: string, label: string | null): string {
   return label?.trim() ? `Site - ${reference} - ${label.trim()}` : `Site - ${reference}`;
-}
-
-function buildQuoteSiteLabel(quote: Pick<QuoteRow, 'site_address' | 'subject_line'>): string | null {
-  return getQuoteLocationSegment(quote.site_address) || quote.subject_line?.trim() || null;
 }
 
 function buildProjectSiteLabel(project: Pick<QuoteProjectNumberRow, 'title' | 'description'>): string | null {
@@ -57,12 +48,28 @@ async function findSiteLocationByReference(
   return data;
 }
 
-export function shouldQuoteHaveActiveSiteLocation(quote: Pick<QuoteRow, 'status' | 'commercial_status'>): boolean {
-  return quote.commercial_status !== 'closed' && OPERATIONAL_QUOTE_STATUSES.has(quote.status);
-}
+function assertProjectOwnedOrClaimable(existingLocation: InventoryLocationRow, sourceId: string): void {
+  if (existingLocation.source_type === 'quote' || existingLocation.source_type === 'legacy_quote') {
+    throw new Error(
+      `Refusing to modify quote-owned site location ${existingLocation.id} from project-number sync.`
+    );
+  }
 
-export function shouldArchiveQuoteSiteLocation(quote: Pick<QuoteRow, 'status' | 'commercial_status'>): boolean {
-  return quote.commercial_status === 'closed' || ARCHIVED_QUOTE_STATUSES.has(quote.status);
+  if (existingLocation.source_type && existingLocation.source_type !== 'project_number') {
+    throw new Error(
+      `Refusing to modify site location ${existingLocation.id} owned by source_type=${existingLocation.source_type}.`
+    );
+  }
+
+  if (
+    existingLocation.source_type === 'project_number'
+    && existingLocation.source_id
+    && existingLocation.source_id !== sourceId
+  ) {
+    throw new Error(
+      `Refusing to modify project site location ${existingLocation.id} owned by a different project number.`
+    );
+  }
 }
 
 export async function syncSiteLocation(
@@ -86,6 +93,15 @@ export async function syncSiteLocation(
       };
     }
 
+    if (
+      existingLocation.source_type !== 'project_number'
+      || (existingLocation.source_id && existingLocation.source_id !== input.sourceId)
+    ) {
+      throw new Error(
+        `Refusing to archive site location ${existingLocation.id}; project-number sync can only archive its own locations.`
+      );
+    }
+
     const { data, error } = await admin
       .from('inventory_locations')
       .update({
@@ -100,6 +116,10 @@ export async function syncSiteLocation(
 
     if (error) throw error;
     return { action: 'archived', location_id: data.id, external_reference: externalReference };
+  }
+
+  if (existingLocation) {
+    assertProjectOwnedOrClaimable(existingLocation, input.sourceId);
   }
 
   const payload = {
@@ -155,30 +175,6 @@ export async function syncSiteLocation(
   return { action: 'created', location_id: data.id, external_reference: externalReference };
 }
 
-export async function syncQuoteSiteLocation(
-  admin: InventoryAdminClient,
-  quote: Pick<QuoteRow, 'id' | 'quote_reference' | 'base_quote_reference' | 'status' | 'commercial_status' | 'site_address' | 'subject_line'>,
-  actorUserId?: string | null
-): Promise<SiteLocationSyncResult> {
-  const reference = normalizeExternalReference(quote.base_quote_reference || quote.quote_reference);
-  const shouldBeActive = shouldQuoteHaveActiveSiteLocation(quote);
-  const shouldArchive = shouldArchiveQuoteSiteLocation(quote);
-
-  if (!shouldBeActive && !shouldArchive) {
-    return { action: 'skipped', location_id: null, external_reference: reference };
-  }
-
-  return syncSiteLocation(admin, {
-    sourceType: 'quote',
-    sourceId: quote.id,
-    externalReference: reference,
-    name: buildSiteLocationName(reference || 'Quote', buildQuoteSiteLabel(quote)),
-    description: quote.site_address?.trim() || quote.subject_line?.trim() || null,
-    isActive: shouldBeActive,
-    actorUserId,
-  });
-}
-
 export async function syncProjectNumberSiteLocation(
   admin: InventoryAdminClient,
   project: Pick<QuoteProjectNumberRow, 'id' | 'project_reference' | 'status' | 'title' | 'description'>,
@@ -193,6 +189,11 @@ export async function syncProjectNumberSiteLocation(
     && project.status !== 'converted'
     && project.status !== 'merged'
   ) {
+    return { action: 'skipped', location_id: null, external_reference: reference };
+  }
+
+  // Converted/merged project rows are owned by the database quote reconciler.
+  if (project.status === 'converted' || project.status === 'merged') {
     return { action: 'skipped', location_id: null, external_reference: reference };
   }
 

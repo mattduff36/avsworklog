@@ -9,10 +9,6 @@ import {
 } from '@/lib/server/quote-workflow';
 import type { Database, Json } from '@/types/database';
 import {
-  syncQuoteSiteLocation,
-  syncSiteLocation,
-} from '@/lib/server/inventory-site-location-sync';
-import {
   loadQuoteMergeContexts,
 } from '@/lib/server/quote-merge-resolution';
 
@@ -461,34 +457,6 @@ export async function mergeLiveQuotes(
     if (!isMergeRpcResult(data)) {
       throw new Error('The live quote merge returned an invalid result.');
     }
-    const canonicalQuote = input.merge_mode === 'consolidated'
-      ? {
-          ...survivor,
-          id: data.quote_id,
-          quote_reference: consolidatedQuote?.quote_reference || survivor.quote_reference,
-          base_quote_reference: data.canonical_reference,
-          status: 'draft' as const,
-        }
-      : survivor;
-    const inventoryResults = await Promise.allSettled([
-      syncQuoteSiteLocation(admin, canonicalQuote, actorUserId),
-      ...quotes
-        .filter(quote => quote.id !== survivor.id)
-        .map(quote => syncSiteLocation(admin, {
-          sourceType: 'quote',
-          sourceId: quote.id,
-          externalReference: quote.base_quote_reference || quote.quote_reference,
-          name: `Site - ${quote.base_quote_reference || quote.quote_reference}`,
-          description: quote.site_address || quote.subject_line,
-          isActive: false,
-          actorUserId,
-        })),
-    ]);
-    inventoryResults.forEach((result) => {
-      if (result.status === 'rejected') {
-        console.error('Live quote merge inventory sync failed:', result.reason);
-      }
-    });
     return data;
   } catch (error) {
     if (!rpcSubmitted) {
