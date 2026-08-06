@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.9.1
+
+**GIT COMMIT MESSAGE**
+`chore(cursor): route important finalise fixes to Sol`
+
+**PUSHED AT**
+2026-08-06T20:41:15.380Z
+
+**WHAT CHANGED**
+Add fap and ffap finalise shortcuts. Route important finalise fixes to Sol.
+
+**VERSION HISTORY DETAILS**
+- Added fap and ffap finalise shortcuts.
+- Route important finalise fixes to Sol.
+
+**COMMITS IN THIS RELEASE**
+- `chore(cursor): add fap and ffap finalise shortcuts`
+- `chore(cursor): route important finalise fixes to Sol`
+
 ## 0826.9.0
 
 **GIT COMMIT MESSAGE**

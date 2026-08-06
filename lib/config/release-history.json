@@ -1,5 +1,21 @@
 [
   {
+    "version": "0826.9.1",
+    "updateKind": "minor",
+    "title": "Cursor maintenance update",
+    "description": "Added fap and ffap finalise shortcuts. Route important finalise fixes to Sol.",
+    "summary": "Added fap and ffap finalise shortcuts. Route important finalise fixes to Sol.",
+    "details": [
+      "Added fap and ffap finalise shortcuts.",
+      "Route important finalise fixes to Sol."
+    ],
+    "areas": [
+      "Ffap finalise shortcuts. Route important finalise fixes to Sol"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-08-06T20:41:15.380Z"
+  },
+  {
     "version": "0826.9.0",
     "updateKind": "major",
     "title": "Inventory update",
