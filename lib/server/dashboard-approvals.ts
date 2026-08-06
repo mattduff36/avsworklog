@@ -71,7 +71,8 @@ export async function getDashboardApprovalsMetrics(params: {
     effectiveRole.role_name,
     effectiveRole.team_name
   );
-  const isAdminTier = hasEffectiveRoleFullAccess(effectiveRole) || hasAccountsVisibilityOverride;
+  const isAdminTier = hasEffectiveRoleFullAccess(effectiveRole);
+  const isTimesheetAdminTier = isAdminTier || hasAccountsVisibilityOverride;
   const actorPermissions = await getActorAbsenceSecondaryPermissions(actorProfileId, {
     role: {
       name: effectiveRole.role_name,
@@ -89,7 +90,7 @@ export async function getDashboardApprovalsMetrics(params: {
       actorPermissions.effective.authorise_bookings_own
   );
 
-  if (!isAdminTier && !canAuthoriseBookings) {
+  if (!isTimesheetAdminTier && !canAuthoriseBookings) {
     return {
       summaryTimesheets: 0,
       summaryAbsences: 0,
@@ -118,7 +119,7 @@ export async function getDashboardApprovalsMetrics(params: {
   if (absencesResult.error) throw absencesResult.error;
 
   const scopedTimesheets = ((timesheetsResult.data || []) as DashboardApprovalTimesheetRow[]).filter((row) => {
-    if (isAdminTier) return true;
+    if (isTimesheetAdminTier) return true;
 
     return canActorUseScopedAbsencePermission({
       actorPermissions,

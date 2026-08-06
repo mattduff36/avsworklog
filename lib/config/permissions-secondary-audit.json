@@ -63,8 +63,8 @@
       "byRole": {
         "Contractor": "Assigned document access: view/read/sign assigned project documents and record visitor signatures where exposed.",
         "Employee": "Same assigned-document workflow as Contractor.",
-        "Supervisor": "Module access exists, but UI treats Supervisor as employee for management pages. RLS still reserves document/assignment management for is_manager_admin.",
-        "Manager": "Manage project documents and assignments: upload/update/delete docs, view all assignments, create/update assignments, and manage document types/favourites where routes allow.",
+        "Supervisor": "Assigned-document workflow only. Project management APIs and UI require RAMS Level 4.",
+        "Manager": "Level 4 management: upload/update/delete docs, view all assignments, create/update assignments, and manage document types. Personal favourites remain available to any RAMS holder for their own rows.",
         "Admin": "Full management, plus admin override where policies distinguish admin."
       }
     },
@@ -89,21 +89,21 @@
       "byRole": {
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
-        "Supervisor": "Can view maintenance overview/data and can reach module-based maintenance create/update APIs if exposed. Settings tab is hidden; category/recipient management remains manager/admin gated.",
-        "Manager": "Can view and update maintenance plus Settings tab: categories, recipients, retired asset restore/delete UI.",
-        "Admin": "Full maintenance access and settings control."
+        "Supervisor": "Level 3 operational access: overview, history, and maintenance record create/update. Settings/categories/recipients remain Level 4+.",
+        "Manager": "Level 4 settings access: categories, recipients, retired asset restore UI, plus Level 3 operations.",
+        "Admin": "Level 5 destructive/category administration plus full maintenance settings control."
       }
     },
     {
       "displayName": "Toolbox Talks",
       "moduleName": "toolbox-talks",
-      "matrixGate": "Supervisor+ and team-enabled",
-      "minimumRole": "Supervisor",
+      "matrixGate": "Manager+ and team-enabled",
+      "minimumRole": "Manager",
       "byRole": {
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
-        "Supervisor": "Module access exists, but management actions require Toolbox Talks Level 4; recipient self-service remains separate.",
-        "Manager": "Level 4 management can create toolbox talks/reminders, manage recipients, and view reports/export compliance data.",
+        "Supervisor": "No module access by rank. Toolbox Talks is enforced at Level 4 (Manager+).",
+        "Manager": "Level 4 management can create toolbox talks/reminders, manage recipients, and view Toolbox reports/export compliance data without a separate Reports module grant. Recipient self-service remains separate.",
         "Admin": "Full access. Strict admin notification audit tools remain admin-only."
       }
     },
@@ -141,8 +141,8 @@
       "byRole": {
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
-        "Supervisor": "No module access by rank in the live matrix. Not manager-admin, so legacy actions table RLS does not grant all-row management.",
-        "Manager": "Manage action/reminder workflow records, assignment directory, action settings, and fleet-inspection reminder generation.",
+        "Supervisor": "No Actions module access by rank. Employees/Supervisors may still create constrained defect actions from inspections; management remains Actions Level 4.",
+        "Manager": "Actions Level 4 manages reminder_actions, legacy actions management, assignment directory, action settings, and fleet-inspection reminder generation.",
         "Admin": "Full action workflow control."
       }
     },
@@ -220,7 +220,7 @@
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
         "Supervisor": "No module access by rank.",
-        "Manager": "No access by rank. A specifically delegated effective Level 5 override grants Admin Settings access, including non-admin role assignment, permission levels, and timesheet configuration, but cannot alter or assign Admin/Super Admin roles.",
+        "Manager": "No access by rank. A deliberately delegated Admin Settings Level 5 override grants full permission-administration authority (including further Level 5 delegation) under sensitive PIN and non-view-as rules; Admin/Super Admin job-role assignment remains separately constrained where role-assignment gates apply.",
         "Admin": "Full Admin Settings access for permission levels, Permission Guide, payroll rules, and timesheet exceptions. A sensitive access PIN is also required when enabled for this module."
       }
     },
@@ -232,9 +232,9 @@
       "byRole": {
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
-        "Supervisor": "Can access Fleet overview and module-gated asset APIs where RLS permits. Settings/category UI is hidden. Some asset writes are mixed between module-based API gates and manager/admin RLS.",
-        "Manager": "Fleet overview plus Settings tab and manager asset operations. Some category sections/actions remain admin-only in UI/RLS.",
-        "Admin": "Full fleet/category/settings control."
+        "Supervisor": "Level 3 fleet read/overview/history access. Asset create/edit/retire and settings require Level 4; category administration requires Level 5.",
+        "Manager": "Level 4 asset management and settings, plus Level 3 read/overview. Category CRUD remains Level 5.",
+        "Admin": "Level 5 category/destructive administration plus full fleet settings control."
       }
     },
     {
@@ -269,10 +269,10 @@
       "matrixGate": "Contractor+ and team-enabled",
       "minimumRole": "Contractor",
       "byRole": {
-        "Contractor": "Employee inventory view: set/change own location, view assigned/location inventory, request locations, move/claim items through module-based user endpoints. Direct RLS is broader on some inventory tables than the UI/API manager split.",
+        "Contractor": "Employee inventory view: set/change own location, view assigned/location inventory, request locations, and move/claim items through scoped module endpoints. Manager catalogue/group tables require Level 4.",
         "Employee": "Same as Contractor.",
-        "Supervisor": "Same employee inventory view. Not is_manager_admin, so no inventory manager endpoints, groups, categories, item admin, check history admin, or minor-plant management.",
-        "Manager": "Full inventory manager view: items, locations, categories, groups, check intervals/history, location requests, minor-plant move/restore flows. Some delete paths are admin-only.",
+        "Supervisor": "Employee inventory workflows plus Supervisor site-assignment management where configured. Manager catalogue/group tables require Level 4.",
+        "Manager": "Level 4 inventory manager view: items, locations, categories, groups, check intervals/history, location requests, minor-plant move/restore flows. Some delete paths are admin-only.",
         "Admin": "Full inventory manager/admin access, including admin-only delete paths."
       }
     },
@@ -291,10 +291,8 @@
     }
   ],
   "prdRelevantMismatches": [
-    "Toolbox Talks: Level 4 management policies are aligned, while recipient self-service remains separate.",
-    "Fleet and Maintenance: several write/settings actions mix module checks, isManager UI flags, admin-only UI, and manager-admin RLS.",
-    "Projects: some APIs are module-gated, but UI and RLS still preserve Manager/Admin management semantics.",
-    "Actions vs Reminders: Reminders access is universal for assigned work, while reminder creation and assignment continue to use Actions Level 4.",
-    "Team overrides: Workshop affects inspection read/write scope; Accounts can elevate timesheet/report visibility for manager-like roles."
+    "Intentional: Workshop team members receive fleet-wide inspection read visibility with constrained write paths; this override does not apply outside inspection modules.",
+    "Intentional: Accounts Supervisor/Manager retain global timesheet and report visibility override beyond normal team scope.",
+    "Intentional: Reminders are universal for assigned personal work, while reminder-action creation/assignment remains Actions Level 4."
   ]
 }
