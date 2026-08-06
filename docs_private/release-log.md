@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.8.0
+
+**GIT COMMIT MESSAGE**
+`feat(quotes): update quotes`
+
+**PUSHED AT**
+2026-08-06T15:43:04.321Z
+
+**WHAT CHANGED**
+Update quotes.
+
+**VERSION HISTORY DETAILS**
+- Updated quotes, with changes to shared logic, automation scripts, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(quotes): update quotes`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0826.7.0
 
 **GIT COMMIT MESSAGE**
