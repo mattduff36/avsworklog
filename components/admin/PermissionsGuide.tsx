@@ -27,25 +27,33 @@ interface PermissionsAuditDocument {
 }
 
 interface GuideRoleBadgeProps {
-  variant: 'destructive' | 'outline' | 'warning';
+  label: string;
+  variant: 'destructive' | 'outline' | 'warning' | 'secondary';
   className?: string;
 }
 
 /** Aligns with Permissions tab role badges; Contractor/Employee use a white outline pill. */
-function getGuideRoleBadge(role: (typeof ROLE_ORDER)[number]): GuideRoleBadgeProps {
-  if (role === 'Contractor' || role === 'Employee') {
-    return { variant: 'outline', className: 'border-white/70 text-foreground' };
+function getGuideRoleBadge(role: string): GuideRoleBadgeProps {
+  const normalized = role.trim();
+  const label = normalized || 'Unknown';
+
+  if (normalized === 'Contractor' || normalized === 'Employee') {
+    return { label, variant: 'outline', className: 'border-white/70 text-foreground' };
   }
-  if (role === 'Supervisor') {
+  if (normalized === 'Supervisor') {
     return {
+      label,
       variant: 'outline',
       className: 'border-sky-400/50 bg-sky-500/20 text-sky-200',
     };
   }
-  if (role === 'Manager') {
-    return { variant: 'warning' };
+  if (normalized === 'Manager') {
+    return { label, variant: 'warning' };
   }
-  return { variant: 'destructive' };
+  if (normalized === 'Admin') {
+    return { label, variant: 'destructive' };
+  }
+  return { label, variant: 'secondary' };
 }
 
 const auditDocument = permissionsAudit as PermissionsAuditDocument;
@@ -97,6 +105,7 @@ export function PermissionsGuide() {
         {modules.map((module) => {
           const moduleMismatches = mismatchByModule.get(module.moduleName) || [];
           const brandSurface = getModuleBrandSurfaceClasses(module.moduleName);
+          const minRoleBadge = getGuideRoleBadge(module.minimumRole);
           return (
             <AccordionItem
               key={module.moduleName}
@@ -110,8 +119,14 @@ export function PermissionsGuide() {
               <AccordionTrigger className="px-4 py-4 hover:no-underline">
                 <div className="flex flex-col items-start gap-2 text-left sm:flex-row sm:items-center sm:gap-3">
                   <span className="font-semibold text-foreground">{module.displayName}</span>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline">Min: {module.minimumRole}</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Min:</span>
+                    <Badge
+                      variant={minRoleBadge.variant}
+                      className={cn('text-[10px]', minRoleBadge.className)}
+                    >
+                      {minRoleBadge.label}
+                    </Badge>
                     <Badge variant="secondary">{module.matrixGate}</Badge>
                   </div>
                 </div>
@@ -131,7 +146,7 @@ export function PermissionsGuide() {
                           variant={roleBadge.variant}
                           className={cn('text-[10px]', roleBadge.className)}
                         >
-                          {role}
+                          {roleBadge.label}
                         </Badge>
                         <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
                       </div>
