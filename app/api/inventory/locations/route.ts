@@ -8,6 +8,7 @@ import {
   getLocationTypeForLinkedAsset,
   listInventoryLocations,
   loadEnrichedInventoryLocationById,
+  parseInventoryLocationDirectoryFilterTypes,
 } from '@/lib/server/inventory-locations';
 import type { Database } from '@/types/database';
 
@@ -77,9 +78,13 @@ export async function GET(request: NextRequest) {
     const limit = normalizeLocationSearchLimit(searchParams.get('limit'));
     const offset = normalizeLocationSearchOffset(searchParams.get('offset'));
     const includeLegacyQuotes = searchParams.get('includeLegacyQuotes') === 'true';
+    const locationTypes = parseInventoryLocationDirectoryFilterTypes(
+      searchParams.getAll('locationTypes').flatMap((value) => value.split(',')),
+    );
     const { locations: locationRows, total } = await listInventoryLocations(admin, {
       search,
       includeLegacyQuotes,
+      locationTypes,
       limit,
       offset,
     });

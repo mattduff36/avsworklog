@@ -6,6 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SearchInput } from '@/components/ui/search-input';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
+import {
+  MultiSelectFilter,
+  type MultiSelectFilterOption,
+} from '@/components/ui/multi-select-filter';
 import { cn } from '@/lib/utils';
 import { Link2, Loader2, MapPin, Pencil, Trash2 } from 'lucide-react';
 import type { FleetAssetOption, InventoryLocation } from '../types';
@@ -21,8 +25,26 @@ interface InventoryLocationsPanelProps {
   refreshVersion?: number;
 }
 
+type DirectoryLocationTypeFilter = 'van' | 'site' | 'manual' | 'hgv' | 'plant';
+
 const LOCATION_PAGE_SIZE = 25;
 const SEARCH_DEBOUNCE_MS = 300;
+
+const LOCATION_TYPE_FILTER_OPTIONS: MultiSelectFilterOption<DirectoryLocationTypeFilter>[] = [
+  { value: 'van', label: 'Van' },
+  { value: 'site', label: 'Site' },
+  { value: 'manual', label: 'Other' },
+  { value: 'hgv', label: 'HGV' },
+  { value: 'plant', label: 'Plant' },
+];
+
+function appendLocationTypeFilterParams(
+  params: URLSearchParams,
+  locationTypes: readonly DirectoryLocationTypeFilter[],
+) {
+  if (locationTypes.length === 0) return;
+  params.set('locationTypes', locationTypes.join(','));
+}
 
 interface InventoryLocationsResponse {
   locations?: InventoryLocation[];
@@ -62,6 +84,7 @@ export function InventoryLocationsPanel({
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
+  const [selectedLocationTypes, setSelectedLocationTypes] = useState<DirectoryLocationTypeFilter[]>([]);
   const queryVersionRef = useRef(0);
   const normalizedSearch = searchQuery.trim();
 
@@ -72,6 +95,7 @@ export function InventoryLocationsPanel({
     setTotal(0);
     setHasMore(false);
     setLoading(true);
+    setLoadingMore(false);
     setError('');
     const controller = new AbortController();
     const timeoutId = window.setTimeout(async () => {
@@ -82,6 +106,7 @@ export function InventoryLocationsPanel({
           offset: '0',
         });
         if (includeLegacyQuotes) params.set('includeLegacyQuotes', 'true');
+        appendLocationTypeFilterParams(params, selectedLocationTypes);
         const response = await fetch(
           `/api/inventory/locations?${params}`,
           { cache: 'no-store', signal: controller.signal },
@@ -107,7 +132,7 @@ export function InventoryLocationsPanel({
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [includeLegacyQuotes, normalizedSearch, refreshVersion]);
+  }, [includeLegacyQuotes, normalizedSearch, refreshVersion, selectedLocationTypes]);
 
   async function loadMoreLocations() {
     if (loadingMore || !hasMore) return;
@@ -122,6 +147,7 @@ export function InventoryLocationsPanel({
         offset: String(locations.length),
       });
       if (includeLegacyQuotes) params.set('includeLegacyQuotes', 'true');
+      appendLocationTypeFilterParams(params, selectedLocationTypes);
       const response = await fetch(`/api/inventory/locations?${params}`, { cache: 'no-store' });
       const payload = await response.json() as InventoryLocationsResponse;
       if (!response.ok) throw new Error(payload.error || 'Failed to load more inventory locations');
@@ -172,7 +198,7 @@ export function InventoryLocationsPanel({
       </CardHeader>
       <CardContent className="p-0">
         <div className="border-b border-slate-700 p-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
             <div>
               <SearchInput
                 value={searchQuery}
@@ -184,6 +210,15 @@ export function InventoryLocationsPanel({
                 aria-label="Search inventory locations"
               />
             </div>
+            <MultiSelectFilter
+              label="Type"
+              allLabel="All types"
+              selectedValues={selectedLocationTypes}
+              options={LOCATION_TYPE_FILTER_OPTIONS}
+              onSelectedValuesChange={setSelectedLocationTypes}
+              triggerClassName="min-h-11 w-full border-slate-600 bg-slate-800 text-white sm:min-h-9 sm:w-[170px]"
+              panelClassName="border-slate-700 bg-slate-900"
+            />
             <LegacyQuoteLocationOptIn
               enabled={includeLegacyQuotes}
               onEnabledChange={setIncludeLegacyQuotes}

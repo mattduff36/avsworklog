@@ -104,6 +104,7 @@ describe('inventory locations route', () => {
     expect(listInventoryLocations).toHaveBeenCalledWith(admin, {
       search: '',
       includeLegacyQuotes: false,
+      locationTypes: [],
       limit: 50,
       offset: 0,
     });
@@ -136,6 +137,7 @@ describe('inventory locations route', () => {
     expect(listInventoryLocations).toHaveBeenCalledWith(admin, {
       search: 'v',
       includeLegacyQuotes: true,
+      locationTypes: [],
       limit: 25,
       offset: 50,
     });
@@ -144,6 +146,29 @@ describe('inventory locations route', () => {
       limit: 25,
       total: 0,
       has_more: false,
+    });
+  });
+
+  it('allowlists locationTypes query values and ignores invalid tokens', async () => {
+    const admin = {};
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+    vi.mocked(listInventoryLocations).mockResolvedValue({
+      locations: [],
+      total: 0,
+    });
+    vi.mocked(enrichInventoryLocations).mockResolvedValue([]);
+
+    const response = await GET(new NextRequest(
+      'http://localhost/api/inventory/locations?locationTypes=van,site,manual,yard,bogus&locationTypes=hgv&locationTypes=plant',
+    ));
+
+    expect(response.status).toBe(200);
+    expect(listInventoryLocations).toHaveBeenCalledWith(admin, {
+      search: '',
+      includeLegacyQuotes: false,
+      locationTypes: ['van', 'site', 'manual', 'hgv', 'plant'],
+      limit: 50,
+      offset: 0,
     });
   });
 

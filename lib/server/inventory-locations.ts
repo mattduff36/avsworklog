@@ -20,11 +20,40 @@ export interface LinkedAssetColumns {
 
 export type InventoryAdminClient = SupabaseClient<Database>;
 
+export const INVENTORY_LOCATION_DIRECTORY_FILTER_TYPES = [
+  'van',
+  'site',
+  'manual',
+  'hgv',
+  'plant',
+] as const;
+
+export type InventoryLocationDirectoryFilterType =
+  (typeof INVENTORY_LOCATION_DIRECTORY_FILTER_TYPES)[number];
+
 export interface InventoryLocationListParams {
   search: string;
   includeLegacyQuotes: boolean;
+  locationTypes: InventoryLocationDirectoryFilterType[];
   limit: number;
   offset: number;
+}
+
+const INVENTORY_LOCATION_DIRECTORY_FILTER_TYPE_SET = new Set<string>(
+  INVENTORY_LOCATION_DIRECTORY_FILTER_TYPES,
+);
+
+export function parseInventoryLocationDirectoryFilterTypes(
+  values: readonly string[],
+): InventoryLocationDirectoryFilterType[] {
+  const parsed: InventoryLocationDirectoryFilterType[] = [];
+  for (const value of values) {
+    const normalized = value.trim().toLowerCase();
+    if (!INVENTORY_LOCATION_DIRECTORY_FILTER_TYPE_SET.has(normalized)) continue;
+    const typed = normalized as InventoryLocationDirectoryFilterType;
+    if (!parsed.includes(typed)) parsed.push(typed);
+  }
+  return parsed;
 }
 
 export interface InventoryLocationListResult {
@@ -124,6 +153,7 @@ export async function listInventoryLocations(
     p_include_legacy: params.includeLegacyQuotes,
     p_limit: params.limit,
     p_offset: params.offset,
+    p_location_types: params.locationTypes.length > 0 ? params.locationTypes : null,
   });
 
   if (error) throw error;

@@ -142,4 +142,110 @@ describe('InventoryLocationsPanel', () => {
     );
     expect(screen.getAllByText('Main Yard').length).toBeGreaterThan(0);
   });
+
+  it('filters by selected location types and maps Other to manual', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        locations: [yardLocation],
+        pagination: { offset: 0, limit: 25, total: 1, has_more: false },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <InventoryLocationsPanel
+        fleetAssets={[]}
+        onEdit={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(0);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    fetchMock.mockClear();
+
+    fireEvent.click(screen.getByRole('button', { name: /All types/i }));
+    fireEvent.click(screen.getByText('Van'));
+    fireEvent.click(screen.getByText('Other'));
+
+    await act(async () => {
+      vi.advanceTimersByTime(0);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/inventory/locations?search=&limit=25&offset=0&locationTypes=van%2Cmanual',
+      expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }),
+    );
+  });
+
+  it('clears a stranded load-more state when type filters change', async () => {
+    let resolveLoadMore: ((value: unknown) => void) | null = null;
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          locations: [yardLocation],
+          pagination: { offset: 0, limit: 25, total: 2, has_more: true },
+        }),
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => {
+        resolveLoadMore = resolve;
+      }))
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          locations: [yardLocation],
+          pagination: { offset: 0, limit: 25, total: 1, has_more: false },
+        }),
+      });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <InventoryLocationsPanel
+        fleetAssets={[]}
+        onEdit={vi.fn()}
+        onRemove={vi.fn()}
+      />,
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(0);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show More' }));
+    expect(screen.getByText('Loading more locations...')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /All types/i }));
+    fireEvent.click(screen.getByText('Van'));
+
+    await act(async () => {
+      vi.advanceTimersByTime(0);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('Loading more locations...')).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveLoadMore?.({
+        ok: true,
+        json: async () => ({
+          locations: [{ ...yardLocation, id: 'late', name: 'Late Location' }],
+          pagination: { offset: 1, limit: 25, total: 2, has_more: false },
+        }),
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByText('Late Location')).not.toBeInTheDocument();
+  });
 });

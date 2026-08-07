@@ -10569,6 +10569,7 @@ export type Database = {
           p_include_legacy?: boolean
           p_limit?: number
           p_offset?: number
+          p_location_types?: string[] | null
         }
         Returns: {
           id: string

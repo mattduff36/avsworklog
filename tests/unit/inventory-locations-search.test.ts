@@ -30,6 +30,7 @@ describe('inventory location directory search', () => {
     const result = await listInventoryLocations({ rpc } as never, {
       search: 'TE57',
       includeLegacyQuotes: true,
+      locationTypes: ['van', 'site'],
       limit: 50,
       offset: 50,
     });
@@ -39,6 +40,7 @@ describe('inventory location directory search', () => {
       p_include_legacy: true,
       p_limit: 50,
       p_offset: 50,
+      p_location_types: ['van', 'site'],
     });
     expect(result.total).toBe(73);
     expect(result.locations).toEqual([
@@ -48,5 +50,25 @@ describe('inventory location directory search', () => {
       }),
     ]);
     expect(result.locations[0]).not.toHaveProperty('total_count');
+  });
+
+  it('passes null location types when the directory type filter is empty', async () => {
+    const rpc = vi.fn().mockResolvedValue({ data: [], error: null });
+
+    await listInventoryLocations({ rpc } as never, {
+      search: '',
+      includeLegacyQuotes: false,
+      locationTypes: [],
+      limit: 25,
+      offset: 0,
+    });
+
+    expect(rpc).toHaveBeenCalledWith('inventory_search_locations', {
+      p_search: '',
+      p_include_legacy: false,
+      p_limit: 25,
+      p_offset: 0,
+      p_location_types: null,
+    });
   });
 });
