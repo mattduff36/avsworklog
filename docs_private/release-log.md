@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.14.0
+
+**GIT COMMIT MESSAGE**
+`feat(automation): add bounded two-pass review protocol`
+
+**PUSHED AT**
+2026-08-07T19:39:47.359Z
+
+**WHAT CHANGED**
+Add bounded two-pass review protocol.
+
+**VERSION HISTORY DETAILS**
+- Updated inventory, with changes to automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `feat(automation): add bounded two-pass review protocol`
+
 ## 0826.13.0
 
 **GIT COMMIT MESSAGE**

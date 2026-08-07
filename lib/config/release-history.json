@@ -1,5 +1,23 @@
 [
   {
+    "version": "0826.14.0",
+    "updateKind": "major",
+    "title": "Release automation update",
+    "description": "Added bounded two-pass review protocol.",
+    "summary": "Added bounded two-pass review protocol.",
+    "details": [
+      "Updated inventory, with changes to automation scripts."
+    ],
+    "areas": [
+      "Release automation",
+      "Bounded two-pass review protocol"
+    ],
+    "areaKeys": [
+      "release-automation"
+    ],
+    "pushedAt": "2026-08-07T19:39:47.359Z"
+  },
+  {
     "version": "0826.13.0",
     "updateKind": "major",
     "title": "Inventory update",
