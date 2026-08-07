@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { getTimesheetReportScopedProfileIds } from '@/lib/server/reports-timesheet-scope';
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +10,6 @@ export async function GET(request: NextRequest) {
     type DbClient = { from: (t: string) => ReturnType<typeof supabase.from> };
     const db = supabase as unknown as DbClient;
 
-    // Check authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -20,12 +20,29 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get current date and week boundaries
+    const scopedProfileIds = await getTimesheetReportScopedProfileIds();
+    if (scopedProfileIds && scopedProfileIds.size === 0) {
+      return NextResponse.json({
+        timesheets: { weekHours: 0, monthHours: 0, pendingApprovals: 0 },
+        inspections: {
+          weekCompleted: 0,
+          monthCompleted: 0,
+          pendingApprovals: 0,
+          passRate: 0,
+          outstandingDefects: 0,
+        },
+        employees: { active: 0 },
+        summary: { totalPendingApprovals: 0, needsAttention: 0 },
+      });
+    }
+
+    const scopedIds = scopedProfileIds ? Array.from(scopedProfileIds) : null;
+
     const now = new Date();
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - now.getDay() + 1); // Monday
     startOfWeek.setHours(0, 0, 0, 0);
-    
+
     const endOfWeek = new Date(startOfWeek);
     endOfWeek.setDate(startOfWeek.getDate() + 6); // Sunday
     endOfWeek.setHours(23, 59, 59, 999);
@@ -33,7 +50,34 @@ export async function GET(request: NextRequest) {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-    // Get statistics in parallel
+    let weekTimesheetsQuery = db
+      .from('timesheets')
+      .select('total_hours')
+      .eq('status', 'approved')
+      .gte('week_ending', startOfWeek.toISOString())
+      .lte('week_ending', endOfWeek.toISOString());
+    let monthTimesheetsQuery = db
+      .from('timesheets')
+      .select('total_hours')
+      .eq('status', 'approved')
+      .gte('week_ending', startOfMonth.toISOString())
+      .lte('week_ending', endOfMonth.toISOString());
+    let pendingTimesheetsQuery = db
+      .from('timesheets')
+      .select('id', { count: 'exact' })
+      .eq('status', 'submitted');
+    let activeEmployeesQuery = db
+      .from('profiles')
+      .select('id, roles!inner(is_manager_admin)', { count: 'exact' })
+      .eq('roles.is_manager_admin', false);
+
+    if (scopedIds) {
+      weekTimesheetsQuery = weekTimesheetsQuery.in('user_id', scopedIds);
+      monthTimesheetsQuery = monthTimesheetsQuery.in('user_id', scopedIds);
+      pendingTimesheetsQuery = pendingTimesheetsQuery.in('user_id', scopedIds);
+      activeEmployeesQuery = activeEmployeesQuery.in('id', scopedIds);
+    }
+
     const [
       weekTimesheetsResult,
       monthTimesheetsResult,
@@ -44,56 +88,25 @@ export async function GET(request: NextRequest) {
       weekPlantInspectionsResult,
       monthPlantInspectionsResult,
     ] = await Promise.all([
-      // Total hours this week
-      db
-        .from('timesheets')
-        .select('total_hours')
-        .eq('status', 'approved')
-        .gte('week_ending', startOfWeek.toISOString())
-        .lte('week_ending', endOfWeek.toISOString()),
-      
-      // Total hours this month
-      db
-        .from('timesheets')
-        .select('total_hours')
-        .eq('status', 'approved')
-        .gte('week_ending', startOfMonth.toISOString())
-        .lte('week_ending', endOfMonth.toISOString()),
-      
-      // Pending timesheet approvals
-      db
-        .from('timesheets')
-        .select('id', { count: 'exact' })
-        .eq('status', 'submitted'),
-      
-      // Active employees (non-admin/manager roles)
-      db
-        .from('profiles')
-        .select('id, roles!inner(is_manager_admin)', { count: 'exact' })
-        .eq('roles.is_manager_admin', false),
-      
-      // Van inspections completed this week
+      weekTimesheetsQuery,
+      monthTimesheetsQuery,
+      pendingTimesheetsQuery,
+      activeEmployeesQuery,
       db
         .from('van_inspections')
         .select('id', { count: 'exact' })
         .gte('inspection_date', startOfWeek.toISOString())
         .lte('inspection_date', endOfWeek.toISOString()),
-      
-      // Van inspections completed this month
       db
         .from('van_inspections')
         .select('id', { count: 'exact' })
         .gte('inspection_date', startOfMonth.toISOString())
         .lte('inspection_date', endOfMonth.toISOString()),
-
-      // Plant inspections completed this week
       db
         .from('plant_inspections')
         .select('id', { count: 'exact' })
         .gte('inspection_date', startOfWeek.toISOString())
         .lte('inspection_date', endOfWeek.toISOString()),
-      
-      // Plant inspections completed this month
       db
         .from('plant_inspections')
         .select('id', { count: 'exact' })
@@ -101,13 +114,11 @@ export async function GET(request: NextRequest) {
         .lte('inspection_date', endOfMonth.toISOString()),
     ]);
 
-    // Calculate total hours
     const weekHours = ((weekTimesheetsResult.data || []) as Array<{ total_hours?: number | null }>)
       .reduce((sum, t) => sum + (t.total_hours || 0), 0);
     const monthHours = ((monthTimesheetsResult.data || []) as Array<{ total_hours?: number | null }>)
       .reduce((sum, t) => sum + (t.total_hours || 0), 0);
 
-    // Get inspection pass/fail statistics for this month (van inspections)
     const { data: inspectionItems } = await db
       .from('inspection_items')
       .select(`
@@ -125,7 +136,6 @@ export async function GET(request: NextRequest) {
     const totalItems = passCount + failCount;
     const passRate = totalItems > 0 ? ((passCount / totalItems) * 100).toFixed(1) : 0;
 
-    // Get defects requiring attention (failed items from last 30 days)
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -144,7 +154,6 @@ export async function GET(request: NextRequest) {
     const outstandingDefects = ((recentDefects || []) as Array<{ inspection?: { status?: string | null } | null }>)
       .filter((d) => d.inspection?.status !== 'approved').length;
 
-    // Return statistics
     return NextResponse.json({
       timesheets: {
         weekHours: Math.round(weekHours * 100) / 100,
@@ -178,9 +187,8 @@ export async function GET(request: NextRequest) {
       },
     });
     return NextResponse.json(
-      { error: 'Failed to fetch statistics' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }
 }
-

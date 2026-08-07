@@ -9,6 +9,11 @@ function readProjectFile(path: string): string {
 
 describe('Permission Alignment Phase 4', () => {
   it('REPORT-SCOPE-001 maps Reports Level 3/4/5 to own/team/global independently of role', () => {
+    const statsRoute = readProjectFile('app/api/reports/stats/route.ts');
+    expect(statsRoute).toContain('getTimesheetReportScopedProfileIds');
+    expect(statsRoute).toContain(".in('user_id', scopedIds)");
+    expect(statsRoute).toContain(".in('id', scopedIds)");
+
     expect(
       resolveReportScopeAccess({
         reportAccessLevel: 3,
