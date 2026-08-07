@@ -145,7 +145,7 @@ export function getInventoryNormalCheckStatus(item: InventoryCheckScheduleItem):
 
   const dueDate = addMonths(new Date(`${item.last_checked_at}T00:00:00`), getInventoryCheckIntervalMonths({
     check_interval_days: item.check_interval_days || null,
-    category: item.category || null,
+    category: item.category ?? undefined,
   }));
   const daysUntilDue = differenceInCalendarDays(dueDate, new Date());
 

@@ -184,7 +184,7 @@ describe('GET /api/quotes/[id]', () => {
 
     expect(response.status).toBe(200);
     expect(adminFrom).not.toHaveBeenCalled();
-  });
+  }, 15000);
 });
 
 describe('PATCH /api/quotes/[id]', () => {

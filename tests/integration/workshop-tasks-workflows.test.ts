@@ -20,6 +20,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const API_REQUEST_TIMEOUT_MS = 5_000;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('Missing Supabase credentials in .env.local');
@@ -434,6 +435,7 @@ describe('Workshop Tasks Module Workflows', () => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newCategory),
+          signal: AbortSignal.timeout(API_REQUEST_TIMEOUT_MS),
         });
 
         if (response.status === 403) {
