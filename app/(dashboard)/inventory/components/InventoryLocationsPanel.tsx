@@ -203,7 +203,7 @@ export function InventoryLocationsPanel({
         : '';
 
   return (
-    <Card className="min-w-0 overflow-hidden border-slate-700 bg-slate-900/70">
+    <Card className="min-w-0 border-slate-700 bg-slate-900/70">
       <CardHeader className="border-b border-slate-700 bg-slate-950/30">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -220,8 +220,8 @@ export function InventoryLocationsPanel({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="p-0">
-        <div className="border-b border-slate-700 p-4">
+      <CardContent className="overflow-visible p-0">
+        <div className="relative z-20 border-b border-slate-700 p-4">
           <div
             className={cn(
               'grid gap-3 lg:items-center',
