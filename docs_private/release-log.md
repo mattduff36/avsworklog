@@ -2,6 +2,49 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.11.0
+
+**GIT COMMIT MESSAGE**
+`feat(permissions): Supervisor Approvals scopes and report Level 4/5`
+
+**PUSHED AT**
+2026-08-07T00:20:26.952Z
+
+**WHAT CHANGED**
+Align finalise coverage with scoped access. Scope reports stats aggregates to Reports L4/L5 rules. Lock absence profile_id against ownership-pivot approve. Enforce absence approve/process status transition matrix. Align adjustment notification mocks. Align absence secondary view-as and workshop action inserts. Close absence self-approve and Approvals L3 notify gaps. Harden final-review RLS and Approvals consumers. Refresh audit copy after alignment remediation. Supervisor Approvals scopes and report Level 4/5. Avoid literal JWT test fixture. Tighten RLS to module Level 3-5 boundaries. Enforce Fleet and Maintenance Level 3-5 API gates. Require Level 4 for Projects and Toolbox management. Live guide metadata and Admin Settings Level 5. Drop redundant matrixGate badges from permission guide. Restore brand tint behind permission guide role rows. Colour Min role badges on permission guide headers. Use slate-900 for permission guide role panels. Polish permission guide card hover and role badges.
+
+**VERSION HISTORY DETAILS**
+- Updated data storage, with changes to automation scripts, automated tests, and data storage.
+- Updated timesheets, with changes to background routes, shared logic, and automated tests.
+- Updated maintenance, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated approvals, with changes to app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated absence and leave, with changes to background routes, shared logic, automation scripts, automated tests, and data storage.
+- Updated fleet, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated projects, with changes to background routes, app screens, and automated tests.
+- Updated reports, with changes to background routes and shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `test(permissions): align finalise coverage with scoped access`
+- `fix(permissions): scope reports stats aggregates to Reports L4/L5 rules`
+- `fix(permissions): lock absence profile_id against ownership-pivot approve`
+- `fix(permissions): enforce absence approve/process status transition matrix`
+- `test(permissions): align adjustment notification mocks`
+- `fix(permissions): align absence secondary view-as and workshop action inserts`
+- `fix(permissions): close absence self-approve and Approvals L3 notify gaps`
+- `fix(permissions): harden final-review RLS and Approvals consumers`
+- `docs(permissions): refresh audit copy after alignment remediation`
+- `feat(permissions): Supervisor Approvals scopes and report Level 4/5`
+- `fix(security): avoid literal JWT test fixture`
+- `fix(permissions): tighten RLS to module Level 3-5 boundaries`
+- `fix(permissions): enforce Fleet and Maintenance Level 3-5 API gates`
+- `fix(permissions): require Level 4 for Projects and Toolbox management`
+- `feat(permissions): live guide metadata and Admin Settings Level 5`
+- `fix(admin): drop redundant matrixGate badges from permission guide`
+- `fix(admin): restore brand tint behind permission guide role rows`
+- `fix(admin): colour Min role badges on permission guide headers`
+- `fix(admin): use slate-900 for permission guide role panels`
+- `fix(admin): polish permission guide card hover and role badges`
+
 ## 0826.10.0
 
 **GIT COMMIT MESSAGE**

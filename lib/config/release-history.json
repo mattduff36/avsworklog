@@ -1,5 +1,31 @@
 [
   {
+    "version": "0826.11.0",
+    "updateKind": "major",
+    "title": "Permissions update",
+    "description": "Align finalise coverage with scoped access. Scope reports stats aggregates to Reports L4/L5 rules. Lock absence profile_id against ownership-pivot approve. Enforce absence approve/process status transition matrix. Align adjustment notification mocks. Align absence secondary view-as and workshop action inserts. Close absence self-approve and Approvals L3 notify gaps. Harden final-review RLS and Approvals consumers. Refresh audit copy after alignment remediation. Supervisor Approvals scopes and report Level 4/5. Avoid literal JWT test fixture. Tighten RLS to module Level 3-5 boundaries. Enforce Fleet and Maintenance Level 3-5 background services gates. Require Level 4 for Projects and Toolbox management. Live guide metadata and Admin Settings Level 5. Drop redundant matrixGate badges from permission guide. Restore brand tint behind permission guide role rows. Colour Min role badges on permission guide headers. Use slate-900 for permission guide role panels. Polish permission guide card hover and role badges.",
+    "summary": "Align finalise coverage with scoped access. Scope reports stats aggregates to Reports L4/L5 rules. Lock absence profile_id against ownership-pivot approve. Enforce absence approve/process status transition matrix. Align adjustment notification mocks. Align absence secondary view-as and workshop action inserts. Close absence self-approve and Approvals L3 notify gaps. Harden final-review RLS and Approvals consumers. Refresh audit copy after alignment remediation. Supervisor Approvals scopes and report Level 4/5. Avoid literal JWT test fixture. Tighten RLS to module Level 3-5 boundaries. Enforce Fleet and Maintenance Level 3-5 background services gates. Require Level 4 for Projects and Toolbox management. Live guide metadata and Admin Settings Level 5. Drop redundant matrixGate badges from permission guide. Restore brand tint behind permission guide role rows. Colour Min role badges on permission guide headers. Use slate-900 for permission guide role panels. Polish permission guide card hover and role badges.",
+    "details": [
+      "Updated data storage, with changes to automation scripts, automated tests, and data storage.",
+      "Updated timesheets, with changes to background routes, shared logic, and automated tests.",
+      "Updated maintenance, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated approvals, with changes to app screens, shared logic, automation scripts, automated tests, and data storage.",
+      "Updated absence and leave, with changes to background routes, shared logic, automation scripts, automated tests, and data storage.",
+      "Updated fleet, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated projects, with changes to background routes, app screens, and automated tests.",
+      "Updated reports, with changes to background routes and shared logic."
+    ],
+    "areas": [
+      "Workshop action inserts. Close absence self-approve",
+      "Approvals L3 notify gaps. Harden final-review RLS",
+      "Maintenance Level 3-5 background services gates. Require Level 4 for Projects",
+      "Toolbox management. Live guide metadata",
+      "Role badges"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-08-07T00:20:26.952Z"
+  },
+  {
     "version": "0826.10.0",
     "updateKind": "major",
     "title": "Release automation update",
