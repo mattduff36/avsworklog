@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.12.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): add server-side location type filters to directory`
+
+**PUSHED AT**
+2026-08-07T15:40:53.576Z
+
+**WHAT CHANGED**
+Add server-side location type filters to directory. Keep check history authoritative for schedule dates.
+
+**VERSION HISTORY DETAILS**
+- Added server-side location type filters to directory, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): add server-side location type filters to directory`
+- `fix(inventory): keep check history authoritative for schedule dates`
+
 ## 0826.11.0
 
 **GIT COMMIT MESSAGE**

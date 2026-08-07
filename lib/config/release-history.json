@@ -1,5 +1,23 @@
 [
   {
+    "version": "0826.12.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Added server-side location type filters to directory. Keep check history authoritative for schedule dates.",
+    "summary": "Added server-side location type filters to directory. Keep check history authoritative for schedule dates.",
+    "details": [
+      "Added server-side location type filters to directory, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.",
+      "Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-08-07T15:40:53.576Z"
+  },
+  {
     "version": "0826.11.0",
     "updateKind": "major",
     "title": "Permissions update",
