@@ -6,11 +6,30 @@ import type {
   InventoryLocationType,
 } from './types';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import {
+  DAYS_PER_INVENTORY_CHECK_MONTH,
+  getDefaultCheckIntervalDays,
+  getDefaultCheckIntervalMonths,
+  MINOR_PLANT_CHECK_INTERVAL_DAYS,
+  MINOR_PLANT_CHECK_INTERVAL_MONTHS,
+  SMALL_TOOLS_CHECK_INTERVAL_DAYS,
+  SMALL_TOOLS_CHECK_INTERVAL_MONTHS,
+} from '@/lib/inventory/check-interval-defaults';
 
-const DAYS_PER_INVENTORY_CHECK_MONTH = 30;
+export {
+  DAYS_PER_INVENTORY_CHECK_MONTH,
+  getDefaultCheckIntervalDays,
+  getDefaultCheckIntervalMonths,
+  MINOR_PLANT_CHECK_INTERVAL_DAYS,
+  MINOR_PLANT_CHECK_INTERVAL_MONTHS,
+  SMALL_TOOLS_CHECK_INTERVAL_DAYS,
+  SMALL_TOOLS_CHECK_INTERVAL_MONTHS,
+};
 
-export const CHECK_INTERVAL_MONTHS = 1;
-export const CHECK_INTERVAL_DAYS = CHECK_INTERVAL_MONTHS * DAYS_PER_INVENTORY_CHECK_MONTH;
+/** @deprecated Prefer SMALL_TOOLS_CHECK_INTERVAL_MONTHS or getDefaultCheckIntervalMonths(category). */
+export const CHECK_INTERVAL_MONTHS = SMALL_TOOLS_CHECK_INTERVAL_MONTHS;
+/** @deprecated Prefer SMALL_TOOLS_CHECK_INTERVAL_DAYS or getDefaultCheckIntervalDays(category). */
+export const CHECK_INTERVAL_DAYS = SMALL_TOOLS_CHECK_INTERVAL_DAYS;
 export const DUE_SOON_DAYS = 7;
 export const INVENTORY_UNKNOWN_LOCATION_NAME = 'Unknown';
 export const INVENTORY_YARD_LOCATION_NAME = 'Yard';
@@ -19,6 +38,7 @@ export const INVENTORY_WORKSHOP_TEAM_ID = 'workshop_yard';
 interface InventoryCheckScheduleItem {
   last_checked_at: string | null;
   check_interval_days?: number | null;
+  category?: string | null;
 }
 
 interface InventorySpecialStatusItem extends InventoryCheckScheduleItem {
@@ -37,12 +57,19 @@ interface InventoryPrimaryLocationSelectionContext extends InventoryTeamContext 
   currentLocationId?: string | null;
 }
 
-export function getInventoryCheckIntervalDays(item: Pick<InventoryItem, 'check_interval_days'>): number {
-  return checkIntervalMonthsToDays(getInventoryCheckIntervalMonths(item)) || CHECK_INTERVAL_DAYS;
+export function getInventoryCheckIntervalDays(
+  item: Pick<InventoryItem, 'check_interval_days'> & Partial<Pick<InventoryItem, 'category'>>
+): number {
+  return (
+    checkIntervalMonthsToDays(getInventoryCheckIntervalMonths(item))
+    || getDefaultCheckIntervalDays(item.category)
+  );
 }
 
-export function getInventoryCheckIntervalMonths(item: Pick<InventoryItem, 'check_interval_days'>): number {
-  if (!item.check_interval_days) return CHECK_INTERVAL_MONTHS;
+export function getInventoryCheckIntervalMonths(
+  item: Pick<InventoryItem, 'check_interval_days'> & Partial<Pick<InventoryItem, 'category'>>
+): number {
+  if (!item.check_interval_days) return getDefaultCheckIntervalMonths(item.category);
   return Math.max(1, Math.round(item.check_interval_days / DAYS_PER_INVENTORY_CHECK_MONTH));
 }
 
@@ -118,6 +145,7 @@ export function getInventoryNormalCheckStatus(item: InventoryCheckScheduleItem):
 
   const dueDate = addMonths(new Date(`${item.last_checked_at}T00:00:00`), getInventoryCheckIntervalMonths({
     check_interval_days: item.check_interval_days || null,
+    category: item.category || null,
   }));
   const daysUntilDue = differenceInCalendarDays(dueDate, new Date());
 

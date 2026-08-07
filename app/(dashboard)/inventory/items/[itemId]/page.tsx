@@ -69,12 +69,12 @@ import {
 } from '@/lib/inventory/check-refresh';
 import { buildInventoryItemDetailsUpdatePayload } from '@/lib/inventory/check-update-payload';
 import {
-  CHECK_INTERVAL_MONTHS,
   checkIntervalMonthsToDays,
   formatInventoryCheckIntervalMonths,
   formatInventoryDate,
   formatInventoryUnknownLocationAge,
   getCheckStatusLabel,
+  getDefaultCheckIntervalMonths,
   getInventoryCheckIntervalMonths,
   getInventoryCheckStatus,
   getInventoryDueDate,
@@ -624,7 +624,7 @@ export default function InventoryItemDetailPage() {
                           max={120}
                           value={editForm.check_interval_months}
                           onChange={(event) => updateEditField('check_interval_months', event.target.value)}
-                          placeholder={`Default ${CHECK_INTERVAL_MONTHS}`}
+                          placeholder={`Default ${getDefaultCheckIntervalMonths(editForm.category)}`}
                           className="bg-slate-800 border-slate-600"
                         />
                       </div>

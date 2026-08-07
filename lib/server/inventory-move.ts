@@ -58,6 +58,7 @@ interface MoveItemRow {
   id: string;
   item_number: string;
   name: string;
+  category: string | null;
   last_checked_at: string | null;
   check_interval_days: number | null;
   location: Pick<InventoryLocation, 'id' | 'name' | 'location_type'> | Array<Pick<InventoryLocation, 'id' | 'name' | 'location_type'>> | null;
@@ -123,7 +124,7 @@ export async function moveInventoryItems(
       .single(),
     admin
       .from('inventory_items')
-      .select('id, item_number, name, last_checked_at, check_interval_days, location:inventory_locations(id, name, location_type)')
+      .select('id, item_number, name, category, last_checked_at, check_interval_days, location:inventory_locations(id, name, location_type)')
       .in('id', itemIds)
       .eq('status', 'active'),
   ]);

@@ -30,7 +30,7 @@ import {
   type InventoryLocation,
 } from '../types';
 import {
-  CHECK_INTERVAL_MONTHS,
+  getDefaultCheckIntervalMonths,
   isInventoryCheckExempt,
   isInventoryUnknownLocation,
 } from '../utils';
@@ -212,7 +212,7 @@ export function InventoryItemDialog({
                   max={120}
                   value={form.check_interval_months}
                   onChange={(event) => updateField('check_interval_months', event.target.value)}
-                  placeholder={`Default ${CHECK_INTERVAL_MONTHS}`}
+                  placeholder={`Default ${getDefaultCheckIntervalMonths(form.category)}`}
                   className="bg-slate-800 border-slate-600"
                 />
               </div>

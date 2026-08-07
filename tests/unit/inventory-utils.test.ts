@@ -3,8 +3,6 @@ import type { InventoryItem, InventoryLocation } from '@/app/(dashboard)/invento
 import {
   canSelectInventoryPrimaryLocation,
   canShareInventoryPrimaryLocation,
-  CHECK_INTERVAL_DAYS,
-  CHECK_INTERVAL_MONTHS,
   formatInventoryCheckIntervalMonths,
   formatInventoryLocationOptionLabel,
   formatInventoryLocationTypeLabel,
@@ -22,17 +20,34 @@ import {
   isInventoryMoveCheckBlocked,
   isInventoryYardExitBlocked,
   isWorkshopInventoryTeam,
+  MINOR_PLANT_CHECK_INTERVAL_DAYS,
+  MINOR_PLANT_CHECK_INTERVAL_MONTHS,
+  SMALL_TOOLS_CHECK_INTERVAL_DAYS,
+  SMALL_TOOLS_CHECK_INTERVAL_MONTHS,
 } from '@/app/(dashboard)/inventory/utils';
 
 describe('inventory utils', () => {
-  it('falls back to the default check interval', () => {
-    expect(getInventoryCheckIntervalDays({ check_interval_days: null })).toBe(CHECK_INTERVAL_DAYS);
-    expect(getInventoryCheckIntervalMonths({ check_interval_days: null })).toBe(CHECK_INTERVAL_MONTHS);
+  it('falls back to category-aware default check intervals', () => {
+    expect(getInventoryCheckIntervalDays({ check_interval_days: null, category: 'van_stock' }))
+      .toBe(SMALL_TOOLS_CHECK_INTERVAL_DAYS);
+    expect(getInventoryCheckIntervalMonths({ check_interval_days: null, category: 'van_stock' }))
+      .toBe(SMALL_TOOLS_CHECK_INTERVAL_MONTHS);
+    expect(getInventoryCheckIntervalDays({ check_interval_days: null, category: 'tools' }))
+      .toBe(SMALL_TOOLS_CHECK_INTERVAL_DAYS);
+    expect(getInventoryCheckIntervalDays({ check_interval_days: null, category: 'minor_plant' }))
+      .toBe(MINOR_PLANT_CHECK_INTERVAL_DAYS);
+    expect(getInventoryCheckIntervalMonths({ check_interval_days: null, category: 'minor_plant' }))
+      .toBe(MINOR_PLANT_CHECK_INTERVAL_MONTHS);
+    expect(getInventoryCheckIntervalMonths({ check_interval_days: null }))
+      .toBe(SMALL_TOOLS_CHECK_INTERVAL_MONTHS);
   });
 
   it('uses an item-specific check interval when present', () => {
-    expect(getInventoryCheckIntervalDays({ check_interval_days: 90 })).toBe(90);
-    expect(getInventoryCheckIntervalMonths({ check_interval_days: 90 })).toBe(3);
+    expect(getInventoryCheckIntervalDays({ check_interval_days: 90, category: 'minor_plant' })).toBe(90);
+    expect(getInventoryCheckIntervalMonths({ check_interval_days: 90, category: 'van_stock' })).toBe(3);
+    expect(getInventoryCheckIntervalMonths({ check_interval_days: 30, category: 'van_stock' })).toBe(1);
+    expect(getInventoryCheckIntervalMonths({ check_interval_days: 180, category: 'minor_plant' })).toBe(6);
+    expect(getInventoryCheckIntervalMonths({ check_interval_days: 360, category: 'van_stock' })).toBe(12);
     expect(formatInventoryCheckIntervalMonths(3)).toBe('3 months');
     expect(getInventoryDueDate('2026-01-01', 3)).toBe('01 Apr 2026');
   });
@@ -50,6 +65,16 @@ describe('inventory utils', () => {
     expect(getInventoryCheckStatus({ last_checked_at: '2026-04-25', check_interval_days: 30 })).toBe('due_soon');
     expect(getInventoryCheckStatus({ last_checked_at: '2026-04-01', check_interval_days: 30 })).toBe('overdue');
     expect(getInventoryCheckStatus({ last_checked_at: null, check_interval_days: 30 })).toBe('needs_check');
+    expect(getInventoryCheckStatus({
+      category: 'van_stock',
+      last_checked_at: '2026-01-01',
+      check_interval_days: null,
+    })).toBe('ok');
+    expect(getInventoryCheckStatus({
+      category: 'minor_plant',
+      last_checked_at: '2026-01-01',
+      check_interval_days: null,
+    })).toBe('overdue');
 
     vi.useRealTimers();
   });

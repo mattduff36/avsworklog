@@ -496,7 +496,7 @@ async function getBlockedItems(
 
   const { data, error } = await admin
     .from('inventory_items')
-    .select('id, item_number, name, last_checked_at, check_interval_days')
+    .select('id, item_number, name, category, last_checked_at, check_interval_days')
     .in('id', payload.serialized_item_ids)
     .eq('status', 'active')
     .eq('location_id', yard.id);
