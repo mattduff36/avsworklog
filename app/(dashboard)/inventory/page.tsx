@@ -1020,6 +1020,9 @@ export default function InventoryPage() {
           locations={knownLocations}
           onClose={() => setMovingItems([])}
           onSubmit={handleMoveItems}
+          onCheckRecorded={async () => {
+            await fetchInventoryData();
+          }}
         />
 
         <ChangeInventoryLocationDialog
@@ -1422,6 +1425,9 @@ export default function InventoryPage() {
         locations={knownLocations}
         onClose={() => setMovingItems([])}
         onSubmit={handleMoveItems}
+        onCheckRecorded={async () => {
+          await fetchInventoryData();
+        }}
       />
 
       <InventoryConfirmActionDialog

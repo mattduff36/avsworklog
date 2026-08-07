@@ -22,6 +22,8 @@ import {
   getInventoryChecklistDefinition,
 } from '@/lib/checklists/inventory-service-checklist';
 import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from './InventoryCheckModal';
+import { getInventoryLondonDateString } from '@/lib/inventory/check-dates';
+import { runInventoryCheckRefresh } from '@/lib/inventory/check-refresh';
 import type { InventoryCheckStatus, InventoryItem, InventoryLocation, InventoryMovePayload } from '../types';
 import { getCheckStatusLabel } from '../utils';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
@@ -32,6 +34,7 @@ interface MoveInventoryDialogProps {
   locations: InventoryLocation[];
   onClose: () => void;
   onSubmit: (payload: InventoryMovePayload) => Promise<void>;
+  onCheckRecorded?: (itemId: string) => Promise<void> | void;
 }
 
 interface CheckBlockedMoveItem {
@@ -65,6 +68,7 @@ export function MoveInventoryDialog({
   locations,
   onClose,
   onSubmit,
+  onCheckRecorded,
 }: MoveInventoryDialogProps) {
   const [locationId, setLocationId] = useState('');
   const [note, setNote] = useState('');
@@ -114,8 +118,10 @@ export function MoveInventoryDialog({
     if (!checkingItem) return;
 
     setSavingCheck(true);
+    const checkedItemId = checkingItem.id;
+    const checkedItemName = checkingItem.name;
     try {
-      const response = await fetch(`/api/inventory/${checkingItem.id}/checks`, {
+      const response = await fetch(`/api/inventory/${checkedItemId}/checks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(checkPayload),
@@ -123,12 +129,16 @@ export function MoveInventoryDialog({
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Failed to record inventory check');
 
-      const checkedItemName = checkingItem.name;
-      setBlockedItems((current) => current.filter((item) => item.id !== checkingItem.id));
+      setBlockedItems((current) => current.filter((item) => item.id !== checkedItemId));
       setCheckingItem(null);
       toast.success(`Inventory check recorded for ${checkedItemName}`, {
         description: 'Retry the move once all blocked items are checked.',
       });
+
+      await runInventoryCheckRefresh(
+        onCheckRecorded ? () => onCheckRecorded(checkedItemId) : undefined,
+        (message) => toast.warning(message),
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to record inventory check');
     } finally {
@@ -265,12 +275,13 @@ export function MoveInventoryDialog({
     </Dialog>
     {checkingItem ? (
       <InventoryCheckModal
+        key={`move-check-${checkingItem.id}`}
         open={Boolean(checkingItem)}
         onOpenChange={(nextOpen) => { if (!nextOpen && !savingCheck) setCheckingItem(null); }}
         itemName={checkingItem.name}
         itemNumber={checkingItem.item_number}
         checklistDefinition={checklistDefinition}
-        initialCheckedAt={new Date().toISOString().slice(0, 10)}
+        initialCheckedAt={getInventoryLondonDateString()}
         saving={savingCheck}
         onSubmit={handleRecordBlockedItemCheck}
       />

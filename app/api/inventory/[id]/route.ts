@@ -86,7 +86,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       requestedLocationId = locationId;
     }
-    if (body.last_checked_at !== undefined) update.last_checked_at = cleanOptionalDate(body.last_checked_at);
     if (body.check_interval_days !== undefined) {
       update.check_interval_days = body.check_interval_days || null;
     }
@@ -105,6 +104,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         update.retire_reason = body.retire_reason;
         update.retired_by = access.userId;
       }
+    }
+
+    if (body.last_checked_at !== undefined) {
+      const { count, error: historyCountError } = await admin
+        .from('inventory_check_history')
+        .select('id', { count: 'exact', head: true })
+        .eq('item_id', id);
+
+      if (historyCountError) throw historyCountError;
+
+      if ((count || 0) > 0) {
+        return NextResponse.json(
+          {
+            error: 'Last checked is managed by inventory check history and cannot be edited directly.',
+            code: 'INVENTORY_LAST_CHECKED_HISTORY_LOCKED',
+          },
+          { status: 409 },
+        );
+      }
+
+      update.last_checked_at = cleanOptionalDate(body.last_checked_at);
     }
 
     const { data: updatedData, error } = await admin

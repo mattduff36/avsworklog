@@ -2272,6 +2272,7 @@ export type Database = {
           checklist_version: string | null
           checklist_items: Json | null
           overall_status: string | null
+          submission_id: string | null
         }
         Insert: {
           id?: string
@@ -2284,6 +2285,7 @@ export type Database = {
           checklist_version?: string | null
           checklist_items?: Json | null
           overall_status?: string | null
+          submission_id?: string | null
         }
         Update: {
           id?: string
@@ -2296,6 +2298,7 @@ export type Database = {
           checklist_version?: string | null
           checklist_items?: Json | null
           overall_status?: string | null
+          submission_id?: string | null
         }
         Relationships: [
           {
@@ -10516,6 +10519,32 @@ export type Database = {
           p_actor: string
         }
         Returns: string
+      }
+      inventory_record_check: {
+        Args: {
+          p_item_id: string
+          p_checked_at: string
+          p_checked_by: string
+          p_note?: string | null
+          p_checklist_version?: string | null
+          p_checklist_items?: Json | null
+          p_overall_status?: string | null
+          p_confirm_future_date?: boolean
+          p_submission_id?: string | null
+        }
+        Returns: {
+          id: string
+          item_id: string
+          checked_at: string
+          interval_days: number
+          note: string | null
+          checked_by: string | null
+          created_at: string
+          checklist_version: string | null
+          checklist_items: Json | null
+          overall_status: string | null
+          submission_id: string | null
+        }[]
       }
       inventory_kiosk_execute_transfer_basket: {
         Args: {

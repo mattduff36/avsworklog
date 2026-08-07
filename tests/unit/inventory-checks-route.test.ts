@@ -6,6 +6,7 @@ import {
   INVENTORY_SERVICE_CHECKLIST_ITEMS,
   INVENTORY_SERVICE_CHECKLIST_VERSION,
 } from '@/lib/checklists/inventory-service-checklist';
+import { FUTURE_CHECK_CONFIRMATION_REQUIRED } from '@/lib/inventory/check-dates';
 
 vi.mock('@/lib/server/inventory-auth', () => ({
   requireInventoryManagerAccess: vi.fn(),
@@ -38,7 +39,7 @@ function buildChecklist(
   }));
 }
 
-describe('inventory check route', () => {
+describe('INV-CHECK-ROUTE inventory check route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(requireInventoryManagerAccess).mockResolvedValue({
@@ -48,7 +49,7 @@ describe('inventory check route', () => {
     });
   });
 
-  it('rejects incomplete structured checklists before touching the database', async () => {
+  it('INV-CHECK-ROUTE-001 rejects incomplete structured checklists before touching the database', async () => {
     const response = await POST(
       buildRequest({
         checked_at: '2026-06-01',
@@ -62,7 +63,7 @@ describe('inventory check route', () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
-  it('rejects unsupported checklist versions before touching the database', async () => {
+  it('INV-CHECK-ROUTE-001 rejects unsupported checklist versions before touching the database', async () => {
     const response = await POST(
       buildRequest({
         checked_at: '2026-06-01',
@@ -77,7 +78,7 @@ describe('inventory check route', () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
-  it('requires comments for failed checklist items', async () => {
+  it('INV-CHECK-ROUTE-001 requires comments for failed checklist items', async () => {
     const checklist = buildChecklist();
     checklist[0] = { ...checklist[0], status: 'attention', comment: null };
 
@@ -94,74 +95,64 @@ describe('inventory check route', () => {
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
-  it('requires comments for failed PAT checklist items', async () => {
-    const checklist = buildChecklist('ok', INVENTORY_PAT_CHECKLIST_ITEMS);
-    checklist[0] = { ...checklist[0], status: 'attention', comment: null };
-
+  it('INV-CHECK-ROUTE-001 rejects impossible calendar dates', async () => {
     const response = await POST(
       buildRequest({
-        checked_at: '2026-06-01',
-        checklist_version: INVENTORY_PAT_CHECKLIST_VERSION,
-        checklist_items: checklist,
+        checked_at: '2026-02-31',
+        checklist_items: buildChecklist(),
       }),
       { params: Promise.resolve({ id: 'item-1' }) },
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ error: 'Checklist item 1 requires a fail comment' });
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Check date must be a valid YYYY-MM-DD date',
+    });
     expect(createAdminClient).not.toHaveBeenCalled();
   });
 
-  it('stores canonical checklist data and derives the overall status', async () => {
-    const insertedRows: Array<Record<string, unknown>> = [];
-    const updatedRows: Array<Record<string, unknown>> = [];
+  it('INV-CHECK-ROUTE-001 requires future-date confirmation without writing', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:00:00+01:00'));
+
+    const response = await POST(
+      buildRequest({
+        checked_at: '2026-06-02',
+        checklist_items: buildChecklist(),
+        submission_id: '11111111-1111-4111-8111-111111111111',
+      }),
+      { params: Promise.resolve({ id: 'item-1' }) },
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      code: FUTURE_CHECK_CONFIRMATION_REQUIRED,
+    });
+    expect(createAdminClient).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('INV-CHECK-ROUTE-001 stores canonical checklist data through the transactional RPC', async () => {
+    const rpcCalls: Array<Record<string, unknown>> = [];
     const admin = {
-      from(table: string) {
-        if (table === 'inventory_items') {
-          return {
-            select() {
-              return {
-                eq() {
-                  return {
-                    async single() {
-                      return {
-                        data: { id: 'item-1', check_interval_days: 30, last_checked_at: null, status: 'active' },
-                        error: null,
-                      };
-                    },
-                  };
-                },
-              };
-            },
-            update(payload: Record<string, unknown>) {
-              updatedRows.push(payload);
-              return {
-                async eq() {
-                  return { error: null };
-                },
-              };
-            },
-          };
-        }
-
-        if (table === 'inventory_check_history') {
-          return {
-            insert(payload: Record<string, unknown>) {
-              insertedRows.push(payload);
-              return {
-                select() {
-                  return {
-                    async single() {
-                      return { data: { id: 'check-1', ...payload }, error: null };
-                    },
-                  };
-                },
-              };
-            },
-          };
-        }
-
-        throw new Error(`Unexpected table ${table}`);
+      async rpc(fn: string, args: Record<string, unknown>) {
+        expect(fn).toBe('inventory_record_check');
+        rpcCalls.push(args);
+        return {
+          data: [{
+            id: 'check-1',
+            item_id: 'item-1',
+            checked_at: args.p_checked_at,
+            interval_days: 30,
+            note: args.p_note,
+            checklist_version: args.p_checklist_version,
+            checklist_items: args.p_checklist_items,
+            overall_status: args.p_overall_status,
+            checked_by: args.p_checked_by,
+            submission_id: args.p_submission_id,
+          }],
+          error: null,
+        };
       },
     };
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
@@ -174,120 +165,112 @@ describe('inventory check route', () => {
         checked_at: '2026-06-01',
         checklist_version: INVENTORY_SERVICE_CHECKLIST_VERSION,
         checklist_items: checklist,
+        submission_id: '11111111-1111-4111-8111-111111111111',
       }),
       { params: Promise.resolve({ id: 'item-1' }) },
     );
 
     expect(response.status).toBe(201);
-    expect(insertedRows).toHaveLength(1);
-    expect(insertedRows[0]).toMatchObject({
-      item_id: 'item-1',
-      checked_at: '2026-06-01',
-      interval_days: 30,
-      checklist_version: INVENTORY_SERVICE_CHECKLIST_VERSION,
-      overall_status: 'fail',
-      checked_by: 'user-1',
+    expect(rpcCalls).toHaveLength(1);
+    expect(rpcCalls[0]).toMatchObject({
+      p_item_id: 'item-1',
+      p_checked_at: '2026-06-01',
+      p_checked_by: 'user-1',
+      p_checklist_version: INVENTORY_SERVICE_CHECKLIST_VERSION,
+      p_overall_status: 'fail',
+      p_confirm_future_date: false,
+      p_submission_id: '11111111-1111-4111-8111-111111111111',
     });
-    expect(insertedRows[0].checklist_items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          item_number: 1,
-          label: 'Spark Plug',
-          status: 'attention',
-          comment: 'Replace spark plug',
-        }),
-      ]),
-    );
-    expect(updatedRows).toEqual([{ last_checked_at: '2026-06-01', updated_by: 'user-1' }]);
   });
 
-  it('stores PAT checklist data and counts it as the latest check', async () => {
-    const insertedRows: Array<Record<string, unknown>> = [];
-    const updatedRows: Array<Record<string, unknown>> = [];
+  it('INV-CHECK-IDEMP-001 and PAT checks pass confirm_future_date and submission ids through the RPC', async () => {
+    const rpcCalls: Array<Record<string, unknown>> = [];
     const admin = {
-      from(table: string) {
-        if (table === 'inventory_items') {
-          return {
-            select() {
-              return {
-                eq() {
-                  return {
-                    async single() {
-                      return {
-                        data: { id: 'item-1', check_interval_days: 30, last_checked_at: '2026-05-01', status: 'active' },
-                        error: null,
-                      };
-                    },
-                  };
-                },
-              };
-            },
-            update(payload: Record<string, unknown>) {
-              updatedRows.push(payload);
-              return {
-                async eq() {
-                  return { error: null };
-                },
-              };
-            },
-          };
-        }
-
-        if (table === 'inventory_check_history') {
-          return {
-            insert(payload: Record<string, unknown>) {
-              insertedRows.push(payload);
-              return {
-                select() {
-                  return {
-                    async single() {
-                      return { data: { id: 'check-1', ...payload }, error: null };
-                    },
-                  };
-                },
-              };
-            },
-          };
-        }
-
-        throw new Error(`Unexpected table ${table}`);
+      async rpc(_fn: string, args: Record<string, unknown>) {
+        rpcCalls.push(args);
+        return {
+          data: [{
+            id: 'check-1',
+            item_id: 'item-1',
+            checked_at: args.p_checked_at,
+            interval_days: 30,
+            note: args.p_note,
+            checklist_version: args.p_checklist_version,
+            checklist_items: args.p_checklist_items,
+            overall_status: args.p_overall_status,
+            checked_by: args.p_checked_by,
+            submission_id: args.p_submission_id,
+          }],
+          error: null,
+        };
       },
     };
     vi.mocked(createAdminClient).mockReturnValue(admin as never);
-
-    const checklist = buildChecklist('ok', INVENTORY_PAT_CHECKLIST_ITEMS);
 
     const response = await POST(
       buildRequest({
         checked_at: '2026-06-01',
         checklist_version: INVENTORY_PAT_CHECKLIST_VERSION,
-        checklist_items: checklist,
+        checklist_items: buildChecklist('ok', INVENTORY_PAT_CHECKLIST_ITEMS),
         note: 'PAT complete',
+        confirm_future_date: true,
+        submission_id: '22222222-2222-4222-8222-222222222222',
       }),
       { params: Promise.resolve({ id: 'item-1' }) },
     );
 
     expect(response.status).toBe(201);
-    expect(insertedRows).toHaveLength(1);
-    expect(insertedRows[0]).toMatchObject({
-      item_id: 'item-1',
-      checked_at: '2026-06-01',
-      interval_days: 30,
-      note: 'PAT complete',
-      checklist_version: INVENTORY_PAT_CHECKLIST_VERSION,
-      overall_status: 'pass',
-      checked_by: 'user-1',
+    expect(rpcCalls[0]).toMatchObject({
+      p_checklist_version: INVENTORY_PAT_CHECKLIST_VERSION,
+      p_overall_status: 'pass',
+      p_confirm_future_date: true,
+      p_submission_id: '22222222-2222-4222-8222-222222222222',
+      p_note: 'PAT complete',
     });
-    expect(insertedRows[0].checklist_items).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          item_number: 1,
-          label: 'Cable',
-          status: 'ok',
-          comment: null,
-        }),
-      ]),
+  });
+
+  it('INV-CHECK-ROUTE-001 records an explicitly confirmed future check date', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T12:00:00+01:00'));
+
+    const rpcCalls: Array<Record<string, unknown>> = [];
+    const admin = {
+      async rpc(_fn: string, args: Record<string, unknown>) {
+        rpcCalls.push(args);
+        return {
+          data: [{
+            id: 'check-future',
+            item_id: 'item-1',
+            checked_at: args.p_checked_at,
+            interval_days: 30,
+            note: null,
+            checklist_version: args.p_checklist_version,
+            checklist_items: args.p_checklist_items,
+            overall_status: args.p_overall_status,
+            checked_by: args.p_checked_by,
+            submission_id: args.p_submission_id,
+          }],
+          error: null,
+        };
+      },
+    };
+    vi.mocked(createAdminClient).mockReturnValue(admin as never);
+
+    const response = await POST(
+      buildRequest({
+        checked_at: '2026-06-02',
+        checklist_items: buildChecklist(),
+        confirm_future_date: true,
+        submission_id: '33333333-3333-4333-8333-333333333333',
+      }),
+      { params: Promise.resolve({ id: 'item-1' }) },
     );
-    expect(updatedRows).toEqual([{ last_checked_at: '2026-06-01', updated_by: 'user-1' }]);
+
+    expect(response.status).toBe(201);
+    expect(rpcCalls[0]).toMatchObject({
+      p_checked_at: '2026-06-02',
+      p_confirm_future_date: true,
+    });
+    vi.useRealTimers();
   });
 });

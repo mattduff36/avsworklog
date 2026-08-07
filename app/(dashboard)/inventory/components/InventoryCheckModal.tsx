@@ -1,9 +1,19 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { AlertCircle, CheckCircle2, MinusCircle, XCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, dialogContentViewportClassName } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +21,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { useDirtyDialogGuard } from '@/lib/hooks/useDirtyDialogGuard';
 import { cn } from '@/lib/utils/cn';
+import {
+  createInventoryCheckSubmissionId,
+  isFutureInventoryCheckDate,
+  isValidInventoryCheckDate,
+} from '@/lib/inventory/check-dates';
 import {
   INVENTORY_CHECKLIST_STATUS_LABELS,
   type InventoryChecklistDefinition,
@@ -23,6 +38,8 @@ export interface InventoryChecklistSubmitPayload {
   note: string | null;
   checklist_version: string;
   checklist_items: InventoryChecklistItemResult[];
+  confirm_future_date?: boolean;
+  submission_id: string;
 }
 
 interface InventoryCheckModalProps {
@@ -108,6 +125,9 @@ export function InventoryCheckModal({
   const [comments, setComments] = useState<Record<number, string>>({});
   const [generalComments, setGeneralComments] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [futureConfirmOpen, setFutureConfirmOpen] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<InventoryChecklistSubmitPayload | null>(null);
+  const submissionIdRef = useRef(createInventoryCheckSubmissionId());
 
   const completedCount = Object.keys(statuses).length;
   const failedCount = useMemo(
@@ -135,6 +155,9 @@ export function InventoryCheckModal({
     setComments({});
     setGeneralComments('');
     setError(null);
+    setFutureConfirmOpen(false);
+    setPendingPayload(null);
+    submissionIdRef.current = createInventoryCheckSubmissionId();
   }
 
   const {
@@ -145,7 +168,7 @@ export function InventoryCheckModal({
     discard,
   } = useDirtyDialogGuard({
     isDirty: isFormDirty,
-    disabled: saving,
+    disabled: saving || futureConfirmOpen,
     onOpenChange: (nextOpen) => {
       if (!nextOpen) resetInventoryCheckForm();
       onOpenChange(nextOpen);
@@ -162,18 +185,16 @@ export function InventoryCheckModal({
     setError(null);
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!checkedAt) {
-      setError('Choose a check date before recording this checklist.');
-      return;
+  function buildPayload(confirmFutureDate: boolean): InventoryChecklistSubmitPayload | null {
+    if (!checkedAt || !isValidInventoryCheckDate(checkedAt)) {
+      setError('Choose a valid check date before recording this checklist.');
+      return null;
     }
 
     const missingItem = checklistItems.find((item) => !statuses[item.item_number]);
     if (missingItem) {
       setError(`Choose Pass, Fail, or N/A for item ${missingItem.item_number}: ${missingItem.label}.`);
-      return;
+      return null;
     }
 
     const failedWithoutComment = checklistItems.find(
@@ -181,172 +202,238 @@ export function InventoryCheckModal({
     );
     if (failedWithoutComment) {
       setError(`Add a comment for failed item ${failedWithoutComment.item_number}: ${failedWithoutComment.label}.`);
-      return;
+      return null;
     }
 
-    const submittedChecklistItems = checklistItems.map((item) => ({
-      ...item,
-      status: statuses[item.item_number],
-      comment: comments[item.item_number]?.trim() || null,
-    }));
-
-    await onSubmit({
+    return {
       checked_at: checkedAt,
       note: generalComments.trim() || null,
       checklist_version: checklistDefinition.version,
-      checklist_items: submittedChecklistItems,
-    });
+      checklist_items: checklistItems.map((item) => ({
+        ...item,
+        status: statuses[item.item_number],
+        comment: comments[item.item_number]?.trim() || null,
+      })),
+      confirm_future_date: confirmFutureDate,
+      submission_id: submissionIdRef.current,
+    };
+  }
+
+  async function submitPayload(payload: InventoryChecklistSubmitPayload) {
+    await onSubmit(payload);
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const payload = buildPayload(false);
+    if (!payload) return;
+
+    if (isFutureInventoryCheckDate(payload.checked_at)) {
+      setPendingPayload(payload);
+      setFutureConfirmOpen(true);
+      return;
+    }
+
+    await submitPayload(payload);
+  }
+
+  async function handleConfirmFutureDate() {
+    const payload = pendingPayload
+      ? { ...pendingPayload, confirm_future_date: true, submission_id: submissionIdRef.current }
+      : buildPayload(true);
+    if (!payload) {
+      setFutureConfirmOpen(false);
+      return;
+    }
+
+    setFutureConfirmOpen(false);
+    setPendingPayload(null);
+    await submitPayload(payload);
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent
-        ref={contentRef}
-        mobileKeyboardSafe
-        data-keyboard-safe-dialog="true"
-        className={dialogContentViewportClassName({
-          size: '6xl',
-          scroll: 'content',
-          className: 'top-0 h-[100dvh] max-h-none w-screen max-w-none translate-y-0 gap-0 rounded-none border border-border bg-slate-950 p-0 text-white sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-6xl sm:-translate-y-1/2 sm:rounded-xl',
-        })}
-        onInteractOutside={handleInteractOutside}
-        onEscapeKeyDown={handleEscapeKeyDown}
-      >
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogHeader className="shrink-0 border-b border-border px-6 pb-5 pt-5 md:px-8 md:py-6">
-            <DialogTitle className="text-xl text-white">{checklistDefinition.modalTitle}</DialogTitle>
-            <DialogDescription>
-              {checklistDefinition.modalDescription}
-              <span className="mt-1 block">
-                Item: {itemName} ({itemNumber}).
-              </span>
-            </DialogDescription>
-            <div className="pt-3">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>{completedCount}/{checklistItems.length} items complete</span>
-                <span>{failedCount} failed</span>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
-                <div className="h-full bg-inventory transition-all duration-300" style={{ width: `${progressPercent}%` }} />
-              </div>
-            </div>
-          </DialogHeader>
-
-          <ScrollArea
-            data-mobile-scroll-lock="true"
-            className="min-h-0 flex-1 px-6 py-6 md:px-8 md:py-8"
-          >
-            <div className="space-y-6">
-              {error ? (
-                <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100">
-                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                  <span>{error}</span>
+    <>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          ref={contentRef}
+          mobileKeyboardSafe
+          data-keyboard-safe-dialog="true"
+          className={dialogContentViewportClassName({
+            size: '6xl',
+            scroll: 'content',
+            className: 'top-0 h-[100dvh] max-h-none w-screen max-w-none translate-y-0 gap-0 rounded-none border border-border bg-slate-950 p-0 text-white sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-1rem)] sm:w-[calc(100vw-1rem)] sm:max-w-6xl sm:-translate-y-1/2 sm:rounded-xl',
+          })}
+          onInteractOutside={handleInteractOutside}
+          onEscapeKeyDown={handleEscapeKeyDown}
+        >
+          <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
+            <DialogHeader className="shrink-0 border-b border-border px-6 pb-5 pt-5 md:px-8 md:py-6">
+              <DialogTitle className="text-xl text-white">{checklistDefinition.modalTitle}</DialogTitle>
+              <DialogDescription>
+                {checklistDefinition.modalDescription}
+                <span className="mt-1 block">
+                  Item: {itemName} ({itemNumber}).
+                </span>
+              </DialogDescription>
+              <div className="pt-3">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>{completedCount}/{checklistItems.length} items complete</span>
+                  <span>{failedCount} failed</span>
                 </div>
-              ) : null}
-
-              <div className="grid gap-2 md:max-w-xs">
-                <Label htmlFor="inventory_check_date">Check Date</Label>
-                <Input
-                  id="inventory_check_date"
-                  type="date"
-                  value={checkedAt}
-                  onChange={(event) => setCheckedAt(event.target.value)}
-                  className="border-slate-600 bg-slate-900 text-white"
-                />
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-800">
+                  <div className="h-full bg-inventory transition-all duration-300" style={{ width: `${progressPercent}%` }} />
+                </div>
               </div>
+            </DialogHeader>
 
-              <div className="grid gap-3 xl:grid-cols-2 xl:gap-4">
-                {checklistItems.map((item) => {
-                  const selectedStatus = statuses[item.item_number];
-                  const showComment = selectedStatus === 'attention' || Boolean(comments[item.item_number]);
+            <ScrollArea
+              data-mobile-scroll-lock="true"
+              className="min-h-0 flex-1 px-6 py-6 md:px-8 md:py-8"
+            >
+              <div className="space-y-6">
+                {error ? (
+                  <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-100">
+                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                ) : null}
 
-                  return (
-                    <div key={item.item_number} className="rounded-xl border border-border/70 bg-slate-900/60 p-4 xl:p-5">
-                      <div className="space-y-4">
-                        <div className="flex gap-3">
-                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm font-bold text-slate-300">
-                            {item.item_number}
+                <div className="grid gap-2 md:max-w-xs">
+                  <Label htmlFor="inventory_check_date">Check Date</Label>
+                  <Input
+                    id="inventory_check_date"
+                    type="date"
+                    value={checkedAt}
+                    onChange={(event) => setCheckedAt(event.target.value)}
+                    className="border-slate-600 bg-slate-900 text-white"
+                  />
+                </div>
+
+                <div className="grid gap-3 xl:grid-cols-2 xl:gap-4">
+                  {checklistItems.map((item) => {
+                    const selectedStatus = statuses[item.item_number];
+                    const showComment = selectedStatus === 'attention' || Boolean(comments[item.item_number]);
+
+                    return (
+                      <div key={item.item_number} className="rounded-xl border border-border/70 bg-slate-900/60 p-4 xl:p-5">
+                        <div className="space-y-4">
+                          <div className="flex gap-3">
+                            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm font-bold text-slate-300">
+                              {item.item_number}
+                            </div>
+                            <div>
+                              <div className="font-medium text-white">{item.label}</div>
+                              {selectedStatus ? (
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  Selected: {INVENTORY_CHECKLIST_STATUS_LABELS[selectedStatus]}
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
-                          <div>
-                            <div className="font-medium text-white">{item.label}</div>
-                            {selectedStatus ? (
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                Selected: {INVENTORY_CHECKLIST_STATUS_LABELS[selectedStatus]}
-                              </div>
-                            ) : null}
+
+                          <div className="grid grid-cols-3 gap-2">
+                            {STATUS_OPTIONS.map(({ status, tone }) => {
+                              const selected = selectedStatus === status;
+                              return (
+                                <button
+                                  key={status}
+                                  type="button"
+                                  aria-pressed={selected}
+                                  onClick={() => handleStatusChange(item.item_number, status)}
+                                  className={getChoiceButtonClasses(tone, selected)}
+                                >
+                                  <span className="flex items-center justify-center gap-2">
+                                    <StatusIcon status={status} selected={selected} />
+                                    {INVENTORY_CHECKLIST_STATUS_LABELS[status]}
+                                  </span>
+                                </button>
+                              );
+                            })}
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-2">
-                          {STATUS_OPTIONS.map(({ status, tone }) => {
-                            const selected = selectedStatus === status;
-                            return (
-                              <button
-                                key={status}
-                                type="button"
-                                aria-pressed={selected}
-                                onClick={() => handleStatusChange(item.item_number, status)}
-                                className={getChoiceButtonClasses(tone, selected)}
-                              >
-                                <span className="flex items-center justify-center gap-2">
-                                  <StatusIcon status={status} selected={selected} />
-                                  {INVENTORY_CHECKLIST_STATUS_LABELS[status]}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
+                        {showComment ? (
+                          <div className="mt-4 space-y-2">
+                            <Label htmlFor={`inventory_check_comment_${item.item_number}`}>
+                              {selectedStatus === 'attention' ? 'Comments (Required)' : 'Notes'}
+                            </Label>
+                            <Textarea
+                              id={`inventory_check_comment_${item.item_number}`}
+                              value={comments[item.item_number] || ''}
+                              onChange={(event) => handleCommentChange(item.item_number, event.target.value)}
+                              placeholder={selectedStatus === 'attention' ? 'Add details for this failed check...' : 'Optional notes...'}
+                              className={cn(
+                                'min-h-20 border-slate-600 bg-slate-950 text-white',
+                                selectedStatus === 'attention' && !comments[item.item_number]?.trim() ? 'border-red-500' : null,
+                              )}
+                            />
+                          </div>
+                        ) : null}
                       </div>
+                    );
+                  })}
+                </div>
 
-                      {showComment ? (
-                        <div className="mt-4 space-y-2">
-                          <Label htmlFor={`inventory_check_comment_${item.item_number}`}>
-                            {selectedStatus === 'attention' ? 'Comments (Required)' : 'Notes'}
-                          </Label>
-                          <Textarea
-                            id={`inventory_check_comment_${item.item_number}`}
-                            value={comments[item.item_number] || ''}
-                            onChange={(event) => handleCommentChange(item.item_number, event.target.value)}
-                            placeholder={selectedStatus === 'attention' ? 'Add details for this failed check...' : 'Optional notes...'}
-                            className={cn(
-                              'min-h-20 border-slate-600 bg-slate-950 text-white',
-                              selectedStatus === 'attention' && !comments[item.item_number]?.trim() ? 'border-red-500' : null,
-                            )}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
+                <div className="grid gap-2">
+                  <Label htmlFor="inventory_check_general_comments">Comments</Label>
+                  <Textarea
+                    id="inventory_check_general_comments"
+                    value={generalComments}
+                    onChange={(event) => {
+                      setGeneralComments(event.target.value);
+                      setError(null);
+                    }}
+                    placeholder="Add any necessary details for this check..."
+                    className="min-h-24 border-slate-600 bg-slate-950 text-white"
+                    disabled={saving}
+                  />
+                </div>
               </div>
+            </ScrollArea>
 
-              <div className="grid gap-2">
-                <Label htmlFor="inventory_check_general_comments">Comments</Label>
-                <Textarea
-                  id="inventory_check_general_comments"
-                  value={generalComments}
-                  onChange={(event) => {
-                    setGeneralComments(event.target.value);
-                    setError(null);
-                  }}
-                  placeholder="Add any necessary details for this check..."
-                  className="min-h-24 border-slate-600 bg-slate-950 text-white"
-                  disabled={saving}
-                />
-              </div>
-            </div>
-          </ScrollArea>
+            <DialogFooter className="shrink-0 border-t border-border px-6 pb-4 pt-4 md:px-8 md:pb-5">
+              <Button type="button" variant="outline" onClick={discard} disabled={saving}>
+                {isFormDirty ? 'Discard Changes' : 'Cancel'}
+              </Button>
+              <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving}>
+                {saving ? 'Submitting...' : 'Submit Check'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
-          <DialogFooter className="shrink-0 border-t border-border px-6 pb-4 pt-4 md:px-8 md:pb-5">
-            <Button type="button" variant="outline" onClick={discard} disabled={saving}>
-              {isFormDirty ? 'Discard Changes' : 'Cancel'}
-            </Button>
-            <Button type="submit" className="bg-inventory text-white hover:bg-inventory-dark" disabled={saving}>
-              {saving ? 'Submitting...' : 'Submit Check'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+      <AlertDialog
+        open={futureConfirmOpen}
+        onOpenChange={(nextOpen) => {
+          if (saving) return;
+          setFutureConfirmOpen(nextOpen);
+          if (!nextOpen) setPendingPayload(null);
+        }}
+      >
+        <AlertDialogContent className="border-slate-700 bg-slate-900 text-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm future check date</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-300">
+              The selected check date is in the future ({pendingPayload?.checked_at || checkedAt}).
+              This will move Last Checked and the next due date forward. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-inventory text-white hover:bg-inventory-dark"
+              disabled={saving}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleConfirmFutureDate();
+              }}
+            >
+              Confirm future date
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

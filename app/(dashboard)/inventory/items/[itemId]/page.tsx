@@ -62,6 +62,12 @@ import {
   type InventoryCheckOverallStatus,
   type InventoryChecklistItemResult,
 } from '@/lib/checklists/inventory-service-checklist';
+import { getInventoryLondonDateString } from '@/lib/inventory/check-dates';
+import {
+  INVENTORY_CHECK_HISTORY_REFRESH_WARNING,
+  runInventoryCheckRefresh,
+} from '@/lib/inventory/check-refresh';
+import { buildInventoryItemDetailsUpdatePayload } from '@/lib/inventory/check-update-payload';
 import {
   CHECK_INTERVAL_MONTHS,
   checkIntervalMonthsToDays,
@@ -158,7 +164,7 @@ export default function InventoryItemDetailPage() {
   const [payload, setPayload] = useState<InventoryHistoryPayload | null>(null);
   const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [checkedAt, setCheckedAt] = useState(new Date().toISOString().slice(0, 10));
+  const [checkedAt, setCheckedAt] = useState(getInventoryLondonDateString());
   const [showCheckTypeModal, setShowCheckTypeModal] = useState(false);
   const [showCheckModal, setShowCheckModal] = useState(false);
   const [selectedChecklistVersion, setSelectedChecklistVersion] = useState(INVENTORY_SERVICE_CHECKLIST_VERSION);
@@ -172,7 +178,7 @@ export default function InventoryItemDetailPage() {
   const [selectedEditLocation, setSelectedEditLocation] = useState<InventoryLocation | null>(null);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
 
-  const fetchHistory = useCallback(async () => {
+  const fetchHistory = useCallback(async (options?: { quiet?: boolean }) => {
     try {
       const [historyResponse, categoriesResponse] = await Promise.all([
         fetch(`/api/inventory/${itemId}/history`, { cache: 'no-store' }),
@@ -191,8 +197,12 @@ export default function InventoryItemDetailPage() {
       setCategories(categoriesData.categories || []);
       setEditForm(buildItemEditForm(historyData.item));
       setSelectedEditLocation(historyData.item.location || null);
+      return true;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load inventory item');
+      if (!options?.quiet) {
+        toast.error(error instanceof Error ? error.message : 'Failed to load inventory item');
+      }
+      return false;
     } finally {
       setLoading(false);
     }
@@ -254,10 +264,11 @@ export default function InventoryItemDetailPage() {
     setDetailsSubmitError('');
     try {
       const parsedInterval = Number.parseInt(editForm.check_interval_months, 10);
+      const hasCheckHistory = (payload?.checks.length || 0) > 0;
       const response = await fetch(`/api/inventory/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+        body: JSON.stringify(buildInventoryItemDetailsUpdatePayload({
           item_number: editForm.item_number,
           name: editForm.name,
           category: editForm.category,
@@ -266,7 +277,8 @@ export default function InventoryItemDetailPage() {
           check_interval_days: checkIntervalMonthsToDays(
             Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : null
           ),
-        }),
+          hasCheckHistory,
+        })),
       });
       await parseResponse(response, 'Failed to update inventory item');
       toast.success('Inventory item updated');
@@ -292,8 +304,17 @@ export default function InventoryItemDetailPage() {
       await parseResponse(response, 'Failed to record check');
       toast.success('Inventory check recorded');
       setShowCheckModal(false);
-      setCheckedAt(new Date().toISOString().slice(0, 10));
-      await fetchHistory();
+      setCheckedAt(getInventoryLondonDateString());
+      await runInventoryCheckRefresh(
+        async () => {
+          const refreshed = await fetchHistory({ quiet: true });
+          if (!refreshed) {
+            throw new Error('history refresh failed');
+          }
+        },
+        (message) => toast.warning(message),
+        INVENTORY_CHECK_HISTORY_REFRESH_WARNING,
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to record check');
     } finally {
@@ -365,6 +386,7 @@ export default function InventoryItemDetailPage() {
       .map((category) => [category.slug, category.name] as const)
     : (Object.entries(INVENTORY_CATEGORY_LABELS) as Array<[InventoryCategory, string]>);
   const isUnknownLocationSelected = isInventoryUnknownLocation(selectedEditLocation);
+  const hasCheckHistory = checks.length > 0;
 
   return (
     <AppPageShell width="wide">
@@ -564,13 +586,34 @@ export default function InventoryItemDetailPage() {
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
                         <Label htmlFor="last_checked_at">Last Checked</Label>
-                        <Input
-                          id="last_checked_at"
-                          type="date"
-                          value={editForm.last_checked_at}
-                          onChange={(event) => updateEditField('last_checked_at', event.target.value)}
-                          className="bg-slate-800 border-slate-600"
-                        />
+                        {hasCheckHistory ? (
+                          <>
+                            <Input
+                              id="last_checked_at"
+                              type="text"
+                              value={formatInventoryDate(item.last_checked_at)}
+                              readOnly
+                              disabled
+                              className="bg-slate-800 border-slate-600"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Managed by recorded inventory checks. Record a new check to update this date.
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <Input
+                              id="last_checked_at"
+                              type="date"
+                              value={editForm.last_checked_at}
+                              onChange={(event) => updateEditField('last_checked_at', event.target.value)}
+                              className="bg-slate-800 border-slate-600"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Legacy items without check history can keep a manual last-checked date.
+                            </p>
+                          </>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="check_interval_months">Check Interval Months</Label>
@@ -764,6 +807,9 @@ export default function InventoryItemDetailPage() {
         locations={moveLocations}
         onClose={() => setMoveDialogOpen(false)}
         onSubmit={handleMoveItem}
+        onCheckRecorded={async () => {
+          await fetchHistory();
+        }}
       />
     </AppPageShell>
   );

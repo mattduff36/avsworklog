@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
-import { CHECK_INTERVAL_DAYS } from '@/app/(dashboard)/inventory/utils';
+import {
+  FUTURE_CHECK_CONFIRMATION_REQUIRED,
+  isFutureInventoryCheckDate,
+  isValidInventoryCheckDate,
+} from '@/lib/inventory/check-dates';
 import {
   INVENTORY_SERVICE_CHECKLIST_VERSION,
   getInventoryChecklistDefinition,
@@ -20,6 +24,8 @@ interface CreateInventoryCheckBody {
   note?: string | null;
   checklist_version?: string | null;
   checklist_items?: unknown;
+  confirm_future_date?: boolean;
+  submission_id?: string | null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -28,6 +34,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function getStringValue(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() : null;
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
 function validateChecklistItems(
@@ -94,6 +104,13 @@ function validateChecklistItems(
   return { items: normalizedItems, error: null };
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
+    return error.message;
+  }
+  return '';
+}
+
 export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const access = await requireInventoryManagerAccess();
@@ -103,9 +120,25 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { id } = await params;
     const body = (await request.json()) as CreateInventoryCheckBody;
-    const checkedAt = body.checked_at?.trim() || new Date().toISOString().slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(checkedAt)) {
-      return NextResponse.json({ error: 'Check date must be in YYYY-MM-DD format' }, { status: 400 });
+    const checkedAt = body.checked_at?.trim() || '';
+    if (!isValidInventoryCheckDate(checkedAt)) {
+      return NextResponse.json({ error: 'Check date must be a valid YYYY-MM-DD date' }, { status: 400 });
+    }
+
+    const confirmFutureDate = body.confirm_future_date === true;
+    if (isFutureInventoryCheckDate(checkedAt) && !confirmFutureDate) {
+      return NextResponse.json(
+        {
+          error: 'Confirm the future check date before recording this checklist.',
+          code: FUTURE_CHECK_CONFIRMATION_REQUIRED,
+        },
+        { status: 409 },
+      );
+    }
+
+    const submissionId = getStringValue(body.submission_id);
+    if (submissionId && !isUuid(submissionId)) {
+      return NextResponse.json({ error: 'Submission id must be a valid UUID' }, { status: 400 });
     }
 
     const hasStructuredChecklist = body.checklist_items !== undefined && body.checklist_items !== null;
@@ -130,52 +163,44 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       checklistItems && checklistDefinition ? getInventoryCheckOverallStatus(checklistItems, checklistDefinition) : null;
 
     const admin = createAdminClient();
-    const { data: item, error: itemError } = await admin
-      .from('inventory_items')
-      .select('id, check_interval_days, last_checked_at, status')
-      .eq('id', id)
-      .single();
+    const { data, error } = await admin.rpc('inventory_record_check', {
+      p_item_id: id,
+      p_checked_at: checkedAt,
+      p_checked_by: access.userId,
+      p_note: body.note?.trim() || null,
+      p_checklist_version: checklistItems && checklistDefinition ? checklistDefinition.version : null,
+      p_checklist_items: checklistItems,
+      p_overall_status: overallStatus,
+      p_confirm_future_date: confirmFutureDate,
+      p_submission_id: submissionId,
+    });
 
-    if (itemError) {
-      if (itemError.code === 'PGRST116') {
+    if (error) {
+      const message = getErrorMessage(error);
+      if (message.includes('Inventory item not found')) {
         return NextResponse.json({ error: 'Inventory item not found' }, { status: 404 });
       }
-      throw itemError;
+      if (message.includes('Retired inventory items cannot be checked')) {
+        return NextResponse.json({ error: 'Retired inventory items cannot be checked' }, { status: 400 });
+      }
+      if (message.includes(FUTURE_CHECK_CONFIRMATION_REQUIRED)) {
+        return NextResponse.json(
+          {
+            error: 'Confirm the future check date before recording this checklist.',
+            code: FUTURE_CHECK_CONFIRMATION_REQUIRED,
+          },
+          { status: 409 },
+        );
+      }
+      if (message.includes('Check date must be in YYYY-MM-DD format')) {
+        return NextResponse.json({ error: 'Check date must be a valid YYYY-MM-DD date' }, { status: 400 });
+      }
+      throw error;
     }
 
-    if (item.status !== 'active') {
-      return NextResponse.json({ error: 'Retired inventory items cannot be checked' }, { status: 400 });
-    }
-
-    const intervalDays = item.check_interval_days || CHECK_INTERVAL_DAYS;
-    const { data: check, error: checkError } = await admin
-      .from('inventory_check_history')
-      .insert({
-        item_id: id,
-        checked_at: checkedAt,
-        interval_days: intervalDays,
-        note: body.note?.trim() || null,
-        checklist_version: checklistItems && checklistDefinition ? checklistDefinition.version : null,
-        checklist_items: checklistItems,
-        overall_status: overallStatus,
-        checked_by: access.userId,
-      })
-      .select('*')
-      .single();
-
-    if (checkError) throw checkError;
-
-    const shouldPromoteLastCheckedAt = !item.last_checked_at || checkedAt >= item.last_checked_at;
-    if (shouldPromoteLastCheckedAt) {
-      const { error: updateError } = await admin
-        .from('inventory_items')
-        .update({
-          last_checked_at: checkedAt,
-          updated_by: access.userId,
-        })
-        .eq('id', id);
-
-      if (updateError) throw updateError;
+    const check = Array.isArray(data) ? data[0] : data;
+    if (!check) {
+      throw new Error('inventory_record_check returned no check row');
     }
 
     return NextResponse.json({ check }, { status: 201 });
