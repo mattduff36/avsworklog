@@ -416,6 +416,8 @@ export function validatePlanContractObject(value: unknown): ParsedPlanContract {
       commit: commit!,
       handoff: handoff!,
       implementationContract,
+      reviewClosureProtocol:
+        asString(value.reviewClosureProtocol) === 'two-pass-v1' ? 'two-pass-v1' : undefined,
     },
     errors: [],
   };
@@ -847,15 +849,18 @@ export function createDefaultPlanContract(params: {
     finalReviewSource: highRisk ? 'independent_subagent' : 'local',
     commit: params.taskType === 'change' ? 'pending' : 'not_applicable',
     handoff: 'pending',
+    reviewClosureProtocol: highRisk ? 'two-pass-v1' : undefined,
     implementationContract: highRisk
       ? {
           invariants: [
             'Preserve fail-open stop-hook topology and mixed-version readers.',
             'Persist hashes, opaque IDs, and derived evidence only.',
+            'Bound premium final review to two-pass-v1 with consolidated fix routing after two failures.',
           ],
           boundaries: [
             'Do not rewrite immutable workflow events.',
             'Do not change user-facing finalise command phrases.',
+            'Do not launch a third premium review without routing or split.',
           ],
           rollback:
             'Revert new writers/rules or switch plan validation to observation-only; keep mixed-version readers accepting already-written records.',

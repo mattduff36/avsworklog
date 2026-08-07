@@ -1,6 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import path from 'path';
 import type { AutomationRunLog, AutomationStepLog } from './automation/types';
+import {
+  getProtocolSkippableFinaliseTasks,
+  resolveActiveProtocolFinaliseContext,
+} from './automation/finalise-checkpoint';
 import { getDefaultTerminalDirectory } from './finalise-activity-guard';
 
 export type FinaliseTaskKey = 'migrations' | 'db-validate' | 'build' | 'test-run' | 'testsuite';
@@ -22,6 +26,8 @@ export interface RecentFinaliseTaskScanOptions {
   automationRunDirectory?: string;
   now?: Date;
   recentWindowMs?: number;
+  /** When true, only protocol checkpoints may skip (no mtime fallback). */
+  preferProtocolCheckpoints?: boolean;
 }
 
 export type SkippableFinaliseTasks = Partial<Record<FinaliseTaskKey, RecentFinaliseTaskRun>>;
@@ -163,6 +169,10 @@ function readRecentAutomationTaskRuns(options: Required<Pick<RecentFinaliseTaskS
     .flatMap((fileName): RecentFinaliseTaskRun[] => {
       try {
         const log = JSON.parse(readFileSync(path.join(options.automationRunDirectory, fileName), 'utf8')) as AutomationRunLog;
+        // Only fully passed runs may contribute skippable steps under the legacy heuristic.
+        if (log.status !== 'passed') {
+          return [];
+        }
         return log.steps.flatMap((step): RecentFinaliseTaskRun[] => {
           const task = getAutomationTaskForStep(step, pendingMigrationFiles);
           const completedAtMs = Date.parse(step.endedAt);
@@ -217,6 +227,28 @@ function canSkipTask(task: FinaliseTaskKey, run: RecentFinaliseTaskRun, options:
 }
 
 export function getSkippableFinaliseTasks(options: RecentFinaliseTaskScanOptions): SkippableFinaliseTasks {
+  // Protocol workstreams use content-addressed checkpoints only — never mtime heuristics.
+  const activeProtocol = resolveActiveProtocolFinaliseContext(options.repoRoot);
+  if (activeProtocol || options.preferProtocolCheckpoints) {
+    const protocolSkips = getProtocolSkippableFinaliseTasks({
+      repoRoot: options.repoRoot,
+      buildArtifactPath: options.buildArtifactPath,
+    });
+    const skippableFromProtocol: SkippableFinaliseTasks = {};
+    for (const [task, meta] of Object.entries(protocolSkips) as Array<
+      [FinaliseTaskKey, { reason: string; checkpointId: string }]
+    >) {
+      skippableFromProtocol[task] = {
+        task,
+        command: `protocol-checkpoint:${meta.checkpointId}`,
+        completedAt: new Date().toISOString(),
+        completedAtMs: Date.now(),
+        source: 'automation-log',
+      };
+    }
+    return skippableFromProtocol;
+  }
+
   const now = options.now ?? new Date();
   const recentWindowMs = options.recentWindowMs ?? DEFAULT_RECENT_WINDOW_MS;
   const terminalDirectory = options.terminalDirectory ?? getDefaultTerminalDirectory(options.repoRoot);
@@ -235,6 +267,11 @@ export function getSkippableFinaliseTasks(options: RecentFinaliseTaskScanOptions
 
   for (const run of runs) {
     if (skippableTasks[run.task]) {
+      continue;
+    }
+
+    // Failed overall runs must not contribute passed-step skip eligibility.
+    if (run.source === 'automation-log' && run.command.startsWith('failed-run:')) {
       continue;
     }
 

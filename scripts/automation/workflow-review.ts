@@ -24,12 +24,15 @@ import {
 } from './workflow-model-tier';
 import { assertNoForbiddenPayload, hashIdentifier } from './workflow-privacy';
 import { parseWorkflowTranscript } from './workflow-transcript';
+import { readProtocolRecord } from './workflow-review-protocol';
 import type {
   AutomationMemorySuggestion,
+  WorkflowIdentityStatus,
   WorkflowReviewMetrics,
   WorkflowReviewState,
   WorkflowStopEvent,
   WorkflowPlanRecommendationAdherence,
+  WorkflowTranscriptStatus,
 } from './types';
 
 export interface WorkflowStopHookInput {
@@ -373,19 +376,24 @@ export async function buildWorkflowStopEvent(
     if (loopCount !== 0) qualificationReasons.push(`loop_count=${loopCount}`);
   }
 
-  let transcriptSignals = null;
-  let planValidationStatus: WorkflowStopEvent['planValidationStatus'] = 'unknown';
-  let planSourceWorkstreamIds: string[] | undefined;
-  let assistantText = '';
-  if (qualifies) {
-    const parsed = await parseWorkflowTranscript(input.transcript_path ?? null, {
-      repoRoot: options?.repoRoot,
-    });
-    transcriptSignals = parsed.signals;
-    assistantText = parsed.assistantText;
-    planValidationStatus = parsed.planValidationStatus;
-    planSourceWorkstreamIds = parsed.planContract?.sourceWorkstreamIds;
-  }
+  const repoRoot = options?.repoRoot ?? process.cwd();
+  const transcriptPathPresent = Object.prototype.hasOwnProperty.call(input, 'transcript_path');
+  const transcriptPathNull = input.transcript_path === null;
+  const transcriptPathEmpty =
+    typeof input.transcript_path === 'string' && input.transcript_path.trim() === '';
+
+  // Always attempt transcript parse so null/missing paths remain visible telemetry.
+  const parsed = await parseWorkflowTranscript(
+    transcriptPathPresent ? (input.transcript_path ?? null) : null,
+    { repoRoot }
+  );
+  const transcriptSignals = parsed.signals;
+  const assistantText = parsed.assistantText;
+  const planValidationStatus: WorkflowStopEvent['planValidationStatus'] =
+    parsed.planValidationStatus;
+  const planSourceWorkstreamIds = parsed.planContract?.sourceWorkstreamIds;
+  const planWorkstreamId = parsed.planContract?.workstreamId;
+  const transcriptStatus: WorkflowTranscriptStatus = parsed.transcriptStatus;
 
   const markerParse = assistantText
     ? extractWorkflowCompletionMarker(assistantText)
@@ -396,6 +404,7 @@ export async function buildWorkflowStopEvent(
     if (transcriptSignals?.skillRead) qualificationReasons.push('skill-read');
     if (transcriptSignals?.architectureGateTask) qualificationReasons.push('architecture-gate');
     if (transcriptSignals?.finalDiffReviewerTask) qualificationReasons.push('final-diff-reviewer');
+    if (parsed.planContract) qualificationReasons.push('plan-contract');
   }
 
   const stronglyQualified =
@@ -403,12 +412,12 @@ export async function buildWorkflowStopEvent(
     (markerParse.status === 'present' ||
       Boolean(transcriptSignals?.skillRead) ||
       Boolean(transcriptSignals?.architectureGateTask) ||
-      Boolean(transcriptSignals?.finalDiffReviewerTask));
+      Boolean(transcriptSignals?.finalDiffReviewerTask) ||
+      Boolean(parsed.planContract));
   const planRecommendationAdherence = computePlanRecommendationAdherence(
     markerParse.marker,
     selectedModelTier
   );
-  const repoRoot = options?.repoRoot ?? process.cwd();
   const branchName = readGitValue(repoRoot, ['branch', '--show-current']);
   const headCommit = readGitValue(repoRoot, ['rev-parse', 'HEAD']);
   const sourceWorkstreamIds = [
@@ -420,6 +429,21 @@ export async function buildWorkflowStopEvent(
     ),
   ];
 
+  // Explicit identity only: marker workstreamId, validated plan contract, or protocol record.
+  // Never infer from branch/recency/transcript free text.
+  let workstreamId = markerParse.marker?.workstreamId ?? planWorkstreamId;
+  let protocolPhase: WorkflowStopEvent['protocolPhase'];
+  let failedPremiumReviewCount: number | undefined;
+  if (workstreamId) {
+    const protocol = readProtocolRecord(repoRoot, workstreamId);
+    if (protocol) {
+      protocolPhase = protocol.phase;
+      failedPremiumReviewCount = protocol.failedPremiumReviewCount;
+      workstreamId = protocol.workstreamId;
+    }
+  }
+  const identityStatus: WorkflowIdentityStatus = workstreamId ? 'present' : 'missing';
+
   const findings = buildWorkflowFindings({
     marker: markerParse.marker,
     markerStatus: markerParse.status,
@@ -427,6 +451,10 @@ export async function buildWorkflowStopEvent(
     observedParentTier: selectedModelTier,
     planValidationStatus,
     planRecommendationAdherence,
+    transcriptStatus,
+    identityStatus,
+    protocolPhase,
+    failedPremiumReviewCount,
   });
 
   return {
@@ -450,7 +478,7 @@ export async function buildWorkflowStopEvent(
     transcriptSignals,
     findings,
     monthKey: monthKeyFromIso(now.toISOString()),
-    workstreamId: markerParse.marker?.workstreamId,
+    workstreamId,
     sourceWorkstreamIds: sourceWorkstreamIds.length > 0 ? sourceWorkstreamIds : undefined,
     planValidationStatus,
     planRecommendationAdherence,
@@ -458,6 +486,15 @@ export async function buildWorkflowStopEvent(
     branchName,
     headCommit,
     reviewPasses: markerParse.marker?.reviewPasses,
+    transcriptStatus,
+    identityStatus,
+    protocolPhase,
+    hookDiagnostics: {
+      transcriptPathPresent,
+      transcriptPathNull,
+      transcriptPathEmpty,
+      transcriptStatus,
+    },
   };
 }
 
@@ -467,14 +504,6 @@ export async function processWorkflowStopEvent(
 ): Promise<WorkflowStopHookResult> {
   const paths = getWorkflowPaths(options?.repoRoot);
   const now = options?.now?.() ?? new Date();
-
-  if (typeof input.loop_count === 'number' && input.loop_count > 0) {
-    return {
-      createdEvent: false,
-      reviewTriggered: false,
-      reason: 'loop_count>0',
-    };
-  }
 
   const event = await buildWorkflowStopEvent(input, {
     now: () => now,
@@ -495,7 +524,22 @@ export async function processWorkflowStopEvent(
       };
     }
 
+    // Always persist the stop attempt, including loop_count>0, as non-qualifying telemetry.
     const written = writeWorkflowEvent(paths.eventsDirectory, event);
+    if (typeof input.loop_count === 'number' && input.loop_count > 0) {
+      const nextState: WorkflowReviewState = {
+        ...state,
+        processedGenerationHashes: [...state.processedGenerationHashes, event.generationHash].slice(
+          -500
+        ),
+      };
+      saveWorkflowReviewState(paths.statePath, nextState);
+      return {
+        createdEvent: written.created,
+        reviewTriggered: false,
+        reason: 'loop_count>0',
+      };
+    }
     let nextState: WorkflowReviewState = {
       ...state,
       processedGenerationHashes: [...state.processedGenerationHashes, event.generationHash].slice(-500),
@@ -516,12 +560,23 @@ export async function processWorkflowStopEvent(
       });
     }
 
+    const routingRequired = event.findings.some((finding) => finding.id === 'review-loop-unbounded');
+    const routingFollowup = routingRequired
+      ? [
+          'Premium review budget exhausted for this workstream (two failed rounds).',
+          'Do not launch another final-diff-reviewer.',
+          'Run one premium-fix-routing pass or split the workstream via:',
+          `npx tsx scripts/workflow-protocol.ts split --workstream ${event.workstreamId ?? '<id>'} --new-workstream <new-id> --narrower-partition`,
+        ].join('\n')
+      : undefined;
+
     if (!event.qualifies) {
       saveWorkflowReviewState(paths.statePath, nextState);
       return {
         createdEvent: written.created,
         reviewTriggered: false,
         reason: event.qualificationReasons.join(','),
+        followup_message: routingFollowup,
       };
     }
 

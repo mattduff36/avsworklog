@@ -38,3 +38,16 @@ Every such plan must include:
 Also embed a machine-readable `<!-- plan-contract-marker:v1 ... -->` block that mirrors the human sections. Plans without a valid plan-contract marker are incomplete. Validate with `npm run workflow-plan:validate -- <plan-path>` before treating a plan as approved for build.
 
 Do not present a CreatePlan for substantive work that omits these sections. If the user asks to apply token-efficient-engineering, the plan artifact is the first place compliance must be visible.
+
+## Review closure protocol (two-pass-v1)
+
+For high-risk workstreams that require independent `final-diff-reviewer` passes, enforce the bounded two-pass protocol:
+
+1. Run `npm run review:preflight -- --workstream <id> [--plan <path>]` and record a passing evidence manifest before the first premium final review.
+2. Launch reviewers only after `npx tsx scripts/workflow-protocol.ts review-start --workstream <id> --pass first|closure` issues a one-use token. Use the first-pass and delta-pass templates under `scripts/automation/templates/`.
+3. After the first FAIL, do one consolidated family-fix sweep (`fix-record`) before any closure review. Do not re-review immediately.
+4. Closure review receives only original blocker IDs, the fix-delta manifest, and closure evidence.
+5. After two failed premium rounds, the protocol enters `routing_required` (exit code 2). Stop launching reviewers; run `premium-fix-routing` or an explicit workstream split with lineage. A third `review-start` is rejected.
+6. After review closure, run `finalise-start` then the normal finalise command once. Protocol workstreams resume only via content-addressed checkpoints, never mtime heuristics.
+
+Workstream identity must come from a validated plan/protocol context or completion marker. Never infer identity from branch, recency, commit proximity, or transcript free text. Null/missing transcripts remain unknown and uncorrelated.

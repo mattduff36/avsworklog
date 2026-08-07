@@ -237,6 +237,36 @@ export interface WorkflowReviewPassRecord {
   result: 'passed' | 'failed' | 'blocked' | 'unknown';
 }
 
+export type WorkflowProtocolPhase =
+  | 'initialized'
+  | 'preflight_ready'
+  | 'first_review'
+  | 'fix_sweep_required'
+  | 'fix_recorded'
+  | 'closure_review'
+  | 'review_closed'
+  | 'routing_required'
+  | 'split'
+  | 'finalise_ready'
+  | 'finalised';
+
+export type WorkflowIdentityStatus = 'present' | 'missing' | 'unknown';
+export type WorkflowTranscriptStatus = 'parsed' | 'null' | 'missing' | 'malformed';
+export type WorkflowReviewClosureProtocol = 'two-pass-v1';
+
+export interface WorkflowReviewClosureState {
+  protocol: WorkflowReviewClosureProtocol;
+  protocolVersion?: string;
+  phase?: WorkflowProtocolPhase;
+  evidenceManifestPath?: string;
+  fixDeltaManifestPath?: string;
+  firstPassId?: string;
+  deltaPassId?: string;
+  blockerFamilies?: string[];
+  failedPremiumReviewCount?: number;
+  activeReviewTokenPresent?: boolean;
+}
+
 export interface WorkflowCompletionMarker {
   schemaVersion: '1' | '2' | '3';
   taskId: string;
@@ -268,6 +298,8 @@ export interface WorkflowCompletionMarker {
   recommendedBuildModel?: WorkflowRecommendedBuildModel;
   planRecommendationAdherence?: WorkflowPlanRecommendationAdherence;
   reviewPasses?: WorkflowReviewPassRecord[];
+  /** Additive two-pass closure evidence; ignored by legacy readers. */
+  reviewClosure?: WorkflowReviewClosureState;
 }
 
 export interface WorkflowPlanContract {
@@ -296,6 +328,8 @@ export interface WorkflowPlanContract {
     boundaries?: string[];
     rollback?: string;
   };
+  /** Additive; high-risk plans should set two-pass-v1. */
+  reviewClosureProtocol?: WorkflowReviewClosureProtocol;
 }
 
 export interface WorkflowFinding {
@@ -322,6 +356,13 @@ export interface WorkflowTranscriptSignals {
   planPathSource: 'repo_relative' | 'external_hashed' | 'unavailable';
   planPathRef: string | null;
   parseErrors: string[];
+}
+
+export interface WorkflowHookDiagnostics {
+  transcriptPathPresent: boolean;
+  transcriptPathNull: boolean;
+  transcriptPathEmpty: boolean;
+  transcriptStatus: WorkflowTranscriptStatus;
 }
 
 export interface WorkflowStopEvent {
@@ -354,6 +395,11 @@ export interface WorkflowStopEvent {
   branchName?: string;
   headCommit?: string;
   reviewPasses?: WorkflowReviewPassRecord[];
+  /** Additive telemetry; absent on legacy events. */
+  transcriptStatus?: WorkflowTranscriptStatus;
+  identityStatus?: WorkflowIdentityStatus;
+  protocolPhase?: WorkflowProtocolPhase;
+  hookDiagnostics?: WorkflowHookDiagnostics;
 }
 
 export interface WorkflowWorkstreamRecord {
@@ -370,6 +416,47 @@ export interface WorkflowWorkstreamRecord {
   updatedAt: string;
 }
 
+export interface WorkflowProtocolReviewAttempt {
+  pass: 'first' | 'closure';
+  token: string;
+  startedAt: string;
+  result?: 'passed' | 'failed';
+  blockerFamilies?: string[];
+  blockerIds?: string[];
+  siblingSurfaces?: string[];
+  recordedAt?: string;
+}
+
+export interface WorkflowProtocolRecord {
+  schemaVersion: '1';
+  workstreamId: string;
+  identityStatus: 'present';
+  sourceWorkstreamIds?: string[];
+  inheritedFailedReviewCount: number;
+  branchName: string | null;
+  baseCommit: string;
+  headCommit: string | null;
+  phase: WorkflowProtocolPhase;
+  nextAction: string;
+  failedPremiumReviewCount: number;
+  activeReviewToken: string | null;
+  activeReviewPass: 'first' | 'closure' | null;
+  reviewAttempts: WorkflowProtocolReviewAttempt[];
+  blockerFamilies: string[];
+  openBlockerIds: string[];
+  evidenceManifestPath: string | null;
+  fixDeltaManifestPath: string | null;
+  activeCheckpointId: string | null;
+  planPath: string | null;
+  updatedAt: string;
+}
+
+export interface WorkflowActiveFinaliseContext {
+  workstreamId: string;
+  checkpointId: string;
+  activatedAt: string;
+}
+
 export interface WorkflowReviewState {
   /** Writers emit '2'; readers accept '1' | '2'. */
   schemaVersion: '1' | '2';
@@ -384,6 +471,9 @@ export interface WorkflowReviewState {
   /** State-side review membership; never rewrite immutable events. */
   reviewWindowByEventId?: Record<string, string>;
   workstreams?: Record<string, WorkflowWorkstreamRecord>;
+  /** Additive two-pass protocol records keyed by workstreamId. */
+  protocolRecords?: Record<string, WorkflowProtocolRecord>;
+  activeFinaliseContext?: WorkflowActiveFinaliseContext | null;
 }
 
 export interface WorkflowReviewMetrics {
@@ -408,10 +498,12 @@ export interface WorkflowReviewMetrics {
 
 export interface WorkflowFinaliseCorrelation {
   workstreamIds: string[];
-  matchedBy: 'branch_ancestry' | 'none' | 'multiple';
+  matchedBy: 'branch_ancestry' | 'none' | 'multiple' | 'explicit_context';
   branchName: string | null;
   headCommit: string | null;
   resultingCommit: string | null;
+  identityStatus?: WorkflowIdentityStatus;
+  checkpointId?: string | null;
 }
 
 export interface AutomationMemory {

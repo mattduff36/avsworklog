@@ -1,0 +1,360 @@
+import { createHash } from 'crypto';
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'fs';
+import path from 'path';
+import { spawnSync } from 'child_process';
+import { writeJsonAtomic } from './workflow-events';
+import { getProtocolDirectory } from './workflow-review-protocol';
+
+export type EvidenceManifestKind = 'preflight' | 'fix-delta';
+export type EvidenceCommandStatus = 'passed' | 'failed' | 'skipped' | 'unknown';
+
+export interface EvidenceCommandResult {
+  name: string;
+  status: EvidenceCommandStatus;
+  exitCode: number | null;
+  durationMs: number;
+  summary: string;
+}
+
+export interface EvidenceTestMapping {
+  id: string;
+  status: 'completed' | 'unresolved' | 'missing';
+  behavioral: boolean;
+  /** True only when a targeted test run executed this ID successfully. */
+  executed: boolean;
+  evidenceLabel: string;
+}
+
+export interface WorkflowEvidenceManifest {
+  schemaVersion: '1';
+  kind: EvidenceManifestKind;
+  workstreamId: string;
+  status: 'passed' | 'failed' | 'unknown';
+  createdAt: string;
+  baseCommit: string;
+  headCommit: string;
+  dirtyTreeHash: string;
+  inputFingerprint: string;
+  contentHash: string;
+  bodyHash?: string;
+  changedFiles: string[];
+  baseHeadEvidence: {
+    baseCommit: string;
+    headCommit: string;
+    changedFileCount: number;
+    changedFilesSample: string[];
+  };
+  commands: EvidenceCommandResult[];
+  requiredTests: EvidenceTestMapping[];
+  liveVerification?: {
+    profile: string;
+    status: EvidenceCommandStatus;
+    summary: string;
+  };
+  closedBlockerIds?: string[];
+  blockerEvidence?: Array<{
+    blockerId: string;
+    evidenceLabel: string;
+    commandName?: string;
+  }>;
+  privacy: {
+    redacted: true;
+  };
+}
+
+function runGit(repoRoot: string, args: string[]): string {
+  const result = spawnSync('git', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    shell: false,
+  });
+  if (result.status !== 0) return '';
+  return (result.stdout ?? '').trim();
+}
+
+function hashText(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 32);
+}
+
+function hashFile(filePath: string): string {
+  if (!existsSync(filePath)) return 'missing';
+  return hashText(readFileSync(filePath, 'utf8'));
+}
+
+function listDirtyPaths(repoRoot: string): string[] {
+  const output = runGit(repoRoot, ['status', '--porcelain', '-uall']);
+  if (!output) return [];
+  return output
+    .split(/\r?\n/u)
+    .map((line) => line.slice(3).trim())
+    .filter(Boolean)
+    .sort();
+}
+
+export function getCurrentTreeFingerprint(repoRoot: string): {
+  headCommit: string;
+  dirtyTreeHash: string;
+  inputFingerprint: string;
+  changedFiles: string[];
+} {
+  const headCommit = runGit(repoRoot, ['rev-parse', 'HEAD']) || 'unknown';
+  const changedFiles = listDirtyPaths(repoRoot);
+  return {
+    headCommit,
+    dirtyTreeHash: hashText(changedFiles.join('\n')),
+    inputFingerprint: fingerprintInputs(repoRoot, changedFiles),
+    changedFiles,
+  };
+}
+
+export function listBaseToHeadChangedFiles(
+  repoRoot: string,
+  baseCommit: string,
+  headCommit: string
+): string[] {
+  if (!baseCommit || !headCommit || baseCommit === 'unknown' || headCommit === 'unknown') {
+    return [];
+  }
+  const output = runGit(repoRoot, ['diff', '--name-only', `${baseCommit}...${headCommit}`]);
+  if (!output) return [];
+  return output
+    .split(/\r?\n/u)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .sort();
+}
+
+function fingerprintInputs(repoRoot: string, dirtyPaths: string[]): string {
+  const parts = [
+    `lock:${hashFile(path.join(repoRoot, 'package-lock.json'))}`,
+    `pkg:${hashFile(path.join(repoRoot, 'package.json'))}`,
+    `tsconfig:${hashFile(path.join(repoRoot, 'tsconfig.json'))}`,
+    `vitest:${hashFile(path.join(repoRoot, 'vitest.config.ts'))}`,
+    `node:${process.version}`,
+  ];
+  for (const relative of dirtyPaths) {
+    const absolute = path.join(repoRoot, relative);
+    if (!existsSync(absolute) || !statSync(absolute).isFile()) {
+      parts.push(`${relative}:absent`);
+      continue;
+    }
+    parts.push(`${relative}:${hashFile(absolute)}`);
+  }
+  const migrationsDir = path.join(repoRoot, 'supabase');
+  if (existsSync(migrationsDir)) {
+    const migrationFiles = readdirSync(migrationsDir)
+      .filter((name) => name.endsWith('.sql'))
+      .sort();
+    for (const name of migrationFiles) {
+      parts.push(`migration:${name}:${hashFile(path.join(migrationsDir, name))}`);
+    }
+  }
+  return hashText(parts.join('\n'));
+}
+
+function runCommand(
+  repoRoot: string,
+  name: string,
+  command: string,
+  args: string[]
+): EvidenceCommandResult {
+  const started = Date.now();
+  const result = spawnSync(command, args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    shell: false,
+    env: process.env,
+  });
+  const durationMs = Date.now() - started;
+  const exitCode = typeof result.status === 'number' ? result.status : null;
+  return {
+    name,
+    status: exitCode === 0 ? 'passed' : 'failed',
+    exitCode,
+    durationMs,
+    summary: exitCode === 0 ? 'ok' : 'failed',
+  };
+}
+
+function discoverBehavioralTestIds(
+  repoRoot: string,
+  ids: string[],
+  executedIds: Set<string>
+): EvidenceTestMapping[] {
+  const testRoots = [
+    path.join(repoRoot, 'tests'),
+    path.join(repoRoot, 'testsuite'),
+  ].filter((dir) => existsSync(dir));
+
+  const fileContents: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (!/\.(test|spec)\.(ts|tsx|js|mjs)$/u.test(entry.name)) continue;
+      try {
+        fileContents.push(readFileSync(full, 'utf8'));
+      } catch {
+        // ignore unreadable
+      }
+    }
+  };
+  for (const root of testRoots) walk(root);
+  const corpus = fileContents.join('\n');
+
+  return ids.map((id) => {
+    const present = corpus.includes(id);
+    // Behavioral if the ID appears in an it()/test() title, not only as a source string.
+    const behavioral =
+      present &&
+      new RegExp(
+        `(?:it|test|describe)\\(\\s*['\`"][^'\`"]*${id.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}`,
+        'u'
+      ).test(corpus);
+    const executed = executedIds.has(id);
+    return {
+      id,
+      status: behavioral && executed ? 'completed' : present ? 'unresolved' : 'missing',
+      behavioral,
+      executed,
+      evidenceLabel:
+        behavioral && executed
+          ? `behavioral-executed:${id}`
+          : behavioral
+            ? `behavioral-unexecuted:${id}`
+            : present
+              ? `source-only:${id}`
+              : `missing:${id}`,
+    };
+  });
+}
+
+export function buildEvidenceManifest(params: {
+  repoRoot: string;
+  workstreamId: string;
+  kind: EvidenceManifestKind;
+  baseCommit: string;
+  requiredTestIds?: string[];
+  runChecks?: boolean;
+  runRequiredTests?: boolean;
+  liveVerification?: WorkflowEvidenceManifest['liveVerification'];
+  closedBlockerIds?: string[];
+  blockerEvidence?: WorkflowEvidenceManifest['blockerEvidence'];
+  commandResults?: EvidenceCommandResult[];
+  executedTestIds?: string[];
+}): { manifest: WorkflowEvidenceManifest; relativePath: string; absolutePath: string } {
+  const tree = getCurrentTreeFingerprint(params.repoRoot);
+  const headCommit = tree.headCommit;
+  const dirtyFiles = tree.changedFiles;
+  const baseHeadFiles = listBaseToHeadChangedFiles(
+    params.repoRoot,
+    params.baseCommit,
+    headCommit
+  );
+  const changedFiles = [...new Set([...baseHeadFiles, ...dirtyFiles])].sort();
+  const dirtyTreeHash = tree.dirtyTreeHash;
+  const inputFingerprint = tree.inputFingerprint;
+  const executedIds = new Set(params.executedTestIds ?? []);
+  const commands: EvidenceCommandResult[] = [...(params.commandResults ?? [])];
+  if (params.runChecks) {
+    commands.push(runCommand(params.repoRoot, 'typecheck', 'npm', ['run', 'typecheck']));
+    commands.push(runCommand(params.repoRoot, 'lint', 'npm', ['run', 'lint']));
+  }
+  if (params.runRequiredTests && (params.requiredTestIds?.length ?? 0) > 0) {
+    const ids = params.requiredTestIds ?? [];
+    // Vitest uses -t/--testNamePattern, not --grep.
+    const testRun = runCommand(params.repoRoot, 'required-tests', 'npm', [
+      'run',
+      'test:run',
+      '--',
+      '-t',
+      ids.join('|'),
+    ]);
+    commands.push(testRun);
+    if (testRun.status === 'passed') {
+      for (const id of ids) executedIds.add(id);
+    }
+  }
+
+  const requiredTests = discoverBehavioralTestIds(
+    params.repoRoot,
+    params.requiredTestIds ?? [],
+    executedIds
+  );
+
+  const checksPassed =
+    commands.length > 0 &&
+    commands.every((command) => command.status === 'passed' || command.status === 'skipped');
+  const testsReady =
+    requiredTests.length === 0 ||
+    requiredTests.every(
+      (test) => test.status === 'completed' && test.behavioral && test.executed
+    );
+  const liveOk =
+    !params.liveVerification ||
+    params.liveVerification.status === 'passed' ||
+    params.liveVerification.status === 'skipped';
+  const fixEvidenceReady =
+    params.kind !== 'fix-delta' ||
+    ((params.closedBlockerIds?.length ?? 0) > 0 &&
+      (params.blockerEvidence?.length ?? 0) > 0);
+
+  let status: WorkflowEvidenceManifest['status'] = 'passed';
+  if (!checksPassed || !testsReady || !liveOk || !fixEvidenceReady) status = 'failed';
+  if (commands.some((command) => command.status === 'unknown')) status = 'unknown';
+
+  const draft: Omit<WorkflowEvidenceManifest, 'contentHash' | 'bodyHash'> = {
+    schemaVersion: '1',
+    kind: params.kind,
+    workstreamId: params.workstreamId,
+    status,
+    createdAt: new Date().toISOString(),
+    baseCommit: params.baseCommit,
+    headCommit,
+    dirtyTreeHash,
+    inputFingerprint,
+    changedFiles: changedFiles.slice(0, 500),
+    baseHeadEvidence: {
+      baseCommit: params.baseCommit,
+      headCommit,
+      changedFileCount: baseHeadFiles.length,
+      changedFilesSample: baseHeadFiles.slice(0, 50),
+    },
+    commands,
+    requiredTests,
+    liveVerification: params.liveVerification,
+    closedBlockerIds: params.closedBlockerIds,
+    blockerEvidence: params.blockerEvidence,
+    privacy: { redacted: true },
+  };
+
+  const bodyHash = hashText(JSON.stringify(draft));
+  const manifest: WorkflowEvidenceManifest = {
+    ...draft,
+    contentHash: bodyHash,
+    bodyHash,
+  };
+
+  const directory = getProtocolDirectory(params.repoRoot, params.workstreamId);
+  mkdirSync(directory, { recursive: true });
+  const fileName = `${params.kind}-${manifest.contentHash}.json`;
+  const absolutePath = path.join(directory, fileName);
+  writeJsonAtomic(absolutePath, manifest);
+  return {
+    manifest,
+    absolutePath,
+    relativePath: path.relative(params.repoRoot, absolutePath).replace(/\\/g, '/'),
+  };
+}
+
+export function readEvidenceManifest(filePath: string): WorkflowEvidenceManifest | null {
+  if (!existsSync(filePath)) return null;
+  try {
+    return JSON.parse(readFileSync(filePath, 'utf8')) as WorkflowEvidenceManifest;
+  } catch {
+    return null;
+  }
+}

@@ -7,7 +7,11 @@ import {
   extractPlanContractMarker,
   resolvePlanPath,
 } from './workflow-plan-contract';
-import type { WorkflowPlanContract, WorkflowTranscriptSignals } from './types';
+import type {
+  WorkflowPlanContract,
+  WorkflowTranscriptSignals,
+  WorkflowTranscriptStatus,
+} from './types';
 
 export const WORKFLOW_TRANSCRIPT_ADAPTER_VERSION = '2';
 const MAX_TRANSCRIPT_BYTES = 8_000_000;
@@ -18,6 +22,7 @@ export interface TranscriptParseResult {
   assistantText: string;
   planValidationStatus: 'present' | 'missing' | 'malformed' | 'unknown';
   planContract: WorkflowPlanContract | null;
+  transcriptStatus: WorkflowTranscriptStatus;
 }
 
 function emptySignals(parseErrors: string[] = []): WorkflowTranscriptSignals {
@@ -177,12 +182,23 @@ export async function parseWorkflowTranscript(
   transcriptPath: string | null,
   options?: { repoRoot?: string }
 ): Promise<TranscriptParseResult> {
-  if (!transcriptPath) {
+  if (transcriptPath === null) {
     return {
       signals: emptySignals(['transcript_path was null']),
       assistantText: '',
       planValidationStatus: 'unknown',
       planContract: null,
+      transcriptStatus: 'null',
+    };
+  }
+
+  if (!transcriptPath.trim()) {
+    return {
+      signals: emptySignals(['transcript_path was empty']),
+      assistantText: '',
+      planValidationStatus: 'unknown',
+      planContract: null,
+      transcriptStatus: 'missing',
     };
   }
 
@@ -192,6 +208,7 @@ export async function parseWorkflowTranscript(
       assistantText: '',
       planValidationStatus: 'unknown',
       planContract: null,
+      transcriptStatus: 'missing',
     };
   }
 
@@ -202,6 +219,7 @@ export async function parseWorkflowTranscript(
       assistantText: '',
       planValidationStatus: 'unknown',
       planContract: null,
+      transcriptStatus: 'malformed',
     };
   }
 
@@ -305,5 +323,10 @@ export async function parseWorkflowTranscript(
     }
   }
 
-  return { signals, assistantText, planValidationStatus, planContract };
+  const transcriptStatus: WorkflowTranscriptStatus =
+    signals.parseErrors.some((error) => error.includes('malformed')) && !assistantText
+      ? 'malformed'
+      : 'parsed';
+
+  return { signals, assistantText, planValidationStatus, planContract, transcriptStatus };
 }

@@ -5,8 +5,16 @@ import path from 'path';
 import pg from 'pg';
 import { parseCommitsFromMessages, selectPrimaryCommitMessage } from '../lib/config/release-version-logic';
 import { AutomationRun } from './automation/logger';
+import {
+  markFinaliseCheckpointStep,
+  resolveActiveProtocolFinaliseContext,
+} from './automation/finalise-checkpoint';
 import { checkFinaliseBlockingActivity, formatBlockingActivity } from './finalise-activity-guard';
-import { getSkippableFinaliseTasks, type RecentFinaliseTaskRun } from './finalise-recent-tasks';
+import {
+  getSkippableFinaliseTasks,
+  type FinaliseTaskKey,
+  type RecentFinaliseTaskRun,
+} from './finalise-recent-tasks';
 import {
   type FinaliseChangedFile,
   buildFinaliseCommitOutcomeMetadata,
@@ -26,6 +34,27 @@ const REPO_ROOT = process.cwd();
 const NEXT_BUILD_DIR = path.join(REPO_ROOT, '.next');
 const NEXT_BUILD_ARTIFACT_PATH = path.join(NEXT_BUILD_DIR, 'BUILD_ID');
 const RELEASE_VERSION_JSON_PATH = path.join(REPO_ROOT, 'lib/config/release-version.json');
+
+function recordProtocolCheckpointStep(params: {
+  task: FinaliseTaskKey;
+  status: 'passed' | 'failed' | 'started' | 'incomplete';
+  command: string;
+  exitCode?: number | null;
+  artifactPaths?: string[];
+}): void {
+  const active = resolveActiveProtocolFinaliseContext(REPO_ROOT);
+  if (!active) return;
+  markFinaliseCheckpointStep({
+    repoRoot: REPO_ROOT,
+    workstreamId: active.workstreamId,
+    checkpointId: active.checkpointId,
+    task: params.task,
+    status: params.status,
+    command: params.command,
+    exitCode: params.exitCode,
+    artifactPaths: params.artifactPaths,
+  });
+}
 const RELEASE_VERSION_FILES = [
   'lib/config/release-version.json',
   'lib/config/release-history.json',
@@ -1021,6 +1050,12 @@ async function main(): Promise<void> {
             migrationFiles: pendingMigrationFiles,
           })
         );
+        recordProtocolCheckpointStep({
+          task: 'migrations',
+          status: 'passed',
+          command: 'run-pending-migrations',
+          exitCode: 0,
+        });
         printProgress('Pending migrations applied.', 20);
       }
     } else {
@@ -1036,6 +1071,12 @@ async function main(): Promise<void> {
       } else {
         printProgress('Running database validation...', 22);
         await timeFinaliseStep(timingEntries, 'Run database validation', () => runCommand('npm', ['run', 'db:validate']));
+        recordProtocolCheckpointStep({
+          task: 'db-validate',
+          status: 'passed',
+          command: 'npm run db:validate',
+          exitCode: 0,
+        });
         printProgress('Database validation passed.', 25);
       }
     } else {
@@ -1056,6 +1097,13 @@ async function main(): Promise<void> {
       await timeFinaliseStep(timingEntries, 'Run clean production build', () =>
         run.step('Run clean production build', () => runCleanProductionBuildWithProgress())
       );
+      recordProtocolCheckpointStep({
+        task: 'build',
+        status: 'passed',
+        command: 'npm run build',
+        exitCode: 0,
+        artifactPaths: [NEXT_BUILD_ARTIFACT_PATH],
+      });
     }
 
     if (options.full) {
@@ -1094,6 +1142,12 @@ async function main(): Promise<void> {
             await timeFinaliseStep(timingEntries, 'Run Vitest test run', () =>
               runCommand('npm', ['run', 'test:run'], { env: localTestEnv })
             );
+            recordProtocolCheckpointStep({
+              task: 'test-run',
+              status: 'passed',
+              command: 'npm run test:run',
+              exitCode: 0,
+            });
             printProgress('Vitest test run passed.', 72);
           }
           if (recentTestsuiteRun) {
@@ -1104,6 +1158,12 @@ async function main(): Promise<void> {
             await timeFinaliseStep(timingEntries, 'Run API and Playwright testsuite', () =>
               runCommand('npm', ['run', 'testsuite'], { env: localTestEnv })
             );
+            recordProtocolCheckpointStep({
+              task: 'testsuite',
+              status: 'passed',
+              command: 'npm run testsuite',
+              exitCode: 0,
+            });
             printProgress('Full automated test suite passed.', 84);
           }
         } finally {

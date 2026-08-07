@@ -60,6 +60,8 @@ export function createEmptyWorkflowReviewState(): WorkflowReviewState {
     processedGenerationHashes: [],
     reviewWindowByEventId: {},
     workstreams: {},
+    protocolRecords: {},
+    activeFinaliseContext: null,
   };
 }
 
@@ -96,6 +98,18 @@ export function loadWorkflowReviewState(statePath: string): WorkflowReviewState 
           !Array.isArray(parsed.workstreams)
             ? parsed.workstreams
             : {},
+        protocolRecords:
+          parsed.protocolRecords &&
+          typeof parsed.protocolRecords === 'object' &&
+          !Array.isArray(parsed.protocolRecords)
+            ? parsed.protocolRecords
+            : {},
+        activeFinaliseContext:
+          parsed.activeFinaliseContext &&
+          typeof parsed.activeFinaliseContext === 'object' &&
+          !Array.isArray(parsed.activeFinaliseContext)
+            ? parsed.activeFinaliseContext
+            : null,
       };
     }
   } catch {

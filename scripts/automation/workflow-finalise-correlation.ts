@@ -5,9 +5,15 @@ import type {
   WorkflowWorkstreamRecord,
 } from './types';
 import {
-  listOpenWorkstreamsForBranch,
   upsertWorkstreamRecord,
+  writeJsonAtomic,
 } from './workflow-events';
+import {
+  getActiveFinaliseContext,
+  getProtocolRecordPath,
+  isWorkflowProtocolRecord,
+  readProtocolRecord,
+} from './workflow-review-protocol';
 
 function runGit(repoRoot: string, args: string[]): string | null {
   const result = spawnSync('git', args, {
@@ -47,28 +53,49 @@ export function resolveFinaliseWorkstreamMatches(params: {
   correlation: WorkflowFinaliseCorrelation;
   matched: WorkflowWorkstreamRecord[];
 } {
-  const openOnBranch = listOpenWorkstreamsForBranch(params.state, params.branchName);
-  const matched = openOnBranch.filter((record) => {
-    if (!record.headCommit) return true;
-    return isGitAncestor({
-      repoRoot: params.repoRoot,
-      ancestorCommit: record.headCommit,
-      descendantCommit: params.headCommit,
-    });
-  });
+  const active = getActiveFinaliseContext(params.state);
+  if (active) {
+    const record = params.state.workstreams?.[active.workstreamId];
+    if (record) {
+      return {
+        matched: [record],
+        correlation: {
+          workstreamIds: [record.workstreamId],
+          matchedBy: 'explicit_context',
+          branchName: params.branchName,
+          headCommit: params.headCommit,
+          resultingCommit: null,
+          identityStatus: 'present',
+          checkpointId: active.checkpointId,
+        },
+      };
+    }
+    return {
+      matched: [],
+      correlation: {
+        workstreamIds: [],
+        matchedBy: 'none',
+        branchName: params.branchName,
+        headCommit: params.headCommit,
+        resultingCommit: null,
+        identityStatus: 'missing',
+        checkpointId: active.checkpointId,
+      },
+    };
+  }
 
-  let matchedBy: WorkflowFinaliseCorrelation['matchedBy'] = 'none';
-  if (matched.length === 1) matchedBy = 'branch_ancestry';
-  if (matched.length > 1) matchedBy = 'multiple';
-
+  // No branch/ancestry heuristics. Without an explicit active finalise context,
+  // finalise remains uncorrelated.
   return {
-    matched,
+    matched: [],
     correlation: {
-      workstreamIds: matched.map((record) => record.workstreamId),
-      matchedBy,
+      workstreamIds: [],
+      matchedBy: 'none',
       branchName: params.branchName,
       headCommit: params.headCommit,
       resultingCommit: null,
+      identityStatus: 'missing',
+      checkpointId: null,
     },
   };
 }
@@ -79,6 +106,7 @@ export function applyFinaliseCorrelationToState(params: {
   finaliseRunId: string;
   finaliseOutcome: 'passed' | 'failed' | 'unknown';
   resultingCommit: string | null;
+  repoRoot?: string;
 }): WorkflowReviewState {
   let next = params.state;
   const now = new Date().toISOString();
@@ -91,7 +119,42 @@ export function applyFinaliseCorrelationToState(params: {
       finaliseCommit: params.resultingCommit ?? undefined,
       updatedAt: now,
     });
+
+    if (params.finaliseOutcome === 'passed' && params.repoRoot) {
+      const protocol = readProtocolRecord(params.repoRoot, record.workstreamId);
+      if (protocol && isWorkflowProtocolRecord(protocol)) {
+        const finalized = {
+          ...protocol,
+          phase: 'finalised' as const,
+          nextAction: 'done',
+          activeCheckpointId: null,
+          updatedAt: now,
+        };
+        writeJsonAtomic(getProtocolRecordPath(params.repoRoot, record.workstreamId), finalized);
+        next = {
+          ...next,
+          protocolRecords: {
+            ...(next.protocolRecords ?? {}),
+            [record.workstreamId]: finalized,
+          },
+        };
+      }
+    }
   }
+
+  if (
+    params.finaliseOutcome === 'passed' &&
+    next.activeFinaliseContext &&
+    params.matched.some(
+      (record) => record.workstreamId === next.activeFinaliseContext?.workstreamId
+    )
+  ) {
+    next = {
+      ...next,
+      activeFinaliseContext: null,
+    };
+  }
+
   return next;
 }
 
@@ -123,6 +186,7 @@ export function correlateFinaliseRun(params: {
       finaliseRunId: params.finaliseRunId,
       finaliseOutcome: params.finaliseOutcome,
       resultingCommit,
+      repoRoot: params.repoRoot,
     }),
     correlation: {
       ...correlation,

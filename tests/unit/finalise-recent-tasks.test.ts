@@ -47,7 +47,10 @@ function writeBuildArtifact(repoRoot: string): string {
   return buildArtifactPath;
 }
 
-function createAutomationLog(steps: AutomationStepLog[]): AutomationRunLog {
+function createAutomationLog(
+  steps: AutomationStepLog[],
+  status: AutomationRunLog['status'] = 'passed'
+): AutomationRunLog {
   return {
     id: 'run-1',
     scriptName: 'finalise',
@@ -56,7 +59,7 @@ function createAutomationLog(steps: AutomationStepLog[]): AutomationRunLog {
     startedAt: STARTED_AT.toISOString(),
     endedAt: COMPLETED_AT.toISOString(),
     durationMs: 60_000,
-    status: 'failed',
+    status,
     metadata: {
       branch: 'feature/test',
       commit: 'abc123',

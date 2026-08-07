@@ -950,7 +950,7 @@ describe('workflow-review cadence', () => {
     const loopResult = await processWorkflowStopEvent(
       {
         conversation_id: 'c1',
-        generation_id: 'g1',
+        generation_id: 'g-loop',
         model: 'composer-2.5',
         model_id: 'composer-2.5-fast',
         transcript_path: transcriptPath,
@@ -959,7 +959,10 @@ describe('workflow-review cadence', () => {
       },
       { repoRoot: root, now: () => new Date('2026-07-29T12:00:00.000Z') }
     );
-    expect(loopResult.createdEvent).toBe(false);
+    // loop_count>0 is persisted as non-qualifying telemetry, never reviewed.
+    expect(loopResult.createdEvent).toBe(true);
+    expect(loopResult.reviewTriggered).toBe(false);
+    expect(loopResult.reason).toBe('loop_count>0');
 
     const first = await processWorkflowStopEvent(
       {

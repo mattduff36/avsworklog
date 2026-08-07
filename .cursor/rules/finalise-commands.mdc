@@ -25,6 +25,8 @@ Command map:
 
 These phrases and aliases are explicit authorisation for commit, and the push variants (`finalise and push`, `fap`, `finalise full and push`, `ffap`) are explicit authorisation to push the current branch.
 
+For protocol-managed high-risk workstreams, run `npx tsx scripts/workflow-protocol.ts finalise-start --workstream <id>` after review closure before the mapped finalise command. Protocol checkpoints resume only exact successful steps; do not widen skip heuristics. Finalise command phrases and push authorisation remain unchanged.
+
 ## Economical-parent fix routing
 
 When Cursor Grok or another economical parent runs a finalise command:

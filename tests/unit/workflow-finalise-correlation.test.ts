@@ -50,9 +50,9 @@ describe('workflow finalise correlation and registry', () => {
 
   it('FINALISE-CORR-001: correlates zero, one, and multiple open workstreams and records resulting commit', () => {
     let state = createEmptyWorkflowReviewState();
-    state = upsertWorkstreamRecord(state, openWorkstream('ws-a', 'main', null));
-    state = upsertWorkstreamRecord(state, openWorkstream('ws-b', 'main', null));
-    state = upsertWorkstreamRecord(state, openWorkstream('ws-other', 'feature/x', null));
+    state = upsertWorkstreamRecord(state, openWorkstream('ws-a', 'main', 'abc'));
+    state = upsertWorkstreamRecord(state, openWorkstream('ws-b', 'main', 'abc'));
+    state = upsertWorkstreamRecord(state, openWorkstream('ws-other', 'feature/x', 'abc'));
 
     const none = resolveFinaliseWorkstreamMatches({
       state: createEmptyWorkflowReviewState(),
@@ -63,9 +63,23 @@ describe('workflow finalise correlation and registry', () => {
     expect(none.correlation.matchedBy).toBe('none');
     expect(none.matched).toHaveLength(0);
 
+    // Null headCommit must not match any finish-time HEAD (no branch-wide inference).
+    const nullHeadState = upsertWorkstreamRecord(
+      createEmptyWorkflowReviewState(),
+      openWorkstream('ws-null', 'main', null)
+    );
+    const nullHead = resolveFinaliseWorkstreamMatches({
+      state: nullHeadState,
+      repoRoot: process.cwd(),
+      branchName: 'main',
+      headCommit: 'abc',
+    });
+    expect(nullHead.correlation.matchedBy).toBe('none');
+
+    // Ancestry heuristics are disabled: without explicit activeFinaliseContext, no match.
     const singleState = upsertWorkstreamRecord(
       createEmptyWorkflowReviewState(),
-      openWorkstream('ws-only', 'main', null)
+      openWorkstream('ws-only', 'main', 'abc')
     );
     const single = resolveFinaliseWorkstreamMatches({
       state: singleState,
@@ -73,8 +87,9 @@ describe('workflow finalise correlation and registry', () => {
       branchName: 'main',
       headCommit: 'abc',
     });
-    expect(single.correlation.matchedBy).toBe('branch_ancestry');
-    expect(single.correlation.workstreamIds).toEqual(['ws-only']);
+    expect(single.correlation.matchedBy).toBe('none');
+    expect(single.correlation.identityStatus).toBe('missing');
+    expect(single.correlation.workstreamIds).toEqual([]);
 
     const multiple = resolveFinaliseWorkstreamMatches({
       state,
@@ -82,12 +97,15 @@ describe('workflow finalise correlation and registry', () => {
       branchName: 'main',
       headCommit: 'abc',
     });
-    expect(multiple.correlation.matchedBy).toBe('multiple');
-    expect(multiple.correlation.workstreamIds.sort()).toEqual(['ws-a', 'ws-b']);
+    expect(multiple.correlation.matchedBy).toBe('none');
+    expect(multiple.correlation.workstreamIds).toEqual([]);
 
     const applied = applyFinaliseCorrelationToState({
       state,
-      matched: multiple.matched,
+      matched: [
+        openWorkstream('ws-a', 'main', 'abc'),
+        openWorkstream('ws-b', 'main', 'abc'),
+      ],
       finaliseRunId: 'run-1',
       finaliseOutcome: 'passed',
       resultingCommit: 'def456',

@@ -33,6 +33,10 @@ export function buildWorkflowFindings(params: {
   observedParentTier?: WorkflowParentTier;
   planValidationStatus?: 'present' | 'missing' | 'malformed' | 'not_applicable' | 'unknown';
   planRecommendationAdherence?: WorkflowPlanRecommendationAdherence;
+  transcriptStatus?: 'parsed' | 'null' | 'missing' | 'malformed';
+  identityStatus?: 'present' | 'missing' | 'unknown';
+  protocolPhase?: string;
+  failedPremiumReviewCount?: number;
 }): WorkflowFinding[] {
   const {
     marker,
@@ -41,8 +45,68 @@ export function buildWorkflowFindings(params: {
     observedParentTier,
     planValidationStatus,
     planRecommendationAdherence,
+    transcriptStatus,
+    identityStatus,
+    protocolPhase,
+    failedPremiumReviewCount,
   } = params;
   const findings: WorkflowFinding[] = [];
+
+  if (transcriptStatus === 'null' || transcriptStatus === 'missing') {
+    findings.push(
+      finding(
+        'missing-transcript',
+        'action',
+        'unknown',
+        'Stop-hook transcript unavailable',
+        'A null or missing transcript_path was recorded. Evidence remains unknown and uncorrelated; identity is never inferred.',
+        [`transcriptStatus:${transcriptStatus}`]
+      )
+    );
+  } else if (transcriptStatus === 'malformed') {
+    findings.push(
+      finding(
+        'malformed-transcript',
+        'action',
+        'unknown',
+        'Stop-hook transcript malformed',
+        'Transcript parsing failed. Evidence remains unknown and uncorrelated.',
+        ['transcriptStatus:malformed']
+      )
+    );
+  }
+
+  if (identityStatus === 'missing') {
+    findings.push(
+      finding(
+        'missing-workstream-id',
+        'action',
+        'unknown',
+        'Missing explicit workstream identity',
+        'Workstream identity must come from a validated plan/protocol context or marker. Missing identity stays uncorrelated.',
+        ['identityStatus:missing']
+      )
+    );
+  }
+
+  if (
+    protocolPhase === 'routing_required' ||
+    (typeof failedPremiumReviewCount === 'number' && failedPremiumReviewCount >= 2)
+  ) {
+    findings.push(
+      finding(
+        'review-loop-unbounded',
+        'action',
+        'failed',
+        'Premium review budget exhausted',
+        'Second failed premium review requires premium-fix-routing or an explicit workstream split. Further review-start transitions are rejected.',
+        [
+          `protocolPhase:${protocolPhase ?? 'unknown'}`,
+          `failedPremiumReviewCount:${failedPremiumReviewCount ?? 'unknown'}`,
+        ]
+      )
+    );
+  }
 
   if (markerStatus === 'missing') {
     findings.push(
@@ -175,8 +239,28 @@ export function buildWorkflowFindings(params: {
         'warning',
         'unknown',
         'Excessive premium re-review passes recorded',
-        'More than two unique premium re-review passes were recorded. This is advisory and never blocks handoff.',
+        'More than two unique premium re-review passes were recorded in the marker. This marker finding remains advisory; executable enforcement is owned by workflow-protocol review-start transitions.',
         [`marker:premiumReReviewCount=${premiumReReviewCount}`]
+      )
+    );
+  }
+
+  if (
+    marker.reviewClosure?.protocol === 'two-pass-v1' &&
+    (marker.reviewClosure.failedPremiumReviewCount ?? 0) >= 2 &&
+    marker.reviewClosure.phase !== 'routing_required'
+  ) {
+    findings.push(
+      finding(
+        'review-closure-bypass',
+        'action',
+        'failed',
+        'Marker reports exhausted review budget without routing_required',
+        'Completion markers that record two failed premium reviews must reflect routing_required and must not claim a third review launch.',
+        [
+          `reviewClosure:phase=${marker.reviewClosure.phase ?? 'unknown'}`,
+          `reviewClosure:failedPremiumReviewCount=${marker.reviewClosure.failedPremiumReviewCount}`,
+        ]
       )
     );
   }

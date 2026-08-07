@@ -9,6 +9,7 @@ import type {
   WorkflowPlanRecommendationAdherence,
   WorkflowRecommendedBuildModel,
   WorkflowRequiredTest,
+  WorkflowReviewClosureState,
   WorkflowReviewPassRecord,
   WorkflowRisk,
   WorkflowReviewSource,
@@ -284,6 +285,41 @@ function parseReviewPasses(value: unknown): {
   return { passes, errors };
 }
 
+function parseReviewClosure(value: unknown): {
+  closure: WorkflowReviewClosureState | undefined;
+  errors: string[];
+} {
+  if (value === undefined) return { closure: undefined, errors: [] };
+  if (!isObject(value)) {
+    return { closure: undefined, errors: ['reviewClosure must be an object when provided'] };
+  }
+  const protocol = asString(value.protocol);
+  if (protocol !== 'two-pass-v1') {
+    return { closure: undefined, errors: ['reviewClosure.protocol must be two-pass-v1'] };
+  }
+  const closure: WorkflowReviewClosureState = {
+    protocol: 'two-pass-v1',
+    protocolVersion: asString(value.protocolVersion) ?? undefined,
+    phase: asString(value.phase) as WorkflowReviewClosureState['phase'] | undefined,
+    evidenceManifestPath: asString(value.evidenceManifestPath) ?? undefined,
+    fixDeltaManifestPath: asString(value.fixDeltaManifestPath) ?? undefined,
+    firstPassId: asString(value.firstPassId) ?? undefined,
+    deltaPassId: asString(value.deltaPassId) ?? undefined,
+    blockerFamilies: Array.isArray(value.blockerFamilies)
+      ? value.blockerFamilies.map(asString).filter((entry): entry is string => Boolean(entry))
+      : undefined,
+    failedPremiumReviewCount:
+      typeof value.failedPremiumReviewCount === 'number'
+        ? value.failedPremiumReviewCount
+        : undefined,
+    activeReviewTokenPresent:
+      typeof value.activeReviewTokenPresent === 'boolean'
+        ? value.activeReviewTokenPresent
+        : undefined,
+  };
+  return { closure, errors: [] };
+}
+
 export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflowMarker {
   if (!isObject(value)) {
     return { status: 'malformed', marker: null, errors: ['marker must be a JSON object'] };
@@ -499,6 +535,9 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
     errors.push(...recommendedBuildModel.errors, ...reviewPasses.errors);
   }
 
+  const reviewClosure = parseReviewClosure(value.reviewClosure);
+  errors.push(...reviewClosure.errors);
+
   if (errors.length > 0) {
     return { status: 'malformed', marker: null, errors };
   }
@@ -533,6 +572,7 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
       recommendedBuildModel: recommendedBuildModel.model ?? undefined,
       planRecommendationAdherence: planRecommendationAdherence ?? undefined,
       reviewPasses: schemaVersion === '3' ? reviewPasses.passes : undefined,
+      reviewClosure: reviewClosure.closure,
     },
     errors: [],
   };
