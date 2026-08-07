@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.14.1
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): stop clipping directory type filter dropdown`
+
+**PUSHED AT**
+2026-08-07T22:57:58.475Z
+
+**WHAT CHANGED**
+Stop clipping directory type filter dropdown.
+
+**VERSION HISTORY DETAILS**
+- Stop clipping directory type filter dropdown, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): stop clipping directory type filter dropdown`
+
 ## 0826.14.0
 
 **GIT COMMIT MESSAGE**
