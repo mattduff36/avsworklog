@@ -56,6 +56,32 @@ export function parseInventoryLocationDirectoryFilterTypes(
   return parsed;
 }
 
+export type InventoryLocationDirectoryTypeCounts = Partial<
+  Record<InventoryLocationDirectoryFilterType, number>
+>;
+
+export async function countInventoryLocationDirectoryFilterTypes(
+  admin: InventoryAdminClient,
+  includeLegacyQuotes: boolean,
+): Promise<InventoryLocationDirectoryTypeCounts> {
+  const { data, error } = await admin
+    .from('inventory_locations')
+    .select('location_type, source_type')
+    .eq('is_active', true);
+
+  if (error) throw error;
+
+  const counts: InventoryLocationDirectoryTypeCounts = {};
+  for (const row of data || []) {
+    if (!includeLegacyQuotes && row.source_type === 'legacy_quote') continue;
+    const locationType = row.location_type;
+    if (!INVENTORY_LOCATION_DIRECTORY_FILTER_TYPE_SET.has(locationType)) continue;
+    const typed = locationType as InventoryLocationDirectoryFilterType;
+    counts[typed] = (counts[typed] || 0) + 1;
+  }
+  return counts;
+}
+
 export interface InventoryLocationListResult {
   locations: InventoryLocationRow[];
   total: number;

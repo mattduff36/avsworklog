@@ -19,12 +19,14 @@ vi.mock('@/lib/server/inventory-locations', async () => {
     listInventoryLocations: vi.fn(),
     enrichInventoryLocations: vi.fn(),
     loadEnrichedInventoryLocationById: vi.fn(),
+    countInventoryLocationDirectoryFilterTypes: vi.fn(),
   };
 });
 
 import { requireInventoryAccess } from '@/lib/server/inventory-auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
+  countInventoryLocationDirectoryFilterTypes,
   enrichInventoryLocations,
   listInventoryLocations,
   loadEnrichedInventoryLocationById,
@@ -76,6 +78,11 @@ describe('inventory locations route', () => {
       userId: 'admin-user',
       isManagerOrAdmin: true,
     });
+    vi.mocked(countInventoryLocationDirectoryFilterTypes).mockResolvedValue({
+      van: 12,
+      site: 200,
+      manual: 40,
+    });
   });
 
   it('returns the first paginated directory page without requiring search text', async () => {
@@ -108,6 +115,7 @@ describe('inventory locations route', () => {
       limit: 50,
       offset: 0,
     });
+    expect(countInventoryLocationDirectoryFilterTypes).toHaveBeenCalledWith(admin, false);
     expect(payload.locations).toEqual([
       expect.objectContaining({ id: yard.id, item_count: 2 }),
     ]);
@@ -116,6 +124,11 @@ describe('inventory locations route', () => {
       limit: 50,
       total: 51,
       has_more: true,
+    });
+    expect(payload.locationTypeCounts).toEqual({
+      van: 12,
+      site: 200,
+      manual: 40,
     });
   });
 
@@ -141,6 +154,8 @@ describe('inventory locations route', () => {
       limit: 25,
       offset: 50,
     });
+    expect(countInventoryLocationDirectoryFilterTypes).not.toHaveBeenCalled();
+    expect(payload.locationTypeCounts).toBeUndefined();
     expect(payload.pagination).toEqual({
       offset: 50,
       limit: 25,

@@ -26,6 +26,12 @@ const yardLocation = {
   updated_by: null,
 };
 
+const directoryTypeCounts = {
+  van: 12,
+  site: 200,
+  manual: 40,
+};
+
 describe('InventoryLocationsPanel', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -49,6 +55,7 @@ describe('InventoryLocationsPanel', () => {
         json: async () => ({
           locations: [yardLocation],
           pagination: { offset: 0, limit: 25, total: 2, has_more: true },
+          locationTypeCounts: directoryTypeCounts,
         }),
       })
       .mockResolvedValueOnce({
@@ -108,6 +115,7 @@ describe('InventoryLocationsPanel', () => {
       json: async () => ({
         locations: [yardLocation],
         pagination: { offset: 0, limit: 25, total: 1, has_more: false },
+        locationTypeCounts: directoryTypeCounts,
       }),
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -149,6 +157,7 @@ describe('InventoryLocationsPanel', () => {
       json: async () => ({
         locations: [yardLocation],
         pagination: { offset: 0, limit: 25, total: 1, has_more: false },
+        locationTypeCounts: directoryTypeCounts,
       }),
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -169,6 +178,11 @@ describe('InventoryLocationsPanel', () => {
     fetchMock.mockClear();
 
     fireEvent.click(screen.getByRole('button', { name: /All types/i }));
+    expect(screen.getByText('Van')).toBeInTheDocument();
+    expect(screen.getByText('Site')).toBeInTheDocument();
+    expect(screen.getByText('Other')).toBeInTheDocument();
+    expect(screen.queryByText('HGV')).not.toBeInTheDocument();
+    expect(screen.queryByText('Plant')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('Van'));
     fireEvent.click(screen.getByText('Other'));
 
@@ -192,6 +206,7 @@ describe('InventoryLocationsPanel', () => {
         json: async () => ({
           locations: [yardLocation],
           pagination: { offset: 0, limit: 25, total: 2, has_more: true },
+          locationTypeCounts: directoryTypeCounts,
         }),
       })
       .mockImplementationOnce(() => new Promise((resolve) => {
@@ -202,6 +217,7 @@ describe('InventoryLocationsPanel', () => {
         json: async () => ({
           locations: [yardLocation],
           pagination: { offset: 0, limit: 25, total: 1, has_more: false },
+          locationTypeCounts: directoryTypeCounts,
         }),
       });
     vi.stubGlobal('fetch', fetchMock);

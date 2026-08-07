@@ -4,6 +4,7 @@ import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/ser
 import type { FleetAssetLinkType } from '@/app/(dashboard)/inventory/types';
 import {
   buildLinkedAssetColumns,
+  countInventoryLocationDirectoryFilterTypes,
   enrichInventoryLocations,
   getLocationTypeForLinkedAsset,
   listInventoryLocations,
@@ -81,13 +82,18 @@ export async function GET(request: NextRequest) {
     const locationTypes = parseInventoryLocationDirectoryFilterTypes(
       searchParams.getAll('locationTypes').flatMap((value) => value.split(',')),
     );
-    const { locations: locationRows, total } = await listInventoryLocations(admin, {
-      search,
-      includeLegacyQuotes,
-      locationTypes,
-      limit,
-      offset,
-    });
+    const [{ locations: locationRows, total }, locationTypeCounts] = await Promise.all([
+      listInventoryLocations(admin, {
+        search,
+        includeLegacyQuotes,
+        locationTypes,
+        limit,
+        offset,
+      }),
+      offset === 0
+        ? countInventoryLocationDirectoryFilterTypes(admin, includeLegacyQuotes)
+        : Promise.resolve(null),
+    ]);
     const locations = await enrichInventoryLocations(admin, locationRows);
 
     return NextResponse.json({
@@ -98,6 +104,7 @@ export async function GET(request: NextRequest) {
         total,
         has_more: offset + locations.length < total,
       },
+      ...(locationTypeCounts ? { locationTypeCounts } : {}),
     });
   } catch (error) {
     console.error('Error fetching inventory locations:', error);

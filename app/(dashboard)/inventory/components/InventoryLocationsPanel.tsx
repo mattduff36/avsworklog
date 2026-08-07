@@ -46,6 +46,17 @@ function appendLocationTypeFilterParams(
   params.set('locationTypes', locationTypes.join(','));
 }
 
+function buildVisibleLocationTypeFilterOptions(
+  counts: Partial<Record<DirectoryLocationTypeFilter, number>>,
+): MultiSelectFilterOption<DirectoryLocationTypeFilter>[] {
+  return LOCATION_TYPE_FILTER_OPTIONS
+    .filter((option) => (counts[option.value] || 0) > 0)
+    .map((option) => ({
+      ...option,
+      count: counts[option.value],
+    }));
+}
+
 interface InventoryLocationsResponse {
   locations?: InventoryLocation[];
   pagination?: {
@@ -54,6 +65,7 @@ interface InventoryLocationsResponse {
     total: number;
     has_more: boolean;
   };
+  locationTypeCounts?: Partial<Record<DirectoryLocationTypeFilter, number>>;
   error?: string;
 }
 
@@ -85,8 +97,12 @@ export function InventoryLocationsPanel({
   const [hasMore, setHasMore] = useState(false);
   const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
   const [selectedLocationTypes, setSelectedLocationTypes] = useState<DirectoryLocationTypeFilter[]>([]);
+  const [locationTypeCounts, setLocationTypeCounts] = useState<
+    Partial<Record<DirectoryLocationTypeFilter, number>>
+  >({});
   const queryVersionRef = useRef(0);
   const normalizedSearch = searchQuery.trim();
+  const locationTypeFilterOptions = buildVisibleLocationTypeFilterOptions(locationTypeCounts);
 
   useEffect(() => {
     const queryVersion = queryVersionRef.current + 1;
@@ -117,6 +133,14 @@ export function InventoryLocationsPanel({
         setLocations(payload.locations || []);
         setTotal(payload.pagination?.total || payload.locations?.length || 0);
         setHasMore(payload.pagination?.has_more || false);
+        if (payload.locationTypeCounts) {
+          const nextCounts = payload.locationTypeCounts;
+          setLocationTypeCounts(nextCounts);
+          setSelectedLocationTypes((current) => {
+            const next = current.filter((type) => (nextCounts[type] || 0) > 0);
+            return next.length === current.length ? current : next;
+          });
+        }
       } catch (searchError) {
         if (controller.signal.aborted || queryVersionRef.current !== queryVersion) return;
         setLocations([]);
@@ -198,7 +222,14 @@ export function InventoryLocationsPanel({
       </CardHeader>
       <CardContent className="p-0">
         <div className="border-b border-slate-700 p-4">
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
+          <div
+            className={cn(
+              'grid gap-3 lg:items-center',
+              locationTypeFilterOptions.length > 0
+                ? 'lg:grid-cols-[minmax(0,1fr)_auto_auto]'
+                : 'lg:grid-cols-[minmax(0,1fr)_auto]',
+            )}
+          >
             <div>
               <SearchInput
                 value={searchQuery}
@@ -210,15 +241,17 @@ export function InventoryLocationsPanel({
                 aria-label="Search inventory locations"
               />
             </div>
-            <MultiSelectFilter
-              label="Type"
-              allLabel="All types"
-              selectedValues={selectedLocationTypes}
-              options={LOCATION_TYPE_FILTER_OPTIONS}
-              onSelectedValuesChange={setSelectedLocationTypes}
-              triggerClassName="min-h-11 w-full border-slate-600 bg-slate-800 text-white sm:min-h-9 sm:w-[170px]"
-              panelClassName="border-slate-700 bg-slate-900"
-            />
+            {locationTypeFilterOptions.length > 0 ? (
+              <MultiSelectFilter
+                label="Type"
+                allLabel="All types"
+                selectedValues={selectedLocationTypes}
+                options={locationTypeFilterOptions}
+                onSelectedValuesChange={setSelectedLocationTypes}
+                triggerClassName="min-h-11 w-full border-slate-600 bg-slate-800 text-white sm:min-h-9 sm:w-[170px]"
+                panelClassName="border-slate-700 bg-slate-900"
+              />
+            ) : null}
             <LegacyQuoteLocationOptIn
               enabled={includeLegacyQuotes}
               onEnabledChange={setIncludeLegacyQuotes}
