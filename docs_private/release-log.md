@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.13.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory, Workshop Tasks, and Quotes`
+
+**PUSHED AT**
+2026-08-07T17:33:05.392Z
+
+**WHAT CHANGED**
+Update Inventory, Workshop Tasks, and Quotes. Set Small Tools check interval to 6 months. Hide empty location type filter options.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory, Workshop Tasks, and Quotes, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to automation scripts, automated tests, and data storage.
+- Updated workshop tasks, with changes to automated tests.
+- Updated quotes, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory, Workshop Tasks, and Quotes`
+- `feat(inventory): set Small Tools check interval to 6 months`
+- `fix(inventory): hide empty location type filter options`
+
 ## 0826.12.0
 
 **GIT COMMIT MESSAGE**

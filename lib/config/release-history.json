@@ -1,5 +1,27 @@
 [
   {
+    "version": "0826.13.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory, Workshop Tasks, and Quotes. Set Small Tools check interval to 6 months. Hide empty location type filter options.",
+    "summary": "Updated Inventory, Workshop Tasks, and Quotes. Set Small Tools check interval to 6 months. Hide empty location type filter options.",
+    "details": [
+      "Updated Inventory, Workshop Tasks, and Quotes, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.",
+      "Updated data storage, with changes to automation scripts, automated tests, and data storage.",
+      "Updated workshop tasks, with changes to automated tests.",
+      "Updated quotes, with changes to automated tests."
+    ],
+    "areas": [
+      "Inventory",
+      "Workshop Tasks"
+    ],
+    "areaKeys": [
+      "inventory",
+      "workshop-tasks"
+    ],
+    "pushedAt": "2026-08-07T17:33:05.392Z"
+  },
+  {
     "version": "0826.12.0",
     "updateKind": "major",
     "title": "Inventory update",
