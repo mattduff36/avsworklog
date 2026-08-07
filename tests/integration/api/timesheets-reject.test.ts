@@ -2,15 +2,24 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { POST } from '@/app/api/timesheets/[id]/reject/route';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { createClient } from '@/lib/supabase/server';
+import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import { createMockTimesheet, createMockManager } from '../../utils/factories';
 import { mockSupabaseAuthUser, mockSupabaseQuery, mockFetch, resetAllMocks } from '../../utils/test-helpers';
 
-vi.mock('@/lib/supabase/server');
+vi.mock('@/lib/supabase/server', () => ({
+  createClient: vi.fn(),
+}));
 vi.mock('@/lib/supabase/admin', () => ({
   createAdminClient: vi.fn(),
 }));
-vi.mock('@/lib/utils/rbac', () => ({
-  canEffectiveRoleAccessModule: vi.fn(),
+vi.mock('@/lib/server/timesheet-approval-scope', () => ({
+  canCurrentActorAuthoriseTimesheetTarget: vi.fn(),
+}));
+vi.mock('@/lib/utils/view-as', () => ({
+  getEffectiveRole: vi.fn(),
 }));
 vi.mock('@/lib/utils/email', () => ({
   sendTimesheetRejectionEmail: vi.fn().mockResolvedValue({ success: true }),
@@ -19,13 +28,30 @@ vi.mock('@/lib/utils/server-error-logger', () => ({
   logServerError: vi.fn().mockResolvedValue(undefined),
 }));
 
+function mockAuthenticatedClients(userId: string, adminClient: Record<string, unknown>) {
+  vi.mocked(createClient).mockResolvedValue({
+    auth: {
+      getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: userId })),
+    },
+  } as unknown as SupabaseClient);
+  vi.mocked(createAdminClient).mockReturnValue({
+    ...adminClient,
+    auth: {
+      admin: {
+        getUserById: vi.fn(async (targetUserId: string) => ({
+          data: { user: { id: targetUserId, email: `${targetUserId}@test.com` } },
+          error: null,
+        })),
+      },
+    },
+  } as never);
+}
+
 describe('POST /api/timesheets/[id]/reject', () => {
   beforeEach(async () => {
     resetAllMocks();
     mockFetch({ id: 'mock-email-id' });
 
-    const { createAdminClient } = await import('@/lib/supabase/admin');
-    const { canEffectiveRoleAccessModule } = await import('@/lib/utils/rbac');
     const { sendTimesheetRejectionEmail } = await import('@/lib/utils/email');
     const { logServerError } = await import('@/lib/utils/server-error-logger');
 
@@ -39,7 +65,20 @@ describe('POST /api/timesheets/[id]/reject', () => {
         },
       },
     } as never);
-    vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(true);
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      user_id: 'manager-id',
+      role_id: 'manager-role',
+      role_name: 'manager',
+      role_class: 'manager',
+      display_name: 'Manager',
+      is_manager_admin: true,
+      is_super_admin: false,
+      is_viewing_as: false,
+      is_actual_super_admin: false,
+      team_id: 'team-a',
+      team_name: 'Team A',
+    });
+    vi.mocked(canCurrentActorAuthoriseTimesheetTarget).mockResolvedValue(true);
     vi.mocked(sendTimesheetRejectionEmail).mockResolvedValue({ success: true });
     vi.mocked(logServerError).mockResolvedValue(undefined);
   });
@@ -66,15 +105,24 @@ describe('POST /api/timesheets/[id]/reject', () => {
     });
 
     it('should return 403 if user is not a manager or admin', async () => {
-      const { createClient } = await import('@/lib/supabase/server');
-      const { canEffectiveRoleAccessModule } = await import('@/lib/utils/rbac');
-
-      vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(false);
-      vi.mocked(createClient).mockResolvedValueOnce({
-        auth: {
-          getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: 'employee-id' })),
-        }
-      } as unknown as SupabaseClient);
+      const timesheet = createMockTimesheet({ status: 'submitted', user_id: 'target-employee-id' });
+      vi.mocked(canCurrentActorAuthoriseTimesheetTarget).mockResolvedValue(false);
+      mockAuthenticatedClients('employee-id', {
+        from: vi.fn((table: string) => {
+          if (table !== 'timesheets') throw new Error(`Unexpected table: ${table}`);
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue(mockSupabaseQuery({
+                  ...timesheet,
+                  profiles: { id: 'target-employee-id', full_name: 'Employee' },
+                  employee: { team_id: 'team-b' },
+                })),
+              }),
+            }),
+          };
+        }),
+      });
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
@@ -85,14 +133,13 @@ describe('POST /api/timesheets/[id]/reject', () => {
       const data = await response.json();
 
       expect(response.status).toBe(403);
-      expect(data.error).toContain('Approvals access required');
+      expect(data.error).toContain('cannot reject');
     });
 
     it('should allow managers to reject timesheets', async () => {
       const manager = createMockManager();
       const timesheet = createMockTimesheet({ status: 'submitted' });
       
-      const { createClient } = await import('@/lib/supabase/server');
       const mockClient = {
         auth: {
           getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
@@ -142,7 +189,7 @@ describe('POST /api/timesheets/[id]/reject', () => {
         }),
       };
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
+      mockAuthenticatedClients(manager.id, mockClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
@@ -228,7 +275,6 @@ describe('POST /api/timesheets/[id]/reject', () => {
       const manager = createMockManager();
       const timesheet = createMockTimesheet({ status: 'approved' });
       
-      const { createClient } = await import('@/lib/supabase/server');
       const mockClient = {
         auth: {
           getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
@@ -261,7 +307,7 @@ describe('POST /api/timesheets/[id]/reject', () => {
         }),
       };
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
+      mockAuthenticatedClients(manager.id, mockClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
@@ -284,7 +330,6 @@ describe('POST /api/timesheets/[id]/reject', () => {
         eq: vi.fn().mockResolvedValue(mockSupabaseQuery({})),
       });
       
-      const { createClient } = await import('@/lib/supabase/server');
       const mockClient = {
         auth: {
           getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
@@ -332,7 +377,7 @@ describe('POST /api/timesheets/[id]/reject', () => {
         }),
       };
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
+      mockAuthenticatedClients(manager.id, mockClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',
@@ -367,7 +412,6 @@ describe('POST /api/timesheets/[id]/reject', () => {
       });
       const recipientInsertMock = vi.fn().mockResolvedValue(mockSupabaseQuery({}));
       
-      const { createClient } = await import('@/lib/supabase/server');
       const mockClient = {
         auth: {
           getUser: vi.fn().mockResolvedValue(mockSupabaseAuthUser({ id: manager.id })),
@@ -413,7 +457,7 @@ describe('POST /api/timesheets/[id]/reject', () => {
         }),
       };
 
-      vi.mocked(createClient).mockResolvedValueOnce(mockClient as unknown as SupabaseClient);
+      mockAuthenticatedClients(manager.id, mockClient);
 
       const request = new Request('http://localhost/api/timesheets/test-id/reject', {
         method: 'POST',

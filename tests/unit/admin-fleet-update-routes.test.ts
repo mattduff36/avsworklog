@@ -11,7 +11,7 @@ vi.mock('@/lib/utils/view-as', () => ({
   getEffectiveRole: vi.fn(),
 }));
 vi.mock('@/lib/utils/rbac', () => ({
-  canEffectiveRoleAccessModule: vi.fn(),
+  canEffectiveRoleUseModuleLevel: vi.fn(),
 }));
 vi.mock('@/lib/utils/server-error-logger', () => ({
   logServerError: vi.fn(),
@@ -30,7 +30,7 @@ vi.mock('@/lib/services/fleet-dvla-sync', () => ({
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getEffectiveRole } from '@/lib/utils/view-as';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { PUT as updateVan } from '@/app/api/admin/vans/[id]/route';
 import { PUT as updateHgv } from '@/app/api/admin/hgvs/[id]/route';
 
@@ -105,7 +105,7 @@ describe('admin fleet update routes', () => {
     vi.mocked(getEffectiveRole).mockResolvedValue({
       user_id: 'user-1',
     } as never);
-    vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(true);
+    vi.mocked(canEffectiveRoleUseModuleLevel).mockResolvedValue(true);
   });
 
   it.each([
@@ -142,7 +142,7 @@ describe('admin fleet update routes', () => {
   });
 
   it('does not create an admin client when fleet access is denied', async () => {
-    vi.mocked(canEffectiveRoleAccessModule).mockResolvedValue(false);
+    vi.mocked(canEffectiveRoleUseModuleLevel).mockResolvedValue(false);
 
     const response = await updateVan(
       buildRequest('vans'),

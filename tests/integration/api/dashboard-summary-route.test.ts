@@ -13,11 +13,15 @@ import { GET } from '@/app/api/dashboard/summary/route';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getInventoryKioskPostLoginPath } from '@/lib/server/inventory-kiosk';
 import { DEBUG_ERROR_LOG_HIDDEN_ADMIN_EMAIL } from '@/lib/utils/error-log-filters';
+import { getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
 
 vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/supabase/admin');
 vi.mock('@/lib/utils/view-as');
 vi.mock('@/lib/server/team-permissions');
+vi.mock('@/lib/utils/rbac', () => ({
+  getEffectiveModuleAccessLevel: vi.fn(),
+}));
 vi.mock('@/lib/server/reminders/ensure-fleet-inspection-actions-fresh', () => ({
   DASHBOARD_FLEET_INSPECTION_REFRESH_INTERVAL_MS: 15 * 60 * 1000,
   ensureFleetInspectionReminderActionsFresh: vi.fn().mockResolvedValue({
@@ -58,6 +62,7 @@ describe('GET /api/dashboard/summary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(getInventoryKioskPostLoginPath).mockResolvedValue(null);
+    vi.mocked(getEffectiveModuleAccessLevel).mockResolvedValue(3);
   });
 
   it('returns 401 when unauthenticated', async () => {
@@ -158,7 +163,7 @@ describe('GET /api/dashboard/summary', () => {
           return {
             select: () =>
               createScopedRowsQuery([
-                { id: 'ts-1', status: 'submitted', user_id: 'user-2', employee: { team_id: 'team-a' } },
+                { id: 'ts-1', status: 'submitted', user_id: 'user-1', employee: { team_id: 'team-a' } },
                 { id: 'ts-2', status: 'submitted', user_id: 'user-3', employee: { team_id: 'team-a' } },
                 { id: 'ts-3', status: 'approved', user_id: 'user-4', employee: { team_id: 'team-a' } },
                 { id: 'ts-4', status: 'approved', user_id: 'user-5', employee: { team_id: 'team-b' } },

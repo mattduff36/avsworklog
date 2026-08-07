@@ -102,8 +102,8 @@ export function PermissionsGuide() {
         if (cancelled) return;
 
         const next = new Map<string, GuideLiveModuleMeta>();
-        for (const module of payload.modules || []) {
-          next.set(module.module_name, toLiveModuleMeta(module));
+        for (const permissionModule of payload.modules || []) {
+          next.set(permissionModule.module_name, toLiveModuleMeta(permissionModule));
         }
         setLiveModulesByName(next);
         setLiveLoadError(null);

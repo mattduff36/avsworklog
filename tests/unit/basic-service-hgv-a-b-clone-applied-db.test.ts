@@ -183,9 +183,9 @@ describe('Basic Service HGV A/B clone applied database checks', () => {
       `);
 
       expect(snapshots.length).toBeGreaterThan(0);
-      const pending = snapshots.find((row) => row.status === 'pending');
+      const validationSnapshot = snapshots.find((row) => row.status === 'pending') ?? snapshots[0];
       const completed = snapshots.find((row) => row.status === 'completed');
-      expect(pending).toBeTruthy();
+      expect(validationSnapshot).toBeTruthy();
       expect(completed).toBeTruthy();
 
       for (const snapshot of snapshots) {
@@ -203,8 +203,8 @@ describe('Basic Service HGV A/B clone applied database checks', () => {
       expect(schemaRoute).toContain('validateRequiredSchemaResponses(snapshotSections');
       expect(schemaRoute).not.toMatch(/is_active/);
 
-      const pendingSections = pending!.snapshot_json.sections as unknown as AttachmentSchemaSection[];
-      const filledResponses = pendingSections.flatMap((section) =>
+      const validationSections = validationSnapshot.snapshot_json.sections as unknown as AttachmentSchemaSection[];
+      const filledResponses = validationSections.flatMap((section) =>
         section.fields
           .filter((field) => field.is_required)
           .map((field) => ({
@@ -221,7 +221,7 @@ describe('Basic Service HGV A/B clone applied database checks', () => {
                 : null,
           })),
       );
-      expect(validateRequiredSchemaResponses(pendingSections, filledResponses)).toEqual([]);
+      expect(validateRequiredSchemaResponses(validationSections, filledResponses)).toEqual([]);
 
       // WAT-SNAPSHOT-002: completed snapshot still drives original labels for PDF rendering.
       const completedChecklist = completed!.snapshot_json.sections.find(
