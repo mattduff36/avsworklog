@@ -163,7 +163,7 @@ export function CategoryRecipientsDialog({
       }
       
       toast.success('Recipients updated', {
-        description: `${data.count} user(s) will receive reminders for ${category.name}`,
+        description: `${data.count} user(s) will receive reminders for ${category.display_name?.trim() || category.name}`,
       });
       
       onOpenChange(false);
@@ -271,7 +271,7 @@ export function CategoryRecipientsDialog({
             Reminder Recipients
           </DialogTitle>
           <DialogDescription className="text-muted-foreground">
-            Select users who should receive reminders for <strong>{category.name}</strong>
+            Select users who should receive reminders for <strong>{category.display_name?.trim() || category.name}</strong>
           </DialogDescription>
         </DialogHeader>
         

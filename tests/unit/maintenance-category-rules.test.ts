@@ -5,6 +5,7 @@ import {
   createMaintenanceCategoryMap,
   getDistanceTypeLabel,
   getMaintenanceCategory,
+  getMaintenanceCategoryDisplayName,
   getVisibleMaintenanceStatuses,
   isMaintenanceCategoryVisibleOnOverview,
   type MaintenanceCategoryConfig,
@@ -80,5 +81,16 @@ describe('maintenance category rules', () => {
     const categoryMap = createMaintenanceCategoryMap([category({ name: 'Service Due' })]);
 
     expect(getMaintenanceCategory(categoryMap, 'service due')?.name).toBe('Service Due');
+  });
+
+  it('HGV-LABEL-001 prefers display_name for UI while identity stays on name', () => {
+    expect(
+      getMaintenanceCategoryDisplayName({ name: 'Service', display_name: 'Service Due' })
+    ).toBe('Service Due');
+    expect(getMaintenanceCategoryDisplayName({ name: 'Service', display_name: null })).toBe('Service');
+    expect(getMaintenanceCategoryDisplayName({ name: 'Service Due' })).toBe('Service Due');
+    expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.hgvService)).toBe(true);
+    expect(MAINTENANCE_CATEGORY_NAMES.hgvService).toBe('service');
+    expect(MAINTENANCE_CATEGORY_NAMES.service).toBe('service due');
   });
 });

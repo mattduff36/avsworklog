@@ -166,6 +166,79 @@ describe('SVC-HGV-BACKFILL-001 screenshot reconciliation', () => {
     expect(runner).toMatch(/exclude|excluded|!==|!.*TEST/i);
     const matches = runner.match(/regNumber:\s*'/g);
     expect(matches?.length).toBe(12);
+    // Approved Engine Service dues (must not regress to prior wrong round numbers)
+    expect(runner).toContain('engineServiceDue: 306993');
+    expect(runner).toContain('engineServiceDue: 302137');
+    expect(runner).toContain('engineServiceDue: 90000');
+    expect(runner).toContain('engineServiceDue: 341633');
+    expect(runner).toContain('engineServiceDue: 650000');
+    expect(runner).toContain('engineServiceDue: 260000');
+    expect(runner).toContain('engineServiceDue: 325906');
+    expect(runner).toContain('engineServiceDue: 170000');
+    expect(runner).not.toContain("regNumber: 'DS71 AVS', engineServiceDue: 300000");
+    expect(runner).not.toContain("regNumber: 'SS15 AVS', engineServiceDue: 75000");
+  });
+});
+
+describe('HGV-CORR correction migration contract', () => {
+  it('HGV-CORR-001 encodes exact dual-write targets for ten registrations', () => {
+    const sql = readRepo('supabase/migrations/20260808_correct_hgv_service_due_values.sql');
+    const runner = readRepo('scripts/run-correct-hgv-service-due-values-migration.ts');
+    const unifyRunner = readRepo('scripts/run-unify-asset-service-scheduling-migration.ts');
+    const expectedRows = [
+      "('AS71AVS', 300402, 300402)",
+      "('DS71AVS', 300000, 306993)",
+      "('ES71AVS', 225000, 302137)",
+      "('KS21AVS', 420000, 420000)",
+      "('KS71AVS', 275000, 90000)",
+      "('PS71AVS', 300000, 341633)",
+      "('SS15AVS', 75000, 650000)",
+      "('TS71AVS', 300000, 260000)",
+      "('VS71AVS', 250000, 325906)",
+      "('XT71AVS', 90000, 170000)",
+    ];
+    for (const row of expectedRows) {
+      expect(sql).toContain(row);
+    }
+    expect(sql).toContain('UPDATE public.vehicle_maintenance');
+    expect(sql).toContain('next_service_mileage = t.corrected');
+    expect(sql).toContain('UPDATE public.asset_maintenance_category_values');
+    expect(sql).toContain('due_mileage = t.corrected');
+    expect(sql).toContain('due stores drifted');
+    expect(runner).toContain('due: 300402');
+    expect(runner).toContain('due: 306993');
+    expect(runner).toContain('due: 420000');
+    expect(runner).toContain('due: 90000');
+    expect(runner).toContain('POSTGRES_URL_NON_POOLING');
+    expect(runner).not.toMatch(/POSTGRES_URL\s*\|\|/);
+    expect(unifyRunner).toContain('POSTGRES_URL_NON_POOLING');
+    expect(unifyRunner).not.toMatch(/POSTGRES_URL_NON_POOLING\s*\|\|\s*process\.env\.POSTGRES_URL/);
+    expect(unifyRunner).toContain('connection string does not include expected project ref');
+  });
+
+  it('HGV-CORR-003 HGV-CORR-005 HGV-CORR-006 protect completions, Not Set rows, and TEST-HGV', () => {
+    const sql = readRepo('supabase/migrations/20260808_correct_hgv_service_due_values.sql');
+    expect(sql).toContain("event_type = 'completion'");
+    expect(sql).toContain('Aborting: % target HGV(s) have completion service events');
+    expect(sql).toContain("'C517773'");
+    expect(sql).toContain("'FL21TVE'");
+    expect(sql).toContain('Not Set HGVs must remain without next_service_mileage');
+    expect(sql).toContain('TE57HGV');
+    expect(sql).toContain('test-hgv');
+    expect(sql).toContain('TEST-HGV must remain without unified service state');
+  });
+
+  it('HGV-LABEL-001/002 uses display_name without renaming unique Service name', () => {
+    const sql = readRepo('supabase/migrations/20260808_correct_hgv_service_due_values.sql');
+    const api = readRepo('app/api/maintenance/route.ts');
+    const rules = readRepo('lib/utils/maintenanceCategoryRules.ts');
+    expect(sql).toContain('ADD COLUMN IF NOT EXISTS display_name');
+    expect(sql).toContain("display_name = 'Service Due'");
+    expect(sql).toContain("name = 'Service'");
+    expect(sql).toContain("config_key = 'service_hgv'");
+    expect(sql).not.toMatch(/(?<![a-z_])name\s*=\s*'Service Due'/i);
+    expect(rules).toContain('getMaintenanceCategoryDisplayName');
+    expect(api).toContain('getMaintenanceCategoryDisplayName(category)');
   });
 });
 

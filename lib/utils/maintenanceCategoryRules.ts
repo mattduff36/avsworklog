@@ -68,6 +68,14 @@ export function normalizeMaintenanceCategoryName(name: string): string {
   return name.trim().toLowerCase();
 }
 
+/** Prefer display_name for UI; keep `name` for identity / map lookups. */
+export function getMaintenanceCategoryDisplayName(
+  category: Pick<MaintenanceCategoryConfig, 'name'> & { display_name?: string | null }
+): string {
+  const label = category.display_name?.trim();
+  return label || category.name;
+}
+
 export function createMaintenanceCategoryMap(
   categories: readonly MaintenanceCategoryConfig[] | null | undefined
 ): MaintenanceCategoryMap {

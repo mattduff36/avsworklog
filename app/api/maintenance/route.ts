@@ -27,6 +27,7 @@ import {
   createMaintenanceCategoryMap,
   getDistanceUnitLabel,
   getMaintenanceCategory,
+  getMaintenanceCategoryDisplayName,
   isMaintenanceCategoryVisibleOnOverview,
 } from '@/lib/utils/maintenanceCategoryRules';
 
@@ -224,7 +225,7 @@ function buildMaintenanceItems(params: {
       return {
         id: `${params.assetId}:${category.id}`,
         category_id: category.id,
-        category_name: category.name,
+        category_name: getMaintenanceCategoryDisplayName(category),
         category_type: category.type,
         category_field_key: category.field_key || null,
         source: category.field_key ? 'system' : 'custom',

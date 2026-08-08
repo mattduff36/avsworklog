@@ -124,7 +124,7 @@ export function MaintenanceSettings() {
                         className="border-slate-700 hover:bg-slate-800/50"
                       >
                         <TableCell className="font-medium text-white">
-                          {category.name}
+                          {category.display_name?.trim() || category.name}
                         </TableCell>
                         
                         <TableCell>

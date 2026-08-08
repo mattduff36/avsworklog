@@ -7,6 +7,8 @@ export type MaintenanceCategorySource = 'system' | 'custom';
 export interface MaintenanceCategory {
   id: string;
   name: string;
+  /** Optional UI label; when set, overview/table headers prefer this over `name`. */
+  display_name?: string | null;
   description: string | null;
   // 'mileage' is the stored distance type. HGV screens label the same readings as kilometres.
   type: 'date' | 'mileage' | 'hours';

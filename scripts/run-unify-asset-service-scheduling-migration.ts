@@ -12,12 +12,12 @@ const { Client } = pg;
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
+const connectionString = process.env.POSTGRES_URL_NON_POOLING;
 const sqlFile = 'supabase/migrations/20260808_unify_asset_service_scheduling.sql';
 const TARGET_PROJECT_REF = 'lrhufzqfzeutgvudcowy';
 
 if (!connectionString) {
-  console.error('Missing database connection string');
+  console.error('Missing POSTGRES_URL_NON_POOLING');
   process.exit(1);
 }
 
@@ -32,16 +32,16 @@ interface ScreenshotRow {
 const SCREENSHOT_ROWS: ScreenshotRow[] = [
   { regNumber: 'AS71 AVS', engineServiceDue: 300402, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
   { regNumber: 'C517773', engineServiceDue: null, lastServiceLabel: null, nextServiceLabel: null },
-  { regNumber: 'DS71 AVS', engineServiceDue: 300000, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
-  { regNumber: 'ES71 AVS', engineServiceDue: 225000, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
+  { regNumber: 'DS71 AVS', engineServiceDue: 306993, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
+  { regNumber: 'ES71 AVS', engineServiceDue: 302137, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
   { regNumber: 'FL21 TVE', engineServiceDue: null, lastServiceLabel: null, nextServiceLabel: null },
   { regNumber: 'KS21 AVS', engineServiceDue: 420000, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
-  { regNumber: 'KS71 AVS', engineServiceDue: 275000, lastServiceLabel: 'Basic B', nextServiceLabel: 'Basic A' },
-  { regNumber: 'PS71 AVS', engineServiceDue: 300000, lastServiceLabel: 'Basic A', nextServiceLabel: 'Full' },
-  { regNumber: 'SS15 AVS', engineServiceDue: 75000, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
-  { regNumber: 'TS71 AVS', engineServiceDue: 300000, lastServiceLabel: 'Basic A', nextServiceLabel: 'Basic B' },
-  { regNumber: 'VS71 AVS', engineServiceDue: 250000, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
-  { regNumber: 'XT71 AVS', engineServiceDue: 90000, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
+  { regNumber: 'KS71 AVS', engineServiceDue: 90000, lastServiceLabel: 'Basic B', nextServiceLabel: 'Basic A' },
+  { regNumber: 'PS71 AVS', engineServiceDue: 341633, lastServiceLabel: 'Basic A', nextServiceLabel: 'Full' },
+  { regNumber: 'SS15 AVS', engineServiceDue: 650000, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
+  { regNumber: 'TS71 AVS', engineServiceDue: 260000, lastServiceLabel: 'Basic A', nextServiceLabel: 'Basic B' },
+  { regNumber: 'VS71 AVS', engineServiceDue: 325906, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
+  { regNumber: 'XT71 AVS', engineServiceDue: 170000, lastServiceLabel: 'Full', nextServiceLabel: 'Basic A' },
 ];
 
 const LABEL_TO_TEMPLATE: Record<string, string> = {
@@ -56,9 +56,13 @@ function normalizeReg(value: string): string {
 
 function createClient(): pg.Client {
   const url = new URL(connectionString!);
-  if (!url.hostname.includes(TARGET_PROJECT_REF) && !url.hostname.includes('localhost')) {
+  // Pooler hosts omit the project ref; username is typically postgres.<project-ref>.
+  if (
+    !connectionString!.includes(TARGET_PROJECT_REF) &&
+    !url.hostname.includes('localhost')
+  ) {
     throw new Error(
-      `Refusing migration: host ${url.hostname} does not include expected project ref ${TARGET_PROJECT_REF}`,
+      `Refusing migration: connection string does not include expected project ref ${TARGET_PROJECT_REF}`,
     );
   }
   return new Client({
