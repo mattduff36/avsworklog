@@ -133,8 +133,29 @@ type TaskAttachment = {
   } | null;
 };
 
+function isPostgrestNoOrMultipleRowsError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+
+  const code = 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+  if (code === 'PGRST116') {
+    return true;
+  }
+
+  const message =
+    'message' in error
+      ? String((error as { message?: unknown }).message || '').toLowerCase()
+      : '';
+  return message.includes('cannot coerce the result to a single json object');
+}
+
 function shouldLogPlantHistoryFetchError(error: unknown) {
-  return !isAuthErrorStatus(getErrorStatus(error)) && !isNetworkFetchError(error);
+  return (
+    !isAuthErrorStatus(getErrorStatus(error)) &&
+    !isNetworkFetchError(error) &&
+    !isPostgrestNoOrMultipleRowsError(error)
+  );
 }
 
 function DocumentsTabContent({ plantId, workshopTasks }: { plantId: string; workshopTasks: WorkshopTask[] }) {
@@ -372,6 +393,12 @@ export default function PlantHistoryPage({
   const fetchPlantData = useCallback(async () => {
     try {
       setLoading(true);
+
+      if (!unwrappedParams.plantId) {
+        setPlant(null);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('plant')
         .select(`
@@ -381,11 +408,12 @@ export default function PlantHistoryPage({
           )
         `)
         .eq('id', unwrappedParams.plantId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       setPlant(data);
     } catch (err) {
+      setPlant(null);
       if (shouldLogPlantHistoryFetchError(err)) {
         console.error('Error fetching plant:', err);
       }
