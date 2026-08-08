@@ -113,8 +113,6 @@ describe('Service Task Creation', () => {
   it('creates one task per alert, mapping severity to priority', async () => {
     mockState.queue.push(
       { terminal: 'limit', table: 'workshop_task_categories', data: [{ id: 'cat-maint' }] },
-      { terminal: 'limit', table: 'workshop_task_subcategories', data: [{ id: 'sub-service' }] },
-      { terminal: 'limit', table: 'workshop_task_subcategories', data: [] },
       { terminal: 'limit', table: 'actions', data: [] },
       { terminal: 'single', table: 'actions', data: { id: 'task-1' } },
       { terminal: 'limit', table: 'actions', data: [] },
@@ -137,13 +135,12 @@ describe('Service Task Creation', () => {
     expect(mockState.insertCalls[1].payload.priority).toBe('medium');
     expect(mockState.insertCalls[0].payload.title).toBe('Tax Due - AB12 CDE');
     expect(mockState.insertCalls[1].payload.title).toBe('MOT Due - AB12 CDE');
+    expect(mockState.insertCalls[0].payload.workshop_category_id).toBe('cat-maint');
   });
 
   it('skips insertion when an active matching task already exists', async () => {
     mockState.queue.push(
       { terminal: 'limit', table: 'workshop_task_categories', data: [{ id: 'cat-maint' }] },
-      { terminal: 'limit', table: 'workshop_task_subcategories', data: [{ id: 'sub-service' }] },
-      { terminal: 'limit', table: 'workshop_task_subcategories', data: [] },
       { terminal: 'limit', table: 'actions', data: [{ id: 'existing-1', status: 'pending' }] }
     );
 
@@ -160,12 +157,9 @@ describe('Service Task Creation', () => {
     expect(mockState.insertCalls).toHaveLength(0);
   });
 
-  it('falls back to uncategorized subcategory when maintenance category is unavailable', async () => {
+  it('skips insertion when maintenance category is unavailable', async () => {
     mockState.queue.push(
-      { terminal: 'limit', table: 'workshop_task_categories', data: [] },
-      { terminal: 'limit', table: 'workshop_task_subcategories', data: [{ id: 'sub-uncat' }] },
-      { terminal: 'limit', table: 'actions', data: [] },
-      { terminal: 'single', table: 'actions', data: { id: 'task-3' } }
+      { terminal: 'limit', table: 'workshop_task_categories', data: [] }
     );
 
     const result = await ensureServiceTasksForAlerts(
@@ -177,15 +171,14 @@ describe('Service Task Creation', () => {
       'manager-1'
     );
 
-    expect(result).toEqual(['task-3']);
-    expect(mockState.insertCalls[0].payload.workshop_subcategory_id).toBe('sub-uncat');
+    expect(result).toEqual([]);
+    expect(mockState.insertCalls).toHaveLength(0);
+    expect(mockState.fromCalls).not.toContain('workshop_task_subcategories');
   });
 
   it('caches category lookups across repeated invocations', async () => {
     mockState.queue.push(
       { terminal: 'limit', table: 'workshop_task_categories', data: [{ id: 'cat-maint' }] },
-      { terminal: 'limit', table: 'workshop_task_subcategories', data: [{ id: 'sub-service' }] },
-      { terminal: 'limit', table: 'workshop_task_subcategories', data: [] },
       { terminal: 'limit', table: 'actions', data: [] },
       { terminal: 'single', table: 'actions', data: { id: 'task-a' } },
       { terminal: 'limit', table: 'actions', data: [] },

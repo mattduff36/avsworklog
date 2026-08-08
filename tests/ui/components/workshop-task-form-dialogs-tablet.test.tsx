@@ -181,6 +181,20 @@ describe('Workshop task dialog tablet safeguards', () => {
         } as Response;
       }
 
+      if (url.includes('/api/workshop-tasks/category-attachments')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            templates: [
+              { templateId: 'van-template' },
+              { templateId: 'hgv-template' },
+              { templateId: 'plant-template' },
+            ],
+          }),
+        } as Response;
+      }
+
       return {
         ok: true,
         status: 200,
@@ -260,6 +274,7 @@ describe('Workshop task dialog tablet safeguards', () => {
   it('shows only templates relevant to the selected asset type', async () => {
     const props = createBaseProps();
     props.assetTab = 'van';
+    props.selectedCategoryId = 'van-category';
     props.attachmentTemplates = [
       { id: 'van-template', name: 'Van Checklist', applies_to: ['van'] },
       { id: 'hgv-template', name: 'HGV Checklist', applies_to: ['hgv'] },
@@ -272,6 +287,9 @@ describe('Workshop task dialog tablet safeguards', () => {
       </TabletModeProvider>
     );
 
+    await waitFor(() => {
+      expect(screen.getByText('Linked Attachment')).toBeInTheDocument();
+    });
     expect(screen.getByText('Van Checklist')).toBeInTheDocument();
     expect(screen.queryByText('HGV Checklist')).not.toBeInTheDocument();
     expect(screen.queryByText('Plant Checklist')).not.toBeInTheDocument();
@@ -280,6 +298,7 @@ describe('Workshop task dialog tablet safeguards', () => {
   it('prunes selected templates that do not match the selected asset type', async () => {
     const props = createBaseProps();
     props.assetTab = 'van';
+    props.selectedCategoryId = 'van-category';
     props.attachmentTemplates = [
       { id: 'van-template', name: 'Van Checklist', applies_to: ['van'] },
       { id: 'hgv-template', name: 'HGV Checklist', applies_to: ['hgv'] },

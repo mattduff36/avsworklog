@@ -71,7 +71,7 @@ describe('Basic Service HGV A/B clone migration contract', () => {
     expect(runner).toContain('inactive original still appears in active selection');
     expect(templatesRoute).toContain(".eq('is_active', true)");
     expect(taskRoute).toContain('Template is inactive and cannot be attached to new tasks');
-    expect(taskRoute).toContain('.select(\'id, is_active\')');
+    expect(taskRoute).toContain(".select('id, is_active, name')");
   });
 
   it('provides a non-destructive down migration', () => {
