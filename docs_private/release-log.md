@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.15.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop-tasks): update Workshop Tasks and Data storage`
+
+**PUSHED AT**
+2026-08-08T01:50:40.428Z
+
+**WHAT CHANGED**
+Update Workshop Tasks and Data storage. Correct HGV service due KM and show Service Due label. Unify asset service scheduling and rotation. Treat missing plant history rows as not-found.
+
+**VERSION HISTORY DETAILS**
+- Updated Workshop Tasks and Data storage, with changes to background routes, app screens, interface components, shared logic, and automated tests.
+- Updated data storage, with changes to shared typing, automation scripts, automated tests, and data storage.
+- Updated maintenance, with changes to background routes, app screens, shared logic, shared typing, and automated tests.
+- Correct HGV service due KM and show Service Due label, with changes to background routes, app screens, and interface components.
+- Updated actions, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(workshop-tasks): update Workshop Tasks and Data storage`
+- `fix(fleet): correct HGV service due KM and show Service Due label`
+- `feat(fleet): unify asset service scheduling and rotation`
+- `fix(fleet): treat missing plant history rows as not-found`
+
 ## 0826.14.1
 
 **GIT COMMIT MESSAGE**
