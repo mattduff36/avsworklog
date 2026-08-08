@@ -61,6 +61,9 @@ interface MaintenanceRow {
   current_hours: number | null;
   next_service_hours: number | null;
   last_service_hours: number | null;
+  last_service_template_id?: string | null;
+  next_service_template_id?: string | null;
+  next_service_rotation_step_id?: string | null;
   created_at: string;
   updated_at: string;
   last_updated_by: string | null;
@@ -580,6 +583,95 @@ export async function GET() {
         due_soon_count: alertCounts.due_soon
       };
     }) as VehicleMaintenanceWithStatus[];
+
+    // Enrich next-service template labels and badge visibility per asset class
+    const templateIds = Array.from(
+      new Set(
+        vehiclesWithStatus
+          .map((vehicle) => vehicle.next_service_template_id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const templateNameById = new Map<string, string>();
+    const compactLabelByTemplateId = new Map<string, string>();
+    const db = admin;
+
+    if (templateIds.length > 0) {
+      const { data: templates } = await db
+        .from('workshop_attachment_templates')
+        .select('id, name')
+        .in('id', templateIds);
+      for (const template of templates || []) {
+        if (template.id && template.name) {
+          templateNameById.set(template.id, template.name);
+        }
+      }
+      const { data: links } = await db
+        .from('workshop_category_attachment_templates')
+        .select('template_id, compact_label')
+        .in('template_id', templateIds);
+      for (const link of links || []) {
+        if (link.template_id && link.compact_label) {
+          compactLabelByTemplateId.set(link.template_id, link.compact_label);
+        }
+      }
+    }
+
+    const linkedCountByAssetType = new Map<'van' | 'hgv' | 'plant', number>();
+    for (const assetType of ['van', 'hgv', 'plant'] as const) {
+      const configKey =
+        assetType === 'hgv' ? 'service_hgv' : assetType === 'plant' ? 'service_plant' : 'service_van';
+      const { data: config } = await db
+        .from('maintenance_categories')
+        .select('workshop_category_id')
+        .eq('config_key', configKey)
+        .maybeSingle();
+      if (!config?.workshop_category_id) {
+        linkedCountByAssetType.set(assetType, 0);
+        continue;
+      }
+      const { data: linked } = await db
+        .from('workshop_category_attachment_templates')
+        .select('template_id')
+        .eq('category_id', config.workshop_category_id);
+      const distinctTemplateIds = Array.from(
+        new Set(
+          (linked || [])
+            .map((row: { template_id: string }) => row.template_id)
+            .filter(Boolean),
+        ),
+      );
+      const { data: activeTemplates } =
+        distinctTemplateIds.length > 0
+          ? await db
+              .from('workshop_attachment_templates')
+              .select('id')
+              .in('id', distinctTemplateIds)
+              .eq('is_active', true)
+          : { data: [] };
+      linkedCountByAssetType.set(
+        assetType,
+        new Set(
+          (activeTemplates || [])
+            .map((row: { id: string }) => row.id)
+            .filter(Boolean),
+        ).size,
+      );
+    }
+
+    for (const vehicle of vehiclesWithStatus) {
+      const assetType: 'van' | 'hgv' | 'plant' = vehicle.is_plant
+        ? 'plant'
+        : vehicle.hgv_id
+          ? 'hgv'
+          : 'van';
+      const templateId = vehicle.next_service_template_id || null;
+      vehicle.next_service_template_name = templateId ? templateNameById.get(templateId) || null : null;
+      vehicle.next_service_compact_label = templateId
+        ? compactLabelByTemplateId.get(templateId) || null
+        : null;
+      vehicle.show_service_type_badge = (linkedCountByAssetType.get(assetType) || 0) >= 2;
+    }
     
     // Calculate summary
     const summary = {

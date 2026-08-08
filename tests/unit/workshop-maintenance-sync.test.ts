@@ -132,7 +132,7 @@ describe('workshop maintenance sync', () => {
     });
   });
 
-  it('updates the HGV Full Service custom category for major service tasks', () => {
+  it('updates the unified HGV Service mileage field for major service tasks', () => {
     const plan = buildAutomaticMaintenancePlan({
       context: {
         title: 'Workshop Task - VS71 AVS',
@@ -151,23 +151,13 @@ describe('workshop maintenance sync', () => {
           applies_to: ['van'],
         }),
         makeCategory({
-          id: 'cat-engine-service',
-          name: 'Engine Service',
+          id: 'cat-hgv-service',
+          name: 'Service',
           type: 'mileage',
-          period_unit: 'miles',
+          period_unit: 'km',
           period_value: 25000,
           alert_threshold_days: null,
           alert_threshold_miles: 1000,
-          applies_to: ['hgv'],
-        }),
-        makeCategory({
-          id: 'cat-full-service',
-          name: 'Full Service',
-          type: 'mileage',
-          period_unit: 'miles',
-          period_value: 100000,
-          alert_threshold_days: null,
-          alert_threshold_miles: 5000,
           applies_to: ['hgv'],
         }),
       ],
@@ -179,20 +169,12 @@ describe('workshop maintenance sync', () => {
       assetType: 'hgv',
     });
 
-    expect(plan?.maintenanceUpdates).toEqual({});
-    expect(plan?.customItems).toEqual([
-      {
-        category_id: 'cat-full-service',
-        last_mileage: 275309,
-        due_mileage: 375309,
-      },
-      {
-        category_id: 'cat-engine-service',
-        last_mileage: 275309,
-        due_mileage: 300309,
-      },
-    ]);
-    expect(plan?.linkedCategoryId).toBe('cat-full-service');
+    expect(plan?.maintenanceUpdates).toEqual({
+      last_service_mileage: 275309,
+      next_service_mileage: 300309,
+    });
+    expect(plan?.customItems).toEqual([]);
+    expect(plan?.linkedCategoryId).toBe('cat-hgv-service');
   });
 
   it('does not apply HGV-only service categories to van service tasks', () => {

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { OnceDialog } from '@/components/ui/once-ui';
 import { formatRegistrationForInput, formatRegistrationForStorage, type HgvCategoryOption } from './utils';
 import { NicknameUserCombobox } from '@/components/fleet/NicknameUserCombobox';
+import { NextServiceTypeSelect } from '@/components/fleet/NextServiceTypeSelect';
 import { buildAssignmentPayload } from '@/lib/fleet/nickname-assignment';
 
 interface AddHgvDialogProps {
@@ -24,6 +25,7 @@ interface HgvFormState {
   nickname: string;
   category_id: string;
   status: string;
+  next_service_template_id: string;
 }
 
 const INITIAL_STATE: HgvFormState = {
@@ -31,6 +33,7 @@ const INITIAL_STATE: HgvFormState = {
   nickname: '',
   category_id: '',
   status: 'active',
+  next_service_template_id: '',
 };
 
 export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProps) {
@@ -72,6 +75,7 @@ export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProp
 
     if (!formData.reg_number.trim()) return setError('Registration is required');
     if (!formData.category_id) return setError('Category is required');
+    if (!formData.next_service_template_id) return setError('Next service type is required');
 
     try {
       setIsLoading(true);
@@ -80,6 +84,7 @@ export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProp
         category_id: formData.category_id,
         nickname: formData.nickname.trim() || null,
         status: formData.status,
+        next_service_template_id: formData.next_service_template_id,
       };
       if (selectedUserId) {
         payload.assignment = buildAssignmentPayload({
@@ -179,6 +184,13 @@ export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProp
             </SelectContent>
           </Select>
         </div>
+        <NextServiceTypeSelect
+          assetType="hgv"
+          id="hgv-next-service-type"
+          value={formData.next_service_template_id}
+          onChange={(templateId) => updateField('next_service_template_id', templateId)}
+          disabled={isLoading}
+        />
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="border-slate-600 text-white">
             Cancel

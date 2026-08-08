@@ -12,6 +12,7 @@ import { OnceDialog } from '@/components/ui/once-ui';
 import { validateAndNormalizePlantSerialNumber } from '@/lib/utils/plant-serial-number';
 import { isApplicableToType, type VehicleCategoryOption } from './utils';
 import { NicknameUserCombobox } from '@/components/fleet/NicknameUserCombobox';
+import { NextServiceTypeSelect } from '@/components/fleet/NextServiceTypeSelect';
 import { buildAssignmentPayload } from '@/lib/fleet/nickname-assignment';
 
 interface AddPlantDialogProps {
@@ -33,6 +34,7 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
     serial_number: '',
     category_id: '',
     status: 'active',
+    next_service_template_id: '',
   });
 
   useEffect(() => {
@@ -65,6 +67,7 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
       serial_number: '',
       category_id: '',
       status: 'active',
+      next_service_template_id: '',
     });
   }, [open]);
 
@@ -78,6 +81,10 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
     }
     if (!formData.category_id) {
       setError('Category is required');
+      return;
+    }
+    if (!formData.next_service_template_id) {
+      setError('Next service type is required');
       return;
     }
 
@@ -95,6 +102,7 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
         serial_number: serialNumberResult.value,
         category_id: formData.category_id,
         status: formData.status,
+        next_service_template_id: formData.next_service_template_id,
       };
       if (selectedUserId) {
         payload.assignment = buildAssignmentPayload({
@@ -190,6 +198,13 @@ export function AddPlantDialog({ open, onOpenChange, onSuccess }: AddPlantDialog
             </SelectContent>
           </Select>
         </div>
+        <NextServiceTypeSelect
+          assetType="plant"
+          id="plant-next-service-type"
+          value={formData.next_service_template_id}
+          onChange={(templateId) => setFormData((prev) => ({ ...prev, next_service_template_id: templateId }))}
+          disabled={isLoading}
+        />
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="border-slate-600 text-white">
             Cancel

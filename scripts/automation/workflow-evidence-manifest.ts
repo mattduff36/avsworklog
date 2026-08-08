@@ -152,6 +152,18 @@ function fingerprintInputs(repoRoot: string, dirtyPaths: string[]): string {
   return hashText(parts.join('\n'));
 }
 
+function resolveCommandExecutable(command: string): string {
+  if (process.platform !== 'win32') return command;
+  if (command === 'npm') return 'npm.cmd';
+  if (command === 'npx') return 'npx.cmd';
+  return command;
+}
+
+function quoteWindowsArg(value: string): string {
+  if (!/[\s|&<>^()"]/u.test(value)) return value;
+  return `"${value.replace(/"/g, '\\"')}"`;
+}
+
 function runCommand(
   repoRoot: string,
   name: string,
@@ -159,12 +171,24 @@ function runCommand(
   args: string[]
 ): EvidenceCommandResult {
   const started = Date.now();
-  const result = spawnSync(command, args, {
+  const executable = resolveCommandExecutable(command);
+  // Prefer shell:false so patterns containing `|` (vitest -t id1|id2) are not
+  // interpreted as Windows shell pipes. Fall back to a quoted shell command if needed.
+  let result = spawnSync(executable, args, {
     cwd: repoRoot,
     encoding: 'utf8',
     shell: false,
     env: process.env,
   });
+  if (result.error && process.platform === 'win32') {
+    const cmdline = [executable, ...args.map(quoteWindowsArg)].join(' ');
+    result = spawnSync(cmdline, {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      shell: true,
+      env: process.env,
+    });
+  }
   const durationMs = Date.now() - started;
   const exitCode = typeof result.status === 'number' ? result.status : null;
   return {
@@ -172,7 +196,7 @@ function runCommand(
     status: exitCode === 0 ? 'passed' : 'failed',
     exitCode,
     durationMs,
-    summary: exitCode === 0 ? 'ok' : 'failed',
+    summary: exitCode === 0 ? 'ok' : (result.stderr || result.stdout || 'failed').slice(0, 240),
   };
 }
 

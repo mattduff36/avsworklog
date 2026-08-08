@@ -16,6 +16,7 @@ import {
   type VehicleCategoryOption,
 } from './utils';
 import { NicknameUserCombobox } from '@/components/fleet/NicknameUserCombobox';
+import { NextServiceTypeSelect } from '@/components/fleet/NextServiceTypeSelect';
 import { buildAssignmentPayload } from '@/lib/fleet/nickname-assignment';
 
 interface AddVanDialogProps {
@@ -36,6 +37,7 @@ export function AddVanDialog({ open, onOpenChange, onSuccess }: AddVanDialogProp
     nickname: '',
     category_id: '',
     status: 'active',
+    next_service_template_id: '',
   });
 
   useEffect(() => {
@@ -67,6 +69,7 @@ export function AddVanDialog({ open, onOpenChange, onSuccess }: AddVanDialogProp
       nickname: '',
       category_id: '',
       status: 'active',
+      next_service_template_id: '',
     });
   }, [open]);
 
@@ -82,6 +85,10 @@ export function AddVanDialog({ open, onOpenChange, onSuccess }: AddVanDialogProp
       setError('Category is required');
       return;
     }
+    if (!formData.next_service_template_id) {
+      setError('Next service type is required');
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -90,6 +97,7 @@ export function AddVanDialog({ open, onOpenChange, onSuccess }: AddVanDialogProp
         nickname: formData.nickname.trim() || null,
         category_id: formData.category_id,
         status: formData.status,
+        next_service_template_id: formData.next_service_template_id,
       };
       if (selectedUserId) {
         payload.assignment = buildAssignmentPayload({
@@ -184,6 +192,13 @@ export function AddVanDialog({ open, onOpenChange, onSuccess }: AddVanDialogProp
             </SelectContent>
           </Select>
         </div>
+        <NextServiceTypeSelect
+          assetType="van"
+          id="van-next-service-type"
+          value={formData.next_service_template_id}
+          onChange={(templateId) => setFormData((prev) => ({ ...prev, next_service_template_id: templateId }))}
+          disabled={isLoading}
+        />
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="border-slate-600 text-white">
             Cancel

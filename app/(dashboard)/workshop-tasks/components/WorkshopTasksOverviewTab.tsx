@@ -80,8 +80,18 @@ interface WorkshopTasksOverviewTabProps {
   onResumeTask: (task: Action) => void;
   onUndoLogged: (taskId: string) => void;
   onUndoComplete: (taskId: string) => void;
+  canCorrectService?: boolean;
+  onCorrectService?: (task: Action) => void;
   onEditTask: (task: Action) => void;
   onDeleteTask: (task: Action) => void;
+}
+
+function isServiceWorkshopTask(task: Action): boolean {
+  const categoryName =
+    task.workshop_task_categories?.name ||
+    task.workshop_task_subcategories?.workshop_task_categories?.name ||
+    '';
+  return /^service(\s|\(|$)/i.test(categoryName);
 }
 
 type CompletedSortField =
@@ -188,6 +198,8 @@ export function WorkshopTasksOverviewTab({
   onResumeTask,
   onUndoLogged,
   onUndoComplete,
+  canCorrectService = false,
+  onCorrectService,
   onEditTask,
   onDeleteTask,
 }: WorkshopTasksOverviewTabProps) {
@@ -1224,16 +1236,31 @@ export function WorkshopTasksOverviewTab({
                                   >
                                     <MessageSquare className="h-3.5 w-3.5" />
                                   </Button>
-                                  <Button
-                                    onClick={() => onUndoComplete(row.task.id)}
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 w-7 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
-                                    title="Undo"
-                                    aria-label="Undo"
-                                  >
-                                    <Undo2 className="h-3.5 w-3.5" />
-                                  </Button>
+                                  {isServiceWorkshopTask(row.task) ? (
+                                    canCorrectService && onCorrectService ? (
+                                      <Button
+                                        onClick={() => onCorrectService(row.task)}
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 w-7 border-amber-600/50 p-0 text-amber-300 hover:bg-amber-900/30 hover:text-amber-100"
+                                        title="Correct service"
+                                        aria-label="Correct service"
+                                      >
+                                        <Wrench className="h-3.5 w-3.5" />
+                                      </Button>
+                                    ) : null
+                                  ) : (
+                                    <Button
+                                      onClick={() => onUndoComplete(row.task.id)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 w-7 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
+                                      title="Undo"
+                                      aria-label="Undo"
+                                    >
+                                      <Undo2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1309,10 +1336,24 @@ export function WorkshopTasksOverviewTab({
                                       <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
                                       Comments
                                     </Button>
-                                    <Button onClick={(e) => { e.stopPropagation(); onUndoComplete(task.id); }} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
-                                      <Undo2 className="h-3.5 w-3.5 mr-1.5" />
-                                      Undo
-                                    </Button>
+                                    {isServiceWorkshopTask(task) ? (
+                                      canCorrectService && onCorrectService ? (
+                                        <Button
+                                          onClick={(e) => { e.stopPropagation(); onCorrectService(task); }}
+                                          size="sm"
+                                          variant="outline"
+                                          className={`${taskActionButtonClass} border-amber-600/50 text-amber-300 hover:text-amber-100 hover:bg-amber-900/30`}
+                                        >
+                                          <Wrench className="h-3.5 w-3.5 mr-1.5" />
+                                          Correct
+                                        </Button>
+                                      ) : null
+                                    ) : (
+                                      <Button onClick={(e) => { e.stopPropagation(); onUndoComplete(task.id); }} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
+                                        <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+                                        Undo
+                                      </Button>
+                                    )}
                                   </div>
                                 </div>
                               </div>

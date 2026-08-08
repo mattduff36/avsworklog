@@ -248,6 +248,12 @@ export function useWorkshopTaskLifecycleActions({
 
     const taskId = completingTask.id;
     const requiresIntermediateStep = completingTask.status === 'pending' || completingTask.status === 'on_hold';
+    const isServiceTask =
+      data.isServiceTask ||
+      Boolean(
+        completingTask.workshop_task_categories?.name &&
+          /^service(\s|\(|$)/i.test(completingTask.workshop_task_categories.name),
+      );
 
     try {
       setUpdatingStatus(prev => new Set(prev).add(taskId));
@@ -286,21 +292,23 @@ export function useWorkshopTaskLifecycleActions({
         });
         nextHistory = appendStatusHistory(nextHistory, intermediateEvent);
 
-        const { error: intermediateError } = await supabase
-          .from('actions')
-          .update({
-            ...(createdAtIso ? { created_at: createdAtIso } : {}),
-            status: 'logged',
-            logged_at: intermediateAtIso,
-            logged_by: userId || null,
-            logged_comment: data.intermediateComment,
-            status_history: nextHistory,
-          })
-          .eq('id', taskId);
+        if (!isServiceTask) {
+          const { error: intermediateError } = await supabase
+            .from('actions')
+            .update({
+              ...(createdAtIso ? { created_at: createdAtIso } : {}),
+              status: 'logged',
+              logged_at: intermediateAtIso,
+              logged_by: userId || null,
+              logged_comment: data.intermediateComment,
+              status_history: nextHistory,
+            })
+            .eq('id', taskId);
 
-        if (intermediateError) {
-          console.error('Error in intermediate step:', intermediateError);
-          throw intermediateError;
+          if (intermediateError) {
+            console.error('Error in intermediate step:', intermediateError);
+            throw intermediateError;
+          }
         }
       } else if (data.intermediateAt) {
         nextHistory = updateLatestInProgressStatusHistoryTimestamp(
@@ -324,67 +332,96 @@ export function useWorkshopTaskLifecycleActions({
       });
       nextHistory = appendStatusHistory(nextHistory, completeEvent);
 
-      const { error } = await supabase
-        .from('actions')
-        .update({
-          ...(createdAtIso ? { created_at: createdAtIso } : {}),
-          ...(data.intermediateAt ? { logged_at: intermediateAtIso } : {}),
-          status: 'completed',
-          actioned: true,
-          actioned_at: completedAtIso,
-          actioned_by: userId || null,
-          actioned_comment: data.completedComment,
-          actioned_signature_data: data.completedSignatureData || null,
-          actioned_signed_at: data.completedSignatureData ? completedAtIso : null,
-          status_history: nextHistory,
-        })
-        .eq('id', taskId);
+      if (isServiceTask) {
+        if (data.completionMeter == null || !data.confirmedNextTemplateId) {
+          throw new Error('Service completion requires meter reading and next service type');
+        }
+        const serviceResponse = await fetch(
+          `/api/workshop-tasks/tasks/${taskId}/complete-service`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              completionMeter: data.completionMeter,
+              confirmedNextTemplateId: data.confirmedNextTemplateId,
+              completedComment: data.completedComment,
+              completedAt: completedAtIso,
+              completedSignatureData: data.completedSignatureData || null,
+              intermediateComment: data.intermediateComment || null,
+              intermediateAt:
+                requiresIntermediateStep || data.intermediateAt ? intermediateAtIso : null,
+              createdAt: createdAtIso || null,
+              statusHistory: nextHistory,
+            }),
+          },
+        );
+        const servicePayload = await serviceResponse.json();
+        if (!serviceResponse.ok) {
+          throw new Error(servicePayload.error || 'Failed to complete service task');
+        }
+      } else {
+        const { error } = await supabase
+          .from('actions')
+          .update({
+            ...(createdAtIso ? { created_at: createdAtIso } : {}),
+            ...(data.intermediateAt ? { logged_at: intermediateAtIso } : {}),
+            status: 'completed',
+            actioned: true,
+            actioned_at: completedAtIso,
+            actioned_by: userId || null,
+            actioned_comment: data.completedComment,
+            actioned_signature_data: data.completedSignatureData || null,
+            actioned_signed_at: data.completedSignatureData ? completedAtIso : null,
+            status_history: nextHistory,
+          })
+          .eq('id', taskId);
 
-      if (error) {
-        console.error('Error completing task:', error);
-        throw error;
-      }
+        if (error) {
+          console.error('Error completing task:', error);
+          throw error;
+        }
 
-      const maintenanceAssetId =
-        completingTask.van_id || completingTask.hgv_id || completingTask.plant_id;
-      const assetType =
-        completingTask.plant_id ? 'plant' : completingTask.hgv_id ? 'hgv' : 'van';
-      const linkedMaintenance = inferMaintenanceLink({
-        title: completingTask.title,
-        description: completingTask.description,
-        workshopCategoryName: completingTask.workshop_task_categories?.name,
-        workshopSubcategoryName: completingTask.workshop_task_subcategories?.name,
-      });
+        const maintenanceAssetId =
+          completingTask.van_id || completingTask.hgv_id || completingTask.plant_id;
+        const assetType =
+          completingTask.plant_id ? 'plant' : completingTask.hgv_id ? 'hgv' : 'van';
+        const linkedMaintenance = inferMaintenanceLink({
+          title: completingTask.title,
+          description: completingTask.description,
+          workshopCategoryName: completingTask.workshop_task_categories?.name,
+          workshopSubcategoryName: completingTask.workshop_task_subcategories?.name,
+        });
 
-      if (maintenanceAssetId && (data.maintenanceUpdates || linkedMaintenance)) {
-        try {
-          const maintenanceResponse = await fetch(
-            `/api/maintenance/by-vehicle/${maintenanceAssetId}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                ...data.maintenanceUpdates,
-                assetType,
-                task_id: taskId,
-                completed_at: completedAtIso,
-                task_title: completingTask.title,
-                task_description: completingTask.description,
-                task_category_name: completingTask.workshop_task_categories?.name,
-                task_subcategory_name: completingTask.workshop_task_subcategories?.name,
-                comment: `Updated from workshop task completion: ${completingTask.title}`,
-              }),
+        if (maintenanceAssetId && (data.maintenanceUpdates || linkedMaintenance)) {
+          try {
+            const maintenanceResponse = await fetch(
+              `/api/maintenance/by-vehicle/${maintenanceAssetId}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  ...data.maintenanceUpdates,
+                  assetType,
+                  task_id: taskId,
+                  completed_at: completedAtIso,
+                  task_title: completingTask.title,
+                  task_description: completingTask.description,
+                  task_category_name: completingTask.workshop_task_categories?.name,
+                  task_subcategory_name: completingTask.workshop_task_subcategories?.name,
+                  comment: `Updated from workshop task completion: ${completingTask.title}`,
+                }),
+              }
+            );
+
+            if (!maintenanceResponse.ok) {
+              const error = await maintenanceResponse.json();
+              console.error('Failed to update maintenance:', error);
+              toast.warning('Task completed but maintenance update failed');
             }
-          );
-
-          if (!maintenanceResponse.ok) {
-            const error = await maintenanceResponse.json();
-            console.error('Failed to update maintenance:', error);
+          } catch (maintError) {
+            console.error('Error updating maintenance:', maintError);
             toast.warning('Task completed but maintenance update failed');
           }
-        } catch (maintError) {
-          console.error('Error updating maintenance:', maintError);
-          toast.warning('Task completed but maintenance update failed');
         }
       }
 
@@ -401,7 +438,7 @@ export function useWorkshopTaskLifecycleActions({
       return true;
     } catch (err) {
       console.error('Error marking complete:', err instanceof Error ? err.message : JSON.stringify(err));
-      toast.error('Failed to mark complete');
+      toast.error(err instanceof Error ? err.message : 'Failed to mark complete');
       setUpdatingStatus(prev => {
         const newSet = new Set(prev);
         newSet.delete(taskId);
@@ -414,6 +451,15 @@ export function useWorkshopTaskLifecycleActions({
   const handleUndoComplete = async (taskId: string) => {
     try {
       const task = tasks.find(t => t.id === taskId);
+      const isServiceTask = Boolean(
+        task?.workshop_task_categories?.name &&
+          /^service(\s|\(|$)/i.test(task.workshop_task_categories.name),
+      );
+      if (isServiceTask) {
+        toast.error('Completed Service tasks cannot be undone. Use an audited correction instead.');
+        return;
+      }
+
       const returnStatus = task?.logged_at ? 'logged' : 'pending';
 
       setUpdatingStatus(prev => new Set(prev).add(taskId));

@@ -60,9 +60,17 @@ const AttachmentManagementPanel = dynamic(
   () => import('@/components/workshop-tasks/AttachmentManagementPanel').then(m => ({ default: m.AttachmentManagementPanel })),
   { ssr: false, loading: () => <ModalChunkLoader message="Loading attachment settings..." /> },
 );
+const ServiceSettingsPanel = dynamic(
+  () => import('@/components/workshop-tasks/ServiceSettingsPanel').then(m => ({ default: m.ServiceSettingsPanel })),
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading service settings..." /> },
+);
 const MarkTaskCompleteDialog = dynamic(
   () => import('@/components/workshop-tasks/MarkTaskCompleteDialog').then(m => ({ default: m.MarkTaskCompleteDialog })),
   { ssr: false, loading: () => <ModalChunkLoader message="Loading completion dialog..." /> },
+);
+const CorrectServiceTaskDialog = dynamic(
+  () => import('@/components/workshop-tasks/CorrectServiceTaskDialog').then(m => ({ default: m.CorrectServiceTaskDialog })),
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading correction dialog..." /> },
 );
 const ErrorDetailsModal = dynamic(
   () => import('@/components/ui/error-details-modal').then(m => ({ default: m.ErrorDetailsModal })),
@@ -116,6 +124,8 @@ export default function WorkshopTasksPage() {
   const [updatingStatus, setUpdatingStatus] = useState<Set<string>>(new Set());
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [completingTask, setCompletingTask] = useState<Action | null>(null);
+  const [showCorrectServiceModal, setShowCorrectServiceModal] = useState(false);
+  const [correctingTask, setCorrectingTask] = useState<Action | null>(null);
   const [showOnHoldModal, setShowOnHoldModal] = useState(false);
   const [onHoldingTask, setOnHoldingTask] = useState<Action | null>(null);
   const [onHoldComment, setOnHoldComment] = useState('');
@@ -215,7 +225,8 @@ export default function WorkshopTasksPage() {
   const fetcher = useWorkshopTasksFetchers({ supabase, userId: user?.id, vehicleFilter, setLoading, setTasks, setVehicles, setRecentVehicleIds, setTaskAttachmentCounts, setCategories, setPlantCategories, setHgvCategories, setSubcategories, setPlantSubcategories, setHgvSubcategories, setCurrentMeterReading, setMeterReadingType });
   const filteredSubcategories = selectedCategoryId ? (assetTab === 'plant' ? plantSubcategories : assetTab === 'hgv' ? hgvSubcategories : subcategories).filter(sub => sub.category_id === selectedCategoryId) : [];
   const activeCategories = assetTab === 'plant' ? plantCategories : assetTab === 'hgv' ? hgvCategories : categories;
-  const categoryHasSubcategories = filteredSubcategories.length > 0;
+  // Subcategories are retained for historical reads only; new/edit flows never require them.
+  const categoryHasSubcategories = false;
   const tabFilteredTasks = useMemo(() => {
     if (assetTab === 'all') return tasks;
     if (assetTab === 'plant') return tasks.filter((task) => task.plant_id !== null);
@@ -464,6 +475,8 @@ export default function WorkshopTasksPage() {
           onResumeTask={(task) => { setResumingTask(task); setResumeComment(''); setShowResumeModal(true); }}
           onUndoLogged={lifecycle.handleUndoLogged}
           onUndoComplete={lifecycle.handleUndoComplete}
+          canCorrectService={showSettings}
+          onCorrectService={(task) => { setCorrectingTask(task); setShowCorrectServiceModal(true); }}
           onEditTask={crud.handleEditTask}
           onDeleteTask={crud.handleDeleteTask}
         />
@@ -495,7 +508,9 @@ export default function WorkshopTasksPage() {
               onAddSubcategory={crud.openAddSubcategoryModal}
               onEditSubcategory={crud.openEditSubcategoryModal}
               onDeleteSubcategory={crud.handleDeleteSubcategory}
+              hideSubcategories
             />
+            <ServiceSettingsPanel assetType={categoryTaxonomyMode} />
             <AttachmentManagementPanel taxonomyMode={categoryTaxonomyMode} />
             <DisplayBoardSettingsCard />
           </TabsContent>
@@ -505,6 +520,18 @@ export default function WorkshopTasksPage() {
       <WorkshopTaskFormDialogs userId={user?.id || null} showAddModal={showAddModal} onShowAddModalChange={setShowAddModal} assetTab={assetTab} selectedVehicleId={selectedVehicleId} onSelectedVehicleIdChange={setSelectedVehicleId} vehicles={vehicles} getAssetDisplay={getAssetDisplay} selectedCategoryId={selectedCategoryId} onSelectedCategoryIdChange={crud.handleCategoryChange} activeCategories={activeCategories} categoryHasSubcategories={categoryHasSubcategories} selectedSubcategoryId={selectedSubcategoryId} onSelectedSubcategoryIdChange={setSelectedSubcategoryId} filteredSubcategories={filteredSubcategories} meterReadingType={meterReadingType} newMeterReading={newMeterReading} onNewMeterReadingChange={setNewMeterReading} currentMeterReading={currentMeterReading} workshopComments={workshopComments} onWorkshopCommentsChange={setWorkshopComments} attachmentTemplates={attachmentTemplates} selectedAttachmentTemplateIds={selectedAttachmentTemplateIds} onSelectedAttachmentTemplateIdsChange={setSelectedAttachmentTemplateIds} submitting={submitting} onResetAddForm={crud.resetAddForm} onFetchCurrentMeterReading={fetcher.fetchCurrentMeterReading} onCreateTask={crud.handleAddTask} showEditModal={showEditModal} onShowEditModalChange={setShowEditModal} editingTask={editingTask} editVehicleId={editVehicleId} onEditVehicleIdChange={crud.handleEditVehicleChange} recentVehicleIds={recentVehicleIds} editCategoryId={editCategoryId} onEditCategoryIdChange={(value) => { setEditCategoryId(value); setEditSubcategoryId(''); }} categories={categories} plantCategories={plantCategories} hgvCategories={hgvCategories} editSubcategoryId={editSubcategoryId} onEditSubcategoryIdChange={setEditSubcategoryId} subcategories={subcategories} plantSubcategories={plantSubcategories} hgvSubcategories={hgvSubcategories} initialEditCategoryId={initialEditCategoryId} initialEditHadSubcategory={initialEditHadSubcategory} editMileage={editMileage} onEditMileageChange={setEditMileage} editCurrentMileage={editCurrentMileage} editComments={editComments} onEditCommentsChange={setEditComments} isSaveEditDisabled={crud.isSaveEditDisabled} onSaveEdit={crud.handleSaveEdit} onResetEditForm={crud.resetEditForm} />
       {(showCompleteModal || !!completingTask) && (
         <MarkTaskCompleteDialog open={showCompleteModal} onOpenChange={setShowCompleteModal} task={completingTask} onConfirm={lifecycle.confirmMarkComplete} isSubmitting={completingTask ? updatingStatus.has(completingTask.id) : false} userId={user?.id || null} />
+      )}
+      {(showCorrectServiceModal || !!correctingTask) && (
+        <CorrectServiceTaskDialog
+          open={showCorrectServiceModal}
+          onOpenChange={(open) => {
+            setShowCorrectServiceModal(open);
+            if (!open) setCorrectingTask(null);
+          }}
+          taskId={correctingTask?.id || null}
+          assetType={correctingTask?.hgv_id ? 'hgv' : correctingTask?.plant_id ? 'plant' : 'van'}
+          onCorrected={() => { void fetcher.fetchTasks(); }}
+        />
       )}
       <WorkshopTaskStatusDialogs userId={user?.id || null} statusTask={selectedTask} showStatusModal={showStatusModal} onShowStatusModalChange={setShowStatusModal} loggedComment={loggedComment} onLoggedCommentChange={setLoggedComment} onCancelStatusModal={() => { setShowStatusModal(false); setSelectedTask(null); setLoggedComment(''); }} onConfirmMarkInProgress={lifecycle.confirmMarkInProgress} showOnHoldModal={showOnHoldModal} onShowOnHoldModalChange={setShowOnHoldModal} onHoldComment={onHoldComment} onOnHoldCommentChange={setOnHoldComment} onCancelOnHoldModal={() => { setShowOnHoldModal(false); setOnHoldingTask(null); setOnHoldComment(''); }} onConfirmMarkOnHold={lifecycle.confirmMarkOnHold} onHoldingTask={onHoldingTask} showResumeModal={showResumeModal} onShowResumeModalChange={setShowResumeModal} resumeComment={resumeComment} onResumeCommentChange={setResumeComment} onCancelResumeModal={() => { setShowResumeModal(false); setResumingTask(null); setResumeComment(''); }} onConfirmResumeTask={lifecycle.confirmResumeTask} resumingTask={resumingTask} updatingStatus={updatingStatus} />
       <WorkshopTaskAdminDialogs showSettings={showSettings} showCategoryModal={showCategoryModal} onShowCategoryModalChange={setShowCategoryModal} editingCategory={editingCategory} categoryName={categoryName} onCategoryNameChange={setCategoryName} submittingCategory={submittingCategory} onSaveCategory={crud.handleSaveCategory} onResetCategoryForm={() => { setShowCategoryModal(false); setEditingCategory(null); setCategoryName(''); }} showDeleteConfirm={showDeleteConfirm} onShowDeleteConfirmChange={setShowDeleteConfirm} taskToDelete={taskToDelete} getVehicleReg={getVehicleReg} deleting={deleting} onConfirmDeleteTask={crud.confirmDeleteTask} onResetDeleteTask={() => { setShowDeleteConfirm(false); setTaskToDelete(null); }} />

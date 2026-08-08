@@ -1,7 +1,7 @@
 // Types for Vehicle Maintenance & Service System
 
 export type CategoryResponsibility = 'workshop' | 'office';
-export type MaintenancePeriodUnit = 'weeks' | 'months' | 'miles' | 'hours';
+export type MaintenancePeriodUnit = 'weeks' | 'months' | 'miles' | 'km' | 'hours';
 export type MaintenanceCategorySource = 'system' | 'custom';
 
 export interface MaintenanceCategory {
@@ -62,6 +62,12 @@ export interface VehicleMaintenance {
   last_service_mileage: number | null;
   next_service_mileage: number | null;
   cambelt_due_mileage: number | null;
+  last_service_template_id?: string | null;
+  next_service_template_id?: string | null;
+  next_service_rotation_step_id?: string | null;
+  next_service_template_name?: string | null;
+  next_service_compact_label?: string | null;
+  show_service_type_badge?: boolean;
   
   // Hours-based maintenance (plant machinery)
   current_hours?: number | null;
@@ -267,6 +273,7 @@ export interface UpdateMaintenanceRequest {
   current_hours?: number | null; // For plant machinery
   last_service_hours?: number | null; // For plant machinery
   next_service_hours?: number | null; // For plant machinery
+  next_service_template_id?: string | null;
   tracker_id?: string | null;
   notes?: string | null;
   custom_items?: CustomMaintenanceItemUpdate[];

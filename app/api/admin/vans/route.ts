@@ -147,7 +147,8 @@ export async function POST(request: NextRequest) {
       reg_number, 
       category_id, 
       nickname,
-      status = 'active'
+      status = 'active',
+      next_service_template_id,
     } = body;
 
     if (!category_id) {
@@ -160,6 +161,13 @@ export async function POST(request: NextRequest) {
     if (!reg_number) {
       return NextResponse.json(
         { error: 'Registration number is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!next_service_template_id) {
+      return NextResponse.json(
+        { error: 'Next service type is required' },
         { status: 400 }
       );
     }
@@ -192,9 +200,31 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
+    const admin = createAdminClient();
+    const { seedAssetServiceState, AssetServiceError } = await import('@/lib/server/asset-service');
+    try {
+      await seedAssetServiceState({
+        assetType: 'van',
+        assetId: data.id,
+        nextServiceTemplateId: String(next_service_template_id),
+      });
+    } catch (seedError) {
+      const { error: maintenanceCleanupError } = await admin
+        .from('vehicle_maintenance')
+        .delete()
+        .eq('van_id', data.id);
+      const { error: assetCleanupError } = await admin.from('vans').delete().eq('id', data.id);
+      if (maintenanceCleanupError || assetCleanupError) {
+        throw new AssetServiceError('Failed to roll back van after service setup failed', 500);
+      }
+      if (seedError instanceof AssetServiceError) {
+        return NextResponse.json({ error: seedError.message }, { status: seedError.status });
+      }
+      throw seedError;
+    }
+
     console.log(`[INFO] Van created: ${data.reg_number} (ID: ${data.id})`);
 
-    const admin = createAdminClient();
     const createAssignment = await applyCreateFleetNicknameAssignment({
       admin,
       body,

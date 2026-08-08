@@ -19,6 +19,11 @@ import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { useWorkshopDraftPersistence } from '@/lib/hooks/useWorkshopDraftPersistence';
 import type { CompletionUpdateConfig, CompletionFieldValues } from '@/types/workshop-completion';
+import {
+  getSuccessorStep,
+  resolveStepForTemplateFirst,
+  type ServiceRotationStep,
+} from '@/lib/utils/assetServiceRotation';
 
 export interface TaskForCompletion {
   id: string;
@@ -45,6 +50,10 @@ export interface CompletionData {
   completedSignatureData?: string;
   completedSignedAt?: string;
   maintenanceUpdates?: CompletionFieldValues;
+  /** Required for Service-category workshop tasks */
+  completionMeter?: number;
+  confirmedNextTemplateId?: string;
+  isServiceTask?: boolean;
 }
 
 interface MarkTaskCompleteDialogProps {
@@ -120,12 +129,21 @@ export function MarkTaskCompleteDialog({
   const [completedSignedAt, setCompletedSignedAt] = useState<string | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [maintenanceFields, setMaintenanceFields] = useState<CompletionFieldValues>({});
+  const [completionMeter, setCompletionMeter] = useState('');
+  const [confirmedNextTemplateId, setConfirmedNextTemplateId] = useState('');
+  const [serviceTemplates, setServiceTemplates] = useState<Array<{ templateId: string; templateName: string; compactLabel: string | null }>>([]);
+  const [suggestedNextTemplateId, setSuggestedNextTemplateId] = useState('');
 
   const requiresIntermediateStep = task?.status === 'pending' || task?.status === 'on_hold';
   const completionUpdates = task?.workshop_task_categories?.completion_updates || [];
   const hasMaintenanceUpdates = completionUpdates.length > 0;
   const requiresCompletionSignature = task?.action_type === 'inspection_defect' && Boolean(task.hgv_id);
   const isHgvTask = Boolean(task?.hgv_id);
+  const isServiceTask = Boolean(
+    task?.workshop_task_categories?.name &&
+      /^service(\s|\(|$)/i.test(task.workshop_task_categories.name),
+  );
+  const serviceAssetType = task?.hgv_id ? 'hgv' : task?.plant_id ? 'plant' : 'van';
   const formatDistanceCopy = (value: string) =>
     isHgvTask
       ? value
@@ -153,9 +171,92 @@ export function MarkTaskCompleteDialog({
         setCompletedSignedAt(null);
         setShowSignaturePad(false);
         setMaintenanceFields({});
+        setCompletionMeter('');
+        setConfirmedNextTemplateId('');
+        setSuggestedNextTemplateId('');
+        setServiceTemplates([]);
       });
     }
   }, [open, task]);
+
+  useEffect(() => {
+    if (!open || !task || !isServiceTask) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const assetId = task.hgv_id || task.plant_id || task.van_id;
+        const [typesResponse, attachmentsResponse] = await Promise.all([
+          fetch(
+            `/api/fleet/service-types?assetType=${serviceAssetType}${
+              assetId ? `&assetId=${encodeURIComponent(assetId)}` : ''
+            }`,
+          ),
+          fetch(`/api/workshop-tasks/attachments/task/${task.id}`),
+        ]);
+        const data = await typesResponse.json();
+        if (!typesResponse.ok || cancelled) return;
+        const templates = (data.templates || []) as Array<{
+          templateId: string;
+          templateName: string;
+          compactLabel: string | null;
+        }>;
+        const rotation = (data.rotation || []) as Array<{
+          id: string;
+          position: number;
+          templateId: string;
+          templateName?: string | null;
+          compactLabel?: string | null;
+        }>;
+        setServiceTemplates(templates);
+
+        let completedTemplateId = '';
+        if (attachmentsResponse.ok) {
+          const attachmentPayload = await attachmentsResponse.json();
+          const attachments = (attachmentPayload.attachments || attachmentPayload.data || []) as Array<{
+            template_id?: string;
+            status?: string;
+          }>;
+          const completed =
+            attachments.find((attachment) => attachment.status === 'completed') || attachments[0];
+          completedTemplateId = completed?.template_id || '';
+        }
+
+        const steps: ServiceRotationStep[] = rotation.map((step) => ({
+          id: step.id,
+          position: step.position,
+          attachmentTemplateId: step.templateId,
+          compactLabel: step.compactLabel,
+          templateName: step.templateName,
+        }));
+        const cursorStep =
+          completedTemplateId && data.currentNextServiceRotationStepId
+            ? steps.find(
+                (step) =>
+                  step.id === data.currentNextServiceRotationStepId &&
+                  step.attachmentTemplateId === completedTemplateId,
+              ) ?? null
+            : null;
+        const completedStep =
+          cursorStep ||
+          (completedTemplateId
+            ? resolveStepForTemplateFirst(steps, completedTemplateId)
+            : null);
+        const successor = getSuccessorStep(steps, completedStep?.id);
+        const suggested =
+          successor?.attachmentTemplateId ||
+          rotation[0]?.templateId ||
+          templates[0]?.templateId ||
+          '';
+        setSuggestedNextTemplateId(suggested);
+        setConfirmedNextTemplateId(suggested);
+      } catch {
+        // optional UI enrichment
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, task, isServiceTask, serviceAssetType]);
 
   const handleMaintenanceFieldChange = (fieldName: string, value: string) => {
     setMaintenanceFields((prev) => ({
@@ -211,6 +312,9 @@ export function MarkTaskCompleteDialog({
       maintenanceUpdates: Object.keys(processedMaintenanceUpdates).length > 0 
         ? processedMaintenanceUpdates 
         : undefined,
+      isServiceTask,
+      completionMeter: isServiceTask ? Number(completionMeter) : undefined,
+      confirmedNextTemplateId: isServiceTask ? confirmedNextTemplateId : undefined,
     };
   };
 
@@ -289,13 +393,21 @@ export function MarkTaskCompleteDialog({
   const isCompletedAtValid =
     Boolean(completedAtDate) &&
     (!maxCompletedAtDate || completedAtDate!.getTime() <= maxCompletedAtDate.getTime());
+  const isServiceMeterValid =
+    !isServiceTask ||
+    (completionMeter.trim() !== '' &&
+      Number.isFinite(Number(completionMeter)) &&
+      Number(completionMeter) >= 0 &&
+      Number.isInteger(Number(completionMeter)));
   const isValid =
     (!requiresIntermediateStep || (intermediateComment.trim() && intermediateComment.length <= 300)) &&
     completedComment.trim() &&
     completedComment.length <= 500 &&
     isCompletedAtValid &&
     (!requiresCompletionSignature || Boolean(completedSignatureData)) &&
-    validateMaintenanceFields();
+    validateMaintenanceFields() &&
+    isServiceMeterValid &&
+    (!isServiceTask || Boolean(confirmedNextTemplateId));
   const isDirty = useMemo(
     () =>
       intermediateComment.trim().length > 0 ||
@@ -440,6 +552,51 @@ export function MarkTaskCompleteDialog({
               Confirm the real completion date. This date is used for future maintenance due dates.
             </p>
           </div>
+
+          {isServiceTask && (
+            <div className="space-y-3 border rounded-md p-3 bg-muted/30">
+              <div className="space-y-2">
+                <Label htmlFor="service-completion-meter">
+                  Actual {serviceAssetType === 'plant' ? 'hours' : serviceAssetType === 'hgv' ? 'KM' : 'mileage'} at service{' '}
+                  <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="service-completion-meter"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={completionMeter}
+                  onChange={(e) => setCompletionMeter(e.target.value)}
+                  placeholder={serviceAssetType === 'plant' ? 'e.g., 1250' : 'e.g., 275402'}
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="service-next-type">
+                  Next service type due <span className="text-red-500">*</span>
+                </Label>
+                <select
+                  id="service-next-type"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={confirmedNextTemplateId}
+                  onChange={(e) => setConfirmedNextTemplateId(e.target.value)}
+                  disabled={isSubmitting || serviceTemplates.length === 0}
+                >
+                  <option value="">Select next service type</option>
+                  {serviceTemplates.map((template) => (
+                    <option key={template.templateId} value={template.templateId}>
+                      {template.compactLabel || template.templateName}
+                    </option>
+                  ))}
+                </select>
+                {suggestedNextTemplateId && confirmedNextTemplateId === suggestedNextTemplateId ? (
+                  <p className="text-xs text-muted-foreground">
+                    Preselected from the configured service rotation. Confirm or override before completing.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          )}
 
           {/* Completion Comment */}
           <div className="space-y-2">

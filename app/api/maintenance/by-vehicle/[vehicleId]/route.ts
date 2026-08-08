@@ -9,6 +9,7 @@ import type {
   UpdateMaintenanceRequest,
 } from '@/types/maintenance';
 import { buildAutomaticMaintenancePlan } from '@/lib/utils/workshopMaintenanceSync';
+import { isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
 
 type AssetType = 'van' | 'hgv' | 'plant';
 type FkColumn = 'van_id' | 'hgv_id' | 'plant_id';
@@ -144,6 +145,15 @@ export async function POST(
 
     // Parse request body
     const body: ExtendedUpdateMaintenanceRequest = await request.json();
+    if (
+      body.next_service_template_id !== undefined &&
+      !(await isEffectiveRoleManagerOrHigher())
+    ) {
+      return NextResponse.json(
+        { error: 'Manager or admin required to update the next service type' },
+        { status: 403 },
+      );
+    }
 
     // Validate comment (mandatory, min 10 characters)
     if (!body.comment || body.comment.trim().length < 10) {
@@ -355,6 +365,7 @@ export async function POST(
       'current_hours',
       'last_service_hours',
       'next_service_hours',
+      'next_service_template_id',
       'tracker_id',
       'notes',
     ];
@@ -516,6 +527,50 @@ export async function POST(
           requestedUpdates.next_service_mileage,
           'mileage'
         );
+      }
+    }
+
+    if (requestedUpdates.next_service_template_id !== undefined) {
+      updates.next_service_template_id = requestedUpdates.next_service_template_id;
+      if (
+        !existingRecord ||
+        (existingRecord as { next_service_template_id?: string | null }).next_service_template_id !==
+          requestedUpdates.next_service_template_id
+      ) {
+        assignChangedField(
+          'next_service_template_id',
+          (existingRecord as { next_service_template_id?: string | null } | null)?.next_service_template_id,
+          requestedUpdates.next_service_template_id,
+          'text'
+        );
+      }
+
+      // Keep rotation cursor aligned with the selected template (first matching step).
+      if (requestedUpdates.next_service_template_id) {
+        const configKey =
+          assetType === 'hgv' ? 'service_hgv' : assetType === 'plant' ? 'service_plant' : 'service_van';
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- service config keys pending generated types
+        const untyped = supabase as any;
+        const { data: config } = await untyped
+          .from('maintenance_categories')
+          .select('id')
+          .eq('config_key', configKey)
+          .maybeSingle();
+        if (config?.id) {
+          const { data: step } = await untyped
+            .from('service_rotation_steps')
+            .select('id')
+            .eq('maintenance_category_id', config.id)
+            .eq('attachment_template_id', requestedUpdates.next_service_template_id)
+            .order('position', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          if (step?.id) {
+            updates.next_service_rotation_step_id = step.id;
+          }
+        }
+      } else {
+        updates.next_service_rotation_step_id = null;
       }
     }
 

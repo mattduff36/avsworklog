@@ -20,14 +20,13 @@ interface VehicleWithAlerts {
 }
 
 interface CategoryCache {
-  maintenanceCategory?: { id: string; subcategory?: { id: string } };
-  uncategorized?: { id: string };
+  maintenanceCategory?: { id: string };
 }
 
 let categoryCache: CategoryCache | null = null;
 
 /**
- * Fetch and cache maintenance/service category and subcategory IDs
+ * Fetch and cache the maintenance category used by legacy alert task creation.
  */
 async function getCategoryCache(): Promise<CategoryCache> {
   if (categoryCache) {
@@ -48,32 +47,9 @@ async function getCategoryCache(): Promise<CategoryCache> {
 
     if (categories && categories.length > 0) {
       const maintenanceCat = categories[0];
-      
-      // Try to find Service subcategory under Maintenance
-      const { data: subcategories } = await supabase
-        .from('workshop_task_subcategories')
-        .select('id, name, slug')
-        .eq('category_id', maintenanceCat.id)
-        .ilike('name', '%service%')
-        .eq('is_active', true)
-        .limit(1);
-
       cache.maintenanceCategory = {
         id: maintenanceCat.id,
-        subcategory: subcategories && subcategories.length > 0 ? { id: subcategories[0].id } : undefined
       };
-    }
-
-    // Fallback: Find Uncategorized
-    const { data: uncategorized } = await supabase
-      .from('workshop_task_subcategories')
-      .select('id, name, slug')
-      .ilike('name', 'uncategorized')
-      .eq('is_active', true)
-      .limit(1);
-
-    if (uncategorized && uncategorized.length > 0) {
-      cache.uncategorized = { id: uncategorized[0].id };
     }
 
     categoryCache = cache;
@@ -172,11 +148,10 @@ export async function ensureServiceTasksForAlerts(
     // Get category cache
     const cache = await getCategoryCache();
 
-    // Determine which category/subcategory to use
-    const subcategoryId = cache.maintenanceCategory?.subcategory?.id || cache.uncategorized?.id;
+    const categoryId = cache.maintenanceCategory?.id;
 
-    if (!subcategoryId) {
-      console.warn('No suitable category/subcategory found for service tasks');
+    if (!categoryId) {
+      console.warn('No suitable category found for service tasks');
       return [];
     }
 
@@ -200,7 +175,7 @@ export async function ensureServiceTasksForAlerts(
         .insert({
           action_type: 'workshop_vehicle_task',
           van_id: vehicleId,
-          workshop_subcategory_id: subcategoryId,
+          workshop_category_id: categoryId,
           title,
           workshop_comments: comments,
           description: comments.substring(0, 200),

@@ -31,6 +31,8 @@ interface CategoryManagementPanelProps {
   onAddSubcategory: (category: Category) => void;
   onEditSubcategory: (subcategory: Subcategory, category: Category) => void;
   onDeleteSubcategory: (subcategoryId: string, subcategoryName: string) => void;
+  /** When true, hide subcategory management (historical data only). */
+  hideSubcategories?: boolean;
 }
 
 export function CategoryManagementPanel({
@@ -42,6 +44,7 @@ export function CategoryManagementPanel({
   onAddSubcategory,
   onEditSubcategory,
   onDeleteSubcategory,
+  hideSubcategories = false,
 }: CategoryManagementPanelProps) {
   const { tabletModeEnabled } = useTabletMode();
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -238,7 +241,13 @@ export function CategoryManagementPanel({
                   </div>
                 </div>
 
-                {/* Subcategories Section */}
+                {hideSubcategories ? (
+                  <div className="rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+                    Subcategories are no longer used for new workshop tasks. Use Linked Attachments
+                    in Service settings (and category-linked templates) instead. Historical subcategory
+                    labels remain visible on completed tasks.
+                  </div>
+                ) : (
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">
@@ -320,6 +329,7 @@ export function CategoryManagementPanel({
                     </div>
                   )}
                 </div>
+                )}
               </>
             ) : (
               <div className="text-center py-12">

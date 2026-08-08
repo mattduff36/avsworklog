@@ -40,11 +40,13 @@ import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 type Task = Database['public']['Tables']['actions']['Row'] & {
   status_history?: unknown[] | null;
   workshop_task_categories?: {
+    id?: string;
     name: string;
   } | null;
   workshop_task_subcategories?: {
     name: string;
     workshop_task_categories?: {
+      id?: string;
       name: string;
     } | null;
   } | null;
@@ -471,6 +473,12 @@ export function WorkshopTaskModal({
             key={`${task.id}-${attachmentsRefreshKey}`}
             taskId={task.id}
             taskStatus={getTaskStatus(task)}
+            workshopCategoryId={
+              task.workshop_category_id
+              || task.workshop_task_categories?.id
+              || task.workshop_task_subcategories?.workshop_task_categories?.id
+              || null
+            }
           />
         </div>
 

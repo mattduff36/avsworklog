@@ -35,6 +35,7 @@ import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import { formatRegistrationForInput } from './add-asset/utils';
 import { NicknameUserCombobox } from '@/components/fleet/NicknameUserCombobox';
+import { NextServiceTypeSelect } from '@/components/fleet/NextServiceTypeSelect';
 import {
   buildAssignmentPayload,
   shouldPromptClearAssignment,
@@ -87,6 +88,7 @@ const editMaintenanceSchema = z.object({
     (val) => val === '' || val === null || val === undefined ? null : Number(val),
     z.number().int().positive('Next service hours must be a positive number').optional().nullable()
   ),
+  next_service_template_id: z.string().uuid().optional().nullable(),
   tracker_id: z.string().max(50, 'Tracker ID must be less than 50 characters').optional().nullable(),
   // notes field removed from schema - kept in database/backend for future use but not used in form
   comment: z.string()
@@ -204,6 +206,7 @@ export function EditMaintenanceDialog({
         'six_weekly_inspection_due_date',
         'fire_extinguisher_due_date',
         'taco_calibration_due_date',
+        'next_service_mileage',
       ]);
     }
 
@@ -271,6 +274,7 @@ export function EditMaintenanceDialog({
         current_hours: vehicle.current_hours || undefined,
         last_service_hours: vehicle.last_service_hours || undefined,
         next_service_hours: vehicle.next_service_hours || undefined,
+        next_service_template_id: vehicle.next_service_template_id || undefined,
         tracker_id: vehicle.tracker_id || '',
         comment: '',
       });
@@ -439,6 +443,7 @@ export function EditMaintenanceDialog({
       current_hours: data.current_hours || null,
       last_service_hours: data.last_service_hours || null,
       next_service_hours: data.next_service_hours || null,
+      next_service_template_id: data.next_service_template_id || null,
       tracker_id: data.tracker_id || null,
       custom_items: customItems.map(item => ({
         category_id: item.category_id,
@@ -865,6 +870,27 @@ export function EditMaintenanceDialog({
                     <p className="text-sm text-red-400">{errors.last_service_mileage.message}</p>
                   )}
                 </div>
+                )}
+
+                {(hasSystemItem('next_service_mileage') || hasSystemItem('next_service_hours')) &&
+                  vehicle?.vehicle?.asset_type && (
+                  <div className="space-y-2 md:col-span-3">
+                    <NextServiceTypeSelect
+                      assetType={
+                        String(vehicle.vehicle.asset_type) === 'hgv'
+                          ? 'hgv'
+                          : String(vehicle.vehicle.asset_type) === 'plant'
+                            ? 'plant'
+                            : 'van'
+                      }
+                      id="next-service-template-id"
+                      value={watch('next_service_template_id') || vehicle.next_service_template_id || ''}
+                      onChange={(templateId) =>
+                        setValue('next_service_template_id', templateId, { shouldDirty: true })
+                      }
+                      required={false}
+                    />
+                  </div>
                 )}
 
                 {/* Cambelt Due */}

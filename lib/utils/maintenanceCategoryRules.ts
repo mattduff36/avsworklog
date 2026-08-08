@@ -13,8 +13,8 @@ export type MaintenanceCategoryKey =
   | 'tacoCalibration'
   | 'loler'
   | 'serviceHours'
-  | 'engineService'
-  | 'fullService';
+  | 'engineService' // legacy alias (inactive after unify)
+  | 'fullService'; // legacy alias (inactive after unify)
 
 export interface MaintenanceCategoryRule {
   key: MaintenanceCategoryKey;
@@ -33,6 +33,7 @@ export const MAINTENANCE_CATEGORY_NAMES = {
   tax: 'tax due date',
   mot: 'mot due date',
   service: 'service due',
+  hgvService: 'service',
   cambelt: 'cambelt replacement',
   firstAid: 'first aid kit expiry',
   sixWeekly: '6 weekly inspection due',
@@ -42,12 +43,13 @@ export const MAINTENANCE_CATEGORY_NAMES = {
   serviceHours: 'service due (hours)',
   engineService: 'engine service',
   fullService: 'full service',
-} as const satisfies Record<MaintenanceCategoryKey, string>;
+} as const;
 
 export const MAINTENANCE_CATEGORY_RULES: MaintenanceCategoryRule[] = [
   { key: 'tax', categoryName: MAINTENANCE_CATEGORY_NAMES.tax, assetTypes: ['van', 'hgv', 'plant'] },
   { key: 'mot', categoryName: MAINTENANCE_CATEGORY_NAMES.mot, assetTypes: ['van', 'hgv'] },
   { key: 'service', categoryName: MAINTENANCE_CATEGORY_NAMES.service, assetTypes: ['van'] },
+  { key: 'service', categoryName: MAINTENANCE_CATEGORY_NAMES.hgvService, assetTypes: ['hgv'] },
   { key: 'cambelt', categoryName: MAINTENANCE_CATEGORY_NAMES.cambelt, assetTypes: ['van'] },
   { key: 'firstAid', categoryName: MAINTENANCE_CATEGORY_NAMES.firstAid, assetTypes: ['van', 'hgv'] },
   { key: 'sixWeekly', categoryName: MAINTENANCE_CATEGORY_NAMES.sixWeekly, assetTypes: ['hgv'] },
@@ -55,8 +57,9 @@ export const MAINTENANCE_CATEGORY_RULES: MaintenanceCategoryRule[] = [
   { key: 'tacoCalibration', categoryName: MAINTENANCE_CATEGORY_NAMES.tacoCalibration, assetTypes: ['hgv'] },
   { key: 'loler', categoryName: MAINTENANCE_CATEGORY_NAMES.loler, assetTypes: ['plant'] },
   { key: 'serviceHours', categoryName: MAINTENANCE_CATEGORY_NAMES.serviceHours, assetTypes: ['plant'] },
-  { key: 'engineService', categoryName: MAINTENANCE_CATEGORY_NAMES.engineService, assetTypes: ['hgv'] },
-  { key: 'fullService', categoryName: MAINTENANCE_CATEGORY_NAMES.fullService, assetTypes: ['hgv'] },
+  // Legacy inactive categories retained for history/rollback only
+  { key: 'engineService', categoryName: MAINTENANCE_CATEGORY_NAMES.engineService, assetTypes: [] },
+  { key: 'fullService', categoryName: MAINTENANCE_CATEGORY_NAMES.fullService, assetTypes: [] },
 ];
 
 export type MaintenanceCategoryMap = Map<string, MaintenanceCategoryConfig>;

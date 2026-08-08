@@ -1158,6 +1158,81 @@ export type Database = {
           },
         ]
       }
+      asset_service_events: {
+        Row: {
+          id: string
+          task_id: string
+          van_id: string | null
+          hgv_id: string | null
+          plant_id: string | null
+          maintenance_category_id: string
+          completed_template_id: string | null
+          completed_template_name: string | null
+          next_template_id: string | null
+          next_template_name: string | null
+          completed_rotation_step_id: string | null
+          next_rotation_step_id: string | null
+          completion_meter: number
+          meter_unit: 'miles' | 'km' | 'hours'
+          interval_value: number
+          interval_unit: 'miles' | 'km' | 'hours'
+          resulting_due_meter: number
+          actor_id: string | null
+          event_type: 'completion' | 'correction' | 'manual_edit'
+          notes: string | null
+          corrects_event_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          van_id?: string | null
+          hgv_id?: string | null
+          plant_id?: string | null
+          maintenance_category_id: string
+          completed_template_id?: string | null
+          completed_template_name?: string | null
+          next_template_id?: string | null
+          next_template_name?: string | null
+          completed_rotation_step_id?: string | null
+          next_rotation_step_id?: string | null
+          completion_meter: number
+          meter_unit: 'miles' | 'km' | 'hours'
+          interval_value: number
+          interval_unit: 'miles' | 'km' | 'hours'
+          resulting_due_meter: number
+          actor_id?: string | null
+          event_type?: 'completion' | 'correction' | 'manual_edit'
+          notes?: string | null
+          corrects_event_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          task_id?: string
+          van_id?: string | null
+          hgv_id?: string | null
+          plant_id?: string | null
+          maintenance_category_id?: string
+          completed_template_id?: string | null
+          completed_template_name?: string | null
+          next_template_id?: string | null
+          next_template_name?: string | null
+          completed_rotation_step_id?: string | null
+          next_rotation_step_id?: string | null
+          completion_meter?: number
+          meter_unit?: 'miles' | 'km' | 'hours'
+          interval_value?: number
+          interval_unit?: 'miles' | 'km' | 'hours'
+          resulting_due_meter?: number
+          actor_id?: string | null
+          event_type?: 'completion' | 'correction' | 'manual_edit'
+          notes?: string | null
+          corrects_event_id?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           id: string
@@ -3960,6 +4035,8 @@ export type Database = {
           field_key: string | null
           is_system: boolean
           is_delete_protected: boolean
+          config_key: 'service_van' | 'service_hgv' | 'service_plant' | 'legacy_full_service_hgv' | null
+          workshop_category_id: string | null
         }
         Insert: {
           id?: string
@@ -3983,6 +4060,8 @@ export type Database = {
           field_key?: string | null
           is_system?: boolean
           is_delete_protected?: boolean
+          config_key?: 'service_van' | 'service_hgv' | 'service_plant' | 'legacy_full_service_hgv' | null
+          workshop_category_id?: string | null
         }
         Update: {
           id?: string
@@ -4006,6 +4085,8 @@ export type Database = {
           field_key?: string | null
           is_system?: boolean
           is_delete_protected?: boolean
+          config_key?: 'service_van' | 'service_hgv' | 'service_plant' | 'legacy_full_service_hgv' | null
+          workshop_category_id?: string | null
         }
         Relationships: [
         ]
@@ -7608,6 +7689,48 @@ export type Database = {
           },
         ]
       }
+      service_rotation_steps: {
+        Row: {
+          id: string
+          maintenance_category_id: string
+          position: number
+          attachment_template_id: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          maintenance_category_id: string
+          position: number
+          attachment_template_id: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          maintenance_category_id?: string
+          position?: number
+          attachment_template_id?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'service_rotation_steps_attachment_template_id_fkey'
+            columns: ['attachment_template_id']
+            isOneToOne: false
+            referencedRelation: 'workshop_attachment_templates'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'service_rotation_steps_maintenance_category_id_fkey'
+            columns: ['maintenance_category_id']
+            isOneToOne: false
+            referencedRelation: 'maintenance_categories'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       service_health_events: {
         Row: {
           id: string
@@ -9454,6 +9577,9 @@ export type Database = {
           six_weekly_inspection_due_date: string | null
           fire_extinguisher_due_date: string | null
           taco_calibration_due_date: string | null
+          last_service_template_id: string | null
+          next_service_template_id: string | null
+          next_service_rotation_step_id: string | null
         }
         Insert: {
           id?: string
@@ -9521,6 +9647,9 @@ export type Database = {
           six_weekly_inspection_due_date?: string | null
           fire_extinguisher_due_date?: string | null
           taco_calibration_due_date?: string | null
+          last_service_template_id?: string | null
+          next_service_template_id?: string | null
+          next_service_rotation_step_id?: string | null
         }
         Update: {
           id?: string
@@ -9588,6 +9717,9 @@ export type Database = {
           six_weekly_inspection_due_date?: string | null
           fire_extinguisher_due_date?: string | null
           taco_calibration_due_date?: string | null
+          last_service_template_id?: string | null
+          next_service_template_id?: string | null
+          next_service_rotation_step_id?: string | null
         }
         Relationships: [
           {
@@ -10248,6 +10380,51 @@ export type Database = {
         Relationships: [
         ]
       }
+      workshop_category_attachment_templates: {
+        Row: {
+          id: string
+          category_id: string
+          template_id: string
+          sort_order: number
+          compact_label: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          category_id: string
+          template_id: string
+          sort_order?: number
+          compact_label?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          category_id?: string
+          template_id?: string
+          sort_order?: number
+          compact_label?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'workshop_category_attachment_templates_category_id_fkey'
+            columns: ['category_id']
+            isOneToOne: false
+            referencedRelation: 'workshop_task_categories'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'workshop_category_attachment_templates_template_id_fkey'
+            columns: ['template_id']
+            isOneToOne: false
+            referencedRelation: 'workshop_attachment_templates'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       workshop_task_attachments: {
         Row: {
           id: string
@@ -10258,6 +10435,7 @@ export type Database = {
           completed_by: string | null
           created_at: string
           created_by: string | null
+          template_name_snapshot: string | null
         }
         Insert: {
           id?: string
@@ -10268,6 +10446,7 @@ export type Database = {
           completed_by?: string | null
           created_at?: string
           created_by?: string | null
+          template_name_snapshot?: string | null
         }
         Update: {
           id?: string
@@ -10278,6 +10457,7 @@ export type Database = {
           completed_by?: string | null
           created_at?: string
           created_by?: string | null
+          template_name_snapshot?: string | null
         }
         Relationships: [
           {

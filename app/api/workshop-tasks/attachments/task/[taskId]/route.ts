@@ -5,6 +5,10 @@ import {
   getAdminFieldResponsesForAttachmentIds,
   getAdminSchemaSnapshotsForAttachmentIds,
 } from '@/lib/server/workshop-attachment-admin';
+import {
+  AssetServiceError,
+  insertWorkshopTaskAttachmentExactOne,
+} from '@/lib/server/asset-service';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 interface RouteParams {
@@ -194,7 +198,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Verify task exists and is a workshop task
     const { data: task, error: taskError } = await db
       .from('actions')
-      .select('id, action_type')
+      .select('id, action_type, workshop_category_id, workshop_subcategory_id')
       .eq('id', taskId)
       .single();
 
@@ -209,10 +213,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    let categoryId = (task as { workshop_category_id: string | null }).workshop_category_id;
+    const subcategoryId = (task as { workshop_subcategory_id: string | null }).workshop_subcategory_id;
+    if (!categoryId && subcategoryId) {
+      const { data: subcategory } = await db
+        .from('workshop_task_subcategories')
+        .select('category_id')
+        .eq('id', subcategoryId)
+        .maybeSingle();
+      categoryId = (subcategory as { category_id?: string } | null)?.category_id ?? null;
+    }
+
     // Verify template exists and is available for new attachments
     const { data: template, error: templateError } = await db
       .from('workshop_attachment_templates')
-      .select('id, is_active')
+      .select('id, is_active, name')
       .eq('id', template_id)
       .single();
 
@@ -225,6 +240,46 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { error: 'Template is inactive and cannot be attached to new tasks' },
         { status: 400 }
       );
+    }
+
+    if (categoryId) {
+      const { data: linkedRows, error: linkedError } = await db
+        .from('workshop_category_attachment_templates')
+        .select('template_id')
+        .eq('category_id', categoryId);
+
+      if (linkedError) throw linkedError;
+
+      const linkedTemplateIds = ((linkedRows || []) as Array<{ template_id: string }>).map(
+        (row) => row.template_id,
+      );
+
+      if (linkedTemplateIds.length === 0) {
+        return NextResponse.json(
+          { error: 'This category does not allow attachments' },
+          { status: 400 },
+        );
+      }
+
+      if (!linkedTemplateIds.includes(template_id)) {
+        return NextResponse.json(
+          { error: 'Selected attachment is not linked to this workshop category' },
+          { status: 400 },
+        );
+      }
+
+      const { data: existingForTask, error: existingError } = await db
+        .from('workshop_task_attachments')
+        .select('id')
+        .eq('task_id', taskId);
+
+      if (existingError) throw existingError;
+      if ((existingForTask || []).length > 0) {
+        return NextResponse.json(
+          { error: 'This category allows exactly one linked attachment' },
+          { status: 409 },
+        );
+      }
     }
 
     // Check if attachment already exists for this task+template
@@ -255,25 +310,55 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    // Create attachment only after schema availability is confirmed.
-    const { data: attachment, error: insertError } = await db
-      .from('workshop_task_attachments')
-      .insert({
-        task_id: taskId,
-        template_id,
-        status: 'pending',
-        created_by: user.id,
-      } as never)
-      .select(`
-        *,
-        workshop_attachment_templates (
-          id,
-          name,
-          description,
-          is_active
-        )
-      `)
-      .single();
+    // Categories with configured links serialize attachment creation by locking
+    // the task row, so concurrent requests cannot both pass the exact-one check.
+    let attachment;
+    let insertError;
+    if (categoryId) {
+      const inserted = await insertWorkshopTaskAttachmentExactOne({
+        taskId,
+        templateId: template_id,
+        templateName: (template as { name?: string }).name ?? null,
+        actorId: user.id,
+      });
+      const result = await db
+        .from('workshop_task_attachments')
+        .select(`
+          *,
+          workshop_attachment_templates (
+            id,
+            name,
+            description,
+            is_active
+          )
+        `)
+        .eq('id', inserted.id)
+        .single();
+      attachment = result.data;
+      insertError = result.error;
+    } else {
+      const result = await db
+        .from('workshop_task_attachments')
+        .insert({
+          task_id: taskId,
+          template_id,
+          status: 'pending',
+          created_by: user.id,
+          template_name_snapshot: (template as { name?: string }).name ?? null,
+        } as never)
+        .select(`
+          *,
+          workshop_attachment_templates (
+            id,
+            name,
+            description,
+            is_active
+          )
+        `)
+        .single();
+      attachment = result.data;
+      insertError = result.error;
+    }
 
     if (insertError || !attachment) {
       throw insertError || new Error('Failed to create attachment');
@@ -312,6 +397,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }, { status: 201 });
   } catch (error) {
     const { taskId } = await params;
+    if (error instanceof AssetServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error creating task attachment:', error);
     await logServerError({
       error: error as Error,

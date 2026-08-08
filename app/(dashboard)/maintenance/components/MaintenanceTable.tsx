@@ -566,12 +566,43 @@ export function MaintenanceTable({
                           .filter(column => columnVisibility[`category:${column.category_id}`] ?? true)
                           .map(column => {
                             const item = vehicle.maintenance_items?.find(maintenanceItem => maintenanceItem.category_id === column.category_id);
+                            const isServiceColumn =
+                              item?.category_field_key === 'next_service_mileage' ||
+                              item?.category_field_key === 'next_service_hours' ||
+                              /^service(\s+due)?$/i.test(column.category_name);
+                            const showTypeBadge =
+                              isServiceColumn &&
+                              vehicle.show_service_type_badge &&
+                              Boolean(vehicle.next_service_template_id);
+                            const typeLabel =
+                              vehicle.next_service_compact_label ||
+                              (vehicle.next_service_template_name
+                                ? vehicle.next_service_template_name
+                                    .replace(/\s*\((HGV|Van|Plant)\)\s*$/i, '')
+                                    .replace(/Service/i, '')
+                                    .trim()
+                                : null);
 
                             return (
                               <TableCell key={column.category_id}>
-                                <Badge className={`font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
-                                  {item?.display_value || 'Not Set'}
-                                </Badge>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <Badge className={`font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
+                                    {item?.display_value || 'Not Set'}
+                                  </Badge>
+                                  {showTypeBadge && typeLabel ? (
+                                    <Badge
+                                      variant="outline"
+                                      className={cn(
+                                        'text-[10px] px-1.5 py-0 font-semibold',
+                                        /full/i.test(typeLabel) && 'bg-red-100 text-red-800 border-red-200',
+                                        /basic\s*a/i.test(typeLabel) && 'bg-green-100 text-green-800 border-green-200',
+                                        /basic\s*b/i.test(typeLabel) && 'bg-blue-100 text-blue-800 border-blue-200',
+                                      )}
+                                    >
+                                      {typeLabel}
+                                    </Badge>
+                                  ) : null}
+                                </div>
                               </TableCell>
                             );
                           })}

@@ -61,11 +61,13 @@ describe('maintenance category rules', () => {
     expect(isMaintenanceCategoryVisibleOnOverview(legacyCategory, 'hgv', 'Service Due')).toBe(false);
   });
 
-  it('keeps shared Service Due off HGVs while allowing HGV-only service categories', () => {
+  it('keeps shared Service Due off HGVs while allowing unified HGV Service', () => {
     expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.service)).toBe(false);
     expect(categoryAppliesToAsset(undefined, 'van', MAINTENANCE_CATEGORY_NAMES.service)).toBe(true);
-    expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.engineService)).toBe(true);
-    expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.fullService)).toBe(true);
+    expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.hgvService)).toBe(true);
+    // Legacy Engine/Full categories are inactive after unify
+    expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.engineService)).toBe(false);
+    expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.fullService)).toBe(false);
   });
 
   it('returns contextual distance labels for vans and HGVs', () => {

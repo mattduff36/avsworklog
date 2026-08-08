@@ -59,15 +59,11 @@ export interface AutomaticMaintenancePlan {
 }
 
 const LINK_PATTERNS: Array<MaintenanceLinkMatch & { pattern: RegExp }> = [
+  // Unified HGV Service track (Basic A/B/Full attachments are selected on the task).
   {
-    categoryName: 'Full Service',
-    fieldName: 'custom_mileage',
-    pattern: /\b(major|full)\b.*\bservice\b|\bservice\b.*\b(major|full)\b/,
-  },
-  {
-    categoryName: 'Engine Service',
-    fieldName: 'custom_mileage',
-    pattern: /\b(engine|basic|small)\b.*\bservice\b|\bservice\b.*\b(engine|basic|small)\b/,
+    categoryName: 'Service',
+    fieldName: 'next_service_mileage',
+    pattern: /\b(major|full|engine|basic|small)\b.*\bservice\b|\bservice\b.*\b(major|full|engine|basic|small)\b|\bservice\s*\(hgv\)\b/,
   },
   {
     categoryName: '6 Weekly Inspection Due',
@@ -203,18 +199,6 @@ export function buildAutomaticMaintenancePlan(params: {
         last_mileage: params.state.currentMileage,
         due_mileage: nextDueMileage,
       });
-
-      const engineServiceCategory = category.name.toLowerCase() === 'full service'
-        ? findApplicableCategory('Engine Service')
-        : null;
-
-      if (engineServiceCategory && engineServiceCategory.id !== category.id) {
-        customItems.push({
-          category_id: engineServiceCategory.id,
-          last_mileage: params.state.currentMileage,
-          due_mileage: params.state.currentMileage + engineServiceCategory.period_value,
-        });
-      }
     }
 
     if (link.fieldName === 'next_service_mileage') {

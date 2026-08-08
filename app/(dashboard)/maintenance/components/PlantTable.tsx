@@ -63,6 +63,10 @@ type PlantMaintenanceWithStatus = {
   plant: PlantAsset;
   current_hours: number | null;
   next_service_hours: number | null;
+  next_service_template_id?: string | null;
+  next_service_template_name?: string | null;
+  next_service_compact_label?: string | null;
+  show_service_type_badge?: boolean;
   maintenance_items?: MaintenanceItem[];
 };
 
@@ -217,6 +221,10 @@ export function PlantTable({
         },
         current_hours: vehicle.current_hours || null,
         next_service_hours: vehicle.next_service_hours || null,
+        next_service_template_id: vehicle.next_service_template_id || null,
+        next_service_template_name: vehicle.next_service_template_name || null,
+        next_service_compact_label: vehicle.next_service_compact_label || null,
+        show_service_type_badge: Boolean(vehicle.show_service_type_badge),
         maintenance_items: vehicle.maintenance_items || [],
       }));
 
@@ -350,6 +358,7 @@ export function PlantTable({
   };
 
   const handleViewHistory = (plantId: string) => {
+    if (!plantId) return;
     router.push(`/fleet/plant/${plantId}/history?fromTab=plant`);
   };
 
@@ -770,12 +779,37 @@ export function PlantTable({
                           .filter(column => columnVisibility[`category:${column.category_id}`] ?? true)
                           .map(column => {
                             const item = asset.maintenance_items?.find(maintenanceItem => maintenanceItem.category_id === column.category_id);
+                            const isServiceColumn =
+                              item?.category_field_key === 'next_service_hours' ||
+                              /service/i.test(column.category_name);
+                            const showTypeBadge =
+                              isServiceColumn &&
+                              asset.show_service_type_badge &&
+                              Boolean(asset.next_service_template_id);
+                            const typeLabel =
+                              asset.next_service_compact_label ||
+                              (asset.next_service_template_name
+                                ? asset.next_service_template_name
+                                    .replace(/\s*\((HGV|Van|Plant)\)\s*$/i, '')
+                                    .replace(/Service/i, '')
+                                    .trim()
+                                : null);
 
                             return (
                               <TableCell key={column.category_id} className="align-top whitespace-nowrap">
-                                <Badge className={`whitespace-nowrap font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
-                                  {item?.display_value || 'Not Set'}
-                                </Badge>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <Badge className={`whitespace-nowrap font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
+                                    {item?.display_value || 'Not Set'}
+                                  </Badge>
+                                  {showTypeBadge && typeLabel ? (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-[10px] px-1.5 py-0 font-semibold"
+                                    >
+                                      {typeLabel}
+                                    </Badge>
+                                  ) : null}
+                                </div>
                               </TableCell>
                             );
                           })}

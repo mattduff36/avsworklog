@@ -21,12 +21,19 @@ import {
 interface TaskAttachmentsSectionProps {
   taskId: string;
   taskStatus: string;
+  workshopCategoryId?: string | null;
   onUpdate?: () => void;
 }
 
-export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAttachmentsSectionProps) {
+export function TaskAttachmentsSection({
+  taskId,
+  taskStatus,
+  workshopCategoryId = null,
+  onUpdate,
+}: TaskAttachmentsSectionProps) {
   const { attachments, loading, addAttachment, saveSchemaResponses, undoCompleteAttachment } = useTaskAttachments({ taskId });
   const { templates } = useAttachmentTemplates();
+  const [linkedTemplateIds, setLinkedTemplateIds] = useState<string[] | null>(null);
   
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   const [adding, setAdding] = useState(false);
@@ -50,9 +57,44 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
     }
   }, [activeAttachment, activeAttachmentId]);
 
-  // Filter out templates that are already attached
+  useEffect(() => {
+    if (!workshopCategoryId) {
+      setLinkedTemplateIds(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/workshop-tasks/category-attachments?categoryId=${workshopCategoryId}`,
+        );
+        const data = await response.json();
+        if (!response.ok || cancelled) return;
+        const ids = ((data.templates || []) as Array<{ templateId?: string; id?: string }>)
+          .map((template) => template.templateId || template.id)
+          .filter((id): id is string => Boolean(id));
+        setLinkedTemplateIds(ids);
+      } catch {
+        if (!cancelled) setLinkedTemplateIds([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [workshopCategoryId]);
+
+  // Filter out templates that are already attached; when category links exist, only those.
   const attachedTemplateIds = attachments.map(a => a.template_id);
-  const availableTemplates = templates.filter(t => !attachedTemplateIds.includes(t.id));
+  const categoryScopedTemplates =
+    linkedTemplateIds == null
+      ? templates
+      : linkedTemplateIds.length === 0
+        ? []
+        : templates.filter((template) => linkedTemplateIds.includes(template.id));
+  const availableTemplates = categoryScopedTemplates.filter(t => !attachedTemplateIds.includes(t.id));
+  const categoryBlocksAttachments = linkedTemplateIds !== null && linkedTemplateIds.length === 0;
+  const categoryRequiresExactOne =
+    linkedTemplateIds !== null && linkedTemplateIds.length > 0 && attachments.length >= 1;
 
   const handleAddAttachment = async () => {
     if (!selectedTemplateId) {
@@ -322,7 +364,7 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
       )}
 
       {/* Add Attachment */}
-      {!isTaskCompleted && availableTemplates.length > 0 && (
+      {!isTaskCompleted && !categoryRequiresExactOne && availableTemplates.length > 0 && (
         <div className="flex items-center gap-2 rounded-lg border border-workshop/25 bg-background/90 p-2 shadow-sm">
           <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
             <SelectTrigger className="flex-1">
@@ -349,7 +391,17 @@ export function TaskAttachmentsSection({ taskId, taskStatus, onUpdate }: TaskAtt
       )}
 
       {/* Empty State */}
-      {attachments.length === 0 && availableTemplates.length === 0 && (
+      {categoryBlocksAttachments && attachments.length === 0 && (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          This category does not allow attachments
+        </p>
+      )}
+      {categoryRequiresExactOne && (
+        <p className="text-sm text-muted-foreground text-center py-2">
+          This category allows exactly one linked attachment
+        </p>
+      )}
+      {!categoryBlocksAttachments && attachments.length === 0 && availableTemplates.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-4">
           No attachment templates available
         </p>

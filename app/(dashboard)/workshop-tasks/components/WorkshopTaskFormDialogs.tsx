@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -186,12 +186,54 @@ export function WorkshopTaskFormDialogs({
       : assetTab === 'all'
         ? null
         : assetTab;
+  const [linkedCategoryTemplateIds, setLinkedCategoryTemplateIds] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!selectedCategoryId) {
+      setLinkedCategoryTemplateIds(null);
+      return;
+    }
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/workshop-tasks/category-attachments?categoryId=${selectedCategoryId}`,
+        );
+        const data = await response.json();
+        if (!response.ok || cancelled) return;
+        const ids = ((data.templates || []) as Array<{ templateId: string }>).map(
+          (template) => template.templateId,
+        );
+        setLinkedCategoryTemplateIds(ids);
+        // Categories with links require exactly one attachment selection.
+        if (ids.length > 0) {
+          const currentValid = selectedAttachmentTemplateIds.filter((id) => ids.includes(id));
+          if (currentValid.length !== 1) {
+            onSelectedAttachmentTemplateIdsChange(ids.slice(0, 1));
+          }
+        } else {
+          onSelectedAttachmentTemplateIdsChange([]);
+        }
+      } catch {
+        if (!cancelled) setLinkedCategoryTemplateIds([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategoryId]);
+
   const filteredAttachmentTemplates = useMemo(() => {
     if (!selectedAddAssetType) return [];
-    return attachmentTemplates.filter((template) =>
+    const byAsset = attachmentTemplates.filter((template) =>
       normalizeTemplateAppliesTo(template.applies_to).includes(selectedAddAssetType),
     );
-  }, [attachmentTemplates, selectedAddAssetType]);
+    if (!selectedCategoryId) return [];
+    if (linkedCategoryTemplateIds == null) return byAsset;
+    if (linkedCategoryTemplateIds.length === 0) return [];
+    return byAsset.filter((template) => linkedCategoryTemplateIds.includes(template.id));
+  }, [attachmentTemplates, selectedAddAssetType, selectedCategoryId, linkedCategoryTemplateIds]);
   const addUsesKm = meterReadingType === 'mileage' && selectedAddVehicle?.asset_type === 'hgv';
   const addMeterLabel = meterReadingType === 'hours' ? 'Current Hours' : addUsesKm ? 'Current KM' : 'Current Mileage';
   const addMeterPlaceholder = meterReadingType === 'hours' ? 'hours' : addUsesKm ? 'KM' : 'mileage';
@@ -429,10 +471,19 @@ export function WorkshopTaskFormDialogs({
               <div className="space-y-2">
                 <Label className="text-foreground flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Attachments (Optional)
+                  {linkedCategoryTemplateIds && linkedCategoryTemplateIds.length > 0
+                    ? 'Linked Attachment'
+                    : 'Attachments'}
+                  {linkedCategoryTemplateIds && linkedCategoryTemplateIds.length > 0 ? (
+                    <span className="text-red-500">*</span>
+                  ) : null}
                 </Label>
                 <p className="text-xs text-muted-foreground mb-2">
-                  Add service checklists or documentation to complete later
+                  {linkedCategoryTemplateIds && linkedCategoryTemplateIds.length > 0
+                    ? 'Select exactly one attachment linked to this category'
+                    : selectedCategoryId
+                      ? 'This category does not allow attachments'
+                      : 'Select a category to see linked attachments'}
                 </p>
                 <div className={`space-y-2 max-h-40 overflow-y-auto p-2 border border-border rounded-md bg-muted/30 ${tabletModeEnabled ? 'p-3' : ''}`}>
                   {!selectedAddAssetType && (
@@ -440,25 +491,22 @@ export function WorkshopTaskFormDialogs({
                       Select an asset first to see relevant attachments.
                     </p>
                   )}
-                  {selectedAddAssetType && filteredAttachmentTemplates.length === 0 && (
+                  {selectedAddAssetType && selectedCategoryId && filteredAttachmentTemplates.length === 0 && (
                     <p className="text-xs text-muted-foreground">
-                      No templates are available for this {selectedAddAssetType.toUpperCase()} asset.
+                      No linked attachments for this category.
                     </p>
                   )}
                   {filteredAttachmentTemplates.map((template) => (
                     <div key={template.id} className={`flex items-center ${tabletModeEnabled ? 'space-x-3 py-1' : 'space-x-2'}`}>
                       <input
-                        type="checkbox"
+                        type="radio"
+                        name="linked-attachment-template"
                         id={`template-inline-${template.id}`}
                         checked={selectedAttachmentTemplateIds.includes(template.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            onSelectedAttachmentTemplateIdsChange([...selectedAttachmentTemplateIds, template.id]);
-                          } else {
-                            onSelectedAttachmentTemplateIdsChange(selectedAttachmentTemplateIds.filter(id => id !== template.id));
-                          }
+                        onChange={() => {
+                          onSelectedAttachmentTemplateIdsChange([template.id]);
                         }}
-                        className={`rounded border-gray-300 text-workshop focus:ring-workshop ${tabletModeEnabled ? 'h-5 w-5' : 'h-4 w-4'}`}
+                        className={`border-gray-300 text-workshop focus:ring-workshop ${tabletModeEnabled ? 'h-5 w-5' : 'h-4 w-4'}`}
                       />
                       <label
                         htmlFor={`template-inline-${template.id}`}
@@ -492,7 +540,15 @@ export function WorkshopTaskFormDialogs({
             </TabletAwareButton>
             <TabletAwareButton
               onClick={onCreateTask}
-              disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH || !newMeterReading.trim()}
+              disabled={
+                submitting ||
+                !selectedVehicleId ||
+                !selectedCategoryId ||
+                workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH ||
+                !newMeterReading.trim() ||
+                (Boolean(linkedCategoryTemplateIds && linkedCategoryTemplateIds.length > 0) &&
+                  selectedAttachmentTemplateIds.length !== 1)
+              }
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
               {submitting ? 'Creating...' : 'Create Task'}
