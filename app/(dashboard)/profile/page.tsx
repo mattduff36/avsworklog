@@ -579,6 +579,7 @@ function ProfilePageContent() {
           <ProfileOverviewTab
             profile={overview.profile}
             managers={overview.managers}
+            teamSummary={overview.team_summary}
             annualLeaveSummary={overview.annual_leave_summary}
             permissionModules={overview.permission_summary.modules}
             helpShortcuts={overview.help_shortcuts}

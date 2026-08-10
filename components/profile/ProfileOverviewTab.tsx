@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { AlertTriangle, CalendarDays, ClipboardCheck, Crown, PlaneTakeoff, Truck } from 'lucide-react';
+import { AlertTriangle, CalendarDays, ClipboardCheck, Crown, PlaneTakeoff, Truck, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ProfileHelpShortcuts } from '@/components/profile/ProfileHelpShortcuts';
@@ -16,15 +16,28 @@ import type {
   ProfileManagerSummary,
   ProfileOverviewPayload,
   ProfilePermissionSummaryItem,
+  ProfileTeamSummary,
 } from '@/types/profile';
 
 interface ProfileOverviewTabProps {
   profile: ProfileIdentityPayload;
   managers: ProfileManagerSummary[];
+  teamSummary: ProfileTeamSummary | null;
   annualLeaveSummary: ProfileAnnualLeaveSummary;
   permissionModules: ProfilePermissionSummaryItem[];
   helpShortcuts: ProfileOverviewPayload['help_shortcuts'];
   currentFleetAssignment: ProfileOverviewPayload['current_fleet_assignment'];
+}
+
+function isManagerOrHigher(profile: ProfileIdentityPayload): boolean {
+  const roleClass = profile.role?.role_class;
+  return (
+    roleClass === 'admin' ||
+    roleClass === 'manager' ||
+    profile.role?.is_manager_admin === true ||
+    profile.role?.is_super_admin === true ||
+    profile.super_admin === true
+  );
 }
 
 function getInitials(fullName: string): string {
@@ -69,6 +82,7 @@ function getRoleBadgeProps(profile: ProfileIdentityPayload): {
 export function ProfileOverviewTab({
   profile,
   managers,
+  teamSummary,
   annualLeaveSummary,
   permissionModules,
   helpShortcuts,
@@ -76,6 +90,7 @@ export function ProfileOverviewTab({
 }: ProfileOverviewTabProps) {
   const initials = getInitials(profile.full_name);
   const roleBadge = getRoleBadgeProps(profile);
+  const showTeamSummary = isManagerOrHigher(profile);
 
   return (
     <div className="space-y-4">
@@ -177,21 +192,46 @@ export function ProfileOverviewTab({
           <div className="grid gap-4 lg:grid-cols-2">
             <Card>
               <CardContent className="p-4 sm:p-3">
-                <p className="text-sm uppercase tracking-wide text-muted-foreground sm:text-xs">Team manager(s)</p>
-                {managers.length > 0 ? (
-                  <div className="mt-3 space-y-2 sm:mt-2">
-                    {managers.map((manager) => (
-                      <div key={`${manager.source}-${manager.id}`} className="rounded-lg border border-border bg-slate-900/30 p-3 sm:p-2.5">
-                        <p className="text-base font-medium text-foreground sm:text-sm">{manager.full_name}</p>
-                        <p className="text-sm text-muted-foreground sm:text-xs">{formatManagerSource(manager.source)}</p>
+                {showTeamSummary ? (
+                  <>
+                    <p className="text-sm uppercase tracking-wide text-muted-foreground sm:text-xs">Your team</p>
+                    {teamSummary?.team_id ? (
+                      <div className="mt-3 rounded-lg border border-avs-yellow/40 bg-avs-yellow/10 p-4 sm:mt-2 sm:p-3">
+                        <Users className="mb-2 h-6 w-6 text-avs-yellow sm:h-5 sm:w-5" />
+                        <p className="text-base font-medium text-foreground sm:text-sm">
+                          {teamSummary.team_name || 'Unnamed team'}
+                        </p>
+                        <p className="text-sm text-muted-foreground sm:text-xs">
+                          {teamSummary.member_count}{' '}
+                          {teamSummary.member_count === 1 ? 'team member' : 'team members'}
+                        </p>
                       </div>
-                    ))}
-                  </div>
+                    ) : (
+                      <p className="mt-3 flex items-center gap-2 text-base text-muted-foreground sm:gap-1.5 sm:text-sm">
+                        <AlertTriangle className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                        No team assigned
+                      </p>
+                    )}
+                  </>
                 ) : (
-                  <p className="mt-3 flex items-center gap-2 text-base text-muted-foreground sm:gap-1.5 sm:text-sm">
-                    <AlertTriangle className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
-                    No manager assigned
-                  </p>
+                  <>
+                    <p className="text-sm uppercase tracking-wide text-muted-foreground sm:text-xs">Team manager(s)</p>
+                    {managers.length > 0 ? (
+                      <div className="mt-3 space-y-2 sm:mt-2">
+                        {managers.map((manager) => (
+                          <div key={`${manager.source}-${manager.id}`} className="rounded-lg border border-border bg-slate-900/30 p-3 sm:p-2.5">
+                            <p className="text-base font-medium text-foreground sm:text-sm">{manager.full_name}</p>
+                            <p className="text-sm text-muted-foreground sm:text-xs">{formatManagerSource(manager.source)}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-3 flex items-center gap-2 text-base text-muted-foreground sm:gap-1.5 sm:text-sm">
+                        <AlertTriangle className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                        No manager assigned
+                      </p>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

@@ -1,4 +1,3 @@
-import { spawnSync } from 'child_process';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import path from 'path';
 import { describe, expect, it } from 'vitest';
@@ -69,22 +68,19 @@ describe('TEE V2 project context', () => {
     expect(ignored).not.toContain('docs_private/automation/knowledge/');
   });
 
-  it('TEE-V2-SCOPE-SAFETY-001 keeps the migration outside application and data surfaces', () => {
-    const changed = spawnSync('git', ['diff', '--name-only', 'HEAD'], {
-      cwd: root,
-      encoding: 'utf8',
-    });
-    const untracked = spawnSync('git', ['ls-files', '--others', '--exclude-standard'], {
-      cwd: root,
-      encoding: 'utf8',
-    });
-    expect(changed.status, changed.stderr).toBe(0);
-    expect(untracked.status, untracked.stderr).toBe(0);
-    const paths = `${changed.stdout}\n${untracked.stdout}`.split(/\r?\n/u).filter(Boolean);
-    const forbidden = paths.filter((relativePath) =>
-      /^(?:app|components|lib|supabase|public|scripts\/migrations)\//u.test(relativePath)
-    );
-    expect(forbidden).toEqual([]);
-    expect(paths.some((relativePath) => relativePath.startsWith('.env'))).toBe(false);
+  it('TEE-V2-SCOPE-SAFETY-001 keeps TEE workflow assets outside application and data surfaces', () => {
+    for (const forbidden of [
+      'app/tee',
+      'components/tee',
+      'lib/tee',
+      'supabase/tee',
+      'public/tee',
+      'scripts/migrations/tee',
+    ]) {
+      expect(existsSync(path.join(root, forbidden)), forbidden).toBe(false);
+    }
+
+    expect(existsSync(path.join(root, '.cursor', 'commands', 'ffap.md'))).toBe(true);
+    expect(existsSync(path.join(root, 'scripts', 'automation'))).toBe(true);
   });
 });

@@ -39,6 +39,12 @@ export interface ProfileManagerSummary {
   source: 'line_manager' | 'secondary_manager' | 'team_manager';
 }
 
+export interface ProfileTeamSummary {
+  team_id: string | null;
+  team_name: string | null;
+  member_count: number;
+}
+
 export interface ProfileTimesheetSummaryItem {
   id: string;
   week_ending: string;
@@ -106,6 +112,7 @@ export interface ProfileOverviewPayload {
   profile: ProfileIdentityPayload;
   can_edit_basic_fields: boolean;
   managers: ProfileManagerSummary[];
+  team_summary: ProfileTeamSummary | null;
   timesheets: ProfileTimesheetSummaryItem[];
   inspections: ProfileInspectionSummaryItem[];
   absences: ProfileAbsenceSummaryItem[];

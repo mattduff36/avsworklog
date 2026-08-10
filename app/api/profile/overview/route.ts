@@ -8,9 +8,10 @@ import { getPermissionLevelsForUser, getPermissionModules } from '@/lib/server/t
 import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
+import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { getCurrentFleetAssignmentSummary } from '@/lib/server/profile-fleet-assignments';
-import type { ProfileOverviewPayload } from '@/types/profile';
+import type { ProfileOverviewPayload, ProfileTeamSummary } from '@/types/profile';
 import {
   ALL_MODULES,
   MODULE_DESCRIPTIONS,
@@ -65,6 +66,54 @@ function getRelationValue<T>(value: T | T[] | null | undefined): T | null {
 function normalizeProjectStatus(status: string): ProfileOverviewPayload['project_assignments'][number]['status'] {
   if (status === 'signed' || status === 'read') return status;
   return 'pending';
+}
+
+function isManagerOrHigherRole(roleValue: Record<string, unknown> | null, superAdmin: boolean): boolean {
+  const roleClass = roleValue?.role_class;
+  return (
+    roleClass === 'admin' ||
+    roleClass === 'manager' ||
+    roleValue?.is_manager_admin === true ||
+    roleValue?.is_super_admin === true ||
+    superAdmin
+  );
+}
+
+async function buildTeamSummary(
+  admin: ReturnType<typeof createAdminClient>,
+  teamValue: Record<string, unknown> | null
+): Promise<ProfileTeamSummary> {
+  const teamId = typeof teamValue?.id === 'string' ? teamValue.id : null;
+  const teamName = typeof teamValue?.name === 'string' ? teamValue.name : null;
+
+  if (!teamId) {
+    return {
+      team_id: null,
+      team_name: null,
+      member_count: 0,
+    };
+  }
+
+  const { data, error } = await admin
+    .from('profiles')
+    .select('id, full_name, employee_id, is_placeholder')
+    .eq('team_id', teamId)
+    .eq('is_placeholder', false);
+
+  if (error) throw error;
+
+  return {
+    team_id: teamId,
+    team_name: teamName,
+    member_count: filterHiddenSystemTestAccounts(
+      ((data || []) as Array<{
+        id: string;
+        full_name: string | null;
+        employee_id: string | null;
+        is_placeholder: boolean | null;
+      }>)
+    ).length,
+  };
 }
 
 async function buildManagerSummaries(
@@ -430,12 +479,23 @@ export async function GET() {
       }
     }
 
-    const [managers, projectAssignments, permissionSummary, currentFleetAssignment] = await Promise.all([
-      buildManagerSummaries(admin, profileRow, teamValue as Record<string, unknown> | null),
-      buildProjectAssignmentSummaries(admin, user.id),
-      buildPermissionSummary(admin, user.id),
-      getCurrentFleetAssignmentSummary(admin, user.id),
-    ]);
+    const showTeamSummary = isManagerOrHigherRole(
+      roleValue as Record<string, unknown> | null,
+      profileRow.super_admin === true
+    );
+
+    const [managers, teamSummary, projectAssignments, permissionSummary, currentFleetAssignment] =
+      await Promise.all([
+        showTeamSummary
+          ? Promise.resolve([])
+          : buildManagerSummaries(admin, profileRow, teamValue as Record<string, unknown> | null),
+        showTeamSummary
+          ? buildTeamSummary(admin, teamValue as Record<string, unknown> | null)
+          : Promise.resolve(null),
+        buildProjectAssignmentSummaries(admin, user.id),
+        buildPermissionSummary(admin, user.id),
+        getCurrentFleetAssignmentSummary(admin, user.id),
+      ]);
     const response: ProfileOverviewPayload = {
       prd_epic_id: PROFILE_HUB_PRD_EPIC_ID,
       profile: typedProfile as ProfileOverviewPayload['profile'],
@@ -443,6 +503,7 @@ export async function GET() {
         typedProfile as Parameters<typeof canEditOwnBasicProfileFields>[0]
       ),
       managers,
+      team_summary: teamSummary,
       timesheets: (timesheets || []) as ProfileOverviewPayload['timesheets'],
       inspections: mergedInspections,
       absences: ((absences || []) as Array<Record<string, unknown>>).map((absence) => ({
