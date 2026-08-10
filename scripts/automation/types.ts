@@ -156,6 +156,7 @@ export interface AutomationMonthlyMetrics {
 export type WorkflowEvidenceState = 'passed' | 'failed' | 'unknown';
 export type WorkflowTaskType = 'change' | 'planning' | 'review';
 export type WorkflowRisk = 'high' | 'routine';
+export type WorkflowLane = 'fast' | 'standard' | 'guarded' | 'critical';
 export type WorkflowParentTier = 'premium' | 'economical' | 'unknown';
 export type WorkflowRoutingDecision =
   | 'switched_to_economical'
@@ -268,7 +269,9 @@ export interface WorkflowReviewClosureState {
 }
 
 export interface WorkflowCompletionMarker {
-  schemaVersion: '1' | '2' | '3';
+  schemaVersion: '1' | '2' | '3' | '4';
+  /** Native V2 lane. Absent on legacy V1-V3 markers. */
+  lane?: WorkflowLane;
   taskId: string;
   taskType: WorkflowTaskType;
   risk: WorkflowRisk;
@@ -381,6 +384,8 @@ export interface WorkflowStopEvent {
   qualifies: boolean;
   qualificationReasons: string[];
   marker: WorkflowCompletionMarker | null;
+  /** Native V2 lane copied from V4 markers. */
+  lane?: WorkflowLane;
   markerStatus: 'present' | 'missing' | 'malformed';
   transcriptSignals: WorkflowTranscriptSignals | null;
   findings: WorkflowFinding[];
@@ -400,6 +405,13 @@ export interface WorkflowStopEvent {
   identityStatus?: WorkflowIdentityStatus;
   protocolPhase?: WorkflowProtocolPhase;
   hookDiagnostics?: WorkflowHookDiagnostics;
+  anomalyFlags?: string[];
+}
+
+export interface WorkflowAnomalySignal {
+  eventId: string;
+  recordedAt: string;
+  flags: string[];
 }
 
 export interface WorkflowWorkstreamRecord {
@@ -474,12 +486,14 @@ export interface WorkflowReviewState {
   /** Additive two-pass protocol records keyed by workstreamId. */
   protocolRecords?: Record<string, WorkflowProtocolRecord>;
   activeFinaliseContext?: WorkflowActiveFinaliseContext | null;
+  pendingAnomalySignals?: WorkflowAnomalySignal[];
 }
 
 export interface WorkflowReviewMetrics {
   qualifyingTaskCount: number;
   highRiskCount: number;
   routineCount: number;
+  laneCounts?: Record<WorkflowLane | 'unknown', number>;
   missingGateCount: number;
   missingFinalReviewCount: number;
   truncatedEvidenceCount: number;

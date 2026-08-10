@@ -540,6 +540,16 @@ export function reduceReviewStart(params: {
     if (!current.evidenceManifestPath) {
       return fail('first review requires a recorded preflight manifest', current);
     }
+    const validation = validateEvidenceManifest({
+      repoRoot: params.repoRoot,
+      workstreamId: params.workstreamId,
+      manifestPath: current.evidenceManifestPath,
+      requireKind: 'preflight',
+      expectedBaseCommit: current.baseCommit,
+    });
+    if (!validation.ok) {
+      return fail(`first review evidence is stale or invalid: ${validation.message}`, current);
+    }
   } else {
     if (current.phase !== 'fix_recorded') {
       return fail(`closure review-start requires fix_recorded (have ${current.phase})`, current);
@@ -553,6 +563,16 @@ export function reduceReviewStart(params: {
         current,
         WORKFLOW_ROUTING_REQUIRED_EXIT_CODE
       );
+    }
+    const validation = validateEvidenceManifest({
+      repoRoot: params.repoRoot,
+      workstreamId: params.workstreamId,
+      manifestPath: current.fixDeltaManifestPath,
+      requireKind: 'fix-delta',
+      expectedBaseCommit: current.baseCommit,
+    });
+    if (!validation.ok) {
+      return fail(`closure review evidence is stale or invalid: ${validation.message}`, current);
     }
   }
 

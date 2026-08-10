@@ -2,6 +2,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'fs';
 import path from 'path';
 import type { AutomationRunLog, AutomationStepLog } from './automation/types';
 import {
+  canReuseOrdinaryFinaliseStep,
+  type FinaliseModeKey,
   getProtocolSkippableFinaliseTasks,
   resolveActiveProtocolFinaliseContext,
 } from './automation/finalise-checkpoint';
@@ -14,7 +16,7 @@ export interface RecentFinaliseTaskRun {
   command: string;
   completedAt: string;
   completedAtMs: number;
-  source: 'terminal' | 'automation-log';
+  source: 'terminal' | 'automation-log' | 'exact-cache';
 }
 
 export interface RecentFinaliseTaskScanOptions {
@@ -28,6 +30,9 @@ export interface RecentFinaliseTaskScanOptions {
   recentWindowMs?: number;
   /** When true, only protocol checkpoints may skip (no mtime fallback). */
   preferProtocolCheckpoints?: boolean;
+  mode?: FinaliseModeKey;
+  /** Temporary opt-in compatibility path. Exact cache is the default. */
+  allowLegacyMtimeFallback?: boolean;
 }
 
 export type SkippableFinaliseTasks = Partial<Record<FinaliseTaskKey, RecentFinaliseTaskRun>>;
@@ -247,6 +252,39 @@ export function getSkippableFinaliseTasks(options: RecentFinaliseTaskScanOptions
       };
     }
     return skippableFromProtocol;
+  }
+
+  const mode = options.mode ?? 'finalise';
+  const exactCommands: Partial<Record<FinaliseTaskKey, string>> = {
+    build: 'npm run build',
+    'test-run': 'npm run test:run',
+    testsuite: 'npm run testsuite',
+  };
+  const exact: SkippableFinaliseTasks = {};
+  for (const [task, command] of Object.entries(exactCommands) as Array<
+    [FinaliseTaskKey, string]
+  >) {
+    const requiredArtifactPaths =
+      task === 'build' && options.buildArtifactPath ? [options.buildArtifactPath] : [];
+    const result = canReuseOrdinaryFinaliseStep({
+      repoRoot: options.repoRoot,
+      mode,
+      task,
+      command,
+      requiredArtifactPaths,
+    });
+    if (result.reusable && result.step?.endedAt) {
+      exact[task] = {
+        task,
+        command,
+        completedAt: result.step.endedAt,
+        completedAtMs: Date.parse(result.step.endedAt),
+        source: 'exact-cache',
+      };
+    }
+  }
+  if (!options.allowLegacyMtimeFallback) {
+    return exact;
   }
 
   const now = options.now ?? new Date();

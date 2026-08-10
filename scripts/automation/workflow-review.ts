@@ -76,6 +76,69 @@ function isQualifyingStatus(status: string | undefined, loopCount: number): bool
   return status === 'completed' && loopCount === 0;
 }
 
+export function detectWorkflowAnomalies(
+  event: Pick<
+    WorkflowStopEvent,
+    'lane' | 'marker' | 'markerStatus' | 'transcriptSignals' | 'findings' | 'protocolPhase'
+  >
+): string[] {
+  const flags = new Set<string>();
+  if (
+    (event.lane === 'fast' || event.lane === 'standard') &&
+    (event.transcriptSignals?.architectureGateTask ||
+      event.transcriptSignals?.finalDiffReviewerTask ||
+      event.marker?.reviewPasses?.some((pass) => pass.tier === 'premium'))
+  ) {
+    flags.add('unexpected-premium-review');
+  }
+  if ((event.marker?.reviewClosure?.failedPremiumReviewCount ?? 0) >= 2) {
+    flags.add('two-premium-review-failures');
+  }
+  if (event.transcriptSignals?.duplicateBroadSearchAfterExplore) {
+    flags.add('duplicate-broad-exploration');
+  }
+  if (event.markerStatus === 'malformed') {
+    flags.add('malformed-completion-evidence');
+  }
+  const criticalEvidenceExpected =
+    event.lane === 'critical' ||
+    event.transcriptSignals?.architectureGateTask === true ||
+    event.transcriptSignals?.finalDiffReviewerTask === true ||
+    event.findings.some((finding) =>
+      [
+        'missing-architecture-gate',
+        'invalid-architecture-review-source',
+        'missing-final-review',
+        'invalid-final-review-source',
+        'unresolved-gate-tests',
+      ].includes(finding.id)
+    );
+  if (
+    criticalEvidenceExpected &&
+    (event.markerStatus !== 'present' ||
+      event.findings.some((finding) =>
+        [
+          'missing-architecture-gate',
+          'invalid-architecture-review-source',
+          'missing-final-review',
+          'invalid-final-review-source',
+          'unresolved-gate-tests',
+        ].includes(finding.id)
+      ))
+  ) {
+    flags.add('malformed-critical-evidence');
+  }
+  if (
+    event.protocolPhase === 'routing_required' ||
+    event.findings.some((finding) =>
+      ['review-loop-unbounded', 'review-closure-bypass'].includes(finding.id)
+    )
+  ) {
+    flags.add('protocol-invariant');
+  }
+  return [...flags];
+}
+
 function readGitValue(repoRoot: string, args: string[]): string | undefined {
   const result = spawnSync('git', args, {
     cwd: repoRoot,
@@ -136,8 +199,16 @@ function buildSuggestionsFromFindings(
 export function buildWorkflowReviewMetrics(events: WorkflowStopEvent[]): WorkflowReviewMetrics {
   const estimate = estimatePremiumTokenReduction(events);
   const selectedModelCounts: Record<string, number> = {};
+  const laneCounts: NonNullable<WorkflowReviewMetrics['laneCounts']> = {
+    fast: 0,
+    standard: 0,
+    guarded: 0,
+    critical: 0,
+    unknown: 0,
+  };
   for (const event of events) {
     selectedModelCounts[event.selectedModel] = (selectedModelCounts[event.selectedModel] ?? 0) + 1;
+    laneCounts[event.lane ?? event.marker?.lane ?? 'unknown'] += 1;
   }
   const planningEvents = events.filter((event) => event.marker?.taskType === 'planning');
   const recommendationAdherenceCounts: Record<WorkflowPlanRecommendationAdherence, number> = {
@@ -165,6 +236,7 @@ export function buildWorkflowReviewMetrics(events: WorkflowStopEvent[]): Workflo
     qualifyingTaskCount: events.length,
     highRiskCount: events.filter((event) => event.marker?.risk === 'high').length,
     routineCount: events.filter((event) => event.marker?.risk === 'routine').length,
+    laneCounts,
     missingGateCount: events.filter((event) =>
       event.findings.some((finding) => finding.id === 'missing-architecture-gate' && finding.status === 'failed')
     ).length,
@@ -197,7 +269,6 @@ export function buildWorkflowReviewMetrics(events: WorkflowStopEvent[]): Workflo
 function selectEventsForReview(params: {
   events: WorkflowStopEvent[];
   state: WorkflowReviewState;
-  incomingMonthKey: string;
 }): { windowEvents: WorkflowStopEvent[]; reason: string } | null {
   const unreviewed = params.events.filter(
     (event) => event.qualifies && params.state.unreviewedEventIds.includes(event.eventId)
@@ -205,19 +276,15 @@ function selectEventsForReview(params: {
 
   if (unreviewed.length === 0) return null;
 
-  const previousMonthKeys = [...new Set(unreviewed.map((event) => event.monthKey))]
-    .filter((key) => key < params.incomingMonthKey)
-    .sort();
-
-  if (previousMonthKeys.length > 0) {
-    const previousMonth = previousMonthKeys[0];
-    const remainder = unreviewed.filter((event) => event.monthKey === previousMonth);
-    if (remainder.length > 0 && remainder.length < WORKFLOW_REVIEW_THRESHOLD) {
-      return {
-        windowEvents: remainder,
-        reason: `month-boundary backstop for ${previousMonth} remainder (${remainder.length})`,
-      };
-    }
+  const anomalySignals = params.state.pendingAnomalySignals ?? [];
+  if (anomalySignals.length > 0) {
+    const flags = [
+      ...new Set(anomalySignals.flatMap((signal) => signal.flags)),
+    ].sort();
+    return {
+      windowEvents: unreviewed.slice(0, WORKFLOW_REVIEW_THRESHOLD),
+      reason: `deterministic anomaly: ${flags.join(',')}`,
+    };
   }
 
   if (unreviewed.length >= WORKFLOW_REVIEW_THRESHOLD) {
@@ -457,7 +524,7 @@ export async function buildWorkflowStopEvent(
     failedPremiumReviewCount,
   });
 
-  return {
+  const event: WorkflowStopEvent = {
     schemaVersion: '2',
     eventId: generationHash,
     recordedAt: now.toISOString(),
@@ -474,6 +541,7 @@ export async function buildWorkflowStopEvent(
       ? qualificationReasons
       : [...qualificationReasons, 'missing-strong-qualification-signal'],
     marker: markerParse.marker,
+    lane: markerParse.marker?.lane,
     markerStatus: markerParse.status,
     transcriptSignals,
     findings,
@@ -496,6 +564,8 @@ export async function buildWorkflowStopEvent(
       transcriptStatus,
     },
   };
+  event.anomalyFlags = detectWorkflowAnomalies(event);
+  return event;
 }
 
 export async function processWorkflowStopEvent(
@@ -546,6 +616,17 @@ export async function processWorkflowStopEvent(
       unreviewedEventIds: written.created && event.qualifies
         ? [...state.unreviewedEventIds, event.eventId]
         : state.unreviewedEventIds,
+      pendingAnomalySignals:
+        written.created && (event.anomalyFlags?.length ?? 0) > 0
+          ? [
+              ...(state.pendingAnomalySignals ?? []),
+              {
+                eventId: event.eventId,
+                recordedAt: event.recordedAt,
+                flags: event.anomalyFlags ?? [],
+              },
+            ].slice(-100)
+          : state.pendingAnomalySignals,
     };
     if (written.created && event.workstreamId) {
       nextState = upsertWorkstreamRecord(nextState, {
@@ -593,11 +674,22 @@ export async function processWorkflowStopEvent(
       nextState.pendingFollowUpPath = null;
     }
 
+    if (
+      (nextState.pendingAnomalySignals?.length ?? 0) === 0 &&
+      nextState.unreviewedEventIds.length < WORKFLOW_REVIEW_THRESHOLD
+    ) {
+      saveWorkflowReviewState(paths.statePath, nextState);
+      return {
+        createdEvent: written.created,
+        reviewTriggered: false,
+        reason: `waiting (${nextState.unreviewedEventIds.length}/${WORKFLOW_REVIEW_THRESHOLD})`,
+      };
+    }
+
     const allEvents = listWorkflowEvents(paths.eventsDirectory);
     const selection = selectEventsForReview({
       events: allEvents,
       state: nextState,
-      incomingMonthKey: event.monthKey,
     });
 
     if (!selection) {
@@ -673,6 +765,7 @@ export async function processWorkflowStopEvent(
       lastReviewedEventId: selection.windowEvents[selection.windowEvents.length - 1]?.eventId ?? null,
       unreviewedEventIds: nextState.unreviewedEventIds.filter((id) => !reviewedIds.has(id)),
       pendingFollowUpPath: pendingPath ?? null,
+      pendingAnomalySignals: [],
     };
     for (const eventId of reviewedIds) {
       reviewedState = attachEventToReviewWindow(
@@ -711,5 +804,6 @@ export function formatWorkflowReviewDiagnostics(repoRoot = process.cwd()): strin
     `Unreviewed: ${state.unreviewedEventIds.length}`,
     `Last review: ${state.lastReviewAt ?? 'never'}`,
     `Pending follow-up: ${state.pendingFollowUpPath ?? 'none'}`,
+    `Pending anomalies: ${state.pendingAnomalySignals?.length ?? 0}`,
   ].join('\n');
 }

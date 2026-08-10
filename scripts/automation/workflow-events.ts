@@ -19,7 +19,7 @@ import type {
 } from './types';
 
 export const WORKFLOW_SCRIPT_NAME = 'workflow-review' as const;
-export const WORKFLOW_REVIEW_THRESHOLD = 5;
+export const WORKFLOW_REVIEW_THRESHOLD = 25;
 const LOCK_STALE_MS = 30_000;
 
 export interface WorkflowPaths {
@@ -62,6 +62,7 @@ export function createEmptyWorkflowReviewState(): WorkflowReviewState {
     workstreams: {},
     protocolRecords: {},
     activeFinaliseContext: null,
+    pendingAnomalySignals: [],
   };
 }
 
@@ -110,6 +111,9 @@ export function loadWorkflowReviewState(statePath: string): WorkflowReviewState 
           !Array.isArray(parsed.activeFinaliseContext)
             ? parsed.activeFinaliseContext
             : null,
+        pendingAnomalySignals: Array.isArray(parsed.pendingAnomalySignals)
+          ? parsed.pendingAnomalySignals
+          : [],
       };
     }
   } catch {
@@ -192,6 +196,33 @@ export function saveWorkflowReviewState(statePath: string, state: WorkflowReview
   writeJsonAtomic(statePath, {
     ...state,
     updatedAt: new Date().toISOString(),
+  });
+}
+
+export function appendWorkflowAnomalySignal(params: {
+  repoRoot: string;
+  eventId: string;
+  flags: string[];
+  recordedAt?: string;
+}): void {
+  if (params.flags.length === 0) return;
+  const paths = getWorkflowPaths(params.repoRoot);
+  withWorkflowLock(paths.lockPath, () => {
+    const state = loadWorkflowReviewState(paths.statePath);
+    if (state.pendingAnomalySignals?.some((signal) => signal.eventId === params.eventId)) {
+      return;
+    }
+    saveWorkflowReviewState(paths.statePath, {
+      ...state,
+      pendingAnomalySignals: [
+        ...(state.pendingAnomalySignals ?? []),
+        {
+          eventId: params.eventId,
+          recordedAt: params.recordedAt ?? new Date().toISOString(),
+          flags: [...new Set(params.flags)],
+        },
+      ].slice(-100),
+    });
   });
 }
 

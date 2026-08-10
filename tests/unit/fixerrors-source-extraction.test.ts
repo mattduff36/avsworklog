@@ -3,6 +3,7 @@ import { tmpdir } from 'os';
 import { dirname, join } from 'path';
 import { describe, expect, it } from 'vitest';
 import {
+  clusterErrorPatterns,
   extractSourceFilesForError,
   groupIntoPatterns,
   type ErrorLogEntry,
@@ -38,6 +39,50 @@ function makeError(overrides: Partial<ErrorLogEntry>): ErrorLogEntry {
 }
 
 describe('fixerrors source extraction', () => {
+  it('routes independent root-cause clusters without critical spillover', () => {
+    const patterns = groupIntoPatterns([
+      makeError({
+        id: 'rls',
+        error_message: 'RLS permission denied for table inspections',
+        error_type: 'PostgrestError',
+        component_name: 'InspectionSave',
+        error_stack: 'at app/api/inspections/route.ts:10:2',
+      }),
+      makeError({
+        id: 'network',
+        error_message: 'Failed to fetch third-party map tiles',
+        error_type: 'TypeError',
+        component_name: 'Map',
+      }),
+    ]);
+    const clusters = clusterErrorPatterns(patterns);
+    expect(
+      clusters.find((cluster) => cluster.rootCauseFamily === 'auth-permissions-security')
+    ).toMatchObject({ lane: 'critical', action: 'critical-gates' });
+    expect(
+      clusters.find((cluster) => cluster.rootCauseFamily === 'external-network')
+    ).toMatchObject({ lane: 'report-only', action: 'report-only' });
+  });
+
+  it('keeps critical security evidence above mixed network wording', () => {
+    const clusters = clusterErrorPatterns([
+      ...groupIntoPatterns([
+        makeError({
+          id: 'mixed',
+          error_message: 'Supabase RLS permission denied: failed to fetch inspections',
+          error_type: 'PostgrestError',
+          component_name: 'InspectionSave',
+        }),
+      ]),
+    ]);
+    expect(clusters).toHaveLength(1);
+    expect(clusters[0]).toMatchObject({
+      rootCauseFamily: 'auth-permissions-security',
+      lane: 'critical',
+      action: 'critical-gates',
+    });
+  });
+
   it('infers App Router source files from minified Next app chunk URLs', () => {
     const root = createFixture({
       'app/(dashboard)/van-inspections/new/page.tsx': 'export default function Page() { return null; }\n',

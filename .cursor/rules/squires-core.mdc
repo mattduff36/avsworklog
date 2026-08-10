@@ -1,0 +1,17 @@
+---
+description: Durable Squires repository safety, Git, stack, and handoff rules.
+alwaysApply: true
+---
+
+# Squires core
+
+- Stay on the current branch unless the user explicitly instructs otherwise.
+- Commit completed coding tasks locally unless the task is planning/review-only or the user says not to commit. Use `type(scope): summary`.
+- Never push unless the user writes `push to GitHub`, invokes `/fap` or `/ffap`, or explicitly requests `finalise and push`, `finalise full and push`, or `finalise:push`. State the branch and summary before pushing.
+- Never destructively change production data without explicit permission.
+- Treat database, schema, persistence, migration, auth, permissions/RLS, security, money, concurrency, irreversible operations, and production-data risk as CRITICAL.
+- For database/persistence intent, load `.cursor/rules/database-migrations.mdc` and the migration guide before acting.
+- Use the existing TypeScript, Node.js, Next.js App Router, React, shadcn/ui, Radix UI, and Tailwind patterns.
+- Keep functions typed and focused; update targeted tests when behavior changes.
+- Do not expose environment values or secrets.
+- Run application builds only when the user authorizes a test build. Project-specific rules override generic TEE when stricter.

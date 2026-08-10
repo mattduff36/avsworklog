@@ -37,6 +37,15 @@ export interface FinaliseCheckpointRecord {
   steps: Partial<Record<FinaliseTaskKey, FinaliseCheckpointStep>>;
 }
 
+export type FinaliseModeKey = 'finalise' | 'finalise-full' | 'fap' | 'ffap';
+
+export interface OrdinaryFinaliseCacheRecord {
+  schemaVersion: '1';
+  mode: FinaliseModeKey;
+  updatedAt: string;
+  steps: Partial<Record<FinaliseTaskKey, FinaliseCheckpointStep>>;
+}
+
 function runGit(repoRoot: string, args: string[]): string {
   const result = spawnSync('git', args, {
     cwd: repoRoot,
@@ -84,6 +93,59 @@ function listDirtyFingerprint(repoRoot: string): string {
   return hashText(parts.join('\n'));
 }
 
+function listDirtyPaths(repoRoot: string): string[] {
+  const output = runGit(repoRoot, ['status', '--porcelain', '-uall', '-z']);
+  if (!output) return [];
+  const records = output.split('\0');
+  const paths: string[] = [];
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    if (!record || record.length < 4) continue;
+    const status = record.slice(0, 2);
+    const firstPath = record.slice(3);
+    if (status.includes('R') || status.includes('C')) {
+      index += 1;
+      const renamedPath = records[index];
+      if (renamedPath) paths.push(renamedPath.replace(/\\/g, '/'));
+      continue;
+    }
+    paths.push(firstPath.replace(/\\/g, '/'));
+  }
+  return [...new Set(paths)].sort();
+}
+
+function isTaskRelevantPath(task: FinaliseTaskKey, relativePath: string): boolean {
+  if (task === 'migrations' || task === 'db-validate') {
+    return relativePath.startsWith('supabase/') || /migration/iu.test(relativePath);
+  }
+  if (relativePath.startsWith('.cursor/')) {
+    return task === 'test-run';
+  }
+  if (
+    relativePath.startsWith('docs/') ||
+    relativePath.startsWith('docs_private/') ||
+    relativePath.startsWith('plans/')
+  ) {
+    return false;
+  }
+  if (task === 'build') {
+    return !relativePath.startsWith('tests/') && !relativePath.startsWith('testsuite/');
+  }
+  return true;
+}
+
+function taskDirtyFingerprint(repoRoot: string, task: FinaliseTaskKey): string {
+  const parts = listDirtyPaths(repoRoot)
+    .filter((relativePath) => isTaskRelevantPath(task, relativePath))
+    .map((relativePath) => {
+      const absolute = path.join(repoRoot, relativePath);
+      return existsSync(absolute) && statSync(absolute).isFile()
+        ? `${relativePath}:${hashFile(absolute)}`
+        : `${relativePath}:absent`;
+    });
+  return hashText(parts.join('\n'));
+}
+
 function collectSqlFiles(directory: string, prefix = ''): string[] {
   if (!existsSync(directory)) return [];
   const entries = readdirSync(directory, { withFileTypes: true });
@@ -109,16 +171,146 @@ function migrationFingerprint(repoRoot: string): string {
   );
 }
 
-function environmentFingerprint(): string {
-  return hashText(
-    [
-      `node:${process.version}`,
-      `platform:${process.platform}`,
-      `arch:${process.arch}`,
-      // Safe keyed indicators only — never raw env secrets.
-      `ci:${process.env.CI ? '1' : '0'}`,
-      `vercel:${process.env.VERCEL ? '1' : '0'}`,
-    ].join('|')
+const ORDINARY_REUSE_FINGERPRINTED_ENV_KEYS = new Set([
+  'ANALYZE',
+  'BROWSERSLIST_ENV',
+  'CI',
+  'NEXT_RUNTIME',
+  'NODE_ENV',
+  'NODE_OPTIONS',
+  'SKIP_BUILD_CHECKS',
+  'TZ',
+  'UV_THREADPOOL_SIZE',
+  'VERCEL',
+  'VERCEL_ENV',
+]);
+
+const ORDINARY_REUSE_AMBIENT_ENV_KEYS = new Set([
+  '_',
+  'ALLUSERSPROFILE',
+  'APPDATA',
+  'COLORTERM',
+  'COMMONPROGRAMFILES',
+  'COMMONPROGRAMFILES(X86)',
+  'COMMONPROGRAMW6432',
+  'COMPUTERNAME',
+  'COMSPEC',
+  'DRIVERDATA',
+  'GDK_BACKEND',
+  'HOME',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'HOSTNAME',
+  'LANG',
+  'LOCALAPPDATA',
+  'LOGNAME',
+  'MSYSTEM',
+  'NUMBER_OF_PROCESSORS',
+  'OLDPWD',
+  'ORIGINAL_XDG_CURRENT_DESKTOP',
+  'OS',
+  'PATH',
+  'PATHEXT',
+  'PROCESSOR_ARCHITECTURE',
+  'PROCESSOR_IDENTIFIER',
+  'PROCESSOR_LEVEL',
+  'PROCESSOR_REVISION',
+  'PROGRAMDATA',
+  'PROGRAMFILES',
+  'PROGRAMFILES(X86)',
+  'PROGRAMW6432',
+  'PROMPT',
+  'PSMODULEPATH',
+  'PUBLIC',
+  'PWD',
+  'SESSIONNAME',
+  'SHELL',
+  'SHLVL',
+  'SSH_AGENT_PID',
+  'SSH_AUTH_SOCK',
+  'SYSTEMDRIVE',
+  'SYSTEMROOT',
+  'TEMP',
+  'TERM',
+  'TERM_PROGRAM',
+  'TERM_PROGRAM_VERSION',
+  'TMP',
+  'TMPDIR',
+  'USER',
+  'USERDOMAIN',
+  'USERDOMAIN_ROAMINGPROFILE',
+  'USERNAME',
+  'USERPROFILE',
+  'WINDIR',
+  'WT_SESSION',
+]);
+
+const ORDINARY_REUSE_AMBIENT_ENV_PREFIXES = [
+  'COREPACK_',
+  'CURSOR_',
+  'GIT_',
+  'LC_',
+  'MINGW_',
+  'NPM_',
+  'NVM_',
+  'PNPM_',
+  'VITEST',
+  'VOLTA_',
+  'VSCODE_',
+  'WSL_',
+  'XDG_',
+  'YARN_',
+];
+
+function declaredEnvironmentKeys(repoRoot: string): Set<string> {
+  const filePath = path.join(repoRoot, '.env.local');
+  if (!existsSync(filePath)) return new Set();
+  const keys = new Set<string>();
+  for (const line of readFileSync(filePath, 'utf8').split(/\r?\n/u)) {
+    const matched = line.match(/^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=/u);
+    if (matched?.[1]) keys.add(matched[1].toUpperCase());
+  }
+  return keys;
+}
+
+function isKnownOrdinaryReuseEnvironmentKey(
+  key: string,
+  declaredKeys: Set<string>
+): boolean {
+  const normalized = key.toUpperCase();
+  return (
+    normalized.startsWith('NEXT_PUBLIC_') ||
+    ORDINARY_REUSE_FINGERPRINTED_ENV_KEYS.has(normalized) ||
+    ORDINARY_REUSE_AMBIENT_ENV_KEYS.has(normalized) ||
+    ORDINARY_REUSE_AMBIENT_ENV_PREFIXES.some((prefix) => normalized.startsWith(prefix)) ||
+    declaredKeys.has(normalized)
+  );
+}
+
+function environmentFingerprint(repoRoot: string): string {
+  const declaredKeys = declaredEnvironmentKeys(repoRoot);
+  const fingerprintedEnvironment = Object.entries(process.env)
+    .filter(([key]) => isKnownOrdinaryReuseEnvironmentKey(key, declaredKeys))
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => [key, value ?? '']);
+  return hashText([
+    `node:${process.version}`,
+    `platform:${process.platform}`,
+    `arch:${process.arch}`,
+    `environment:${hashText(JSON.stringify(fingerprintedEnvironment))}`,
+    `envLocal:${hashFile(path.join(repoRoot, '.env.local'))}`,
+  ].join('|'));
+}
+
+function ordinaryReuseEnvironmentSupported(repoRoot: string): boolean {
+  const declaredKeys = declaredEnvironmentKeys(repoRoot);
+  return (
+    !process.env.CI &&
+    !process.env.VERCEL &&
+    process.env.NODE_ENV !== 'production' &&
+    Object.keys(process.env).every((key) =>
+      isKnownOrdinaryReuseEnvironmentKey(key, declaredKeys)
+    )
   );
 }
 
@@ -183,9 +375,180 @@ function inputFingerprint(repoRoot: string): string {
       `next:${hashFile(path.join(repoRoot, 'next.config.ts'))}`,
       `nextAlt:${hashFile(path.join(repoRoot, 'next.config.js'))}`,
       `migrations:${migrationFingerprint(repoRoot)}`,
-      `env:${environmentFingerprint()}`,
+      `env:${environmentFingerprint(repoRoot)}`,
     ].join('\n')
   );
+}
+
+export function getFinaliseTaskFingerprint(params: {
+  repoRoot: string;
+  task: FinaliseTaskKey;
+  mode: FinaliseModeKey;
+  command: string;
+}): string {
+  const taskConfigPaths =
+    params.task === 'build'
+      ? ['tsconfig.json', 'next.config.ts', 'next.config.js', 'next.config.mjs']
+      : params.task === 'test-run'
+        ? ['tsconfig.json', 'tsconfig.tests.json', 'vitest.config.ts', 'vitest.workspace.ts']
+        : params.task === 'testsuite'
+          ? [
+              'tsconfig.json',
+              'tsconfig.tests.json',
+              'testsuite/config/vitest.config.ts',
+              'testsuite/config/playwright.config.ts',
+            ]
+          : [];
+  return hashText(
+    [
+      `task:${params.task}`,
+      `mode:${params.mode}`,
+      `command:${params.command}`,
+      `head:${runGit(params.repoRoot, ['rev-parse', 'HEAD'])}`,
+      `dirty:${taskDirtyFingerprint(params.repoRoot, params.task)}`,
+      `lock:${hashFile(path.join(params.repoRoot, 'package-lock.json'))}`,
+      `pkg:${hashFile(path.join(params.repoRoot, 'package.json'))}`,
+      ...taskConfigPaths.map(
+        (relativePath) => `${relativePath}:${hashFile(path.join(params.repoRoot, relativePath))}`
+      ),
+      `env:${environmentFingerprint(params.repoRoot)}`,
+      params.task === 'migrations' || params.task === 'db-validate'
+        ? `migrations:${migrationFingerprint(params.repoRoot)}`
+        : '',
+    ].join('\n')
+  );
+}
+
+export function getFinaliseRepairSafetyFingerprint(params: {
+  repoRoot: string;
+  task: FinaliseTaskKey;
+  mode: FinaliseModeKey;
+  command: string;
+}): string {
+  return hashText(
+    [
+      `task:${params.task}`,
+      `mode:${params.mode}`,
+      `command:${params.command}`,
+      `head:${runGit(params.repoRoot, ['rev-parse', 'HEAD'])}`,
+      `lock:${hashFile(path.join(params.repoRoot, 'package-lock.json'))}`,
+      `pkg:${hashFile(path.join(params.repoRoot, 'package.json'))}`,
+      `tsconfig:${hashFile(path.join(params.repoRoot, 'tsconfig.json'))}`,
+      `next:${hashFile(path.join(params.repoRoot, 'next.config.ts'))}`,
+      `vitest:${hashFile(path.join(params.repoRoot, 'vitest.config.ts'))}`,
+      `env:${environmentFingerprint(params.repoRoot)}`,
+    ].join('\n')
+  );
+}
+
+export function getOrdinaryFinaliseCachePath(
+  repoRoot: string,
+  mode: FinaliseModeKey
+): string {
+  return path.join(
+    repoRoot,
+    'docs_private',
+    'automation',
+    'finalise-cache',
+    `${mode}.json`
+  );
+}
+
+export function readOrdinaryFinaliseCache(
+  repoRoot: string,
+  mode: FinaliseModeKey
+): OrdinaryFinaliseCacheRecord | null {
+  const filePath = getOrdinaryFinaliseCachePath(repoRoot, mode);
+  if (!existsSync(filePath)) return null;
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as OrdinaryFinaliseCacheRecord;
+    if (parsed.schemaVersion !== '1' || parsed.mode !== mode || !parsed.steps) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function markOrdinaryFinaliseStep(params: {
+  repoRoot: string;
+  mode: FinaliseModeKey;
+  task: FinaliseTaskKey;
+  status: FinaliseCheckpointStep['status'];
+  command: string;
+  exitCode?: number | null;
+  artifactPaths?: string[];
+}): OrdinaryFinaliseCacheRecord {
+  const current = readOrdinaryFinaliseCache(params.repoRoot, params.mode);
+  const now = new Date().toISOString();
+  const previous = current?.steps[params.task];
+  const artifactHashes: Record<string, string> = {};
+  for (const relative of params.artifactPaths ?? []) {
+    const absolute = path.isAbsolute(relative)
+      ? relative
+      : path.join(params.repoRoot, relative);
+    artifactHashes[relative.replace(/\\/g, '/')] = hashFile(absolute);
+  }
+  const step: FinaliseCheckpointStep = {
+    task: params.task,
+    status: params.status,
+    startedAt: previous?.startedAt ?? now,
+    endedAt: params.status === 'started' ? undefined : now,
+    inputFingerprint: getFinaliseTaskFingerprint(params),
+    artifactHashes,
+    command: params.command,
+    exitCode: params.exitCode,
+  };
+  const next: OrdinaryFinaliseCacheRecord = {
+    schemaVersion: '1',
+    mode: params.mode,
+    updatedAt: now,
+    steps: {
+      ...(current?.steps ?? {}),
+      [params.task]: step,
+    },
+  };
+  writeJsonAtomic(getOrdinaryFinaliseCachePath(params.repoRoot, params.mode), next);
+  return next;
+}
+
+export function canReuseOrdinaryFinaliseStep(params: {
+  repoRoot: string;
+  mode: FinaliseModeKey;
+  task: FinaliseTaskKey;
+  command: string;
+  requiredArtifactPaths?: string[];
+}): { reusable: boolean; reason: string; step?: FinaliseCheckpointStep } {
+  if (params.task === 'migrations' || params.task === 'db-validate') {
+    return { reusable: false, reason: 'ordinary-database-reuse-disabled' };
+  }
+  if (!ordinaryReuseEnvironmentSupported(params.repoRoot)) {
+    return { reusable: false, reason: 'ordinary-reuse-environment-unsupported' };
+  }
+  const cache = readOrdinaryFinaliseCache(params.repoRoot, params.mode);
+  if (!cache) return { reusable: false, reason: 'cache-missing-or-corrupt' };
+  const step = cache.steps[params.task];
+  if (!step) return { reusable: false, reason: 'step-missing' };
+  if (step.status !== 'passed') {
+    return { reusable: false, reason: `step-status=${step.status}` };
+  }
+  if (step.command !== params.command) {
+    return { reusable: false, reason: 'command-mismatch' };
+  }
+  if (step.inputFingerprint !== getFinaliseTaskFingerprint(params)) {
+    return { reusable: false, reason: 'input-fingerprint-mismatch' };
+  }
+  for (const relative of params.requiredArtifactPaths ?? []) {
+    const normalized = relative.replace(/\\/g, '/');
+    const absolute = path.isAbsolute(relative)
+      ? relative
+      : path.join(params.repoRoot, relative);
+    const expected = step.artifactHashes[normalized];
+    if (!expected) return { reusable: false, reason: `artifact-untracked:${normalized}` };
+    if (hashFile(absolute) !== expected) {
+      return { reusable: false, reason: `artifact-mismatch:${normalized}` };
+    }
+  }
+  return { reusable: true, reason: 'exact-match', step };
 }
 
 export function getCheckpointDirectory(repoRoot: string, workstreamId: string): string {
@@ -249,7 +612,7 @@ export function createOrLoadFinaliseCheckpoint(params: {
     inputFingerprint: inputFingerprint(params.repoRoot),
     migrationFingerprint: migrationFingerprint(params.repoRoot),
     liveSchemaFingerprint: liveSchemaFingerprint(),
-    environmentFingerprint: environmentFingerprint(),
+    environmentFingerprint: environmentFingerprint(params.repoRoot),
     steps: {},
   };
   mkdirSync(getCheckpointDirectory(params.repoRoot, params.workstreamId), { recursive: true });
@@ -298,7 +661,7 @@ export function markFinaliseCheckpointStep(params: {
     inputFingerprint: inputFingerprint(params.repoRoot),
     migrationFingerprint: migrationFingerprint(params.repoRoot),
     liveSchemaFingerprint: liveSchemaFingerprint(),
-    environmentFingerprint: environmentFingerprint(),
+    environmentFingerprint: environmentFingerprint(params.repoRoot),
     headCommit: runGit(params.repoRoot, ['rev-parse', 'HEAD']) || current.headCommit,
     steps: {
       ...current.steps,
@@ -342,7 +705,7 @@ export function canResumeFinaliseCheckpointStep(params: {
       return { resumable: false, reason: 'live-schema-fingerprint-mismatch' };
     }
   }
-  if (record.environmentFingerprint !== environmentFingerprint()) {
+  if (record.environmentFingerprint !== environmentFingerprint(params.repoRoot)) {
     return { resumable: false, reason: 'environment-fingerprint-mismatch' };
   }
 

@@ -5,6 +5,7 @@ import type {
   WorkflowFinalReviewStatus,
   WorkflowGateDecision,
   WorkflowHandoffStatus,
+  WorkflowLane,
   WorkflowParentTier,
   WorkflowPlanRecommendationAdherence,
   WorkflowRecommendedBuildModel,
@@ -22,11 +23,13 @@ import { isWorkflowRoutingDecisionCoherent } from './workflow-model-tier';
 export const WORKFLOW_MARKER_PREFIX_V1 = '<!-- workflow-completion-marker:v1';
 export const WORKFLOW_MARKER_PREFIX_V2 = '<!-- workflow-completion-marker:v2';
 export const WORKFLOW_MARKER_PREFIX_V3 = '<!-- workflow-completion-marker:v3';
-export const WORKFLOW_MARKER_PREFIX = WORKFLOW_MARKER_PREFIX_V3;
+export const WORKFLOW_MARKER_PREFIX_V4 = '<!-- workflow-completion-marker:v4';
+export const WORKFLOW_MARKER_PREFIX = WORKFLOW_MARKER_PREFIX_V4;
 export const WORKFLOW_MARKER_SUFFIX = '-->';
 
 const TASK_TYPES = new Set<WorkflowTaskType>(['change', 'planning', 'review']);
 const RISKS = new Set<WorkflowRisk>(['high', 'routine']);
+const LANES = new Set<WorkflowLane>(['fast', 'standard', 'guarded', 'critical']);
 const GATE_DECISIONS = new Set<WorkflowGateDecision>([
   'approved',
   'approved_with_conditions',
@@ -93,6 +96,10 @@ function isObject(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+export function normalizeWorkflowLaneToRisk(lane: WorkflowLane): WorkflowRisk {
+  return lane === 'fast' || lane === 'standard' ? 'routine' : 'high';
 }
 
 function parseOptionalStringArray(
@@ -327,9 +334,14 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
 
   const errors: string[] = [];
   const schemaVersion = asString(value.schemaVersion);
+  const lane = asString(value.lane) as WorkflowLane | null;
   const taskId = asString(value.taskId);
   const taskType = asString(value.taskType) as WorkflowTaskType | null;
-  const risk = asString(value.risk) as WorkflowRisk | null;
+  const rawRisk = asString(value.risk) as WorkflowRisk | null;
+  const risk =
+    schemaVersion === '4' && lane && LANES.has(lane)
+      ? normalizeWorkflowLaneToRisk(lane)
+      : rawRisk;
   const initialParentTier = asString(value.initialParentTier) as WorkflowParentTier | null;
   const executionParentTier = asString(value.executionParentTier) as WorkflowParentTier | null;
   const routingDecision = asString(value.routingDecision) as WorkflowRoutingDecision | null;
@@ -350,7 +362,8 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
         .filter((reason): reason is string => Boolean(reason))
     : [];
   const finalReviewRequired =
-    risk === 'high' ||
+    lane === 'critical' ||
+    (schemaVersion !== '4' && risk === 'high') ||
     reviewEscalationReasons.length > 0 ||
     value.finalReviewRequired === true;
   const rawIndependentReasons = value.independentReviewReasons;
@@ -362,13 +375,28 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   const independentReviewRequired =
     value.independentReviewRequired === true || independentReviewReasons.length > 0;
 
-  if (schemaVersion !== '1' && schemaVersion !== '2' && schemaVersion !== '3') {
-    errors.push('schemaVersion must be "1", "2", or "3"');
+  if (
+    schemaVersion !== '1' &&
+    schemaVersion !== '2' &&
+    schemaVersion !== '3' &&
+    schemaVersion !== '4'
+  ) {
+    errors.push('schemaVersion must be "1", "2", "3", or "4"');
   }
   if (!taskId) errors.push('taskId is required');
   if (!taskType || !TASK_TYPES.has(taskType)) errors.push('taskType must be change|planning|review');
-  if (!risk || !RISKS.has(risk)) errors.push('risk must be high|routine');
-  if (typeof exploreCanonical !== 'boolean') errors.push('exploreCanonical must be boolean');
+  if (schemaVersion === '4') {
+    if (!lane || !LANES.has(lane)) errors.push('lane must be fast|standard|guarded|critical');
+    if (rawRisk && (!RISKS.has(rawRisk) || rawRisk !== risk)) {
+      errors.push('risk must match the legacy normalization for lane when provided');
+    }
+    if (exploreCanonical !== undefined && typeof exploreCanonical !== 'boolean') {
+      errors.push('exploreCanonical must be boolean when provided');
+    }
+  } else {
+    if (!risk || !RISKS.has(risk)) errors.push('risk must be high|routine');
+    if (typeof exploreCanonical !== 'boolean') errors.push('exploreCanonical must be boolean');
+  }
   if (
     value.finalReviewRequired !== undefined &&
     typeof value.finalReviewRequired !== 'boolean'
@@ -449,15 +477,29 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
       errors.push('routingDecision conflicts with initialParentTier or executionParentTier');
     }
   }
-  if (!architectureGate || !GATE_DECISIONS.has(architectureGate)) {
-    errors.push('architectureGate is invalid');
+  if (schemaVersion !== '4' || lane === 'critical') {
+    if (!architectureGate || !GATE_DECISIONS.has(architectureGate)) {
+      errors.push('architectureGate is invalid');
+    }
+    if (!finalReview || !FINAL_REVIEW_STATES.has(finalReview)) {
+      errors.push('finalReview is invalid');
+    }
+  } else {
+    if (architectureGate && !GATE_DECISIONS.has(architectureGate)) {
+      errors.push('architectureGate is invalid when provided');
+    }
+    if (finalReview && !FINAL_REVIEW_STATES.has(finalReview)) {
+      errors.push('finalReview is invalid when provided');
+    }
   }
   if (!verification || !EVIDENCE_STATES.has(verification)) errors.push('verification is invalid');
-  if (!finalReview || !FINAL_REVIEW_STATES.has(finalReview)) errors.push('finalReview is invalid');
   if (!commit || !COMMIT_STATES.has(commit)) errors.push('commit is invalid');
   if (!handoff || !HANDOFF_STATES.has(handoff)) errors.push('handoff is invalid');
 
-  const requiredTests = parseRequiredTests(value.requiredTests);
+  const requiredTests =
+    schemaVersion === '4' && value.requiredTests === undefined
+      ? { tests: [], errors: [] }
+      : parseRequiredTests(value.requiredTests);
   const unresolvedRisks = parseUnresolvedRisks(value.unresolvedRisks);
   errors.push(...requiredTests.errors, ...unresolvedRisks.errors);
   if ((schemaVersion === '2' || schemaVersion === '3') && risk === 'high' && requiredTests.tests.length === 0) {
@@ -511,6 +553,8 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
     value.reviewPasses === undefined
       ? { passes: [], errors: [] }
       : parseReviewPasses(value.reviewPasses);
+  const reviewClosure = parseReviewClosure(value.reviewClosure);
+  errors.push(...reviewClosure.errors);
   if (schemaVersion === '3') {
     if (!workstreamId) errors.push('workstreamId is required for schemaVersion 3');
     errors.push(...sourceWorkstreamIds.errors);
@@ -535,8 +579,82 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
     errors.push(...recommendedBuildModel.errors, ...reviewPasses.errors);
   }
 
-  const reviewClosure = parseReviewClosure(value.reviewClosure);
-  errors.push(...reviewClosure.errors);
+  if (schemaVersion === '4' && lane === 'critical') {
+    if (!workstreamId) errors.push('critical V4 markers require workstreamId');
+    errors.push(...sourceWorkstreamIds.errors);
+    if (!registryVersion) errors.push('critical V4 markers require registryVersion');
+    if (
+      !planRecommendationAdherence ||
+      !PLAN_ADHERENCE_STATES.has(planRecommendationAdherence)
+    ) {
+      errors.push('critical V4 markers require valid planRecommendationAdherence');
+    }
+    if (
+      value.recommendedBuildModel === undefined &&
+      planRecommendationAdherence !== 'not_applicable'
+    ) {
+      errors.push(
+        'critical V4 markers require recommendedBuildModel unless planRecommendationAdherence is not_applicable'
+      );
+    }
+    errors.push(...recommendedBuildModel.errors);
+    if (!initialParentTier || !PARENT_TIERS.has(initialParentTier)) {
+      errors.push('critical V4 markers require initialParentTier');
+    }
+    if (!executionParentTier || !PARENT_TIERS.has(executionParentTier)) {
+      errors.push('critical V4 markers require executionParentTier');
+    }
+    if (!routingDecision || !ROUTING_DECISIONS.has(routingDecision)) {
+      errors.push('critical V4 markers require routingDecision');
+    }
+    if (
+      initialParentTier &&
+      executionParentTier &&
+      routingDecision &&
+      !isWorkflowRoutingDecisionCoherent({
+        initialParentTier,
+        executionParentTier,
+        routingDecision,
+      })
+    ) {
+      errors.push(
+        'critical V4 routingDecision conflicts with initialParentTier or executionParentTier'
+      );
+    }
+    if (
+      architectureGate !== 'approved' &&
+      architectureGate !== 'approved_with_conditions'
+    ) {
+      errors.push('critical V4 markers require an approved architecture gate');
+    }
+    if (architectureReviewSource !== 'independent_subagent') {
+      errors.push('critical V4 markers require independent architecture review');
+    }
+    if (value.independentReviewRequired !== true || independentReviewReasons.length === 0) {
+      errors.push('critical V4 markers require independent review reasons');
+    }
+    if (requiredTests.tests.length === 0) {
+      errors.push('critical V4 markers require stable requiredTests IDs');
+    }
+    if (value.finalReviewRequired !== true || finalReview !== 'passed') {
+      errors.push('critical V4 markers require a passed final review');
+    }
+    if (finalReviewSource !== 'independent_subagent') {
+      errors.push('critical V4 markers require independent final review');
+    }
+    if (!Array.isArray(value.reviewPasses) || reviewPasses.passes.length === 0) {
+      errors.push('critical V4 markers require reviewPasses');
+    }
+    errors.push(...reviewPasses.errors);
+    if (
+      !reviewClosure.closure ||
+      (reviewClosure.closure.phase !== 'review_closed' &&
+        reviewClosure.closure.phase !== 'finalise_ready' &&
+        reviewClosure.closure.phase !== 'finalised')
+    ) {
+      errors.push('critical V4 markers require closed two-pass review evidence');
+    }
+  }
 
   if (errors.length > 0) {
     return { status: 'malformed', marker: null, errors };
@@ -545,15 +663,16 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   return {
     status: 'present',
     marker: {
-      schemaVersion: schemaVersion as '1' | '2' | '3',
+      schemaVersion: schemaVersion as '1' | '2' | '3' | '4',
+      lane: lane ?? undefined,
       taskId: taskId!,
       taskType: taskType!,
       risk: risk!,
       initialParentTier: initialParentTier ?? undefined,
       executionParentTier: executionParentTier ?? undefined,
       routingDecision: routingDecision ?? undefined,
-      exploreCanonical: exploreCanonical as boolean,
-      architectureGate: architectureGate!,
+      exploreCanonical: typeof exploreCanonical === 'boolean' ? exploreCanonical : true,
+      architectureGate: architectureGate ?? 'not_applicable',
       architectureReviewSource: architectureReviewSource ?? undefined,
       requiredTests: requiredTests.tests,
       unresolvedRisks: unresolvedRisks.risks,
@@ -562,7 +681,7 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
       reviewEscalationReasons,
       independentReviewRequired,
       independentReviewReasons,
-      finalReview: finalReview!,
+      finalReview: finalReview ?? 'not_applicable',
       finalReviewSource: finalReviewSource ?? undefined,
       commit: commit!,
       handoff: handoff!,
@@ -571,7 +690,10 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
       registryVersion: registryVersion ?? undefined,
       recommendedBuildModel: recommendedBuildModel.model ?? undefined,
       planRecommendationAdherence: planRecommendationAdherence ?? undefined,
-      reviewPasses: schemaVersion === '3' ? reviewPasses.passes : undefined,
+      reviewPasses:
+        schemaVersion === '3' || (schemaVersion === '4' && value.reviewPasses !== undefined)
+          ? reviewPasses.passes
+          : undefined,
       reviewClosure: reviewClosure.closure,
     },
     errors: [],
@@ -583,6 +705,7 @@ export function extractWorkflowCompletionMarker(text: string): ParsedWorkflowMar
     { version: 1, prefix: WORKFLOW_MARKER_PREFIX_V1, start: text.lastIndexOf(WORKFLOW_MARKER_PREFIX_V1) },
     { version: 2, prefix: WORKFLOW_MARKER_PREFIX_V2, start: text.lastIndexOf(WORKFLOW_MARKER_PREFIX_V2) },
     { version: 3, prefix: WORKFLOW_MARKER_PREFIX_V3, start: text.lastIndexOf(WORKFLOW_MARKER_PREFIX_V3) },
+    { version: 4, prefix: WORKFLOW_MARKER_PREFIX_V4, start: text.lastIndexOf(WORKFLOW_MARKER_PREFIX_V4) },
   ].sort((left, right) => right.start - left.start || right.version - left.version);
   const selected = candidates[0]!;
   const start = selected.start;
@@ -613,8 +736,10 @@ export function extractWorkflowCompletionMarker(text: string): ParsedWorkflowMar
 
 export function renderWorkflowCompletionMarker(marker: WorkflowCompletionMarker): string {
   const prefix =
-    marker.schemaVersion === '3'
-      ? WORKFLOW_MARKER_PREFIX_V3
+    marker.schemaVersion === '4'
+      ? WORKFLOW_MARKER_PREFIX_V4
+      : marker.schemaVersion === '3'
+        ? WORKFLOW_MARKER_PREFIX_V3
       : marker.schemaVersion === '2'
         ? WORKFLOW_MARKER_PREFIX_V2
         : WORKFLOW_MARKER_PREFIX_V1;

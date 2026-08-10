@@ -98,11 +98,23 @@ export type ErrorPattern = {
   lastSeen: string;
 };
 
+export type ErrorClusterLane = 'fast' | 'standard' | 'guarded' | 'critical' | 'report-only';
+
+export interface ErrorRootCauseCluster {
+  id: string;
+  rootCauseFamily: string;
+  lane: ErrorClusterLane;
+  action: 'fix' | 'investigate' | 'report-only' | 'critical-gates';
+  patterns: ErrorPattern[];
+  occurrences: number;
+}
+
 type ErrorLogClearResult = {
   clearedCount: number | null;
 };
 
 function getPatternReviewMetadata(patterns: ErrorPattern[]) {
+  const clusters = clusterErrorPatterns(patterns);
   return {
     topPatterns: patterns.slice(0, 10).map((pattern) => ({
       errorType: pattern.errorType,
@@ -113,6 +125,14 @@ function getPatternReviewMetadata(patterns: ErrorPattern[]) {
       sourceFiles: pattern.sourceFiles.slice(0, 10).map((sourceFile) => sourceFile.file),
     })),
     patternsWithoutSourceFiles: patterns.filter((pattern) => pattern.sourceFiles.length === 0).length,
+    clusters: clusters.map((cluster) => ({
+      id: cluster.id,
+      rootCauseFamily: cluster.rootCauseFamily,
+      lane: cluster.lane,
+      action: cluster.action,
+      patternCount: cluster.patterns.length,
+      occurrences: cluster.occurrences,
+    })),
   };
 }
 
@@ -567,6 +587,89 @@ export function groupIntoPatterns(errors: ErrorLogEntry[], repoRoot = process.cw
   );
 }
 
+function classifyRootCauseFamily(pattern: ErrorPattern): string {
+  const text = [
+    pattern.errorType,
+    pattern.component,
+    pattern.normalizedMessage,
+    ...pattern.affectedPages,
+  ]
+    .join(' ')
+    .toLowerCase();
+  if (/\b(rls|row level|auth|jwt|permission|forbidden|unauthori[sz]ed|access control)\b/u.test(text)) {
+    return 'auth-permissions-security';
+  }
+  if (/\b(postgres|database|sql|constraint|foreign key|supabase|schema|migration)\b/u.test(text)) {
+    return 'database-persistence';
+  }
+  if (/\b(payment|billing|invoice total|payroll|money|charge)\b/u.test(text)) {
+    return 'money-billing';
+  }
+  if (/\b(deadlock|race condition|concurren|transaction conflict)\b/u.test(text)) {
+    return 'concurrency-transaction';
+  }
+  if (/\b(network|failed to fetch|econn|enotfound|third[- ]party|gateway|offline)\b/u.test(text)) {
+    return 'external-network';
+  }
+  if (/\b(validation|invalid input|required field|user input)\b/u.test(text)) {
+    return 'user-input';
+  }
+  const primarySource = pattern.sourceFiles[0]?.file;
+  return primarySource
+    ? `source:${primarySource}`
+    : `component:${pattern.component.toLowerCase().replace(/[^a-z0-9]+/gu, '-')}`;
+}
+
+function classifyCluster(
+  rootCauseFamily: string,
+  patterns: ErrorPattern[]
+): Pick<ErrorRootCauseCluster, 'lane' | 'action'> {
+  if (
+    rootCauseFamily === 'auth-permissions-security' ||
+    rootCauseFamily === 'database-persistence' ||
+    rootCauseFamily === 'money-billing' ||
+    rootCauseFamily === 'concurrency-transaction'
+  ) {
+    return { lane: 'critical', action: 'critical-gates' };
+  }
+  if (rootCauseFamily === 'external-network' || rootCauseFamily === 'user-input') {
+    return { lane: 'report-only', action: 'report-only' };
+  }
+  const sourceFiles = new Set(patterns.flatMap((pattern) => pattern.sourceFiles.map((ref) => ref.file)));
+  if (patterns.length > 2 || sourceFiles.size > 2) {
+    return { lane: 'guarded', action: 'investigate' };
+  }
+  if (patterns.length > 1 || sourceFiles.size > 1) {
+    return { lane: 'standard', action: 'fix' };
+  }
+  return sourceFiles.size === 1
+    ? { lane: 'fast', action: 'fix' }
+    : { lane: 'report-only', action: 'report-only' };
+}
+
+export function clusterErrorPatterns(patterns: ErrorPattern[]): ErrorRootCauseCluster[] {
+  const grouped = new Map<string, ErrorPattern[]>();
+  for (const pattern of patterns) {
+    const family = classifyRootCauseFamily(pattern);
+    grouped.set(family, [...(grouped.get(family) ?? []), pattern]);
+  }
+  return [...grouped.entries()]
+    .map(([rootCauseFamily, familyPatterns], index) => {
+      const classification = classifyCluster(rootCauseFamily, familyPatterns);
+      return {
+        id: `cluster-${index + 1}`,
+        rootCauseFamily,
+        ...classification,
+        patterns: familyPatterns,
+        occurrences: familyPatterns.reduce(
+          (total, pattern) => total + pattern.occurrences.length,
+          0
+        ),
+      };
+    })
+    .sort((left, right) => right.occurrences - left.occurrences);
+}
+
 // ─── Report Generation ───────────────────────────────────────────────
 
 function generateReport(patterns: ErrorPattern[], totalFetched: number, totalFiltered: number): string {
@@ -589,6 +692,20 @@ function generateReport(patterns: ErrorPattern[], totalFetched: number, totalFil
     lines.push('');
     return lines.join('\n');
   }
+
+  const clusters = clusterErrorPatterns(patterns);
+  lines.push('## Root Cause Clusters and TEE Routing');
+  lines.push('');
+  lines.push('| Cluster | Root cause family | Lane | Action | Patterns | Occurrences |');
+  lines.push('|---|---|---|---|---:|---:|');
+  for (const cluster of clusters) {
+    lines.push(
+      `| ${cluster.id} | ${cluster.rootCauseFamily} | ${cluster.lane.toUpperCase()} | ${cluster.action} | ${cluster.patterns.length} | ${cluster.occurrences} |`
+    );
+  }
+  lines.push('');
+  lines.push('Clusters are routed independently; a CRITICAL cluster does not escalate unrelated clusters.');
+  lines.push('');
 
   // ── Section 1: Summary Table ──
   lines.push('## Summary');

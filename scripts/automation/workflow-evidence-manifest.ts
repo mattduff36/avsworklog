@@ -14,6 +14,8 @@ export interface EvidenceCommandResult {
   exitCode: number | null;
   durationMs: number;
   summary: string;
+  command?: string;
+  files?: string[];
 }
 
 export interface EvidenceTestMapping {
@@ -212,8 +214,15 @@ function runCommand(
     status: exitCode === 0 ? 'passed' : 'failed',
     exitCode,
     durationMs,
-    summary: exitCode === 0 ? 'ok' : (result.stderr || result.stdout || 'failed').slice(0, 240),
+    summary: exitCode === 0 ? 'ok' : (result.stderr || result.stdout || 'failed').trim(),
+    command: [command, ...args].join(' '),
   };
+}
+
+export type EvidenceCommandRunner = typeof runCommand;
+
+function isLintableFile(relativePath: string): boolean {
+  return /\.(?:cjs|mjs|js|jsx|ts|tsx)$/u.test(relativePath);
 }
 
 function discoverBehavioralTestIds(
@@ -285,6 +294,7 @@ export function buildEvidenceManifest(params: {
   blockerEvidence?: WorkflowEvidenceManifest['blockerEvidence'];
   commandResults?: EvidenceCommandResult[];
   executedTestIds?: string[];
+  commandRunner?: EvidenceCommandRunner;
 }): { manifest: WorkflowEvidenceManifest; relativePath: string; absolutePath: string } {
   const tree = getCurrentTreeFingerprint(params.repoRoot);
   const headCommit = tree.headCommit;
@@ -299,14 +309,55 @@ export function buildEvidenceManifest(params: {
   const inputFingerprint = tree.inputFingerprint;
   const executedIds = new Set(params.executedTestIds ?? []);
   const commands: EvidenceCommandResult[] = [...(params.commandResults ?? [])];
+  const execute = params.commandRunner ?? runCommand;
   if (params.runChecks) {
-    commands.push(runCommand(params.repoRoot, 'typecheck', 'npm', ['run', 'typecheck']));
-    commands.push(runCommand(params.repoRoot, 'lint', 'npm', ['run', 'lint']));
+    commands.push(execute(params.repoRoot, 'typecheck', 'npm', ['run', 'typecheck']));
+    const lintableFiles = changedFiles.filter(
+      (relativePath) =>
+        isLintableFile(relativePath) && existsSync(path.join(params.repoRoot, relativePath))
+    );
+    if (lintableFiles.length === 0) {
+      commands.push(
+        {
+          name: 'oxlint-changed',
+          status: 'skipped',
+          exitCode: null,
+          durationMs: 0,
+          summary: 'no changed lintable files',
+          command: 'npx oxlint --',
+          files: [],
+        },
+        {
+          name: 'eslint-changed',
+          status: 'skipped',
+          exitCode: null,
+          durationMs: 0,
+          summary: 'no changed lintable files',
+          command: 'npx eslint --',
+          files: [],
+        }
+      );
+    } else {
+      const oxlint = execute(params.repoRoot, 'oxlint-changed', 'npx', [
+        'oxlint',
+        '--',
+        ...lintableFiles,
+      ]);
+      oxlint.files = lintableFiles;
+      commands.push(oxlint);
+      const eslint = execute(params.repoRoot, 'eslint-changed', 'npx', [
+        'eslint',
+        '--',
+        ...lintableFiles,
+      ]);
+      eslint.files = lintableFiles;
+      commands.push(eslint);
+    }
   }
   if (params.runRequiredTests && (params.requiredTestIds?.length ?? 0) > 0) {
     const ids = params.requiredTestIds ?? [];
     // Vitest uses -t/--testNamePattern, not --grep.
-    const testRun = runCommand(params.repoRoot, 'required-tests', 'npm', [
+    const testRun = execute(params.repoRoot, 'required-tests', 'npm', [
       'run',
       'test:run',
       '--',

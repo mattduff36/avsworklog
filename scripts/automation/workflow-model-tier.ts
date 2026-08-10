@@ -1,4 +1,5 @@
 import type {
+  WorkflowLane,
   WorkflowParentTier,
   WorkflowRoutingDecision,
 } from './types';
@@ -30,8 +31,12 @@ export interface WorkflowModelRole {
 
 export interface WorkflowRoutingContext {
   parentTier: WorkflowParentTier;
-  risk: 'high' | 'routine';
+  /** Legacy fallback when lane is not yet available. */
+  risk?: 'high' | 'routine';
+  lane?: WorkflowLane;
   substantive: boolean;
+  /** STANDARD only: switching is offered only when the implementation is materially large. */
+  substantialImplementation?: boolean;
   explicitPremiumRequested: boolean;
   premiumTaskDecision?: 'pause_to_switch' | 'continue_premium';
 }
@@ -159,10 +164,16 @@ export function classifyWorkflowModelTier(model: string | null | undefined): Wor
 }
 
 export function getWorkflowRoutingAction(context: WorkflowRoutingContext): WorkflowRoutingAction {
+  const economicalSwitchEligible =
+    context.lane === 'standard'
+      ? context.substantialImplementation === true
+      : context.lane
+        ? false
+        : context.risk === 'routine';
   if (
     !context.substantive ||
     context.parentTier !== 'premium' ||
-    context.risk !== 'routine' ||
+    !economicalSwitchEligible ||
     context.explicitPremiumRequested
   ) {
     return 'continue';

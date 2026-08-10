@@ -6,9 +6,16 @@ import pg from 'pg';
 import { parseCommitsFromMessages, selectPrimaryCommitMessage } from '../lib/config/release-version-logic';
 import { AutomationRun } from './automation/logger';
 import {
+  type FinaliseModeKey,
+  markOrdinaryFinaliseStep,
   markFinaliseCheckpointStep,
   resolveActiveProtocolFinaliseContext,
 } from './automation/finalise-checkpoint';
+import {
+  clearFinaliseFailureArtifact,
+  writeFinaliseFailureArtifact,
+} from './automation/finalise-failure';
+import { appendWorkflowAnomalySignal } from './automation/workflow-events';
 import { checkFinaliseBlockingActivity, formatBlockingActivity } from './finalise-activity-guard';
 import {
   getSkippableFinaliseTasks,
@@ -34,8 +41,10 @@ const REPO_ROOT = process.cwd();
 const NEXT_BUILD_DIR = path.join(REPO_ROOT, '.next');
 const NEXT_BUILD_ARTIFACT_PATH = path.join(NEXT_BUILD_DIR, 'BUILD_ID');
 const RELEASE_VERSION_JSON_PATH = path.join(REPO_ROOT, 'lib/config/release-version.json');
+const FINALISE_HIGH_DURATION_MS = 15 * 60 * 1000;
 
-function recordProtocolCheckpointStep(params: {
+function recordFinaliseCheckpointStep(params: {
+  mode: FinaliseModeKey;
   task: FinaliseTaskKey;
   status: 'passed' | 'failed' | 'started' | 'incomplete';
   command: string;
@@ -43,11 +52,22 @@ function recordProtocolCheckpointStep(params: {
   artifactPaths?: string[];
 }): void {
   const active = resolveActiveProtocolFinaliseContext(REPO_ROOT);
-  if (!active) return;
-  markFinaliseCheckpointStep({
+  if (active) {
+    markFinaliseCheckpointStep({
+      repoRoot: REPO_ROOT,
+      workstreamId: active.workstreamId,
+      checkpointId: active.checkpointId,
+      task: params.task,
+      status: params.status,
+      command: params.command,
+      exitCode: params.exitCode,
+      artifactPaths: params.artifactPaths,
+    });
+    return;
+  }
+  markOrdinaryFinaliseStep({
     repoRoot: REPO_ROOT,
-    workstreamId: active.workstreamId,
-    checkpointId: active.checkpointId,
+    mode: params.mode,
     task: params.task,
     status: params.status,
     command: params.command,
@@ -326,6 +346,50 @@ function getPushModeDescription(options: FinaliseOptions): string {
   return 'standard';
 }
 
+function getFinaliseModeKey(options: FinaliseOptions): FinaliseModeKey {
+  if (options.full && options.push) return 'ffap';
+  if (options.full) return 'finalise-full';
+  if (options.push) return 'fap';
+  return 'finalise';
+}
+
+async function runDeterministicFinaliseStep<T>(params: {
+  mode: FinaliseModeKey;
+  task: FinaliseTaskKey;
+  command: string;
+  artifactPaths?: string[];
+  action: () => Promise<T> | T;
+}): Promise<T> {
+  recordFinaliseCheckpointStep({
+    ...params,
+    status: 'started',
+  });
+  try {
+    const result = await params.action();
+    recordFinaliseCheckpointStep({
+      ...params,
+      status: 'passed',
+      exitCode: 0,
+    });
+    return result;
+  } catch (error) {
+    recordFinaliseCheckpointStep({
+      ...params,
+      status: 'failed',
+      exitCode: 1,
+    });
+    const active = resolveActiveProtocolFinaliseContext(REPO_ROOT);
+    writeFinaliseFailureArtifact({
+      repoRoot: REPO_ROOT,
+      originalMode: params.mode,
+      failedStep: params.task,
+      command: params.command,
+      workstreamId: active?.workstreamId ?? null,
+    });
+    throw error;
+  }
+}
+
 function printProgress(message: string, percent: number): void {
   console.log(`- ${message} [${percent}% complete]`);
 }
@@ -370,13 +434,26 @@ async function recordFinaliseTimingSummary(
   await run.step('Record timing summary', () => undefined, metadata);
 }
 
+function recordFinaliseDurationAnomaly(
+  mode: FinaliseModeKey,
+  timings: FinaliseTimingEntry[]
+): void {
+  const durationMs = timings.reduce((total, entry) => total + entry.durationMs, 0);
+  if (durationMs <= FINALISE_HIGH_DURATION_MS) return;
+  appendWorkflowAnomalySignal({
+    repoRoot: REPO_ROOT,
+    eventId: `finalise-duration:${mode}:${Date.now()}`,
+    flags: ['finalise-high-duration'],
+  });
+}
+
 function formatRecentTask(run: RecentFinaliseTaskRun): string {
   return `${run.command} (${run.source}, completed ${run.completedAt})`;
 }
 
 function getRecentTaskMetadata(run: RecentFinaliseTaskRun): Record<string, unknown> {
   return {
-    reason: 'recent-successful-run',
+    reason: run.source === 'exact-cache' ? 'exact-fingerprint-match' : 'recent-successful-run',
     command: run.command,
     completedAt: run.completedAt,
     source: run.source,
@@ -909,6 +986,7 @@ function assertNoBlockingCursorActivity(): void {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+  const finaliseMode = getFinaliseModeKey(options);
   const run = new AutomationRun({
     scriptName: 'finalise',
     mode: getPushModeDescription(options),
@@ -940,6 +1018,7 @@ async function main(): Promise<void> {
     const initialChangeSummary = summarizeFinaliseChanges(changedFileStats);
     const skippableTasks = getSkippableFinaliseTasks({
       repoRoot: REPO_ROOT,
+      mode: finaliseMode,
       changedFiles,
       pendingMigrationFiles,
       buildArtifactPath: NEXT_BUILD_ARTIFACT_PATH,
@@ -1045,16 +1124,16 @@ async function main(): Promise<void> {
         printProgress(`Reused recent migration run: ${formatRecentTask(recentMigrationRun)}.`, 20);
       } else {
         printProgress(`Running ${pendingMigrationFiles.length} pending migration${pendingMigrationFiles.length === 1 ? '' : 's'}...`, 12);
-        await timeFinaliseStep(timingEntries, 'Run pending local migrations', () =>
-          run.step('Run pending local migrations', () => runPendingMigrations(pendingMigrationFiles), {
-            migrationFiles: pendingMigrationFiles,
-          })
-        );
-        recordProtocolCheckpointStep({
+        await runDeterministicFinaliseStep({
+          mode: finaliseMode,
           task: 'migrations',
-          status: 'passed',
           command: 'run-pending-migrations',
-          exitCode: 0,
+          action: () =>
+            timeFinaliseStep(timingEntries, 'Run pending local migrations', () =>
+              run.step('Run pending local migrations', () => runPendingMigrations(pendingMigrationFiles), {
+                migrationFiles: pendingMigrationFiles,
+              })
+            ),
         });
         printProgress('Pending migrations applied.', 20);
       }
@@ -1070,12 +1149,14 @@ async function main(): Promise<void> {
         printProgress(`Reused recent database validation: ${formatRecentTask(recentDbValidateRun)}.`, 25);
       } else {
         printProgress('Running database validation...', 22);
-        await timeFinaliseStep(timingEntries, 'Run database validation', () => runCommand('npm', ['run', 'db:validate']));
-        recordProtocolCheckpointStep({
+        await runDeterministicFinaliseStep({
+          mode: finaliseMode,
           task: 'db-validate',
-          status: 'passed',
           command: 'npm run db:validate',
-          exitCode: 0,
+          action: () =>
+            timeFinaliseStep(timingEntries, 'Run database validation', () =>
+              runCommand('npm', ['run', 'db:validate'])
+            ),
         });
         printProgress('Database validation passed.', 25);
       }
@@ -1094,15 +1175,15 @@ async function main(): Promise<void> {
       const removedBuildOutput = await run.step('Remove clean build output', () => removeNextBuildOutput());
       printProgress(removedBuildOutput ? 'Removed .next build output.' : 'No .next build output to remove.', 30);
 
-      await timeFinaliseStep(timingEntries, 'Run clean production build', () =>
-        run.step('Run clean production build', () => runCleanProductionBuildWithProgress())
-      );
-      recordProtocolCheckpointStep({
+      await runDeterministicFinaliseStep({
+        mode: finaliseMode,
         task: 'build',
-        status: 'passed',
         command: 'npm run build',
-        exitCode: 0,
         artifactPaths: [NEXT_BUILD_ARTIFACT_PATH],
+        action: () =>
+          timeFinaliseStep(timingEntries, 'Run clean production build', () =>
+            run.step('Run clean production build', () => runCleanProductionBuildWithProgress())
+          ),
       });
     }
 
@@ -1139,14 +1220,14 @@ async function main(): Promise<void> {
             printProgress(`Reused recent Vitest test run: ${formatRecentTask(recentTestRun)}.`, 72);
           } else {
             printProgress('Running Vitest unit, integration, and component tests...', 60);
-            await timeFinaliseStep(timingEntries, 'Run Vitest test run', () =>
-              runCommand('npm', ['run', 'test:run'], { env: localTestEnv })
-            );
-            recordProtocolCheckpointStep({
+            await runDeterministicFinaliseStep({
+              mode: finaliseMode,
               task: 'test-run',
-              status: 'passed',
               command: 'npm run test:run',
-              exitCode: 0,
+              action: () =>
+                timeFinaliseStep(timingEntries, 'Run Vitest test run', () =>
+                  runCommand('npm', ['run', 'test:run'], { env: localTestEnv })
+                ),
             });
             printProgress('Vitest test run passed.', 72);
           }
@@ -1155,14 +1236,14 @@ async function main(): Promise<void> {
             printProgress(`Reused recent API and Playwright testsuite: ${formatRecentTask(recentTestsuiteRun)}.`, 84);
           } else {
             printProgress('Running API and Playwright testsuite...', 75);
-            await timeFinaliseStep(timingEntries, 'Run API and Playwright testsuite', () =>
-              runCommand('npm', ['run', 'testsuite'], { env: localTestEnv })
-            );
-            recordProtocolCheckpointStep({
+            await runDeterministicFinaliseStep({
+              mode: finaliseMode,
               task: 'testsuite',
-              status: 'passed',
               command: 'npm run testsuite',
-              exitCode: 0,
+              action: () =>
+                timeFinaliseStep(timingEntries, 'Run API and Playwright testsuite', () =>
+                  runCommand('npm', ['run', 'testsuite'], { env: localTestEnv })
+                ),
             });
             printProgress('Full automated test suite passed.', 84);
           }
@@ -1261,6 +1342,8 @@ async function main(): Promise<void> {
     console.log('\n==> Timing summary');
     getFinaliseTimingSummaryLines(timingEntries).forEach((line) => console.log(line));
     await recordFinaliseTimingSummary(run, timingEntries);
+    recordFinaliseDurationAnomaly(finaliseMode, timingEntries);
+    clearFinaliseFailureArtifact(REPO_ROOT);
     printProgress('Finalise workflow complete.', 100);
     await run.finish('passed');
   } catch (error) {
@@ -1269,6 +1352,7 @@ async function main(): Promise<void> {
         console.log('\n==> Timing summary');
         getFinaliseTimingSummaryLines(timingEntries).forEach((line) => console.log(line));
         await recordFinaliseTimingSummary(run, timingEntries);
+        recordFinaliseDurationAnomaly(finaliseMode, timingEntries);
       } catch {
         // Keep the original failure as the primary exit reason.
       }

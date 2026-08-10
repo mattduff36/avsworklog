@@ -11,6 +11,7 @@ import {
 } from '@/scripts/automation/monthly-follow-up';
 import {
   WORKFLOW_REVIEW_THRESHOLD,
+  appendWorkflowAnomalySignal,
   createEmptyWorkflowReviewState,
   getWorkflowPaths,
   listWorkflowEvents,
@@ -38,6 +39,7 @@ import {
 import {
   buildWorkflowReviewMetrics,
   computePlanRecommendationAdherence,
+  detectWorkflowAnomalies,
   processWorkflowStopEvent,
 } from '@/scripts/automation/workflow-review';
 import type { WorkflowCompletionMarker, WorkflowStopEvent, WorkflowTranscriptSignals } from '@/scripts/automation/types';
@@ -126,6 +128,73 @@ function markerV3(overrides: Partial<WorkflowCompletionMarker> = {}): WorkflowCo
   };
 }
 
+function markerV4(
+  lane: NonNullable<WorkflowCompletionMarker['lane']>,
+  overrides: Partial<WorkflowCompletionMarker> = {}
+): WorkflowCompletionMarker {
+  const critical = lane === 'critical';
+  return {
+    ...marker({
+      risk: lane === 'fast' || lane === 'standard' ? 'routine' : 'high',
+      architectureGate: critical ? 'approved' : 'not_applicable',
+      finalReviewRequired: critical,
+      finalReview: critical ? 'passed' : 'not_applicable',
+    }),
+    ...overrides,
+    schemaVersion: '4',
+    lane,
+    workstreamId: critical ? (overrides.workstreamId ?? 'ws_v4_critical') : overrides.workstreamId,
+    registryVersion: critical ? (overrides.registryVersion ?? '2') : overrides.registryVersion,
+    recommendedBuildModel: critical
+      ? (overrides.recommendedBuildModel ?? markerV3().recommendedBuildModel)
+      : overrides.recommendedBuildModel,
+    planRecommendationAdherence: critical
+      ? (overrides.planRecommendationAdherence ?? 'matched')
+      : overrides.planRecommendationAdherence,
+    initialParentTier: critical ? (overrides.initialParentTier ?? 'premium') : overrides.initialParentTier,
+    executionParentTier: critical
+      ? (overrides.executionParentTier ?? 'premium')
+      : overrides.executionParentTier,
+    routingDecision: critical
+      ? (overrides.routingDecision ?? 'continued_premium')
+      : overrides.routingDecision,
+    architectureReviewSource: critical
+      ? (overrides.architectureReviewSource ?? 'independent_subagent')
+      : overrides.architectureReviewSource,
+    requiredTests: critical
+      ? (overrides.requiredTests ?? [{ id: 'TEE-V2-CRITICAL-EVIDENCE-001', status: 'completed' }])
+      : (overrides.requiredTests ?? []),
+    independentReviewRequired: critical
+      ? (overrides.independentReviewRequired ?? true)
+      : overrides.independentReviewRequired,
+    independentReviewReasons: critical
+      ? (overrides.independentReviewReasons ?? ['broad-regression'])
+      : (overrides.independentReviewReasons ?? []),
+    finalReviewSource: critical
+      ? (overrides.finalReviewSource ?? 'independent_subagent')
+      : overrides.finalReviewSource,
+    reviewPasses: critical
+      ? (overrides.reviewPasses ?? [
+          {
+            passId: 'final-1',
+            stage: 'final-diff-reviewer',
+            source: 'independent_subagent',
+            tier: 'premium',
+            iteration: 1,
+            result: 'passed',
+          },
+        ])
+      : overrides.reviewPasses,
+    reviewClosure: critical
+      ? (overrides.reviewClosure ?? {
+          protocol: 'two-pass-v1',
+          phase: 'review_closed',
+          failedPremiumReviewCount: 0,
+        })
+      : overrides.reviewClosure,
+  };
+}
+
 function writeJsonl(filePath: string, records: unknown[]): void {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${records.map((record) => JSON.stringify(record)).join('\n')}\n`, 'utf8');
@@ -170,6 +239,41 @@ describe('workflow-marker', () => {
       `${renderWorkflowCompletionMarker(v3)}\n${renderWorkflowCompletionMarker(markerV2({ taskId: 'latest-v2' }))}`
     );
     expect(latest.marker?.taskId).toBe('latest-v2');
+  });
+
+  it('TEE-V2-MARKER-COMPAT-001 parses compact/detailed V4 and selects the latest marker', () => {
+    const compactText =
+      '<!-- workflow-completion-marker:v4\n{"schemaVersion":"4","lane":"fast","taskId":"v4-fast","taskType":"change","verification":"passed","commit":"completed","handoff":"completed"}\n-->';
+    const detailed = markerV4('critical', { taskId: 'v4-critical' });
+    const compactParsed = extractWorkflowCompletionMarker(compactText);
+    const detailedParsed = extractWorkflowCompletionMarker(renderWorkflowCompletionMarker(detailed));
+
+    expect(compactParsed).toMatchObject({
+      status: 'present',
+      marker: { schemaVersion: '4', lane: 'fast', risk: 'routine' },
+    });
+    expect(detailedParsed).toMatchObject({
+      status: 'present',
+      marker: { schemaVersion: '4', lane: 'critical', risk: 'high' },
+    });
+    const latest = extractWorkflowCompletionMarker(
+      `${renderWorkflowCompletionMarker(markerV3({ taskId: 'legacy-first' }))}\n${compactText}`
+    );
+    expect(latest.marker?.taskId).toBe('v4-fast');
+  });
+
+  it('TEE-V2-CRITICAL-EVIDENCE-001 rejects incomplete critical V4 evidence', () => {
+    const incomplete = markerV4('critical');
+    delete incomplete.reviewClosure;
+    delete incomplete.workstreamId;
+    expect(validateWorkflowCompletionMarker(incomplete)).toMatchObject({
+      status: 'malformed',
+    });
+    const missingPlanEvidence = markerV4('critical');
+    delete missingPlanEvidence.registryVersion;
+    delete missingPlanEvidence.recommendedBuildModel;
+    delete missingPlanEvidence.planRecommendationAdherence;
+    expect(validateWorkflowCompletionMarker(missingPlanEvidence).status).toBe('malformed');
   });
 
   it('requires complete v2 routing and independent-review evidence', () => {
@@ -357,6 +461,26 @@ describe('workflow model routing', () => {
         risk: 'routine',
         substantive: true,
         explicitPremiumRequested: true,
+      })
+    ).toBe('continue');
+  });
+
+  it('does not interrupt FAST or moderate STANDARD work with a model switch prompt', () => {
+    expect(
+      getWorkflowRoutingAction({
+        parentTier: 'premium',
+        lane: 'fast',
+        substantive: true,
+        explicitPremiumRequested: false,
+      })
+    ).toBe('continue');
+    expect(
+      getWorkflowRoutingAction({
+        parentTier: 'premium',
+        lane: 'standard',
+        substantive: true,
+        substantialImplementation: false,
+        explicitPremiumRequested: false,
       })
     ).toBe('continue');
   });
@@ -601,6 +725,21 @@ describe('workflow-findings', () => {
     const missing = findings.find((finding) => finding.id === 'missing-final-review');
     expect(missing?.status).toBe('failed');
     expect(missing?.evidenceLabels).toContain('marker:reviewEscalationReason=hardcoding');
+  });
+
+  it('TEE-V2-LANE-NORMALIZE-001 keeps GUARDED separate from CRITICAL gate policy', () => {
+    const findings = buildWorkflowFindings({
+      marker: markerV4('guarded', {
+        architectureGate: 'not_applicable',
+        finalReviewRequired: false,
+        finalReview: 'not_applicable',
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+    });
+    const ids = findings.map((finding) => finding.id);
+    expect(ids).not.toContain('missing-architecture-gate');
+    expect(ids).not.toContain('missing-final-review');
   });
 
   it('GATE-001 requires independent pre/post review for sensitive work', () => {
@@ -875,34 +1014,179 @@ describe('workflow-review cadence', () => {
     );
   }
 
-  it('waits until five qualifying tasks before reviewing', async () => {
+  it('TEE-V2-STOP-HOOK-001 keeps the no-review path fast and fails open', async () => {
+    const root = makeTempRoot('fast-stop');
+    const started = Date.now();
+    const result = await seedQualifyingEvent({
+      repoRoot: root,
+      conversationId: 'fast-stop',
+      generationId: 'fast-stop-1',
+      now: new Date('2026-07-20T00:00:00.000Z'),
+    });
+    expect(result.reviewTriggered).toBe(false);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(existsSync(getWorkflowPaths(root).reviewsDirectory)).toBe(false);
+
+    const hook = spawnSync(
+      process.execPath,
+      [path.join(process.cwd(), '.cursor', 'hooks', 'workflow-stop.mjs')],
+      {
+        cwd: process.cwd(),
+        input: '{not-json',
+        encoding: 'utf8',
+        shell: false,
+      }
+    );
+    expect(hook.status).toBe(0);
+    expect(hook.stdout.trim()).toBe('{}');
+  });
+
+  it('records deterministic anomaly signals without launching a review', () => {
+    const flags = detectWorkflowAnomalies({
+      lane: 'fast',
+      marker: markerV4('fast', {
+        reviewPasses: [
+          {
+            passId: 'unexpected',
+            stage: 'final-diff-reviewer',
+            source: 'independent_subagent',
+            tier: 'premium',
+            iteration: 1,
+            result: 'passed',
+          },
+        ],
+      }),
+      markerStatus: 'present',
+      transcriptSignals: null,
+      findings: [],
+    });
+    expect(flags).toContain('unexpected-premium-review');
+  });
+
+  it('detects malformed critical evidence even when lane parsing failed', () => {
+    const flags = detectWorkflowAnomalies({
+      lane: undefined,
+      marker: null,
+      markerStatus: 'malformed',
+      protocolPhase: 'first_review',
+      transcriptSignals: {
+        finalDiffReviewerTask: true,
+      } as WorkflowTranscriptSignals,
+      findings: [],
+    });
+    expect(flags).toContain('malformed-completion-evidence');
+    expect(flags).toContain('malformed-critical-evidence');
+  });
+
+  it('persists deterministic runtime anomaly signals for the next collector pass', () => {
+    const root = makeTempRoot('runtime-anomaly');
+    appendWorkflowAnomalySignal({
+      repoRoot: root,
+      eventId: 'repair-cycle-1',
+      flags: ['targeted-repair-cycle-exceeded'],
+      recordedAt: '2026-08-10T21:00:00.000Z',
+    });
+    appendWorkflowAnomalySignal({
+      repoRoot: root,
+      eventId: 'repair-cycle-1',
+      flags: ['targeted-repair-cycle-exceeded'],
+    });
+
+    const state = loadWorkflowReviewState(getWorkflowPaths(root).statePath);
+    expect(state.pendingAnomalySignals).toEqual([
+      {
+        eventId: 'repair-cycle-1',
+        recordedAt: '2026-08-10T21:00:00.000Z',
+        flags: ['targeted-repair-cycle-exceeded'],
+      },
+    ]);
+  });
+
+  it('TEE-V2-REVIEW-TRIGGERS-001 reviews a deterministic anomaly before the cadence threshold', async () => {
+    const root = makeTempRoot('anomaly-trigger');
+    const transcriptPath = path.join(root, 'anomaly.jsonl');
+    writeJsonl(transcriptPath, [
+      {
+        role: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              name: 'Read',
+              input: { path: 'token-efficient-engineering/SKILL.md' },
+            },
+            {
+              type: 'text',
+              text: renderWorkflowCompletionMarker(
+                markerV4('standard', {
+                  taskId: 'unexpected-review',
+                  risk: 'routine',
+                  finalReviewRequired: false,
+                  finalReview: 'passed',
+                  reviewPasses: [
+                    {
+                      passId: 'unexpected-premium-pass',
+                      stage: 'final-diff-reviewer',
+                      source: 'independent_subagent',
+                      tier: 'premium',
+                      iteration: 1,
+                      result: 'passed',
+                    },
+                  ],
+                })
+              ),
+            },
+          ],
+        },
+      },
+    ]);
+
+    const result = await processWorkflowStopEvent(
+      {
+        conversation_id: 'anomaly-conversation',
+        generation_id: 'anomaly-generation',
+        model_id: 'composer-2.5-fast',
+        transcript_path: transcriptPath,
+        status: 'completed',
+        loop_count: 0,
+      },
+      { repoRoot: root, now: () => new Date('2026-08-10T21:00:00.000Z') }
+    );
+    expect(result.reviewTriggered).toBe(true);
+    expect(result.reason).toContain('unexpected-premium-review');
+    const state = loadWorkflowReviewState(getWorkflowPaths(root).statePath);
+    expect(state.pendingAnomalySignals).toEqual([]);
+  });
+
+  it('TEE-V2-REVIEW-TRIGGERS-001 waits until 25 qualifying tasks before reviewing', async () => {
     const root = makeTempRoot('threshold');
-    for (let index = 1; index <= 4; index += 1) {
+    const start = Date.parse('2026-07-20T00:00:00.000Z');
+    for (let index = 1; index <= 24; index += 1) {
       const result = await seedQualifyingEvent({
         repoRoot: root,
         conversationId: `c-${index}`,
         generationId: `g-${index}`,
-        now: new Date(`2026-07-29T0${index}:00:00.000Z`),
+        now: new Date(start + index * 60 * 60 * 1000),
       });
       expect(result.reviewTriggered).toBe(false);
     }
 
-    const fifth = await seedQualifyingEvent({
+    const twentyFifth = await seedQualifyingEvent({
       repoRoot: root,
-      conversationId: 'c-5',
-      generationId: 'g-5',
-      now: new Date('2026-07-29T05:00:00.000Z'),
+      conversationId: 'c-25',
+      generationId: 'g-25',
+      now: new Date(start + 25 * 60 * 60 * 1000),
     });
-    expect(fifth.reviewTriggered).toBe(true);
-    expect(fifth.reviewWindowId).toBeTruthy();
+    expect(twentyFifth.reviewTriggered).toBe(true);
+    expect(twentyFifth.reviewWindowId).toBeTruthy();
 
     const paths = getWorkflowPaths(root);
     const state = loadWorkflowReviewState(paths.statePath);
     expect(state.unreviewedEventIds).toHaveLength(0);
-    expect(Object.keys(state.reviewWindowByEventId ?? {})).toHaveLength(5);
+    expect(Object.keys(state.reviewWindowByEventId ?? {})).toHaveLength(25);
   });
 
-  it('reviews previous-month remainder on month-boundary backstop', async () => {
+  it('does not run expensive aggregation merely because the month changes', async () => {
     const root = makeTempRoot('month');
     for (let index = 1; index <= 3; index += 1) {
       await seedQualifyingEvent({
@@ -920,12 +1204,12 @@ describe('workflow-review cadence', () => {
       now: new Date('2026-07-01T01:00:00.000Z'),
     });
 
-    expect(boundary.reviewTriggered).toBe(true);
-    expect(boundary.reason).toMatch(/month-boundary/i);
+    expect(boundary.reviewTriggered).toBe(false);
+    expect(boundary.reason).toMatch(/waiting/iu);
 
     const paths = getWorkflowPaths(root);
     const state = loadWorkflowReviewState(paths.statePath);
-    expect(state.unreviewedEventIds).toHaveLength(1);
+    expect(state.unreviewedEventIds).toHaveLength(4);
   });
 
   it('ignores loop follow-ups and duplicate generations, and prefers model_id', async () => {
@@ -1031,7 +1315,9 @@ describe('workflow-review cadence', () => {
 
   it('WORKSTREAM-001: carries reviewed workstreams through pending follow-up, plan, and completion state', async () => {
     const root = makeTempRoot('workstream-lineage');
-    const sourceWorkstreamIds = ['ws-source-a', 'ws-source-a', 'ws-source-b', 'ws-source-c', 'ws-source-d'];
+    const sourceWorkstreamIds = Array.from({ length: WORKFLOW_REVIEW_THRESHOLD }, (_, index) =>
+      ['ws-source-a', 'ws-source-a', 'ws-source-b', 'ws-source-c', 'ws-source-d'][index % 5]!
+    );
     let reviewResult: Awaited<ReturnType<typeof seedQualifyingEvent>> | undefined;
     for (const [index, workstreamId] of sourceWorkstreamIds.entries()) {
       reviewResult = await seedQualifyingEvent({
@@ -1040,7 +1326,7 @@ describe('workflow-review cadence', () => {
         generationId: `lineage-g-${index}`,
         workstreamId,
         commit: 'pending',
-        now: new Date(`2026-07-29T0${index + 1}:00:00.000Z`),
+        now: new Date(Date.parse('2026-07-20T00:00:00.000Z') + index * 60 * 60 * 1000),
       });
     }
 
@@ -1126,7 +1412,7 @@ describe('workflow-review cadence', () => {
         repoRoot: root,
         conversationId: `imm-${index}`,
         generationId: `imm-g-${index}`,
-        now: new Date(`2026-07-29T0${index}:00:00.000Z`),
+        now: new Date(Date.parse('2026-07-20T00:00:00.000Z') + index * 60 * 60 * 1000),
       });
     }
 
@@ -1150,25 +1436,25 @@ describe('workflow-review cadence', () => {
     const resumed = await seedQualifyingEvent({
       repoRoot: root,
       conversationId: 'imm-6',
-      generationId: 'imm-g-6',
+      generationId: 'imm-g-resumed',
       now: new Date('2026-07-29T06:00:00.000Z'),
     });
     expect(resumed.reason).not.toBe('pending-follow-up-unresolved');
     expect(loadWorkflowReviewState(paths.statePath).pendingFollowUpPath).toBeNull();
   });
 
-  it('supports thresholds 6/9/10 and unavailable model fallback', async () => {
+  it('supports threshold progression around 25 and unavailable model fallback', async () => {
     const root = makeTempRoot('thresholds');
-    for (let index = 1; index <= 10; index += 1) {
+    for (let index = 1; index <= 26; index += 1) {
       const result = await seedQualifyingEvent({
         repoRoot: root,
         conversationId: ` thr-${index} `,
         generationId: `thr-g-${index}`,
-        now: new Date(`2026-07-${String(10 + Math.floor((index - 1) / 5)).padStart(2, '0')}T${String(index).padStart(2, '0')}:00:00.000Z`),
+        now: new Date(Date.parse('2026-07-10T00:00:00.000Z') + index * 60 * 60 * 1000),
       });
-      if (index === 5 || index === 10) {
+      if (index === 25) {
         expect(result.reviewTriggered).toBe(true);
-      } else if (index === 6 || index === 9) {
+      } else {
         expect(result.reviewTriggered).toBe(false);
       }
     }
@@ -1528,6 +1814,13 @@ describe('TEE telemetry v3 coverage', () => {
     expect(metrics.registryVersionCounts?.['2']).toBe(1);
     expect(metrics.planContractPresentCount).toBe(1);
     expect(metrics.planContractMissingCount).toBe(1);
+    expect(metrics.laneCounts).toEqual({
+      fast: 0,
+      standard: 0,
+      guarded: 0,
+      critical: 0,
+      unknown: 2,
+    });
   });
 
   it('FINAL-REVIEW-001: high-risk markers without independent final review remain failed findings', () => {

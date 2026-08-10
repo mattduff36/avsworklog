@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
+import { spawnSync } from 'child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildEvidenceManifest } from '@/scripts/automation/workflow-evidence-manifest';
 import {
@@ -86,6 +87,53 @@ function writePassingManifest(
 }
 
 describe('workflow review protocol', () => {
+  it('rejects a review token when the recorded evidence no longer matches the tree', () => {
+    const repoRoot = makeTempRoot('stale-review-start');
+    const workstreamId = 'ws_stale_review_start';
+    writeFileSync(path.join(repoRoot, 'package.json'), '{"name":"fixture"}\n', 'utf8');
+    writeFileSync(path.join(repoRoot, '.gitignore'), 'docs_private/\n', 'utf8');
+    spawnSync('git', ['init'], { cwd: repoRoot });
+    spawnSync('git', ['add', '.'], { cwd: repoRoot });
+    spawnSync(
+      'git',
+      [
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.com',
+        'commit',
+        '-m',
+        'fixture',
+      ],
+      { cwd: repoRoot }
+    );
+    applyProtocolTransition({
+      repoRoot,
+      command: 'init',
+      workstreamId,
+      baseCommit: 'abc1234deadbeef',
+    });
+    const manifestPath = writePassingManifest(repoRoot, workstreamId, 'preflight');
+    expect(
+      applyProtocolTransition({
+        repoRoot,
+        command: 'preflight-record',
+        workstreamId,
+        manifestPath,
+      }).ok
+    ).toBe(true);
+
+    writeFileSync(path.join(repoRoot, 'changed-after-preflight.ts'), 'export {};\n', 'utf8');
+    const started = applyProtocolTransition({
+      repoRoot,
+      command: 'review-start',
+      workstreamId,
+      pass: 'first',
+    });
+    expect(started.ok).toBe(false);
+    expect(started.message).toContain('stale');
+  });
+
   it('WF-IDENTITY-001 / WF-REVIEW-001 / WF-REVIEW-002 / WF-ROUTE-001 / WF-ROUTE-002: two-pass budget and routing', () => {
     const repoRoot = makeTempRoot('route');
     const workstreamId = 'ws_protocol_route_1';
@@ -294,6 +342,53 @@ describe('workflow review protocol', () => {
     expect(executed.manifest.baseHeadEvidence.headCommit).toBeTruthy();
   });
 
+  it('TEE-V2-PREFLIGHT-SCOPE-001 runs changed-file oxlint and ESLint with exact evidence', () => {
+    const repoRoot = makeTempRoot('changed-scope');
+    mkdirSync(path.join(repoRoot, 'src'), { recursive: true });
+    writeFileSync(path.join(repoRoot, 'package.json'), '{}', 'utf8');
+    writeFileSync(path.join(repoRoot, 'src', 'base.ts'), 'export const value = 1;', 'utf8');
+    spawnSync('git', ['init'], { cwd: repoRoot, encoding: 'utf8' });
+    spawnSync('git', ['add', '.'], { cwd: repoRoot, encoding: 'utf8' });
+    spawnSync(
+      'git',
+      ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'fixture'],
+      { cwd: repoRoot, encoding: 'utf8' }
+    );
+    writeFileSync(path.join(repoRoot, 'src', 'base.ts'), 'export const value = 2;', 'utf8');
+    writeFileSync(path.join(repoRoot, 'notes.md'), 'not lintable', 'utf8');
+
+    const calls: Array<{ name: string; command: string; args: string[] }> = [];
+    const built = buildEvidenceManifest({
+      repoRoot,
+      workstreamId: 'ws_scope_1',
+      kind: 'preflight',
+      baseCommit: 'HEAD',
+      runChecks: true,
+      commandRunner: (_root, name, command, args) => {
+        calls.push({ name, command, args });
+        return {
+          name,
+          status: 'passed',
+          exitCode: 0,
+          durationMs: 1,
+          summary: 'ok',
+          command: [command, ...args].join(' '),
+        };
+      },
+    });
+
+    expect(calls.map((call) => call.name)).toEqual([
+      'typecheck',
+      'oxlint-changed',
+      'eslint-changed',
+    ]);
+    expect(calls[1]?.args).toEqual(['oxlint', '--', 'src/base.ts']);
+    expect(calls[2]?.args).toEqual(['eslint', '--', 'src/base.ts']);
+    expect(built.manifest.commands.find((command) => command.name === 'oxlint-changed')?.files).toEqual([
+      'src/base.ts',
+    ]);
+  });
+
   it('WF-PAY-INVENTORY-001 / WF-PAY-LIVE-001: fixture inventory completeness and no mutating SQL marker', () => {
     const inventory = buildFixtureTimesheetsPayInventory();
     const completeness = validateTimesheetsPayInventoryCompleteness(inventory);
@@ -303,7 +398,7 @@ describe('workflow review protocol', () => {
     expect(inventory.surfaces.filter((surface) => surface.kind === 'actor')).toHaveLength(6);
   });
 
-  it('WF-CKPT-001 / WF-CKPT-002 / WF-CKPT-003 / WF-CKPT-004: checkpoint resume rules', () => {
+  it('TEE-V2-PROTOCOL-COMPAT-001 / WF-CKPT-001 / WF-CKPT-002 / WF-CKPT-003 / WF-CKPT-004: checkpoint resume rules', () => {
     const repoRoot = makeTempRoot('ckpt');
     writeFileSync(path.join(repoRoot, 'package.json'), '{"name":"tmp"}', 'utf8');
     writeFileSync(path.join(repoRoot, 'package-lock.json'), '{}', 'utf8');

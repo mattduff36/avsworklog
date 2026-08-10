@@ -115,7 +115,7 @@ export function buildWorkflowFindings(params: {
         'action',
         'unknown',
         'Missing workflow completion marker',
-        'Substantive tasks must emit the versioned workflow-completion-marker:v3 block. Missing markers are unknown, never passes.',
+        'Substantive tasks must emit a supported versioned workflow completion marker. Missing markers are unknown, never passes.',
         ['marker:missing']
       )
     );
@@ -147,6 +147,8 @@ export function buildWorkflowFindings(params: {
     }
     return findings;
   }
+
+  const criticalPolicy = marker.lane === 'critical' || (!marker.lane && marker.risk === 'high');
 
   if (marker.schemaVersion === '1') {
     findings.push(
@@ -302,7 +304,7 @@ export function buildWorkflowFindings(params: {
     );
   }
 
-  if (marker.risk === 'high' && marker.architectureGate === 'skipped') {
+  if (criticalPolicy && marker.architectureGate === 'skipped') {
     findings.push(
       finding(
         'missing-architecture-gate',
@@ -313,7 +315,7 @@ export function buildWorkflowFindings(params: {
         ['marker:architectureGate=skipped', 'marker:risk=high']
       )
     );
-  } else if (marker.risk === 'high' && marker.architectureGate === 'blocked') {
+  } else if (criticalPolicy && marker.architectureGate === 'blocked') {
     findings.push(
       finding(
         'architecture-gate-blocked',
@@ -324,7 +326,7 @@ export function buildWorkflowFindings(params: {
         ['marker:architectureGate=blocked']
       )
     );
-  } else if (marker.risk === 'high' && marker.architectureGate === 'not_applicable') {
+  } else if (criticalPolicy && marker.architectureGate === 'not_applicable') {
     findings.push(
       finding(
         'architecture-gate-not-applicable',
@@ -335,7 +337,7 @@ export function buildWorkflowFindings(params: {
         ['marker:architectureGate=not_applicable', 'marker:risk=high']
       )
     );
-  } else if (marker.risk === 'high' && marker.architectureGate === 'unknown') {
+  } else if (criticalPolicy && marker.architectureGate === 'unknown') {
     findings.push(
       finding(
         'architecture-gate-unknown',
@@ -351,7 +353,12 @@ export function buildWorkflowFindings(params: {
     );
   }
 
-  if ((marker.schemaVersion === '2' || marker.schemaVersion === '3') && marker.risk === 'high') {
+  if (
+    (marker.schemaVersion === '2' ||
+      marker.schemaVersion === '3' ||
+      marker.schemaVersion === '4') &&
+    criticalPolicy
+  ) {
     const source = marker.architectureReviewSource ?? 'unknown';
     const parentCanSelfReview = effectiveParentTier === 'premium';
     const sourceIsValid = marker.independentReviewRequired
@@ -377,7 +384,7 @@ export function buildWorkflowFindings(params: {
     }
   }
 
-  const finalReviewRequired = marker.finalReviewRequired ?? marker.risk === 'high';
+  const finalReviewRequired = marker.finalReviewRequired ?? criticalPolicy;
   const escalationEvidence = marker.reviewEscalationReasons ?? [];
 
   if (
@@ -425,7 +432,12 @@ export function buildWorkflowFindings(params: {
     );
   }
 
-  if ((marker.schemaVersion === '2' || marker.schemaVersion === '3') && finalReviewRequired) {
+  if (
+    (marker.schemaVersion === '2' ||
+      marker.schemaVersion === '3' ||
+      marker.schemaVersion === '4') &&
+    finalReviewRequired
+  ) {
     const source = marker.finalReviewSource ?? 'unknown';
     const parentCanSelfReview = effectiveParentTier === 'premium';
     const sourceIsValid = marker.independentReviewRequired
