@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.16.0
+
+**GIT COMMIT MESSAGE**
+`feat(profile): update profile`
+
+**PUSHED AT**
+2026-08-10T23:59:31.759Z
+
+**WHAT CHANGED**
+Update profile. Implement token-efficient engineering v2.
+
+**VERSION HISTORY DETAILS**
+- Updated profile, with changes to background routes, app screens, interface components, and shared typing.
+- Updated actions, with changes to automated tests.
+- Updated data storage, with changes to data storage.
+
+**COMMITS IN THIS RELEASE**
+- `feat(profile): update profile`
+- `feat(workflow): implement token-efficient engineering v2`
+
 ## 0826.15.3
 
 **GIT COMMIT MESSAGE**

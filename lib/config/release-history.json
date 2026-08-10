@@ -1,5 +1,24 @@
 [
   {
+    "version": "0826.16.0",
+    "updateKind": "major",
+    "title": "Profile update",
+    "description": "Updated profile. Implement token-efficient engineering v2.",
+    "summary": "Updated profile. Implement token-efficient engineering v2.",
+    "details": [
+      "Updated profile, with changes to background routes, app screens, interface components, and shared typing.",
+      "Updated actions, with changes to automated tests.",
+      "Updated data storage, with changes to data storage."
+    ],
+    "areas": [
+      "Profile. Implement token-efficient engineering v2"
+    ],
+    "areaKeys": [
+      "profile"
+    ],
+    "pushedAt": "2026-08-10T23:59:31.759Z"
+  },
+  {
     "version": "0826.15.3",
     "updateKind": "minor",
     "title": "Approvals improvements",
