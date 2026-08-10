@@ -48,6 +48,7 @@ import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scrol
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTiles';
+import { isApplicableToType } from '@/app/(dashboard)/maintenance/components/add-asset/utils';
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
@@ -501,11 +502,14 @@ function NewInspectionContent() {
       try {
         const { data, error } = await supabase
           .from('van_categories')
-          .select('id, name')
+          .select('id, name, applies_to')
           .order('name');
 
         if (error) throw error;
-        setCategories(data || []);
+        const vanCategories = (data || [])
+          .filter((category) => isApplicableToType(category.applies_to, 'van'))
+          .map((category) => ({ id: category.id, name: category.name }));
+        setCategories(vanCategories);
       } catch (err) {
         if (isTransientNetworkError(err)) {
           console.warn('Unable to load van categories (network):', err);
@@ -1551,6 +1555,15 @@ function NewInspectionContent() {
           setError(DUPLICATE_VEHICLE_REGISTRATION_MESSAGE);
           toast.error(DUPLICATE_VEHICLE_REGISTRATION_MESSAGE, {
             id: 'van-inspections-new-add-vehicle-duplicate',
+          });
+          return;
+        }
+        if (vehicleError.code === '42501') {
+          const rlsMessage =
+            'You do not have permission to add this van. Ask a fleet admin, or check that the registration and category are valid.';
+          setError(rlsMessage);
+          toast.error(rlsMessage, {
+            id: 'van-inspections-new-add-vehicle-rls',
           });
           return;
         }

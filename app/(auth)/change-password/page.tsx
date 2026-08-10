@@ -119,8 +119,12 @@ export default function ChangePasswordPage() {
         router.push('/dashboard');
       }, 2000);
     } catch (error) {
-      console.error('Error changing password:', error);
-      setError(error instanceof Error ? error.message : 'Failed to change password');
+      const message = error instanceof Error ? error.message : 'Failed to change password';
+      const isExpectedPasswordChangeFailure = message === 'Current password is incorrect';
+      if (!isExpectedPasswordChangeFailure) {
+        console.error('Error changing password:', error);
+      }
+      setError(message);
     } finally {
       setSubmitting(false);
     }

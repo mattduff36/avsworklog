@@ -69,7 +69,9 @@ function runGit(repoRoot: string, args: string[]): string {
     shell: false,
   });
   if (result.status !== 0) return '';
-  return (result.stdout ?? '').trim();
+  // Do not trimStart: porcelain status lines can begin with a leading space
+  // (e.g. " M path"). Trimming would shift slice offsets and corrupt paths.
+  return (result.stdout ?? '').replace(/(?:\r?\n)+\s*$/u, '');
 }
 
 function hashText(value: string): string {
@@ -82,13 +84,27 @@ function hashFile(filePath: string): string {
 }
 
 function listDirtyPaths(repoRoot: string): string[] {
-  const output = runGit(repoRoot, ['status', '--porcelain', '-uall']);
+  const output = runGit(repoRoot, ['status', '--porcelain', '-uall', '-z']);
   if (!output) return [];
-  return output
-    .split(/\r?\n/u)
-    .map((line) => line.slice(3).trim())
-    .filter(Boolean)
-    .sort();
+  const paths: string[] = [];
+  const records = output.split('\0');
+  for (let index = 0; index < records.length; index += 1) {
+    const record = records[index];
+    if (!record) continue;
+    // Porcelain -z entries are "XY path\0". Rename/copy adds a second path record.
+    if (record.length < 3) continue;
+    const status = record.slice(0, 2);
+    const firstPath = record.slice(3);
+    if (!firstPath) continue;
+    if (status.includes('R') || status.includes('C')) {
+      index += 1;
+      const renamedPath = records[index];
+      if (renamedPath) paths.push(renamedPath);
+      continue;
+    }
+    paths.push(firstPath);
+  }
+  return [...new Set(paths)].sort();
 }
 
 export function getCurrentTreeFingerprint(repoRoot: string): {
