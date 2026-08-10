@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.15.1
+
+**GIT COMMIT MESSAGE**
+`fix(payroll): make Others profile overrides optional on activation`
+
+**PUSHED AT**
+2026-08-10T13:19:59.617Z
+
+**WHAT CHANGED**
+Make Others profile overrides optional on activation.
+
+**VERSION HISTORY DETAILS**
+- Updated admin settings, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(payroll): make Others profile overrides optional on activation`
+
 ## 0826.15.0
 
 **GIT COMMIT MESSAGE**

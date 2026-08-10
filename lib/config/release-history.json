@@ -1,5 +1,18 @@
 [
   {
+    "version": "0826.15.1",
+    "updateKind": "minor",
+    "title": "Payroll improvements",
+    "description": "Make Others profile overrides optional on activation.",
+    "summary": "Make Others profile overrides optional on activation.",
+    "details": [
+      "Updated admin settings, with changes to app screens."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-08-10T13:19:59.617Z"
+  },
+  {
     "version": "0826.15.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",
