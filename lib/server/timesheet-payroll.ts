@@ -358,6 +358,42 @@ async function approveInTransaction(
   );
   const timesheet = timesheetResult.rows[0];
   if (!timesheet) throw new Error('Timesheet not found.');
+  // Concurrent/double-click approve: already approved is an idempotent success (no writes).
+  if (timesheet.status === 'approved') {
+    if (!timesheet.current_payroll_snapshot_id) {
+      return {
+        timesheetId: timesheet.id,
+        status: 'approved',
+        legacy: true,
+        snapshotId: null,
+        revision: null,
+        breakdown: null,
+      };
+    }
+
+    const snapshotResult = await client.query<{ id: string; revision: number }>(
+      `
+        SELECT id, revision
+        FROM public.timesheet_payroll_snapshots
+        WHERE id = $1
+          AND timesheet_id = $2
+      `,
+      [timesheet.current_payroll_snapshot_id, timesheet.id]
+    );
+    const snapshot = snapshotResult.rows[0];
+    if (!snapshot) {
+      throw new Error('Approved timesheet snapshot pointer is invalid.');
+    }
+
+    return {
+      timesheetId: timesheet.id,
+      status: 'approved',
+      legacy: false,
+      snapshotId: snapshot.id,
+      revision: snapshot.revision,
+      breakdown: null,
+    };
+  }
   if (!['submitted', 'adjusted'].includes(timesheet.status)) {
     throw new Error(`Timesheet cannot be approved from status "${timesheet.status}".`);
   }

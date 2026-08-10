@@ -67,6 +67,21 @@ class ApprovalClient implements PayrollPgClient {
         }] as Row[],
       };
     }
+    if (
+      sql.includes('FROM public.timesheet_payroll_snapshots') &&
+      sql.includes('WHERE id = $1') &&
+      sql.includes('AND timesheet_id = $2')
+    ) {
+      if (!this.options.currentSnapshotId) {
+        return { rows: [] };
+      }
+      return {
+        rows: [{
+          id: this.options.currentSnapshotId,
+          revision: this.options.revision || 1,
+        }] as Row[],
+      };
+    }
     if (sql.includes('FROM public.payroll_rollout_activations')) {
       return { rows: [{ applies: !this.options.legacy }] as Row[] };
     }
@@ -184,6 +199,66 @@ describe('transactional payroll approval', () => {
     }, () => client);
     expect(result.snapshotId).toBe(SNAPSHOT_ID);
     expect(client.statements.some((item) => item.sql.includes('FOR UPDATE'))).toBe(false);
+  });
+
+  it('PAY-APPROVAL-IDEMPOTENT-001 returns current approved snapshot state without writes', async () => {
+    const client = new ApprovalClient({
+      status: 'approved',
+      currentSnapshotId: SNAPSHOT_ID,
+      revision: 3,
+    });
+    const result = await approveTimesheetWithPayrollSnapshot({
+      timesheetId: TIMESHEET_ID,
+      actorId: ACTOR_ID,
+      idempotencyKey: IDEMPOTENCY_ID,
+    }, () => client);
+    expect(result).toEqual({
+      timesheetId: TIMESHEET_ID,
+      status: 'approved',
+      legacy: false,
+      snapshotId: SNAPSHOT_ID,
+      revision: 3,
+      breakdown: null,
+    });
+    expect(client.statements.some((item) => item.sql.includes('INSERT INTO'))).toBe(false);
+    expect(client.statements.some((item) => item.sql.includes('UPDATE public.'))).toBe(false);
+  });
+
+  it('PAY-APPROVAL-IDEMPOTENT-LEGACY-001 returns legacy approved state without writes', async () => {
+    const client = new ApprovalClient({
+      status: 'approved',
+      currentSnapshotId: null,
+    });
+    const result = await approveTimesheetWithPayrollSnapshot({
+      timesheetId: TIMESHEET_ID,
+      actorId: ACTOR_ID,
+      idempotencyKey: IDEMPOTENCY_ID,
+    }, () => client);
+    expect(result).toEqual({
+      timesheetId: TIMESHEET_ID,
+      status: 'approved',
+      legacy: true,
+      snapshotId: null,
+      revision: null,
+      breakdown: null,
+    });
+    expect(client.statements.some((item) => item.sql.includes('INSERT INTO'))).toBe(false);
+    expect(client.statements.some((item) => item.sql.includes('UPDATE public.'))).toBe(false);
+  });
+
+  it('PAY-APPROVAL-STATE-GUARD-002 rejects processed, rejected, and draft without writes', async () => {
+    for (const status of ['processed', 'rejected', 'draft'] as const) {
+      const client = new ApprovalClient({ status });
+      await expect(
+        approveTimesheetWithPayrollSnapshot({
+          timesheetId: TIMESHEET_ID,
+          actorId: ACTOR_ID,
+          idempotencyKey: IDEMPOTENCY_ID,
+        }, () => client)
+      ).rejects.toThrow(`Timesheet cannot be approved from status "${status}".`);
+      expect(client.statements.some((item) => item.sql.includes('INSERT INTO'))).toBe(false);
+      expect(client.statements.some((item) => item.sql.includes('UPDATE public.'))).toBe(false);
+    }
   });
 
   it('PAY-APPROVAL-GUARD-001 and PAY-RLS-IMMUTABLE-001 are enforced by migration guards', () => {

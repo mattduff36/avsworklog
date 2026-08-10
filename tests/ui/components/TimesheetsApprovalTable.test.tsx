@@ -83,4 +83,41 @@ describe('TimesheetsApprovalTable', () => {
     expect(onProcess).toHaveBeenCalledWith('timesheet-approved');
     expect(pushMock).not.toHaveBeenCalled();
   });
+
+  it('PAY-APPROVAL-BUSY-UI-001 disables Payroll Received only for the busy timesheet', () => {
+    const busy = {
+      ...buildTimesheet('submitted'),
+      id: 'timesheet-busy',
+      week_ending: '2026-06-21',
+      user: { full_name: 'Busy User', employee_id: 'BU001' },
+    };
+    const idle = {
+      ...buildTimesheet('submitted'),
+      id: 'timesheet-idle',
+      week_ending: '2026-06-14',
+      user: { full_name: 'Idle User', employee_id: 'IU001' },
+    };
+
+    render(
+      <TimesheetsApprovalTable
+        timesheets={[busy, idle]}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onProcess={vi.fn()}
+        columnVisibility={DEFAULT_COLUMN_VISIBILITY}
+        busyTimesheetIds={new Set([busy.id])}
+      />
+    );
+
+    const busyRow = screen.getByText('Busy User').closest('tr');
+    const idleRow = screen.getByText('Idle User').closest('tr');
+    expect(busyRow).not.toBeNull();
+    expect(idleRow).not.toBeNull();
+    const busyButtons = Array.from(busyRow!.querySelectorAll('button'));
+    const idleButtons = Array.from(idleRow!.querySelectorAll('button'));
+    expect(busyButtons.find((button) => button.textContent?.includes('Reject'))).toBeDisabled();
+    expect(busyButtons.find((button) => button.textContent?.includes('Payroll Received'))).toBeDisabled();
+    expect(idleButtons.find((button) => button.textContent?.includes('Reject'))).not.toBeDisabled();
+    expect(idleButtons.find((button) => button.textContent?.includes('Payroll Received'))).not.toBeDisabled();
+  });
 });

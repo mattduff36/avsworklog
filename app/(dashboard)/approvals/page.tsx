@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
@@ -46,6 +46,7 @@ import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
 import { AbsencesApprovalTable, ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_ABSENCE_COLUMN_VISIBILITY } from './components/AbsencesApprovalTable';
 import type { AbsenceColumnVisibility } from './components/AbsencesApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
+import { TimesheetSubmittedActions } from './components/TimesheetSubmittedActions';
 import { SectionLoader } from '@/components/ui/section-loader';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import {
@@ -66,6 +67,10 @@ import {
   getApprovalsDefaultStatusFilters,
   shouldIncludeTimesheetInAllSubmittedFilter,
 } from '@/lib/utils/approvals-filters';
+import {
+  createApprovalInFlightGuard,
+  isAlreadyApprovedConflict,
+} from './approvals-quick-approve';
 
 const APPROVALS_PAGE_SIZE = 50;
 const approvalsTabTriggerClassName = 'gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900';
@@ -156,6 +161,8 @@ function ApprovalsContent() {
   const [visibleAbsenceCount, setVisibleAbsenceCount] = useState(APPROVALS_PAGE_SIZE);
   const [employees, setEmployees] = useState<FilterEmployee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
+  const approveInFlightRef = useRef(createApprovalInFlightGuard());
+  const [busyTimesheetIds, setBusyTimesheetIds] = useState<ReadonlySet<string>>(() => new Set());
 
   // View mode (cards vs table) - persisted to localStorage per tab
   const [timesheetViewMode, setTimesheetViewMode] = useState<'cards' | 'table'>(() => {
@@ -685,6 +692,15 @@ function ApprovalsContent() {
   }, [canViewApprovals, permissionLoading, router, fetchApprovals]);
 
   const handleQuickApprove = async (_type: 'timesheet', id: string) => {
+    if (!approveInFlightRef.current.tryBegin(id)) {
+      return;
+    }
+    setBusyTimesheetIds((previous) => {
+      const next = new Set(previous);
+      next.add(id);
+      return next;
+    });
+
     try {
       const response = await fetch(`/api/timesheets/${id}/approve`, {
         method: 'POST',
@@ -694,13 +710,25 @@ function ApprovalsContent() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || 'Failed to approve timesheet');
 
-      // Refresh data
+      toast.success('Timesheet marked as Payroll Received');
       await fetchApprovals();
     } catch (error) {
+      if (isAlreadyApprovedConflict(error)) {
+        toast.success('Timesheet already marked as Payroll Received');
+        await fetchApprovals();
+        return;
+      }
       const errorContextId = 'approvals-quick-approve-error';
       console.error('Error approving:', error, { errorContextId });
       toast.error(error instanceof Error ? error.message : 'Failed to approve timesheet', {
         id: errorContextId,
+      });
+    } finally {
+      approveInFlightRef.current.end(id);
+      setBusyTimesheetIds((previous) => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
       });
     }
   };
@@ -1146,6 +1174,7 @@ function ApprovalsContent() {
                       onProcess={handleOpenProcessModal}
                       columnVisibility={columnVisibility}
                       visibleCount={visibleTimesheetCount}
+                      busyTimesheetIds={busyTimesheetIds}
                     />
                   </div>
                 )}
@@ -1187,33 +1216,16 @@ function ApprovalsContent() {
                               )}
                             </div>
                             {timesheet.status === 'submitted' && (
-                              <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleQuickReject('timesheet', timesheet.id);
-                                  }}
-                                  className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                                >
-                                  <XCircle className="h-4 w-4 mr-1" />
-                                  Reject
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleQuickApprove('timesheet', timesheet.id);
-                                  }}
-                                  className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
-                                >
-                                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                                  Payroll Received
-                                </Button>
+                              <div onClick={(e) => e.preventDefault()}>
+                                <TimesheetSubmittedActions
+                                  timesheetId={timesheet.id}
+                                  busy={busyTimesheetIds.has(timesheet.id)}
+                                  onApprove={(id) => { void handleQuickApprove('timesheet', id); }}
+                                  onReject={(id) => { void handleQuickReject('timesheet', id); }}
+                                  className="flex gap-2"
+                                  rejectClassName="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
+                                  approveClassName="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
+                                />
                               </div>
                             )}
                             {timesheet.status === 'approved' && (
