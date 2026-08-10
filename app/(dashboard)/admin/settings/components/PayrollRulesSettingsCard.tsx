@@ -827,7 +827,7 @@ export function PayrollRulesSettingsCard() {
                       <div>
                         <h5 className="font-semibold text-foreground">Individual payroll overrides</h5>
                         <p className={HELPER_TEXT_CLASS}>
-                          Use only for exceptions. At least three employees must be assigned to Others.
+                          Optional exceptions. Assign employees to Others only when they should not use their team rule.
                         </p>
                       </div>
                     </div>

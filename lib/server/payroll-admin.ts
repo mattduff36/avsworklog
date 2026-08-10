@@ -381,14 +381,6 @@ export async function activatePayrollRollout(input: {
   if (new Set(input.profileAssignments.map((item) => item.profileId)).size !== input.profileAssignments.length) {
     throw new Error('Each profile can have only one payroll override per activation.');
   }
-  const othersProfiles = new Set(
-    input.profileAssignments
-      .filter((item) => item.ruleSetKey === 'others')
-      .map((item) => item.profileId)
-  );
-  if (othersProfiles.size < 3) {
-    throw new Error('At least three explicit Others profile assignments are required.');
-  }
 
   const client = createPayrollAdminPgClient();
   await client.connect();
