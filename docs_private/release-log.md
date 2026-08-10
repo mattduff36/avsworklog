@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.15.3
+
+**GIT COMMIT MESSAGE**
+`fix(approvals): make already-approved timesheet approve idempotent`
+
+**PUSHED AT**
+2026-08-10T15:35:58.371Z
+
+**WHAT CHANGED**
+Make already-approved timesheet approve idempotent.
+
+**VERSION HISTORY DETAILS**
+- Make already-approved timesheet approve idempotent, with changes to app screens and automated tests.
+- Updated timesheets, with changes to app screens, shared logic, and automated tests.
+- Updated actions, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(approvals): make already-approved timesheet approve idempotent`
+
 ## 0826.15.2
 
 **GIT COMMIT MESSAGE**
