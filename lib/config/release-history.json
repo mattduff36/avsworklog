@@ -1,5 +1,24 @@
 [
   {
+    "version": "0826.15.2",
+    "updateKind": "minor",
+    "title": "Daily Tasks improvements",
+    "description": "Restore constrained van insert for inspection creators.",
+    "summary": "Restore constrained van insert for inspection creators.",
+    "details": [
+      "Restore constrained van insert for inspection creators, with changes to app screens, automation scripts, automated tests, and data storage.",
+      "Updated data storage, with changes to automation scripts, automated tests, and data storage.",
+      "Updated sign in across 1 changed file."
+    ],
+    "areas": [
+      "Daily Tasks"
+    ],
+    "areaKeys": [
+      "daily-tasks"
+    ],
+    "pushedAt": "2026-08-10T14:13:58.647Z"
+  },
+  {
     "version": "0826.15.1",
     "updateKind": "minor",
     "title": "Payroll improvements",

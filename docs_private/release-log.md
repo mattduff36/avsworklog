@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.15.2
+
+**GIT COMMIT MESSAGE**
+`fix(inspections): restore constrained van insert for inspection creators`
+
+**PUSHED AT**
+2026-08-10T14:13:58.647Z
+
+**WHAT CHANGED**
+Restore constrained van insert for inspection creators.
+
+**VERSION HISTORY DETAILS**
+- Restore constrained van insert for inspection creators, with changes to app screens, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to automation scripts, automated tests, and data storage.
+- Updated sign in across 1 changed file.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inspections): restore constrained van insert for inspection creators`
+
 ## 0826.15.1
 
 **GIT COMMIT MESSAGE**
