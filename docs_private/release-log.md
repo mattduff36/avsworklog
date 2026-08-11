@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.19.1
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): hide legacy Regular Check from type picker`
+
+**PUSHED AT**
+2026-08-11T14:38:34.084Z
+
+**WHAT CHANGED**
+Hide legacy Regular Check from type picker.
+
+**VERSION HISTORY DETAILS**
+- Hide legacy Regular Check from type picker, with changes to app screens, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inventory): hide legacy Regular Check from type picker`
+
 ## 0826.19.0
 
 **GIT COMMIT MESSAGE**
