@@ -118,6 +118,15 @@ describe('Conditional KM labels in shared components', () => {
     expect(src).toMatch(/formatMilesUntil\([^)]*distanceUnit/);
   });
 
+  it('T2 MaintenanceOverview gates Service alerts with asset-aware service category', () => {
+    const src = readSource('app/(dashboard)/maintenance/components/MaintenanceOverview.tsx');
+    expect(src).toContain('getServiceCategoryNameForAsset');
+    expect(src).toContain('categoryVisible(getServiceCategoryNameForAsset(rawAssetType))');
+    expect(src).not.toMatch(
+      /categoryVisible\(\s*MAINTENANCE_CATEGORY_NAMES\.service\s*\)/
+    );
+  });
+
   it('MaintenanceOverview shows the HGV fleet maintenance category strip from category items', () => {
     const src = readSource('app/(dashboard)/maintenance/components/MaintenanceOverview.tsx');
     expect(src).toContain('getHgvMaintenanceSummaryItems');

@@ -18,6 +18,8 @@ import {
   MAINTENANCE_CATEGORY_NAMES,
   createMaintenanceCategoryMap,
   getMaintenanceCategory,
+  getServiceAlertThresholdMiles,
+  getServiceCategoryNameForAsset,
   getVisibleMaintenanceStatuses,
   type MaintenanceCategoryConfig,
   type MaintenanceCategoryMap,
@@ -151,7 +153,6 @@ function getThresholds(categoryMap: MaintenanceCategoryMap) {
   return {
     taxThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.tax, 30),
     motThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.mot, 30),
-    serviceThreshold: getMiles(MAINTENANCE_CATEGORY_NAMES.service, 1000),
     cambeltThreshold: getMiles(MAINTENANCE_CATEGORY_NAMES.cambelt, 5000),
     firstAidThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.firstAid, 30),
     sixWeeklyThreshold: getDays(MAINTENANCE_CATEGORY_NAMES.sixWeekly, 7),
@@ -191,7 +192,7 @@ function getMaintenanceCountsForAsset(params: {
   const serviceStatus = getMileageBasedStatus(
       params.maintenance.current_mileage,
       params.maintenance.next_service_mileage,
-      params.thresholds.serviceThreshold
+      getServiceAlertThresholdMiles(params.categoryMap, params.assetType)
     );
   const cambeltStatus = getMileageBasedStatus(
       params.maintenance.current_mileage,
@@ -222,7 +223,7 @@ function getMaintenanceCountsForAsset(params: {
   const counts = calculateAlertCounts(getVisibleMaintenanceStatuses(params.assetType, params.categoryMap, [
     { categoryName: MAINTENANCE_CATEGORY_NAMES.tax, status: taxStatus },
     { categoryName: MAINTENANCE_CATEGORY_NAMES.mot, status: motStatus },
-    { categoryName: MAINTENANCE_CATEGORY_NAMES.service, status: serviceStatus },
+    { categoryName: getServiceCategoryNameForAsset(params.assetType), status: serviceStatus },
     { categoryName: MAINTENANCE_CATEGORY_NAMES.cambelt, status: cambeltStatus },
     { categoryName: MAINTENANCE_CATEGORY_NAMES.firstAid, status: firstAidStatus },
     { categoryName: MAINTENANCE_CATEGORY_NAMES.sixWeekly, status: sixWeeklyStatus },

@@ -34,14 +34,14 @@ import {
   createMaintenanceCategoryMap,
   getDistanceUnitLabel,
   getMaintenanceCategory,
+  getServiceCategoryNameForAsset,
   isMaintenanceCategoryVisibleOnOverview,
 } from '@/lib/utils/maintenanceCategoryRules';
 
-// Map alert type to category name for lookup
+// Map alert type to category name for lookup (Service resolved per asset type)
 const ALERT_TO_CATEGORY_NAME: Record<string, string> = {
   'Tax': MAINTENANCE_CATEGORY_NAMES.tax,
   'MOT': MAINTENANCE_CATEGORY_NAMES.mot,
-  'Service': MAINTENANCE_CATEGORY_NAMES.service,
   'Cambelt': MAINTENANCE_CATEGORY_NAMES.cambelt,
   'First Aid Kit': MAINTENANCE_CATEGORY_NAMES.firstAid,
   'LOLER': MAINTENANCE_CATEGORY_NAMES.loler,
@@ -216,14 +216,23 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
   } | null>(null);
   
   // Helper to get category responsibility
-  const getCategoryForAlert = (alertType: string): MaintenanceCategory | undefined => {
-    const categoryName = ALERT_TO_CATEGORY_NAME[alertType] || alertType;
+  const getCategoryForAlert = (
+    alertType: string,
+    assetType?: string | null
+  ): MaintenanceCategory | undefined => {
+    const categoryName =
+      alertType === 'Service'
+        ? getServiceCategoryNameForAsset(assetType)
+        : ALERT_TO_CATEGORY_NAME[alertType] || alertType;
     const category = getMaintenanceCategory(maintenanceCategoryMap, categoryName);
     return category?.id ? category as MaintenanceCategory : undefined;
   };
 
-  const getCategoryResponsibility = (alertType: string): CategoryResponsibility => {
-    const category = getCategoryForAlert(alertType);
+  const getCategoryResponsibility = (
+    alertType: string,
+    assetType?: string | null
+  ): CategoryResponsibility => {
+    const category = getCategoryForAlert(alertType, assetType);
     return category?.responsibility || 'workshop';
   };
   
@@ -449,7 +458,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
     }
     
     // Check Service (normalize miles to days equivalent for sorting - only if category applies)
-    if (categoryVisible(MAINTENANCE_CATEGORY_NAMES.service)) {
+    if (categoryVisible(getServiceCategoryNameForAsset(rawAssetType))) {
       if (vehicle.service_status?.status === 'overdue') {
         const milesUntil = vehicle.service_status.miles_until ?? 0;
         alerts.push({
@@ -1227,6 +1236,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
 
   const renderAlertCard = (entry: AlertEntry, isOverdue: boolean) => {
     const { vehicle, alert: cardAlert, entryKey, vehicleId, isPlant } = entry;
+    const rawAssetType = (vehicle.vehicle?.asset_type || (isPlant ? 'plant' : 'vehicle')).toLowerCase();
     const isExpanded = expandedVehicles.has(entryKey);
     const historyData = vehicleHistory[vehicleId];
     const historyResolved = Boolean(historyData) && !historyData.loading;
@@ -1426,7 +1436,7 @@ export function MaintenanceOverview({ vehicles, summary, onVehicleClick }: Maint
                   </Button>
                 ) : !hasExistingTask ? (
                   (() => {
-                    const responsibility = getCategoryResponsibility(cardAlert.type);
+                    const responsibility = getCategoryResponsibility(cardAlert.type, rawAssetType);
                     
                     if (responsibility === 'office') {
                       return (

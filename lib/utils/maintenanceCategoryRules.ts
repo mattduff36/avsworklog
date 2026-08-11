@@ -147,6 +147,21 @@ export function getVisibleMaintenanceStatuses(
     .map(({ status }) => status);
 }
 
+export function getServiceCategoryNameForAsset(assetType: string | null | undefined): string {
+  return normalizeMaintenanceAssetType(assetType) === 'hgv'
+    ? MAINTENANCE_CATEGORY_NAMES.hgvService
+    : MAINTENANCE_CATEGORY_NAMES.service;
+}
+
+export function getServiceAlertThresholdMiles(
+  categoryMap: MaintenanceCategoryMap,
+  assetType: string | null | undefined
+): number {
+  const categoryName = getServiceCategoryNameForAsset(assetType);
+  const fallback = normalizeMaintenanceAssetType(assetType) === 'hgv' ? 2500 : 1000;
+  return getMaintenanceCategory(categoryMap, categoryName)?.alert_threshold_miles || fallback;
+}
+
 export function getDistanceUnitLabel(assetType: string | null | undefined): 'miles' | 'km' {
   return normalizeMaintenanceAssetType(assetType) === 'hgv' ? 'km' : 'miles';
 }

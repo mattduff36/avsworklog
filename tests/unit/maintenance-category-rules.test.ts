@@ -6,6 +6,8 @@ import {
   getDistanceTypeLabel,
   getMaintenanceCategory,
   getMaintenanceCategoryDisplayName,
+  getServiceAlertThresholdMiles,
+  getServiceCategoryNameForAsset,
   getVisibleMaintenanceStatuses,
   isMaintenanceCategoryVisibleOnOverview,
   type MaintenanceCategoryConfig,
@@ -92,5 +94,55 @@ describe('maintenance category rules', () => {
     expect(categoryAppliesToAsset(undefined, 'hgv', MAINTENANCE_CATEGORY_NAMES.hgvService)).toBe(true);
     expect(MAINTENANCE_CATEGORY_NAMES.hgvService).toBe('service');
     expect(MAINTENANCE_CATEGORY_NAMES.service).toBe('service due');
+  });
+
+  it('T1 resolves service category name and alert threshold by asset type', () => {
+    expect(getServiceCategoryNameForAsset('hgv')).toBe(MAINTENANCE_CATEGORY_NAMES.hgvService);
+    expect(getServiceCategoryNameForAsset('van')).toBe(MAINTENANCE_CATEGORY_NAMES.service);
+    expect(getServiceCategoryNameForAsset('plant')).toBe(MAINTENANCE_CATEGORY_NAMES.service);
+
+    const categoryMap = createMaintenanceCategoryMap([
+      category({
+        name: 'Service Due',
+        applies_to: ['van'],
+        alert_threshold_miles: 1000,
+      }),
+      category({
+        name: 'Service',
+        applies_to: ['hgv'],
+        alert_threshold_miles: 2500,
+      }),
+    ]);
+
+    expect(getServiceAlertThresholdMiles(categoryMap, 'hgv')).toBe(2500);
+    expect(getServiceAlertThresholdMiles(categoryMap, 'van')).toBe(1000);
+    expect(getServiceAlertThresholdMiles(createMaintenanceCategoryMap([]), 'hgv')).toBe(2500);
+    expect(getServiceAlertThresholdMiles(createMaintenanceCategoryMap([]), 'van')).toBe(1000);
+  });
+
+  it('includes HGV Service status in visible dashboard statuses', () => {
+    const categoryMap = createMaintenanceCategoryMap([
+      category({
+        name: 'Service',
+        applies_to: ['hgv'],
+        show_on_overview: true,
+      }),
+      category({
+        name: 'Service Due',
+        applies_to: ['van'],
+        show_on_overview: true,
+      }),
+    ]);
+
+    const hgvStatuses = getVisibleMaintenanceStatuses('hgv', categoryMap, [
+      { categoryName: getServiceCategoryNameForAsset('hgv'), status: { status: 'overdue' } },
+      { categoryName: MAINTENANCE_CATEGORY_NAMES.service, status: { status: 'due_soon' } },
+    ]);
+    expect(hgvStatuses).toEqual([{ status: 'overdue' }]);
+
+    const vanStatuses = getVisibleMaintenanceStatuses('van', categoryMap, [
+      { categoryName: getServiceCategoryNameForAsset('van'), status: { status: 'due_soon' } },
+    ]);
+    expect(vanStatuses).toEqual([{ status: 'due_soon' }]);
   });
 });

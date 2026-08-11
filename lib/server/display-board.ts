@@ -13,6 +13,7 @@ import {
   createMaintenanceCategoryMap,
   getDistanceUnitLabel,
   getMaintenanceCategory,
+  getServiceAlertThresholdMiles,
   isMaintenanceCategoryVisibleOnOverview,
 } from '@/lib/utils/maintenanceCategoryRules';
 import {
@@ -762,7 +763,6 @@ export async function buildMaintenanceListResponse(): Promise<MaintenanceListRes
   const categoryMap = createMaintenanceCategoryMap(maintenanceCategories);
   const taxThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.tax)?.alert_threshold_days || 30;
   const motThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.mot)?.alert_threshold_days || 30;
-  const serviceThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.service)?.alert_threshold_miles || 1000;
   const cambeltThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.cambelt)?.alert_threshold_miles || 5000;
   const firstAidThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.firstAid)?.alert_threshold_days || 30;
   const sixWeeklyThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.sixWeekly)?.alert_threshold_days || 7;
@@ -887,7 +887,11 @@ export async function buildMaintenanceListResponse(): Promise<MaintenanceListRes
       vehicle: vehicleObj,
       tax_status: getDateBasedStatus(maintenance.tax_due_date, taxThreshold),
       mot_status: getDateBasedStatus(maintenance.mot_due_date, motThreshold),
-      service_status: getMileageBasedStatus(maintenance.current_mileage, maintenance.next_service_mileage, serviceThreshold),
+      service_status: getMileageBasedStatus(
+        maintenance.current_mileage,
+        maintenance.next_service_mileage,
+        getServiceAlertThresholdMiles(categoryMap, assetType)
+      ),
       cambelt_status: getMileageBasedStatus(maintenance.current_mileage, maintenance.cambelt_due_mileage, cambeltThreshold),
       first_aid_status: getDateBasedStatus(maintenance.first_aid_kit_expiry, firstAidThreshold),
       six_weekly_status: getDateBasedStatus(maintenance.six_weekly_inspection_due_date, sixWeeklyThreshold),

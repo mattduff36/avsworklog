@@ -28,6 +28,7 @@ import {
   getDistanceUnitLabel,
   getMaintenanceCategory,
   getMaintenanceCategoryDisplayName,
+  getServiceAlertThresholdMiles,
   isMaintenanceCategoryVisibleOnOverview,
 } from '@/lib/utils/maintenanceCategoryRules';
 
@@ -292,7 +293,6 @@ export async function GET() {
     // Get thresholds (with defaults)
     const taxThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.tax)?.alert_threshold_days || 30;
     const motThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.mot)?.alert_threshold_days || 30;
-    const serviceThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.service)?.alert_threshold_miles || 1000;
     const cambeltThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.cambelt)?.alert_threshold_miles || 5000;
     const firstAidThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.firstAid)?.alert_threshold_days || 30;
     const sixWeeklyThreshold = getMaintenanceCategory(categoryMap, MAINTENANCE_CATEGORY_NAMES.sixWeekly)?.alert_threshold_days || 7;
@@ -521,7 +521,7 @@ export async function GET() {
       const service_status = getMileageBasedStatus(
         maintenance.current_mileage,
         maintenance.next_service_mileage,
-        serviceThreshold
+        getServiceAlertThresholdMiles(categoryMap, assetType)
       );
       const cambelt_status = getMileageBasedStatus(
         maintenance.current_mileage,
