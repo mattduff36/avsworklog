@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.20.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): allow moves after check warnings`
+
+**PUSHED AT**
+2026-08-11T15:43:13.549Z
+
+**WHAT CHANGED**
+Allow moves after check warnings.
+
+**VERSION HISTORY DETAILS**
+- Allow moves after check warnings, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to automation scripts and data storage.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): allow moves after check warnings`
+
 ## 0826.19.1
 
 **GIT COMMIT MESSAGE**

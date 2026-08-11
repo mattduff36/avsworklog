@@ -1,5 +1,23 @@
 [
   {
+    "version": "0826.20.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Allow moves after check warnings.",
+    "summary": "Allow moves after check warnings.",
+    "details": [
+      "Allow moves after check warnings, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.",
+      "Updated data storage, with changes to automation scripts and data storage."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-08-11T15:43:13.549Z"
+  },
+  {
     "version": "0826.19.1",
     "updateKind": "minor",
     "title": "Inventory improvements",
