@@ -15,6 +15,7 @@ export interface DashboardTaskBadgeCounts {
   suggestions: number;
   quotes: number;
   errorReports: number;
+  errorLogs: number;
 }
 
 interface DashboardTaskBadgeState {
@@ -37,6 +38,7 @@ const emptyCounts: DashboardTaskBadgeCounts = {
   suggestions: 0,
   quotes: 0,
   errorReports: 0,
+  errorLogs: 0,
 };
 
 const DashboardTaskBadgeContext = createContext<DashboardTaskBadgeContextValue | null>(null);

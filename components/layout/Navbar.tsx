@@ -47,6 +47,7 @@ import {
   adminNavItems 
 } from '@/lib/config/navigation';
 import { cn } from '@/lib/utils/cn';
+import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 import { getPublicReleaseVersionLabel } from '@/lib/config/release-version';
 
 interface NavbarBrandProps {
@@ -590,6 +591,11 @@ export function Navbar() {
   );
   const hasMobileManagementLinks = mobileManagerLinks.length > 0 || adminLinks.length > 0;
   const isDashboardRoute = pathname === '/dashboard';
+  const canAccessDebugTools = canAccessDebugConsole({
+    email: profile?.email,
+    isActualSuperAdmin,
+    isViewingAs,
+  });
   const dashboardTaskBadgeCountByHref: Record<string, number> = {
     '/approvals': dashboardTaskBadgeCounts.approvals,
     '/actions': dashboardTaskBadgeCounts.actions,
@@ -598,17 +604,30 @@ export function Navbar() {
     '/admin/errors/manage': dashboardTaskBadgeCounts.errorReports,
   };
   const dashboardTopNavTaskLinks = dashboardTaskBadgesReady
-    ? [...mobileManagerLinks, ...adminLinks]
-        .filter(item => item.href in dashboardTaskBadgeCountByHref)
-        .map(item => ({
-          href: item.href,
-          label: item.label,
-          icon: item.icon,
-          count: dashboardTaskBadgeCountByHref[item.href] || 0,
-        }))
-        .filter(item => item.count > 0)
+    ? [
+        ...[...mobileManagerLinks, ...adminLinks]
+          .filter(item => item.href in dashboardTaskBadgeCountByHref)
+          .map(item => ({
+            href: item.href,
+            label: item.label,
+            icon: item.icon,
+            count: dashboardTaskBadgeCountByHref[item.href] || 0,
+          }))
+          .filter(item => item.count > 0),
+        ...(canAccessDebugTools && dashboardTaskBadgeCounts.errorLogs > 0
+          ? [
+              {
+                href: '/debug',
+                label: 'Debug',
+                icon: Bug,
+                count: dashboardTaskBadgeCounts.errorLogs,
+                accent: 'danger' as const,
+              },
+            ]
+          : []),
+      ]
     : [];
-  const hasMobileDeveloperLinks = isActualSuperAdmin && !isViewingAs;
+  const hasMobileDeveloperLinks = canAccessDebugTools;
   const showInstallAppLink = !isStandaloneApp;
   const unreadBadgeLabel = unreadCount > 99 ? '99+' : unreadCount;
 

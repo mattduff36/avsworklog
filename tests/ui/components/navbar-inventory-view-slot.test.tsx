@@ -73,6 +73,7 @@ vi.mock('@/components/layout/dashboard-task-badge-context', () => ({
       suggestions: 0,
       quotes: 0,
       errorReports: 0,
+      errorLogs: 0,
     },
     ready: false,
   }),

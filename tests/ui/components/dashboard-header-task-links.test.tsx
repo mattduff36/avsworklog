@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { render, screen } from '@testing-library/react';
-import { AlertTriangle, CheckSquare, ListTodo } from 'lucide-react';
+import { AlertTriangle, Bug, CheckSquare, ListTodo } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DashboardTaskBadgeLinks,
@@ -36,6 +36,13 @@ const taskLinks: DashboardTaskBadgeLink[] = [
     count: 125,
     icon: AlertTriangle,
   },
+  {
+    href: '/debug',
+    label: 'Debug',
+    count: 7,
+    icon: Bug,
+    accent: 'danger',
+  },
 ];
 
 describe('DashboardTaskBadgeLinks', () => {
@@ -56,6 +63,11 @@ describe('DashboardTaskBadgeLinks', () => {
     expect(
       screen.getByRole('link', { name: 'Error Reports: 125 pending' })
     ).toHaveAttribute('href', '/admin/errors/manage');
+    expect(screen.getByRole('link', { name: 'Debug: 7 pending' })).toHaveAttribute(
+      'href',
+      '/debug'
+    );
+    expect(screen.getByRole('link', { name: 'Debug: 7 pending' })).toHaveClass('text-red-500');
   });
 
   it('caps the displayed badge count at 99+', () => {

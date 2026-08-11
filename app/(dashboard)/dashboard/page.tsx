@@ -320,11 +320,13 @@ export default function DashboardPage() {
       suggestions: newSuggestionsCount,
       quotes: pendingQuotesCount,
       errorReports: newErrorReportsCount,
+      errorLogs: errorLogsCount,
     });
   }, [
     actionsUnassignedCount,
     approvalsTileBadgeCount,
     badgesLoading,
+    errorLogsCount,
     newErrorReportsCount,
     newSuggestionsCount,
     pendingQuotesCount,
@@ -490,15 +492,28 @@ export default function DashboardPage() {
   };
   const hasManagementTileBadge = (href: string) => href in managementTileBadgeCountByHref;
   const getManagementTileBadgeCount = (href: string) => managementTileBadgeCountByHref[href] || 0;
-  const dashboardHeaderTaskLinks = [...renderedManagerTiles, ...visibleAdminTiles]
-    .filter(link => hasManagementTileBadge(link.href))
-    .map(link => ({
-      href: link.href,
-      label: link.label,
-      icon: link.icon,
-      count: getManagementTileBadgeCount(link.href),
-    }))
-    .filter(link => link.count > 0);
+  const dashboardHeaderTaskLinks = [
+    ...[...renderedManagerTiles, ...visibleAdminTiles]
+      .filter(link => hasManagementTileBadge(link.href))
+      .map(link => ({
+        href: link.href,
+        label: link.label,
+        icon: link.icon,
+        count: getManagementTileBadgeCount(link.href),
+      }))
+      .filter(link => link.count > 0),
+    ...(canAccessDebugTools && errorLogsCount > 0
+      ? [
+          {
+            href: '/debug',
+            label: 'Debug',
+            icon: Bug,
+            count: errorLogsCount,
+            accent: 'danger' as const,
+          },
+        ]
+      : []),
+  ];
   const hasSensitivePinIndicator = (moduleName: ModuleName | undefined) => Boolean(
     moduleName && sensitivePinModuleSet.has(moduleName)
   );

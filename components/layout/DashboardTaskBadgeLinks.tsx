@@ -16,6 +16,8 @@ export interface DashboardTaskBadgeLink {
   label: string;
   count: number;
   icon: LucideIcon;
+  /** Visual accent for restricted/superadmin shortcuts (e.g. Debug). */
+  accent?: 'default' | 'danger';
 }
 
 interface DashboardTaskBadgeLinksProps {
@@ -135,7 +137,10 @@ export function DashboardTaskBadgeLinks({
               : 'gap-2 px-1 pb-1 pt-2 md:justify-end'
           )}
         >
-          {items.map(({ href, label, count, icon: Icon }, index) => (
+          {items.map(({ href, label, count, icon: Icon, accent = 'default' }, index) => {
+            const isDangerAccent = accent === 'danger';
+
+            return (
             <Tooltip key={href}>
               <TooltipTrigger asChild>
                 <Link
@@ -147,7 +152,10 @@ export function DashboardTaskBadgeLinks({
                       : undefined
                   }
                   className={cn(
-                    'group flex shrink-0 flex-col items-center rounded-md text-slate-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900',
+                    'group flex shrink-0 flex-col items-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-avs-yellow focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900',
+                    isDangerAccent
+                      ? 'text-red-500 hover:text-red-400'
+                      : 'text-slate-300 hover:text-white',
                     isNavbar
                       ? cn('min-w-8', showNavbarLabels ? 'gap-1' : 'gap-0')
                       : 'min-w-14 gap-1',
@@ -157,7 +165,10 @@ export function DashboardTaskBadgeLinks({
                 >
                   <span
                     className={cn(
-                      'relative flex items-center justify-center rounded-full border border-slate-600 bg-slate-800/80 shadow-sm transition-colors group-hover:border-slate-500 group-hover:bg-slate-700',
+                      'relative flex items-center justify-center rounded-full bg-slate-800/80 shadow-sm transition-colors',
+                      isDangerAccent
+                        ? 'border border-red-600 group-hover:border-red-500 group-hover:bg-red-950/40'
+                        : 'border border-slate-600 group-hover:border-slate-500 group-hover:bg-slate-700',
                       isNavbar ? 'h-8 w-8' : 'h-10 w-10'
                     )}
                   >
@@ -188,7 +199,8 @@ export function DashboardTaskBadgeLinks({
                 {label}: {count} pending
               </TooltipContent>
             </Tooltip>
-          ))}
+            );
+          })}
         </div>
       </TooltipProvider>
     </nav>
