@@ -1,5 +1,25 @@
 [
   {
+    "version": "0826.22.0",
+    "updateKind": "major",
+    "title": "Dashboard update",
+    "description": "Updated Dashboard and Inventory.",
+    "summary": "Updated Dashboard and Inventory.",
+    "details": [
+      "Updated Dashboard and Inventory, with changes to app screens.",
+      "Updated inventory, with changes to app screens."
+    ],
+    "areas": [
+      "Dashboard",
+      "Inventory"
+    ],
+    "areaKeys": [
+      "dashboard",
+      "inventory"
+    ],
+    "pushedAt": "2026-08-11T22:41:53.178Z"
+  },
+  {
     "version": "0826.21.0",
     "updateKind": "major",
     "title": "Navigation update",

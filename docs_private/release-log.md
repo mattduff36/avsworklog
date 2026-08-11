@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.22.0
+
+**GIT COMMIT MESSAGE**
+`feat(dashboard): update Dashboard and Inventory`
+
+**PUSHED AT**
+2026-08-11T22:41:53.178Z
+
+**WHAT CHANGED**
+Update Dashboard and Inventory.
+
+**VERSION HISTORY DETAILS**
+- Updated Dashboard and Inventory, with changes to app screens.
+- Updated inventory, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(dashboard): update Dashboard and Inventory`
+
 ## 0826.21.0
 
 **GIT COMMIT MESSAGE**
