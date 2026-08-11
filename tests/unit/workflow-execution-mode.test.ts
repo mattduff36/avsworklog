@@ -209,7 +209,7 @@ describe('TEE V2.1 execution-mode policy', () => {
 });
 
 describe('TEE V2.1 telemetry compatibility', () => {
-  it('TEE21-MARKER-COMPAT-001 keeps advisory fields optional and validates additions', () => {
+  it('TEE21-MARKER-COMPAT-001 / TEE22-COMPAT-009 keeps V2.1 and legacy telemetry compatible', () => {
     expect(validateWorkflowCompletionMarker(compactMarker()).status).toBe('present');
     const parsed = validateWorkflowCompletionMarker(
       compactMarker({

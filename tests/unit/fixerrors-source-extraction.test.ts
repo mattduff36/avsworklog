@@ -25,6 +25,7 @@ function makeError(overrides: Partial<ErrorLogEntry>): ErrorLogEntry {
   return {
     id: 'error-1',
     timestamp: '2026-06-07T12:00:00.000Z',
+    created_at: '2026-06-07T12:00:00.000Z',
     error_message: 'Console Error: Example error',
     error_stack: null,
     error_type: 'Error',
@@ -39,7 +40,7 @@ function makeError(overrides: Partial<ErrorLogEntry>): ErrorLogEntry {
 }
 
 describe('fixerrors source extraction', () => {
-  it('routes independent root-cause clusters without critical spillover', () => {
+  it('FXERR-CLUSTER-007 routes independent root-cause clusters without critical spillover', () => {
     const patterns = groupIntoPatterns([
       makeError({
         id: 'rls',
@@ -305,4 +306,5 @@ describe('fixerrors source extraction', () => {
       rmSync(root, { recursive: true, force: true });
     }
   });
+
 });
