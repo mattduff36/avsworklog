@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.19.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): trim Regular Check checklist to v2`
+
+**PUSHED AT**
+2026-08-11T14:26:07.417Z
+
+**WHAT CHANGED**
+Trim Regular Check checklist to v2.
+
+**VERSION HISTORY DETAILS**
+- Trim Regular Check checklist to v2, with changes to shared logic and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): trim Regular Check checklist to v2`
+
 ## 0826.18.1
 
 **GIT COMMIT MESSAGE**
