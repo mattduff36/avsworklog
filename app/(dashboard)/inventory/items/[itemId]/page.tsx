@@ -53,6 +53,7 @@ import { InventoryMoveButton } from '../../components/InventoryMoveButton';
 import { MoveInventoryDialog } from '../../components/MoveInventoryDialog';
 import {
   INVENTORY_CHECKLIST_DEFINITIONS,
+  INVENTORY_CHECKLIST_OPTIONS,
   INVENTORY_CHECK_OVERALL_STATUS_LABELS,
   INVENTORY_SERVICE_CHECKLIST_VERSION,
   getInventoryChecklistDefinition,
@@ -773,7 +774,7 @@ export default function InventoryItemDetailPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-3 sm:grid-cols-2">
-            {INVENTORY_CHECKLIST_DEFINITIONS.map((checklistDefinition) => (
+            {INVENTORY_CHECKLIST_OPTIONS.map((checklistDefinition) => (
               <button
                 key={checklistDefinition.version}
                 type="button"

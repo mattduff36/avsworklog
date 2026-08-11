@@ -126,6 +126,12 @@ export const INVENTORY_CHECKLIST_DEFINITIONS: InventoryChecklistDefinition[] = [
   },
 ];
 
+/** Definitions offered when starting a new check (excludes legacy versions kept for history). */
+export const INVENTORY_CHECKLIST_OPTIONS: InventoryChecklistDefinition[] =
+  INVENTORY_CHECKLIST_DEFINITIONS.filter(
+    (definition) => definition.version !== INVENTORY_SERVICE_CHECKLIST_VERSION_V1,
+  );
+
 export const INVENTORY_CHECKLIST_STATUS_LABELS: Record<InventoryChecklistStatus, string> = {
   ok: 'Pass',
   attention: 'Fail',

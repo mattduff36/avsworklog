@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   INVENTORY_PAT_CHECKLIST_ITEMS,
   INVENTORY_PAT_CHECKLIST_VERSION,
+  INVENTORY_CHECKLIST_OPTIONS,
   INVENTORY_SERVICE_CHECKLIST_ITEMS,
   INVENTORY_SERVICE_CHECKLIST_ITEMS_V1,
   INVENTORY_SERVICE_CHECKLIST_VERSION,
@@ -46,6 +47,13 @@ describe('inventory service checklist', () => {
     expect(v1Definition?.items).toEqual(INVENTORY_SERVICE_CHECKLIST_ITEMS_V1);
     expect(INVENTORY_SERVICE_CHECKLIST_ITEMS_V1).toHaveLength(27);
     expect(getInventoryChecklistLabel(INVENTORY_SERVICE_CHECKLIST_VERSION_V1)).toBe('Regular Check');
+  });
+
+  it('excludes legacy Regular Check from new-check options', () => {
+    expect(INVENTORY_CHECKLIST_OPTIONS.map((definition) => definition.version)).toEqual([
+      INVENTORY_SERVICE_CHECKLIST_VERSION,
+      INVENTORY_PAT_CHECKLIST_VERSION,
+    ]);
   });
 
   it('defines the PAT checklist items and label', () => {
