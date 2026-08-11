@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.17.0
+
+**GIT COMMIT MESSAGE**
+`feat(workflow): add execution mode advisory`
+
+**PUSHED AT**
+2026-08-11T00:25:32.283Z
+
+**WHAT CHANGED**
+Add execution mode advisory.
+
+**VERSION HISTORY DETAILS**
+- Updated app reliability, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(workflow): add execution mode advisory`
+
 ## 0826.16.0
 
 **GIT COMMIT MESSAGE**

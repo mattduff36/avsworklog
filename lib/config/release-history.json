@@ -1,5 +1,20 @@
 [
   {
+    "version": "0826.17.0",
+    "updateKind": "major",
+    "title": "Workflow update",
+    "description": "Added execution mode advisory.",
+    "summary": "Added execution mode advisory.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [
+      "Execution mode advisory"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-08-11T00:25:32.283Z"
+  },
+  {
     "version": "0826.16.0",
     "updateKind": "major",
     "title": "Profile update",
