@@ -206,9 +206,35 @@ export function buildWorkflowReviewMetrics(events: WorkflowStopEvent[]): Workflo
     critical: 0,
     unknown: 0,
   };
+  const executionModeRecommendationCounts: NonNullable<
+    WorkflowReviewMetrics['executionModeRecommendationCounts']
+  > = { agent: 0, multitask: 0, unknown: 0 };
+  const executionModeDetectedCounts: NonNullable<
+    WorkflowReviewMetrics['executionModeDetectedCounts']
+  > = { agent: 0, multitask: 0, unknown: 0 };
+  const executionModeAcceptanceCounts: NonNullable<
+    WorkflowReviewMetrics['executionModeAcceptanceCounts']
+  > = { accepted: 0, declined: 0, unknown: 0 };
+  let executionModeAdvisedCount = 0;
   for (const event of events) {
     selectedModelCounts[event.selectedModel] = (selectedModelCounts[event.selectedModel] ?? 0) + 1;
     laneCounts[event.lane ?? event.marker?.lane ?? 'unknown'] += 1;
+    const recommended =
+      event.executionModeRecommended ?? event.marker?.executionModeRecommended ?? 'unknown';
+    const detected = event.executionModeDetected ?? event.marker?.executionModeDetected ?? 'unknown';
+    executionModeRecommendationCounts[recommended] += 1;
+    executionModeDetectedCounts[detected] += 1;
+    const advised = event.executionModeAdvised ?? event.marker?.executionModeAdvised;
+    if (advised === true) {
+      executionModeAdvisedCount += 1;
+      const accepted =
+        event.executionModeAccepted !== undefined
+          ? event.executionModeAccepted
+          : event.marker?.executionModeAccepted;
+      executionModeAcceptanceCounts[
+        accepted === true ? 'accepted' : accepted === false ? 'declined' : 'unknown'
+      ] += 1;
+    }
   }
   const planningEvents = events.filter((event) => event.marker?.taskType === 'planning');
   const recommendationAdherenceCounts: Record<WorkflowPlanRecommendationAdherence, number> = {
@@ -259,6 +285,10 @@ export function buildWorkflowReviewMetrics(events: WorkflowStopEvent[]): Workflo
     recommendationAdherenceCounts,
     registryVersionCounts,
     premiumReReviewFlagCount,
+    executionModeRecommendationCounts,
+    executionModeDetectedCounts,
+    executionModeAdvisedCount,
+    executionModeAcceptanceCounts,
     estimatedPremiumTokenReductionLowPercent: estimate.lowPercent,
     estimatedPremiumTokenReductionHighPercent: estimate.highPercent,
     estimateFormulaVersion: ESTIMATE_FORMULA_VERSION,
@@ -554,6 +584,12 @@ export async function buildWorkflowStopEvent(
     branchName,
     headCommit,
     reviewPasses: markerParse.marker?.reviewPasses,
+    executionModeRecommended: markerParse.marker?.executionModeRecommended,
+    executionModeDetected: markerParse.marker?.executionModeDetected,
+    executionModeAdvised: markerParse.marker?.executionModeAdvised,
+    executionModeAccepted: markerParse.marker?.executionModeAccepted,
+    parallelWorkUnits: markerParse.marker?.parallelWorkUnits,
+    parallelismReason: markerParse.marker?.parallelismReason,
     transcriptStatus,
     identityStatus,
     protocolPhase,

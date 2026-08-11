@@ -157,6 +157,8 @@ export type WorkflowEvidenceState = 'passed' | 'failed' | 'unknown';
 export type WorkflowTaskType = 'change' | 'planning' | 'review';
 export type WorkflowRisk = 'high' | 'routine';
 export type WorkflowLane = 'fast' | 'standard' | 'guarded' | 'critical';
+export type WorkflowExecutionMode = 'agent' | 'multitask';
+export type WorkflowExecutionModeDetected = WorkflowExecutionMode | 'unknown';
 export type WorkflowParentTier = 'premium' | 'economical' | 'unknown';
 export type WorkflowRoutingDecision =
   | 'switched_to_economical'
@@ -303,6 +305,13 @@ export interface WorkflowCompletionMarker {
   reviewPasses?: WorkflowReviewPassRecord[];
   /** Additive two-pass closure evidence; ignored by legacy readers. */
   reviewClosure?: WorkflowReviewClosureState;
+  /** Optional V2.1 execution-mode advisory telemetry. */
+  executionModeRecommended?: WorkflowExecutionMode;
+  executionModeDetected?: WorkflowExecutionModeDetected;
+  executionModeAdvised?: boolean;
+  executionModeAccepted?: boolean | null;
+  parallelWorkUnits?: number;
+  parallelismReason?: string;
 }
 
 export interface WorkflowPlanContract {
@@ -406,6 +415,12 @@ export interface WorkflowStopEvent {
   protocolPhase?: WorkflowProtocolPhase;
   hookDiagnostics?: WorkflowHookDiagnostics;
   anomalyFlags?: string[];
+  executionModeRecommended?: WorkflowExecutionMode;
+  executionModeDetected?: WorkflowExecutionModeDetected;
+  executionModeAdvised?: boolean;
+  executionModeAccepted?: boolean | null;
+  parallelWorkUnits?: number;
+  parallelismReason?: string;
 }
 
 export interface WorkflowAnomalySignal {
@@ -508,6 +523,10 @@ export interface WorkflowReviewMetrics {
   recommendationAdherenceCounts?: Record<WorkflowPlanRecommendationAdherence, number>;
   registryVersionCounts?: Record<string, number>;
   premiumReReviewFlagCount?: number;
+  executionModeRecommendationCounts?: Record<WorkflowExecutionMode | 'unknown', number>;
+  executionModeDetectedCounts?: Record<WorkflowExecutionModeDetected, number>;
+  executionModeAdvisedCount?: number;
+  executionModeAcceptanceCounts?: Record<'accepted' | 'declined' | 'unknown', number>;
 }
 
 export interface WorkflowFinaliseCorrelation {

@@ -2,6 +2,8 @@ import type {
   WorkflowCommitStatus,
   WorkflowCompletionMarker,
   WorkflowEvidenceState,
+  WorkflowExecutionMode,
+  WorkflowExecutionModeDetected,
   WorkflowFinalReviewStatus,
   WorkflowGateDecision,
   WorkflowHandoffStatus,
@@ -80,6 +82,12 @@ const REVIEW_PASS_RESULTS = new Set<WorkflowReviewPassRecord['result']>([
   'passed',
   'failed',
   'blocked',
+  'unknown',
+]);
+const EXECUTION_MODES = new Set<WorkflowExecutionMode>(['agent', 'multitask']);
+const DETECTED_EXECUTION_MODES = new Set<WorkflowExecutionModeDetected>([
+  'agent',
+  'multitask',
   'unknown',
 ]);
 
@@ -355,6 +363,13 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   const commit = asString(value.commit) as WorkflowCommitStatus | null;
   const handoff = asString(value.handoff) as WorkflowHandoffStatus | null;
   const exploreCanonical = value.exploreCanonical;
+  const executionModeRecommended = asString(
+    value.executionModeRecommended
+  ) as WorkflowExecutionMode | null;
+  const executionModeDetected = asString(
+    value.executionModeDetected
+  ) as WorkflowExecutionModeDetected | null;
+  const parallelismReason = asString(value.parallelismReason);
   const rawEscalationReasons = value.reviewEscalationReasons;
   const reviewEscalationReasons = Array.isArray(rawEscalationReasons)
     ? rawEscalationReasons
@@ -495,6 +510,40 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   if (!verification || !EVIDENCE_STATES.has(verification)) errors.push('verification is invalid');
   if (!commit || !COMMIT_STATES.has(commit)) errors.push('commit is invalid');
   if (!handoff || !HANDOFF_STATES.has(handoff)) errors.push('handoff is invalid');
+  if (
+    value.executionModeRecommended !== undefined &&
+    (!executionModeRecommended || !EXECUTION_MODES.has(executionModeRecommended))
+  ) {
+    errors.push('executionModeRecommended must be agent|multitask when provided');
+  }
+  if (
+    value.executionModeDetected !== undefined &&
+    (!executionModeDetected || !DETECTED_EXECUTION_MODES.has(executionModeDetected))
+  ) {
+    errors.push('executionModeDetected must be agent|multitask|unknown when provided');
+  }
+  if (
+    value.executionModeAdvised !== undefined &&
+    typeof value.executionModeAdvised !== 'boolean'
+  ) {
+    errors.push('executionModeAdvised must be boolean when provided');
+  }
+  if (
+    value.executionModeAccepted !== undefined &&
+    value.executionModeAccepted !== null &&
+    typeof value.executionModeAccepted !== 'boolean'
+  ) {
+    errors.push('executionModeAccepted must be boolean|null when provided');
+  }
+  if (
+    value.parallelWorkUnits !== undefined &&
+    (!Number.isInteger(value.parallelWorkUnits) || (value.parallelWorkUnits as number) < 0)
+  ) {
+    errors.push('parallelWorkUnits must be a non-negative integer when provided');
+  }
+  if (value.parallelismReason !== undefined && !parallelismReason) {
+    errors.push('parallelismReason must be a non-empty string when provided');
+  }
 
   const requiredTests =
     schemaVersion === '4' && value.requiredTests === undefined
@@ -695,6 +744,21 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
           ? reviewPasses.passes
           : undefined,
       reviewClosure: reviewClosure.closure,
+      executionModeRecommended: executionModeRecommended ?? undefined,
+      executionModeDetected: executionModeDetected ?? undefined,
+      executionModeAdvised:
+        typeof value.executionModeAdvised === 'boolean'
+          ? value.executionModeAdvised
+          : undefined,
+      executionModeAccepted:
+        typeof value.executionModeAccepted === 'boolean' || value.executionModeAccepted === null
+          ? value.executionModeAccepted
+          : undefined,
+      parallelWorkUnits:
+        Number.isInteger(value.parallelWorkUnits) && (value.parallelWorkUnits as number) >= 0
+          ? (value.parallelWorkUnits as number)
+          : undefined,
+      parallelismReason: parallelismReason ?? undefined,
     },
     errors: [],
   };
