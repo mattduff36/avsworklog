@@ -1,4 +1,5 @@
-export const INVENTORY_SERVICE_CHECKLIST_VERSION = 'minor-plant-equipment-service-record-v1';
+export const INVENTORY_SERVICE_CHECKLIST_VERSION_V1 = 'minor-plant-equipment-service-record-v1';
+export const INVENTORY_SERVICE_CHECKLIST_VERSION = 'minor-plant-equipment-service-record-v2';
 export const INVENTORY_PAT_CHECKLIST_VERSION = 'portable-appliance-test-v1';
 
 export type InventoryChecklistStatus = 'ok' | 'attention' | 'na';
@@ -32,7 +33,8 @@ export interface InventoryChecklistSummary {
   total: number;
 }
 
-export const INVENTORY_SERVICE_CHECKLIST_ITEMS: InventoryServiceChecklistItem[] = [
+/** Legacy Regular Check items retained so historical v1 checks still resolve a definition. */
+export const INVENTORY_SERVICE_CHECKLIST_ITEMS_V1: InventoryServiceChecklistItem[] = [
   { item_number: 1, label: 'Spark Plug' },
   { item_number: 2, label: 'HT Lead and Plug Cover' },
   { item_number: 3, label: 'Pre Filter' },
@@ -62,6 +64,29 @@ export const INVENTORY_SERVICE_CHECKLIST_ITEMS: InventoryServiceChecklistItem[] 
   { item_number: 28, label: 'Oil Level' },
 ];
 
+export const INVENTORY_SERVICE_CHECKLIST_ITEMS: InventoryServiceChecklistItem[] = [
+  { item_number: 1, label: 'Spark Plug' },
+  { item_number: 2, label: 'HT Lead and Plug Cover' },
+  { item_number: 3, label: 'Main Filter' },
+  { item_number: 4, label: 'Pull cord' },
+  { item_number: 5, label: 'Fuel System' },
+  { item_number: 6, label: 'Vibration Suppression' },
+  { item_number: 7, label: 'Fuel Cap' },
+  { item_number: 8, label: 'Carrying Handles' },
+  { item_number: 9, label: 'Safety Shields' },
+  { item_number: 10, label: 'Base Plate Condition' },
+  { item_number: 11, label: 'Couplings' },
+  { item_number: 12, label: 'Throttle Cable' },
+  { item_number: 13, label: 'Water Hose & Unions' },
+  { item_number: 14, label: 'Plant Tag Fitted and Complete' },
+  { item_number: 15, label: 'Blade Cover Debris Free' },
+  { item_number: 16, label: 'Oil Level' },
+  { item_number: 17, label: 'Breaker Hose' },
+  { item_number: 18, label: 'Fittings' },
+  { item_number: 19, label: 'Grease' },
+  { item_number: 20, label: 'Point Condition' },
+];
+
 export const INVENTORY_PAT_CHECKLIST_ITEMS: InventoryServiceChecklistItem[] = [
   { item_number: 1, label: 'Cable' },
   { item_number: 2, label: 'Appliance' },
@@ -71,15 +96,24 @@ export const INVENTORY_PAT_CHECKLIST_ITEMS: InventoryServiceChecklistItem[] = [
   { item_number: 6, label: 'Polarity' },
 ];
 
+const REGULAR_CHECK_DEFINITION_BASE = {
+  label: 'Regular Check',
+  modalTitle: 'Record Regular Check',
+  modalDescription: 'Complete the service checklist for this inventory item.',
+  pdfTitle: 'Inventory Regular Check',
+  pdfSubtitle: 'Minor Plant and Equipment Service Record',
+} as const;
+
 export const INVENTORY_CHECKLIST_DEFINITIONS: InventoryChecklistDefinition[] = [
   {
+    ...REGULAR_CHECK_DEFINITION_BASE,
     version: INVENTORY_SERVICE_CHECKLIST_VERSION,
-    label: 'Regular Check',
-    modalTitle: 'Record Regular Check',
-    modalDescription: 'Complete the service checklist for this inventory item.',
-    pdfTitle: 'Inventory Regular Check',
-    pdfSubtitle: 'Minor Plant and Equipment Service Record',
     items: INVENTORY_SERVICE_CHECKLIST_ITEMS,
+  },
+  {
+    ...REGULAR_CHECK_DEFINITION_BASE,
+    version: INVENTORY_SERVICE_CHECKLIST_VERSION_V1,
+    items: INVENTORY_SERVICE_CHECKLIST_ITEMS_V1,
   },
   {
     version: INVENTORY_PAT_CHECKLIST_VERSION,

@@ -3,6 +3,9 @@ import {
   INVENTORY_PAT_CHECKLIST_ITEMS,
   INVENTORY_PAT_CHECKLIST_VERSION,
   INVENTORY_SERVICE_CHECKLIST_ITEMS,
+  INVENTORY_SERVICE_CHECKLIST_ITEMS_V1,
+  INVENTORY_SERVICE_CHECKLIST_VERSION,
+  INVENTORY_SERVICE_CHECKLIST_VERSION_V1,
   getInventoryChecklistDefinition,
   getInventoryChecklistLabel,
   getInventoryCheckOverallStatus,
@@ -11,11 +14,38 @@ import {
 } from '@/lib/checklists/inventory-service-checklist';
 
 describe('inventory service checklist', () => {
-  it('preserves the scanned form item numbering and omits the blank row', () => {
-    expect(INVENTORY_SERVICE_CHECKLIST_ITEMS).toHaveLength(27);
-    expect(INVENTORY_SERVICE_CHECKLIST_ITEMS.map((item) => item.item_number)).not.toContain(27);
-    expect(INVENTORY_SERVICE_CHECKLIST_ITEMS.at(0)).toEqual({ item_number: 1, label: 'Spark Plug' });
-    expect(INVENTORY_SERVICE_CHECKLIST_ITEMS.at(-1)).toEqual({ item_number: 28, label: 'Oil Level' });
+  it('defines the sequential v2 Regular Check items', () => {
+    expect(INVENTORY_SERVICE_CHECKLIST_VERSION).toBe('minor-plant-equipment-service-record-v2');
+    expect(INVENTORY_SERVICE_CHECKLIST_ITEMS).toEqual([
+      { item_number: 1, label: 'Spark Plug' },
+      { item_number: 2, label: 'HT Lead and Plug Cover' },
+      { item_number: 3, label: 'Main Filter' },
+      { item_number: 4, label: 'Pull cord' },
+      { item_number: 5, label: 'Fuel System' },
+      { item_number: 6, label: 'Vibration Suppression' },
+      { item_number: 7, label: 'Fuel Cap' },
+      { item_number: 8, label: 'Carrying Handles' },
+      { item_number: 9, label: 'Safety Shields' },
+      { item_number: 10, label: 'Base Plate Condition' },
+      { item_number: 11, label: 'Couplings' },
+      { item_number: 12, label: 'Throttle Cable' },
+      { item_number: 13, label: 'Water Hose & Unions' },
+      { item_number: 14, label: 'Plant Tag Fitted and Complete' },
+      { item_number: 15, label: 'Blade Cover Debris Free' },
+      { item_number: 16, label: 'Oil Level' },
+      { item_number: 17, label: 'Breaker Hose' },
+      { item_number: 18, label: 'Fittings' },
+      { item_number: 19, label: 'Grease' },
+      { item_number: 20, label: 'Point Condition' },
+    ]);
+  });
+
+  it('keeps the legacy v1 Regular Check definition resolvable', () => {
+    const v1Definition = getInventoryChecklistDefinition(INVENTORY_SERVICE_CHECKLIST_VERSION_V1);
+    expect(v1Definition).not.toBeNull();
+    expect(v1Definition?.items).toEqual(INVENTORY_SERVICE_CHECKLIST_ITEMS_V1);
+    expect(INVENTORY_SERVICE_CHECKLIST_ITEMS_V1).toHaveLength(27);
+    expect(getInventoryChecklistLabel(INVENTORY_SERVICE_CHECKLIST_VERSION_V1)).toBe('Regular Check');
   });
 
   it('defines the PAT checklist items and label', () => {
@@ -38,10 +68,10 @@ describe('inventory service checklist', () => {
     }));
 
     expect(getInventoryChecklistSummary(results)).toEqual({
-      pass: 25,
+      pass: 18,
       fail: 1,
       na: 1,
-      total: 27,
+      total: 20,
     });
     expect(getInventoryCheckOverallStatus(results)).toBe('fail');
   });
