@@ -15,7 +15,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PanelLoader } from '@/components/ui/panel-loader';
@@ -918,7 +917,6 @@ export default function InventoryPage() {
       <AppPageShell width="wide">
         <AppPageHeader
           title="Inventory"
-          titleMeta={<InventoryBetaBadge />}
           description="Track small tools, plant, signs, equipment, locations, and check status."
           icon={<PackageSearch className="h-5 w-5" />}
           className={INVENTORY_PAGE_HEADER_CLASSNAME}
@@ -958,7 +956,6 @@ export default function InventoryPage() {
       <AppPageShell width="wide">
         <AppPageHeader
           title="Inventory"
-          titleMeta={<InventoryBetaBadge />}
           description="Set your location, view assigned inventory, and claim or move items."
           icon={<PackageSearch className="h-5 w-5" />}
           className={INVENTORY_PAGE_HEADER_CLASSNAME}
@@ -979,7 +976,6 @@ export default function InventoryPage() {
         <AppPageShell width="wide">
         <AppPageHeader
           title="Inventory"
-          titleMeta={<InventoryBetaBadge />}
           description="Set your location, view assigned inventory, and claim or move items."
           details={employeeLocationName ? <InventoryLocationLabel locationLabel={employeeLocationName} /> : null}
           icon={<PackageSearch className="h-5 w-5" />}
@@ -1042,7 +1038,6 @@ export default function InventoryPage() {
       <AppPageShell width="wide">
       <AppPageHeader
         title="Inventory"
-        titleMeta={<InventoryBetaBadge />}
         description="Track small tools, plant, signs, equipment, locations, and check status."
         details={<InventoryLocationLabel locationLabel={employeeLocationName} />}
         icon={<PackageSearch className="h-5 w-5" />}
@@ -1483,17 +1478,6 @@ function InventoryConfirmActionDialog({ action, onClose }: InventoryConfirmActio
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
-  );
-}
-
-function InventoryBetaBadge() {
-  return (
-    <Badge
-      variant="outline"
-      className="w-fit border-inventory/30 bg-inventory-soft px-2 py-0 text-[10px] font-semibold uppercase tracking-[0.16em] text-inventory"
-    >
-      Beta
-    </Badge>
   );
 }
 
