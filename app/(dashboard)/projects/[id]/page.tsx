@@ -155,7 +155,7 @@ export default function RAMSDetailsPage() {
       }
 
       if (!doc) {
-        console.error('Document not found or no permission. ID:', documentId);
+        console.warn('Document not found or unavailable. ID:', documentId);
         setLoading(false);
         return;
       }
