@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.18.0
+
+**GIT COMMIT MESSAGE**
+`feat(projects): update projects`
+
+**PUSHED AT**
+2026-08-11T07:31:46.627Z
+
+**WHAT CHANGED**
+Update projects. Harden trusted fixerrors operations.
+
+**VERSION HISTORY DETAILS**
+- Updated actions, with changes to automation scripts and automated tests.
+- Updated projects, with changes to app screens and automated tests.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(projects): update projects`
+- `feat(workflow): harden trusted fixerrors operations`
+
 ## 0826.17.0
 
 **GIT COMMIT MESSAGE**
