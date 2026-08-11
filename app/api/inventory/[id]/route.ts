@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeInventoryItemNumber, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
 import { withEnrichedInventoryLocation } from '@/lib/server/inventory-locations';
-import { InventoryMoveError, moveInventoryItems, toInventoryMoveErrorResponse } from '@/lib/server/inventory-move';
+import {
+  InventoryMoveError,
+  assertInventoryMoveCheckConfirmation,
+  moveInventoryItems,
+  prepareInventoryMove,
+  toInventoryMoveErrorResponse,
+} from '@/lib/server/inventory-move';
 import { isInventoryRetireReason, type InventoryCategory, type InventoryRetireReason, type InventoryStatus } from '@/app/(dashboard)/inventory/types';
 import type { Database } from '@/types/database';
 
@@ -19,6 +25,7 @@ interface InventoryItemUpdateBody {
   check_interval_days?: number | null;
   status?: InventoryStatus;
   retire_reason?: InventoryRetireReason | null;
+  check_warning_confirmation?: unknown;
 }
 
 type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
@@ -127,6 +134,44 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       update.last_checked_at = cleanOptionalDate(body.last_checked_at);
     }
 
+    let shouldMove = false;
+    if (requestedLocationId) {
+      const { data: currentLocation, error: currentLocationError } = await admin
+        .from('inventory_items')
+        .select('location_id')
+        .eq('id', id)
+        .single();
+      if (currentLocationError) throw currentLocationError;
+      shouldMove = currentLocation.location_id !== requestedLocationId;
+    }
+
+    const moveInput = requestedLocationId && shouldMove
+      ? {
+          itemIds: [id],
+          destinationLocationId: requestedLocationId,
+          note: 'Moved from inventory item edit',
+          scope: 'single' as const,
+          movedBy: access.userId,
+          checkWarningConfirmation: body.check_warning_confirmation,
+          itemCheckOverrides: {
+            [id]: {
+              ...(body.category !== undefined ? { category: body.category.trim() } : {}),
+              ...(body.check_interval_days !== undefined
+                ? { check_interval_days: body.check_interval_days || null }
+                : {}),
+              ...(body.last_checked_at !== undefined
+                ? { last_checked_at: cleanOptionalDate(body.last_checked_at) }
+                : {}),
+            },
+          },
+        }
+      : null;
+
+    if (moveInput) {
+      const preparedMove = await prepareInventoryMove(admin, moveInput);
+      assertInventoryMoveCheckConfirmation(preparedMove, body.check_warning_confirmation);
+    }
+
     const { data: updatedData, error } = await admin
       .from('inventory_items')
       .update(update)
@@ -149,14 +194,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     let responseItem = updatedData;
-    if (requestedLocationId && updatedData.location_id !== requestedLocationId) {
-      await moveInventoryItems(admin, {
-        itemIds: [id],
-        destinationLocationId: requestedLocationId,
-        note: 'Moved from inventory item edit',
-        scope: 'single',
-        movedBy: access.userId,
-      });
+    if (moveInput && updatedData.location_id !== requestedLocationId) {
+      await moveInventoryItems(admin, moveInput!);
 
       const { data: movedData, error: movedLoadError } = await admin
         .from('inventory_items')

@@ -3,6 +3,7 @@
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
+  AlertTriangle,
   Boxes,
   PackageCheck,
   Trash2,
@@ -96,12 +97,19 @@ export function YardKioskBasket({
                   <div className="text-xs text-slate-400">
                     {line.kind === 'hardware' ? `Quantity ${line.quantity}` : line.item_number}
                   </div>
+                  {line.kind === 'serialized' && line.check_warning_required ? (
+                    <div className="mt-1 flex items-center gap-1 text-xs font-bold text-amber-200">
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      Check required
+                    </div>
+                  ) : null}
                 </div>
                 <button
                   type="button"
                   aria-label={`Remove ${line.name}`}
                   onClick={() => onRemove(line)}
-                  className="grid h-10 w-10 flex-none place-items-center rounded-xl text-slate-400 hover:bg-red-500/15 hover:text-red-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                  disabled={submitting}
+                  className="grid h-10 w-10 flex-none place-items-center rounded-xl text-slate-400 hover:bg-red-500/15 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
                 >
                   <Trash2 className="h-5 w-5" />
                 </button>

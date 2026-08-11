@@ -1,3 +1,5 @@
+import type { InventoryMoveCheckConfirmation } from '@/lib/inventory/move-check-warning';
+
 export type InventoryCategory = string;
 
 export type InventoryStatus = 'active' | 'retired';
@@ -199,6 +201,7 @@ export interface InventoryMovePayload {
   note: string;
   scope?: 'single' | 'bulk' | 'group' | 'claim';
   group_id?: string | null;
+  check_warning_confirmation?: InventoryMoveCheckConfirmation;
 }
 
 export interface InventoryItemGroupSummary {

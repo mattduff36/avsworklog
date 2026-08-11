@@ -29,9 +29,6 @@ describe('Yard kiosk error catalogue', () => {
     ).toBe('PAIRING_CLAIMED');
     expect(mapHttpStatusToYardKioskErrorCode(401)).toBe('SESSION_EXPIRED');
     expect(mapHttpStatusToYardKioskErrorCode(409)).toBe('STOCK_STALE');
-    expect(
-      mapHttpStatusToYardKioskErrorCode(400, 'INVENTORY_CHECK_REQUIRED'),
-    ).toBe('INVENTORY_CHECK_REQUIRED');
   });
 
   it('builds user errors with diagnostic ids and no tech jargon titles', () => {

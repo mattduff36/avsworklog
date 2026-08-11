@@ -1,6 +1,5 @@
 import type {
   YardKioskBasketLine,
-  YardKioskBlockedItem,
   YardKioskDirection,
   YardKioskLocation,
   YardKioskReceipt,
@@ -21,7 +20,6 @@ export interface YardKioskState {
   loadingStock: boolean;
   error: string | null;
   userError: YardKioskUserError | null;
-  blockedItems: YardKioskBlockedItem[];
   receipt: YardKioskReceipt | null;
 }
 
@@ -42,7 +40,6 @@ export const INITIAL_YARD_KIOSK_STATE: YardKioskState = {
   loadingStock: false,
   error: null,
   userError: null,
-  blockedItems: [],
   receipt: null,
 };
 
@@ -58,10 +55,10 @@ export type YardKioskAction =
   | { type: 'REMOVE_LINE'; kind: YardKioskBasketLine['kind']; itemId: string }
   | { type: 'CLEAR_BASKET' }
   | { type: 'SUBMIT_START' }
+  | { type: 'SUBMIT_WARNING' }
   | {
       type: 'SUBMIT_FAILED';
       message: string;
-      blockedItems?: YardKioskBlockedItem[];
       userError?: YardKioskUserError;
     }
   | { type: 'SUBMIT_SUCCEEDED'; receipt: YardKioskReceipt }
@@ -93,7 +90,6 @@ export function yardKioskReducer(
         loadingStock: true,
         error: null,
         userError: null,
-        blockedItems: [],
       };
     case 'STOCK_LOADED':
       return {
@@ -116,19 +112,6 @@ export function yardKioskReducer(
     case 'SET_CATEGORY':
       return { ...state, category: action.category, searchQuery: '', error: null };
     case 'ADD_SERIALIZED': {
-      if (action.item.is_check_blocked) {
-        return {
-          ...state,
-          error: `${action.item.item_number} needs an inventory check before it can leave Yard.`,
-          userError: null,
-          blockedItems: [{
-            id: action.item.id,
-            item_number: action.item.item_number,
-            name: action.item.name,
-            check_status: action.item.check_status,
-          }],
-        };
-      }
       if (state.basket.some((line) => line.kind === 'serialized' && line.item_id === action.item.id)) {
         return state;
       }
@@ -136,13 +119,14 @@ export function yardKioskReducer(
         ...state,
         error: null,
         userError: null,
-        blockedItems: [],
         basket: [...state.basket, {
           kind: 'serialized',
           item_id: action.item.id,
           item_number: action.item.item_number,
           name: action.item.name,
           category: action.item.category,
+          check_status: action.item.check_status,
+          check_warning_required: action.item.check_warning_required,
         }],
       };
     }
@@ -156,7 +140,6 @@ export function yardKioskReducer(
         ...state,
         error: null,
         userError: null,
-        blockedItems: [],
         basket: [...withoutItem, {
           kind: 'hardware',
           item_id: action.item.id,
@@ -174,14 +157,20 @@ export function yardKioskReducer(
         ),
       };
     case 'CLEAR_BASKET':
-      return { ...state, basket: [], error: null, userError: null, blockedItems: [] };
+      return { ...state, basket: [], error: null, userError: null };
     case 'SUBMIT_START':
       return {
         ...state,
         phase: 'submitting',
         error: null,
         userError: null,
-        blockedItems: [],
+      };
+    case 'SUBMIT_WARNING':
+      return {
+        ...state,
+        phase: 'items',
+        error: null,
+        userError: null,
       };
     case 'SUBMIT_FAILED':
       return {
@@ -189,7 +178,6 @@ export function yardKioskReducer(
         phase: 'items',
         error: action.message,
         userError: action.userError || null,
-        blockedItems: action.blockedItems || [],
       };
     case 'SUBMIT_SUCCEEDED':
       return {
@@ -198,7 +186,6 @@ export function yardKioskReducer(
         receipt: action.receipt,
         error: null,
         userError: null,
-        blockedItems: [],
       };
     case 'SET_USER_ERROR':
       return {
@@ -207,7 +194,7 @@ export function yardKioskReducer(
         userError: action.userError,
       };
     case 'DISMISS_ERROR':
-      return { ...state, error: null, userError: null, blockedItems: [] };
+      return { ...state, error: null, userError: null };
     case 'BACK':
       if (state.phase === 'items') {
         return {

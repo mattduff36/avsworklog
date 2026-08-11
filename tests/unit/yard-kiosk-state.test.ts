@@ -14,7 +14,7 @@ const serializedItem: Extract<YardKioskStockItem, { kind: 'serialized' }> = {
   name: 'Breaker',
   category: 'tools',
   check_status: 'ok',
-  is_check_blocked: false,
+  check_warning_required: false,
 };
 
 const hardwareItem: Extract<YardKioskStockItem, { kind: 'hardware' }> = {
@@ -96,21 +96,24 @@ describe('Yard kiosk state', () => {
     ]);
   });
 
-  it('does not add a Yard-exit item whose check is blocked', () => {
+  it('adds a Yard-exit warning item and retains its check marker', () => {
     const state = yardKioskReducer(INITIAL_YARD_KIOSK_STATE, {
       type: 'ADD_SERIALIZED',
       item: {
         ...serializedItem,
         check_status: 'overdue',
-        is_check_blocked: true,
+        check_warning_required: true,
       },
     });
 
-    expect(state.basket).toHaveLength(0);
-    expect(state.blockedItems).toEqual([
-      expect.objectContaining({ item_number: 'TOOL-001', check_status: 'overdue' }),
+    expect(state.basket).toEqual([
+      expect.objectContaining({
+        item_number: 'TOOL-001',
+        check_status: 'overdue',
+        check_warning_required: true,
+      }),
     ]);
-    expect(state.error).toContain('inventory check');
+    expect(state.error).toBeNull();
   });
 
   it('preserves the basket after a recoverable submission failure', () => {
@@ -151,17 +154,13 @@ describe('Yard kiosk state', () => {
         item_number: serializedItem.item_number,
         name: serializedItem.name,
         category: serializedItem.category,
+        check_status: serializedItem.check_status,
+        check_warning_required: serializedItem.check_warning_required,
       }],
       searchQuery: 'breaker',
       category: 'tools',
       loadingStock: true,
       error: 'Draft error',
-      blockedItems: [{
-        id: serializedItem.id,
-        item_number: serializedItem.item_number,
-        name: serializedItem.name,
-        check_status: serializedItem.check_status,
-      }],
       receipt: {
         kiosk_batch_id: 'batch-one',
         movement_batch_id: 'movement-one',
@@ -210,6 +209,8 @@ describe('Yard kiosk state', () => {
         item_number: serializedItem.item_number,
         name: serializedItem.name,
         category: serializedItem.category,
+        check_status: serializedItem.check_status,
+        check_warning_required: serializedItem.check_warning_required,
       }],
     }).message).toBe('Review your basket, then confirm');
     expect(getYardKioskGuidance({

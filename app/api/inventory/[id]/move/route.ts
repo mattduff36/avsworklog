@@ -15,6 +15,7 @@ interface RouteParams {
 interface MoveInventoryItemBody {
   location_id?: string;
   note?: string;
+  check_warning_confirmation?: unknown;
 }
 
 export async function POST(request: NextRequest, { params }: RouteParams) {
@@ -35,6 +36,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       note: body.note,
       scope: 'single',
       movedBy: access.userId,
+      checkWarningConfirmation: body.check_warning_confirmation,
     });
 
     const { data: updatedItem, error: itemError } = await admin

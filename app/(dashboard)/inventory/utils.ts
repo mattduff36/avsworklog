@@ -164,7 +164,7 @@ export function hasInventoryCheckLapsed(item: InventoryCheckScheduleItem): boole
   return status === 'needs_check' || status === 'overdue';
 }
 
-export function isInventoryYardExitBlocked(
+export function requiresInventoryYardExitCheckWarning(
   item: InventoryCheckScheduleItem & { location?: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null },
   destinationLocation: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null | undefined
 ): boolean {
@@ -173,11 +173,11 @@ export function isInventoryYardExitBlocked(
   return hasInventoryCheckLapsed(item);
 }
 
-export function isInventoryMoveCheckBlocked(
+export function requiresInventoryMoveCheckWarning(
   item: InventorySpecialStatusItem,
   destinationLocation: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null | undefined
 ): boolean {
-  if (isInventoryYardExitBlocked(item, destinationLocation)) return true;
+  if (requiresInventoryYardExitCheckWarning(item, destinationLocation)) return true;
   if (isInventoryYardLocation(destinationLocation)) return false;
   return getInventoryCheckStatus(item) === 'overdue';
 }

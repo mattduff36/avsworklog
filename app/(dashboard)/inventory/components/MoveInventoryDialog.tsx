@@ -17,16 +17,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  INVENTORY_CHECKLIST_DEFINITIONS,
-  INVENTORY_SERVICE_CHECKLIST_VERSION,
-  getInventoryChecklistDefinition,
-} from '@/lib/checklists/inventory-service-checklist';
-import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from './InventoryCheckModal';
-import { getInventoryLondonDateString } from '@/lib/inventory/check-dates';
-import { runInventoryCheckRefresh } from '@/lib/inventory/check-refresh';
-import type { InventoryCheckStatus, InventoryItem, InventoryLocation, InventoryMovePayload } from '../types';
-import { getCheckStatusLabel } from '../utils';
+  getInventoryMoveCheckWarningPayload,
+  type InventoryMoveCheckWarningPayload,
+} from '@/lib/inventory/move-check-warning';
+import type { InventoryItem, InventoryLocation, InventoryMovePayload } from '../types';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
+import { InventoryMoveCheckWarningDialog } from './InventoryMoveCheckWarningDialog';
 
 interface MoveInventoryDialogProps {
   open: boolean;
@@ -34,32 +30,6 @@ interface MoveInventoryDialogProps {
   locations: InventoryLocation[];
   onClose: () => void;
   onSubmit: (payload: InventoryMovePayload) => Promise<void>;
-  onCheckRecorded?: (itemId: string) => Promise<void> | void;
-}
-
-interface CheckBlockedMoveItem {
-  id: string;
-  item_number: string;
-  name: string;
-  check_status: InventoryCheckStatus;
-}
-
-interface ApiResponseError extends Error {
-  payload?: unknown;
-}
-
-interface InventoryCheckRequiredPayload {
-  code: 'INVENTORY_CHECK_REQUIRED';
-  error: string;
-  blocked_items: CheckBlockedMoveItem[];
-}
-
-function getInventoryCheckRequiredPayload(error: unknown): InventoryCheckRequiredPayload | null {
-  const payload = (error as ApiResponseError | undefined)?.payload;
-  if (!payload || typeof payload !== 'object') return null;
-  const candidate = payload as Partial<InventoryCheckRequiredPayload>;
-  if (candidate.code !== 'INVENTORY_CHECK_REQUIRED' || !Array.isArray(candidate.blocked_items)) return null;
-  return candidate as InventoryCheckRequiredPayload;
 }
 
 export function MoveInventoryDialog({
@@ -68,44 +38,37 @@ export function MoveInventoryDialog({
   locations,
   onClose,
   onSubmit,
-  onCheckRecorded,
 }: MoveInventoryDialogProps) {
   const [locationId, setLocationId] = useState('');
   const [note, setNote] = useState('');
   const [moveScope, setMoveScope] = useState<'single' | 'group'>('single');
   const [saving, setSaving] = useState(false);
-  const [blockedItems, setBlockedItems] = useState<CheckBlockedMoveItem[]>([]);
-  const [checkingItem, setCheckingItem] = useState<CheckBlockedMoveItem | null>(null);
-  const [savingCheck, setSavingCheck] = useState(false);
+  const [warningPayload, setWarningPayload] = useState<InventoryMoveCheckWarningPayload | null>(null);
+  const [pendingMove, setPendingMove] = useState<InventoryMovePayload | null>(null);
   const isBulkMove = items.length > 1;
   const group = !isBulkMove ? items[0]?.group : null;
-  const checklistDefinition =
-    getInventoryChecklistDefinition(INVENTORY_SERVICE_CHECKLIST_VERSION) || INVENTORY_CHECKLIST_DEFINITIONS[0];
 
   useEffect(() => {
     setLocationId('');
     setNote('');
     setMoveScope('single');
-    setBlockedItems([]);
-    setCheckingItem(null);
+    setWarningPayload(null);
+    setPendingMove(null);
   }, [open]);
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
+  async function submitMove(payload: InventoryMovePayload) {
     setSaving(true);
     try {
-      await onSubmit({
-        location_id: locationId,
-        note,
-        scope: group && moveScope === 'group' ? 'group' : isBulkMove ? 'bulk' : 'single',
-        group_id: group && moveScope === 'group' ? group.id : null,
-      });
+      await onSubmit(payload);
       onClose();
     } catch (error) {
-      const blockedPayload = getInventoryCheckRequiredPayload(error);
-      if (blockedPayload) {
-        setBlockedItems(blockedPayload.blocked_items);
-        toast.error(blockedPayload.error);
+      const nextWarning = getInventoryMoveCheckWarningPayload(error);
+      if (nextWarning) {
+        setPendingMove({
+          ...payload,
+          check_warning_confirmation: undefined,
+        });
+        setWarningPayload(nextWarning);
         return;
       }
       toast.error(error instanceof Error ? error.message : 'Failed to move inventory items');
@@ -114,41 +77,35 @@ export function MoveInventoryDialog({
     }
   }
 
-  async function handleRecordBlockedItemCheck(checkPayload: InventoryChecklistSubmitPayload) {
-    if (!checkingItem) return;
+  function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    void submitMove({
+      location_id: locationId,
+      note,
+      scope: group && moveScope === 'group' ? 'group' : isBulkMove ? 'bulk' : 'single',
+      group_id: group && moveScope === 'group' ? group.id : null,
+    });
+  }
 
-    setSavingCheck(true);
-    const checkedItemId = checkingItem.id;
-    const checkedItemName = checkingItem.name;
-    try {
-      const response = await fetch(`/api/inventory/${checkedItemId}/checks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(checkPayload),
-      });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Failed to record inventory check');
-
-      setBlockedItems((current) => current.filter((item) => item.id !== checkedItemId));
-      setCheckingItem(null);
-      toast.success(`Inventory check recorded for ${checkedItemName}`, {
-        description: 'Retry the move once all blocked items are checked.',
-      });
-
-      await runInventoryCheckRefresh(
-        onCheckRecorded ? () => onCheckRecorded(checkedItemId) : undefined,
-        (message) => toast.warning(message),
-      );
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to record inventory check');
-    } finally {
-      setSavingCheck(false);
-    }
+  async function handleMoveAnyway() {
+    if (!pendingMove || !warningPayload) return;
+    await submitMove({
+      ...pendingMove,
+      check_warning_confirmation: {
+        warning_item_ids: warningPayload.warning_items.map((item) => item.id),
+        move_item_ids: warningPayload.move_item_ids,
+      },
+    });
   }
 
   return (
     <>
-    <Dialog open={open && !checkingItem} onOpenChange={(isOpen) => { if (!isOpen && !saving && !savingCheck && !checkingItem) onClose(); }}>
+    <Dialog
+      open={open && !warningPayload}
+      onOpenChange={(isOpen) => {
+        if (!isOpen && !saving && !warningPayload) onClose();
+      }}
+    >
       <DialogContent
         mobileKeyboardSafe
         data-keyboard-safe-dialog="true"
@@ -203,7 +160,8 @@ export function MoveInventoryDialog({
                 value={locationId}
                 onValueChange={(value) => {
                   setLocationId(value);
-                  setBlockedItems([]);
+                  setWarningPayload(null);
+                  setPendingMove(null);
                 }}
                 locations={locations}
                 serverSearch
@@ -222,39 +180,6 @@ export function MoveInventoryDialog({
               />
             </div>
 
-            {blockedItems.length > 0 ? (
-              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
-                <div className="font-medium">
-                  {blockedItems.length === 1
-                    ? 'This item needs a check before it can move.'
-                    : 'These items need checks before they can move.'}
-                </div>
-                <div className="mt-1 text-xs text-amber-100/80">
-                  Use Check Now here, then retry the move once the blocked list is clear.
-                </div>
-                <div className="mt-3 space-y-2">
-                  {blockedItems.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between gap-3 rounded border border-amber-500/20 bg-slate-950/30 p-2">
-                      <div>
-                        <div className="font-medium text-white">{item.name}</div>
-                        <div className="text-xs text-amber-100/80">
-                          {item.item_number} · {getCheckStatusLabel(item.check_status)}
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setCheckingItem(item)}
-                        className="min-h-11 shrink-0 border-amber-400/40 text-amber-100 hover:bg-amber-500/10"
-                      >
-                        Check Now
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
           </div>
 
           <DialogFooter className="shrink-0 border-t border-slate-700 px-6 pb-4 pt-4 sm:pb-6">
@@ -273,19 +198,17 @@ export function MoveInventoryDialog({
         </form>
       </DialogContent>
     </Dialog>
-    {checkingItem ? (
-      <InventoryCheckModal
-        key={`move-check-${checkingItem.id}`}
-        open={Boolean(checkingItem)}
-        onOpenChange={(nextOpen) => { if (!nextOpen && !savingCheck) setCheckingItem(null); }}
-        itemName={checkingItem.name}
-        itemNumber={checkingItem.item_number}
-        checklistDefinition={checklistDefinition}
-        initialCheckedAt={getInventoryLondonDateString()}
-        saving={savingCheck}
-        onSubmit={handleRecordBlockedItemCheck}
-      />
-    ) : null}
+    <InventoryMoveCheckWarningDialog
+      payload={warningPayload}
+      saving={saving}
+      onCancel={() => {
+        setWarningPayload(null);
+        setPendingMove(null);
+      }}
+      onConfirm={() => {
+        void handleMoveAnyway();
+      }}
+    />
     </>
   );
 }

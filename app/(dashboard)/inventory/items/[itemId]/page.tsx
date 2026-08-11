@@ -51,6 +51,7 @@ import {
 import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from '../../components/InventoryCheckModal';
 import { InventoryMoveButton } from '../../components/InventoryMoveButton';
 import { MoveInventoryDialog } from '../../components/MoveInventoryDialog';
+import { InventoryMoveCheckWarningDialog } from '../../components/InventoryMoveCheckWarningDialog';
 import {
   INVENTORY_CHECKLIST_DEFINITIONS,
   INVENTORY_CHECKLIST_OPTIONS,
@@ -69,6 +70,11 @@ import {
   runInventoryCheckRefresh,
 } from '@/lib/inventory/check-refresh';
 import { buildInventoryItemDetailsUpdatePayload } from '@/lib/inventory/check-update-payload';
+import {
+  getInventoryMoveCheckWarningPayload,
+  type InventoryMoveCheckConfirmation,
+  type InventoryMoveCheckWarningPayload,
+} from '@/lib/inventory/move-check-warning';
 import {
   checkIntervalMonthsToDays,
   formatInventoryCheckIntervalMonths,
@@ -178,6 +184,10 @@ export default function InventoryItemDetailPage() {
   const [downloadingCheckId, setDownloadingCheckId] = useState<string | null>(null);
   const [selectedEditLocation, setSelectedEditLocation] = useState<InventoryLocation | null>(null);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
+  const [detailsWarningPayload, setDetailsWarningPayload] =
+    useState<InventoryMoveCheckWarningPayload | null>(null);
+  const [pendingDetailsUpdate, setPendingDetailsUpdate] =
+    useState<Record<string, unknown> | null>(null);
 
   const fetchHistory = useCallback(async (options?: { quiet?: boolean }) => {
     try {
@@ -237,6 +247,7 @@ export default function InventoryItemDetailPage() {
         note: movePayload.note,
         scope: movePayload.scope || 'single',
         group_id: movePayload.group_id || null,
+        check_warning_confirmation: movePayload.check_warning_confirmation,
       }),
     });
     await parseResponse(response, 'Failed to move inventory item');
@@ -259,39 +270,58 @@ export default function InventoryItemDetailPage() {
     setIsEditingDetails(false);
   }
 
-  async function handleSaveItemDetails(event: React.FormEvent) {
-    event.preventDefault();
+  async function submitItemDetails(
+    updatePayload: Record<string, unknown>,
+    confirmation?: InventoryMoveCheckConfirmation,
+  ) {
     setSavingDetails(true);
     setDetailsSubmitError('');
     try {
-      const parsedInterval = Number.parseInt(editForm.check_interval_months, 10);
-      const hasCheckHistory = (payload?.checks.length || 0) > 0;
       const response = await fetch(`/api/inventory/${itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(buildInventoryItemDetailsUpdatePayload({
-          item_number: editForm.item_number,
-          name: editForm.name,
-          category: editForm.category,
-          location_id: editForm.location_id,
-          last_checked_at: editForm.last_checked_at || null,
-          check_interval_days: checkIntervalMonthsToDays(
-            Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : null
-          ),
-          hasCheckHistory,
-        })),
+        body: JSON.stringify({
+          ...updatePayload,
+          ...(confirmation ? { check_warning_confirmation: confirmation } : {}),
+        }),
       });
       await parseResponse(response, 'Failed to update inventory item');
       toast.success('Inventory item updated');
+      setDetailsWarningPayload(null);
+      setPendingDetailsUpdate(null);
       setIsEditingDetails(false);
       await fetchHistory();
     } catch (error) {
+      const warningPayload = getInventoryMoveCheckWarningPayload(error);
+      if (warningPayload) {
+        setDetailsWarningPayload(warningPayload);
+        setPendingDetailsUpdate(updatePayload);
+        return;
+      }
       const message = error instanceof Error ? error.message : 'Failed to update inventory item';
       setDetailsSubmitError(message);
       toast.error(message);
     } finally {
       setSavingDetails(false);
     }
+  }
+
+  function handleSaveItemDetails(event: React.FormEvent) {
+    event.preventDefault();
+    const parsedInterval = Number.parseInt(editForm.check_interval_months, 10);
+    const hasCheckHistory = (payload?.checks.length || 0) > 0;
+    const updatePayload = buildInventoryItemDetailsUpdatePayload({
+      item_number: editForm.item_number,
+      name: editForm.name,
+      category: editForm.category,
+      location_id: editForm.location_id,
+      last_checked_at: editForm.last_checked_at || null,
+      check_interval_days: checkIntervalMonthsToDays(
+        Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : null
+      ),
+      hasCheckHistory,
+    });
+    void submitItemDetails(updatePayload);
   }
 
   async function handleRecordCheck(checkPayload: InventoryChecklistSubmitPayload) {
@@ -808,8 +838,20 @@ export default function InventoryItemDetailPage() {
         locations={moveLocations}
         onClose={() => setMoveDialogOpen(false)}
         onSubmit={handleMoveItem}
-        onCheckRecorded={async () => {
-          await fetchHistory();
+      />
+      <InventoryMoveCheckWarningDialog
+        payload={detailsWarningPayload}
+        saving={savingDetails}
+        onCancel={() => {
+          setDetailsWarningPayload(null);
+          setPendingDetailsUpdate(null);
+        }}
+        onConfirm={() => {
+          if (!pendingDetailsUpdate || !detailsWarningPayload) return;
+          void submitItemDetails(pendingDetailsUpdate, {
+            warning_item_ids: detailsWarningPayload.warning_items.map((item) => item.id),
+            move_item_ids: detailsWarningPayload.move_item_ids,
+          });
         }}
       />
     </AppPageShell>

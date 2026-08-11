@@ -45,6 +45,7 @@ interface YardKioskItemPickerProps {
   searchQuery: string;
   activeCategory: string;
   loading: boolean;
+  disabled?: boolean;
   uiState: YardKioskItemUiState;
   onUiStateChange: (state: YardKioskItemUiState) => void;
   onSearchChange: (query: string) => void;
@@ -83,6 +84,7 @@ export function YardKioskItemPicker({
   searchQuery,
   activeCategory,
   loading,
+  disabled = false,
   uiState,
   onUiStateChange,
   onSearchChange,
@@ -311,17 +313,19 @@ export function YardKioskItemPicker({
                   <div className="grid min-h-0 grid-cols-3 grid-rows-2 gap-3">
                     {page.items.map((item) => {
                       const selected = getBasketLine(item);
-                      const blocked = item.kind === 'serialized' && item.is_check_blocked;
+                      const warningRequired =
+                        item.kind === 'serialized' && item.check_warning_required;
                       return (
                         <button
                           key={`${item.kind}-${item.id}`}
                           type="button"
+                          disabled={disabled}
                           onClick={() => item.kind === 'serialized'
                             ? onAddSerialized(item)
                             : openHardwareQuantity(item)}
-                          className={`relative flex min-h-0 flex-col items-start justify-between overflow-hidden rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-amber-300 ${
-                            blocked
-                              ? 'border-red-400/30 bg-red-500/10'
+                          className={`relative flex min-h-0 flex-col items-start justify-between overflow-hidden rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-amber-300 ${
+                            warningRequired
+                              ? 'border-amber-300/50 bg-amber-300/10'
                               : selected
                                 ? 'border-emerald-300/60 bg-emerald-400/15'
                                 : 'border-white/10 bg-white/[0.06] hover:border-amber-300/50 hover:bg-amber-300/10'
@@ -335,8 +339,8 @@ export function YardKioskItemPicker({
                               <span className="grid h-7 min-w-7 place-items-center rounded-full bg-emerald-300 px-2 text-xs font-black text-slate-950">
                                 {selected.kind === 'hardware' ? selected.quantity : <Check className="h-4 w-4" />}
                               </span>
-                            ) : blocked ? (
-                              <AlertTriangle className="h-6 w-6 text-red-300" />
+                            ) : warningRequired ? (
+                              <AlertTriangle className="h-6 w-6 text-amber-300" />
                             ) : null}
                           </span>
                           <span className="min-w-0">
@@ -348,8 +352,8 @@ export function YardKioskItemPicker({
                                 ? `${item.available_quantity} available`
                                 : item.item_number}
                             </span>
-                            {blocked ? (
-                              <span className="mt-1 block text-xs font-bold text-red-200">
+                            {warningRequired ? (
+                              <span className="mt-1 block text-xs font-bold text-amber-200">
                                 Check required
                               </span>
                             ) : null}
@@ -383,7 +387,7 @@ export function YardKioskItemPicker({
       </section>
 
       <Dialog
-        open={Boolean(hardwareItem)}
+        open={Boolean(hardwareItem) && !disabled}
         onOpenChange={(open) => {
           if (!open) onUiStateChange({ ...uiState, hardware_item_id: null });
         }}
@@ -398,6 +402,7 @@ export function YardKioskItemPicker({
           <div className="grid grid-cols-[4rem_1fr_4rem] items-center gap-3 py-4">
             <button
               type="button"
+              disabled={disabled}
               aria-label="Decrease quantity"
               onClick={() => onUiStateChange({
                 ...uiState,
@@ -412,6 +417,7 @@ export function YardKioskItemPicker({
               min={0}
               max={hardwareItem?.available_quantity || 0}
               value={quantity}
+              disabled={disabled}
               onChange={(event) => onUiStateChange({
                 ...uiState,
                 hardware_quantity: Math.min(
@@ -423,6 +429,7 @@ export function YardKioskItemPicker({
             />
             <button
               type="button"
+              disabled={disabled}
               aria-label="Increase quantity"
               onClick={() => onUiStateChange({
                 ...uiState,
@@ -438,6 +445,7 @@ export function YardKioskItemPicker({
           </div>
           <Button
             type="button"
+            disabled={disabled}
             onClick={saveHardwareQuantity}
             className="h-14 bg-amber-300 text-lg font-black text-slate-950 hover:bg-amber-200"
           >

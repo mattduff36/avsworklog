@@ -3,7 +3,7 @@ import 'server-only';
 import type { Json } from '@/types/database';
 import {
   getInventoryCheckStatus,
-  isInventoryMoveCheckBlocked,
+  requiresInventoryMoveCheckWarning,
 } from '@/app/(dashboard)/inventory/utils';
 import type { InventoryLocation } from '@/app/(dashboard)/inventory/types';
 import type {
@@ -13,9 +13,14 @@ import type {
   YardKioskStockItem,
   YardKioskSubmitPayload,
 } from '@/lib/inventory/kiosk-types';
+import {
+  INVENTORY_CHECK_WARNING_REQUIRED,
+  type InventoryMoveCheckConfirmation,
+  type InventoryMoveCheckWarningItem,
+} from '@/lib/inventory/move-check-warning';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { logger } from '@/lib/utils/logger';
 import { requireInventoryAccess } from './inventory-auth';
-import type { CheckBlockedMoveItem } from './inventory-move';
 
 type InventoryAdminClient = ReturnType<typeof createAdminClient>;
 
@@ -70,18 +75,24 @@ export interface InventoryKioskAccessResult {
 export class InventoryKioskError extends Error {
   status: number;
   code?: string;
-  blockedItems?: CheckBlockedMoveItem[];
+  warningItems?: InventoryMoveCheckWarningItem[];
+  moveItemIds?: string[];
 
   constructor(
     message: string,
     status = 400,
-    options?: { code?: string; blockedItems?: CheckBlockedMoveItem[] },
+    options?: {
+      code?: string;
+      warningItems?: InventoryMoveCheckWarningItem[];
+      moveItemIds?: string[];
+    },
   ) {
     super(message);
     this.name = 'InventoryKioskError';
     this.status = status;
     this.code = options?.code;
-    this.blockedItems = options?.blockedItems;
+    this.warningItems = options?.warningItems;
+    this.moveItemIds = options?.moveItemIds;
   }
 }
 
@@ -401,7 +412,7 @@ export async function getYardKioskStock(
       name: item.name,
       category: item.category,
       check_status: getInventoryCheckStatus(statusItem),
-      is_check_blocked: isInventoryMoveCheckBlocked(statusItem, destinationLocation),
+      check_warning_required: requiresInventoryMoveCheckWarning(statusItem, destinationLocation),
     };
   });
 
@@ -474,6 +485,26 @@ export function validateYardKioskSubmitPayload(input: unknown): YardKioskSubmitP
     throw new InventoryKioskError('The transfer note must be 500 characters or less', 400);
   }
 
+  let checkWarningConfirmation: InventoryMoveCheckConfirmation | undefined;
+  if (payload.check_warning_confirmation !== undefined) {
+    const candidate = payload.check_warning_confirmation as Partial<InventoryMoveCheckConfirmation> | null;
+    if (
+      !candidate
+      || !Array.isArray(candidate.warning_item_ids)
+      || !Array.isArray(candidate.move_item_ids)
+      || candidate.warning_item_ids.some((id) => !isUuid(id))
+      || candidate.move_item_ids.some((id) => !isUuid(id))
+      || new Set(candidate.warning_item_ids).size !== candidate.warning_item_ids.length
+      || new Set(candidate.move_item_ids).size !== candidate.move_item_ids.length
+    ) {
+      throw new InventoryKioskError('Invalid inventory check warning confirmation', 400);
+    }
+    checkWarningConfirmation = {
+      warning_item_ids: [...candidate.warning_item_ids].sort(),
+      move_item_ids: [...candidate.move_item_ids].sort(),
+    };
+  }
+
   return {
     direction: payload.direction,
     counterpart_location_id: payload.counterpart_location_id,
@@ -483,15 +514,18 @@ export function validateYardKioskSubmitPayload(input: unknown): YardKioskSubmitP
       quantity: line.quantity,
     })),
     ...(note ? { note } : {}),
+    ...(checkWarningConfirmation
+      ? { check_warning_confirmation: checkWarningConfirmation }
+      : {}),
   };
 }
 
-async function getBlockedItems(
+async function getCheckWarningItems(
   admin: InventoryAdminClient,
   yard: KioskLocationRow,
   counterpart: KioskLocationRow,
   payload: YardKioskSubmitPayload,
-): Promise<CheckBlockedMoveItem[]> {
+): Promise<InventoryMoveCheckWarningItem[]> {
   if (payload.direction !== 'take' || payload.serialized_item_ids.length === 0) return [];
 
   const { data, error } = await admin
@@ -505,14 +539,14 @@ async function getBlockedItems(
 
   return ((data || []) as KioskSerializedRow[]).flatMap((item) => {
     const statusItem = { ...item, location: toKioskLocation(yard) };
-    if (!isInventoryMoveCheckBlocked(statusItem, toKioskLocation(counterpart))) return [];
+    if (!requiresInventoryMoveCheckWarning(statusItem, toKioskLocation(counterpart))) return [];
     return [{
       id: item.id,
       item_number: item.item_number,
       name: item.name,
       check_status: getInventoryCheckStatus(statusItem),
     }];
-  });
+  }).sort((left, right) => left.id.localeCompare(right.id));
 }
 
 export async function submitYardKioskBasket(
@@ -527,15 +561,42 @@ export async function submitYardKioskBasket(
     access.yard.id,
     payload.counterpart_location_id,
   );
-  const blockedItems = await getBlockedItems(admin, access.yard, counterpart, payload);
-  if (blockedItems.length > 0) {
-    throw new InventoryKioskError(
-      blockedItems.length === 1
-        ? 'This item needs an inventory check before leaving Yard.'
-        : 'These items need inventory checks before leaving Yard.',
-      400,
-      { code: 'INVENTORY_CHECK_REQUIRED', blockedItems },
+  const warningItems = await getCheckWarningItems(admin, access.yard, counterpart, payload);
+  const moveItemIds = Array.from(new Set([
+    ...payload.serialized_item_ids,
+    ...payload.hardware_lines.map((line) => line.item_id),
+  ])).sort();
+  const confirmation = payload.check_warning_confirmation;
+  if (warningItems.length > 0) {
+    const warningItemIds = warningItems.map((item) => item.id);
+    const confirmedAllWarnings = warningItemIds.every((id) => (
+      confirmation?.warning_item_ids.includes(id)
+    ));
+    const confirmedSameMove = Boolean(
+      confirmation
+      && confirmation.move_item_ids.length === moveItemIds.length
+      && confirmation.move_item_ids.every((id, index) => id === moveItemIds[index]),
     );
+    const confirmedWarningsBelongToMove = Boolean(
+      confirmation?.warning_item_ids.every((id) => moveItemIds.includes(id)),
+    );
+    if (
+      !confirmedAllWarnings
+      || !confirmedSameMove
+      || !confirmedWarningsBelongToMove
+    ) {
+      throw new InventoryKioskError(
+        warningItems.length === 1
+          ? 'This item needs an inventory check. Confirm to move it anyway.'
+          : 'These items need inventory checks. Confirm to move them anyway.',
+        409,
+        {
+          code: INVENTORY_CHECK_WARNING_REQUIRED,
+          warningItems,
+          moveItemIds,
+        },
+      );
+    }
   }
 
   const { data, error } = await admin.rpc('inventory_kiosk_execute_transfer_basket', {
@@ -551,13 +612,6 @@ export async function submitYardKioskBasket(
     if (error.message?.includes('Yard kiosk access denied')) {
       throw new InventoryKioskError('Yard kiosk access denied', 403);
     }
-    if (error.message?.includes('Inventory check required')) {
-      throw new InventoryKioskError(
-        'An item now needs an inventory check before leaving Yard.',
-        409,
-        { code: 'INVENTORY_CHECK_REQUIRED' },
-      );
-    }
     if (
       error.message?.includes('unavailable')
       || error.message?.includes('changed before')
@@ -572,6 +626,16 @@ export async function submitYardKioskBasket(
   if (!row) {
     throw new InventoryKioskError('The Yard kiosk transfer did not return a receipt', 500);
   }
+  if (confirmation && warningItems.length > 0) {
+    logger.info('Inventory check warning override completed', {
+      actor: access.userId,
+      surface: 'yard-kiosk',
+      warning_item_ids: warningItems.map((item) => item.id),
+      destination_location_id: counterpart.id,
+      movement_batch_id: row.movement_batch_id,
+      kiosk_batch_id: row.kiosk_batch_id,
+    });
+  }
   return row;
 }
 
@@ -580,7 +644,8 @@ export function toInventoryKioskErrorResponse(error: InventoryKioskError) {
     body: {
       error: error.message,
       ...(error.code ? { code: error.code } : {}),
-      ...(error.blockedItems ? { blocked_items: error.blockedItems } : {}),
+      ...(error.warningItems ? { warning_items: error.warningItems } : {}),
+      ...(error.moveItemIds ? { move_item_ids: error.moveItemIds } : {}),
     },
     status: error.status,
   };

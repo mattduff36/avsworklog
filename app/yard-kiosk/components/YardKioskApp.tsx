@@ -20,7 +20,12 @@ import type {
   YardKioskLocation,
   YardKioskReceipt,
   YardKioskStockItem,
+  YardKioskSubmitPayload,
 } from '@/lib/inventory/kiosk-types';
+import {
+  INVENTORY_CHECK_WARNING_REQUIRED,
+  type InventoryMoveCheckWarningPayload,
+} from '@/lib/inventory/move-check-warning';
 import type {
   YardKioskControlAction,
   YardKioskItemUiState,
@@ -39,6 +44,7 @@ import {
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useYardKioskRemoteControl } from '@/lib/hooks/useYardKioskRemoteControl';
 import { YardKioskBasket } from './YardKioskBasket';
+import { YardKioskCheckWarningDialog } from './YardKioskCheckWarningDialog';
 import { YardKioskAdminMenu } from './YardKioskAdminMenu';
 import { YardKioskInactivityGuard } from './YardKioskInactivityGuard';
 import { YardKioskItemPicker } from './YardKioskItemPicker';
@@ -66,12 +72,8 @@ interface ApiErrorPayload {
   error?: string;
   code?: string;
   diagnostic_id?: string;
-  blocked_items?: Array<{
-    id: string;
-    item_number: string;
-    name: string;
-    check_status: 'ok' | 'due_soon' | 'overdue' | 'needs_check' | 'not_required';
-  }>;
+  warning_items?: InventoryMoveCheckWarningPayload['warning_items'];
+  move_item_ids?: string[];
 }
 
 const INITIAL_LOCATION_UI_STATE: YardKioskLocationUiState = {
@@ -97,8 +99,15 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   const [locationUiState, setLocationUiState] = useState(INITIAL_LOCATION_UI_STATE);
   const [itemUiState, setItemUiState] = useState(INITIAL_ITEM_UI_STATE);
   const [remoteActivityRevision, setRemoteActivityRevision] = useState(0);
+  const [checkWarningPayload, setCheckWarningPayload] =
+    useState<InventoryMoveCheckWarningPayload | null>(null);
+  const [pendingSubmitPayload, setPendingSubmitPayload] =
+    useState<YardKioskSubmitPayload | null>(null);
   const legacyLocationRequestIdRef = useRef(0);
   const workflowSessionIdRef = useRef(0);
+  const submissionGenerationRef = useRef(0);
+  const submittingRef = useRef(false);
+  const remoteControlledRef = useRef(false);
   const snapshotRevisionRef = useRef(Date.now());
 
   useEffect(() => {
@@ -123,6 +132,8 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   const handleWorkflowReset = useCallback(() => {
     legacyLocationRequestIdRef.current += 1;
     workflowSessionIdRef.current += 1;
+    submissionGenerationRef.current += 1;
+    submittingRef.current = false;
     setLocations(bootstrap.locations);
     setLocationUiState((current) => ({
       ...INITIAL_LOCATION_UI_STATE,
@@ -130,6 +141,8 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       pinned_ids: current.pinned_ids,
     }));
     setItemUiState(INITIAL_ITEM_UI_STATE);
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
     dispatch({ type: 'RESET' });
   }, [bootstrap.locations]);
 
@@ -183,6 +196,8 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   function handleDirection(direction: YardKioskDirection) {
     legacyLocationRequestIdRef.current += 1;
     workflowSessionIdRef.current += 1;
+    submissionGenerationRef.current += 1;
+    submittingRef.current = false;
     setLocations(bootstrap.locations);
     setLocationUiState((current) => ({
       ...INITIAL_LOCATION_UI_STATE,
@@ -190,14 +205,20 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       pinned_ids: current.pinned_ids,
     }));
     setItemUiState(INITIAL_ITEM_UI_STATE);
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
     dispatch({ type: 'SELECT_DIRECTION', direction });
   }
 
   function handleLocation(location: YardKioskLocation) {
     if (!state.direction) return;
     legacyLocationRequestIdRef.current += 1;
+    submissionGenerationRef.current += 1;
+    submittingRef.current = false;
     setLocations(bootstrap.locations);
     setItemUiState(INITIAL_ITEM_UI_STATE);
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
     dispatch({ type: 'SELECT_LOCATION', location });
     void loadStock(state.direction, location, workflowSessionIdRef.current);
   }
@@ -216,16 +237,12 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     }
   }
 
-  async function handleSubmit() {
-    if (
-      !state.direction
-      || !state.counterpart
-      || state.basket.length === 0
-      || state.phase === 'submitting'
-    ) return;
-
+  async function submitBasket(requestPayload: YardKioskSubmitPayload) {
+    if (submittingRef.current) return;
     if (!window.navigator.onLine) {
       const userError = yardKioskOfflineError();
+      setCheckWarningPayload(null);
+      setPendingSubmitPayload(null);
       dispatch({
         type: 'SUBMIT_FAILED',
         message: userError.title,
@@ -236,51 +253,80 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     }
 
     const expectedSessionId = workflowSessionIdRef.current;
+    const expectedSubmissionGeneration = submissionGenerationRef.current + 1;
+    submissionGenerationRef.current = expectedSubmissionGeneration;
+    submittingRef.current = true;
     dispatch({ type: 'SUBMIT_START' });
     try {
       const response = await fetch('/api/inventory/kiosk/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          direction: state.direction,
-          counterpart_location_id: state.counterpart.id,
-          serialized_item_ids: state.basket.flatMap((line) => (
-            line.kind === 'serialized' ? [line.item_id] : []
-          )),
-          hardware_lines: state.basket.flatMap((line) => (
-            line.kind === 'hardware'
-              ? [{ item_id: line.item_id, quantity: line.quantity }]
-              : []
-          )),
-        }),
+        body: JSON.stringify(requestPayload),
       });
       const payload = await response.json() as ApiErrorPayload & YardKioskReceipt;
-      if (workflowSessionIdRef.current !== expectedSessionId) return;
+      if (
+        workflowSessionIdRef.current !== expectedSessionId
+        || submissionGenerationRef.current !== expectedSubmissionGeneration
+      ) return;
+      submittingRef.current = false;
       if (!response.ok) {
+        if (
+          payload.code === INVENTORY_CHECK_WARNING_REQUIRED
+          && Array.isArray(payload.warning_items)
+          && Array.isArray(payload.move_item_ids)
+        ) {
+          if (remoteControlledRef.current) {
+            dispatch({ type: 'SUBMIT_WARNING' });
+            return;
+          }
+          const unconfirmedPayload = { ...requestPayload };
+          delete unconfirmedPayload.check_warning_confirmation;
+          setPendingSubmitPayload(unconfirmedPayload);
+          setCheckWarningPayload({
+            code: INVENTORY_CHECK_WARNING_REQUIRED,
+            error: payload.error || 'Inventory check warning confirmation required',
+            warning_items: payload.warning_items,
+            move_item_ids: payload.move_item_ids,
+          });
+          dispatch({ type: 'SUBMIT_WARNING' });
+          return;
+        }
         const userError = yardKioskErrorFromApiPayload(response.status, {
           ...payload,
           code: payload.code
             || (response.status === 409 ? 'STOCK_STALE' : 'SUBMIT_FAILED'),
         });
+        setCheckWarningPayload(null);
+        setPendingSubmitPayload(null);
         dispatch({
           type: 'SUBMIT_FAILED',
           message: userError.whatHappened,
-          blockedItems: payload.blocked_items,
           userError,
         });
         void logYardKioskHandledError(userError, { action: 'submit', httpStatus: response.status });
-        if (response.status === 409) {
-          void loadStock(state.direction, state.counterpart, expectedSessionId);
+        if (
+          response.status === 409
+          && state.counterpart?.id === requestPayload.counterpart_location_id
+        ) {
+          void loadStock(requestPayload.direction, state.counterpart, expectedSessionId);
         }
         return;
       }
+      setCheckWarningPayload(null);
+      setPendingSubmitPayload(null);
       dispatch({ type: 'SUBMIT_SUCCEEDED', receipt: payload });
     } catch (error) {
-      if (workflowSessionIdRef.current !== expectedSessionId) return;
+      if (
+        workflowSessionIdRef.current !== expectedSessionId
+        || submissionGenerationRef.current !== expectedSubmissionGeneration
+      ) return;
+      submittingRef.current = false;
       const userError = buildYardKioskUserError('SUBMIT_UNCERTAIN', {
         diagnosticId: createYardKioskDiagnosticId(),
         technicalDetail: error instanceof Error ? error.message : undefined,
       });
+      setCheckWarningPayload(null);
+      setPendingSubmitPayload(null);
       dispatch({
         type: 'SUBMIT_FAILED',
         message: userError.whatHappened,
@@ -290,13 +336,81 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     }
   }
 
+  function handleSubmit() {
+    if (
+      !state.direction
+      || !state.counterpart
+      || state.basket.length === 0
+      || state.phase === 'submitting'
+    ) return;
+
+    void submitBasket({
+      direction: state.direction,
+      counterpart_location_id: state.counterpart.id,
+      serialized_item_ids: state.basket.flatMap((line) => (
+        line.kind === 'serialized' ? [line.item_id] : []
+      )),
+      hardware_lines: state.basket.flatMap((line) => (
+        line.kind === 'hardware'
+          ? [{ item_id: line.item_id, quantity: line.quantity }]
+          : []
+      )),
+    });
+  }
+
+  function handleConfirmCheckWarning() {
+    if (!pendingSubmitPayload || !checkWarningPayload) return;
+    void submitBasket({
+      ...pendingSubmitPayload,
+      check_warning_confirmation: {
+        warning_item_ids: checkWarningPayload.warning_items.map((item) => item.id),
+        move_item_ids: checkWarningPayload.move_item_ids,
+      },
+    });
+  }
+
+  function handleAddSerialized(
+    item: Extract<YardKioskStockItem, { kind: 'serialized' }>,
+  ) {
+    if (submittingRef.current) return;
+    submissionGenerationRef.current += 1;
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
+    dispatch({ type: 'ADD_SERIALIZED', item });
+  }
+
+  function handleSetHardwareQuantity(
+    item: Extract<YardKioskStockItem, { kind: 'hardware' }>,
+    quantity: number,
+  ) {
+    if (submittingRef.current) return;
+    submissionGenerationRef.current += 1;
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
+    dispatch({ type: 'SET_HARDWARE_QUANTITY', item, quantity });
+  }
+
   function handleRemove(line: YardKioskBasketLine) {
+    if (submittingRef.current) return;
+    submissionGenerationRef.current += 1;
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
     dispatch({ type: 'REMOVE_LINE', kind: line.kind, itemId: line.item_id });
+  }
+
+  function handleClearBasket() {
+    if (submittingRef.current) return;
+    submissionGenerationRef.current += 1;
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
+    dispatch({ type: 'CLEAR_BASKET' });
   }
 
   function handleWorkflowBack() {
     legacyLocationRequestIdRef.current += 1;
     workflowSessionIdRef.current += 1;
+    submissionGenerationRef.current += 1;
+    submittingRef.current = false;
     setLocations(bootstrap.locations);
     setLocationUiState((current) => ({
       ...INITIAL_LOCATION_UI_STATE,
@@ -304,6 +418,8 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       pinned_ids: current.pinned_ids,
     }));
     setItemUiState(INITIAL_ITEM_UI_STATE);
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
     dispatch({ type: 'BACK' });
   }
 
@@ -335,6 +451,20 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
 
   function handleControlAction(action: YardKioskControlAction) {
     setRemoteActivityRevision((revision) => revision + 1);
+    if (
+      submittingRef.current
+      && [
+        'add_serialized',
+        'open_hardware_quantity',
+        'set_hardware_dialog_quantity',
+        'set_hardware_quantity',
+        'close_hardware_quantity',
+        'remove_line',
+        'clear_basket',
+      ].includes(action.type)
+    ) return;
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
 
     switch (action.type) {
       case 'select_direction':
@@ -411,7 +541,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
           candidate.kind === 'serialized' && candidate.id === action.item_id
         ));
         if (item?.kind === 'serialized') {
-          dispatch({ type: 'ADD_SERIALIZED', item });
+          handleAddSerialized(item);
         }
         break;
       }
@@ -441,11 +571,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
           candidate.kind === 'hardware' && candidate.id === action.item_id
         ));
         if (item?.kind === 'hardware') {
-          dispatch({
-            type: 'SET_HARDWARE_QUANTITY',
-            item,
-            quantity: action.quantity,
-          });
+          handleSetHardwareQuantity(item, action.quantity);
           setItemUiState((current) => ({
             ...current,
             hardware_item_id: null,
@@ -458,14 +584,15 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
         setItemUiState((current) => ({ ...current, hardware_item_id: null }));
         break;
       case 'remove_line':
-        dispatch({
-          type: 'REMOVE_LINE',
-          kind: action.kind,
-          itemId: action.item_id,
-        });
+        {
+          const line = state.basket.find((candidate) => (
+            candidate.kind === action.kind && candidate.item_id === action.item_id
+          ));
+          if (line) handleRemove(line);
+        }
         break;
       case 'clear_basket':
-        dispatch({ type: 'CLEAR_BASKET' });
+        handleClearBasket();
         break;
       case 'dismiss_error':
         dispatch({ type: 'DISMISS_ERROR' });
@@ -493,6 +620,13 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       void logYardKioskHandledError(userError, { action: 'remote_command' });
     },
   });
+
+  useEffect(() => {
+    remoteControlledRef.current = isRemotelyControlled;
+    if (!isRemotelyControlled) return;
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
+  }, [isRemotelyControlled]);
 
   const guidance = getYardKioskGuidance(state);
   const workflowBackLabel = state.phase === 'location'
@@ -656,16 +790,13 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
                 searchQuery={state.searchQuery}
                 activeCategory={state.category}
                 loading={state.loadingStock}
+                disabled={state.phase === 'submitting'}
                 uiState={itemUiState}
                 onUiStateChange={setItemUiState}
                 onSearchChange={(query) => dispatch({ type: 'SET_SEARCH', query })}
                 onCategoryChange={(category) => dispatch({ type: 'SET_CATEGORY', category })}
-                onAddSerialized={(item) => dispatch({ type: 'ADD_SERIALIZED', item })}
-                onSetHardwareQuantity={(item, quantity) => dispatch({
-                  type: 'SET_HARDWARE_QUANTITY',
-                  item,
-                  quantity,
-                })}
+                onAddSerialized={handleAddSerialized}
+                onSetHardwareQuantity={handleSetHardwareQuantity}
               />
             </div>
             <div
@@ -679,7 +810,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
                 offline={offline}
                 submitting={state.phase === 'submitting'}
                 onRemove={handleRemove}
-                onClear={() => dispatch({ type: 'CLEAR_BASKET' })}
+                onClear={handleClearBasket}
                 onSubmit={() => void handleSubmit()}
               />
             </div>
@@ -722,11 +853,6 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
                     </p>
                   </>
                 ) : null}
-                {state.blockedItems.length > 0 ? (
-                  <p className="mt-1 text-sm text-red-100/75">
-                    {state.blockedItems.map((item) => `${item.item_number} · ${item.name}`).join(', ')}
-                  </p>
-                ) : null}
               </div>
               {(state.loadingStock || state.userError?.retryable)
                 && state.counterpart
@@ -762,6 +888,17 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
           </div>
         ) : null}
       </div>
+
+      <YardKioskCheckWarningDialog
+        payload={checkWarningPayload}
+        saving={state.phase === 'submitting'}
+        enabled={!isRemotelyControlled}
+        onCancel={() => {
+          setCheckWarningPayload(null);
+          setPendingSubmitPayload(null);
+        }}
+        onConfirm={handleConfirmCheckWarning}
+      />
 
       {isRemotelyControlled ? (
         <div

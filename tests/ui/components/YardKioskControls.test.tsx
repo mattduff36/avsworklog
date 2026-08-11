@@ -45,6 +45,8 @@ describe('Yard kiosk touch controls', () => {
             item_number: 'TOOL-001',
             name: 'Breaker',
             category: 'tools',
+            check_status: 'ok',
+            check_warning_required: false,
           },
           {
             kind: 'hardware',
@@ -79,6 +81,8 @@ describe('Yard kiosk touch controls', () => {
           item_number: 'TOOL-001',
           name: 'Breaker',
           category: 'tools',
+          check_status: 'ok',
+          check_warning_required: false,
         }]}
         offline
         submitting={false}
@@ -91,6 +95,32 @@ describe('Yard kiosk touch controls', () => {
     expect(screen.getByText(/offline/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Confirm transfer' })).toBeDisabled();
     expect(screen.getByText('Breaker')).toBeInTheDocument();
+  });
+
+  it('disables basket mutations while a transfer is submitting', () => {
+    render(
+      <YardKioskBasket
+        direction="take"
+        counterpart={counterpart}
+        basket={[{
+          kind: 'serialized',
+          item_id: '22222222-2222-4222-8222-222222222222',
+          item_number: 'TOOL-001',
+          name: 'Breaker',
+          category: 'tools',
+          check_status: 'overdue',
+          check_warning_required: true,
+        }]}
+        offline={false}
+        submitting
+        onRemove={vi.fn()}
+        onClear={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Remove Breaker' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Clear basket' })).toBeDisabled();
   });
 
   it('keeps enlarged carousel controls together and separate from workflow navigation', () => {
@@ -157,7 +187,7 @@ describe('Yard kiosk touch controls', () => {
           name: 'Breaker',
           category: 'tools',
           check_status: 'ok',
-          is_check_blocked: false,
+          check_warning_required: false,
         }]}
         basket={[]}
         searchQuery=""

@@ -21,7 +21,7 @@ function makeSerializedItem(index: number, category = 'tools'): YardKioskStockIt
     name: `Item ${String(index).padStart(2, '0')}`,
     category,
     check_status: 'ok',
-    is_check_blocked: false,
+    check_warning_required: false,
   };
 }
 
@@ -253,6 +253,8 @@ describe('Yard kiosk item result threshold', () => {
       item_number: 'TOOL-001',
       name: 'Item 01',
       category: 'tools',
+      check_status: 'ok',
+      check_warning_required: false,
     };
     render(
       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_21rem] overflow-hidden">

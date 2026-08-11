@@ -1,5 +1,11 @@
-import { getInventoryCheckStatus, isInventoryMoveCheckBlocked } from '@/app/(dashboard)/inventory/utils';
-import type { InventoryCheckStatus, InventoryLocation } from '@/app/(dashboard)/inventory/types';
+import { getInventoryCheckStatus, requiresInventoryMoveCheckWarning } from '@/app/(dashboard)/inventory/utils';
+import type { InventoryLocation } from '@/app/(dashboard)/inventory/types';
+import {
+  INVENTORY_CHECK_WARNING_REQUIRED,
+  type InventoryMoveCheckConfirmation,
+  type InventoryMoveCheckWarningItem,
+} from '@/lib/inventory/move-check-warning';
+import { logger } from '@/lib/utils/logger';
 import type { InventoryAdminClient } from './inventory-locations';
 
 export type InventoryMoveScope = 'single' | 'bulk' | 'group' | 'claim';
@@ -11,6 +17,8 @@ export interface MoveInventoryItemsInput {
   scope?: InventoryMoveScope;
   groupId?: string | null;
   movedBy: string;
+  checkWarningConfirmation?: unknown;
+  itemCheckOverrides?: Record<string, Partial<Pick<MoveItemRow, 'category' | 'last_checked_at' | 'check_interval_days'>>>;
 }
 
 export interface MoveInventoryItemsResult {
@@ -18,24 +26,27 @@ export interface MoveInventoryItemsResult {
   movement_batch_id: string | null;
 }
 
-export interface CheckBlockedMoveItem {
-  id: string;
-  item_number: string;
-  name: string;
-  check_status: InventoryCheckStatus;
-}
-
 export class InventoryMoveError extends Error {
   status: number;
   code?: string;
-  blockedItems?: CheckBlockedMoveItem[];
+  warningItems?: InventoryMoveCheckWarningItem[];
+  moveItemIds?: string[];
 
-  constructor(message: string, status = 400, options?: { code?: string; blockedItems?: CheckBlockedMoveItem[] }) {
+  constructor(
+    message: string,
+    status = 400,
+    options?: {
+      code?: string;
+      warningItems?: InventoryMoveCheckWarningItem[];
+      moveItemIds?: string[];
+    },
+  ) {
     super(message);
     this.name = 'InventoryMoveError';
     this.status = status;
     this.code = options?.code;
-    this.blockedItems = options?.blockedItems;
+    this.warningItems = options?.warningItems;
+    this.moveItemIds = options?.moveItemIds;
   }
 }
 
@@ -64,8 +75,24 @@ interface MoveItemRow {
   location: Pick<InventoryLocation, 'id' | 'name' | 'location_type'> | Array<Pick<InventoryLocation, 'id' | 'name' | 'location_type'>> | null;
 }
 
-function uniqueIds(ids: string[] | undefined): string[] {
-  return Array.from(new Set((ids || []).map((id) => id.trim()).filter(Boolean)));
+export interface PreparedInventoryMove {
+  destinationLocationId: string;
+  scope: InventoryMoveScope;
+  groupId: string | null;
+  itemIds: string[];
+  destinationLocation: MoveLocationRow;
+  warningItems: InventoryMoveCheckWarningItem[];
+}
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function uniqueIds(ids: readonly unknown[] | undefined): string[] {
+  return Array.from(new Set(
+    (ids || [])
+      .filter((id): id is string => typeof id === 'string')
+      .map((id) => id.trim())
+      .filter(Boolean),
+  )).sort();
 }
 
 function normalizeMoveItemLocation(
@@ -80,16 +107,98 @@ export function toInventoryMoveErrorResponse(error: InventoryMoveError) {
     body: {
       error: error.message,
       ...(error.code ? { code: error.code } : {}),
-      ...(error.blockedItems ? { blocked_items: error.blockedItems } : {}),
+      ...(error.warningItems ? { warning_items: error.warningItems } : {}),
+      ...(error.moveItemIds ? { move_item_ids: error.moveItemIds } : {}),
     },
     status: error.status,
   };
 }
 
-export async function moveInventoryItems(
+function parseCheckWarningConfirmation(value: unknown): InventoryMoveCheckConfirmation | null {
+  if (value === undefined || value === null) return null;
+  if (!value || typeof value !== 'object') {
+    throw new InventoryMoveError('Invalid inventory check warning confirmation', 400);
+  }
+
+  const candidate = value as Partial<InventoryMoveCheckConfirmation>;
+  if (!Array.isArray(candidate.warning_item_ids) || !Array.isArray(candidate.move_item_ids)) {
+    throw new InventoryMoveError('Invalid inventory check warning confirmation', 400);
+  }
+  if (
+    candidate.warning_item_ids.some((id: unknown) => typeof id !== 'string')
+    || candidate.move_item_ids.some((id: unknown) => typeof id !== 'string')
+  ) {
+    throw new InventoryMoveError('Inventory check warning confirmation contains invalid item ids', 400);
+  }
+
+  const warningItemIds = uniqueIds(candidate.warning_item_ids);
+  const moveItemIds = uniqueIds(candidate.move_item_ids);
+  if (
+    warningItemIds.length !== candidate.warning_item_ids.length
+    || moveItemIds.length !== candidate.move_item_ids.length
+    || warningItemIds.some((id) => !UUID_PATTERN.test(id))
+    || moveItemIds.some((id) => !UUID_PATTERN.test(id))
+  ) {
+    throw new InventoryMoveError('Inventory check warning confirmation contains invalid item ids', 400);
+  }
+
+  return {
+    warning_item_ids: warningItemIds,
+    move_item_ids: moveItemIds,
+  };
+}
+
+function sameIds(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((id, index) => id === right[index]);
+}
+
+function throwCheckWarning(
+  warningItems: InventoryMoveCheckWarningItem[],
+  moveItemIds: string[],
+): never {
+  throw new InventoryMoveError(
+    warningItems.length === 1
+      ? 'This item needs an inventory check. Confirm to move it anyway.'
+      : 'These items need inventory checks. Confirm to move them anyway.',
+    409,
+    {
+      code: INVENTORY_CHECK_WARNING_REQUIRED,
+      warningItems,
+      moveItemIds,
+    },
+  );
+}
+
+export function assertInventoryMoveCheckConfirmation(
+  prepared: PreparedInventoryMove,
+  value: unknown,
+): InventoryMoveCheckConfirmation | null {
+  const confirmation = parseCheckWarningConfirmation(value);
+  if (prepared.warningItems.length === 0) return confirmation;
+  if (!confirmation) throwCheckWarning(prepared.warningItems, prepared.itemIds);
+
+  const currentWarningIds = prepared.warningItems.map((item) => item.id).sort();
+  const allCurrentWarningsConfirmed = currentWarningIds.every((id) => (
+    confirmation.warning_item_ids.includes(id)
+  ));
+  const allConfirmedWarningsBelongToMove = confirmation.warning_item_ids.every((id) => (
+    prepared.itemIds.includes(id)
+  ));
+  if (
+    !sameIds(confirmation.move_item_ids, prepared.itemIds)
+    || !allCurrentWarningsConfirmed
+    || !allConfirmedWarningsBelongToMove
+  ) {
+    throwCheckWarning(prepared.warningItems, prepared.itemIds);
+  }
+
+  return confirmation;
+}
+
+export async function prepareInventoryMove(
   admin: InventoryAdminClient,
   input: MoveInventoryItemsInput
-): Promise<MoveInventoryItemsResult> {
+): Promise<PreparedInventoryMove> {
   const destinationLocationId = input.destinationLocationId.trim();
   const scope = input.scope || 'single';
   const groupId = input.groupId?.trim() || null;
@@ -98,6 +207,15 @@ export async function moveInventoryItems(
     throw new InventoryMoveError('Destination location is required', 400);
   }
 
+  if (
+    input.itemIds !== undefined
+    && (
+      !Array.isArray(input.itemIds)
+      || input.itemIds.some((id: unknown) => typeof id !== 'string')
+    )
+  ) {
+    throw new InventoryMoveError('Inventory item ids must be strings', 400);
+  }
   let itemIds = uniqueIds(input.itemIds);
 
   if (scope === 'group') {
@@ -109,7 +227,7 @@ export async function moveInventoryItems(
       .eq('group_id', groupId);
 
     if (membersError) throw membersError;
-    itemIds = ((members || []) as GroupMemberRow[]).map((member) => member.item_id);
+    itemIds = uniqueIds(((members || []) as GroupMemberRow[]).map((member) => member.item_id));
   }
 
   if (itemIds.length === 0) {
@@ -135,7 +253,9 @@ export async function moveInventoryItems(
   if (itemsResult.error) throw itemsResult.error;
 
   const destinationLocation = destinationResult.data as MoveLocationRow;
-  const moveItems = (itemsResult.data || []) as MoveItemRow[];
+  const moveItems = ((itemsResult.data || []) as MoveItemRow[])
+    .slice()
+    .sort((left, right) => left.id.localeCompare(right.id));
 
   if (moveItems.length !== itemIds.length) {
     throw new InventoryMoveError('One or more inventory items could not be found', 404);
@@ -149,12 +269,14 @@ export async function moveInventoryItems(
     );
   }
 
-  const blockedItems = moveItems.reduce<CheckBlockedMoveItem[]>((acc, item) => {
+  const warningItems = moveItems.reduce<InventoryMoveCheckWarningItem[]>((acc, item) => {
+    const checkOverrides = input.itemCheckOverrides?.[item.id];
     const moveItem = {
       ...item,
+      ...checkOverrides,
       location: normalizeMoveItemLocation(item.location),
     };
-    if (!isInventoryMoveCheckBlocked(moveItem, destinationLocation)) return acc;
+    if (!requiresInventoryMoveCheckWarning(moveItem, destinationLocation)) return acc;
     acc.push({
       id: item.id,
       item_number: item.item_number,
@@ -164,26 +286,30 @@ export async function moveInventoryItems(
     return acc;
   }, []);
 
-  if (blockedItems.length > 0) {
-    throw new InventoryMoveError(
-      blockedItems.length === 1
-        ? 'Record an inventory check before moving this item.'
-        : 'Record inventory checks before moving these items.',
-      400,
-      {
-        code: 'INVENTORY_CHECK_REQUIRED',
-        blockedItems,
-      }
-    );
-  }
+  return {
+    destinationLocationId,
+    scope,
+    groupId,
+    itemIds,
+    destinationLocation,
+    warningItems,
+  };
+}
+
+export async function moveInventoryItems(
+  admin: InventoryAdminClient,
+  input: MoveInventoryItemsInput
+): Promise<MoveInventoryItemsResult> {
+  const prepared = await prepareInventoryMove(admin, input);
+  const confirmation = assertInventoryMoveCheckConfirmation(prepared, input.checkWarningConfirmation);
 
   const { data: movedItems, error: moveError } = await admin.rpc('inventory_move_items_with_batch', {
-    p_item_ids: itemIds,
-    p_destination_location_id: destinationLocationId,
+    p_item_ids: prepared.itemIds,
+    p_destination_location_id: prepared.destinationLocationId,
     p_note: input.note?.trim() || null,
     p_moved_by: input.movedBy,
-    p_move_scope: scope,
-    p_group_id: scope === 'group' ? groupId : null,
+    p_move_scope: prepared.scope,
+    p_group_id: prepared.scope === 'group' ? prepared.groupId : null,
   });
 
   if (moveError) {
@@ -199,6 +325,16 @@ export async function moveInventoryItems(
     : null;
 
   if (movedCount === 0) throw new InventoryMoveError('No items were moved', 400);
+
+  if (confirmation && prepared.warningItems.length > 0) {
+    logger.info('Inventory check warning override completed', {
+      actor: input.movedBy,
+      surface: 'inventory',
+      warning_item_ids: prepared.warningItems.map((item) => item.id),
+      destination_location_id: prepared.destinationLocationId,
+      movement_batch_id: movementBatchId,
+    });
+  }
 
   return {
     moved_count: movedCount,

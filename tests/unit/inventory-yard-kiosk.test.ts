@@ -36,6 +36,24 @@ describe('Inventory Yard kiosk validation', () => {
     expect(payload).not.toHaveProperty('actor');
   });
 
+  it('accepts a bound inventory check warning confirmation', () => {
+    const payload = validateYardKioskSubmitPayload({
+      direction: 'take',
+      counterpart_location_id: counterpartId,
+      serialized_item_ids: [serializedId],
+      hardware_lines: [],
+      check_warning_confirmation: {
+        warning_item_ids: [serializedId],
+        move_item_ids: [serializedId],
+      },
+    });
+
+    expect(payload.check_warning_confirmation).toEqual({
+      warning_item_ids: [serializedId],
+      move_item_ids: [serializedId],
+    });
+  });
+
   it.each([
     {
       name: 'an empty basket',
@@ -71,12 +89,22 @@ describe('Inventory Yard kiosk validation', () => {
 
 describe('Inventory Yard kiosk migration contract', () => {
   const migration = readFileSync(
-    resolve(process.cwd(), 'supabase/migrations/20260714_inventory_yard_kiosk.sql'),
+    resolve(
+      process.cwd(),
+      'supabase/migrations/20260811150436_inventory_check_warning_override.sql',
+    ),
+    'utf8',
+  );
+  const runner = readFileSync(
+    resolve(
+      process.cwd(),
+      'scripts/run-inventory-check-warning-override-migration.ts',
+    ),
     'utf8',
   );
 
   it('keeps mixed transfers inside one database transaction and derives locations', () => {
-    expect(migration).toMatch(/^BEGIN;/);
+    expect(migration).toContain('BEGIN;');
     expect(migration).toMatch(/COMMIT;\s*$/);
     expect(migration).toContain("IF p_direction = 'take' THEN");
     expect(migration).toContain('v_source_location_id := v_yard_location_id');
@@ -85,12 +113,21 @@ describe('Inventory Yard kiosk migration contract', () => {
     expect(migration).toContain('inventory_transfer_hardware_stock(');
   });
 
-  it('fails closed for actor, Yard checks, stale stock, and direct RPC access', () => {
+  it('keeps integrity checks and direct RPC restrictions but removes the check hard stop', () => {
     expect(migration).toContain('kiosk_user_id = p_actor');
     expect(migration).toContain("location_type = 'yard'");
-    expect(migration).toContain('Inventory check required before leaving Yard');
+    expect(migration).not.toContain('Inventory check required before leaving Yard');
+    expect(migration).not.toContain('v_blocked_count');
+    expect(migration).toContain('FOR UPDATE');
     expect(migration).toContain('Hardware quantities are unavailable at the source location');
     expect(migration).toMatch(/REVOKE ALL ON FUNCTION[\s\S]+FROM PUBLIC, anon, authenticated/);
     expect(migration).toMatch(/GRANT EXECUTE ON FUNCTION[\s\S]+TO service_role/);
+  });
+
+  it('INV-ROLLBACK-10 proves the guarded snapshot in a rollback-only transaction', () => {
+    expect(runner).toContain("await client.query('BEGIN')");
+    expect(runner).toContain('await client.query(rollbackDefinition)');
+    expect(runner).toContain("await client.query('ROLLBACK')");
+    expect(runner).toContain('Rollback restoration verified in a rollback-only transaction.');
   });
 });

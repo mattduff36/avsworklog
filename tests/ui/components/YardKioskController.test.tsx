@@ -20,7 +20,6 @@ const snapshot = {
     loadingStock: false,
     error: null,
     userError: null,
-    blockedItems: [],
     receipt: null,
   },
   bootstrap: {

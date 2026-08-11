@@ -3,6 +3,10 @@ import type {
   InventoryLocation,
   InventoryLocationType,
 } from '@/app/(dashboard)/inventory/types';
+import type {
+  InventoryMoveCheckConfirmation,
+  InventoryMoveCheckWarningItem,
+} from './move-check-warning';
 
 export type YardKioskDirection = 'take' | 'return';
 
@@ -36,7 +40,7 @@ export interface YardKioskSerializedStockItem {
   name: string;
   category: string;
   check_status: InventoryCheckStatus;
-  is_check_blocked: boolean;
+  check_warning_required: boolean;
 }
 
 export interface YardKioskHardwareStockItem {
@@ -51,12 +55,7 @@ export type YardKioskStockItem =
   | YardKioskSerializedStockItem
   | YardKioskHardwareStockItem;
 
-export interface YardKioskBlockedItem {
-  id: string;
-  item_number: string;
-  name: string;
-  check_status: InventoryCheckStatus;
-}
+export type YardKioskCheckWarningItem = InventoryMoveCheckWarningItem;
 
 export interface YardKioskBootstrapResponse {
   configured: true;
@@ -71,6 +70,8 @@ export interface YardKioskSerializedBasketLine {
   item_number: string;
   name: string;
   category: string;
+  check_status: InventoryCheckStatus;
+  check_warning_required: boolean;
 }
 
 export interface YardKioskHardwareBasketLine {
@@ -94,6 +95,7 @@ export interface YardKioskSubmitPayload {
     quantity: number;
   }>;
   note?: string;
+  check_warning_confirmation?: InventoryMoveCheckConfirmation;
 }
 
 export interface YardKioskReceipt {

@@ -14,6 +14,7 @@ interface MoveInventoryItemsBody {
   note?: string;
   scope?: InventoryMoveScope;
   group_id?: string | null;
+  check_warning_confirmation?: unknown;
 }
 
 export async function POST(request: NextRequest) {
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
       scope: body.scope,
       groupId: body.group_id,
       movedBy: access.userId,
+      checkWarningConfirmation: body.check_warning_confirmation,
     });
 
     return NextResponse.json(result);

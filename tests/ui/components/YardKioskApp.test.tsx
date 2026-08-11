@@ -4,6 +4,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { YardKioskBootstrapResponse } from '@/lib/inventory/kiosk-types';
+import type { YardKioskControlAction } from '@/lib/inventory/kiosk-remote-types';
 import { YARD_KIOSK_ADMIN_HOLD_DURATION_MS } from '@/app/yard-kiosk/components/YardKioskAdminMenu';
 import {
   YARD_KIOSK_INACTIVITY_RESET_MS,
@@ -58,6 +59,78 @@ const bootstrap: YardKioskBootstrapResponse = {
   locations: [],
   categories: [],
 };
+
+const warningItemId = '33333333-3333-4333-8333-333333333333';
+const warningSite = {
+  id: '22222222-2222-4222-8222-222222222222',
+  name: 'Site One',
+  description: null,
+  location_type: 'site' as const,
+  source_type: 'manual' as const,
+  external_reference: null,
+  linked_asset_label: null,
+  linked_asset_nickname: null,
+  primary_user_names: [],
+  secondary_user_names: [],
+};
+const warningBootstrap: YardKioskBootstrapResponse = {
+  ...bootstrap,
+  locations: [warningSite],
+};
+
+function warningStockResponse() {
+  return {
+    ok: true,
+    status: 200,
+    json: async () => ({
+      items: [{
+        kind: 'serialized',
+        id: warningItemId,
+        item_number: 'TOOL-001',
+        name: 'Breaker',
+        category: 'tools',
+        check_status: 'overdue',
+        check_warning_required: true,
+      }],
+    }),
+  };
+}
+
+function warningRequiredResponse() {
+  return {
+    ok: false,
+    status: 409,
+    json: async () => ({
+      code: 'INVENTORY_CHECK_WARNING_REQUIRED',
+      error: 'Confirm warning',
+      warning_items: [{
+        id: warningItemId,
+        item_number: 'TOOL-001',
+        name: 'Breaker',
+        check_status: 'overdue',
+      }],
+      move_item_ids: [warningItemId],
+    }),
+  };
+}
+
+async function addWarningItemToBasket() {
+  fireEvent.click(screen.getByRole('button', { name: /^Collect/ }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /^Site One/ }));
+  });
+  fireEvent.click(screen.getByRole('button', { name: /^Breaker/ }));
+}
+
+function latestRemoteControlHandler(): (action: YardKioskControlAction) => void {
+  const latestCall = useRemoteControlMock.mock.calls[
+    useRemoteControlMock.mock.calls.length - 1
+  ]?.[0] as { onControlAction?: (action: YardKioskControlAction) => void } | undefined;
+  if (!latestCall?.onControlAction) {
+    throw new Error('Remote control handler was not registered');
+  }
+  return latestCall.onControlAction;
+}
 
 describe('YardKioskApp', () => {
   beforeEach(() => {
@@ -213,7 +286,7 @@ describe('YardKioskApp', () => {
           name: 'Breaker',
           category: 'tools',
           check_status: 'ok',
-          is_check_blocked: false,
+          check_warning_required: false,
         }],
       }),
     }));
@@ -242,8 +315,7 @@ describe('YardKioskApp', () => {
       fireEvent.click(screen.getByRole('button', { name: /^Site One/ }));
     });
     fireEvent.click(screen.getByRole('button', { name: /^Breaker/ }));
-    expect(screen.getByRole('list', { name: 'Transfer basket' }))
-      .toHaveTextContent('Breaker');
+    expect(screen.getByTestId('yard-kiosk-basket-pane')).toHaveTextContent('Breaker');
 
     act(() => {
       vi.advanceTimersByTime(YARD_KIOSK_INACTIVITY_WARNING_MS);
@@ -265,6 +337,215 @@ describe('YardKioskApp', () => {
     expect(screen.getByRole('button', { name: /^Site One/ })).toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Transfer basket' }))
       .not.toBeInTheDocument();
+  });
+
+  it('INV-KIOSK-07 confirms warning items once at final transfer', async () => {
+    const itemId = '33333333-3333-4333-8333-333333333333';
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/api/inventory/kiosk/stock')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            items: [{
+              kind: 'serialized',
+              id: itemId,
+              item_number: 'TOOL-001',
+              name: 'Breaker',
+              category: 'tools',
+              check_status: 'overdue',
+              check_warning_required: true,
+            }],
+          }),
+        };
+      }
+
+      const body = JSON.parse(String(init?.body || '{}')) as {
+        check_warning_confirmation?: {
+          warning_item_ids: string[];
+          move_item_ids: string[];
+        };
+      };
+      if (!body.check_warning_confirmation) {
+        return {
+          ok: false,
+          status: 409,
+          json: async () => ({
+            code: 'INVENTORY_CHECK_WARNING_REQUIRED',
+            error: 'Confirm warning',
+            warning_items: [{
+              id: itemId,
+              item_number: 'TOOL-001',
+              name: 'Breaker',
+              check_status: 'overdue',
+            }],
+            move_item_ids: [itemId],
+          }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          kiosk_batch_id: '44444444-4444-4444-8444-444444444444',
+          movement_batch_id: '55555555-5555-4555-8555-555555555555',
+          hardware_batch_id: null,
+          serialized_count: 1,
+          hardware_line_count: 0,
+        }),
+      };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <YardKioskApp
+        bootstrap={{
+          ...bootstrap,
+          locations: [{
+            id: '22222222-2222-4222-8222-222222222222',
+            name: 'Site One',
+            description: null,
+            location_type: 'site',
+            source_type: 'manual',
+            external_reference: null,
+            linked_asset_label: null,
+            linked_asset_nickname: null,
+            primary_user_names: [],
+            secondary_user_names: [],
+          }],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Collect/ }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^Site One/ }));
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^Breaker/ }));
+    expect(screen.getByRole('list', { name: 'Transfer basket' }))
+      .toHaveTextContent('Check required');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm transfer' }));
+    });
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      'Are you sure you want to move it anyway?',
+    );
+    expect(screen.getByTestId('yard-kiosk-basket-pane')).toHaveTextContent('Breaker');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Move anyway' }));
+    });
+    expect(screen.getByText('Transfer complete')).toBeInTheDocument();
+
+    const submitCalls = fetchMock.mock.calls.filter(([input]) => (
+      String(input).includes('/api/inventory/kiosk/submit')
+    ));
+    const confirmedBody = JSON.parse(
+      String((submitCalls[1]?.[1] as RequestInit | undefined)?.body || '{}'),
+    );
+    expect(confirmedBody.check_warning_confirmation).toEqual({
+      warning_item_ids: [itemId],
+      move_item_ids: [itemId],
+    });
+  });
+
+  it('INV-KIOSK-07 blocks double submit and basket mutations until a warning response settles', async () => {
+    let resolveSubmit: ((response: ReturnType<typeof warningRequiredResponse>) => void) | null = null;
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (String(input).includes('/api/inventory/kiosk/stock')) {
+        return Promise.resolve(warningStockResponse());
+      }
+      return new Promise<ReturnType<typeof warningRequiredResponse>>((resolve) => {
+        resolveSubmit = resolve;
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    render(<YardKioskApp bootstrap={warningBootstrap} />);
+    await addWarningItemToBasket();
+
+    const confirm = screen.getByRole('button', { name: 'Confirm transfer' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    const submitCalls = fetchMock.mock.calls.filter(([input]) => (
+      String(input).includes('/api/inventory/kiosk/submit')
+    ));
+    expect(submitCalls).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Remove Breaker' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Clear basket' })).toBeDisabled();
+
+    act(() => {
+      latestRemoteControlHandler()({ type: 'clear_basket' });
+    });
+    expect(screen.getByTestId('yard-kiosk-basket-pane')).toHaveTextContent('Breaker');
+
+    await act(async () => {
+      resolveSubmit?.(warningRequiredResponse());
+      await Promise.resolve();
+    });
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(
+      'Are you sure you want to move it anyway?',
+    );
+    expect(screen.getByTestId('yard-kiosk-basket-pane')).toHaveTextContent('Breaker');
+  });
+
+  it('INV-KIOSK-07 ignores a late warning response after remote reset', async () => {
+    let resolveSubmit: ((response: ReturnType<typeof warningRequiredResponse>) => void) | null = null;
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      if (String(input).includes('/api/inventory/kiosk/stock')) {
+        return Promise.resolve(warningStockResponse());
+      }
+      return new Promise<ReturnType<typeof warningRequiredResponse>>((resolve) => {
+        resolveSubmit = resolve;
+      });
+    }));
+    render(<YardKioskApp bootstrap={warningBootstrap} />);
+    await addWarningItemToBasket();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm transfer' }));
+
+    act(() => {
+      latestRemoteControlHandler()({ type: 'reset' });
+    });
+    await act(async () => {
+      resolveSubmit?.(warningRequiredResponse());
+      await Promise.resolve();
+    });
+
+    expect(screen.getByRole('button', { name: /^Collect/ })).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.queryByText('Breaker')).not.toBeInTheDocument();
+  });
+
+  it('INV-KIOSK-07 never exposes a late warning dialog after remote control activates', async () => {
+    let resolveSubmit: ((response: ReturnType<typeof warningRequiredResponse>) => void) | null = null;
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      if (String(input).includes('/api/inventory/kiosk/stock')) {
+        return Promise.resolve(warningStockResponse());
+      }
+      return new Promise<ReturnType<typeof warningRequiredResponse>>((resolve) => {
+        resolveSubmit = resolve;
+      });
+    }));
+    const view = render(<YardKioskApp bootstrap={warningBootstrap} />);
+    await addWarningItemToBasket();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm transfer' }));
+
+    useRemoteControlMock.mockReturnValue({ isRemotelyControlled: true });
+    view.rerender(<YardKioskApp bootstrap={warningBootstrap} />);
+    await act(async () => {
+      resolveSubmit?.(warningRequiredResponse());
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('yard-kiosk-remote-lock')).toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(screen.getByTestId('yard-kiosk-basket-pane')).toHaveTextContent('Breaker');
+
+    useRemoteControlMock.mockReturnValue({ isRemotelyControlled: false });
+    view.rerender(<YardKioskApp bootstrap={warningBootstrap} />);
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
   });
 
   it('does not reveal admin controls for a short or cancelled hold', () => {

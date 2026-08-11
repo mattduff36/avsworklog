@@ -26,7 +26,6 @@ export type YardKioskErrorCode =
   | 'SERVICE_UNAVAILABLE'
   | 'STOCK_LOAD_FAILED'
   | 'STOCK_STALE'
-  | 'INVENTORY_CHECK_REQUIRED'
   | 'SUBMIT_FAILED'
   | 'SUBMIT_UNCERTAIN'
   | 'MALFORMED_RESPONSE'
@@ -263,15 +262,6 @@ const CATALOGUE: Record<YardKioskErrorCode, Omit<YardKioskErrorDefinition, 'code
     preservesBasket: true,
     retryable: true,
   },
-  INVENTORY_CHECK_REQUIRED: {
-    severity: 'warning',
-    title: 'Inventory check needed',
-    whatHappened: 'One or more items need an inventory check before they can leave Yard.',
-    whatToDoNext: 'Remove the blocked items or ask a manager to complete the inventory check, then try again.',
-    actions: ['dismiss'],
-    preservesBasket: true,
-    retryable: false,
-  },
   SUBMIT_FAILED: {
     severity: 'error',
     title: 'Transfer not completed',
@@ -394,7 +384,6 @@ export function mapHttpStatusToYardKioskErrorCode(
   status: number,
   apiCode?: string | null,
 ): YardKioskErrorCode {
-  if (apiCode === 'INVENTORY_CHECK_REQUIRED') return 'INVENTORY_CHECK_REQUIRED';
   if (apiCode === 'STOCK_STALE' || status === 409) return 'STOCK_STALE';
   if (status === 401) return 'SESSION_EXPIRED';
   if (status === 403) return 'WRONG_PROFILE';

@@ -35,7 +35,7 @@ describe('inventory server category propagation for check intervals', () => {
       ".select('id, item_number, name, category, last_checked_at, check_interval_days')",
     );
     expect(kioskSource).toMatch(
-      /getBlockedItems[\s\S]*\.select\('id, item_number, name, category, last_checked_at, check_interval_days'\)/,
+      /getCheckWarningItems[\s\S]*\.select\('id, item_number, name, category, last_checked_at, check_interval_days'\)/,
     );
   });
 

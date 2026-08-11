@@ -62,7 +62,6 @@ export function resolveRecoveryError(
     'SERVICE_UNAVAILABLE',
     'STOCK_LOAD_FAILED',
     'STOCK_STALE',
-    'INVENTORY_CHECK_REQUIRED',
     'SUBMIT_FAILED',
     'SUBMIT_UNCERTAIN',
     'MALFORMED_RESPONSE',

@@ -17,8 +17,8 @@ import {
   getInventoryLocationTypePresentation,
   hasInventoryCheckLapsed,
   isInventoryUnknownLocation,
-  isInventoryMoveCheckBlocked,
-  isInventoryYardExitBlocked,
+  requiresInventoryMoveCheckWarning,
+  requiresInventoryYardExitCheckWarning,
   isWorkshopInventoryTeam,
   MINOR_PLANT_CHECK_INTERVAL_DAYS,
   MINOR_PLANT_CHECK_INTERVAL_MONTHS,
@@ -85,14 +85,14 @@ describe('inventory utils', () => {
 
     expect(getInventoryCheckStatus({
       category: 'van_stock',
-      location: { name: 'Yard' },
+      location: { name: 'Yard', location_type: 'yard' },
       last_checked_at: '2026-01-01',
       check_interval_days: 30,
     })).toBe('overdue');
 
     expect(getInventoryCheckStatus({
       category: 'tools',
-      location: { name: 'Unknown' },
+      location: { name: 'Unknown', location_type: 'unknown' },
       last_checked_at: null,
       check_interval_days: null,
     })).toBe('not_required');
@@ -148,13 +148,13 @@ describe('inventory utils', () => {
     vi.setSystemTime(new Date('2026-06-19T12:00:00Z'));
 
     expect(formatInventoryUnknownLocationAge({
-      location: { name: 'Unknown' },
+      location: { name: 'Unknown' } as InventoryLocation,
       unknown_location_entered_at: '2026-06-17T08:00:00Z',
       created_at: '2026-06-01T08:00:00Z',
     })).toBe('In Unknown for 2 days');
 
     expect(formatInventoryUnknownLocationAge({
-      location: { name: 'Unknown' },
+      location: { name: 'Unknown' } as InventoryLocation,
       unknown_location_entered_at: null,
       created_at: '2026-06-18T08:00:00Z',
     })).toBe('In Unknown for 1 day');
@@ -173,32 +173,32 @@ describe('inventory utils', () => {
     vi.useRealTimers();
   });
 
-  it('blocks Yard exits only when the normal check has lapsed', () => {
+  it('warns on Yard exits only when the normal check has lapsed', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-19T12:00:00Z'));
 
-    const yardLocation = { name: 'Yard' };
-    const vanLocation = { name: 'Van 1' };
+    const yardLocation = { name: 'Yard', location_type: 'yard' as const };
+    const vanLocation = { name: 'Van 1', location_type: 'van' as const };
 
-    expect(isInventoryYardExitBlocked({
+    expect(requiresInventoryYardExitCheckWarning({
       location: yardLocation,
       last_checked_at: '2026-04-01',
       check_interval_days: 30,
     }, vanLocation)).toBe(true);
 
-    expect(isInventoryYardExitBlocked({
+    expect(requiresInventoryYardExitCheckWarning({
       location: yardLocation,
       last_checked_at: null,
       check_interval_days: 30,
     }, vanLocation)).toBe(true);
 
-    expect(isInventoryYardExitBlocked({
+    expect(requiresInventoryYardExitCheckWarning({
       location: yardLocation,
       last_checked_at: '2026-04-25',
       check_interval_days: 30,
     }, vanLocation)).toBe(false);
 
-    expect(isInventoryYardExitBlocked({
+    expect(requiresInventoryYardExitCheckWarning({
       location: yardLocation,
       last_checked_at: null,
       check_interval_days: 30,
@@ -207,27 +207,27 @@ describe('inventory utils', () => {
     vi.useRealTimers();
   });
 
-  it('blocks overdue non-Yard moves unless the destination is Yard', () => {
+  it('warns on overdue non-Yard moves unless the destination is Yard', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-05-19T12:00:00Z'));
 
-    const storesLocation = { name: 'Stores' };
-    const vanLocation = { name: 'Van 1' };
-    const yardLocation = { name: 'Yard' };
+    const storesLocation = { name: 'Stores', location_type: 'manual' as const };
+    const vanLocation = { name: 'Van 1', location_type: 'van' as const };
+    const yardLocation = { name: 'Yard', location_type: 'yard' as const };
 
-    expect(isInventoryMoveCheckBlocked({
+    expect(requiresInventoryMoveCheckWarning({
       location: storesLocation,
       last_checked_at: '2026-04-01',
       check_interval_days: 30,
     }, vanLocation)).toBe(true);
 
-    expect(isInventoryMoveCheckBlocked({
+    expect(requiresInventoryMoveCheckWarning({
       location: storesLocation,
       last_checked_at: '2026-04-01',
       check_interval_days: 30,
     }, yardLocation)).toBe(false);
 
-    expect(isInventoryMoveCheckBlocked({
+    expect(requiresInventoryMoveCheckWarning({
       location: storesLocation,
       last_checked_at: null,
       check_interval_days: 30,

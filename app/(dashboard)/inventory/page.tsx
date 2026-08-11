@@ -626,6 +626,7 @@ export default function InventoryPage() {
         note: payload.note,
         scope: payload.scope || (itemsToMove.length > 1 ? 'bulk' : 'single'),
         group_id: payload.group_id || null,
+        check_warning_confirmation: payload.check_warning_confirmation,
       }),
     });
     const result = await parseJsonResponse(response, 'Failed to move inventory items');
@@ -1020,9 +1021,6 @@ export default function InventoryPage() {
           locations={knownLocations}
           onClose={() => setMovingItems([])}
           onSubmit={handleMoveItems}
-          onCheckRecorded={async () => {
-            await fetchInventoryData();
-          }}
         />
 
         <ChangeInventoryLocationDialog
@@ -1425,9 +1423,6 @@ export default function InventoryPage() {
         locations={knownLocations}
         onClose={() => setMovingItems([])}
         onSubmit={handleMoveItems}
-        onCheckRecorded={async () => {
-          await fetchInventoryData();
-        }}
       />
 
       <InventoryConfirmActionDialog
