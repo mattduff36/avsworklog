@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.21.0
+
+**GIT COMMIT MESSAGE**
+`feat(layout): update Navigation, Dashboard, Inventory, and Profile`
+
+**PUSHED AT**
+2026-08-11T20:48:16.878Z
+
+**WHAT CHANGED**
+Update Navigation, Dashboard, Inventory, and Profile.
+
+**VERSION HISTORY DETAILS**
+- Updated Navigation, Dashboard, Inventory, and Profile, with changes to interface components.
+- Updated dashboard, with changes to app screens.
+- Updated inventory, with changes to automated tests.
+- Updated profile, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(layout): update Navigation, Dashboard, Inventory, and Profile`
+
 ## 0826.20.0
 
 **GIT COMMIT MESSAGE**
