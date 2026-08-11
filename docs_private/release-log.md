@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.18.1
+
+**GIT COMMIT MESSAGE**
+`fix(maintenance): show HGV service overdue alerts`
+
+**PUSHED AT**
+2026-08-11T10:30:54.317Z
+
+**WHAT CHANGED**
+Show HGV service overdue alerts.
+
+**VERSION HISTORY DETAILS**
+- Show HGV service overdue alerts, with changes to background routes, app screens, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(maintenance): show HGV service overdue alerts`
+
 ## 0826.18.0
 
 **GIT COMMIT MESSAGE**
