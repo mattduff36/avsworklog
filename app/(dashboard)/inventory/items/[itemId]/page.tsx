@@ -473,7 +473,7 @@ export default function InventoryItemDetailPage() {
         {!isRetired && renderCheckDueDetails(item) ? (
           <p className="mt-1 text-xs text-muted-foreground">{renderCheckDueDetails(item)}</p>
         ) : null}
-        <InventoryMoveButton onMove={() => setMoveDialogOpen(true)} className="mt-3 h-10 w-full justify-center" />
+        <InventoryMoveButton onMove={() => setMoveDialogOpen(true)} className="mt-3 h-11 w-full justify-center" />
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

@@ -265,10 +265,9 @@ export function InventoryMobileStatusChip({ id, label, value, icon, tone, isActi
 export interface InventoryMobileNavItem<TValue extends string = string> {
   value: TValue;
   label: string;
+  shortLabel?: string;
   icon: ComponentType<{ className?: string }>;
   count?: number;
-  /** Optional per-tile icon tint (used by Settings-style navs); defaults to uniform slate. Overridden by the yellow active-state tint. */
-  iconClassName?: string;
 }
 
 interface InventoryMobileNavProps<TValue extends string> {
@@ -287,6 +286,8 @@ export function InventoryMobilePrimaryNav<TValue extends string>({
   'aria-label': ariaLabel,
   className,
 }: InventoryMobileNavProps<TValue>) {
+  const useCompactFourItemLayout = items.length > 3;
+
   return (
     <div
       role="group"
@@ -302,16 +303,20 @@ export function InventoryMobilePrimaryNav<TValue extends string>({
             key={item.value}
             type="button"
             aria-pressed={isActive}
+            aria-label={item.label}
             onClick={() => onValueChange(item.value)}
             className={cn(
-              'relative flex min-h-10 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-[13px] font-semibold transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory',
+              'relative flex min-h-10 items-center justify-center rounded-md py-2 font-semibold transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory',
+              useCompactFourItemLayout
+                ? 'flex-col gap-1 px-1 text-[11px]'
+                : 'gap-1.5 px-2 text-[13px]',
               index > 0 && 'ml-0.5',
               isActive ? 'text-white' : 'text-muted-foreground hover:bg-slate-800/50 hover:text-slate-200',
             )}
           >
             <Icon className={cn('h-4 w-4', isActive && 'text-avs-yellow')} />
             <span className="flex items-center gap-1 whitespace-nowrap">
-              {item.label}
+              {useCompactFourItemLayout ? item.shortLabel || item.label : item.label}
               {typeof item.count === 'number' ? (
                 <span className="rounded-full bg-slate-700 px-1.5 py-0.5 text-[9px] font-bold leading-none text-slate-200">
                   {item.count}
@@ -375,7 +380,7 @@ export function InventoryMobileSecondaryNav<TValue extends string>({
             <Icon
               className={cn(
                 'h-4 w-4 shrink-0',
-                isActive ? 'text-avs-yellow' : item.iconClassName || 'text-slate-500',
+                isActive ? 'text-avs-yellow' : 'text-slate-500',
               )}
             />
             <span className="min-w-0 flex-1 truncate">{item.label}</span>

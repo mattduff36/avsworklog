@@ -158,6 +158,27 @@ describe('InventoryPageChrome', () => {
     expect(onValueChange).toHaveBeenCalledWith('settings');
   });
 
+  it('uses compact short labels without changing accessible names for four-item mobile navs', () => {
+    render(
+      <InventoryMobilePrimaryNav
+        items={[
+          { value: 'overview', label: 'Overview', icon: PackageSearch },
+          { value: 'items', label: 'Inventory Items', shortLabel: 'Items', icon: PackageSearch },
+          { value: 'hardware', label: 'Hardware', icon: PackageSearch },
+          { value: 'claim', label: 'Claim Item', shortLabel: 'Claim', icon: PackageSearch },
+        ]}
+        value="overview"
+        onValueChange={vi.fn()}
+        aria-label="My Inventory sections"
+      />,
+    );
+
+    const itemsButton = screen.getByRole('button', { name: 'Inventory Items' });
+    expect(itemsButton).toHaveTextContent('Items');
+    expect(itemsButton).toHaveClass('flex-col', 'text-[11px]');
+    expect(screen.getByRole('button', { name: 'Claim Item' })).toHaveTextContent('Claim');
+  });
+
   it('secondary nav renders distinct tiles with active state and optional counts', () => {
     const onValueChange = vi.fn();
     render(

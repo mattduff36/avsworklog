@@ -105,9 +105,9 @@ const INVENTORY_LOCATIONS_SECONDARY_NAV_ITEMS = [
 
 const INVENTORY_SETTINGS_SECONDARY_NAV_ITEMS = [
   { value: 'categories' as const, label: 'Categories', icon: PackageSearch },
-  { value: 'groups' as const, label: 'Groups', icon: PackageSearch, iconClassName: 'text-blue-300' },
-  { value: 'hardware' as const, label: 'Hardware Catalogue', icon: Boxes, iconClassName: 'text-teal-300' },
-  { value: 'kiosk' as const, label: 'Yard Kiosk', icon: ShieldCheck, iconClassName: 'text-amber-300' },
+  { value: 'groups' as const, label: 'Groups', icon: PackageSearch },
+  { value: 'hardware' as const, label: 'Hardware Catalogue', icon: Boxes },
+  { value: 'kiosk' as const, label: 'Yard Kiosk', icon: ShieldCheck },
 ];
 
 interface ConfirmActionState {

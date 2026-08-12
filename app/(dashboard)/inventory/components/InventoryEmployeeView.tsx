@@ -57,12 +57,13 @@ export type InventoryEmployeeTab = 'overview' | 'items' | 'hardware' | 'claim';
 const EMPLOYEE_NAV_ITEMS: Array<{
   value: InventoryEmployeeTab;
   label: string;
+  shortLabel?: string;
   icon: typeof LayoutDashboard;
 }> = [
   { value: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { value: 'items', label: 'Inventory Items', icon: PackageSearch },
+  { value: 'items', label: 'Inventory Items', shortLabel: 'Items', icon: PackageSearch },
   { value: 'hardware', label: 'Hardware', icon: Boxes },
-  { value: 'claim', label: 'Claim Item', icon: Hand },
+  { value: 'claim', label: 'Claim Item', shortLabel: 'Claim', icon: Hand },
 ];
 
 interface InventoryEmployeeViewProps {
