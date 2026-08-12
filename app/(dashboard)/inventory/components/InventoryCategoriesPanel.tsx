@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Boxes, Pencil, Plus, Tags, Trash2 } from 'lucide-react';
+import { Plus, Tags } from 'lucide-react';
 import type { InventoryItemCategory, InventoryItemCategoryFormData } from '../types';
+import { InventorySettingsListRow } from './InventorySettingsListRow';
 
 interface InventoryCategoriesPanelProps {
   categories: InventoryItemCategory[];
@@ -97,34 +97,16 @@ export function InventoryCategoriesPanel({
             <p className="py-8 text-center text-sm text-muted-foreground">No inventory categories have been created yet.</p>
           ) : (
             sortedCategories.map((category) => (
-              <div key={category.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="break-words font-semibold text-white">{category.name}</div>
-                    <Badge variant="outline" className="mt-3 border-slate-600 text-slate-200">
-                      <Boxes className="mr-1 h-3 w-3" />
-                      {category.item_count || 0} item{category.item_count === 1 ? '' : 's'}
-                    </Badge>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setEditingCategory(category)} className="min-h-11 border-slate-600">
-                      <Pencil className="mr-2 h-3 w-3" />
-                      Edit
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => onRemove(category)}
-                      disabled={(category.item_count || 0) > 0}
-                      title={(category.item_count || 0) > 0 ? 'Move items to another category before deleting' : 'Delete category'}
-                      aria-label={`Delete ${category.name}`}
-                      className="h-11 w-11 border-red-500/30 text-red-300 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              <InventorySettingsListRow
+                key={category.id}
+                title={category.name}
+                meta={`${category.item_count || 0} item${category.item_count === 1 ? '' : 's'} · Inventory category`}
+                onEdit={() => setEditingCategory(category)}
+                onRemove={() => onRemove(category)}
+                removeDisabled={(category.item_count || 0) > 0}
+                removeDisabledReason="Move items to another category before deleting"
+                removeLabel="Delete category"
+              />
             ))
           )}
         </CardContent>

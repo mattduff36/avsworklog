@@ -31,6 +31,8 @@ interface MultiSelectFilterProps<TValue extends string> {
   collapsibleGroupLabels?: readonly string[];
   minimumSearchCharactersByGroupLabel?: Readonly<Record<string, number>>;
   onOpenChange?: (open: boolean) => void;
+  /** Override the generated panel id; use when the same filter is intentionally rendered twice (e.g. desktop + mobile) to avoid duplicate DOM ids. */
+  panelId?: string;
 }
 
 type MultiSelectFilterRenderEntry<TValue extends string> =
@@ -77,12 +79,13 @@ export function MultiSelectFilter<TValue extends string>({
   collapsibleGroupLabels = [],
   minimumSearchCharactersByGroupLabel = {},
   onOpenChange,
+  panelId: panelIdOverride,
 }: MultiSelectFilterProps<TValue>) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set(collapsibleGroupLabels));
   const containerRef = useRef<HTMLDivElement>(null);
-  const panelId = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-filter-menu`;
+  const panelId = panelIdOverride || `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-filter-menu`;
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredOptions = searchable && normalizedSearchQuery
     ? options.filter((option) => (option.searchLabel || `${option.label} ${option.description || ''} ${option.groupLabel || ''}`).toLowerCase().includes(normalizedSearchQuery))

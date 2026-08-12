@@ -37,6 +37,11 @@ import { InventoryLocationsPanel } from './components/InventoryLocationsPanel';
 import {
   InventoryLocationAction,
   InventoryLocationLabel,
+  InventoryMobileHeader,
+  InventoryMobilePrimaryNav,
+  InventoryMobileSecondaryNav,
+  InventoryMobileStatusOverview,
+  InventoryMobileStickyNav,
   InventoryRoleViewToggle,
   InventorySummaryCards,
   INVENTORY_HEADER_CTA_CLASSNAME,
@@ -80,6 +85,58 @@ import type {
   InventoryRetireReason,
   InventoryCheckStatus,
 } from './types';
+
+const INVENTORY_PRIMARY_NAV_ITEMS = [
+  { value: 'overview' as const, label: 'Overview', icon: PackageSearch },
+  { value: 'locations' as const, label: 'Locations', icon: MapPin },
+  { value: 'settings' as const, label: 'Settings', icon: Settings },
+];
+
+const INVENTORY_OVERVIEW_SECONDARY_NAV_ITEMS = [
+  { value: 'small_tools' as const, label: 'Small Tools', icon: PackageSearch },
+  { value: 'minor_plant' as const, label: 'Minor Plant', icon: Truck },
+  { value: 'hardware' as const, label: 'Hardware', icon: Boxes },
+  { value: 'retired' as const, label: 'Retired', icon: Archive },
+];
+
+const INVENTORY_LOCATIONS_SECONDARY_NAV_ITEMS = [
+  { value: 'directory' as const, label: 'All Locations', icon: MapPin },
+  { value: 'site_assignments' as const, label: 'Assignments', icon: Users },
+];
+
+const INVENTORY_SETTINGS_SECONDARY_NAV_ITEMS = [
+  {
+    value: 'categories' as const,
+    label: 'Categories',
+    icon: PackageSearch,
+    tileClassName: 'bg-slate-800/50 hover:bg-slate-800/80',
+    activeClassName: 'border-slate-600 bg-slate-700/70 text-white',
+  },
+  {
+    value: 'groups' as const,
+    label: 'Groups',
+    icon: PackageSearch,
+    tileClassName: 'bg-blue-500/[0.05] hover:bg-blue-500/[0.1]',
+    activeClassName: 'border-blue-500/30 bg-blue-500/15 text-white',
+    iconClassName: 'text-blue-300',
+  },
+  {
+    value: 'hardware' as const,
+    label: 'Hardware Catalogue',
+    icon: Boxes,
+    tileClassName: 'bg-teal-500/[0.05] hover:bg-teal-500/[0.1]',
+    activeClassName: 'border-teal-500/30 bg-teal-500/15 text-white',
+    iconClassName: 'text-teal-300',
+  },
+  {
+    value: 'kiosk' as const,
+    label: 'Yard Kiosk',
+    icon: ShieldCheck,
+    tileClassName: 'bg-amber-500/[0.05] hover:bg-amber-500/[0.1]',
+    activeClassName: 'border-amber-500/30 bg-amber-500/15 text-white',
+    iconClassName: 'text-amber-300',
+  },
+];
 
 interface ConfirmActionState {
   title: string;
@@ -491,6 +548,45 @@ export default function InventoryPage() {
     }
 
     applyInventorySummaryFilter({ locationFilters: [unknownLocation.id] });
+  }
+
+  function changePageTab(value: string) {
+    if (value === 'settings') {
+      setPageTab('settings');
+      router.push(`/inventory?tab=settings&settings=${settingsTab}`, { scroll: false });
+      return;
+    }
+    if (value === 'locations') {
+      setPageTab('locations');
+      router.push(
+        `/inventory?tab=locations&locations=${locationsTab === 'site_assignments' ? 'site-assignments' : 'directory'}`,
+        { scroll: false },
+      );
+      return;
+    }
+    setPageTab('overview');
+    router.push(getInventoryOverviewHref(overviewTab), { scroll: false });
+  }
+
+  function changeOverviewTab(value: string) {
+    const nextOverviewTab = value as InventoryOverviewTab;
+    setOverviewTab(nextOverviewTab);
+    router.push(getInventoryOverviewHref(nextOverviewTab), { scroll: false });
+  }
+
+  function changeSettingsTab(value: string) {
+    const nextSettingsTab = value as 'categories' | 'groups' | 'hardware' | 'kiosk';
+    setSettingsTab(nextSettingsTab);
+    router.push(`/inventory?tab=settings&settings=${nextSettingsTab}`, { scroll: false });
+  }
+
+  function changeLocationsTab(value: string) {
+    const nextLocationsTab = value as InventoryLocationsTab;
+    setLocationsTab(nextLocationsTab);
+    router.push(
+      `/inventory?tab=locations&locations=${nextLocationsTab === 'site_assignments' ? 'site-assignments' : 'directory'}`,
+      { scroll: false },
+    );
   }
 
   async function parseJsonResponse(response: Response, fallbackMessage: string) {
@@ -1036,36 +1132,94 @@ export default function InventoryPage() {
     <>
       {mobileRoleViewToggle}
       <AppPageShell width="wide">
-      <AppPageHeader
-        title="Inventory"
-        description="Track small tools, plant, signs, equipment, locations, and check status."
-        details={<InventoryLocationLabel locationLabel={employeeLocationName} />}
-        icon={<PackageSearch className="h-5 w-5" />}
-        className={INVENTORY_PAGE_HEADER_CLASSNAME}
-        contentClassName="flex-row items-start justify-between"
-        titleClassName="text-2xl"
-        actionsClassName="w-auto shrink-0 flex-col items-end justify-start"
-        actions={(
-          <>
-            <Button
-              size="sm"
-              onClick={() => setItemDialogOpen(true)}
-              className={INVENTORY_HEADER_CTA_CLASSNAME}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Add Item
-            </Button>
-            <InventoryLocationAction
-              locationLabel={employeeLocationName}
-              onChangeLocation={() => setChangeLocationDialogOpen(true)}
-            />
-          </>
-        )}
-      />
+      <div className="hidden md:block">
+        <AppPageHeader
+          title="Inventory"
+          description="Track small tools, plant, signs, equipment, locations, and check status."
+          details={<InventoryLocationLabel locationLabel={employeeLocationName} />}
+          icon={<PackageSearch className="h-5 w-5" />}
+          className={INVENTORY_PAGE_HEADER_CLASSNAME}
+          contentClassName="flex-row items-start justify-between"
+          titleClassName="text-2xl"
+          actionsClassName="w-auto shrink-0 flex-col items-end justify-start"
+          actions={(
+            <>
+              <Button
+                size="sm"
+                onClick={() => setItemDialogOpen(true)}
+                className={INVENTORY_HEADER_CTA_CLASSNAME}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Add Item
+              </Button>
+              <InventoryLocationAction
+                locationLabel={employeeLocationName}
+                onChangeLocation={() => setChangeLocationDialogOpen(true)}
+              />
+            </>
+          )}
+        />
+      </div>
+
+      <div className="md:hidden">
+        <InventoryMobileHeader
+          addLabel="Add"
+          onAdd={() => setItemDialogOpen(true)}
+          locationLabel={employeeLocationName}
+          onChangeLocation={() => setChangeLocationDialogOpen(true)}
+        />
+      </div>
 
       {inventoryLoadError ? (
         <InventoryLoadErrorNotice message={inventoryLoadError} onRetry={fetchInventoryData} />
       ) : null}
+
+      <div className="md:hidden">
+        <InventoryMobileStatusOverview
+          activeLabel="Active items"
+          activeValue={summary.total}
+          activeIcon={<PackageSearch className="h-5 w-5" />}
+          onActiveClick={() => applyInventorySummaryFilter({})}
+          statuses={[
+            {
+              id: 'overdue',
+              label: 'Overdue',
+              value: summary.overdue,
+              icon: <AlertTriangle className="h-4 w-4" />,
+              tone: 'danger',
+              isActive: inventoryTableQuickFilter.statusFilters.includes('overdue'),
+              onClick: () => applyInventorySummaryFilter({ statusFilters: ['overdue'] }),
+            },
+            {
+              id: 'due-soon',
+              label: 'Due soon',
+              value: summary.dueSoon,
+              icon: <AlertTriangle className="h-4 w-4" />,
+              tone: 'warning',
+              isActive: inventoryTableQuickFilter.statusFilters.includes('due_soon'),
+              onClick: () => applyInventorySummaryFilter({ statusFilters: ['due_soon'] }),
+            },
+            {
+              id: 'needs-check',
+              label: 'Need check',
+              value: summary.needsCheck,
+              icon: <CheckCircle2 className="h-4 w-4" />,
+              tone: 'info',
+              isActive: inventoryTableQuickFilter.statusFilters.includes('needs_check'),
+              onClick: () => applyInventorySummaryFilter({ statusFilters: ['needs_check'] }),
+            },
+            {
+              id: 'unknown',
+              label: 'Unknown location',
+              value: summary.unknownLocation,
+              icon: <Truck className="h-4 w-4" />,
+              tone: 'neutral',
+              isActive: Boolean(unknownLocation) && inventoryTableQuickFilter.locationFilters.includes(unknownLocation?.id || ''),
+              onClick: applyUnknownLocationFilter,
+            },
+          ]}
+        />
+      </div>
 
       <InventorySummaryCards
         cards={[
@@ -1113,28 +1267,18 @@ export default function InventoryPage() {
         ]}
       />
 
-      <Tabs
-        value={pageTab}
-        onValueChange={(value) => {
-          if (value === 'settings') {
-            setPageTab('settings');
-            router.push(`/inventory?tab=settings&settings=${settingsTab}`, { scroll: false });
-            return;
-          }
-          if (value === 'locations') {
-            setPageTab('locations');
-            router.push(
-              `/inventory?tab=locations&locations=${locationsTab === 'site_assignments' ? 'site-assignments' : 'directory'}`,
-              { scroll: false },
-            );
-            return;
-          }
-          setPageTab('overview');
-          router.push(getInventoryOverviewHref(overviewTab), { scroll: false });
-        }}
-      >
+      <Tabs value={pageTab} onValueChange={changePageTab}>
+        <InventoryMobileStickyNav className="md:hidden">
+          <InventoryMobilePrimaryNav
+            items={INVENTORY_PRIMARY_NAV_ITEMS}
+            value={pageTab}
+            onValueChange={changePageTab}
+            aria-label="Inventory sections"
+          />
+        </InventoryMobileStickyNav>
+
         <div
-          className={`${INVENTORY_PRIMARY_TABS_ROW_CLASSNAME} -mx-1 px-1 pb-1`}
+          className={INVENTORY_PRIMARY_TABS_ROW_CLASSNAME}
           data-testid="inventory-primary-tabs"
         >
           <TabsList className={INVENTORY_PRIMARY_TABS_LIST_CLASSNAME}>
@@ -1151,81 +1295,90 @@ export default function InventoryPage() {
               Settings
             </TabsTrigger>
           </TabsList>
-          {desktopRoleViewToggle ? (
-            <div className="hidden md:block">{desktopRoleViewToggle}</div>
-          ) : null}
+          {desktopRoleViewToggle}
         </div>
 
         {pageTab === 'settings' ? (
-          <div className={INVENTORY_SECONDARY_TABS_ROW_CLASSNAME} data-testid="inventory-settings-tabs">
-            <Tabs
-              value={settingsTab}
-              onValueChange={(value) => {
-                const nextSettingsTab = value as 'categories' | 'groups' | 'hardware' | 'kiosk';
-                setSettingsTab(nextSettingsTab);
-                router.push(`/inventory?tab=settings&settings=${nextSettingsTab}`, { scroll: false });
-              }}
-            >
-              <TabsList className={INVENTORY_SECONDARY_TABS_LIST_CLASSNAME}>
-                <TabsTrigger value="categories" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
-                  <PackageSearch className="h-4 w-4" />
-                  Categories
-                </TabsTrigger>
-                <TabsTrigger value="groups" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
-                  <PackageSearch className="h-4 w-4" />
-                  Groups
-                </TabsTrigger>
-                <TabsTrigger value="hardware" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
-                  <Boxes className="h-4 w-4" />
-                  Hardware Catalogue
-                </TabsTrigger>
-                <TabsTrigger value="kiosk" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
-                  <ShieldCheck className="h-4 w-4" />
-                  Yard Kiosk
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
+          <>
+            <div className="mt-3 md:hidden">
+              <InventoryMobileSecondaryNav
+                items={INVENTORY_SETTINGS_SECONDARY_NAV_ITEMS}
+                value={settingsTab}
+                onValueChange={changeSettingsTab}
+                aria-label="Settings sections"
+              />
+            </div>
+            <div className={INVENTORY_SECONDARY_TABS_ROW_CLASSNAME} data-testid="inventory-settings-tabs">
+              <Tabs value={settingsTab} onValueChange={changeSettingsTab}>
+                <TabsList className={INVENTORY_SECONDARY_TABS_LIST_CLASSNAME}>
+                  <TabsTrigger value="categories" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
+                    <PackageSearch className="h-4 w-4" />
+                    Categories
+                  </TabsTrigger>
+                  <TabsTrigger value="groups" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
+                    <PackageSearch className="h-4 w-4" />
+                    Groups
+                  </TabsTrigger>
+                  <TabsTrigger value="hardware" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
+                    <Boxes className="h-4 w-4" />
+                    Hardware Catalogue
+                  </TabsTrigger>
+                  <TabsTrigger value="kiosk" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
+                    <ShieldCheck className="h-4 w-4" />
+                    Yard Kiosk
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </>
         ) : null}
 
         {pageTab === 'locations' ? (
-          <div className={INVENTORY_SECONDARY_TABS_ROW_CLASSNAME} data-testid="inventory-locations-tabs">
-            <Tabs
-              value={inventoryContext?.can_manage_site_locations ? locationsTab : 'directory'}
-              onValueChange={(value) => {
-                const nextLocationsTab = value as InventoryLocationsTab;
-                setLocationsTab(nextLocationsTab);
-                router.push(
-                  `/inventory?tab=locations&locations=${nextLocationsTab === 'site_assignments' ? 'site-assignments' : 'directory'}`,
-                  { scroll: false },
-                );
-              }}
-            >
-              <TabsList className={INVENTORY_SECONDARY_TABS_LIST_CLASSNAME}>
-                <TabsTrigger value="directory" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
-                  <MapPin className="h-4 w-4" />
-                  All Locations
-                </TabsTrigger>
-                {inventoryContext?.can_manage_site_locations ? (
-                  <TabsTrigger value="site_assignments" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
-                    <Users className="h-4 w-4" />
-                    Location Assignments
+          <>
+            <div className="mt-3 md:hidden">
+              <InventoryMobileSecondaryNav
+                items={inventoryContext?.can_manage_site_locations
+                  ? INVENTORY_LOCATIONS_SECONDARY_NAV_ITEMS
+                  : INVENTORY_LOCATIONS_SECONDARY_NAV_ITEMS.filter((item) => item.value === 'directory')}
+                value={inventoryContext?.can_manage_site_locations ? locationsTab : 'directory'}
+                onValueChange={changeLocationsTab}
+                aria-label="Locations sections"
+              />
+            </div>
+            <div className={INVENTORY_SECONDARY_TABS_ROW_CLASSNAME} data-testid="inventory-locations-tabs">
+              <Tabs
+                value={inventoryContext?.can_manage_site_locations ? locationsTab : 'directory'}
+                onValueChange={changeLocationsTab}
+              >
+                <TabsList className={INVENTORY_SECONDARY_TABS_LIST_CLASSNAME}>
+                  <TabsTrigger value="directory" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
+                    <MapPin className="h-4 w-4" />
+                    All Locations
                   </TabsTrigger>
-                ) : null}
-              </TabsList>
-            </Tabs>
-          </div>
+                  {inventoryContext?.can_manage_site_locations ? (
+                    <TabsTrigger value="site_assignments" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
+                      <Users className="h-4 w-4" />
+                      Location Assignments
+                    </TabsTrigger>
+                  ) : null}
+                </TabsList>
+              </Tabs>
+            </div>
+          </>
         ) : null}
 
         <TabsContent value="overview" className="mt-0 space-y-6">
-          <Tabs
-            value={overviewTab}
-            onValueChange={(value) => {
-              const nextOverviewTab = value as InventoryOverviewTab;
-              setOverviewTab(nextOverviewTab);
-              router.push(getInventoryOverviewHref(nextOverviewTab), { scroll: false });
-            }}
-          >
+          <Tabs value={overviewTab} onValueChange={changeOverviewTab}>
+            <div className="mt-1 md:hidden">
+              <InventoryMobileSecondaryNav
+                items={INVENTORY_OVERVIEW_SECONDARY_NAV_ITEMS.map((item) => (
+                  item.value === 'retired' ? { ...item, count: retiredItems.length } : item
+                ))}
+                value={overviewTab}
+                onValueChange={changeOverviewTab}
+                aria-label="Overview sections"
+              />
+            </div>
             <div className={INVENTORY_SECONDARY_TABS_ROW_CLASSNAME} data-testid="inventory-overview-tabs">
               <TabsList className={INVENTORY_SECONDARY_TABS_LIST_CLASSNAME}>
                 <TabsTrigger value="small_tools" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
@@ -1314,24 +1467,13 @@ export default function InventoryPage() {
 
         <TabsContent value="locations" className="mt-0 space-y-6">
           {locationsTab === 'directory' || !inventoryContext?.can_manage_site_locations ? (
-            <>
-              <div className="flex justify-start sm:justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => { setEditingLocation(null); setLocationDialogOpen(true); }}
-                  className="min-h-11 w-full border-slate-600 sm:w-auto"
-                >
-                  <MapPin className="mr-2 h-4 w-4" />
-                  Add Location
-                </Button>
-              </div>
-              <InventoryLocationsPanel
-                fleetAssets={fleetAssets}
-                onEdit={(location) => { setEditingLocation(location); setLocationDialogOpen(true); }}
-                onRemove={handleRemoveLocation}
-                refreshVersion={locationSearchVersion}
-              />
-            </>
+            <InventoryLocationsPanel
+              fleetAssets={fleetAssets}
+              onEdit={(location) => { setEditingLocation(location); setLocationDialogOpen(true); }}
+              onRemove={handleRemoveLocation}
+              onAdd={() => { setEditingLocation(null); setLocationDialogOpen(true); }}
+              refreshVersion={locationSearchVersion}
+            />
           ) : null}
           {locationsTab === 'site_assignments' && inventoryContext?.can_manage_site_locations ? (
             <InventorySiteAssignmentsPanel

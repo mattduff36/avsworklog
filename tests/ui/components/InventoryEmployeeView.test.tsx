@@ -184,13 +184,14 @@ describe('InventoryEmployeeView', () => {
     expect(screen.getByText(/Showing inventory for/)).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute('data-state', 'active');
     expect(screen.getByRole('button', { name: 'Open inventory items' })).toBeInTheDocument();
-    expect(screen.getByTestId('inventory-employee-tabs').className).toContain('grid-cols-2');
-    expect(screen.getByTestId('inventory-employee-tabs').className).toContain('gap-0');
+    expect(screen.getByTestId('inventory-employee-tabs').className).toContain('hidden');
     expect(screen.getByTestId('inventory-employee-tabs').className).toContain('md:inline-flex');
     expect(screen.getByTestId('inventory-employee-tabs-row')).toContainElement(
       screen.getByTestId('employee-view-toggle'),
     );
-    expect(screen.getByTestId('inventory-employee-tabs-row').className).toContain('md:justify-between');
+    expect(screen.getByTestId('inventory-employee-tabs-row').className).toContain('md:flex');
+    // Mobile primary nav mirrors the same section state as the (CSS-hidden on mobile) desktop tabs.
+    expect(screen.getAllByRole('button', { name: 'Overview' }).length).toBeGreaterThan(0);
 
     openEmployeeTab('Inventory Items');
     expect(screen.getByRole('tab', { name: 'Inventory Items' })).toHaveAttribute('data-state', 'active');

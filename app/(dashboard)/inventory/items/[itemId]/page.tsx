@@ -32,10 +32,13 @@ import { toast } from 'sonner';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { cn } from '@/lib/utils/cn';
 import {
+  InventoryMobilePrimaryNav,
   INVENTORY_PAGE_HEADER_CLASSNAME,
   INVENTORY_PRIMARY_TABS_LIST_CLASSNAME,
   INVENTORY_TAB_TRIGGER_CLASSNAME,
 } from '../../components/InventoryPageChrome';
+import { renderCheckDueDetails } from '../../components/InventoryItemPresentation';
+import { ClipboardList, Clock3, LayoutGrid } from 'lucide-react';
 import {
   EMPTY_INVENTORY_ITEM_FORM,
   INVENTORY_CATEGORY_LABELS,
@@ -165,9 +168,16 @@ function buildItemEditForm(item: InventoryItem): InventoryItemFormData {
   };
 }
 
+const ITEM_DETAIL_NAV_ITEMS = [
+  { value: 'overview' as const, label: 'Overview', icon: LayoutGrid },
+  { value: 'movements' as const, label: 'Movements', icon: Clock3 },
+  { value: 'checks' as const, label: 'Checks', icon: ClipboardList },
+];
+
 export default function InventoryItemDetailPage() {
   const params = useParams<{ itemId: string }>();
   const itemId = params.itemId;
+  const [detailTab, setDetailTab] = useState<'overview' | 'movements' | 'checks'>('overview');
   const [payload, setPayload] = useState<InventoryHistoryPayload | null>(null);
   const [categories, setCategories] = useState<InventoryItemCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -421,29 +431,52 @@ export default function InventoryItemDetailPage() {
 
   return (
     <AppPageShell width="wide">
-      <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-start">
-        <div className="self-start">
-          <BackButton fallbackHref="/inventory" />
-        </div>
-        <AppPageHeader
-          title={item.name}
-          description={`${item.item_number} · ${item.location?.name || 'No location assigned'}`}
-          icon={<PackageSearch className="h-5 w-5" />}
-          actions={(
-            <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
-              <InventoryMoveButton onMove={() => setMoveDialogOpen(true)} />
-              <Badge variant="outline" className={`max-w-full whitespace-normal text-center ${getStatusBadgeClass(item)}`}>
-                {isRetired ? 'Retired' : getCheckStatusLabel(checkStatus)}
-              </Badge>
-            </div>
-          )}
-          className={cn(INVENTORY_PAGE_HEADER_CLASSNAME, 'min-w-0 flex-1')}
-          titleClassName="text-2xl"
-          descriptionClassName="break-words"
-        />
+      <div className="self-start">
+        <BackButton fallbackHref="/inventory" />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      <div className="hidden md:block">
+        <div className="flex min-w-0 flex-col items-stretch gap-3 sm:flex-row sm:items-start">
+          <AppPageHeader
+            title={item.name}
+            description={`${item.item_number} · ${item.location?.name || 'No location assigned'}`}
+            icon={<PackageSearch className="h-5 w-5" />}
+            actions={(
+              <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
+                <InventoryMoveButton onMove={() => setMoveDialogOpen(true)} />
+                <Badge variant="outline" className={`max-w-full whitespace-normal text-center ${getStatusBadgeClass(item)}`}>
+                  {isRetired ? 'Retired' : getCheckStatusLabel(checkStatus)}
+                </Badge>
+              </div>
+            )}
+            className={cn(INVENTORY_PAGE_HEADER_CLASSNAME, 'min-w-0 flex-1')}
+            titleClassName="text-2xl"
+            descriptionClassName="break-words"
+          />
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-slate-700/70 bg-slate-900/70 p-3.5 md:hidden" data-testid="inventory-item-mobile-header">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h1 className="break-words text-lg font-bold leading-snug text-white">{item.name}</h1>
+            <p className="mt-0.5 text-xs text-muted-foreground">{item.item_number}</p>
+          </div>
+          <Badge variant="outline" className={`shrink-0 whitespace-nowrap text-[11px] ${getStatusBadgeClass(item)}`}>
+            {isRetired ? 'Retired' : getCheckStatusLabel(checkStatus)}
+          </Badge>
+        </div>
+        <div className="mt-2.5 flex items-center gap-1.5 text-sm text-slate-300">
+          <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+          <span className="min-w-0 truncate">{item.location?.name || 'No location assigned'}</span>
+        </div>
+        {!isRetired && renderCheckDueDetails(item) ? (
+          <p className="mt-1 text-xs text-muted-foreground">{renderCheckDueDetails(item)}</p>
+        ) : null}
+        <InventoryMoveButton onMove={() => setMoveDialogOpen(true)} className="mt-3 h-10 w-full justify-center" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Card className="border-slate-700 bg-slate-900/70">
           <CardContent className="p-4">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Current Location</div>
@@ -505,8 +538,16 @@ export default function InventoryItemDetailPage() {
         </Card>
       ) : null}
 
-      <Tabs defaultValue="overview" className="min-w-0">
-        <div className="-mx-1 overflow-x-auto px-1 pb-1" data-testid="inventory-item-detail-tabs">
+      <Tabs value={detailTab} onValueChange={(value) => setDetailTab(value as typeof detailTab)} className="min-w-0">
+        <div className="sticky z-30 -mx-4 border-b border-slate-800/80 bg-slate-950/90 px-4 py-2 backdrop-blur-md md:hidden" style={{ top: 'var(--top-nav-h)' }}>
+          <InventoryMobilePrimaryNav
+            items={ITEM_DETAIL_NAV_ITEMS}
+            value={detailTab}
+            onValueChange={setDetailTab}
+            aria-label="Item detail sections"
+          />
+        </div>
+        <div className="hidden overflow-x-auto md:block" data-testid="inventory-item-detail-tabs">
           <TabsList className={`${INVENTORY_PRIMARY_TABS_LIST_CLASSNAME} w-max max-w-none flex-nowrap justify-start`}>
             <TabsTrigger value="overview" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>Overview</TabsTrigger>
             <TabsTrigger value="movements" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>Movements</TabsTrigger>

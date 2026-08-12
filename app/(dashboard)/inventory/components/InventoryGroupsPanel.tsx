@@ -8,9 +8,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { PackagePlus, Pencil, Trash2, Users } from 'lucide-react';
+import { PackagePlus, Users } from 'lucide-react';
 import type { InventoryItem, InventoryItemGroup } from '../types';
 import { isLegacyQuoteInventoryLocation } from '../utils';
+import { InventorySettingsListRow } from './InventorySettingsListRow';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 interface InventoryGroupFormData {
@@ -127,34 +128,28 @@ export function InventoryGroupsPanel({
             <p className="py-8 text-center text-sm text-muted-foreground">No inventory groups have been created yet.</p>
           ) : (
             groups.map((group) => (
-              <div key={group.id} className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="break-words font-semibold text-white">{group.name}</div>
-                    {group.description ? <p className="mt-1 text-sm text-muted-foreground">{group.description}</p> : null}
-                    <Badge variant="outline" className="mt-2 border-purple-500/30 bg-purple-500/10 text-purple-200">
-                      {(group.members || []).length} item{(group.members || []).length === 1 ? '' : 's'}
-                    </Badge>
+              <InventorySettingsListRow
+                key={group.id}
+                title={group.name}
+                meta={(
+                  <>
+                    {group.description ? <span className="block">{group.description}</span> : null}
+                    <span>{(group.members || []).length} item{(group.members || []).length === 1 ? '' : 's'}</span>
+                  </>
+                )}
+                onEdit={() => setEditingGroup(group)}
+                onRemove={() => onRemove(group)}
+              >
+                {(group.members || []).length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {(group.members || []).map((member) => (
+                      <Badge key={member.id} variant="outline" className="max-w-full whitespace-normal break-words border-slate-600 text-[11px] text-slate-300">
+                        {member.item?.item_number || member.item_id} · {member.item?.name || 'Inventory item'}
+                      </Badge>
+                    ))}
                   </div>
-                  <div className="grid grid-cols-2 gap-2 sm:flex">
-                    <Button size="sm" variant="outline" onClick={() => setEditingGroup(group)} className="min-h-11">
-                      <Pencil className="mr-2 h-3 w-3" />
-                      Edit
-                    </Button>
-                    <Button size="sm" variant="outline" className="min-h-11 border-red-500/30 text-red-300 hover:bg-red-500/10" onClick={() => onRemove(group)}>
-                      <Trash2 className="mr-2 h-3 w-3" />
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {(group.members || []).map((member) => (
-                    <Badge key={member.id} variant="outline" className="max-w-full whitespace-normal break-words border-slate-600 text-slate-200">
-                      {member.item?.item_number || member.item_id} · {member.item?.name || 'Inventory item'}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+                ) : null}
+              </InventorySettingsListRow>
             ))
           )}
         </CardContent>

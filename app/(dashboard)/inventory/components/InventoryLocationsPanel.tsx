@@ -10,18 +10,26 @@ import {
   MultiSelectFilter,
   type MultiSelectFilterOption,
 } from '@/components/ui/multi-select-filter';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { Link2, Loader2, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { Link2, Loader2, MapPin, MoreHorizontal, Pencil, Plus, Trash2 } from 'lucide-react';
 import type { FleetAssetOption, InventoryLocation } from '../types';
 import { getInventoryLocationTypePresentation } from '../utils';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { InventoryLocationTypeBadge } from './InventoryLocationTypeBadge';
+import { InventoryMobileFilters, type InventoryMobileFilterChip } from './InventoryMobileFilters';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 interface InventoryLocationsPanelProps {
   fleetAssets: FleetAssetOption[];
   onEdit: (location: InventoryLocation) => void;
   onRemove: (location: InventoryLocation) => void;
+  onAdd: () => void;
   refreshVersion?: number;
 }
 
@@ -86,9 +94,11 @@ export function InventoryLocationsPanel({
   fleetAssets,
   onEdit,
   onRemove,
+  onAdd,
   refreshVersion = 0,
 }: InventoryLocationsPanelProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [locations, setLocations] = useState<InventoryLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -202,35 +212,47 @@ export function InventoryLocationsPanel({
           : 'No active Inventory locations are available.'
         : '';
 
+  const mobileActiveFilterCount = selectedLocationTypes.length + (includeLegacyQuotes ? 1 : 0);
+  const mobileFilterChips: InventoryMobileFilterChip[] = [
+    ...selectedLocationTypes.map((type) => ({
+      id: `type:${type}`,
+      label: locationTypeFilterOptions.find((option) => option.value === type)?.label || type,
+      onRemove: () => setSelectedLocationTypes((current) => current.filter((value) => value !== type)),
+    })),
+    ...(includeLegacyQuotes ? [{ id: 'legacy', label: 'Legacy locations', onRemove: () => setIncludeLegacyQuotes(false) }] : []),
+  ];
+
   return (
     <Card className="min-w-0 border-slate-700 bg-slate-900/70">
       <CardHeader className="border-b border-slate-700 bg-slate-950/30">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-white">
               <MapPin className="h-5 w-5 text-inventory" />
               All Locations
             </CardTitle>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 hidden text-sm text-muted-foreground md:block">
               Browse every active Inventory location and find locations by name, type, reference, or linked asset.
             </p>
+            <p className="mt-0.5 text-xs text-muted-foreground md:hidden">
+              {total.toLocaleString()} {total === 1 ? 'location' : 'locations'}
+            </p>
           </div>
-          <Badge variant="outline" className="w-fit border-inventory/40 bg-inventory/10 text-inventory-light">
-            {total.toLocaleString()} {total === 1 ? 'location' : 'locations'}
-          </Badge>
+          <div className="flex shrink-0 items-center gap-2">
+            <Badge variant="outline" className="hidden w-fit border-inventory/40 bg-inventory/10 text-inventory md:inline-flex">
+              {total.toLocaleString()} {total === 1 ? 'location' : 'locations'}
+            </Badge>
+            <Button size="sm" onClick={onAdd} className="h-11 bg-inventory text-white hover:bg-inventory-dark md:h-9">
+              <Plus className="mr-2 h-4 w-4" />
+              Add
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="overflow-visible p-0">
         <div className="relative z-20 border-b border-slate-700 p-4">
-          <div
-            className={cn(
-              'grid gap-3 lg:items-center',
-              locationTypeFilterOptions.length > 0
-                ? 'lg:grid-cols-[minmax(0,1fr)_auto_auto]'
-                : 'lg:grid-cols-[minmax(0,1fr)_auto]',
-            )}
-          >
-            <div>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="min-w-0 flex-1">
               <SearchInput
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
@@ -241,25 +263,56 @@ export function InventoryLocationsPanel({
                 aria-label="Search inventory locations"
               />
             </div>
-            {locationTypeFilterOptions.length > 0 ? (
-              <MultiSelectFilter
-                label="Type"
-                allLabel="All types"
-                selectedValues={selectedLocationTypes}
-                options={locationTypeFilterOptions}
-                onSelectedValuesChange={setSelectedLocationTypes}
-                triggerClassName="min-h-11 w-full border-slate-600 bg-slate-800 text-white sm:min-h-9 sm:w-[170px]"
-                panelClassName="border-slate-700 bg-slate-900"
+
+            <div className="hidden items-center gap-3 md:flex">
+              {locationTypeFilterOptions.length > 0 ? (
+                <MultiSelectFilter
+                  label="Type"
+                  allLabel="All types"
+                  selectedValues={selectedLocationTypes}
+                  options={locationTypeFilterOptions}
+                  onSelectedValuesChange={setSelectedLocationTypes}
+                  triggerClassName="min-h-9 w-[170px] border-slate-600 bg-slate-800 text-white"
+                  panelClassName="border-slate-700 bg-slate-900"
+                />
+              ) : null}
+              <LegacyQuoteLocationOptIn
+                enabled={includeLegacyQuotes}
+                onEnabledChange={setIncludeLegacyQuotes}
               />
-            ) : null}
-            <LegacyQuoteLocationOptIn
-              enabled={includeLegacyQuotes}
-              onEnabledChange={setIncludeLegacyQuotes}
-            />
+            </div>
+
+            <div className="md:hidden">
+              <InventoryMobileFilters
+                open={mobileFiltersOpen}
+                onOpenChange={setMobileFiltersOpen}
+                activeFilterCount={mobileActiveFilterCount}
+                chips={mobileFilterChips}
+                hasAnyFilters={mobileActiveFilterCount > 0}
+                onClearAll={() => { setSelectedLocationTypes([]); setIncludeLegacyQuotes(false); }}
+              >
+                {locationTypeFilterOptions.length > 0 ? (
+                  <MultiSelectFilter
+                    label="Type"
+                    panelId="mobile-location-type-filter-menu"
+                    allLabel="All types"
+                    selectedValues={selectedLocationTypes}
+                    options={locationTypeFilterOptions}
+                    onSelectedValuesChange={setSelectedLocationTypes}
+                    triggerClassName="!w-full min-h-11"
+                  />
+                ) : null}
+                <LegacyQuoteLocationOptIn
+                  enabled={includeLegacyQuotes}
+                  onEnabledChange={setIncludeLegacyQuotes}
+                  className="w-full"
+                />
+              </InventoryMobileFilters>
+            </div>
           </div>
-          <div className="mt-2 text-xs text-muted-foreground">
-            <p>Search starts immediately; results load from the server in groups of 25.</p>
-          </div>
+          <p className="mt-2 hidden text-xs text-muted-foreground md:block">
+            Search starts immediately; results load from the server in groups of 25.
+          </p>
         </div>
 
         {status ? (
@@ -339,50 +392,70 @@ export function InventoryLocationsPanel({
           </table>
         </div>
 
-        <div className="space-y-3 p-4 md:hidden">
+        <div className="space-y-2.5 p-4 md:hidden">
           {locations.map((location) => {
             const linkedAssetLabel = getLinkedAssetLabel(location, fleetAssets);
             const presentation = getInventoryLocationTypePresentation(location);
+            const canRemove = location.location_type === 'manual';
             return (
               <div
                 key={location.id}
                 data-location-type={location.location_type}
                 className={cn(
-                  'rounded-lg border p-4 transition-colors',
+                  'rounded-xl border p-3.5 transition-colors',
                   presentation.surfaceClassName,
                 )}
               >
                 <div className="flex min-w-0 items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex min-w-0 items-start gap-2 font-semibold text-white">
-                      <MapPin className={cn('mt-0.5 h-4 w-4 shrink-0', presentation.iconClassName)} />
-                      <span className="min-w-0 break-words">{location.name}</span>
+                  <div className="flex min-w-0 items-start gap-2">
+                    <MapPin className={cn('mt-0.5 h-4 w-4 shrink-0', presentation.iconClassName)} />
+                    <div className="min-w-0">
+                      <div className="break-words text-[15px] font-semibold leading-snug text-white">{location.name}</div>
+                      <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <InventoryLocationTypeBadge location={location} className="border-0 bg-transparent px-0 text-[11px] font-medium text-slate-400" />
+                        <span>·</span>
+                        <span>{location.item_count || 0} item{location.item_count === 1 ? '' : 's'}</span>
+                      </div>
+                      <div className="mt-1 break-words text-xs text-muted-foreground">
+                        {linkedAssetLabel ? `Linked to ${linkedAssetLabel}` : 'No linked asset'}
+                        {location.external_reference ? ` · Ref: ${location.external_reference}` : ''}
+                      </div>
                     </div>
-                    {location.description ? (
-                      <div className="mt-1 text-xs text-muted-foreground">{location.description}</div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onEdit(location)}
+                      className="h-11 border-slate-600 px-3"
+                    >
+                      <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                      Edit
+                    </Button>
+                    {canRemove ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            className="h-11 w-11 border-slate-600 text-slate-300"
+                            aria-label={`More actions for ${location.name}`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={() => onRemove(location)}
+                            className="text-red-300 focus:bg-red-500/10 focus:text-red-200"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     ) : null}
                   </div>
-                  <Badge variant="outline" className="shrink-0 whitespace-normal text-center">{location.item_count || 0} items</Badge>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <InventoryLocationTypeBadge location={location} />
-                  <Badge variant="outline" className="border-slate-600 text-slate-200">
-                    {location.sync_status}
-                  </Badge>
-                </div>
-                <div className="mt-3 break-words text-xs text-muted-foreground">
-                  {linkedAssetLabel ? `Linked to ${linkedAssetLabel}` : 'No linked asset'}
-                  {location.external_reference ? ` · Ref: ${location.external_reference}` : ''}
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <Button size="sm" variant="outline" onClick={() => onEdit(location)} className="min-h-11 border-slate-600">
-                    Edit
-                  </Button>
-                  {location.location_type === 'manual' ? (
-                    <Button size="sm" variant="outline" onClick={() => onRemove(location)} className="min-h-11 border-red-500/30 text-red-300">
-                      Remove
-                    </Button>
-                  ) : null}
                 </div>
               </div>
             );

@@ -37,6 +37,9 @@ import {
 } from '../utils';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
 import {
+  InventoryMobilePrimaryNav,
+  InventoryMobileStatusChip,
+  InventoryMobileStickyNav,
   InventorySummaryCards,
   INVENTORY_EMPLOYEE_TABS_LIST_CLASSNAME,
   INVENTORY_PRIMARY_TABS_ROW_CLASSNAME,
@@ -358,6 +361,15 @@ export function InventoryEmployeeView({
         onValueChange={(value) => setActiveTab(value as InventoryEmployeeTab)}
         className="space-y-4"
       >
+        <InventoryMobileStickyNav className="md:hidden">
+          <InventoryMobilePrimaryNav
+            items={EMPLOYEE_NAV_ITEMS}
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value)}
+            aria-label="My Location sections"
+          />
+        </InventoryMobileStickyNav>
+
         <div
           className={INVENTORY_PRIMARY_TABS_ROW_CLASSNAME}
           data-testid="inventory-employee-tabs-row"
@@ -380,9 +392,7 @@ export function InventoryEmployeeView({
               );
             })}
           </TabsList>
-          {desktopViewToggle ? (
-            <div className="hidden md:block">{desktopViewToggle}</div>
-          ) : null}
+          {desktopViewToggle}
         </div>
 
         <TabsContent value="overview" className="mt-0 space-y-4">
@@ -453,6 +463,32 @@ export function InventoryEmployeeView({
                 <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Check alerts at your locations
                 </p>
+                <div className="grid grid-cols-3 gap-2 md:hidden">
+                  <InventoryMobileStatusChip
+                    id="overdue"
+                    label="Overdue"
+                    value={overviewStats.overdue}
+                    icon={<AlertTriangle className="h-4 w-4" />}
+                    tone="danger"
+                    onClick={() => openItemsTab(['overdue'])}
+                  />
+                  <InventoryMobileStatusChip
+                    id="due-soon"
+                    label="Due soon"
+                    value={overviewStats.dueSoon}
+                    icon={<AlertTriangle className="h-4 w-4" />}
+                    tone="warning"
+                    onClick={() => openItemsTab(['due_soon'])}
+                  />
+                  <InventoryMobileStatusChip
+                    id="needs-check"
+                    label="Need check"
+                    value={overviewStats.needsCheck}
+                    icon={<CheckCircle2 className="h-4 w-4" />}
+                    tone="info"
+                    onClick={() => openItemsTab(['needs_check'])}
+                  />
+                </div>
                 <InventorySummaryCards
                   cards={[
                     {

@@ -72,6 +72,7 @@ describe('InventoryLocationsPanel', () => {
         fleetAssets={[]}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
+        onAdd={vi.fn()}
       />,
     );
 
@@ -91,7 +92,7 @@ describe('InventoryLocationsPanel', () => {
       'bg-[hsl(var(--workshop-primary)/0.10)]',
     );
     const mobileYardCard = [...document.querySelectorAll('div[data-location-type="yard"]')]
-      .find((element) => element.classList.contains('rounded-lg'));
+      .find((element) => element.classList.contains('rounded-xl'));
     expect(mobileYardCard).toHaveClass('border-[hsl(var(--workshop-primary)/0.32)]');
     const yardBadge = [...document.querySelectorAll('[data-location-type="yard"]')]
       .find((element) => element.classList.contains('rounded-full'));
@@ -125,6 +126,7 @@ describe('InventoryLocationsPanel', () => {
         fleetAssets={[]}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
+        onAdd={vi.fn()}
       />,
     );
 
@@ -167,6 +169,7 @@ describe('InventoryLocationsPanel', () => {
         fleetAssets={[]}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
+        onAdd={vi.fn()}
       />,
     );
 
@@ -227,6 +230,7 @@ describe('InventoryLocationsPanel', () => {
         fleetAssets={[]}
         onEdit={vi.fn()}
         onRemove={vi.fn()}
+        onAdd={vi.fn()}
       />,
     );
 
