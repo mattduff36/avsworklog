@@ -24,7 +24,7 @@ export const INVENTORY_TAB_TRIGGER_CLASSNAME =
   'gap-2 rounded-md px-3 data-[state=active]:bg-inventory data-[state=active]:text-white';
 
 export const INVENTORY_HEADER_CTA_CLASSNAME =
-  'h-11 w-auto bg-inventory text-white shadow-md transition-all duration-200 hover:bg-inventory-dark hover:shadow-lg active:scale-95 sm:h-8';
+  'h-11 w-auto bg-inventory text-white shadow-md transition-all duration-200 hover:bg-inventory-dark hover:shadow-lg active:scale-95 md:h-8';
 
 /** Desktop-only secondary tab row wrapper (right-aligned). Mobile renders InventoryMobileSecondaryNav instead. */
 export const INVENTORY_SECONDARY_TABS_ROW_CLASSNAME = 'hidden justify-end md:flex';
@@ -113,12 +113,12 @@ export function InventoryLocationAction({
       size="sm"
       onClick={onChangeLocation}
       aria-label={locationLabel ? 'Change My Location' : 'Set My Location'}
-      className="h-11 shrink-0 border-slate-600 sm:h-8"
+      className="h-11 shrink-0 border-slate-600 md:h-8"
       data-testid="inventory-location-action"
     >
       <MapPin className="mr-2 h-4 w-4" />
-      <span className="sm:hidden">{locationLabel ? 'Change' : 'Set'}</span>
-      <span className="hidden sm:inline">
+      <span className="md:hidden">{locationLabel ? 'Change' : 'Set'}</span>
+      <span className="hidden md:inline">
         {locationLabel ? 'Change My Location' : 'Set My Location'}
       </span>
     </Button>
@@ -421,7 +421,7 @@ export function InventoryMobileHeader({
           <Button
             size="sm"
             onClick={onAdd}
-            className="h-9 shrink-0 bg-inventory px-3 text-white hover:bg-inventory-dark"
+            className="h-11 shrink-0 bg-inventory px-3 text-white hover:bg-inventory-dark"
           >
             <Plus className="mr-1.5 h-4 w-4" />
             {addLabel}
@@ -432,7 +432,7 @@ export function InventoryMobileHeader({
       <button
         type="button"
         onClick={onChangeLocation}
-        className="mt-3 flex min-h-9 w-full items-center justify-between gap-2 border-t border-slate-800/70 pt-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory"
+        className="mt-3 flex min-h-11 w-full items-center justify-between gap-2 border-t border-slate-800/70 pt-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory"
         data-testid="inventory-mobile-location-action"
       >
         <span className="flex min-w-0 items-center gap-1.5 text-sm text-slate-300">

@@ -86,6 +86,8 @@ describe('InventoryPageChrome', () => {
     expect(INVENTORY_HEADER_CTA_CLASSNAME).toContain('shadow-md');
     expect(INVENTORY_HEADER_CTA_CLASSNAME).toContain('hover:shadow-lg');
     expect(INVENTORY_HEADER_CTA_CLASSNAME).toContain('active:scale-95');
+    expect(INVENTORY_HEADER_CTA_CLASSNAME).toContain('md:h-8');
+    expect(INVENTORY_HEADER_CTA_CLASSNAME).not.toContain('sm:h-8');
   });
 
   it('keeps Add Item and location context inside one clean header surface', () => {
@@ -116,6 +118,7 @@ describe('InventoryPageChrome', () => {
     expect(headingSurface).toHaveTextContent('Current location: Van - TE57 VAN');
     expect(headingSurface).not.toHaveTextContent('Working context');
     expect(headingSurface).toHaveClass('p-4');
+    expect(screen.getByTestId('inventory-location-action')).toHaveClass('h-11', 'md:h-8');
   });
 
   it('renders primary/secondary tab surfaces as desktop-only (mobile uses dedicated nav components)', () => {

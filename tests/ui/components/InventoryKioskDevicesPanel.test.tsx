@@ -80,6 +80,8 @@ describe('InventoryKioskDevicesPanel', () => {
     expect(screen.getByText(/Last automatic login/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open kiosk control' }))
       .toHaveAttribute('href', '/inventory/kiosk-control');
+    expect(screen.getByRole('link', { name: 'Open kiosk control' }))
+      .toHaveClass('h-11', 'md:h-9');
     expect(screen.queryByRole('button', { name: 'Start pairing' }))
       .not.toBeInTheDocument();
 
@@ -137,7 +139,14 @@ describe('InventoryKioskDevicesPanel', () => {
     render(<InventoryKioskDevicesPanel />);
     expect(await screen.findByText('Yard Tablet 1')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Ping' }));
+    const pingButton = screen.getByRole('button', { name: 'Ping' });
+    const reloadButton = screen.getByRole('button', { name: 'Reload' });
+    const overflowButton = screen.getByRole('button', { name: 'More actions for Yard Tablet 1' });
+    expect(pingButton).toHaveClass('h-11', 'md:h-9');
+    expect(reloadButton).toHaveClass('h-11', 'md:h-9');
+    expect(overflowButton).toHaveClass('h-11', 'w-11', 'md:h-9', 'md:w-9');
+
+    fireEvent.click(pingButton);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/inventory/kiosk/devices',
@@ -148,7 +157,7 @@ describe('InventoryKioskDevicesPanel', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'Reload' }));
+    fireEvent.click(reloadButton);
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/inventory/kiosk/devices',

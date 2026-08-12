@@ -29,6 +29,11 @@ import {
   type HardwareTransferPrefill,
 } from './HardwareTransferDialog';
 import { HardwareQuantityRow } from './HardwareQuantityRow';
+import {
+  InventoryMobileFilterChips,
+  InventoryMobileFilters,
+  type InventoryMobileFilterChip,
+} from './InventoryMobileFilters';
 import { LegacyQuoteLocationOptIn } from './LegacyQuoteLocationOptIn';
 
 interface HardwareOverviewPanelProps {
@@ -49,6 +54,7 @@ export function HardwareOverviewPanel({
   const [search, setSearch] = useState('');
   const [locationFilter, setLocationFilter] = useState(ALL_LOCATIONS);
   const [includeLegacyQuotes, setIncludeLegacyQuotes] = useState(false);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferPrefill, setTransferPrefill] = useState<HardwareTransferPrefill | null>(null);
@@ -130,6 +136,33 @@ export function HardwareOverviewPanel({
     positiveBalancesByItem,
     search,
   ]);
+  const selectedLocation = locationFilter === ALL_LOCATIONS
+    ? null
+    : locationById.get(locationFilter) || null;
+  const mobileFilterChips = useMemo<InventoryMobileFilterChip[]>(() => {
+    const chips: InventoryMobileFilterChip[] = [];
+    if (locationFilter !== ALL_LOCATIONS) {
+      chips.push({
+        id: `location:${locationFilter}`,
+        label: selectedLocation?.name || 'Selected location',
+        onRemove: () => setLocationFilter(ALL_LOCATIONS),
+      });
+    }
+    if (includeLegacyQuotes) {
+      chips.push({
+        id: 'legacy-quotes',
+        label: 'Legacy locations',
+        onRemove: () => setIncludeLegacyQuotes(false),
+      });
+    }
+    return chips;
+  }, [includeLegacyQuotes, locationFilter, selectedLocation?.name]);
+  const mobileActiveFilterCount = mobileFilterChips.length;
+
+  function clearMobileFilters() {
+    setLocationFilter(ALL_LOCATIONS);
+    setIncludeLegacyQuotes(false);
+  }
 
   function toggleExpandedItem(itemId: string) {
     setExpandedItemIds((current) => {
@@ -153,18 +186,22 @@ export function HardwareOverviewPanel({
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden border-slate-700 bg-slate-900/70">
-        <CardHeader className="border-b border-slate-700 bg-slate-950/40">
+        <CardHeader className="border-b border-slate-700 bg-slate-950/40 p-4 md:p-6">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2 text-white">
-                <Boxes className="h-5 w-5 text-inventory" />
+              <CardTitle className="flex items-center gap-2 text-base font-bold text-white md:text-2xl md:font-semibold">
+                <Boxes className="h-4 w-4 text-inventory md:h-5 md:w-5" />
                 Hardware Stock
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
                 View company-wide quantities and transfer Hardware.
               </p>
             </div>
-            <Button variant="outline" onClick={() => openTransfer()} className="border-slate-600">
+            <Button
+              variant="outline"
+              onClick={() => openTransfer()}
+              className="min-h-11 border-slate-600 md:min-h-9"
+            >
               <ArrowRightLeft className="mr-2 h-4 w-4" />
               Transfer Stock
             </Button>
@@ -172,15 +209,50 @@ export function HardwareOverviewPanel({
         </CardHeader>
         <CardContent className="space-y-4 p-4">
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(360px,auto)] lg:items-center">
-            <div>
+            <div className="flex min-w-0 items-center gap-2">
               <SearchInput
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="Search Hardware or location..."
-                containerClassName="border-slate-600 bg-slate-800"
+                containerClassName="h-11 min-w-0 flex-1 border-slate-600 bg-slate-800 md:h-10"
               />
+              <div className="md:hidden">
+                <InventoryMobileFilters
+                  open={mobileFiltersOpen}
+                  onOpenChange={setMobileFiltersOpen}
+                  activeFilterCount={mobileActiveFilterCount}
+                  hasAnyFilters={mobileActiveFilterCount > 0}
+                  onClearAll={clearMobileFilters}
+                >
+                  <Select
+                    value={locationFilter}
+                    onValueChange={setLocationFilter}
+                    onOpenChange={(open) => {
+                      if (!open) setIncludeLegacyQuotes(false);
+                    }}
+                  >
+                    <SelectTrigger
+                      className="min-h-11 border-slate-600 bg-slate-800"
+                      aria-label="Filter Hardware by location"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ALL_LOCATIONS}>All locations</SelectItem>
+                      {activeLocations.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>{location.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <LegacyQuoteLocationOptIn
+                    enabled={includeLegacyQuotes}
+                    onEnabledChange={setIncludeLegacyQuotes}
+                    className="w-full"
+                  />
+                </InventoryMobileFilters>
+              </div>
             </div>
-            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="hidden gap-2 md:grid md:grid-cols-[minmax(0,1fr)_auto]">
               <Select
                 value={locationFilter}
                 onValueChange={setLocationFilter}
@@ -204,6 +276,11 @@ export function HardwareOverviewPanel({
               />
             </div>
           </div>
+          <InventoryMobileFilterChips
+            chips={mobileFilterChips}
+            onClearAll={clearMobileFilters}
+            className="md:hidden"
+          />
 
           <div className="overflow-hidden rounded-lg border border-slate-700">
             {filteredItems.length === 0 ? (

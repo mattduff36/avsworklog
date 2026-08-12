@@ -267,7 +267,7 @@ export function InventoryKioskDevicesPanel() {
               {activeDevices.length} active · password-free Yard kiosk access
             </p>
           </div>
-          <Button asChild variant="outline" size="sm" className="h-9 shrink-0">
+          <Button asChild variant="outline" size="sm" className="h-11 shrink-0 md:h-9">
             <a href="/inventory/kiosk-control" target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-1.5 h-4 w-4" />
               Open kiosk control
@@ -460,7 +460,7 @@ export function InventoryKioskDevicesPanel() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-9 flex-1 min-w-0 justify-center border-slate-600"
+                        className="h-11 flex-1 min-w-0 justify-center border-slate-600 md:h-9"
                         disabled={saving || device.presence === 'offline'}
                         onClick={() => void issueCommand(device, 'ping')}
                       >
@@ -471,7 +471,7 @@ export function InventoryKioskDevicesPanel() {
                         type="button"
                         size="sm"
                         variant="outline"
-                        className="h-9 flex-1 min-w-0 justify-center border-slate-600"
+                        className="h-11 flex-1 min-w-0 justify-center border-slate-600 md:h-9"
                         disabled={saving || device.presence === 'offline'}
                         onClick={() => void issueCommand(device, 'reload_app')}
                       >
@@ -484,7 +484,7 @@ export function InventoryKioskDevicesPanel() {
                             type="button"
                             size="icon"
                             variant="outline"
-                            className="h-9 w-9 shrink-0 border-slate-600 text-slate-300"
+                            className="h-11 w-11 shrink-0 border-slate-600 text-slate-300 md:h-9 md:w-9"
                             aria-label={`More actions for ${device.device_label}`}
                           >
                             <MoreHorizontal className="h-4 w-4" />

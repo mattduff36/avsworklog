@@ -162,6 +162,48 @@ describe('HardwareOverviewPanel', () => {
     expect(screen.getByRole('heading', { name: 'Transfer Hardware' })).toBeInTheDocument();
   });
 
+  it('keeps mobile Hardware search and the compact Filters control on one row', () => {
+    render(
+      <HardwareOverviewPanel
+        items={[cones]}
+        balances={[]}
+        locations={[yard, van]}
+        onTransfer={vi.fn()}
+      />,
+    );
+
+    const search = screen.getByPlaceholderText('Search Hardware or location...');
+    const filters = screen.getByRole('button', { name: 'Filters' });
+    const mobileControlRow = search.parentElement?.parentElement;
+
+    expect(mobileControlRow).toHaveClass('flex', 'items-center');
+    expect(mobileControlRow).toContainElement(filters);
+    expect(filters).toHaveClass('h-11', 'w-11');
+  });
+
+  it('shows and removes active Hardware filter chips through the mobile Filters dialog', () => {
+    render(
+      <HardwareOverviewPanel
+        items={[cones]}
+        balances={[]}
+        locations={[yard, van]}
+        onTransfer={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    fireEvent.click(
+      within(screen.getByRole('dialog')).getByRole('button', { name: 'Include legacy locations' }),
+    );
+
+    const chips = screen.getByTestId('inventory-mobile-filter-chips');
+    const legacyChip = within(chips).getByText('Legacy locations');
+    expect(legacyChip).toBeInTheDocument();
+
+    fireEvent.click(legacyChip);
+    expect(screen.queryByTestId('inventory-mobile-filter-chips')).not.toBeInTheDocument();
+  });
+
   it('prefills the Hardware item and source from a location Move action', () => {
     render(
       <HardwareOverviewPanel

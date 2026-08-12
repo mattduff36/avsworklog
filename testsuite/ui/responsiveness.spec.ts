@@ -88,17 +88,61 @@ for (const width of inventoryMobileWidths) {
       isMobile: true,
     });
 
-    test('keeps summaries, tabs, and page width usable', async ({ page }) => {
+    test('keeps header, navigation, filters, and page width usable', async ({ page }) => {
       await gotoWithInfraSkip(page, '/inventory', 'Inventory', `${width}px mobile`);
 
-      await expect(page.getByRole('button', { name: /filter inventory by active items/i }))
-        .toBeVisible();
-      await expect(page.getByRole('tab', { name: /overview/i }).first()).toBeVisible();
+      const mobileHeader = page.getByTestId('inventory-mobile-header');
+      const stickyNavigation = page.getByTestId('inventory-mobile-sticky-nav');
+      const filters = page.getByTestId('inventory-mobile-filters-trigger');
+      await expect(mobileHeader).toBeVisible();
+      await expect(stickyNavigation).toBeVisible();
+      await expect(filters).toBeVisible();
+      await expect(page.getByTestId('inventory-mobile-status-overview')).toHaveCount(0);
 
-      const overflowPixels = await page.evaluate(
-        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
-      );
-      expect(overflowPixels, 'Inventory should not overflow the document viewport').toBeLessThanOrEqual(1);
+      const addButtonBox = await mobileHeader.getByRole('button', { name: 'Add' }).boundingBox();
+      const locationActionBox = await page
+        .getByTestId('inventory-mobile-location-action')
+        .boundingBox();
+      const filtersBox = await filters.boundingBox();
+      expect(addButtonBox?.height || 0, 'Mobile Add should be at least 44px high')
+        .toBeGreaterThanOrEqual(44);
+      expect(locationActionBox?.height || 0, 'Mobile location action should be at least 44px high')
+        .toBeGreaterThanOrEqual(44);
+      expect(filtersBox?.height || 0, 'Mobile Filters should be at least 44px high')
+        .toBeGreaterThanOrEqual(44);
+
+      const overflow = await page.evaluate(() => {
+        // Use the layout viewport width; documentElement.clientWidth can be a few pixels
+        // narrower when Chromium reserves a vertical scrollbar gutter.
+        const viewportWidth = window.innerWidth;
+        const offenders = Array.from(document.querySelectorAll<HTMLElement>('body *'))
+          .map((element) => {
+            const bounds = element.getBoundingClientRect();
+            return {
+              tag: element.tagName.toLowerCase(),
+              testId: element.dataset.testid || null,
+              className: typeof element.className === 'string' ? element.className : '',
+              parentClassName: typeof element.parentElement?.className === 'string'
+                ? element.parentElement.className
+                : '',
+              svgClassName: element.closest('svg')?.getAttribute('class') || '',
+              svgMarkup: element.closest('svg')?.outerHTML.slice(0, 300) || '',
+              text: (element.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 80),
+              left: Math.round(bounds.left),
+              right: Math.round(bounds.right),
+            };
+          })
+          .filter(({ left, right }) => left < -1 || right > viewportWidth + 1)
+          .slice(0, 8);
+        return {
+          pixels: Math.max(0, document.documentElement.scrollWidth - viewportWidth),
+          offenders,
+        };
+      });
+      expect(
+        overflow.pixels,
+        `Inventory should not overflow the document viewport. Offenders: ${JSON.stringify(overflow.offenders)}`,
+      ).toBeLessThanOrEqual(1);
     });
   });
 }
@@ -113,9 +157,7 @@ test.describe('@inventory Inventory mobile dialogs', () => {
   test('keeps location selection and dialog actions reachable', async ({ page }) => {
     await gotoWithInfraSkip(page, '/inventory', 'Inventory', '375px mobile dialog');
 
-    const locationAction = page
-      .getByRole('button', { name: /change my location|set my location/i })
-      .first();
+    const locationAction = page.getByTestId('inventory-mobile-location-action');
     await expect(locationAction).toBeVisible({ timeout: 20_000 });
     await locationAction.click();
     const locationDialog = page.getByRole('dialog', {
