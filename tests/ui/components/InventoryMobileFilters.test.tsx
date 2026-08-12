@@ -3,29 +3,31 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { InventoryMobileFilters } from '@/app/(dashboard)/inventory/components/InventoryMobileFilters';
+import {
+  InventoryMobileFilterChips,
+  InventoryMobileFilters,
+} from '@/app/(dashboard)/inventory/components/InventoryMobileFilters';
 
 describe('InventoryMobileFilters', () => {
-  it('INV-MOBILE-003: search stays visible while filters are hidden behind one Filters control', () => {
+  it('INV-MOBILE-003: search and the compact Filters button share one row; the sheet is closed by default', () => {
     const onOpenChange = vi.fn();
     render(
-      <>
+      <div className="flex items-center gap-2">
         <input aria-label="Search small tools..." />
         <InventoryMobileFilters
           open={false}
           onOpenChange={onOpenChange}
           activeFilterCount={2}
-          chips={[]}
           hasAnyFilters
           onClearAll={vi.fn()}
         >
           <div>filter body</div>
         </InventoryMobileFilters>
-      </>,
+      </div>,
     );
 
     expect(screen.getByLabelText('Search small tools...')).toBeInTheDocument();
-    const trigger = screen.getByTestId('inventory-mobile-filters-trigger');
+    const trigger = screen.getByRole('button', { name: 'Filters' });
     expect(trigger).toHaveTextContent('2');
     expect(screen.queryByText('filter body')).not.toBeInTheDocument();
 
@@ -45,12 +47,15 @@ describe('InventoryMobileFilters', () => {
           open
           onOpenChange={vi.fn()}
           activeFilterCount={1}
-          chips={[{ id: 'status:overdue', label: 'Overdue', onRemove: onRemoveOverdue }]}
           hasAnyFilters
           onClearAll={onClearAll}
         >
           <div>filter body</div>
         </InventoryMobileFilters>
+        <InventoryMobileFilterChips
+          chips={[{ id: 'status:overdue', label: 'Overdue', onRemove: onRemoveOverdue }]}
+          onClearAll={onClearAll}
+        />
       </>,
     );
 
@@ -64,5 +69,12 @@ describe('InventoryMobileFilters', () => {
 
     // Search input is an independent control; nothing in the filter chip row touches it.
     expect(screen.getByLabelText('search-input')).toHaveValue(searchValue);
+  });
+
+  it('reserves no space for chips when there are no active filters', () => {
+    const { container } = render(
+      <InventoryMobileFilterChips chips={[]} onClearAll={vi.fn()} />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

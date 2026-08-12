@@ -86,13 +86,13 @@ export function InventoryCategoriesPanel({
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <Card className="border-slate-700 bg-slate-900/70">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Tags className="h-5 w-5 text-inventory" />
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base font-bold text-white md:text-xl md:font-semibold">
+            <Tags className="h-4 w-4 text-inventory md:h-5 md:w-5" />
             Item Categories
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2.5 p-4 pt-0 md:space-y-3 md:p-6 md:pt-0">
           {sortedCategories.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No inventory categories have been created yet.</p>
           ) : (
@@ -113,13 +113,13 @@ export function InventoryCategoriesPanel({
       </Card>
 
       <Card className="border-slate-700 bg-slate-900/70">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Plus className="h-5 w-5 text-inventory" />
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base font-bold text-white md:text-xl md:font-semibold">
+            <Plus className="h-4 w-4 text-inventory md:h-5 md:w-5" />
             {editingCategory ? 'Edit Category' : 'Create Category'}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 pt-0 md:p-6 md:pt-0">
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="category_name">Category Name *</Label>

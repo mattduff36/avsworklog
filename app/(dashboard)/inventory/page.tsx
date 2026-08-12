@@ -40,7 +40,6 @@ import {
   InventoryMobileHeader,
   InventoryMobilePrimaryNav,
   InventoryMobileSecondaryNav,
-  InventoryMobileStatusOverview,
   InventoryMobileStickyNav,
   InventoryRoleViewToggle,
   InventorySummaryCards,
@@ -105,37 +104,10 @@ const INVENTORY_LOCATIONS_SECONDARY_NAV_ITEMS = [
 ];
 
 const INVENTORY_SETTINGS_SECONDARY_NAV_ITEMS = [
-  {
-    value: 'categories' as const,
-    label: 'Categories',
-    icon: PackageSearch,
-    tileClassName: 'bg-slate-800/50 hover:bg-slate-800/80',
-    activeClassName: 'border-slate-600 bg-slate-700/70 text-white',
-  },
-  {
-    value: 'groups' as const,
-    label: 'Groups',
-    icon: PackageSearch,
-    tileClassName: 'bg-blue-500/[0.05] hover:bg-blue-500/[0.1]',
-    activeClassName: 'border-blue-500/30 bg-blue-500/15 text-white',
-    iconClassName: 'text-blue-300',
-  },
-  {
-    value: 'hardware' as const,
-    label: 'Hardware Catalogue',
-    icon: Boxes,
-    tileClassName: 'bg-teal-500/[0.05] hover:bg-teal-500/[0.1]',
-    activeClassName: 'border-teal-500/30 bg-teal-500/15 text-white',
-    iconClassName: 'text-teal-300',
-  },
-  {
-    value: 'kiosk' as const,
-    label: 'Yard Kiosk',
-    icon: ShieldCheck,
-    tileClassName: 'bg-amber-500/[0.05] hover:bg-amber-500/[0.1]',
-    activeClassName: 'border-amber-500/30 bg-amber-500/15 text-white',
-    iconClassName: 'text-amber-300',
-  },
+  { value: 'categories' as const, label: 'Categories', icon: PackageSearch },
+  { value: 'groups' as const, label: 'Groups', icon: PackageSearch, iconClassName: 'text-blue-300' },
+  { value: 'hardware' as const, label: 'Hardware Catalogue', icon: Boxes, iconClassName: 'text-teal-300' },
+  { value: 'kiosk' as const, label: 'Yard Kiosk', icon: ShieldCheck, iconClassName: 'text-amber-300' },
 ];
 
 interface ConfirmActionState {
@@ -1167,59 +1139,13 @@ export default function InventoryPage() {
           onAdd={() => setItemDialogOpen(true)}
           locationLabel={employeeLocationName}
           onChangeLocation={() => setChangeLocationDialogOpen(true)}
+          description="Track small tools, plant, signs, equipment, locations, and check status."
         />
       </div>
 
       {inventoryLoadError ? (
         <InventoryLoadErrorNotice message={inventoryLoadError} onRetry={fetchInventoryData} />
       ) : null}
-
-      <div className="md:hidden">
-        <InventoryMobileStatusOverview
-          activeLabel="Active items"
-          activeValue={summary.total}
-          activeIcon={<PackageSearch className="h-5 w-5" />}
-          onActiveClick={() => applyInventorySummaryFilter({})}
-          statuses={[
-            {
-              id: 'overdue',
-              label: 'Overdue',
-              value: summary.overdue,
-              icon: <AlertTriangle className="h-4 w-4" />,
-              tone: 'danger',
-              isActive: inventoryTableQuickFilter.statusFilters.includes('overdue'),
-              onClick: () => applyInventorySummaryFilter({ statusFilters: ['overdue'] }),
-            },
-            {
-              id: 'due-soon',
-              label: 'Due soon',
-              value: summary.dueSoon,
-              icon: <AlertTriangle className="h-4 w-4" />,
-              tone: 'warning',
-              isActive: inventoryTableQuickFilter.statusFilters.includes('due_soon'),
-              onClick: () => applyInventorySummaryFilter({ statusFilters: ['due_soon'] }),
-            },
-            {
-              id: 'needs-check',
-              label: 'Need check',
-              value: summary.needsCheck,
-              icon: <CheckCircle2 className="h-4 w-4" />,
-              tone: 'info',
-              isActive: inventoryTableQuickFilter.statusFilters.includes('needs_check'),
-              onClick: () => applyInventorySummaryFilter({ statusFilters: ['needs_check'] }),
-            },
-            {
-              id: 'unknown',
-              label: 'Unknown location',
-              value: summary.unknownLocation,
-              icon: <Truck className="h-4 w-4" />,
-              tone: 'neutral',
-              isActive: Boolean(unknownLocation) && inventoryTableQuickFilter.locationFilters.includes(unknownLocation?.id || ''),
-              onClick: applyUnknownLocationFilter,
-            },
-          ]}
-        />
-      </div>
 
       <InventorySummaryCards
         cards={[

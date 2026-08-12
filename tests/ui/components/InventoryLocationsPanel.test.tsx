@@ -137,7 +137,7 @@ describe('InventoryLocationsPanel', () => {
     });
     fetchMock.mockClear();
 
-    fireEvent.change(screen.getByLabelText('Search inventory locations'), {
+    fireEvent.change(screen.getAllByLabelText('Search inventory locations')[0], {
       target: { value: 'y' },
     });
     await act(async () => {

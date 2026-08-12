@@ -7,6 +7,10 @@ import {
   Clock3,
   ExternalLink,
   Loader2,
+  MoreHorizontal,
+  RadioTower,
+  RefreshCw,
+  RotateCcw,
   Search,
   ShieldCheck,
   Tablet,
@@ -26,12 +30,12 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PanelLoader } from '@/components/ui/panel-loader';
@@ -251,321 +255,295 @@ export function InventoryKioskDevicesPanel() {
 
   return (
     <>
-      <Card className="overflow-hidden border-border bg-slate-900/60">
-        <div className="h-1 bg-inventory" />
-        <CardHeader>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-white">
-                <ShieldCheck className="h-5 w-5 text-inventory" />
-                Yard kiosk trusted devices
-              </CardTitle>
-              <CardDescription className="mt-2 max-w-3xl leading-relaxed text-slate-400">
-                Pair approved browser installations for password-free Yard kiosk access.
-              </CardDescription>
-            </div>
-            <Badge
-              variant="outline"
-              className="w-fit border-inventory/40 bg-inventory/10 text-inventory"
-            >
-              {activeDevices.length} active
-            </Badge>
+      <div className="min-w-0 space-y-5 md:space-y-0 md:overflow-hidden md:rounded-lg md:border md:border-border md:bg-slate-900/60">
+        {/* Section header: consistent with the module-wide [icon] Title [count] + metadata pattern. */}
+        <div className="flex items-center justify-between gap-3 md:border-b md:border-border md:bg-slate-950/30 md:p-6">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-base font-bold text-white md:text-lg">
+              <ShieldCheck className="h-4 w-4 shrink-0 text-inventory md:h-5 md:w-5" />
+              Yard kiosk trusted devices
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground md:text-sm">
+              {activeDevices.length} active · password-free Yard kiosk access
+            </p>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {error ? (
-            <div
-              role="alert"
-              className="flex items-start gap-2 rounded-xl border border-red-500/35 bg-red-500/10 p-3 text-sm text-red-100"
-            >
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              {error}
-            </div>
-          ) : null}
+          <Button asChild variant="outline" size="sm" className="h-9 shrink-0">
+            <a href="/inventory/kiosk-control" target="_blank" rel="noopener noreferrer">
+              <ExternalLink className="mr-1.5 h-4 w-4" />
+              Open kiosk control
+            </a>
+          </Button>
+        </div>
 
-          <div className="rounded-xl border border-border bg-slate-950/45 p-4">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="font-semibold text-white">Pair a new kiosk browser</p>
-                <p className="mt-1 text-sm leading-relaxed text-slate-400">
-                  {activeDevices.length > 0
-                    ? 'Only one kiosk can be linked. Replacing it keeps the current tablet active until you confirm the new tablet code.'
-                    : 'Start a five-minute pairing window, then open '}{' '}
-                  {activeDevices.length === 0 ? (
-                    <>
-                  <span className="break-all font-medium text-slate-200">squiresapp.com/yard-kiosk</span>{' '}
-                  on the device and compare the six-digit code.
-                    </>
-                  ) : null}
-                </p>
-              </div>
-              {!pairing ? (
-                <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-                  <div className="w-full min-w-0 space-y-1.5 sm:min-w-64">
-                    <Label htmlFor="kiosk-device-label" className="sr-only">
-                      Device name
-                    </Label>
-                    <Input
-                      id="kiosk-device-label"
-                      value={deviceLabel}
-                      onChange={(event) => setDeviceLabel(event.target.value)}
-                      maxLength={100}
-                      placeholder="e.g. Yard Tablet 1"
-                      disabled={saving}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      if (activeDevices.length > 0) {
-                        if (!deviceLabel.trim()) {
-                          setError('Enter a name for the replacement kiosk device');
-                          return;
-                        }
-                        setIsReplaceDialogOpen(true);
-                        return;
-                      }
-                      void startPairing();
-                    }}
-                    disabled={saving}
-                    className={`min-h-11 w-full sm:w-auto ${
-                      activeDevices.length > 0
-                        ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                        : 'bg-inventory text-white hover:bg-inventory-dark'
-                    }`}
-                  >
-                    {saving ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Search className="mr-2 h-4 w-4" />
-                    )}
-                    {activeDevices.length > 0 ? 'Replace existing kiosk' : 'Start pairing'}
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-
-            {pairing ? (
-              <div className="mt-4 rounded-xl border border-inventory/35 bg-inventory/10 p-4">
-                <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="font-semibold text-inventory">
-                      Pairing {pairing.device_label}
-                    </p>
-                    {pairing.confirmation_code ? (
-                      <>
-                        <p className="mt-1 text-sm text-slate-300">
-                          Confirm only if this matches the code on the kiosk screen.
-                          {pairing.replaces_device_id
-                            ? ' This will immediately revoke the existing kiosk.'
-                            : ''}
-                        </p>
-                        <p className="mt-3 break-all font-mono text-3xl font-black tracking-[0.16em] text-white min-[380px]:text-4xl min-[380px]:tracking-[0.22em]">
-                          {pairing.confirmation_code}
-                        </p>
-                      </>
-                    ) : (
-                      <p className="mt-2 flex items-center gap-2 text-sm text-slate-300">
-                        <Loader2 className="h-4 w-4 animate-spin text-inventory" />
-                        Waiting for the kiosk browser to open the Yard kiosk page
-                      </p>
-                    )}
-                    <p className="mt-3 flex items-center gap-2 text-xs text-slate-400">
-                      <Clock3 className="h-3.5 w-3.5" />
-                      Expires {formatDateTime(pairing.expires_at)}
-                    </p>
-                  </div>
-                  <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => void runAction('cancel_pairing')}
-                      disabled={saving}
-                      className="min-h-11 border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
-                    >
-                      <XCircle className="mr-2 h-4 w-4" />
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => void confirmPairing()}
-                      disabled={saving || !pairing.confirmation_code}
-                      className="min-h-11 bg-inventory text-white hover:bg-inventory-dark"
-                    >
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      {pairing.replaces_device_id
-                        ? 'Confirm and replace kiosk'
-                        : 'Confirm matching code'}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
+        <div className="space-y-5 md:p-6">
+        {error ? (
+          <div
+            role="alert"
+            className="flex items-start gap-2 rounded-xl border border-red-500/35 bg-red-500/10 p-3 text-sm text-red-100"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            {error}
           </div>
+        ) : null}
 
+        {/* Pair a kiosk */}
+        <div className="space-y-3">
           <div>
-            <div className="mb-3 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <p className="font-semibold text-white">Trusted browsers</p>
-                <p className="text-sm text-slate-400">
-                  Access continues until revoked here or browser cookies are cleared.
-                </p>
+            <p className="text-sm font-semibold text-white">Pair a kiosk</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+              {activeDevices.length > 0
+                ? 'Only one kiosk can be linked. Replacing it keeps the current tablet active until you confirm the new code.'
+                : (
+                  <>
+                    Start a five-minute pairing window, then open{' '}
+                    <span className="break-all font-medium text-slate-300">squiresapp.com/yard-kiosk</span>{' '}
+                    on the device and compare the six-digit code.
+                  </>
+                )}
+            </p>
+          </div>
+
+          {!pairing ? (
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="min-w-0 flex-1 space-y-1.5 sm:max-w-64">
+                <Label htmlFor="kiosk-device-label" className="sr-only">
+                  Device name
+                </Label>
+                <Input
+                  id="kiosk-device-label"
+                  value={deviceLabel}
+                  onChange={(event) => setDeviceLabel(event.target.value)}
+                  maxLength={100}
+                  placeholder="e.g. Yard Tablet 1"
+                  disabled={saving}
+                  className="h-11 border-slate-600 bg-slate-800"
+                />
               </div>
-              <Button asChild variant="outline" size="sm" className="min-h-11 w-full sm:w-auto">
-                <a
-                  href="/inventory/kiosk-control"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Open kiosk control
-                </a>
+              <Button
+                type="button"
+                onClick={() => {
+                  if (activeDevices.length > 0) {
+                    if (!deviceLabel.trim()) {
+                      setError('Enter a name for the replacement kiosk device');
+                      return;
+                    }
+                    setIsReplaceDialogOpen(true);
+                    return;
+                  }
+                  void startPairing();
+                }}
+                disabled={saving}
+                className={`h-11 w-full shrink-0 sm:w-auto ${
+                  activeDevices.length > 0
+                    ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+                    : 'bg-inventory text-white hover:bg-inventory-dark'
+                }`}
+              >
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Search className="mr-2 h-4 w-4" />
+                )}
+                {activeDevices.length > 0 ? 'Replace existing kiosk' : 'Start pairing'}
               </Button>
             </div>
-
-            <div className="space-y-2">
-              {activeDevices.length > 0 ? activeDevices.map((device) => (
-                <div
-                  key={device.id}
-                  className="rounded-xl border border-border bg-slate-950/40 p-4"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <div className="rounded-lg bg-inventory/10 p-2 text-inventory">
-                        <Tablet className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-white">{device.device_label}</p>
-                          <Badge
-                            variant="outline"
-                            className={
-                              device.presence === 'online'
-                                ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-200'
-                                : device.presence === 'stale'
-                                  ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
-                                  : 'border-slate-500/40 bg-slate-500/10 text-slate-300'
-                            }
-                          >
-                            {presenceLabel(device)}
-                          </Badge>
-                        </div>
-                        <p className="mt-1 break-words text-sm text-slate-400">
-                          Paired {formatDateTime(device.created_at)}
-                        </p>
-                        <p className="break-words text-sm text-slate-400">
-                          Last automatic login {formatDateTime(device.last_authenticated_at)}
-                        </p>
-                        <p className="break-words text-sm text-slate-400">
-                          Last contact {formatDateTime(device.last_heartbeat_at || null)}
-                          {device.last_phase ? ` · ${device.last_phase}` : ''}
-                        </p>
-                        {device.last_error_code ? (
-                          <p className="mt-1 break-words text-sm text-amber-200">
-                            Last issue {device.last_error_code}
-                            {device.last_diagnostic_id
-                              ? ` · Ref ${device.last_diagnostic_id}`
-                              : ''}
-                          </p>
-                        ) : null}
-                        {(device.pending_commands || []).length > 0 ? (
-                          <p className="mt-1 break-words text-xs text-sky-200">
-                            Pending: {(device.pending_commands || [])
-                              .map((command) => `${command.command_type} (${command.status})`)
-                              .join(', ')}
-                          </p>
-                        ) : null}
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setRevokeTarget(device)}
-                      disabled={saving}
-                      className="min-h-11 w-full border-red-500/40 text-red-300 hover:bg-red-500/10 sm:w-auto"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Revoke
-                    </Button>
-                  </div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="min-h-11"
-                      disabled={saving || device.presence === 'offline'}
-                      onClick={() => void issueCommand(device, 'ping')}
-                    >
-                      Ping
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="min-h-11"
-                      disabled={saving || device.presence === 'offline'}
-                      onClick={() => void issueCommand(device, 'reload_app')}
-                    >
-                      Reload app
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="min-h-11"
-                      disabled={saving || device.presence === 'offline'}
-                      onClick={() => setDestructiveTarget({
-                        device,
-                        command: 'reset_workflow',
-                      })}
-                    >
-                      Reset screen
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      className="min-h-11"
-                      disabled={saving || device.presence === 'offline'}
-                      onClick={() => setDestructiveTarget({
-                        device,
-                        command: 'logout',
-                      })}
-                    >
-                      Sign out
-                    </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      disabled={saving}
-                      onClick={() => setDestructiveTarget({
-                        device,
-                        command: 'clear_credentials',
-                      })}
-                      className="min-h-11 border-amber-500/40 text-amber-200"
-                    >
-                      Clear &amp; re-pair
-                    </Button>
-                  </div>
-                </div>
-              )) : (
-                <div className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-slate-400">
-                  No Yard kiosk browsers are paired yet.
-                </div>
+          ) : (
+            <div className="rounded-xl border border-inventory/35 bg-inventory/10 p-4">
+              <p className="font-semibold text-inventory">
+                Pairing {pairing.device_label}
+              </p>
+              {pairing.confirmation_code ? (
+                <>
+                  <p className="mt-1 text-sm text-slate-300">
+                    Confirm only if this matches the code on the kiosk screen.
+                    {pairing.replaces_device_id
+                      ? ' This will immediately revoke the existing kiosk.'
+                      : ''}
+                  </p>
+                  <p className="mt-3 break-all font-mono text-3xl font-black tracking-[0.16em] text-white min-[380px]:text-4xl min-[380px]:tracking-[0.22em]">
+                    {pairing.confirmation_code}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 flex items-center gap-2 text-sm text-slate-300">
+                  <Loader2 className="h-4 w-4 animate-spin text-inventory" />
+                  Waiting for the kiosk browser to open the Yard kiosk page
+                </p>
               )}
+              <p className="mt-3 flex items-center gap-2 text-xs text-slate-400">
+                <Clock3 className="h-3.5 w-3.5" />
+                Expires {formatDateTime(pairing.expires_at)}
+              </p>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void runAction('cancel_pairing')}
+                  disabled={saving}
+                  className="h-11 border-amber-500/40 text-amber-200 hover:bg-amber-500/10"
+                >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void confirmPairing()}
+                  disabled={saving || !pairing.confirmation_code}
+                  className="h-11 flex-1 bg-inventory text-white hover:bg-inventory-dark"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  {pairing.replaces_device_id
+                    ? 'Confirm and replace kiosk'
+                    : 'Confirm matching code'}
+                </Button>
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* Trusted browsers */}
+        <div className="space-y-2.5">
+          <div>
+            <p className="text-sm font-semibold text-white">Trusted browsers</p>
+            <p className="text-xs text-muted-foreground">
+              Access continues until revoked here or browser cookies are cleared.
+            </p>
           </div>
 
-          {revokedDevices.length > 0 ? (
-            <p className="text-xs text-slate-500">
-              {revokedDevices.length} revoked device{revokedDevices.length === 1 ? '' : 's'} retained
-              in the audit history.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
+          <div className="space-y-2.5">
+            {activeDevices.length > 0 ? activeDevices.map((device) => (
+              <div
+                key={device.id}
+                className="min-w-0 rounded-xl border border-slate-700/70 bg-slate-900/50 p-3.5"
+              >
+                <div className="flex items-start gap-2">
+                  <Tablet className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-white">{device.device_label}</p>
+                      <Badge
+                        variant="outline"
+                        className={
+                          device.presence === 'online'
+                            ? 'border-emerald-400/40 bg-emerald-500/10 text-[10px] text-emerald-200'
+                            : device.presence === 'stale'
+                              ? 'border-amber-400/40 bg-amber-500/10 text-[10px] text-amber-200'
+                              : 'border-slate-500/40 bg-slate-500/10 text-[10px] text-slate-300'
+                        }
+                      >
+                        {presenceLabel(device)}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 break-words text-xs text-muted-foreground">
+                      Paired {formatDateTime(device.created_at)} · Last automatic login {formatDateTime(device.last_authenticated_at)}
+                    </p>
+                    <p className="break-words text-xs text-muted-foreground">
+                      Last contact {formatDateTime(device.last_heartbeat_at || null)}
+                      {device.last_phase ? ` · ${device.last_phase}` : ''}
+                    </p>
+                    {device.last_error_code ? (
+                      <p className="mt-1 break-words text-xs text-amber-200">
+                        Last issue {device.last_error_code}
+                        {device.last_diagnostic_id ? ` · Ref ${device.last_diagnostic_id}` : ''}
+                      </p>
+                    ) : null}
+                    {(device.pending_commands || []).length > 0 ? (
+                      <p className="mt-1 break-words text-xs text-sky-200">
+                        Pending: {(device.pending_commands || [])
+                          .map((command) => `${command.command_type} (${command.status})`)
+                          .join(', ')}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-3 flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-9 flex-1 min-w-0 justify-center border-slate-600"
+                        disabled={saving || device.presence === 'offline'}
+                        onClick={() => void issueCommand(device, 'ping')}
+                      >
+                        <RadioTower className="mr-1.5 h-3.5 w-3.5" />
+                        Ping
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-9 flex-1 min-w-0 justify-center border-slate-600"
+                        disabled={saving || device.presence === 'offline'}
+                        onClick={() => void issueCommand(device, 'reload_app')}
+                      >
+                        <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                        Reload
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            className="h-9 w-9 shrink-0 border-slate-600 text-slate-300"
+                            aria-label={`More actions for ${device.device_label}`}
+                          >
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            disabled={saving || device.presence === 'offline'}
+                            onClick={() => setDestructiveTarget({ device, command: 'reset_workflow' })}
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                            Reset screen
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={saving || device.presence === 'offline'}
+                            onClick={() => setDestructiveTarget({ device, command: 'logout' })}
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Sign out
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            disabled={saving}
+                            onClick={() => setDestructiveTarget({ device, command: 'clear_credentials' })}
+                            className="text-amber-300 focus:bg-amber-500/10 focus:text-amber-200"
+                          >
+                            <Clock3 className="h-4 w-4" />
+                            Clear &amp; re-pair
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            disabled={saving}
+                            onClick={() => setRevokeTarget(device)}
+                            className="text-red-300 focus:bg-red-500/10 focus:text-red-200"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Revoke device
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )) : (
+              <div className="rounded-xl border border-dashed border-slate-700 p-6 text-center text-sm text-muted-foreground">
+                No Yard kiosk browsers are paired yet.
+              </div>
+            )}
+          </div>
+        </div>
+
+        {revokedDevices.length > 0 ? (
+          <p className="text-xs text-slate-500">
+            {revokedDevices.length} revoked device{revokedDevices.length === 1 ? '' : 's'} retained
+            in the audit history.
+          </p>
+        ) : null}
+        </div>
+      </div>
 
       <AlertDialog
         open={isReplaceDialogOpen}

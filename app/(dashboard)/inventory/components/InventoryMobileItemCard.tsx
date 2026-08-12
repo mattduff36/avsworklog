@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils/cn';
-import { Archive, MapPin, MoreHorizontal, RotateCcw } from 'lucide-react';
+import { Archive, MapPin, MoreHorizontal, PackageSearch, RotateCcw } from 'lucide-react';
 import type { InventoryCheckStatus, InventoryItem } from '../types';
 import { formatInventoryCategoryLabel } from '../types';
 import { formatInventoryDate, getInventoryCheckStatus, getCheckStatusLabel, shouldMuteInventoryCheckBadge } from '../utils';
@@ -22,12 +22,13 @@ import {
   renderLocationDetails,
 } from './InventoryItemPresentation';
 
-const STATUS_ACCENT_CLASSNAME: Record<InventoryCheckStatus, string> = {
-  overdue: 'before:bg-red-500/70',
-  due_soon: 'before:bg-amber-500/70',
-  needs_check: 'before:bg-blue-500/70',
-  not_required: 'before:bg-slate-600/70',
-  ok: 'before:bg-green-500/60',
+/** Same restrained "full tinted border" grammar used by Location cards; only communicates when it's useful (overdue/due soon/needs check). */
+const STATUS_SURFACE_CLASSNAME: Record<InventoryCheckStatus, string> = {
+  overdue: 'border-red-500/25 bg-red-500/[0.04]',
+  due_soon: 'border-amber-500/25 bg-amber-500/[0.04]',
+  needs_check: 'border-blue-500/25 bg-blue-500/[0.04]',
+  not_required: 'border-slate-700/70 bg-slate-900/50',
+  ok: 'border-slate-700/70 bg-slate-900/50',
 };
 
 interface InventoryMobileItemCardProps {
@@ -57,12 +58,16 @@ export function InventoryMobileItemCard({
 }: InventoryMobileItemCardProps) {
   const checkStatus = getInventoryCheckStatus(item);
   const isMuted = shouldMuteInventoryCheckBadge(item);
-  const accentClassName = retiredMode
-    ? 'before:bg-slate-500/60'
-    : isMuted
-      ? 'before:bg-slate-600/70'
-      : STATUS_ACCENT_CLASSNAME[checkStatus];
+  const surfaceClassName = retiredMode || isMuted
+    ? 'border-slate-700/70 bg-slate-900/50'
+    : STATUS_SURFACE_CLASSNAME[checkStatus];
   const checkDueDetails = !retiredMode ? renderCheckDueDetails(item) : null;
+  const metaParts = [
+    item.item_number,
+    showSerialNumber ? `SN ${item.minor_plant_detail?.serial_number || 'Not recorded'}` : null,
+    formatInventoryCategoryLabel(item.category, categoryLabels),
+    item.group ? item.group.name : null,
+  ].filter(Boolean);
 
   function stop(event: MouseEvent) {
     event.stopPropagation();
@@ -71,10 +76,9 @@ export function InventoryMobileItemCard({
   return (
     <div
       className={cn(
-        'relative min-w-0 overflow-hidden rounded-xl border border-slate-700/70 bg-slate-900/60 p-3.5 pl-4',
-        "before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:content-['']",
-        accentClassName,
-        onOpenDetails && 'cursor-pointer active:bg-slate-900/80',
+        'min-w-0 rounded-xl border p-3.5 transition-colors',
+        surfaceClassName,
+        onOpenDetails && 'cursor-pointer active:brightness-110',
       )}
       onClick={onOpenDetails ? () => onOpenDetails(item) : undefined}
       data-testid="inventory-mobile-item-card"
@@ -91,18 +95,19 @@ export function InventoryMobileItemCard({
         ) : null}
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2">
+            <PackageSearch className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
             {onOpenDetails ? (
               <button
                 type="button"
                 onClick={(event) => { event.stopPropagation(); onOpenDetails(item); }}
-                className="min-w-0 break-words text-left text-[15px] font-semibold leading-snug text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory"
+                className="min-w-0 flex-1 break-words text-left text-[15px] font-semibold leading-snug text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inventory"
                 aria-label={`Open ${item.name} details`}
               >
                 {item.name}
               </button>
             ) : (
-              <span className="min-w-0 break-words text-[15px] font-semibold leading-snug text-white">{item.name}</span>
+              <span className="min-w-0 flex-1 break-words text-[15px] font-semibold leading-snug text-white">{item.name}</span>
             )}
             {retiredMode ? (
               <Badge variant="outline" className={cn('shrink-0 whitespace-nowrap text-[10px]', getRetireReasonBadgeClass(item.retire_reason))}>
@@ -115,25 +120,16 @@ export function InventoryMobileItemCard({
             )}
           </div>
 
-          <div className="mt-0.5 text-xs text-muted-foreground">
-            {item.item_number}
-            {showSerialNumber ? ` · SN ${item.minor_plant_detail?.serial_number || 'Not recorded'}` : ''}
-            {' · '}
-            {formatInventoryCategoryLabel(item.category, categoryLabels)}
+          <div className="ml-6 mt-0.5 truncate text-xs text-muted-foreground">
+            {metaParts.join(' · ')}
           </div>
 
-          {item.group ? (
-            <Badge variant="outline" className="mt-1.5 border-purple-500/30 bg-purple-500/10 text-[10px] text-purple-200">
-              {item.group.name}
-            </Badge>
-          ) : null}
-
-          <div className="mt-2 flex min-w-0 items-start gap-1.5 text-sm text-slate-300">
+          <div className="ml-6 mt-1.5 flex min-w-0 items-start gap-1.5 text-sm text-slate-300">
             <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-500" />
             <div className="min-w-0 break-words">{renderLocationDetails(item)}</div>
           </div>
 
-          <div className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+          <div className="ml-6 mt-1 text-[11px] leading-relaxed text-muted-foreground">
             {retiredMode
               ? `Retired ${formatInventoryDate(item.retired_at)}`
               : (
@@ -144,7 +140,7 @@ export function InventoryMobileItemCard({
               )}
           </div>
 
-          <div className="mt-3 flex items-center gap-2">
+          <div className="ml-6 mt-3 flex items-center gap-2">
             {!retiredMode && onMove ? (
               <Button
                 type="button"

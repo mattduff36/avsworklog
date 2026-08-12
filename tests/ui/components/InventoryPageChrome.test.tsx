@@ -10,7 +10,7 @@ import {
   InventoryMobileHeader,
   InventoryMobilePrimaryNav,
   InventoryMobileSecondaryNav,
-  InventoryMobileStatusOverview,
+  InventoryMobileStatusChip,
   InventoryRoleViewToggle,
   InventorySummaryCards,
   INVENTORY_EMPLOYEE_TABS_LIST_CLASSNAME,
@@ -174,39 +174,25 @@ describe('InventoryPageChrome', () => {
     expect(onValueChange).toHaveBeenCalledWith('retired');
   });
 
-  it('INV-MOBILE-002: mobile status overview retains all five summary values and quick-filter callbacks', () => {
-    const onActiveClick = vi.fn();
-    const onOverdueClick = vi.fn();
-
+  it('a standalone status chip remains tappable for contextual alerts (e.g. My Location check alerts)', () => {
+    const onClick = vi.fn();
     render(
-      <InventoryMobileStatusOverview
-        activeLabel="Active items"
-        activeValue={469}
-        activeIcon={<PackageSearch className="h-5 w-5" />}
-        onActiveClick={onActiveClick}
-        statuses={[
-          { id: 'overdue', label: 'Overdue', value: 78, icon: <PackageSearch className="h-4 w-4" />, tone: 'danger', onClick: onOverdueClick },
-          { id: 'due-soon', label: 'Due soon', value: 2, icon: <PackageSearch className="h-4 w-4" />, tone: 'warning' },
-          { id: 'needs-check', label: 'Need check', value: 106, icon: <PackageSearch className="h-4 w-4" />, tone: 'info' },
-          { id: 'unknown', label: 'Unknown location', value: 113, icon: <PackageSearch className="h-4 w-4" />, tone: 'neutral' },
-        ]}
+      <InventoryMobileStatusChip
+        id="overdue"
+        label="Overdue"
+        value={78}
+        icon={<PackageSearch className="h-4 w-4" />}
+        tone="danger"
+        onClick={onClick}
       />,
     );
 
-    expect(screen.getByText('469')).toBeInTheDocument();
     expect(screen.getByText('78')).toBeInTheDocument();
-    expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('106')).toBeInTheDocument();
-    expect(screen.getByText('113')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Active items/ }));
-    expect(onActiveClick).toHaveBeenCalledTimes(1);
-
     fireEvent.click(screen.getByText('Overdue'));
-    expect(onOverdueClick).toHaveBeenCalledTimes(1);
+    expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it('mobile header exposes Add and current-location Change actions', () => {
+  it('mobile header is a single card (icon/title/description + Add, then a Change-location row) with no permanent KPI panel', () => {
     const onAdd = vi.fn();
     const onChangeLocation = vi.fn();
 
@@ -215,14 +201,21 @@ describe('InventoryPageChrome', () => {
         onAdd={onAdd}
         locationLabel="Van - TE57 VAN"
         onChangeLocation={onChangeLocation}
+        description="Track small tools, plant, signs, equipment, locations, and check status."
       />,
     );
 
-    expect(screen.getByRole('heading', { name: 'Inventory' })).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { name: 'Inventory' });
+    expect(heading).toBeInTheDocument();
+    expect(screen.getByText(/Track small tools/)).toBeInTheDocument();
+    expect(screen.getByTestId('inventory-mobile-header')).toHaveClass('rounded-xl', 'border');
+
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
     expect(onAdd).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByTestId('inventory-mobile-location-action'));
     expect(onChangeLocation).toHaveBeenCalledTimes(1);
+
+    expect(screen.queryByTestId('inventory-mobile-status-overview')).not.toBeInTheDocument();
   });
 });

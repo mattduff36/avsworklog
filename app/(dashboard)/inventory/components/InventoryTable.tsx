@@ -15,7 +15,11 @@ import {
   RotateCcw,
   Truck,
 } from 'lucide-react';
-import { InventoryMobileFilters, type InventoryMobileFilterChip } from './InventoryMobileFilters';
+import {
+  InventoryMobileFilterChips,
+  InventoryMobileFilters,
+  type InventoryMobileFilterChip,
+} from './InventoryMobileFilters';
 import { InventoryMobileItemCard } from './InventoryMobileItemCard';
 import {
   getRetireReasonBadgeClass,
@@ -491,9 +495,95 @@ export function InventoryTable({
 
   return (
     <TooltipProvider delayDuration={150}>
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-3">
+      {/* Mobile: search + Filters share one row; chips only appear when filters are active. */}
+      <div className="flex items-center gap-2 md:hidden">
+        <SearchInput
+          placeholder={`Search ${tableLabel}...`}
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          containerClassName="h-11 flex-1 border-slate-600 bg-slate-800"
+          className="text-white placeholder:text-muted-foreground"
+        />
+        <InventoryMobileFilters
+          open={mobileFiltersOpen}
+          onOpenChange={setMobileFiltersOpen}
+          activeFilterCount={activeFilterCount}
+          hasAnyFilters={hasAnyFilters}
+          onClearAll={clearFilters}
+        >
+          {showLocationFilter ? (
+            <LegacyQuoteLocationOptIn
+              enabled={includeLegacyQuotes}
+              onEnabledChange={setIncludeLegacyQuotes}
+              className="w-full"
+            />
+          ) : null}
+
+          {!retiredMode && statusFilterOptions.length > 0 ? (
+            <MultiSelectFilter
+              label="Check Status"
+              panelId="mobile-check-status-filter-menu"
+              allLabel="All status"
+              selectedValues={statusFilters}
+              options={statusFilterOptions}
+              onSelectedValuesChange={setStatusFilters}
+              triggerClassName="!w-full min-h-11"
+            />
+          ) : null}
+
+          {showCategoryFilter ? (
+            <MultiSelectFilter
+              label="Category"
+              panelId="mobile-category-filter-menu"
+              allLabel="All categories"
+              selectedValues={categoryFilters}
+              options={categoryFilterOptions}
+              onSelectedValuesChange={setCategoryFilters}
+              triggerClassName="!w-full min-h-11"
+            />
+          ) : null}
+
+          {retiredMode && retireReasonFilterOptions.length > 0 ? (
+            <MultiSelectFilter
+              label="Retire Reason"
+              panelId="mobile-retire-reason-filter-menu"
+              allLabel="All reasons"
+              selectedValues={retireReasonFilters}
+              options={retireReasonFilterOptions}
+              onSelectedValuesChange={setRetireReasonFilters}
+              triggerClassName="!w-full min-h-11"
+            />
+          ) : null}
+
+          {showLocationFilter && locationFilterOptions.length > 0 ? (
+            <MultiSelectFilter
+              label="Location"
+              panelId="mobile-location-filter-menu"
+              allLabel="All locations"
+              selectedValues={locationFilters}
+              options={locationFilterOptions}
+              onSelectedValuesChange={setLocationFilters}
+              triggerClassName="!w-full min-h-11"
+              panelClassName="max-h-[min(20rem,calc(100dvh-14rem))]"
+              searchable
+              searchPlaceholder="Search locations..."
+              emptyLabel="No locations found"
+              allOptionPosition="bottom"
+              showPanelLabel={false}
+              collapsibleGroupLabels={COLLAPSIBLE_LOCATION_FILTER_GROUPS}
+              minimumSearchCharactersByGroupLabel={LOCATION_FILTER_MINIMUM_SEARCH_CHARACTERS}
+              onOpenChange={(open) => {
+                if (!open) setIncludeLegacyQuotes(false);
+              }}
+            />
+          ) : null}
+        </InventoryMobileFilters>
+      </div>
+      <InventoryMobileFilterChips chips={mobileFilterChips} onClearAll={clearFilters} className="md:hidden" />
+
       <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0 max-w-sm flex-1">
+        <div className="hidden min-w-0 max-w-sm flex-1 md:block">
           <SearchInput
             placeholder={`Search ${tableLabel}...`}
             value={search}
@@ -589,84 +679,6 @@ export function InventoryTable({
               </Button>
             ) : null}
           </div>
-        </div>
-
-        <div className="md:hidden">
-          <InventoryMobileFilters
-            open={mobileFiltersOpen}
-            onOpenChange={setMobileFiltersOpen}
-            activeFilterCount={activeFilterCount}
-            chips={mobileFilterChips}
-            hasAnyFilters={hasAnyFilters}
-            onClearAll={clearFilters}
-          >
-            {showLocationFilter ? (
-              <LegacyQuoteLocationOptIn
-                enabled={includeLegacyQuotes}
-                onEnabledChange={setIncludeLegacyQuotes}
-                className="w-full"
-              />
-            ) : null}
-
-            {!retiredMode && statusFilterOptions.length > 0 ? (
-              <MultiSelectFilter
-                label="Check Status"
-                panelId="mobile-check-status-filter-menu"
-                allLabel="All status"
-                selectedValues={statusFilters}
-                options={statusFilterOptions}
-                onSelectedValuesChange={setStatusFilters}
-                triggerClassName="!w-full min-h-11"
-              />
-            ) : null}
-
-            {showCategoryFilter ? (
-              <MultiSelectFilter
-                label="Category"
-                panelId="mobile-category-filter-menu"
-                allLabel="All categories"
-                selectedValues={categoryFilters}
-                options={categoryFilterOptions}
-                onSelectedValuesChange={setCategoryFilters}
-                triggerClassName="!w-full min-h-11"
-              />
-            ) : null}
-
-            {retiredMode && retireReasonFilterOptions.length > 0 ? (
-              <MultiSelectFilter
-                label="Retire Reason"
-                panelId="mobile-retire-reason-filter-menu"
-                allLabel="All reasons"
-                selectedValues={retireReasonFilters}
-                options={retireReasonFilterOptions}
-                onSelectedValuesChange={setRetireReasonFilters}
-                triggerClassName="!w-full min-h-11"
-              />
-            ) : null}
-
-            {showLocationFilter && locationFilterOptions.length > 0 ? (
-              <MultiSelectFilter
-                label="Location"
-                panelId="mobile-location-filter-menu"
-                allLabel="All locations"
-                selectedValues={locationFilters}
-                options={locationFilterOptions}
-                onSelectedValuesChange={setLocationFilters}
-                triggerClassName="!w-full min-h-11"
-                panelClassName="max-h-[min(20rem,calc(100dvh-14rem))]"
-                searchable
-                searchPlaceholder="Search locations..."
-                emptyLabel="No locations found"
-                allOptionPosition="bottom"
-                showPanelLabel={false}
-                collapsibleGroupLabels={COLLAPSIBLE_LOCATION_FILTER_GROUPS}
-                minimumSearchCharactersByGroupLabel={LOCATION_FILTER_MINIMUM_SEARCH_CHARACTERS}
-                onOpenChange={(open) => {
-                  if (!open) setIncludeLegacyQuotes(false);
-                }}
-              />
-            ) : null}
-          </InventoryMobileFilters>
         </div>
       </div>
 

@@ -117,13 +117,13 @@ export function InventoryGroupsPanel({
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
       <Card className="border-slate-700 bg-slate-900/70">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <Users className="h-5 w-5 text-inventory" />
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base font-bold text-white md:text-xl md:font-semibold">
+            <Users className="h-4 w-4 text-inventory md:h-5 md:w-5" />
             Inventory Groups
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-2.5 p-4 pt-0 md:space-y-3 md:p-6 md:pt-0">
           {groups.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No inventory groups have been created yet.</p>
           ) : (
@@ -156,9 +156,9 @@ export function InventoryGroupsPanel({
       </Card>
 
       <Card className="border-slate-700 bg-slate-900/70">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-white">
-            <PackagePlus className="h-5 w-5 text-inventory" />
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-base font-bold text-white md:text-xl md:font-semibold">
+            <PackagePlus className="h-4 w-4 text-inventory md:h-5 md:w-5" />
             {editingGroup ? 'Edit Group' : 'Create Group'}
           </CardTitle>
         </CardHeader>
