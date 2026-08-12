@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.23.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update inventory`
+
+**PUSHED AT**
+2026-08-12T01:53:18.918Z
+
+**WHAT CHANGED**
+Update inventory. Unify and simplify mobile Inventory visual language. Redesign mobile Inventory module UX.
+
+**VERSION HISTORY DETAILS**
+- Updated inventory, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update inventory`
+- `polish(inventory): unify and simplify mobile Inventory visual language`
+- `feat(inventory): redesign mobile Inventory module UX`
+
 ## 0826.22.0
 
 **GIT COMMIT MESSAGE**

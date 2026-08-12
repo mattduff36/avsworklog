@@ -1,5 +1,23 @@
 [
   {
+    "version": "0826.23.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated inventory. Unify and simplify mobile Inventory visual language. Redesign mobile Inventory module UX.",
+    "summary": "Updated inventory. Unify and simplify mobile Inventory visual language. Redesign mobile Inventory module UX.",
+    "details": [
+      "Updated inventory, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Inventory. Unify",
+      "Simplify mobile Inventory visual language. Redesign mobile Inventory module UX"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-08-12T01:53:18.918Z"
+  },
+  {
     "version": "0826.22.0",
     "updateKind": "major",
     "title": "Dashboard update",
