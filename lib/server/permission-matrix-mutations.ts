@@ -179,7 +179,7 @@ export async function applyPermissionMatrixUpdatesAtomically(
         FROM public.profiles profile
         INNER JOIN public.roles role ON role.id = profile.role_id
         WHERE profile.id = ANY($1::uuid[])
-           OR profile.team_id = ANY($2::uuid[])
+           OR profile.team_id = ANY($2::text[])
         FOR UPDATE OF profile
       `,
       [targetUserIds, teamIds]
@@ -222,7 +222,7 @@ export async function applyPermissionMatrixUpdatesAtomically(
           `
             SELECT team_id, module_name, enabled
             FROM public.team_module_permissions
-            WHERE team_id = ANY($1::uuid[])
+            WHERE team_id = ANY($1::text[])
               AND module_name = ANY($2::text[])
             FOR UPDATE
           `,

@@ -8,6 +8,7 @@ import {
   getPermissionSetForUser,
   getUsersWithModuleAccess,
   isFullAccessRole,
+  isMissingTeamPermissionSchemaError,
   normalizePermissionAccessLevel,
   resolveModuleLevelForRoleRank,
   resolveModulesForRoleRank,
@@ -734,5 +735,32 @@ describe('team permission helpers', () => {
     );
 
     expect(allowedUsers).toEqual(new Set(['employee-1', 'employee-2']));
+  });
+
+  it('PERM-ERR-01 only classifies known missing permission schema objects', () => {
+    expect(isMissingTeamPermissionSchemaError({
+      code: '42P01',
+      message: 'relation "public.permission_modules" does not exist',
+    })).toBe(true);
+    expect(isMissingTeamPermissionSchemaError({
+      code: '42703',
+      message: 'column permission_modules.access_mode does not exist',
+    })).toBe(true);
+    expect(isMissingTeamPermissionSchemaError({
+      code: 'PGRST204',
+      message: "Could not find the 'access_level' column of 'user_module_permissions'",
+    })).toBe(true);
+
+    expect(isMissingTeamPermissionSchemaError({
+      code: '42883',
+      message: 'operator does not exist: text = uuid',
+    })).toBe(false);
+    expect(isMissingTeamPermissionSchemaError({
+      code: '42P01',
+      message: 'relation "public.audit_log" does not exist',
+    })).toBe(false);
+    expect(isMissingTeamPermissionSchemaError({
+      message: 'permission_modules does not exist',
+    })).toBe(false);
   });
 });

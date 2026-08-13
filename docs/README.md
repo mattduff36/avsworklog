@@ -14,6 +14,7 @@ Step-by-step guides for common tasks:
 
 - **[How to Run Migrations](./guides/HOW_TO_RUN_MIGRATIONS.md)** ⭐ **START HERE** - Quick reference for running database migrations
 - **[Migrations Guide](./guides/MIGRATIONS_GUIDE.md)** - Comprehensive guide to creating and running migrations
+- **[Adding a New Module With Permissions](./guides/ADDING_A_NEW_MODULE_WITH_PERMISSIONS.md)** - End-to-end registration, enforcement, rollout, and test checklist
 - **[Reports Quick Start](./guides/REPORTS_QUICK_START.md)** - Using the reports system
 - **[Resend Email Setup](./guides/RESEND_SETUP_GUIDE.md)** - Configuring email service
 - **[Sample Data Info](./guides/SAMPLE_DATA_INFO.md)** - Information about test data

@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { JobCataloguePicker } from '@/components/daily-allocation/JobCataloguePicker';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
-import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import type { DailyAllocationBoardPayload, DailyLabourBoardRow, DailyPlantBoardRow } from '@/types/daily-allocation';
 import type { JobCatalogueOption } from '@/types/job-catalogue';
@@ -88,7 +88,7 @@ function clearStoredPublishAttempt() {
 
 export default function DailyAllocationBoardPage() {
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('daily-allocation');
-  const { permissionLevels } = usePermissionSnapshot();
+  const { canUseLevel, isLoading: levelLoading } = useModuleAccessLevel('daily-allocation');
   const [workDate, setWorkDate] = useState(tomorrowIso);
   const [board, setBoard] = useState<DailyAllocationBoardPayload | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -105,7 +105,7 @@ export default function DailyAllocationBoardPage() {
   const [hiredJob, setHiredJob] = useState<JobCatalogueOption | null>(null);
   const [registeredPlantId, setRegisteredPlantId] = useState('');
   const [registeredJob, setRegisteredJob] = useState<JobCatalogueOption | null>(null);
-  const canManage = (permissionLevels?.['daily-allocation'] || 0) >= 4 || Boolean(board?.context.is_manager);
+  const canManage = canUseLevel(4);
 
   const loadBoard = useCallback(async (date: string): Promise<boolean> => {
     setLoading(true);
@@ -128,9 +128,9 @@ export default function DailyAllocationBoardPage() {
   }, []);
 
   useEffect(() => {
-    if (!hasPermission || permissionLoading) return;
+    if (!hasPermission || !canManage || permissionLoading || levelLoading) return;
     void loadBoard(workDate);
-  }, [hasPermission, loadBoard, permissionLoading, workDate]);
+  }, [canManage, hasPermission, levelLoading, loadBoard, permissionLoading, workDate]);
 
   useEffect(() => {
     if (previousWorkDateRef.current === workDate) return;
@@ -298,7 +298,7 @@ export default function DailyAllocationBoardPage() {
     setPublishing(false);
   }
 
-  if (permissionLoading) {
+  if (permissionLoading || levelLoading) {
     return (
       <AppPageLoadingShell
         title="Daily Allocation"
@@ -315,6 +315,18 @@ export default function DailyAllocationBoardPage() {
           title="Daily Allocation"
           titleMeta={dailyAllocationBetaBadge}
           description="This module is not enabled for your team. During deployment it remains unavailable until post-deploy activation is complete."
+        />
+      </AppPageShell>
+    );
+  }
+
+  if (!canManage) {
+    return (
+      <AppPageShell>
+        <AppPageHeader
+          title="Daily Allocation"
+          titleMeta={dailyAllocationBetaBadge}
+          description="Level 4 manager access is required to plan this board."
         />
       </AppPageShell>
     );
@@ -338,18 +350,6 @@ export default function DailyAllocationBoardPage() {
           titleMeta={dailyAllocationBetaBadge}
           description={loadError || 'The allocation board could not be loaded.'}
           actions={<Button onClick={() => void loadBoard(workDate)}>Retry</Button>}
-        />
-      </AppPageShell>
-    );
-  }
-
-  if (!canManage) {
-    return (
-      <AppPageShell>
-        <AppPageHeader
-          title="Daily Allocation"
-          titleMeta={dailyAllocationBetaBadge}
-          description="Manager access is required to plan this board."
         />
       </AppPageShell>
     );

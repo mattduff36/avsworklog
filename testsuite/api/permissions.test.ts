@@ -156,6 +156,9 @@ describe('@permissions API Endpoint Access Control', () => {
       '/api/admin/vans',
       '/api/admin/categories',
       '/api/reports/stats',
+      '/api/daily-allocation/me',
+      '/api/daily-allocation/board',
+      '/api/daily-allocation/jobs/JOB-100',
     ];
 
     for (const endpoint of protectedEndpoints) {

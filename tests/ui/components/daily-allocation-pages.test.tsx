@@ -6,12 +6,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import DailyAllocationBoardPage from '@/app/(dashboard)/daily-allocation/page';
 import DailyAllocationJobSheetPage from '@/app/(dashboard)/daily-allocation/jobs/[code]/page';
+import MyDailyAllocationPage from '@/app/(dashboard)/daily-allocation/my/page';
 import type { DailyAllocationBoardPayload, DailyJobSheetPayload } from '@/types/daily-allocation';
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
   toastSuccess: vi.fn(),
   randomUUID: vi.fn(),
+  accessLevel: 5,
 }));
 
 vi.mock('sonner', () => ({
@@ -23,6 +25,7 @@ vi.mock('sonner', () => ({
 
 vi.mock('next/navigation', () => ({
   useParams: () => ({ code: 'JOB-100' }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 vi.mock('@/lib/hooks/usePermissionCheck', () => ({
@@ -31,6 +34,14 @@ vi.mock('@/lib/hooks/usePermissionCheck', () => ({
 
 vi.mock('@/lib/hooks/usePermissionSnapshot', () => ({
   usePermissionSnapshot: () => ({ permissionLevels: { 'daily-allocation': 5 } }),
+}));
+
+vi.mock('@/lib/hooks/useModuleAccessLevel', () => ({
+  useModuleAccessLevel: () => ({
+    accessLevel: mocks.accessLevel,
+    canUseLevel: (minimumLevel: number) => mocks.accessLevel >= minimumLevel,
+    isLoading: false,
+  }),
 }));
 
 vi.mock('@/components/layout/AppPageShell', () => ({
@@ -175,6 +186,7 @@ function buildBoard(): DailyAllocationBoardPayload {
 describe('daily allocation manager board', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.accessLevel = 5;
     window.sessionStorage.clear();
     mocks.randomUUID
       .mockReturnValueOnce('attempt-one')
@@ -230,6 +242,17 @@ describe('daily allocation manager board', () => {
     expect(publishBodies[0].idempotency_key).toBe(publishBodies[1].idempotency_key);
     expect(publishBodies[2].idempotency_key).not.toBe(publishBodies[1].idempotency_key);
     expect(mocks.randomUUID).toHaveBeenCalledTimes(2);
+  });
+
+  it('PERM-PAGE-01 does not request the manager board below Level 4', async () => {
+    mocks.accessLevel = 2;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<DailyAllocationBoardPage />);
+
+    expect(await screen.findByText(/Level 4 manager access is required/)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('calls the labour DELETE endpoint and preserves a stale server message', async () => {
@@ -324,6 +347,10 @@ describe('daily allocation manager board', () => {
 });
 
 describe('daily allocation job sheet', () => {
+  beforeEach(() => {
+    mocks.accessLevel = 5;
+  });
+
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
@@ -358,5 +385,50 @@ describe('daily allocation job sheet', () => {
     const link = await screen.findByRole('link', { name: 'View inspection' });
     expect(link).toHaveAttribute('href', '/plant-inspections/inspection%2Fwith%20space');
     expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
+  });
+
+  it('PERM-PAGE-01 does not request a job sheet below Level 4', async () => {
+    mocks.accessLevel = 2;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<DailyAllocationJobSheetPage />);
+
+    expect(await screen.findByText(/Level 4 manager access is required/)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('my daily allocation', () => {
+  beforeEach(() => {
+    mocks.accessLevel = 2;
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it('PERM-PAGE-01 does not request issued work below Level 2', async () => {
+    mocks.accessLevel = 1;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MyDailyAllocationPage />);
+
+    expect(await screen.findByText(/Level 2 Daily Allocation access is required/))
+      .toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('requests issued work at Level 2', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse({ current: null, history: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<MyDailyAllocationPage />);
+
+    expect(await screen.findByText('No published allocation is available yet.'))
+      .toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/daily-allocation/me', { cache: 'no-store' });
   });
 });

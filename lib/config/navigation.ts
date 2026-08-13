@@ -7,8 +7,8 @@
  * - Left sidebar navigation
  * 
  * To add a new module:
- * 1. Add it to the appropriate array below
- * 2. It will automatically appear in all navigation areas
+ * Follow docs/guides/ADDING_A_NEW_MODULE_WITH_PERMISSIONS.md, then add its
+ * level-aware navigation entries to the appropriate arrays below.
  */
 
 import {
@@ -35,13 +35,18 @@ import {
   GraduationCap,
   LucideIcon
 } from 'lucide-react';
-import { ModuleName } from '@/types/roles';
+import type { ModuleName, PermissionAccessLevel } from '@/types/roles';
+
+export type ModulePermissionLevelMap = Partial<
+  Record<ModuleName, number | null | undefined>
+>;
 
 export interface NavItem {
   href: string;
   label: string;
   icon: LucideIcon;
   module?: ModuleName; // For permission checking
+  minimumAccessLevel?: PermissionAccessLevel;
   category?: 'employee' | 'manager' | 'admin'; // Which nav area it belongs to
   dropdownItems?: NavItem[]; // For dropdown menus
 }
@@ -128,6 +133,7 @@ export const employeeNavItems: NavItem[] = [
     label: 'My Allocation',
     icon: CalendarDays,
     module: 'daily-allocation',
+    minimumAccessLevel: 2,
     category: 'employee'
   },
   { 
@@ -187,6 +193,7 @@ export const managerNavItems: NavItem[] = [
     label: 'Daily Allocation',
     icon: CalendarDays,
     module: 'daily-allocation',
+    minimumAccessLevel: 4,
     category: 'manager'
   },
   { 
@@ -278,26 +285,14 @@ export const dashboardNavItem: NavItem = {
  */
 export function getFilteredEmployeeNav(
   userPermissions: Set<ModuleName>,
+  permissionLevels: ModulePermissionLevelMap | null,
   isManager: boolean,
   isAdmin: boolean,
   hasRAMSAssignments: boolean
 ): NavItem[] {
   return employeeNavItems.filter(item => {
-    // For items with dropdown children, check if user has access to ANY child
-    if (item.dropdownItems && item.dropdownItems.length > 0) {
-      const hasAccessToAnyChild = item.dropdownItems.some(child => {
-        // If child has no module requirement, it's accessible
-        if (!child.module) return true;
-        // Otherwise check if user has the module permission
-        return userPermissions.has(child.module);
-      });
-      
-      // If user has access to at least one child, show the parent
-      return hasAccessToAnyChild;
-    }
-    
     // Check basic permission for employees
-    if (item.module && !userPermissions.has(item.module)) {
+    if (!canAccessNavItem(item, userPermissions, permissionLevels, isAdmin)) {
       return false;
     }
     
@@ -310,20 +305,47 @@ export function getFilteredEmployeeNav(
   });
 }
 
+export function canAccessNavItem(
+  item: NavItem,
+  userPermissions: Set<ModuleName>,
+  permissionLevels: ModulePermissionLevelMap | null,
+  isAdmin: boolean
+): boolean {
+  if (isAdmin) {
+    return true;
+  }
+  if (item.dropdownItems && item.dropdownItems.length > 0) {
+    return item.dropdownItems.some((child) => canAccessNavItem(
+      child,
+      userPermissions,
+      permissionLevels,
+      false
+    ));
+  }
+  if (!item.module) {
+    return true;
+  }
+  if (!userPermissions.has(item.module)) {
+    return false;
+  }
+  if (item.minimumAccessLevel === undefined) {
+    return true;
+  }
+
+  return (permissionLevels?.[item.module] ?? 0) >= item.minimumAccessLevel;
+}
+
 export function getFilteredNavByPermissions(
   items: NavItem[],
   userPermissions: Set<ModuleName>,
+  permissionLevels: ModulePermissionLevelMap | null,
   isAdmin: boolean
 ): NavItem[] {
-  if (isAdmin) {
-    return items;
-  }
-
-  return items.filter((item) => {
-    if (!item.module) {
-      return true;
-    }
-    return userPermissions.has(item.module);
-  });
+  return items.filter((item) => canAccessNavItem(
+    item,
+    userPermissions,
+    permissionLevels,
+    isAdmin
+  ));
 }
 

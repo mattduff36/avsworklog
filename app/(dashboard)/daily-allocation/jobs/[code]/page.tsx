@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { Badge } from '@/components/ui/badge';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import type { DailyJobSheetPayload } from '@/types/daily-allocation';
 import { toast } from 'sonner';
 
@@ -17,6 +18,8 @@ const dailyAllocationBetaBadge = <DailyAllocationBetaBadge />;
 
 export default function DailyAllocationJobSheetPage() {
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('daily-allocation');
+  const { canUseLevel, isLoading: levelLoading } = useModuleAccessLevel('daily-allocation');
+  const canViewJobSheet = canUseLevel(4);
   const params = useParams<{ code: string }>();
   const code = decodeURIComponent(params.code || '');
   const [sheet, setSheet] = useState<DailyJobSheetPayload | null>(null);
@@ -24,7 +27,7 @@ export default function DailyAllocationJobSheetPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!hasPermission || permissionLoading || !code) return;
+    if (!hasPermission || !canViewJobSheet || permissionLoading || levelLoading || !code) return;
     let mounted = true;
     fetch(`/api/daily-allocation/jobs/${encodeURIComponent(code)}`, { cache: 'no-store' })
       .then(async (response) => {
@@ -43,9 +46,9 @@ export default function DailyAllocationJobSheetPage() {
     return () => {
       mounted = false;
     };
-  }, [code, hasPermission, permissionLoading]);
+  }, [canViewJobSheet, code, hasPermission, levelLoading, permissionLoading]);
 
-  if (permissionLoading) {
+  if (permissionLoading || levelLoading) {
     return (
       <AppPageLoadingShell
         title="Job allocation sheet"
@@ -62,6 +65,18 @@ export default function DailyAllocationJobSheetPage() {
           title="Job allocation sheet"
           titleMeta={dailyAllocationBetaBadge}
           description="Daily Allocation is not enabled for your team or is awaiting post-deploy activation."
+        />
+      </AppPageShell>
+    );
+  }
+
+  if (!canViewJobSheet) {
+    return (
+      <AppPageShell>
+        <AppPageHeader
+          title="Job allocation sheet"
+          titleMeta={dailyAllocationBetaBadge}
+          description="Level 4 manager access is required to view job allocation sheets."
         />
       </AppPageShell>
     );

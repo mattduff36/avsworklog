@@ -204,6 +204,10 @@ export const NOTIFICATION_MODULES: NotificationModule[] = [
 ];
 
 const NOTIFICATION_MODULE_ACCESS_RULES: Partial<Record<NotificationModuleKey, NotificationModuleAccessRule>> = {
+  daily_allocation: {
+    moduleNames: ['daily-allocation'],
+    minimumLevel: 2,
+  },
   errors: {
     moduleNames: ['error-reports'],
     minimumLevel: 1,
@@ -238,13 +242,15 @@ export function isNotificationModuleAvailable(
   module: NotificationModule,
   context: NotificationModuleAccessContext
 ): boolean {
-  if (module.availableFor === 'all') return true;
-
+  const accessRule = NOTIFICATION_MODULE_ACCESS_RULES[module.key];
   const hasPermissionAccess = hasNotificationModulePermission(
     context.permissionLevels,
-    NOTIFICATION_MODULE_ACCESS_RULES[module.key]
+    accessRule
   );
 
+  if (module.availableFor === 'all') {
+    return accessRule ? hasPermissionAccess : true;
+  }
   if (module.availableFor === 'admin') return context.isAdmin || hasPermissionAccess;
   if (module.availableFor === 'manager') return context.isManager || context.isAdmin || hasPermissionAccess;
 

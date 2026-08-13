@@ -82,6 +82,31 @@ describe('daily allocation API auth', () => {
     expect(eq).toHaveBeenCalledWith('profile_id', 'employee-1');
   });
 
+  it('PERM-SERVER-01 resolves Level 2 self, Level 4 manager, and Level 5 admin access', async () => {
+    const { getDailyAllocationContext } = await import('@/lib/server/daily-allocation');
+
+    mockGetEffectiveModuleAccessLevel.mockResolvedValueOnce(2);
+    await expect(getDailyAllocationContext()).resolves.toMatchObject({
+      access_level: 2,
+      is_manager: false,
+      is_admin: false,
+    });
+
+    mockGetEffectiveModuleAccessLevel.mockResolvedValueOnce(4);
+    await expect(getDailyAllocationContext()).resolves.toMatchObject({
+      access_level: 4,
+      is_manager: true,
+      is_admin: false,
+    });
+
+    mockGetEffectiveModuleAccessLevel.mockResolvedValueOnce(5);
+    await expect(getDailyAllocationContext()).resolves.toMatchObject({
+      access_level: 5,
+      is_manager: true,
+      is_admin: true,
+    });
+  });
+
   it('AUTH-002 rejects employees from the manager board', async () => {
     mockGetEffectiveModuleAccessLevel.mockResolvedValue(2);
     const { GET } = await import('@/app/api/daily-allocation/board/route');

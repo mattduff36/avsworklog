@@ -215,7 +215,10 @@ export function Navbar() {
   const effectiveIsManager = isManager;
   const effectiveIsAdmin = isAdmin;
 
-  const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
+  const {
+    enabledModuleSet: userPermissions,
+    permissionLevels,
+  } = usePermissionSnapshot();
   const {
     counts: dashboardTaskBadgeCounts,
     ready: dashboardTaskBadgesReady,
@@ -572,6 +575,7 @@ export function Navbar() {
   // Employee navigation - filtered by permissions (using shared config)
   const employeeNav = getFilteredEmployeeNav(
     userPermissions,
+    permissionLevels,
     effectiveIsManager,
     effectiveIsAdmin,
     hasRAMSAssignments
@@ -581,12 +585,14 @@ export function Navbar() {
   const managerLinks = getFilteredNavByPermissions(
     managerNavItems,
     userPermissions,
+    permissionLevels,
     effectiveIsAdmin
   );
   const mobileManagerLinks = managerLinks.filter((item) => item.href !== '/absence/manage');
   const adminLinks = getFilteredNavByPermissions(
     adminNavItems,
     userPermissions,
+    permissionLevels,
     effectiveIsAdmin
   );
   const hasMobileManagementLinks = mobileManagerLinks.length > 0 || adminLinks.length > 0;

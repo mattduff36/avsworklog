@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Unable to load user permission levels.' },
       { status: 500 }
     );
   }
@@ -167,7 +167,7 @@ export async function PUT(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { error: 'Unable to update user permission levels.' },
       { status: 500 }
     );
   }

@@ -20,16 +20,16 @@ class FakePermissionMatrixClient implements PermissionMatrixPgClient {
     if (normalized.includes('FROM public.permission_modules')) {
       return {
         rows: [{
-          module_name: 'admin-settings',
-          minimum_hierarchy_rank: 4,
+          module_name: 'daily-allocation',
+          minimum_hierarchy_rank: 2,
         }] as Row[],
       };
     }
     if (normalized.includes('FROM public.profiles profile')) {
       return {
         rows: [{
-          id: 'user-1',
-          team_id: '00000000-0000-0000-0000-000000000001',
+          id: '00000000-0000-0000-0000-000000000001',
+          team_id: 'civils',
           role_id: 'role-manager',
           role_name: 'manager',
           role_class: 'manager',
@@ -50,7 +50,7 @@ class FakePermissionMatrixClient implements PermissionMatrixPgClient {
     if (
       this.failExplicitUserUpdate
       && normalized.includes('INSERT INTO public.user_module_permissions')
-      && values?.[2] === 5
+      && values?.[2] === 4
     ) {
       throw new Error('Simulated user permission failure');
     }
@@ -64,29 +64,38 @@ class FakePermissionMatrixClient implements PermissionMatrixPgClient {
 const mutation = {
   actorUserId: '00000000-0000-0000-0000-000000000099',
   userUpdates: [{
-    user_id: 'user-1',
-    module_name: 'admin-settings' as const,
-    access_level: 5 as const,
+    user_id: '00000000-0000-0000-0000-000000000001',
+    module_name: 'daily-allocation' as const,
+    access_level: 4 as const,
   }],
   teamDefaultUpdates: [{
-    team_id: '00000000-0000-0000-0000-000000000001',
-    module_name: 'admin-settings' as const,
+    team_id: 'civils',
+    module_name: 'daily-allocation' as const,
     enabled: true,
   }],
 };
 
 describe('atomic permission matrix mutations', () => {
-  it('AUTH-PERM-USERS-01 commits team and user changes in one serializable transaction', async () => {
+  it('PERM-TX-01 commits text-team and UUID-user changes in one serializable transaction', async () => {
     const client = new FakePermissionMatrixClient();
     await applyPermissionMatrixUpdatesAtomically(mutation, () => client);
 
     expect(client.calls[0]?.text).toBe('BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+    const profileRead = client.calls.find((call) => call.text.includes('FROM public.profiles profile'));
+    const teamDefaultRead = client.calls.find((call) => (
+      call.text.includes('FROM public.team_module_permissions')
+    ));
+    expect(profileRead?.text).toContain('profile.id = ANY($1::uuid[])');
+    expect(profileRead?.text).toContain('profile.team_id = ANY($2::text[])');
+    expect(profileRead?.values?.[1]).toEqual(['civils']);
+    expect(teamDefaultRead?.text).toContain('team_id = ANY($1::text[])');
+    expect(teamDefaultRead?.text).not.toContain('team_id = ANY($1::uuid[])');
     expect(client.calls.some((call) => (
       call.text.includes('INSERT INTO public.team_module_permissions')
     ))).toBe(true);
     expect(client.calls.some((call) => (
       call.text.includes('INSERT INTO public.user_module_permissions')
-      && call.values?.[2] === 5
+      && call.values?.[2] === 4
     ))).toBe(true);
     expect(client.calls.some((call) => (
       call.text.includes('INSERT INTO public.audit_log')
@@ -95,7 +104,7 @@ describe('atomic permission matrix mutations', () => {
     expect(client.calls.at(-1)?.text).toBe('COMMIT');
   });
 
-  it('rolls back all permission changes when a later write fails', async () => {
+  it('PERM-TX-02 rolls back all permission changes when a later write fails', async () => {
     const client = new FakePermissionMatrixClient();
     client.failExplicitUserUpdate = true;
 

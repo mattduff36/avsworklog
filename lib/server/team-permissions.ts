@@ -231,19 +231,34 @@ export function isMissingTeamPermissionSchemaError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
 
   const code = 'code' in error ? String((error as { code?: unknown }).code || '') : '';
-  const message =
-    'message' in error ? String((error as { message?: unknown }).message || '').toLowerCase() : '';
+  const description = ['message', 'details', 'hint']
+    .map((key) => (
+      key in error
+        ? String((error as Record<string, unknown>)[key] || '').toLowerCase()
+        : ''
+    ))
+    .join(' ');
+  const mentionsPermissionRelation = [
+    'permission_modules',
+    'team_module_permissions',
+    'user_module_permissions',
+  ].some((relation) => description.includes(relation));
+  const mentionsPermissionColumn = [
+    'hierarchy_rank',
+    'minimum_role_id',
+    'access_mode',
+    'access_level',
+    'requires_sensitive_pin',
+  ].some((column) => description.includes(column));
 
-  return (
-    code === '42P01' ||
-    code === '42703' ||
-    message.includes('permission_modules') ||
-    message.includes('team_module_permissions') ||
-    message.includes('user_module_permissions') ||
-    message.includes('hierarchy_rank') ||
-    message.includes('minimum_role_id') ||
-    message.includes('does not exist')
-  );
+  if (code === '42P01' || code === 'PGRST205') {
+    return mentionsPermissionRelation;
+  }
+  if (code === '42703' || code === 'PGRST204') {
+    return mentionsPermissionRelation || mentionsPermissionColumn;
+  }
+
+  return false;
 }
 
 export async function getPermissionTierRoles(

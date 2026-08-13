@@ -1,17 +1,12 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
+import { ALL_MODULES } from '../types/roles';
 
 const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 const cs = process.env.POSTGRES_URL_NON_POOLING!;
 const url = new URL(cs);
-
-const ALL_MODULES = [
-  'timesheets', 'inspections', 'plant-inspections', 'hgv-inspections', 'rams', 'absence',
-  'maintenance', 'toolbox-talks', 'workshop-tasks', 'approvals',
-  'actions', 'reports', 'admin-users', 'admin-vans',
-];
 
 async function run() {
   const client = new Client({
@@ -24,93 +19,138 @@ async function run() {
   });
   await client.connect();
 
-  // 1. Get all roles
   const { rows: roles } = await client.query(`
-    SELECT id, name, display_name, is_manager_admin, is_super_admin
-    FROM roles
-    ORDER BY is_super_admin DESC, is_manager_admin DESC, name
+    SELECT id, name, display_name, hierarchy_rank, is_manager_admin, is_super_admin
+    FROM public.roles
+    ORDER BY hierarchy_rank DESC, name
   `);
 
   console.log('=== ALL ROLES ===');
   for (const role of roles) {
-    console.log(`  ${role.display_name} (${role.name}) | manager_admin: ${role.is_manager_admin} | super_admin: ${role.is_super_admin}`);
+    console.log(
+      `  L${role.hierarchy_rank} ${role.display_name} (${role.name})`
+      + ` | manager_admin: ${role.is_manager_admin} | super_admin: ${role.is_super_admin}`
+    );
   }
 
-  // 2. Get all permissions
-  const { rows: allPerms } = await client.query(`
-    SELECT rp.role_id, r.name as role_name, r.display_name, r.is_manager_admin,
-           rp.module_name, rp.enabled
-    FROM role_permissions rp
-    JOIN roles r ON rp.role_id = r.id
-    ORDER BY r.name, rp.module_name
+  const { rows: modules } = await client.query(`
+    SELECT
+      pm.module_name,
+      pm.access_mode,
+      public.module_enforced_minimum_access_level(pm.module_name)
+        AS enforced_minimum_access_level,
+      public.module_requires_full_access_role(pm.module_name)
+        AS requires_full_access_role,
+      pm.requires_sensitive_pin,
+      role.display_name AS minimum_role_name
+    FROM public.permission_modules pm
+    LEFT JOIN public.roles role ON role.id = pm.minimum_role_id
+    ORDER BY pm.sort_order, pm.module_name
   `);
 
-  console.log('\n=== PERMISSIONS BY ROLE ===');
-  interface PermRow {
-    role_name: string;
-    module_name: string;
-    enabled: boolean;
-  }
-  const permsByRole: Record<string, PermRow[]> = {};
-  for (const p of allPerms as PermRow[]) {
-    if (!permsByRole[p.role_name]) permsByRole[p.role_name] = [];
-    permsByRole[p.role_name].push(p);
+  console.log('\n=== PERMISSION MODULES ===');
+  for (const moduleDefinition of modules) {
+    console.log(
+      `  ${moduleDefinition.module_name} | mode: ${moduleDefinition.access_mode}`
+      + ` | minimum: L${moduleDefinition.enforced_minimum_access_level} ${moduleDefinition.minimum_role_name || ''}`
+      + ` | full-role-only: ${moduleDefinition.requires_full_access_role}`
+      + ` | sensitive PIN: ${moduleDefinition.requires_sensitive_pin}`
+    );
   }
 
-  for (const role of roles) {
-    const perms = permsByRole[role.name] || [];
-    const enabledModules = perms.filter(p => p.enabled).map(p => p.module_name);
-    const disabledModules = perms.filter(p => !p.enabled).map(p => p.module_name);
-    const missingModules = ALL_MODULES.filter(m => !perms.find(p => p.module_name === m));
-
-    console.log(`\n  ${role.display_name} (${role.name})${role.is_manager_admin ? ' [MANAGER/ADMIN - all access]' : ''}`);
-    if (role.is_manager_admin) {
-      console.log(`    → Manager/admin roles have ALL permissions regardless of role_permissions rows`);
-    }
-    console.log(`    Enabled  (${enabledModules.length}): ${enabledModules.join(', ') || '(none)'}`);
-    console.log(`    Disabled (${disabledModules.length}): ${disabledModules.join(', ') || '(none)'}`);
-    if (missingModules.length > 0) {
-      console.log(`    MISSING  (${missingModules.length}): ${missingModules.join(', ')}`);
-      console.log(`    ⚠️  Missing modules have NO row in role_permissions — app may treat as denied!`);
-    }
+  const databaseModules = new Set(
+    modules.map((moduleDefinition) => String(moduleDefinition.module_name))
+  );
+  const missingModules = ALL_MODULES.filter((module) => !databaseModules.has(module));
+  const unexpectedModules = [...databaseModules].filter(
+    (module) => !ALL_MODULES.includes(module as (typeof ALL_MODULES)[number])
+  );
+  if (missingModules.length > 0) {
+    console.log(`  ⚠️  Missing database modules: ${missingModules.join(', ')}`);
+  }
+  if (unexpectedModules.length > 0) {
+    console.log(`  ⚠️  Database modules missing from ALL_MODULES: ${unexpectedModules.join(', ')}`);
   }
 
-  // 3. Count users per role
-  console.log('\n=== USERS PER ROLE ===');
-  const { rows: userCounts } = await client.query(`
-    SELECT r.name, r.display_name, r.is_manager_admin, COUNT(p.id) as user_count
-    FROM roles r
-    LEFT JOIN profiles p ON p.role_id = r.id
-    GROUP BY r.id, r.name, r.display_name, r.is_manager_admin
-    ORDER BY r.name
+  const { rows: teamDefaults } = await client.query(`
+    SELECT
+      team.id AS team_id,
+      team.name AS team_name,
+      COUNT(*) FILTER (WHERE permissions.enabled) AS enabled_count,
+      ARRAY_AGG(permissions.module_name ORDER BY permissions.module_name)
+        FILTER (WHERE permissions.enabled) AS enabled_modules
+    FROM public.org_teams team
+    LEFT JOIN public.team_module_permissions permissions ON permissions.team_id = team.id
+    WHERE team.active
+    GROUP BY team.id, team.name
+    ORDER BY team.name
   `);
-  for (const uc of userCounts) {
-    console.log(`  ${uc.display_name}: ${uc.user_count} users${uc.is_manager_admin ? ' (manager/admin)' : ''}`);
+
+  console.log('\n=== ENABLED TEAM DEFAULTS ===');
+  for (const team of teamDefaults) {
+    console.log(
+      `  ${team.team_name} [${team.team_id}] (${team.enabled_count}):`
+      + ` ${team.enabled_modules?.join(', ') || '(none)'}`
+    );
   }
 
-  // 4. Check for users who might be affected
-  console.log('\n=== POTENTIAL ISSUES ===');
-  for (const role of roles) {
-    if (role.is_manager_admin) continue; // Managers have all access
+  const { rows: userOverrides } = await client.query(`
+    SELECT
+      profile.full_name,
+      override.user_id,
+      override.module_name,
+      override.access_level,
+      public.user_module_access_level(
+        profile.id,
+        profile.role_id,
+        profile.team_id,
+        override.module_name
+      ) AS effective_access_level
+    FROM public.user_module_permissions override
+    INNER JOIN public.profiles profile ON profile.id = override.user_id
+    ORDER BY profile.full_name, override.module_name
+  `);
 
-    const perms = permsByRole[role.name] || [];
-    const missingModules = ALL_MODULES.filter(m => !perms.find(p => p.module_name === m));
-
-    if (missingModules.length > 0) {
-      const { rows: users } = await client.query(
-        `SELECT full_name FROM profiles WHERE role_id = $1 ORDER BY full_name`,
-        [role.id]
-      );
-      if (users.length > 0) {
-        console.log(`\n  ⚠️  Role "${role.display_name}" has ${missingModules.length} MISSING permission rows`);
-        console.log(`     Missing: ${missingModules.join(', ')}`);
-        console.log(`     Affected users (${users.length}): ${users.map(u => u.full_name).join(', ')}`);
-      }
-    }
+  console.log('\n=== EXPLICIT USER OVERRIDES ===');
+  for (const override of userOverrides) {
+    console.log(
+      `  ${override.full_name} [${override.user_id}] | ${override.module_name}:`
+      + ` L${override.access_level} (effective L${override.effective_access_level})`
+    );
   }
+  if (userOverrides.length === 0) {
+    console.log('  (none)');
+  }
+
+  const { rows: [integrity] } = await client.query(`
+    SELECT
+      (
+        SELECT COUNT(*)
+        FROM public.team_module_permissions permissions
+        LEFT JOIN public.org_teams team ON team.id = permissions.team_id
+        LEFT JOIN public.permission_modules module ON module.module_name = permissions.module_name
+        WHERE team.id IS NULL OR module.module_name IS NULL
+      ) AS orphan_team_rows,
+      (
+        SELECT COUNT(*)
+        FROM public.user_module_permissions permissions
+        LEFT JOIN public.profiles profile ON profile.id = permissions.user_id
+        LEFT JOIN public.permission_modules module ON module.module_name = permissions.module_name
+        WHERE profile.id IS NULL
+           OR module.module_name IS NULL
+           OR permissions.access_level < 0
+           OR permissions.access_level > 5
+      ) AS invalid_user_rows
+  `);
+  console.log('\n=== INTEGRITY ===');
+  console.log(`  Orphan team rows: ${integrity.orphan_team_rows}`);
+  console.log(`  Orphan/invalid user rows: ${integrity.invalid_user_rows}`);
 
   await client.end();
   console.log('\nDone');
 }
 
-run().catch(e => { console.error(e.message); process.exit(1); });
+run().catch((error: unknown) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});

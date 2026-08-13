@@ -108,6 +108,19 @@
       }
     },
     {
+      "displayName": "Training",
+      "moduleName": "training",
+      "matrixGate": "Manager+ and team-enabled; non-admin disabled by default",
+      "minimumRole": "Manager",
+      "byRole": {
+        "Contractor": "No module access by rank.",
+        "Employee": "No module access by rank.",
+        "Supervisor": "No module access by rank.",
+        "Manager": "Level 4 can view training people, qualifications, records, import history, and workbook notes when the team or a user override enables the module. Training mutations require Level 5.",
+        "Admin": "Automatic Level 5 access with full training administration."
+      }
+    },
+    {
       "displayName": "Workshop",
       "moduleName": "workshop-tasks",
       "matrixGate": "Contractor+ and team-enabled",

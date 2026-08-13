@@ -90,6 +90,11 @@ describe('permissions guide', () => {
     expect(guideSource).toContain('PERMISSION_LEVEL_LABELS');
     expect(usersRouteSource).toContain('access_mode');
     expect(usersRouteSource).toContain('live enforced minima');
+    expect(usersRouteSource).toContain("error: 'Unable to load user permission levels.'");
+    expect(usersRouteSource).toContain("error: 'Unable to update user permission levels.'");
+    expect(usersRouteSource).not.toContain(
+      "error instanceof Error ? error.message : 'Internal server error'"
+    );
     expect(teamPermissionsSource).toContain('access_mode');
     expect(teamPermissionsSource).toContain("select('module_name, minimum_role_id, requires_sensitive_pin, access_mode, sort_order')");
   });

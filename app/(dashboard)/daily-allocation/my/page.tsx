@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { Badge } from '@/components/ui/badge';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import type { DailyAllocationIssuedItem } from '@/types/daily-allocation';
 import { toast } from 'sonner';
 
@@ -24,14 +25,15 @@ export default function MyDailyAllocationPage() {
 
 function MyDailyAllocationContent() {
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('daily-allocation');
+  const { canUseLevel, isLoading: levelLoading } = useModuleAccessLevel('daily-allocation');
   const searchParams = useSearchParams();
   const itemId = searchParams.get('item');
 
   return (
     <MyDailyAllocationBody
       key={itemId || 'latest'}
-      hasPermission={hasPermission}
-      permissionLoading={permissionLoading}
+      hasPermission={hasPermission && canUseLevel(2)}
+      permissionLoading={permissionLoading || levelLoading}
       itemId={itemId}
     />
   );
@@ -77,7 +79,29 @@ function MyDailyAllocationBody({
     };
   }, [hasPermission, itemId, permissionLoading]);
 
-  if (permissionLoading || !hasPermission || loading) {
+  if (permissionLoading) {
+    return (
+      <AppPageLoadingShell
+        title="My Allocation"
+        titleMeta={dailyAllocationBetaBadge}
+        message="Loading your allocation..."
+      />
+    );
+  }
+
+  if (!hasPermission) {
+    return (
+      <AppPageShell>
+        <AppPageHeader
+          title="My Allocation"
+          titleMeta={dailyAllocationBetaBadge}
+          description="Level 2 Daily Allocation access is required to view issued work."
+        />
+      </AppPageShell>
+    );
+  }
+
+  if (loading) {
     return (
       <AppPageLoadingShell
         title="My Allocation"

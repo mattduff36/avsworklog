@@ -70,6 +70,22 @@ describe('notification module settings', () => {
     expect(moduleKeys).not.toContain('sensitive_pin_security');
   });
 
+  it('PERM-NOTIFY-01 requires Daily Allocation Level 2', () => {
+    const levelZeroModules = keysFor({
+      isAdmin: false,
+      isManager: false,
+      permissionLevels: { 'daily-allocation': 0 },
+    });
+    const levelTwoModules = keysFor({
+      isAdmin: false,
+      isManager: false,
+      permissionLevels: { 'daily-allocation': 2 },
+    });
+
+    expect(levelZeroModules).not.toContain('daily_allocation');
+    expect(levelTwoModules).toContain('daily_allocation');
+  });
+
   it('treats Toolbox Talks as a required notification module', () => {
     expect(canDisableNotificationModule('toolbox_talks')).toBe(false);
     expect(canDisableNotificationModule('reminders')).toBe(true);

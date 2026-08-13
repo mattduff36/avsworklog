@@ -69,7 +69,10 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const activeUsersTriggerRef = useRef<HTMLButtonElement | null>(null);
   const activeUsersPanelRef = useRef<HTMLDivElement | null>(null);
   const hoverExpandTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const { enabledModuleSet: userPermissions } = usePermissionSnapshot();
+  const {
+    enabledModuleSet: userPermissions,
+    permissionLevels,
+  } = usePermissionSnapshot();
   const { count: pendingAbsenceCount } = usePendingAbsenceCount(isManager || isAdmin, profile?.id);
   const isExpanded = open || hoverExpanded;
 
@@ -290,9 +293,19 @@ export function SidebarNav({ open, onToggle }: SidebarNavProps) {
   const draftRole = allRoles.find((r) => r.id === draftRoleId) ?? null;
   const draftTeam = allTeams.find((team) => team.id === draftTeamId) ?? null;
   
-  const managerLinks = getFilteredNavByPermissions(managerNavItems, userPermissions, isAdmin);
+  const managerLinks = getFilteredNavByPermissions(
+    managerNavItems,
+    userPermissions,
+    permissionLevels,
+    isAdmin
+  );
   const sidebarManagerLinks = managerLinks.filter((link) => link.href !== '/absence/manage');
-  const adminLinks = getFilteredNavByPermissions(adminNavItems, userPermissions, isAdmin);
+  const adminLinks = getFilteredNavByPermissions(
+    adminNavItems,
+    userPermissions,
+    permissionLevels,
+    isAdmin
+  );
   // Delegated module access can expose management links without changing the user's job-role class.
   if (
     !isManager

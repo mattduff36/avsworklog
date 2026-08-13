@@ -11,6 +11,7 @@ import {
   PackageSearch,
   LucideIcon
 } from 'lucide-react';
+import type { PermissionAccessLevel } from '@/types/roles';
 
 /**
  * Form Type Configuration
@@ -38,6 +39,7 @@ export interface FormType {
   listHref: string;
   color: string; // Must match CSS custom property in globals.css
   enabled: boolean; // Toggle to enable/disable without removing code
+  minimumAccessLevel?: PermissionAccessLevel;
 }
 
 export const FORM_TYPES: FormType[] = [
@@ -150,6 +152,7 @@ export const FORM_TYPES: FormType[] = [
     listHref: '/daily-allocation/my',
     color: 'daily-allocation',
     enabled: true,
+    minimumAccessLevel: 2,
   },
   {
     id: 'reminders',

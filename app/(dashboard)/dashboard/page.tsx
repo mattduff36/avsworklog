@@ -119,6 +119,7 @@ export default function DashboardPage() {
   const [showCompactGreeting, setShowCompactGreeting] = useState(false);
   const {
     enabledModuleSet: userPermissions,
+    permissionLevels,
     sensitivePinModuleSet,
     effectiveTeamName,
     isLoading: permissionsLoading,
@@ -438,8 +439,18 @@ export default function DashboardPage() {
     loadDashboardMetrics,
   ]);
 
-  const visibleManagerTiles = getFilteredNavByPermissions(managerNavItems, userPermissions, effectiveIsAdmin);
-  const visibleAdminTiles = getFilteredNavByPermissions(adminNavItems, userPermissions, effectiveIsAdmin);
+  const visibleManagerTiles = getFilteredNavByPermissions(
+    managerNavItems,
+    userPermissions,
+    permissionLevels,
+    effectiveIsAdmin
+  );
+  const visibleAdminTiles = getFilteredNavByPermissions(
+    adminNavItems,
+    userPermissions,
+    permissionLevels,
+    effectiveIsAdmin
+  );
   const renderedManagerTiles = visibleManagerTiles.filter(link => link.href !== '/absence/manage');
   const renderedManagementTiles = [...renderedManagerTiles, ...visibleAdminTiles];
   const renderedQuickActionTiles = formTypes
@@ -464,6 +475,14 @@ export default function DashboardPage() {
 
       // Check module permission (admin permissions are expanded to full set above).
       if (moduleName && !userPermissions.has(moduleName)) {
+        return false;
+      }
+      if (
+        moduleName
+        && formType.minimumAccessLevel !== undefined
+        && !effectiveIsAdmin
+        && (permissionLevels?.[moduleName] ?? 0) < formType.minimumAccessLevel
+      ) {
         return false;
       }
 
