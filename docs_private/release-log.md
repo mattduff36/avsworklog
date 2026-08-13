@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.25.1
+
+**GIT COMMIT MESSAGE**
+`fix(permissions): wire daily allocation access levels`
+
+**PUSHED AT**
+2026-08-13T12:37:33.910Z
+
+**WHAT CHANGED**
+Wire daily allocation access levels.
+
+**VERSION HISTORY DETAILS**
+- Updated daily allocation, with changes to app screens and automated tests.
+- Updated navigation, with changes to interface components and shared logic.
+- Updated help and FAQ, with changes to documentation.
+- Updated notifications, with changes to shared typing and automated tests.
+- Updated dashboard, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(permissions): wire daily allocation access levels`
+
 ## 0826.25.0
 
 **GIT COMMIT MESSAGE**

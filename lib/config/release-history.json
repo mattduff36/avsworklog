@@ -1,5 +1,22 @@
 [
   {
+    "version": "0826.25.1",
+    "updateKind": "minor",
+    "title": "Permissions improvements",
+    "description": "Wire daily allocation access levels.",
+    "summary": "Wire daily allocation access levels.",
+    "details": [
+      "Updated daily allocation, with changes to app screens and automated tests.",
+      "Updated navigation, with changes to interface components and shared logic.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated notifications, with changes to shared typing and automated tests.",
+      "Updated dashboard, with changes to app screens."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-08-13T12:37:33.910Z"
+  },
+  {
     "version": "0826.25.0",
     "updateKind": "major",
     "title": "Daily Allocation update",
@@ -13,10 +30,12 @@
     ],
     "areas": [
       "Data storage",
+      "Daily Allocation",
       "Maintenance"
     ],
     "areaKeys": [
       "data-storage",
+      "daily-allocation",
       "maintenance"
     ],
     "pushedAt": "2026-08-13T10:47:25.958Z"
@@ -45,6 +64,7 @@
     ],
     "areaKeys": [
       "data-storage",
+      "daily-allocation",
       "inventory"
     ],
     "pushedAt": "2026-08-13T09:38:32.944Z"
