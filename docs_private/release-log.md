@@ -2,6 +2,31 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.27.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update Daily Allocation and Data storage`
+
+**PUSHED AT**
+2026-08-13T22:01:07.186Z
+
+**WHAT CHANGED**
+Update Daily Allocation and Data storage. Add disposable PostgreSQL workflow. Rebuild allocation board.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Allocation and Data storage, with changes to background routes, app screens, interface components, shared logic, shared typing, automation scripts, automated tests, and data storage.
+- Added disposable PostgreSQL workflow, with changes to shared typing, automation scripts, automated tests, data storage, and documentation.
+- Updated notifications, with changes to background routes, interface components, shared logic, shared typing, and automated tests.
+- Updated sign in, with changes to shared logic.
+- Updated navigation, with changes to interface components.
+- Updated help and FAQ, with changes to shared logic, automated tests, data storage, and documentation.
+- Updated projects, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update Daily Allocation and Data storage`
+- `test(database): add disposable PostgreSQL workflow`
+- `feat(daily-allocation): rebuild allocation board`
+
 ## 0826.26.0
 
 **GIT COMMIT MESSAGE**

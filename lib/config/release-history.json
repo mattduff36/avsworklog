@@ -1,5 +1,30 @@
 [
   {
+    "version": "0826.27.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated Daily Allocation and Data storage. Add disposable PostgreSQL workflow. Rebuild allocation board.",
+    "summary": "Updated Daily Allocation and Data storage. Add disposable PostgreSQL workflow. Rebuild allocation board.",
+    "details": [
+      "Updated Daily Allocation and Data storage, with changes to background routes, app screens, interface components, shared logic, shared typing, automation scripts, automated tests, and data storage.",
+      "Added disposable PostgreSQL workflow, with changes to shared typing, automation scripts, automated tests, data storage, and documentation.",
+      "Updated notifications, with changes to background routes, interface components, shared logic, shared typing, and automated tests.",
+      "Updated sign in, with changes to shared logic.",
+      "Updated navigation, with changes to interface components.",
+      "Updated help and FAQ, with changes to shared logic, automated tests, data storage, and documentation.",
+      "Updated projects, with changes to automated tests."
+    ],
+    "areas": [
+      "Daily Allocation",
+      "Data storage. Add disposable PostgreSQL workflow. Rebuild allocation board"
+    ],
+    "areaKeys": [
+      "daily-allocation",
+      "data-storage"
+    ],
+    "pushedAt": "2026-08-13T22:01:07.186Z"
+  },
+  {
     "version": "0826.26.0",
     "updateKind": "major",
     "title": "Background services update",
