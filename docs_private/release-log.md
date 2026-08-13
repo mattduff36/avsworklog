@@ -2,6 +2,32 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.24.0
+
+**GIT COMMIT MESSAGE**
+`feat(db): update Data storage and Quotes`
+
+**PUSHED AT**
+2026-08-13T09:38:32.944Z
+
+**WHAT CHANGED**
+Update Data storage and Quotes. Add labour and plant daily allocation module. Close remaining mobile polish gaps.
+
+**VERSION HISTORY DETAILS**
+- Updated Data storage and Quotes, with changes to shared typing, automation scripts, automated tests, and data storage.
+- Updated daily tasks, with changes to background routes, app screens, shared logic, shared typing, and automated tests.
+- Updated notifications, with changes to background routes, interface components, shared logic, shared typing, and automated tests.
+- Updated quotes, with changes to background routes, app screens, and automated tests.
+- Updated timesheets, with changes to background routes and automated tests.
+- Close remaining mobile polish gaps, with changes to app screens and automated tests.
+- Updated PDF documents, with changes to background routes, shared logic, and automated tests.
+- Updated projects, with changes to background routes and app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(db): update Data storage and Quotes`
+- `feat(daily-allocation): add labour and plant daily allocation module`
+- `fix(inventory): close remaining mobile polish gaps`
+
 ## 0826.23.0
 
 **GIT COMMIT MESSAGE**
