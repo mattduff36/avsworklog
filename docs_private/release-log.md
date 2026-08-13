@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.25.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): add beta badges to the new module`
+
+**PUSHED AT**
+2026-08-13T10:47:25.958Z
+
+**WHAT CHANGED**
+Update data storage. Add beta badges to the new module. Allow asset retirement with unsaved edits.
+
+**VERSION HISTORY DETAILS**
+- Allow asset retirement with unsaved edits, with changes to app screens and automated tests.
+- Updated data storage, with changes to automated tests and data storage.
+- Updated dashboard, with changes to app screens.
+- Updated navigation, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `chore(db): update data storage`
+- `feat(daily-allocation): add beta badges to the new module`
+- `fix(maintenance): allow asset retirement with unsaved edits`
+
 ## 0826.24.0
 
 **GIT COMMIT MESSAGE**

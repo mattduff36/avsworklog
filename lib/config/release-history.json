@@ -1,5 +1,27 @@
 [
   {
+    "version": "0826.25.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated data storage. Add beta badges to the new module. Allow asset retirement with unsaved edits.",
+    "summary": "Updated data storage. Add beta badges to the new module. Allow asset retirement with unsaved edits.",
+    "details": [
+      "Allow asset retirement with unsaved edits, with changes to app screens and automated tests.",
+      "Updated data storage, with changes to automated tests and data storage.",
+      "Updated dashboard, with changes to app screens.",
+      "Updated navigation, with changes to interface components."
+    ],
+    "areas": [
+      "Data storage",
+      "Maintenance"
+    ],
+    "areaKeys": [
+      "data-storage",
+      "maintenance"
+    ],
+    "pushedAt": "2026-08-13T10:47:25.958Z"
+  },
+  {
     "version": "0826.24.0",
     "updateKind": "major",
     "title": "Data storage update",
