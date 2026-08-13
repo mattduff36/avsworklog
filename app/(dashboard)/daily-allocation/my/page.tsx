@@ -6,14 +6,17 @@ import { format, parseISO } from 'date-fns';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { Badge } from '@/components/ui/badge';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { DailyAllocationIssuedItem } from '@/types/daily-allocation';
 import { toast } from 'sonner';
 
+const dailyAllocationBetaBadge = <DailyAllocationBetaBadge />;
+
 export default function MyDailyAllocationPage() {
   return (
-    <Suspense fallback={<AppPageLoadingShell title="My Allocation" message="Loading your allocation..." />}>
+    <Suspense fallback={<AppPageLoadingShell title="My Allocation" titleMeta={dailyAllocationBetaBadge} message="Loading your allocation..." />}>
       <MyDailyAllocationContent />
     </Suspense>
   );
@@ -75,13 +78,20 @@ function MyDailyAllocationBody({
   }, [hasPermission, itemId, permissionLoading]);
 
   if (permissionLoading || !hasPermission || loading) {
-    return <AppPageLoadingShell title="My Allocation" message="Loading your allocation..." />;
+    return (
+      <AppPageLoadingShell
+        title="My Allocation"
+        titleMeta={dailyAllocationBetaBadge}
+        message="Loading your allocation..."
+      />
+    );
   }
 
   return (
     <AppPageShell>
       <AppPageHeader
         title="My Allocation"
+        titleMeta={dailyAllocationBetaBadge}
         description="Issued site, job, and instructions for your published work days."
       />
       {current ? (

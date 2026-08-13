@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils/cn';
 
 interface AppPageLoadingShellProps {
   title: string;
+  titleMeta?: ReactNode;
   description?: string;
   icon?: ReactNode;
   message?: string;
@@ -21,6 +22,7 @@ interface AppPageLoadingShellProps {
 
 export function AppPageLoadingShell({
   title,
+  titleMeta,
   description,
   icon,
   message = 'Loading...',
@@ -33,6 +35,7 @@ export function AppPageLoadingShell({
     <AppPageShell width={width} className={className}>
       <AppPageHeader
         title={title}
+        titleMeta={titleMeta}
         description={description}
         icon={icon}
       />

@@ -22,4 +22,17 @@ describe('AppPageLoadingShell', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Loading inventory...');
     expect(screen.getByTestId('page-loader')).toHaveAttribute('data-loader-variant', 'compact');
   });
+
+  it('renders title metadata beside the loading heading', () => {
+    render(
+      <AppPageLoadingShell
+        title="Daily Allocation"
+        titleMeta={<span>Beta</span>}
+        message="Loading daily allocation..."
+      />
+    );
+
+    expect(screen.getByRole('heading', { name: 'Daily Allocation' })).toBeInTheDocument();
+    expect(screen.getByText('Beta')).toBeInTheDocument();
+  });
 });

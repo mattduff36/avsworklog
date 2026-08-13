@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { JobCataloguePicker } from '@/components/daily-allocation/JobCataloguePicker';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
@@ -45,6 +46,7 @@ type PublishAttempt = {
 };
 
 const PUBLISH_ATTEMPT_STORAGE_KEY = 'daily-allocation:publish-attempt';
+const dailyAllocationBetaBadge = <DailyAllocationBetaBadge />;
 
 class DailyAllocationRequestError extends Error {
   constructor(message: string, readonly isConflict: boolean) {
@@ -297,7 +299,13 @@ export default function DailyAllocationBoardPage() {
   }
 
   if (permissionLoading) {
-    return <AppPageLoadingShell title="Daily Allocation" message="Loading daily allocation..." />;
+    return (
+      <AppPageLoadingShell
+        title="Daily Allocation"
+        titleMeta={dailyAllocationBetaBadge}
+        message="Loading daily allocation..."
+      />
+    );
   }
 
   if (!hasPermission) {
@@ -305,6 +313,7 @@ export default function DailyAllocationBoardPage() {
       <AppPageShell>
         <AppPageHeader
           title="Daily Allocation"
+          titleMeta={dailyAllocationBetaBadge}
           description="This module is not enabled for your team. During deployment it remains unavailable until post-deploy activation is complete."
         />
       </AppPageShell>
@@ -312,7 +321,13 @@ export default function DailyAllocationBoardPage() {
   }
 
   if (loading) {
-    return <AppPageLoadingShell title="Daily Allocation" message="Loading daily allocation..." />;
+    return (
+      <AppPageLoadingShell
+        title="Daily Allocation"
+        titleMeta={dailyAllocationBetaBadge}
+        message="Loading daily allocation..."
+      />
+    );
   }
 
   if (!board) {
@@ -320,6 +335,7 @@ export default function DailyAllocationBoardPage() {
       <AppPageShell>
         <AppPageHeader
           title="Daily Allocation unavailable"
+          titleMeta={dailyAllocationBetaBadge}
           description={loadError || 'The allocation board could not be loaded.'}
           actions={<Button onClick={() => void loadBoard(workDate)}>Retry</Button>}
         />
@@ -330,7 +346,11 @@ export default function DailyAllocationBoardPage() {
   if (!canManage) {
     return (
       <AppPageShell>
-        <AppPageHeader title="Daily Allocation" description="Manager access is required to plan this board." />
+        <AppPageHeader
+          title="Daily Allocation"
+          titleMeta={dailyAllocationBetaBadge}
+          description="Manager access is required to plan this board."
+        />
       </AppPageShell>
     );
   }
@@ -339,6 +359,7 @@ export default function DailyAllocationBoardPage() {
     <AppPageShell width="wide">
       <AppPageHeader
         title="Daily Allocation"
+        titleMeta={dailyAllocationBetaBadge}
         description="Assign one primary job per employee, plan plant, then publish immutable instructions."
         actions={
           <div className="flex flex-wrap items-center gap-2">

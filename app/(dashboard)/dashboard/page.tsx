@@ -32,6 +32,7 @@ import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError, createStatusError } from '@/lib/utils/http-error';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 import { DashboardTaskBadgeLinks } from '@/components/layout/DashboardTaskBadgeLinks';
+import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { YardKioskAutoLaunch } from './components/YardKioskAutoLaunch';
 
 type PendingApprovalCount = {
@@ -455,6 +456,7 @@ export default function DashboardPage() {
         'fleet': 'maintenance',
         'workshop': 'workshop-tasks',
         'inventory': 'inventory',
+        'daily-allocation': 'daily-allocation',
         'reminders': 'reminders',
       };
 
@@ -643,6 +645,7 @@ export default function DashboardPage() {
                 formType.id === 'maintenance' &&
                 !showPrimaryBadgeLoading &&
                 (maintenanceDueSoonCount > 0 || maintenanceOverdueCount > 0);
+              const showDailyAllocationBetaBadge = formType.id === 'daily-allocation';
               const maintenanceDueSoonAnimationIndex =
                 showMaintenanceBadges && maintenanceDueSoonCount > 0
                   ? nextDashboardBadgeAnimationIndex++
@@ -698,9 +701,14 @@ export default function DashboardPage() {
                       </div>
                     )}
                     <Icon className={tabletModeEnabled ? 'h-12 w-12' : 'h-8 w-8'} />
-                    <span className={`font-semibold leading-tight ${tabletModeEnabled ? 'text-base' : 'text-2xl'}`}>
-                      {formType.title}
-                    </span>
+                    <div className="flex flex-col items-center gap-1">
+                      <span className={`font-semibold leading-tight ${tabletModeEnabled ? 'text-base' : 'text-2xl'}`}>
+                        {formType.title}
+                      </span>
+                      {showDailyAllocationBetaBadge ? (
+                        <DailyAllocationBetaBadge tone="onColor" />
+                      ) : null}
+                    </div>
                     {formType.subtitle && (
                       <span
                         className={`pointer-events-none absolute bottom-2 left-2 right-2 truncate leading-tight opacity-90 max-[350px]:hidden ${tabletModeEnabled ? 'text-xs' : 'text-base'} ${textColorClass}`}
@@ -762,9 +770,14 @@ export default function DashboardPage() {
                         )}
                         <div className="flex flex-col items-start justify-between h-full">
                           <Icon className="h-6 w-6 text-muted-foreground" />
-                          <span className="text-white font-semibold text-base leading-tight">
-                            {link.label}
-                          </span>
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="text-white font-semibold text-base leading-tight">
+                              {link.label}
+                            </span>
+                            {link.href === '/daily-allocation' ? (
+                              <DailyAllocationBetaBadge tone="onColor" />
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     </Link>

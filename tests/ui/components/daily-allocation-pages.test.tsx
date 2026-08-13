@@ -37,15 +37,18 @@ vi.mock('@/components/layout/AppPageShell', () => ({
   AppPageShell: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   AppPageHeader: ({
     title,
+    titleMeta,
     description,
     actions,
   }: {
     title: string;
+    titleMeta?: ReactNode;
     description?: string;
     actions?: ReactNode;
   }) => (
     <header>
       <h1>{title}</h1>
+      {titleMeta}
       {description ? <p>{description}</p> : null}
       {actions}
     </header>
@@ -314,8 +317,9 @@ describe('daily allocation manager board', () => {
         row_version: 1,
       });
     });
-    expect(screen.getByText('Publication history')).toBeInTheDocument();
+    expect(await screen.findByText('Publication history')).toBeInTheDocument();
     expect(screen.getByText('Revision 1')).toBeInTheDocument();
+    expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
   });
 });
 
@@ -353,5 +357,6 @@ describe('daily allocation job sheet', () => {
 
     const link = await screen.findByRole('link', { name: 'View inspection' });
     expect(link).toHaveAttribute('href', '/plant-inspections/inspection%2Fwith%20space');
+    expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
   });
 });

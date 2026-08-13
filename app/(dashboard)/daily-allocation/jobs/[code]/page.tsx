@@ -7,10 +7,13 @@ import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { Badge } from '@/components/ui/badge';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import type { DailyJobSheetPayload } from '@/types/daily-allocation';
 import { toast } from 'sonner';
+
+const dailyAllocationBetaBadge = <DailyAllocationBetaBadge />;
 
 export default function DailyAllocationJobSheetPage() {
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('daily-allocation');
@@ -43,7 +46,13 @@ export default function DailyAllocationJobSheetPage() {
   }, [code, hasPermission, permissionLoading]);
 
   if (permissionLoading) {
-    return <AppPageLoadingShell title="Job allocation sheet" message="Loading job allocation sheet..." />;
+    return (
+      <AppPageLoadingShell
+        title="Job allocation sheet"
+        titleMeta={dailyAllocationBetaBadge}
+        message="Loading job allocation sheet..."
+      />
+    );
   }
 
   if (!hasPermission) {
@@ -51,6 +60,7 @@ export default function DailyAllocationJobSheetPage() {
       <AppPageShell>
         <AppPageHeader
           title="Job allocation sheet"
+          titleMeta={dailyAllocationBetaBadge}
           description="Daily Allocation is not enabled for your team or is awaiting post-deploy activation."
         />
       </AppPageShell>
@@ -58,7 +68,13 @@ export default function DailyAllocationJobSheetPage() {
   }
 
   if (loading) {
-    return <AppPageLoadingShell title="Job allocation sheet" message="Loading job allocation sheet..." />;
+    return (
+      <AppPageLoadingShell
+        title="Job allocation sheet"
+        titleMeta={dailyAllocationBetaBadge}
+        message="Loading job allocation sheet..."
+      />
+    );
   }
 
   if (!sheet) {
@@ -66,6 +82,7 @@ export default function DailyAllocationJobSheetPage() {
       <AppPageShell>
         <AppPageHeader
           title={loadError ? 'Job allocation sheet unavailable' : 'Job allocation sheet'}
+          titleMeta={dailyAllocationBetaBadge}
           description={loadError || 'This job code has no allocation records yet.'}
         />
       </AppPageShell>
@@ -76,6 +93,7 @@ export default function DailyAllocationJobSheetPage() {
     <AppPageShell width="wide" className="print:max-w-none">
       <AppPageHeader
         title={`Job ${sheet.job_code}`}
+        titleMeta={dailyAllocationBetaBadge}
         description={[sheet.customer_name, sheet.title].filter(Boolean).join(' · ') || 'Allocation sheet'}
         actions={
           <div className="flex gap-2 print:hidden">

@@ -142,6 +142,16 @@ export const FORM_TYPES: FormType[] = [
     enabled: true,
   },
   {
+    id: 'daily-allocation',
+    title: 'My Allocation',
+    description: 'Published job, site, and instructions',
+    icon: CalendarDays,
+    href: '/daily-allocation/my',
+    listHref: '/daily-allocation/my',
+    color: 'daily-allocation',
+    enabled: true,
+  },
+  {
     id: 'reminders',
     title: 'Reminders',
     description: 'Assigned reminders that need actioning',
