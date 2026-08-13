@@ -38,6 +38,10 @@ export interface PlantInspection {
   hired_plant_id_serial?: string | null;
   hired_plant_description?: string | null;
   hired_plant_hiring_company?: string | null;
+  job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null;
+  job_source_id?: string | null;
+  job_code?: string | null;
+  job_site_address?: string | null;
   created_at: string;
   updated_at: string;
 }

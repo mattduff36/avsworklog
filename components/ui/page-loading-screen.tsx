@@ -25,7 +25,8 @@ export type LoaderAccent =
   | 'inventory'
   | 'reminders'
   | 'reports'
-  | 'debug';
+  | 'debug'
+  | 'daily-allocation';
 
 type LoaderVariant = 'fullscreen' | 'compact';
 
@@ -50,6 +51,7 @@ const ROUTE_ACCENT_TO_LOADER_ACCENT: Record<AccentType, LoaderAccent> = {
   reminders: 'reminders',
   reports: 'reports',
   debug: 'debug',
+  'daily-allocation': 'daily-allocation',
   brand: 'brand',
 };
 

@@ -1576,7 +1576,12 @@ export function useCreateAbsenceReason() {
   const supabase = createClient();
   
   return useMutation({
-    mutationFn: async (reason: { name: string; is_paid: boolean; color?: string }) => {
+    mutationFn: async (reason: {
+      name: string;
+      is_paid: boolean;
+      color?: string;
+      allocation_behaviour?: 'block' | 'reduce' | 'ignore';
+    }) => {
       const { data, error } = await supabase
         .from('absence_reasons')
         .insert(reason)

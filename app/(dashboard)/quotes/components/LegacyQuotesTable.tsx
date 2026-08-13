@@ -34,6 +34,7 @@ export interface LegacyQuoteEditForm {
   quote_manager_name: string;
   quote_value_text: string;
   comments: string;
+  site_address: string;
 }
 
 type LegacyQuoteSortField = 'quote_reference' | 'customer' | 'details' | 'quote_date' | 'manager' | 'total';
@@ -124,6 +125,8 @@ function getQuoteSearchText(quote: LegacyQuote): string {
     quote.quote_manager_name,
     quote.quote_manager_initials,
     quote.quote_value_text,
+    quote.comments,
+    quote.site_address,
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
@@ -142,6 +145,7 @@ function buildLegacyQuoteEditForm(quote: LegacyQuote): LegacyQuoteEditForm {
     quote_manager_name: quote.quote_manager_name || '',
     quote_value_text: quote.quote_value_text || '',
     comments: quote.comments || '',
+    site_address: quote.site_address || '',
   };
 }
 
@@ -331,6 +335,16 @@ function LegacyQuoteEditDialog({
           </label>
 
           <label className="space-y-2 sm:col-span-2">
+            <span className="text-sm font-medium text-slate-300">Site address</span>
+            <Textarea
+              value={form.site_address}
+              onChange={(event) => onFormChange('site_address', event.target.value)}
+              placeholder="Required before this legacy job can be allocated"
+              className="border-slate-700 bg-slate-900 text-white"
+            />
+          </label>
+
+          <label className="space-y-2 sm:col-span-2">
             <span className="text-sm font-medium text-slate-300">Comments</span>
             <Textarea
               value={form.comments}
@@ -390,6 +404,7 @@ export function LegacyQuotesTable({
     quote_manager_name: '',
     quote_value_text: '',
     comments: '',
+    site_address: '',
   });
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);

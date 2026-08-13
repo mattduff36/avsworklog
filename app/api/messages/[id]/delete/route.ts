@@ -34,12 +34,16 @@ export async function DELETE(
     // Check if message exists
     const { data: message, error: fetchError } = await supabase
       .from('messages')
-      .select('id, deleted_at')
+      .select('id, deleted_at, daily_allocation_labour_item_id, module_key')
       .eq('id', messageId)
       .single();
 
     if (fetchError || !message) {
       return NextResponse.json({ error: 'Message not found' }, { status: 404 });
+    }
+
+    if (message.daily_allocation_labour_item_id || message.module_key === 'daily_allocation') {
+      return NextResponse.json({ error: 'Published allocation messages cannot be deleted.' }, { status: 403 });
     }
 
     // Check if already deleted

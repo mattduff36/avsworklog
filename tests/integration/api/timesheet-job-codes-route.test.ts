@@ -30,11 +30,15 @@ vi.mock('@/lib/utils/server-error-logger', () => ({
 }));
 
 interface QuoteJobCodeTestRow {
+  id: string;
+  quote_thread_id: string;
   base_quote_reference: string | null;
   quote_reference: string | null;
   subject_line: string | null;
   project_description: string | null;
   site_address: string | null;
+  status?: string | null;
+  commercial_status?: string | null;
   customer: {
     status: string | null;
     company_name: string | null;
@@ -42,6 +46,7 @@ interface QuoteJobCodeTestRow {
 }
 
 interface LegacyQuoteJobCodeTestRow {
+  id: string;
   quote_reference: string | null;
   customer_name: string | null;
   title: string | null;
@@ -151,43 +156,59 @@ describe('GET /api/timesheets/job-codes', () => {
   it('returns catalogued live and legacy job codes with customer context', async () => {
     const quoteQuery = createQuoteQuery([
       {
+        id: 'quote-1',
+        quote_thread_id: 'thread-1',
         base_quote_reference: '40001-GH',
         quote_reference: '40001-GH',
         subject_line: 'Cable repairs',
         project_description: null,
         site_address: null,
+        status: 'sent',
+        commercial_status: 'open',
         customer: { status: 'active', company_name: 'Omexom' },
       },
       {
+        id: 'quote-2',
+        quote_thread_id: 'thread-1',
         base_quote_reference: '40001-GH',
         quote_reference: '40001-GH-REV2',
         subject_line: 'Duplicate revision',
         project_description: null,
         site_address: null,
+        status: 'sent',
+        commercial_status: 'open',
         customer: { status: 'active', company_name: 'Omexom' },
       },
       {
+        id: 'quote-3',
+        quote_thread_id: 'thread-3',
         base_quote_reference: '1234-AB',
         quote_reference: '1234-AB',
         subject_line: 'Legacy-shaped live quote',
         project_description: null,
         site_address: null,
+        status: 'sent',
+        commercial_status: 'open',
         customer: { status: 'active', company_name: 'Legacy Customer' },
       },
       {
+        id: 'quote-4',
+        quote_thread_id: 'thread-4',
         base_quote_reference: '50001-LC',
         quote_reference: '50001-LC',
         subject_line: null,
         project_description: 'Concrete works',
         site_address: null,
+        status: 'sent',
+        commercial_status: 'open',
         customer: { status: 'active', company_name: 'Saint Gobain' },
       },
     ]);
     const legacyQuoteQuery = createLegacyQuoteQuery([
-      { quote_reference: '4323-GH', customer_name: 'Omexom', title: 'ATV hire' },
-      { quote_reference: 'P500', customer_name: 'Arena Racing', title: 'Arena Racing' },
-      { quote_reference: 'WORKSHOP', customer_name: 'Internal Use Only', title: 'Workshop sales' },
-      { quote_reference: '40001-GH', customer_name: 'Duplicate Legacy', title: 'Ignored duplicate' },
+      { id: 'legacy-1', quote_reference: '4323-GH', customer_name: 'Omexom', title: 'ATV hire' },
+      { id: 'legacy-2', quote_reference: 'P500', customer_name: 'Arena Racing', title: 'Arena Racing' },
+      { id: 'legacy-3', quote_reference: 'WORKSHOP', customer_name: 'Internal Use Only', title: 'Workshop sales' },
+      { id: 'legacy-4', quote_reference: '40001-GH', customer_name: 'Duplicate Legacy', title: 'Ignored duplicate' },
     ]);
     const projectNumberQuery = createProjectNumberQuery([
       {
@@ -230,6 +251,13 @@ describe('GET /api/timesheets/job-codes', () => {
         source: 'live_quote',
       },
       {
+        value: '4323-GH',
+        label: '4323-GH',
+        customerName: 'Omexom',
+        quoteTitle: 'ATV hire',
+        source: 'legacy_quote',
+      },
+      {
         value: '50001-LC',
         label: '50001-LC',
         customerName: 'Saint Gobain',
@@ -237,11 +265,11 @@ describe('GET /api/timesheets/job-codes', () => {
         source: 'live_quote',
       },
       {
-        value: '4323-GH',
-        label: '4323-GH',
-        customerName: 'Omexom',
-        quoteTitle: 'ATV hire',
-        source: 'legacy_quote',
+        value: '60001-MD',
+        label: '60001-MD',
+        customerName: 'Project number',
+        quoteTitle: 'Emergency enabling works',
+        source: 'project_number',
       },
       {
         value: 'P500',
@@ -256,13 +284,6 @@ describe('GET /api/timesheets/job-codes', () => {
         customerName: 'Internal Use Only',
         quoteTitle: 'Workshop sales',
         source: 'legacy_quote',
-      },
-      {
-        value: '60001-MD',
-        label: '60001-MD',
-        customerName: 'Project number',
-        quoteTitle: 'Emergency enabling works',
-        source: 'project_number',
       },
     ]);
     expect(quoteQuery.query.eq).toHaveBeenCalledWith('is_latest_version', true);
@@ -280,25 +301,30 @@ describe('GET /api/timesheets/job-codes', () => {
       'invoiced',
     ]);
     expect(legacyQuoteQuery.query.not).toHaveBeenCalledWith('quote_reference', 'is', null);
-    expect(projectNumberQuery.query.in).toHaveBeenCalledWith('status', ['open', 'merged']);
+    expect(projectNumberQuery.query.in).toHaveBeenCalledWith('status', ['open', 'merged', 'converted']);
   });
 
   it('finds a canonical project number when searching by a merged alias', async () => {
     const quoteQuery = createQuoteQuery([]);
     const legacyQuoteQuery = createLegacyQuoteQuery([]);
-    const projectNumberQuery = createProjectNumberQuery([{
-      id: 'project-2',
-      project_reference: '60002-LC',
-      title: 'Old drainage project',
-      description: null,
-      status: 'merged',
-      merged_into_project_number_id: 'project-1',
-    }], [{
-      id: 'project-1',
-      project_reference: '60001-MD',
-      title: 'Combined drainage works',
-      description: null,
-    }]);
+    const projectNumberQuery = createProjectNumberQuery([
+      {
+        id: 'project-1',
+        project_reference: '60001-MD',
+        title: 'Combined drainage works',
+        description: null,
+        status: 'open',
+        merged_into_project_number_id: null,
+      },
+      {
+        id: 'project-2',
+        project_reference: '60002-LC',
+        title: 'Old drainage project',
+        description: null,
+        status: 'merged',
+        merged_into_project_number_id: 'project-1',
+      },
+    ]);
     const aliasQuery = createAliasQuery();
     const from = vi.fn((table: string) => {
       if (table === 'quote_reference_aliases') return aliasQuery;
@@ -321,7 +347,7 @@ describe('GET /api/timesheets/job-codes', () => {
     expect(payload.job_codes).toEqual([{
       value: '60001-MD',
       label: '60001-MD',
-      customerName: 'Merged project number',
+      customerName: 'Project number',
       quoteTitle: 'Combined drainage works',
       source: 'project_number',
     }]);
@@ -331,12 +357,14 @@ describe('GET /api/timesheets/job-codes', () => {
     const quoteQuery = createQuoteQuery([]);
     const legacyQuoteQuery = createLegacyQuoteQuery([
       Array.from({ length: 1_000 }, (_, index) => ({
+        id: `legacy-page-${index}`,
         quote_reference: `1000-AA-${index}`,
         customer_name: 'Earlier legacy row',
         title: 'Earlier page',
       })),
       [
         {
+          id: 'legacy-5388',
           quote_reference: '5388-LC',
           customer_name: 'Saint Gobain East Leake',
           title: 'day works',

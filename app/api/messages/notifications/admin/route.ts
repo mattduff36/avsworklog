@@ -21,6 +21,7 @@ interface MessageShape {
   acceptance_delay_minutes?: number | null;
   sender_id?: string | null;
   created_at?: string | null;
+  daily_allocation_labour_item_id?: string | null;
   sender?: SenderShape | SenderShape[] | null;
 }
 
@@ -124,6 +125,7 @@ export async function GET(request: NextRequest) {
           sender_id,
           created_at,
           deleted_at,
+          daily_allocation_labour_item_id,
           sender:profiles!messages_sender_id_fkey(
             id,
             full_name
@@ -167,6 +169,7 @@ export async function GET(request: NextRequest) {
           signed_at: item.signed_at ?? null,
           first_shown_at: item.first_shown_at ?? null,
           signature_data: item.signature_data ?? null,
+          daily_allocation_labour_item_id: message.daily_allocation_labour_item_id ?? null,
         };
       })
       .filter((item): item is NotificationItem => item !== null);

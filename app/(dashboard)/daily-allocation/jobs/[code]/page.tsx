@@ -1,0 +1,136 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import type { DailyJobSheetPayload } from '@/types/daily-allocation';
+import { toast } from 'sonner';
+
+export default function DailyAllocationJobSheetPage() {
+  const { hasPermission, loading: permissionLoading } = usePermissionCheck('daily-allocation');
+  const params = useParams<{ code: string }>();
+  const code = decodeURIComponent(params.code || '');
+  const [sheet, setSheet] = useState<DailyJobSheetPayload | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!hasPermission || permissionLoading || !code) return;
+    let mounted = true;
+    fetch(`/api/daily-allocation/jobs/${encodeURIComponent(code)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const payload = await response.json() as DailyJobSheetPayload & { error?: string };
+        if (!response.ok) throw new Error(payload.error || 'Unable to load this job sheet.');
+        if (mounted) setSheet(payload);
+      })
+      .catch((error: unknown) => {
+        toast.error(error instanceof Error ? error.message : 'Unable to load this job sheet.');
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [code, hasPermission, permissionLoading]);
+
+  if (permissionLoading || !hasPermission || loading) {
+    return <AppPageLoadingShell title="Job allocation sheet" message="Loading job allocation sheet..." />;
+  }
+
+  if (!sheet) {
+    return (
+      <AppPageShell>
+        <AppPageHeader title="Job allocation sheet" description="This job code has no allocation records yet." />
+      </AppPageShell>
+    );
+  }
+
+  return (
+    <AppPageShell width="wide" className="print:max-w-none">
+      <AppPageHeader
+        title={`Job ${sheet.job_code}`}
+        description={[sheet.customer_name, sheet.title].filter(Boolean).join(' · ') || 'Allocation sheet'}
+        actions={
+          <div className="flex gap-2 print:hidden">
+            {sheet.source_href ? (
+              <Button asChild variant="outline">
+                <Link href={sheet.source_href}>Open source</Link>
+              </Button>
+            ) : null}
+            <Button onClick={() => window.print()}>Print plant sheet</Button>
+          </div>
+        }
+      />
+
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Site</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            {sheet.site_address || 'No reliable site address is stored on the source record yet.'}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Issued labour</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {sheet.labour.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No published labour for this job yet.</p>
+            ) : sheet.labour.map((row) => (
+              <div key={`${row.work_date}-${row.profile_name}-${row.revision_no}`} className="rounded-md border p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{row.profile_name}</span>
+                  <Badge variant="secondary">{row.work_date} · rev {row.revision_no}</Badge>
+                </div>
+                <p className="text-muted-foreground">{row.site_address || row.availability.replaceAll('_', ' ')}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Plant allocation</CardTitle>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="py-2 pr-3">Date</th>
+                  <th className="py-2 pr-3">Plant</th>
+                  <th className="py-2 pr-3">Planned job</th>
+                  <th className="py-2 pr-3">Actual job</th>
+                  <th className="py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sheet.plant.length === 0 ? (
+                  <tr>
+                    <td className="py-3 text-muted-foreground" colSpan={5}>No planned or actual plant for this job.</td>
+                  </tr>
+                ) : sheet.plant.map((row) => (
+                  <tr key={`${row.work_date}-${row.plant_label}-${row.inspection_id || row.plant_id || row.hired_serial}`} className="border-b">
+                    <td className="py-2 pr-3">{row.work_date || '—'}</td>
+                    <td className="py-2 pr-3">{row.plant_label}</td>
+                    <td className="py-2 pr-3">{row.planned_job_code || '—'}</td>
+                    <td className="py-2 pr-3">{row.actual_job_code || '—'}</td>
+                    <td className="py-2">{row.status.replaceAll('_', ' ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      </div>
+    </AppPageShell>
+  );
+}

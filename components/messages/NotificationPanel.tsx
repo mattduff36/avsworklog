@@ -90,6 +90,10 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
 
   function handleNotificationClick(notification: NotificationItem) {
     onClose();
+    if (notification.daily_allocation_labour_item_id) {
+      router.push(`/daily-allocation/my?item=${notification.daily_allocation_labour_item_id}`);
+      return;
+    }
     router.push(`/notifications?openNotification=${notification.id}`);
   }
 

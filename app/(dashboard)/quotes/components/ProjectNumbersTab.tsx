@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CheckCircle2, CircleDollarSign, Clock3, GitMerge, Link2, Plus, ReceiptText } from 'lucide-react';
+import { CheckCircle2, CircleDollarSign, Clock3, GitMerge, Link2, Pencil, Plus, ReceiptText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,7 @@ interface ProjectFormState {
   title: string;
   description: string;
   notes: string;
+  site_address: string;
 }
 
 interface CostFormState {
@@ -75,6 +76,7 @@ const emptyProjectForm: ProjectFormState = {
   title: '',
   description: '',
   notes: '',
+  site_address: '',
 };
 
 const emptyConvertForm: ConvertFormState = {
@@ -164,6 +166,7 @@ export function ProjectNumbersTab({
   onOpenQuote,
 }: ProjectNumbersTabProps) {
   const [projectFormOpen, setProjectFormOpen] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [costFormOpen, setCostFormOpen] = useState(false);
   const [projectForm, setProjectForm] = useState<ProjectFormState>(emptyProjectForm);
   const [costForm, setCostForm] = useState<CostFormState>(buildEmptyCostForm());
@@ -222,6 +225,7 @@ export function ProjectNumbersTab({
       setProjectFormOpen(open);
       if (!open) {
         setProjectForm(emptyProjectForm);
+        setEditingProjectId(null);
         setProjectFormBaseline(buildDialogSnapshot(emptyProjectForm));
       }
     },
@@ -269,19 +273,22 @@ export function ProjectNumbersTab({
     setIsSubmitting(true);
     try {
       const response = await fetch('/api/quotes/project-numbers', {
-        method: 'POST',
+        method: editingProjectId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(projectForm),
+        body: JSON.stringify(editingProjectId
+          ? { ...projectForm, action: 'update_project', project_number_id: editingProjectId }
+          : projectForm),
       });
       const payload = await response.json().catch(() => null) as { error?: string } | null;
-      if (!response.ok) throw new Error(payload?.error || 'Unable to create project number.');
+      if (!response.ok) throw new Error(payload?.error || (editingProjectId ? 'Unable to update project number.' : 'Unable to create project number.'));
 
-      toast.success('Project number created');
+      toast.success(editingProjectId ? 'Project number updated' : 'Project number created');
       setProjectForm(emptyProjectForm);
+      setEditingProjectId(null);
       setProjectFormOpen(false);
       await onRefresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Unable to create project number.');
+      toast.error(error instanceof Error ? error.message : 'Unable to save project number.');
     } finally {
       setIsSubmitting(false);
     }
@@ -447,6 +454,7 @@ export function ProjectNumbersTab({
         </div>
         <Button
           onClick={() => {
+            setEditingProjectId(null);
             setProjectForm(emptyProjectForm);
             setProjectFormBaseline(buildDialogSnapshot(emptyProjectForm));
             setProjectFormOpen(true);
@@ -482,6 +490,13 @@ export function ProjectNumbersTab({
                     <h3 className="mt-1 break-words text-lg font-semibold text-foreground">{project.title}</h3>
                     {project.description ? (
                       <p className="mt-1 break-words text-sm text-slate-400">{project.description}</p>
+                    ) : null}
+                    {project.site_address ? (
+                      <p className="mt-1 break-words text-sm text-slate-400">Site: {project.site_address}</p>
+                    ) : project.status === 'open' ? (
+                      <p className="mt-1 text-sm text-amber-600 dark:text-amber-300">
+                        Add a site address before this job can be allocated.
+                      </p>
                     ) : null}
                     <p className="mt-2 break-words text-xs text-slate-400">
                       Manager: {project.manager?.full_name || project.requester_initials} · Created {formatDate(project.created_at)}
@@ -526,6 +541,28 @@ export function ProjectNumbersTab({
                 <div className="mt-4 space-y-3">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <p className="text-sm font-medium text-foreground">Manual costs</p>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        const nextForm = {
+                          manager_profile_id: project.manager_profile_id,
+                          title: project.title,
+                          description: project.description || '',
+                          notes: project.notes || '',
+                          site_address: project.site_address || '',
+                        };
+                        setEditingProjectId(project.id);
+                        setProjectForm(nextForm);
+                        setProjectFormBaseline(buildDialogSnapshot(nextForm));
+                        setProjectFormOpen(true);
+                      }}
+                      disabled={project.status !== 'open'}
+                      className="w-full sm:w-auto"
+                    >
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit details
+                    </Button>
                     <Button
                       size="sm"
                       onClick={() => openCostModal(project.id)}
@@ -653,7 +690,7 @@ export function ProjectNumbersTab({
           onEscapeKeyDown={handleProjectDialogEscapeKeyDown}
         >
           <DialogHeader>
-            <DialogTitle>Create Project Number</DialogTitle>
+            <DialogTitle>{editingProjectId ? 'Edit Project Number' : 'Create Project Number'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -661,6 +698,7 @@ export function ProjectNumbersTab({
               <Select
                 value={projectForm.manager_profile_id}
                 onValueChange={(value) => setProjectForm(current => ({ ...current, manager_profile_id: value }))}
+                disabled={Boolean(editingProjectId)}
               >
                 <SelectTrigger className="data-[placeholder]:[&>span]:!text-slate-400">
                   <SelectValue placeholder="Select manager" />
@@ -698,6 +736,15 @@ export function ProjectNumbersTab({
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="project-site-address">Site address</Label>
+              <Textarea
+                id="project-site-address"
+                value={projectForm.site_address}
+                onChange={(event) => setProjectForm(current => ({ ...current, site_address: event.target.value }))}
+                placeholder="Required before this job can be allocated or published"
+              />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="project-notes">Notes</Label>
               <Textarea
                 id="project-notes"
@@ -714,7 +761,7 @@ export function ProjectNumbersTab({
                 disabled={isSubmitting}
                 className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
               >
-                Reserve Number
+                {editingProjectId ? 'Save changes' : 'Reserve Number'}
               </Button>
             </div>
           </div>

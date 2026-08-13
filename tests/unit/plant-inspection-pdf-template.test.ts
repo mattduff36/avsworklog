@@ -61,6 +61,8 @@ describe('PlantInspectionPDF', () => {
     expect(text).toContain('MACHINE');
     expect(text).toContain('HOURS');
     expect(text).toContain('INSPECTOR NAME');
+    expect(text).toContain('JOB CODE');
+    expect(text).toContain('SITE');
     expect(text).not.toContain('LOLER THOROUGH EXAMINATION');
     expect(text).not.toContain('EXAMINATION');
     expect(text).not.toContain('INTERVAL');

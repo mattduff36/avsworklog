@@ -25,6 +25,7 @@ export interface Message {
   module_key: NotificationModuleKey;
   pdf_file_path: string | null;
   acceptance_delay_minutes: number;
+  daily_allocation_labour_item_id?: string | null;
 }
 
 // Message recipient (per-user assignment)
@@ -83,6 +84,7 @@ export interface NotificationItem {
   signed_at: string | null;
   first_shown_at: string | null;
   signature_data: string | null;
+  daily_allocation_labour_item_id: string | null;
 }
 
 // Form input types

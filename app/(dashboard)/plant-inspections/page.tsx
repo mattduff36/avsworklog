@@ -251,7 +251,9 @@ function PlantInspectionsContent() {
           is_hired_plant,
           hired_plant_id_serial,
           hired_plant_description,
-          hired_plant_hiring_company
+          hired_plant_hiring_company,
+          job_code,
+          job_site_address
         `)
         .order('inspection_date', { ascending: false });
 
@@ -833,6 +835,7 @@ function PlantInspectionsContent() {
                             {inspection.plant?.van_categories?.name && `${inspection.plant.van_categories.name} • `}
                           </>
                         )}
+                        {inspection.job_code ? `Job ${inspection.job_code} • ` : ''}
                         {inspection.inspection_end_date && inspection.inspection_end_date !== inspection.inspection_date
                           ? `${formatDate(inspection.inspection_date)} - ${formatDate(inspection.inspection_end_date)}`
                           : formatDate(inspection.inspection_date)

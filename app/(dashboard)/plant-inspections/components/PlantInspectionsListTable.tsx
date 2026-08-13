@@ -38,6 +38,8 @@ interface PlantInspectionRow {
   hired_plant_id_serial?: string | null;
   hired_plant_description?: string | null;
   hired_plant_hiring_company?: string | null;
+  job_code?: string | null;
+  job_site_address?: string | null;
   plant: {
     plant_id: string;
     nickname: string | null;
@@ -173,6 +175,9 @@ export function PlantInspectionsListTable({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
+            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
+              Job
+            </TableHead>
             {columnVisibility.category && (
               <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
                 Category
@@ -231,6 +236,9 @@ export function PlantInspectionsListTable({
               )}
               <TableCell className="text-white">
                 {getPlantLabel(inspection)}
+              </TableCell>
+              <TableCell className="text-muted-foreground">
+                {inspection.job_code || 'Unclassified'}
               </TableCell>
               {columnVisibility.category && (
                 <TableCell className="text-muted-foreground">

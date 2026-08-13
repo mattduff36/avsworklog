@@ -43,6 +43,8 @@ interface PlantInspectionWithDetails {
   hired_plant_id_serial?: string | null;
   hired_plant_description?: string | null;
   hired_plant_hiring_company?: string | null;
+  job_code?: string | null;
+  job_site_address?: string | null;
   plant: {
     plant_id: string;
     nickname: string | null;
@@ -624,6 +626,14 @@ export default function ViewPlantInspectionPage() {
                   : formatDate(inspection.inspection_date)
                 }
               </p>
+              {inspection.job_code ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Job {inspection.job_code}
+                  {inspection.job_site_address ? ` · ${inspection.job_site_address}` : ''}
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">No catalogue job recorded</p>
+              )}
               {inspectionReference && (
                 <div className="mt-1 text-xs md:text-sm text-slate-500 dark:text-slate-400/80">
                   <span>{inspectionReference}</span>

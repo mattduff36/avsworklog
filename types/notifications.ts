@@ -20,7 +20,8 @@ export type NotificationModuleKey =
   | 'reminders'
   | 'quotes'
   | 'general_notifications'
-  | 'sensitive_pin_security';
+  | 'sensitive_pin_security'
+  | 'daily_allocation';
 
 export const NOTIFICATION_MODULE_KEYS: NotificationModuleKey[] = [
   'errors',
@@ -39,6 +40,7 @@ export const NOTIFICATION_MODULE_KEYS: NotificationModuleKey[] = [
   'quotes',
   'general_notifications',
   'sensitive_pin_security',
+  'daily_allocation',
 ];
 
 export const REQUIRED_NOTIFICATION_MODULE_KEYS: NotificationModuleKey[] = [
@@ -191,6 +193,13 @@ export const NOTIFICATION_MODULES: NotificationModule[] = [
     description: 'Admin alerts when users set or change sensitive module PINs',
     icon: 'Shield',
     availableFor: 'admin',
+  },
+  {
+    key: 'daily_allocation',
+    label: 'Daily Allocation',
+    description: 'Tomorrow’s labour allocation, site instructions, and plant plan updates',
+    icon: 'CalendarDays',
+    availableFor: 'all',
   },
 ];
 

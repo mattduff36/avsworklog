@@ -182,13 +182,22 @@ export const MODULE_PAGES: ModulePage[] = [
       { value: 'inventory-locations', label: 'Location Management' },
     ],
   },
-  {
-    module: 'reminders',
-    displayName: MODULE_DISPLAY_NAMES.reminders,
-    subPages: [
-      { value: 'reminders-list', label: 'Reminders List' },
-    ],
-  },
+    {
+      module: 'reminders',
+      displayName: MODULE_DISPLAY_NAMES.reminders,
+      subPages: [
+        { value: 'reminders-list', label: 'Reminders List' },
+      ],
+    },
+    {
+      module: 'daily-allocation',
+      displayName: MODULE_DISPLAY_NAMES['daily-allocation'],
+      subPages: [
+        { value: 'daily-allocation-board', label: 'Daily Allocation Board' },
+        { value: 'daily-allocation-my', label: 'My Allocation' },
+        { value: 'daily-allocation-job', label: 'Job Allocation Sheet' },
+      ],
+    },
   {
     module: 'other',
     displayName: 'Other',
@@ -326,6 +335,11 @@ export function getPageUrl(value: string): string {
 
     // Reminders
     'reminders-list': '/reminders',
+
+    // Daily allocation
+    'daily-allocation-board': '/daily-allocation',
+    'daily-allocation-my': '/daily-allocation/my',
+    'daily-allocation-job': '/daily-allocation/jobs/[code]',
     
     // Admin - FAQ
     'admin-faq-list': '/admin/faq',

@@ -70,6 +70,8 @@ interface PlantInspectionWithRelations extends BaseInspectionShape {
   hired_plant_id_serial?: string | null;
   hired_plant_description?: string | null;
   hired_plant_hiring_company?: string | null;
+  job_code?: string | null;
+  job_site_address?: string | null;
 }
 
 interface HgvInspectionWithRelations extends BaseInspectionShape {
@@ -153,6 +155,8 @@ function resolvePlantTemplate(
       inspector_comments: inspection.inspector_comments || null,
       signature_data: inspection.signature_data || null,
       signed_at: inspection.signed_at || null,
+      job_code: inspection.job_code,
+      job_site_address: inspection.job_site_address,
     },
     plant: isHired
       ? {

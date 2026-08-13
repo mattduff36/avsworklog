@@ -17,6 +17,7 @@ import {
   ClipboardCheck,
   CheckSquare,
   Calendar,
+  CalendarDays,
   Wrench,
   Settings,
   ListTodo,
@@ -122,6 +123,13 @@ export const employeeNavItems: NavItem[] = [
     module: 'inventory',
     category: 'employee'
   },
+  {
+    href: '/daily-allocation/my',
+    label: 'My Allocation',
+    icon: CalendarDays,
+    module: 'daily-allocation',
+    category: 'employee'
+  },
   { 
     href: '/help', 
     label: 'Help', 
@@ -172,6 +180,13 @@ export const managerNavItems: NavItem[] = [
     label: 'Training',
     icon: GraduationCap,
     module: 'training',
+    category: 'manager'
+  },
+  {
+    href: '/daily-allocation',
+    label: 'Daily Allocation',
+    icon: CalendarDays,
+    module: 'daily-allocation',
     category: 'manager'
   },
   { 

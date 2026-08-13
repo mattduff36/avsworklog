@@ -21,6 +21,7 @@ function makeNotification(overrides: Partial<NotificationItem> = {}): Notificati
     signed_at: null,
     first_shown_at: null,
     signature_data: null,
+    daily_allocation_labour_item_id: null,
     ...overrides,
   };
 }

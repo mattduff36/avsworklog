@@ -15,6 +15,7 @@ interface LegacyQuotePatchBody {
   quote_manager_name?: unknown;
   quote_value_text?: unknown;
   comments?: unknown;
+  site_address?: unknown;
 }
 
 function normalizeEditableText(value: unknown): string {
@@ -111,6 +112,7 @@ export async function GET(request: NextRequest) {
         quote_value_text,
         quote_value_amount,
         comments,
+        site_address,
         created_at,
         updated_at
       `)
@@ -191,6 +193,7 @@ export async function PATCH(request: NextRequest) {
         quote_value_text: quoteValueText,
         quote_value_amount: parseLegacyQuoteValueAmount(quoteValueText),
         comments: normalizeOptionalEditableText(body.comments),
+        site_address: normalizeOptionalEditableText(body.site_address),
       })
       .eq('id', id)
       .select(`
@@ -206,6 +209,7 @@ export async function PATCH(request: NextRequest) {
         quote_value_text,
         quote_value_amount,
         comments,
+        site_address,
         created_at,
         updated_at
       `)

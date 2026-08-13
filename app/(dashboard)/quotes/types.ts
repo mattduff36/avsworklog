@@ -295,6 +295,7 @@ export interface LegacyQuote {
   quote_value_text: string | null;
   quote_value_amount: number | null;
   comments: string | null;
+  site_address: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -345,6 +346,7 @@ export interface QuoteProjectNumber {
   merged_into_project_number_id: string | null;
   merged_at: string | null;
   notes: string | null;
+  site_address: string | null;
   created_by: string | null;
   updated_by: string | null;
   created_at: string;

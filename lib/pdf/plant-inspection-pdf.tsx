@@ -125,6 +125,8 @@ interface PlantInspectionPDFProps {
     inspector_comments: string | null;
     signature_data: string | null;
     signed_at?: string | null;
+    job_code?: string | null;
+    job_site_address?: string | null;
   };
   plant: {
     plant_id: string;
@@ -251,6 +253,16 @@ export function PlantInspectionPDF({
             <View style={[styles.topCellLast, { width: '38%' }]}>
               <Text style={styles.topLabel}>INSPECTOR NAME</Text>
               <Text style={styles.topValue}>{operator.full_name}</Text>
+            </View>
+          </View>
+          <View style={[styles.topRow, { borderTopWidth: 1, borderTopColor: '#000' }]}>
+            <View style={[styles.topCell, { width: '32%' }]}>
+              <Text style={styles.topLabel}>JOB CODE</Text>
+              <Text style={styles.topValue}>{inspection.job_code || 'Unclassified'}</Text>
+            </View>
+            <View style={[styles.topCellLast, { width: '68%' }]}>
+              <Text style={styles.topLabel}>SITE</Text>
+              <Text style={styles.topValue}>{inspection.job_site_address || '-'}</Text>
             </View>
           </View>
         </View>

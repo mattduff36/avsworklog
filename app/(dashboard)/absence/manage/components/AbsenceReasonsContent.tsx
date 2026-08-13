@@ -36,6 +36,7 @@ import {
 } from '@/lib/hooks/useAbsence';
 import { AbsenceReason } from '@/types/absence';
 import { toast } from 'sonner';
+import type { AbsenceAllocationBehaviour } from '@/types/daily-allocation';
 
 type SortField = 'name' | 'is_paid' | 'updated_at';
 type SortDirection = 'asc' | 'desc';
@@ -68,6 +69,18 @@ const DEFAULT_REASON_COLORS = [
   '#795548', // brown
 ];
 
+const ALLOCATION_BEHAVIOUR_LABELS: Record<AbsenceAllocationBehaviour, string> = {
+  block: 'Block the day — approved leave replaces work',
+  reduce: 'Reduce the day — half-day leave still allows remaining work',
+  ignore: 'Ignore — leave does not change allocation',
+};
+
+function getReasonAllocationBehaviour(reason: AbsenceReason): AbsenceAllocationBehaviour {
+  const value = (reason as AbsenceReason & { allocation_behaviour?: AbsenceAllocationBehaviour }).allocation_behaviour;
+  if (value === 'reduce' || value === 'ignore' || value === 'block') return value;
+  return 'block';
+}
+
 export function AbsenceReasonsContent() {
   const { data: reasons, isLoading } = useAllAbsenceReasons();
 
@@ -87,6 +100,7 @@ export function AbsenceReasonsContent() {
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(DEFAULT_COLUMN_VISIBILITY);
   const [name, setName] = useState('');
   const [isPaid, setIsPaid] = useState(true);
+  const [allocationBehaviour, setAllocationBehaviour] = useState<AbsenceAllocationBehaviour>('block');
   const [color, setColor] = useState('#6366f1');
   const [submitting, setSubmitting] = useState(false);
   const [disableSubmitting, setDisableSubmitting] = useState(false);
@@ -162,11 +176,13 @@ export function AbsenceReasonsContent() {
         name: name.trim(),
         is_paid: isPaid,
         color,
+        allocation_behaviour: allocationBehaviour,
       });
 
       toast.success('Absence reason created');
       setName('');
       setIsPaid(true);
+      setAllocationBehaviour('block');
       setColor('#6366f1');
       setShowCreateDialog(false);
     } catch (error: unknown) {
@@ -185,6 +201,7 @@ export function AbsenceReasonsContent() {
     setEditingReason(reason);
     setName(reason.name);
     setIsPaid(reason.is_paid);
+    setAllocationBehaviour(getReasonAllocationBehaviour(reason));
     setColor(reason.color || '#6366f1');
     setShowEditDialog(true);
   }
@@ -204,6 +221,7 @@ export function AbsenceReasonsContent() {
           name: name.trim(),
           is_paid: isPaid,
           color,
+          allocation_behaviour: allocationBehaviour,
         },
       });
 
@@ -211,6 +229,7 @@ export function AbsenceReasonsContent() {
       setEditingReason(null);
       setName('');
       setIsPaid(true);
+      setAllocationBehaviour('block');
       setColor('#6366f1');
       setShowEditDialog(false);
     } catch (error: unknown) {
@@ -276,6 +295,7 @@ export function AbsenceReasonsContent() {
             onClick={() => {
               setName('');
               setIsPaid(true);
+              setAllocationBehaviour('block');
               setColor('#6366f1');
               setShowCreateDialog(true);
             }}
@@ -572,6 +592,19 @@ export function AbsenceReasonsContent() {
               </label>
             </div>
             <div className="space-y-1.5">
+              <Label htmlFor="allocationBehaviour" className="text-foreground font-medium">Daily allocation</Label>
+              <select
+                id="allocationBehaviour"
+                value={allocationBehaviour}
+                onChange={(event) => setAllocationBehaviour(event.target.value as AbsenceAllocationBehaviour)}
+                className="flex h-10 w-full rounded-md border border-border bg-slate-950 px-3 py-2 text-sm text-foreground"
+              >
+                {(Object.keys(ALLOCATION_BEHAVIOUR_LABELS) as AbsenceAllocationBehaviour[]).map((value) => (
+                  <option key={value} value={value}>{ALLOCATION_BEHAVIOUR_LABELS[value]}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="reasonColor" className="text-foreground font-medium">Calendar Color</Label>
               <div className="mt-2 flex items-center gap-3">
                 <Input
@@ -625,6 +658,19 @@ export function AbsenceReasonsContent() {
               <label htmlFor="editIsPaid" className="text-sm text-slate-400/90 cursor-pointer">
                 This is a paid absence
               </label>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="editAllocationBehaviour" className="text-foreground font-medium">Daily allocation</Label>
+              <select
+                id="editAllocationBehaviour"
+                value={allocationBehaviour}
+                onChange={(event) => setAllocationBehaviour(event.target.value as AbsenceAllocationBehaviour)}
+                className="flex h-10 w-full rounded-md border border-border bg-slate-950 px-3 py-2 text-sm text-foreground"
+              >
+                {(Object.keys(ALLOCATION_BEHAVIOUR_LABELS) as AbsenceAllocationBehaviour[]).map((value) => (
+                  <option key={value} value={value}>{ALLOCATION_BEHAVIOUR_LABELS[value]}</option>
+                ))}
+              </select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="editReasonColor" className="text-foreground font-medium">Calendar Color</Label>

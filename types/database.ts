@@ -407,6 +407,7 @@ export type Database = {
           created_at: string | null
           updated_at: string | null
           color: string
+          allocation_behaviour: 'block' | 'reduce' | 'ignore'
         }
         Insert: {
           id?: string
@@ -416,6 +417,7 @@ export type Database = {
           created_at?: string | null
           updated_at?: string | null
           color?: string
+          allocation_behaviour?: 'block' | 'reduce' | 'ignore'
         }
         Update: {
           id?: string
@@ -425,6 +427,7 @@ export type Database = {
           created_at?: string | null
           updated_at?: string | null
           color?: string
+          allocation_behaviour?: 'block' | 'reduce' | 'ignore'
         }
         Relationships: [
         ]
@@ -1412,6 +1415,352 @@ export type Database = {
             columns: ['updated_by']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      daily_allocation_labour_items: {
+        Row: {
+          id: string
+          publication_id: string
+          profile_id: string
+          availability: 'available' | 'full_day_absence' | 'half_day_absence'
+          job_source_type: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id: string | null
+          job_code: string | null
+          site_address: string | null
+          customer_name: string | null
+          title: string | null
+          start_time: string | null
+          meeting_point: string | null
+          meet_person: string | null
+          notes: string | null
+          absence_id: string | null
+          absence_reason_id: string | null
+          absence_reason_name: string | null
+          absence_colour: string | null
+          absence_is_paid: boolean | null
+          absence_is_half_day: boolean | null
+          absence_half_day_session: string | null
+          absence_status: string | null
+          absence_allocation_behaviour: 'block' | 'reduce' | 'ignore' | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          publication_id: string
+          profile_id: string
+          availability: 'available' | 'full_day_absence' | 'half_day_absence'
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code?: string | null
+          site_address?: string | null
+          customer_name?: string | null
+          title?: string | null
+          start_time?: string | null
+          meeting_point?: string | null
+          meet_person?: string | null
+          notes?: string | null
+          absence_id?: string | null
+          absence_reason_id?: string | null
+          absence_reason_name?: string | null
+          absence_colour?: string | null
+          absence_is_paid?: boolean | null
+          absence_is_half_day?: boolean | null
+          absence_half_day_session?: string | null
+          absence_status?: string | null
+          absence_allocation_behaviour?: 'block' | 'reduce' | 'ignore' | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          publication_id?: string
+          profile_id?: string
+          availability?: 'available' | 'full_day_absence' | 'half_day_absence'
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code?: string | null
+          site_address?: string | null
+          customer_name?: string | null
+          title?: string | null
+          start_time?: string | null
+          meeting_point?: string | null
+          meet_person?: string | null
+          notes?: string | null
+          absence_id?: string | null
+          absence_reason_id?: string | null
+          absence_reason_name?: string | null
+          absence_colour?: string | null
+          absence_is_paid?: boolean | null
+          absence_is_half_day?: boolean | null
+          absence_half_day_session?: string | null
+          absence_status?: string | null
+          absence_allocation_behaviour?: 'block' | 'reduce' | 'ignore' | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'daily_allocation_labour_items_publication_id_fkey'
+            columns: ['publication_id']
+            isOneToOne: false
+            referencedRelation: 'daily_allocation_publications'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'daily_allocation_labour_items_profile_id_fkey'
+            columns: ['profile_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      daily_allocation_plant_items: {
+        Row: {
+          id: string
+          publication_id: string
+          plant_kind: 'registered' | 'hired'
+          plant_id: string | null
+          hired_serial: string | null
+          hired_description: string | null
+          hired_company: string | null
+          hired_serial_normalized: string | null
+          owner_team_id: string | null
+          job_source_type: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id: string | null
+          job_code: string
+          site_address: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          publication_id: string
+          plant_kind: 'registered' | 'hired'
+          plant_id?: string | null
+          hired_serial?: string | null
+          hired_description?: string | null
+          hired_company?: string | null
+          hired_serial_normalized?: string | null
+          owner_team_id?: string | null
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code: string
+          site_address: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          publication_id?: string
+          plant_kind?: 'registered' | 'hired'
+          plant_id?: string | null
+          hired_serial?: string | null
+          hired_description?: string | null
+          hired_company?: string | null
+          hired_serial_normalized?: string | null
+          owner_team_id?: string | null
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code?: string
+          site_address?: string
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'daily_allocation_plant_items_publication_id_fkey'
+            columns: ['publication_id']
+            isOneToOne: false
+            referencedRelation: 'daily_allocation_publications'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'daily_allocation_plant_items_plant_id_fkey'
+            columns: ['plant_id']
+            isOneToOne: false
+            referencedRelation: 'plant'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      daily_allocation_publications: {
+        Row: {
+          id: string
+          work_date: string
+          revision_no: number
+          idempotency_key: string
+          published_by: string
+          published_at: string
+          scope_team_id: string | null
+          scope_profile_ids: string[]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          work_date: string
+          revision_no?: number
+          idempotency_key: string
+          published_by?: string
+          published_at?: string
+          scope_team_id?: string | null
+          scope_profile_ids?: string[]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          work_date?: string
+          revision_no?: number
+          idempotency_key?: string
+          published_by?: string
+          published_at?: string
+          scope_team_id?: string | null
+          scope_profile_ids?: string[]
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'daily_allocation_publications_published_by_fkey'
+            columns: ['published_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      daily_labour_allocation_drafts: {
+        Row: {
+          id: string
+          work_date: string
+          profile_id: string
+          job_source_type: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id: string | null
+          job_code: string | null
+          site_address: string | null
+          start_time: string | null
+          meeting_point: string | null
+          meet_person: string | null
+          notes: string | null
+          row_version: number
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          work_date: string
+          profile_id: string
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code?: string | null
+          site_address?: string | null
+          start_time?: string | null
+          meeting_point?: string | null
+          meet_person?: string | null
+          notes?: string | null
+          row_version?: number
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          work_date?: string
+          profile_id?: string
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code?: string | null
+          site_address?: string | null
+          start_time?: string | null
+          meeting_point?: string | null
+          meet_person?: string | null
+          notes?: string | null
+          row_version?: number
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'daily_labour_allocation_drafts_profile_id_fkey'
+            columns: ['profile_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      daily_plant_allocation_drafts: {
+        Row: {
+          id: string
+          work_date: string
+          plant_kind: 'registered' | 'hired'
+          plant_id: string | null
+          hired_serial: string | null
+          hired_description: string | null
+          hired_company: string | null
+          hired_serial_normalized: string | null
+          owner_team_id: string | null
+          job_source_type: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id: string | null
+          job_code: string | null
+          site_address: string | null
+          notes: string | null
+          row_version: number
+          created_by: string | null
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          work_date: string
+          plant_kind: 'registered' | 'hired'
+          plant_id?: string | null
+          hired_serial?: string | null
+          hired_description?: string | null
+          hired_company?: string | null
+          owner_team_id?: string | null
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code?: string | null
+          site_address?: string | null
+          notes?: string | null
+          row_version?: number
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          work_date?: string
+          plant_kind?: 'registered' | 'hired'
+          plant_id?: string | null
+          hired_serial?: string | null
+          hired_description?: string | null
+          hired_company?: string | null
+          owner_team_id?: string | null
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code?: string | null
+          site_address?: string | null
+          notes?: string | null
+          row_version?: number
+          created_by?: string | null
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'daily_plant_allocation_drafts_plant_id_fkey'
+            columns: ['plant_id']
+            isOneToOne: false
+            referencedRelation: 'plant'
             referencedColumns: ['id']
           },
         ]
@@ -3956,6 +4305,7 @@ export type Database = {
           quote_value_text: string | null
           quote_value_amount: number | null
           comments: string | null
+          site_address: string | null
           raw_data: Json
           created_at: string
           updated_at: string
@@ -3977,6 +4327,7 @@ export type Database = {
           quote_value_text?: string | null
           quote_value_amount?: number | null
           comments?: string | null
+          site_address?: string | null
           raw_data?: Json
           created_at?: string
           updated_at?: string
@@ -3998,6 +4349,7 @@ export type Database = {
           quote_value_text?: string | null
           quote_value_amount?: number | null
           comments?: string | null
+          site_address?: string | null
           raw_data?: Json
           created_at?: string
           updated_at?: string
@@ -4279,7 +4631,8 @@ export type Database = {
           created_via: string | null
           pdf_file_path: string | null
           acceptance_delay_minutes: number
-          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
+          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
+          daily_allocation_labour_item_id: string | null
         }
         Insert: {
           id?: string
@@ -4294,7 +4647,8 @@ export type Database = {
           created_via?: string | null
           pdf_file_path?: string | null
           acceptance_delay_minutes?: number
-          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
+          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
+          daily_allocation_labour_item_id?: string | null
         }
         Update: {
           id?: string
@@ -4309,7 +4663,8 @@ export type Database = {
           created_via?: string | null
           pdf_file_path?: string | null
           acceptance_delay_minutes?: number
-          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
+          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
+          daily_allocation_labour_item_id?: string | null
         }
         Relationships: [
           {
@@ -4317,6 +4672,13 @@ export type Database = {
             columns: ['sender_id']
             isOneToOne: false
             referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'messages_daily_allocation_labour_item_id_fkey'
+            columns: ['daily_allocation_labour_item_id']
+            isOneToOne: true
+            referencedRelation: 'daily_allocation_labour_items'
             referencedColumns: ['id']
           },
         ]
@@ -4479,7 +4841,7 @@ export type Database = {
         Row: {
           id: string
           user_id: string
-          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
+          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
           enabled: boolean | null
           notify_in_app: boolean | null
           notify_email: boolean | null
@@ -4489,7 +4851,7 @@ export type Database = {
         Insert: {
           id?: string
           user_id: string
-          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
+          module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
           enabled?: boolean | null
           notify_in_app?: boolean | null
           notify_email?: boolean | null
@@ -4499,7 +4861,7 @@ export type Database = {
         Update: {
           id?: string
           user_id?: string
-          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
+          module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
           enabled?: boolean | null
           notify_in_app?: boolean | null
           notify_email?: boolean | null
@@ -4809,6 +5171,10 @@ export type Database = {
           hired_plant_id_serial: string | null
           hired_plant_description: string | null
           hired_plant_hiring_company: string | null
+          job_source_type: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id: string | null
+          job_code: string | null
+          job_site_address: string | null
           created_at: string | null
           updated_at: string | null
         }
@@ -4832,6 +5198,10 @@ export type Database = {
           hired_plant_id_serial?: string | null
           hired_plant_description?: string | null
           hired_plant_hiring_company?: string | null
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code?: string | null
+          job_site_address?: string | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -4855,6 +5225,10 @@ export type Database = {
           hired_plant_id_serial?: string | null
           hired_plant_description?: string | null
           hired_plant_hiring_company?: string | null
+          job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
+          job_source_id?: string | null
+          job_code?: string | null
+          job_site_address?: string | null
           created_at?: string | null
           updated_at?: string | null
         }
@@ -6261,6 +6635,7 @@ export type Database = {
           merged_into_project_number_id: string | null
           merged_at: string | null
           notes: string | null
+          site_address: string | null
           created_by: string | null
           updated_by: string | null
           created_at: string
@@ -6282,6 +6657,7 @@ export type Database = {
           merged_into_project_number_id?: string | null
           merged_at?: string | null
           notes?: string | null
+          site_address?: string | null
           created_by?: string | null
           updated_by?: string | null
           created_at?: string
@@ -6303,6 +6679,7 @@ export type Database = {
           merged_into_project_number_id?: string | null
           merged_at?: string | null
           notes?: string | null
+          site_address?: string | null
           created_by?: string | null
           updated_by?: string | null
           created_at?: string
@@ -10635,6 +11012,38 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_actor_manage_daily_allocation: {
+        Args: {
+          target_profile_id: string
+        }
+        Returns: boolean
+      }
+      can_actor_manage_daily_allocation_team: {
+        Args: {
+          target_team_id: string
+        }
+        Returns: boolean
+      }
+      can_actor_view_daily_allocation: {
+        Args: {
+          target_profile_id: string
+        }
+        Returns: boolean
+      }
+      list_daily_allocation_scope_profile_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
+      list_daily_allocation_plant_conflicts: {
+        Args: {
+          p_work_date: string
+        }
+        Returns: {
+          plant_id: string | null
+          hired_serial: string | null
+          owner_team_id: string | null
+        }[]
+      }
       convert_quote_project_numbers: {
         Args: {
           p_project_number_ids: string[]
@@ -10870,10 +11279,10 @@ export type Database = {
       check__maintenance_categories__type: 'date' | 'mileage' | 'hours'
       check__maintenance_history__value_type: 'date' | 'mileage' | 'boolean' | 'text'
       check__message_recipients__status: 'PENDING' | 'SHOWN' | 'SIGNED' | 'DISMISSED'
-      check__messages__module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
+      check__messages__module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
       check__messages__priority: 'LOW' | 'HIGH' | 'URGENT'
       check__messages__type: 'TOOLBOX_TALK' | 'REMINDER' | 'NOTIFICATION'
-      check__notification_preferences__module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security'
+      check__notification_preferences__module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
       check__org_teams__timesheet_type: 'civils' | 'plant'
       check__plant__status: 'active' | 'inactive' | 'maintenance' | 'retired'
       check__plant_inspections__status: 'draft' | 'submitted'

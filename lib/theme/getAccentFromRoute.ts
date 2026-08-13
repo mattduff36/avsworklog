@@ -19,6 +19,7 @@ export type AccentType =
   | 'reminders'
   | 'reports'
   | 'debug'
+  | 'daily-allocation'
   | 'brand'; // yellow for Dashboard, Manager/Admin, Help
 
 /**
@@ -48,6 +49,7 @@ export function getAccentFromRoute(
   if (path.startsWith('/workshop-tasks')) return 'workshop';
   if (path.startsWith('/inventory')) return 'inventory';
   if (path.startsWith('/reminders')) return 'reminders';
+  if (path.startsWith('/daily-allocation')) return 'daily-allocation';
   if (path.startsWith('/debug')) return 'debug';
   if (path.startsWith('/reports')) return 'reports';
 

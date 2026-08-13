@@ -173,6 +173,7 @@ export const STANDARD_MODULES: ModuleName[] = [
   'admin-vans',
   'inventory',
   'reminders',
+  'daily-allocation',
 ];
 
 export const MANAGEMENT_MODULES: ModuleName[] = [
@@ -214,6 +215,7 @@ export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'quotes': 'Quotes',
   'inventory': 'Inventory',
   'reminders': 'Reminders',
+  'daily-allocation': 'Allocation',
 };
 
 export const MODULE_CSS_VAR: Record<ModuleName, string> = {
@@ -240,6 +242,7 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'quotes': '--avs-yellow',
   'inventory': '--inventory-primary',
   'reminders': '--reminders-primary',
+  'daily-allocation': '--daily-allocation-primary',
 };
 
 // All available modules in the system
@@ -266,7 +269,8 @@ export type ModuleName =
   | 'customers'
   | 'quotes'
   | 'inventory'
-  | 'reminders';
+  | 'reminders'
+  | 'daily-allocation';
 
 export type SensitiveAccessModuleName = ModuleName | 'debug';
 
@@ -294,6 +298,7 @@ export const ALL_MODULES: ModuleName[] = [
   'quotes',
   'inventory',
   'reminders',
+  'daily-allocation',
 ];
 
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
@@ -320,6 +325,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'quotes': 'Quotes',
   'inventory': 'Inventory',
   'reminders': 'Reminders',
+  'daily-allocation': 'Daily Allocation',
 };
 
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
@@ -346,6 +352,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'quotes': 'Create and track customer quotations',
   'inventory': 'Track small tools, equipment, and location buckets',
   'reminders': 'View and action assigned reminders',
+  'daily-allocation': 'Assign daily labour and plant to jobs, then publish tomorrow’s instructions',
 };
 
 // For API responses

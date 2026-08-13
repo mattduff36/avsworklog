@@ -48,6 +48,7 @@ import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/ut
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import { JobCataloguePicker } from '@/components/daily-allocation/JobCataloguePicker';
 
 // Dynamic imports for heavy components
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
@@ -80,6 +81,10 @@ type InspectionWithRelations = {
   status: string;
   plant?: PlantWithCategory;
   inspection_items?: InspectionItem[];
+  job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null;
+  job_source_id?: string | null;
+  job_code?: string | null;
+  job_site_address?: string | null;
 };
 type RecentCompletedDefect = { completedAt: string };
 
@@ -195,6 +200,10 @@ function NewPlantInspectionContent() {
   const [hiredPlantIdSerial, setHiredPlantIdSerial] = useState('');
   const [hiredPlantDescription, setHiredPlantDescription] = useState('');
   const [hiredPlantHiringCompany, setHiredPlantHiringCompany] = useState('');
+  const [jobSourceType, setJobSourceType] = useState<'live_quote' | 'legacy_quote' | 'project_number' | null>(null);
+  const [jobSourceId, setJobSourceId] = useState<string | null>(null);
+  const [jobCode, setJobCode] = useState('');
+  const [jobSiteAddress, setJobSiteAddress] = useState<string | null>(null);
 
   const showPermissionLoader = permissionLoading;
 
@@ -359,6 +368,10 @@ function NewPlantInspectionContent() {
       hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
       hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
       hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
+      job_source_type: jobSourceType,
+      job_source_id: jobSourceId,
+      job_code: jobCode.trim() || null,
+      job_site_address: jobSiteAddress,
       updated_at: new Date().toISOString(),
     };
 
@@ -418,6 +431,10 @@ function NewPlantInspectionContent() {
     inspectionDate,
     inspectorComments,
     isHiredPlant,
+    jobCode,
+    jobSiteAddress,
+    jobSourceId,
+    jobSourceType,
     selectedEmployeeId,
     selectedPlantId,
     supabase,
@@ -549,6 +566,10 @@ function NewPlantInspectionContent() {
             hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
             hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
             hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
+            job_source_type: jobSourceType,
+            job_source_id: jobSourceId,
+            job_code: jobCode.trim() || null,
+            job_site_address: jobSiteAddress,
           })
           .select('id')
           .single();
@@ -720,6 +741,10 @@ function NewPlantInspectionContent() {
         setIsHiredPlant(false);
         setSelectedPlantId(inspectionData.plant?.id || '');
       }
+      setJobSourceType(inspection.job_source_type || null);
+      setJobSourceId(inspection.job_source_id || null);
+      setJobCode(inspection.job_code || '');
+      setJobSiteAddress(inspection.job_site_address || null);
       
       setInspectionDate(inspection.inspection_date || formatDateISO(new Date()));
       setSelectedEmployeeId(inspection.user_id);
@@ -1055,6 +1080,13 @@ function NewPlantInspectionContent() {
       }
     }
 
+    if (!jobCode.trim() || !jobSourceType || !jobSourceId) {
+      setError('Please select a catalogue job with a valid site address');
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('plant-job-code'));
+      return;
+    }
+
     const hoursValue = getParsedHours();
     // Allow null hours only for existing inspections that originally had null (backward compatibility)
     const isOldDraftWithoutHours = existingInspectionId && originalCurrentMileage === null;
@@ -1252,6 +1284,10 @@ function NewPlantInspectionContent() {
         hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
         hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
         hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
+        job_source_type: jobSourceType,
+        job_source_id: jobSourceId,
+        job_code: jobCode.trim() || null,
+        job_site_address: jobSiteAddress,
       };
 
       let inspection: { id: string };
@@ -1337,6 +1373,10 @@ function NewPlantInspectionContent() {
           hired_plant_id_serial: isHiredPlant ? hiredPlantIdSerial.trim() : null,
           hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() : null,
           hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() : null,
+          job_source_type: jobSourceType,
+          job_source_id: jobSourceId,
+          job_code: jobCode.trim() || null,
+          job_site_address: jobSiteAddress,
         };
 
         const { data: updatedInspection, error: updateError } = await supabase
@@ -1805,6 +1845,25 @@ function NewPlantInspectionContent() {
               </div>
             </div>
           )}
+
+          <div id="plant-job-code" className="space-y-2">
+            <Label className="text-foreground text-base">
+              Job code <span className="text-red-400">*</span>
+            </Label>
+            <JobCataloguePicker
+              value={jobCode || null}
+              sourceId={jobSourceId}
+              onSelect={(option) => {
+                setJobSourceType(option?.source || null);
+                setJobSourceId(option?.sourceId || null);
+                setJobCode(option?.value || '');
+                setJobSiteAddress(option?.siteAddress || null);
+              }}
+            />
+            <p className="text-sm text-muted-foreground">
+              Site: {jobSiteAddress || 'Derived from the selected catalogue job'}
+            </p>
+          </div>
 
           {/* Current Hours */}
           <div className="space-y-2">

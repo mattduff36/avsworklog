@@ -18,6 +18,8 @@ interface PlantInspectionWithRelations {
   hired_plant_id_serial: string | null;
   hired_plant_description: string | null;
   hired_plant_hiring_company: string | null;
+  job_code?: string | null;
+  job_site_address?: string | null;
   plant?: {
     plant_id: string;
     nickname: string | null;
@@ -116,6 +118,8 @@ export async function GET(
         inspector_comments: inspectionWithRelations.inspector_comments,
         signature_data: inspectionWithRelations.signature_data,
         signed_at: inspectionWithRelations.signed_at,
+        job_code: inspectionWithRelations.job_code,
+        job_site_address: inspectionWithRelations.job_site_address,
       },
       plant: isHired
         ? {

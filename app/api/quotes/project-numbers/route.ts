@@ -236,9 +236,49 @@ async function createProjectNumber(admin: ReturnType<typeof createAdminClient>, 
       title,
       description: normalizeOptionalString(body.description),
       notes: normalizeOptionalString(body.notes),
+      site_address: normalizeOptionalString(body.site_address),
       created_by: userId,
       updated_by: userId,
     })
+    .select('*')
+    .single();
+  if (error) throw error;
+
+  return { project: data };
+}
+
+async function updateProjectNumber(admin: ReturnType<typeof createAdminClient>, body: Record<string, unknown>, userId: string) {
+  const projectNumberId = normalizeOptionalString(body.project_number_id);
+  const title = normalizeOptionalString(body.title);
+  const fieldErrors: Record<string, string> = {};
+
+  if (!projectNumberId) fieldErrors.project_number_id = 'Select a project number.';
+  if (!title) fieldErrors.title = 'Enter a project title.';
+  if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
+
+  const { data: existing, error: existingError } = await admin
+    .from('quote_project_numbers')
+    .select('id, status')
+    .eq('id', projectNumberId)
+    .maybeSingle();
+  if (existingError) throw existingError;
+  if (!existing) {
+    return { fieldErrors: { project_number_id: 'Project number not found.' } };
+  }
+  if (existing.status !== 'open') {
+    return { fieldErrors: { project_number_id: 'Only open project numbers can be edited.' } };
+  }
+
+  const { data, error } = await admin
+    .from('quote_project_numbers')
+    .update({
+      title,
+      description: normalizeOptionalString(body.description),
+      notes: normalizeOptionalString(body.notes),
+      site_address: normalizeOptionalString(body.site_address),
+      updated_by: userId,
+    })
+    .eq('id', projectNumberId)
     .select('*')
     .single();
   if (error) throw error;
@@ -470,6 +510,8 @@ export async function PATCH(request: NextRequest) {
       result = await linkCostsToExistingQuote(admin, body, user.id);
     } else if (action === 'convert_to_quote') {
       result = await convertProjectNumbersToQuote(admin, body, user.id);
+    } else if (action === 'update_project') {
+      result = await updateProjectNumber(admin, body, user.id);
     } else {
       return NextResponse.json({ error: 'Unsupported project number action.' }, { status: 400 });
     }
@@ -479,6 +521,10 @@ export async function PATCH(request: NextRequest) {
         { error: 'Please correct the highlighted fields and try again.', field_errors: result.fieldErrors },
         { status: 400 }
       );
+    }
+
+    if (action === 'update_project' && 'project' in result && result.project) {
+      await syncProjectNumberSiteLocation(admin, result.project as QuoteProjectNumberRow, user.id);
     }
 
     // Conversion/link inventory reconciliation is owned by deferred database triggers.
