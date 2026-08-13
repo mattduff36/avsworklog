@@ -22,3 +22,15 @@ export function isUnreadNotification(notification: Pick<NotificationItem, 'statu
     && notification.type === 'TOOLBOX_TALK'
     && notification.priority === 'LOW';
 }
+
+export function dailyAllocationNotificationHref(
+  notification: Pick<NotificationItem, 'daily_allocation_publication_id' | 'daily_allocation_labour_item_id'>
+): string | null {
+  if (notification.daily_allocation_publication_id) {
+    return `/daily-allocation/my?publication=${notification.daily_allocation_publication_id}`;
+  }
+  if (notification.daily_allocation_labour_item_id) {
+    return `/daily-allocation/my?item=${notification.daily_allocation_labour_item_id}`;
+  }
+  return null;
+}

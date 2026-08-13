@@ -13,6 +13,7 @@ export default defineWorkspace([
         'tests/integration/**/*.test.ts',
         'tests/unit/**/*.test.ts',
         'tests/regression/**/*.test.ts',
+        'tests/db/**/*.test.ts',
       ],
     },
   },

@@ -76,6 +76,8 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.67",
+    "@dnd-kit/dom": "^0.5.0",
+    "@dnd-kit/react": "^0.5.0",
     "@hookform/resolvers": "^5.2.2",
     "@maptiler/sdk": "^3.11.1",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -125,6 +127,7 @@
   },
   "devDependencies": {
     "@cursor/sdk": "^1.0.21",
+    "@electric-sql/pglite": "^0.5.5",
     "@eslint/eslintrc": "^3",
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^15.5.12",

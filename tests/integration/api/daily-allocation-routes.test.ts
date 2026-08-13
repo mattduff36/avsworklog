@@ -51,6 +51,22 @@ function authClient(userId = 'user-1') {
   };
 }
 
+function issuedReadClient(userId: string) {
+  const client = authClient(userId);
+  const eq = vi.fn().mockReturnThis();
+  client.from = vi.fn(() => ({
+    select: vi.fn().mockReturnThis(),
+    eq,
+    order: vi.fn().mockResolvedValue({ data: [], error: null }),
+    in: vi.fn().mockReturnThis(),
+    maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+    insert: vi.fn().mockReturnThis(),
+    update: vi.fn().mockReturnThis(),
+    delete: vi.fn().mockReturnThis(),
+  }));
+  return { client, eq };
+}
+
 describe('daily allocation API auth', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -67,14 +83,7 @@ describe('daily allocation API auth', () => {
     mockGetEffectiveModuleAccessLevel.mockResolvedValue(2);
     mockCanEffectiveRoleUseModuleLevel.mockImplementation(async (_module: string, level: number) => level <= 2);
     const { GET } = await import('@/app/api/daily-allocation/me/route');
-    const client = authClient('employee-1');
-    const eq = vi.fn().mockReturnThis();
-    client.from = vi.fn(() => ({
-      select: vi.fn().mockReturnThis(),
-      eq,
-      order: vi.fn().mockResolvedValue({ data: [], error: null }),
-      in: vi.fn().mockReturnThis(),
-    }));
+    const { client, eq } = issuedReadClient('employee-1');
     mockCreateClient.mockResolvedValue(client);
 
     const response = await GET(new NextRequest('http://localhost/api/daily-allocation/me'));
@@ -188,5 +197,97 @@ describe('daily allocation API auth', () => {
       }),
     }));
     expect(response.status).toBe(409);
+  });
+
+  it('keeps v1 labour draft writes on the drafts table before v2 cutover', async () => {
+    mockGetEffectiveModuleAccessLevel.mockResolvedValue(4);
+    mockCanEffectiveRoleUseModuleLevel.mockResolvedValue(true);
+    const client = authClient();
+    const draftRow = {
+      id: 'draft-1',
+      work_date: '2026-08-14',
+      profile_id: 'user-2',
+      job_source_type: 'project_number',
+      job_source_id: '44444444-4444-4444-8444-444444444444',
+      job_code: '60001-MD',
+      site_address: '12 Site Road',
+      start_time: '08:00',
+      meeting_point: null,
+      meet_person: null,
+      notes: null,
+      row_version: 1,
+      updated_at: '2026-08-13T12:00:00Z',
+    };
+    const query = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn()
+        .mockResolvedValueOnce({ data: null, error: null })
+        .mockResolvedValueOnce({ data: draftRow, error: null }),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+    };
+    client.from = vi.fn(() => query);
+    mockCreateClient.mockResolvedValue(client);
+
+    const { PUT } = await import('@/app/api/daily-allocation/labour/route');
+    const response = await PUT(new NextRequest('http://localhost/api/daily-allocation/labour', {
+      method: 'PUT',
+      body: JSON.stringify({
+        work_date: '2026-08-14',
+        profile_id: 'user-2',
+        job_source_type: 'project_number',
+        job_source_id: '44444444-4444-4444-8444-444444444444',
+        job_code: '60001-MD',
+        start_time: '08:00',
+      }),
+    }));
+    expect(response.status).toBe(200);
+    expect(client.from).toHaveBeenCalledWith('daily_labour_allocation_drafts');
+    expect(client.rpc).not.toHaveBeenCalled();
+    expect(query.insert).toHaveBeenCalled();
+  });
+});
+
+describe('DA2-COMPAT-001 issued and reconciliation reads', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateClient.mockResolvedValue(authClient());
+    mockGetEffectiveRole.mockResolvedValue({
+      user_id: 'employee-1',
+      is_viewing_as: false,
+      team_id: 'team-1',
+      team_name: 'Civils',
+    });
+    mockGetEffectiveModuleAccessLevel.mockResolvedValue(2);
+    mockCanEffectiveRoleUseModuleLevel.mockImplementation(async (_module: string, level: number) => level <= 2);
+  });
+
+  it('queries only the signed-in employee itinerary and accepts a publication selector', async () => {
+    const { GET } = await import('@/app/api/daily-allocation/me/route');
+    const { client, eq } = issuedReadClient('employee-1');
+    mockCreateClient.mockResolvedValue(client);
+
+    const response = await GET(new NextRequest('http://localhost/api/daily-allocation/me?publication=pub-v2'));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ current: null, history: [] });
+    expect(eq).toHaveBeenCalledWith('profile_id', 'employee-1');
+    expect(eq).not.toHaveBeenCalledWith('profile_id', 'user-1');
+  });
+
+  it('rejects employees from plant reconciliation and keeps manager history metadata available', async () => {
+    const { GET: getReconciliation } = await import('@/app/api/daily-allocation/reconciliation/route');
+    const employeeResponse = await getReconciliation(
+      new NextRequest('http://localhost/api/daily-allocation/reconciliation?date=2026-08-14')
+    );
+    expect(employeeResponse.status).toBe(403);
+
+    const { GET: getHistory } = await import('@/app/api/daily-allocation/history/route');
+    const { client, eq } = issuedReadClient('employee-1');
+    mockCreateClient.mockResolvedValue(client);
+    const historyResponse = await getHistory(new NextRequest('http://localhost/api/daily-allocation/history'));
+    expect(historyResponse.status).toBe(200);
+    expect(await historyResponse.json()).toEqual({ publications: [] });
+    expect(eq).toHaveBeenCalledWith('profile_id', 'employee-1');
   });
 });

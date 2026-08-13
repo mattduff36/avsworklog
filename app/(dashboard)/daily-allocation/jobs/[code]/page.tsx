@@ -11,6 +11,7 @@ import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAll
 import { Badge } from '@/components/ui/badge';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
+import { formatDailyAllocationVisitTime } from '@/lib/utils/daily-allocation-timeline';
 import type { DailyJobSheetPayload } from '@/types/daily-allocation';
 import { toast } from 'sonner';
 
@@ -140,12 +141,21 @@ export default function DailyAllocationJobSheetPage() {
             {sheet.labour.length === 0 ? (
               <p className="text-sm text-muted-foreground">No published labour for this job yet.</p>
             ) : sheet.labour.map((row) => (
-              <div key={`${row.work_date}-${row.profile_name}-${row.revision_no}`} className="rounded-md border p-3 text-sm">
+              <div key={`${row.work_date}-${row.profile_name}-${row.revision_no}-${row.published_visit_id || 'legacy'}`} className="rounded-md border p-3 text-sm">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-medium">{row.profile_name}</span>
                   <Badge variant="secondary">{row.work_date} · rev {row.revision_no}</Badge>
                 </div>
                 <p className="text-muted-foreground">{row.site_address || row.availability.replaceAll('_', ' ')}</p>
+                {row.starts_at && row.ends_at ? (
+                  <p>
+                    {formatDailyAllocationVisitTime(row.starts_at) || row.instructions.start_time}
+                    –
+                    {formatDailyAllocationVisitTime(row.ends_at)}
+                  </p>
+                ) : row.instructions.start_time ? (
+                  <p>Start {row.instructions.start_time}</p>
+                ) : null}
               </div>
             ))}
           </CardContent>

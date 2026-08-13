@@ -52,6 +52,7 @@ function makeNotification(overrides: Partial<NotificationItem> = {}): Notificati
     first_shown_at: null,
     signature_data: null,
     daily_allocation_labour_item_id: null,
+    daily_allocation_publication_id: null,
     ...overrides,
   };
 }
@@ -116,5 +117,56 @@ describe('NotificationPanel', () => {
     } finally {
       window.removeEventListener('notification-dismissed', notificationDismissed);
     }
+  });
+
+  it('DA2-NOTIF-001 opens the issued itinerary for a publication-linked message', async () => {
+    const onClose = vi.fn();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/api/messages/notifications')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            notifications: [makeNotification({
+              subject: 'Your allocation for 2026-08-14',
+              module_key: 'daily_allocation',
+              daily_allocation_publication_id: 'pub-v2',
+            })],
+          }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<NotificationPanel open onClose={onClose} />);
+    fireEvent.click(await screen.findByText('Your allocation for 2026-08-14'));
+    expect(pushMock).toHaveBeenCalledWith('/daily-allocation/my?publication=pub-v2');
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it('DA2-NOTIF-001 preserves v1 labour-item deep links', async () => {
+    const onClose = vi.fn();
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/api/messages/notifications')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            notifications: [makeNotification({
+              subject: 'Your allocation for 2026-08-13',
+              daily_allocation_labour_item_id: 'labour-1',
+            })],
+          }),
+        } as Response;
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+
+    render(<NotificationPanel open onClose={onClose} />);
+    fireEvent.click(await screen.findByText('Your allocation for 2026-08-13'));
+    expect(pushMock).toHaveBeenCalledWith('/daily-allocation/my?item=labour-1');
   });
 });

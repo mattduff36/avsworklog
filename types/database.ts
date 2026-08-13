@@ -4641,6 +4641,7 @@ export type Database = {
           acceptance_delay_minutes: number
           module_key: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
           daily_allocation_labour_item_id: string | null
+          daily_allocation_publication_id: string | null
         }
         Insert: {
           id?: string
@@ -4657,6 +4658,7 @@ export type Database = {
           acceptance_delay_minutes?: number
           module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
           daily_allocation_labour_item_id?: string | null
+          daily_allocation_publication_id?: string | null
         }
         Update: {
           id?: string
@@ -4673,6 +4675,7 @@ export type Database = {
           acceptance_delay_minutes?: number
           module_key?: 'errors' | 'maintenance' | 'rams' | 'approvals' | 'inspections' | 'absence' | 'timesheets' | 'inventory' | 'processed_absence' | 'training' | 'suggestions' | 'toolbox_talks' | 'reminders' | 'quotes' | 'general_notifications' | 'sensitive_pin_security' | 'daily_allocation'
           daily_allocation_labour_item_id?: string | null
+          daily_allocation_publication_id?: string | null
         }
         Relationships: [
           {
@@ -4687,6 +4690,13 @@ export type Database = {
             columns: ['daily_allocation_labour_item_id']
             isOneToOne: true
             referencedRelation: 'daily_allocation_labour_items'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'messages_daily_allocation_publication_id_fkey'
+            columns: ['daily_allocation_publication_id']
+            isOneToOne: false
+            referencedRelation: 'daily_allocation_publications'
             referencedColumns: ['id']
           },
         ]

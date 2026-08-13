@@ -2,12 +2,11 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { format, parseISO } from 'date-fns';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
-import { Badge } from '@/components/ui/badge';
+import { IssuedAllocationCard } from '@/components/daily-allocation/IssuedAllocationCard';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import type { DailyAllocationIssuedItem } from '@/types/daily-allocation';
@@ -28,13 +27,15 @@ function MyDailyAllocationContent() {
   const { canUseLevel, isLoading: levelLoading } = useModuleAccessLevel('daily-allocation');
   const searchParams = useSearchParams();
   const itemId = searchParams.get('item');
+  const publicationId = searchParams.get('publication');
 
   return (
     <MyDailyAllocationBody
-      key={itemId || 'latest'}
+      key={publicationId || itemId || 'latest'}
       hasPermission={hasPermission && canUseLevel(2)}
       permissionLoading={permissionLoading || levelLoading}
       itemId={itemId}
+      publicationId={publicationId}
     />
   );
 }
@@ -43,10 +44,12 @@ function MyDailyAllocationBody({
   hasPermission,
   permissionLoading,
   itemId,
+  publicationId,
 }: {
   hasPermission: boolean;
   permissionLoading: boolean;
   itemId: string | null;
+  publicationId: string | null;
 }) {
   const [current, setCurrent] = useState<DailyAllocationIssuedItem | null>(null);
   const [history, setHistory] = useState<DailyAllocationIssuedItem[]>([]);
@@ -55,7 +58,10 @@ function MyDailyAllocationBody({
   useEffect(() => {
     if (!hasPermission || permissionLoading) return;
     let mounted = true;
-    const query = itemId ? `?item=${encodeURIComponent(itemId)}` : '';
+    const params = new URLSearchParams();
+    if (publicationId) params.set('publication', publicationId);
+    else if (itemId) params.set('item', itemId);
+    const query = params.toString() ? `?${params.toString()}` : '';
     fetch(`/api/daily-allocation/me${query}`, { cache: 'no-store' })
       .then(async (response) => {
         const payload = await response.json() as {
@@ -77,7 +83,7 @@ function MyDailyAllocationBody({
     return () => {
       mounted = false;
     };
-  }, [hasPermission, itemId, permissionLoading]);
+  }, [hasPermission, itemId, permissionLoading, publicationId]);
 
   if (permissionLoading) {
     return (
@@ -111,6 +117,11 @@ function MyDailyAllocationBody({
     );
   }
 
+  const highlighted = Boolean(publicationId || itemId);
+  const earlier = current
+    ? history.filter((item) => item.publication_id !== current.publication_id)
+    : history;
+
   return (
     <AppPageShell>
       <AppPageHeader
@@ -119,7 +130,7 @@ function MyDailyAllocationBody({
         description="Issued site, job, and instructions for your published work days."
       />
       {current ? (
-        <IssuedCard item={current} highlighted={Boolean(itemId)} />
+        <IssuedAllocationCard item={current} highlighted={highlighted} />
       ) : (
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
@@ -127,11 +138,11 @@ function MyDailyAllocationBody({
           </CardContent>
         </Card>
       )}
-      {history.length > 1 ? (
+      {earlier.length ? (
         <div className="mt-6 space-y-3">
           <h2 className="text-lg font-semibold">Earlier revisions</h2>
-          {history.slice(1).map((item) => (
-            <IssuedCard
+          {earlier.map((item) => (
+            <IssuedAllocationCard
               key={`${item.publication_id}-${item.work_date}-${item.revision_no}`}
               item={item}
             />
@@ -139,30 +150,5 @@ function MyDailyAllocationBody({
         </div>
       ) : null}
     </AppPageShell>
-  );
-}
-
-function IssuedCard({ item, highlighted = false }: { item: DailyAllocationIssuedItem; highlighted?: boolean }) {
-  return (
-    <Card className={highlighted ? 'border-primary' : undefined}>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center justify-between gap-2">
-          <span>{format(parseISO(item.work_date), 'EEEE d MMM yyyy')}</span>
-          <Badge variant="secondary">Revision {item.revision_no}</Badge>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2 text-sm">
-        {item.availability !== 'available' && item.absence ? (
-          <p>{item.absence.reason_name}{item.absence.is_half_day ? ` (${item.absence.half_day_session || 'half day'})` : ''}</p>
-        ) : null}
-        {item.job_code ? <p><span className="text-muted-foreground">Job:</span> {item.job_code}</p> : null}
-        {item.title ? <p><span className="text-muted-foreground">Title:</span> {item.title}</p> : null}
-        {item.site_address ? <p><span className="text-muted-foreground">Site:</span> {item.site_address}</p> : null}
-        {item.instructions.start_time ? <p><span className="text-muted-foreground">Start:</span> {item.instructions.start_time}</p> : null}
-        {item.instructions.meeting_point ? <p><span className="text-muted-foreground">Meeting point:</span> {item.instructions.meeting_point}</p> : null}
-        {item.instructions.meet_person ? <p><span className="text-muted-foreground">Meet:</span> {item.instructions.meet_person}</p> : null}
-        {item.instructions.notes ? <p><span className="text-muted-foreground">Notes:</span> {item.instructions.notes}</p> : null}
-      </CardContent>
-    </Card>
   );
 }

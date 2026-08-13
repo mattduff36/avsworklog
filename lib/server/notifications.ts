@@ -22,6 +22,7 @@ interface MessageShape {
   sender_id?: string | null;
   created_at?: string | null;
   daily_allocation_labour_item_id?: string | null;
+  daily_allocation_publication_id?: string | null;
   sender?: SenderShape | SenderShape[] | null;
 }
 
@@ -154,6 +155,7 @@ export async function listNotificationsForUser(
           created_at,
           deleted_at,
           daily_allocation_labour_item_id,
+          daily_allocation_publication_id,
           sender:profiles!messages_sender_id_fkey(
             id,
             full_name
@@ -204,6 +206,7 @@ export async function listNotificationsForUser(
         first_shown_at: item.first_shown_at ?? null,
         signature_data: item.signature_data ?? null,
         daily_allocation_labour_item_id: message.daily_allocation_labour_item_id ?? null,
+        daily_allocation_publication_id: message.daily_allocation_publication_id ?? null,
       };
     })
     .filter((item): item is NotificationItem => item !== null);

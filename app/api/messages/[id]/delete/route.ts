@@ -34,7 +34,7 @@ export async function DELETE(
     // Check if message exists
     const { data: message, error: fetchError } = await supabase
       .from('messages')
-      .select('id, deleted_at, daily_allocation_labour_item_id, module_key')
+      .select('id, deleted_at, daily_allocation_labour_item_id, daily_allocation_publication_id, module_key')
       .eq('id', messageId)
       .single();
 
@@ -42,7 +42,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Message not found' }, { status: 404 });
     }
 
-    if (message.daily_allocation_labour_item_id || message.module_key === 'daily_allocation') {
+    if (
+      message.daily_allocation_labour_item_id
+      || message.daily_allocation_publication_id
+      || message.module_key === 'daily_allocation'
+    ) {
       return NextResponse.json({ error: 'Published allocation messages cannot be deleted.' }, { status: 403 });
     }
 

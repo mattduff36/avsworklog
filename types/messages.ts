@@ -26,6 +26,7 @@ export interface Message {
   pdf_file_path: string | null;
   acceptance_delay_minutes: number;
   daily_allocation_labour_item_id?: string | null;
+  daily_allocation_publication_id?: string | null;
 }
 
 // Message recipient (per-user assignment)
@@ -85,6 +86,7 @@ export interface NotificationItem {
   first_shown_at: string | null;
   signature_data: string | null;
   daily_allocation_labour_item_id: string | null;
+  daily_allocation_publication_id: string | null;
 }
 
 // Form input types

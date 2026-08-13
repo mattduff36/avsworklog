@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { formatDateTime } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import type { NotificationItem } from '@/types/messages';
-import { isUnreadNotification } from '@/lib/utils/notification-helpers';
+import { isUnreadNotification, dailyAllocationNotificationHref } from '@/lib/utils/notification-helpers';
 
 interface NotificationPanelProps {
   open: boolean;
@@ -90,8 +90,9 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
 
   function handleNotificationClick(notification: NotificationItem) {
     onClose();
-    if (notification.daily_allocation_labour_item_id) {
-      router.push(`/daily-allocation/my?item=${notification.daily_allocation_labour_item_id}`);
+    const allocationHref = dailyAllocationNotificationHref(notification);
+    if (allocationHref) {
+      router.push(allocationHref);
       return;
     }
     router.push(`/notifications?openNotification=${notification.id}`);

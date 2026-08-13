@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isUnreadNotification, resolveNotificationToOpen } from '@/lib/utils/notification-helpers';
+import { isUnreadNotification, resolveNotificationToOpen, dailyAllocationNotificationHref } from '@/lib/utils/notification-helpers';
 import type { NotificationItem } from '@/types/messages';
 
 function makeNotification(overrides: Partial<NotificationItem> = {}): NotificationItem {
@@ -22,6 +22,7 @@ function makeNotification(overrides: Partial<NotificationItem> = {}): Notificati
     first_shown_at: null,
     signature_data: null,
     daily_allocation_labour_item_id: null,
+    daily_allocation_publication_id: null,
     ...overrides,
   };
 }
@@ -90,5 +91,21 @@ describe('isUnreadNotification', () => {
       priority: 'LOW',
       status: 'SHOWN',
     }))).toBe(false);
+  });
+});
+
+describe('DA2-NOTIF-001 publication and labour-item linking', () => {
+  it('links v2 publication messages to the immutable self-view and preserves v1 labour-item links', () => {
+    expect(dailyAllocationNotificationHref(makeNotification({
+      daily_allocation_publication_id: 'pub-2',
+    }))).toBe('/daily-allocation/my?publication=pub-2');
+    expect(dailyAllocationNotificationHref(makeNotification({
+      daily_allocation_labour_item_id: 'item-1',
+    }))).toBe('/daily-allocation/my?item=item-1');
+    expect(dailyAllocationNotificationHref(makeNotification({
+      daily_allocation_publication_id: 'pub-2',
+      daily_allocation_labour_item_id: 'item-1',
+    }))).toBe('/daily-allocation/my?publication=pub-2');
+    expect(dailyAllocationNotificationHref(makeNotification())).toBeNull();
   });
 });
