@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.26.0
+
+**GIT COMMIT MESSAGE**
+`feat(api): update background services`
+
+**PUSHED AT**
+2026-08-13T13:09:55.923Z
+
+**WHAT CHANGED**
+Update background services.
+
+**VERSION HISTORY DETAILS**
+- Updated background services, with changes to shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `feat(api): update background services`
+
 ## 0826.25.1
 
 **GIT COMMIT MESSAGE**

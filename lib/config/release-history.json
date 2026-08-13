@@ -1,5 +1,22 @@
 [
   {
+    "version": "0826.26.0",
+    "updateKind": "major",
+    "title": "Background services update",
+    "description": "Updated background services.",
+    "summary": "Updated background services.",
+    "details": [
+      "Updated background services, with changes to shared logic."
+    ],
+    "areas": [
+      "Background services"
+    ],
+    "areaKeys": [
+      "background-services"
+    ],
+    "pushedAt": "2026-08-13T13:09:55.923Z"
+  },
+  {
     "version": "0826.25.1",
     "updateKind": "minor",
     "title": "Permissions improvements",
