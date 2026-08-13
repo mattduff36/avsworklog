@@ -9,6 +9,7 @@ REVOKE ALL ON SCHEMA private FROM PUBLIC;
 
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+SET LOCAL search_path = public, extensions, pg_catalog;
 
 -- ---------------------------------------------------------------------------
 -- DA2-MIG-001 / DA2-ROLL-001: v2 remains inaccessible until explicitly enabled
@@ -829,7 +830,7 @@ CREATE OR REPLACE FUNCTION private.daily_allocation_v2_conflict_signature(
 RETURNS TEXT
 LANGUAGE plpgsql
 STABLE
-SET search_path = public, pg_temp
+SET search_path = public, extensions, pg_temp
 AS $$
 DECLARE
   conflict_payload JSONB;
@@ -1183,11 +1184,13 @@ $$;
 
 CREATE OR REPLACE FUNCTION private.daily_allocation_v2_hash_snapshot_payload(p_payload JSONB)
 RETURNS TEXT
-LANGUAGE sql
+LANGUAGE plpgsql
 IMMUTABLE
-SET search_path = pg_catalog, public
+SET search_path = pg_catalog, public, extensions
 AS $$
-  SELECT ENCODE(DIGEST(CONVERT_TO(p_payload::TEXT, 'utf8'), 'sha256'), 'hex');
+BEGIN
+  RETURN ENCODE(DIGEST(CONVERT_TO(p_payload::TEXT, 'utf8'), 'sha256'), 'hex');
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION private.daily_allocation_v2_plan_fingerprint(

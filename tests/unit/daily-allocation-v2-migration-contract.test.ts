@@ -554,7 +554,13 @@ describe('DA2-ABS-001 timed absence and shift policy', () => {
     expect(signatureFn).toContain('ORDER BY absences.id');
     expect(signatureFn).toContain('SELECT TO_JSONB(shifts)');
     expect(signatureFn).toContain("'session_result'");
+    expect(signatureFn).toContain('SET search_path = public, extensions, pg_temp');
     expect(signatureFn).toContain("RETURN ENCODE(DIGEST(CONVERT_TO(conflict_payload::TEXT, 'utf8'), 'sha256'), 'hex')");
+
+    const hashFn = functionSql('private.daily_allocation_v2_hash_snapshot_payload');
+    expect(v2Sql).toContain('SET LOCAL search_path = public, extensions, pg_catalog');
+    expect(hashFn).toContain('SET search_path = pg_catalog, public, extensions');
+    expect(hashFn).toContain("RETURN ENCODE(DIGEST(CONVERT_TO(p_payload::TEXT, 'utf8'), 'sha256'), 'hex')");
   });
 });
 
