@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -13,6 +12,18 @@ import {
   withAuthenticatedRole,
   type DailyAllocationV1ContentHash,
 } from './daily-allocation-v2-pglite-harness';
+import {
+  DATABASE_COMMENT_PREFIX,
+  DB_NAME,
+  DB_USER,
+  FRESHNESS_SQL,
+  PROJECT_NAME_HASH_LENGTH,
+  PROJECT_NAME_PREFIX,
+  PROVENANCE_ENV_KEYS,
+  STATE_VERSION,
+  findFreshnessViolations,
+  validateLocalTestDatabaseUrl,
+} from '../../scripts/local-test-postgres';
 import type { PGlite } from '@electric-sql/pglite';
 
 const START = '2026-08-14 09:00:00+01';
@@ -757,7 +768,7 @@ describe('DA2 isolated PGlite runtime', () => {
 
 const describeConcurrency = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 
-describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite', () => {
+describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite [LTDB-CONC-001]', () => {
   const connectionString = process.env.TEST_DATABASE_URL || '';
   const clients: Client[] = [];
   let setupClient: Client;
@@ -767,18 +778,40 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite', () => {
   let originalBoardEnabled = false;
   let originalWritesEnabled = false;
   let runtimeCaptured = false;
-  const workDate = (() => {
-    const offset = Number.parseInt(randomUUID().slice(0, 8), 16) % 30_000;
-    const date = new Date(Date.UTC(2100, 0, 1 + offset));
-    return date.toISOString().slice(0, 10);
-  })();
+  let backendPids: number[] = [];
+  const workDate = '2100-01-04';
+
+  function requireRunnerProvenance(): { marker: string; projectName: string; hostPort: number } {
+    const marker = process.env[PROVENANCE_ENV_KEYS.marker];
+    const projectName = process.env[PROVENANCE_ENV_KEYS.project];
+    const portText = process.env[PROVENANCE_ENV_KEYS.port];
+    if (!marker || !projectName || !portText || !/^[0-9]+$/u.test(portText)) {
+      throw new Error('LTDB-SAFE-001: disposable local PostgreSQL runner provenance is required');
+    }
+
+    const hostPort = Number.parseInt(portText, 10);
+    validateLocalTestDatabaseUrl(connectionString, hostPort);
+
+    const markerPattern = new RegExp(
+      `^${DATABASE_COMMENT_PREFIX}:v${STATE_VERSION}:([0-9a-f]{64}):([0-9a-f]{64})$`,
+      'u'
+    );
+    const markerMatch = markerPattern.exec(marker);
+    if (
+      !markerMatch ||
+      projectName !==
+        `${PROJECT_NAME_PREFIX}${markerMatch[1].slice(0, PROJECT_NAME_HASH_LENGTH)}`
+    ) {
+      throw new Error('LTDB-SAFE-001: runner project and database marker provenance disagree');
+    }
+
+    return { marker, projectName, hostPort };
+  }
 
   function createClient(): Client {
-    const url = new URL(connectionString);
-    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     return new Client({
       connectionString,
-      ssl: isLocal ? undefined : { rejectUnauthorized: false },
+      ssl: false,
     });
   }
 
@@ -802,7 +835,47 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite', () => {
   }
 
   beforeAll(async () => {
+    const provenance = requireRunnerProvenance();
     setupClient = await connectClient();
+
+    const [identity, marker, schemas, relations, functions, extensions, fixtureRoles] =
+      await Promise.all([
+        setupClient.query<{ current_database: string; current_user: string }>(
+          FRESHNESS_SQL.identity
+        ),
+        setupClient.query<{ comment: string | null }>(FRESHNESS_SQL.marker),
+        setupClient.query<{ name: string }>(FRESHNESS_SQL.schemas),
+        setupClient.query<{ schema_name: string; name: string }>(FRESHNESS_SQL.relations),
+        setupClient.query<{ schema_name: string; name: string }>(FRESHNESS_SQL.functions),
+        setupClient.query<{ name: string }>(FRESHNESS_SQL.extensions),
+        setupClient.query<{ rolname: string }>(`
+          SELECT rolname
+          FROM pg_roles
+          WHERE rolname IN ('anon', 'authenticated', 'service_role')
+          ORDER BY rolname
+        `),
+      ]);
+    expect(identity.rows[0]).toEqual({
+      current_database: DB_NAME,
+      current_user: DB_USER,
+    });
+    expect(marker.rows[0]?.comment).toBe(provenance.marker);
+    expect(fixtureRoles.rows).toEqual([]);
+    expect(
+      findFreshnessViolations({
+        schemas: schemas.rows.map((row) => row.name),
+        relations: relations.rows.map((row) => ({
+          schema: row.schema_name,
+          name: row.name,
+        })),
+        functions: functions.rows.map((row) => ({
+          schema: row.schema_name,
+          name: row.name,
+        })),
+        extensions: extensions.rows.map((row) => row.name),
+      })
+    ).toEqual([]);
+
     await setupClient.query(readFileSync(DA2_PGLITE_BASE_PATH, 'utf8'));
     await setupClient.query(readFileSync(DA2_V2_MIGRATION_PATH, 'utf8'));
     await setupClient.query(readFileSync(DA2_V2_MIGRATION_PATH, 'utf8'));
@@ -861,6 +934,12 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite', () => {
     secondClient = await connectClient();
     await authenticate(firstClient);
     await authenticate(secondClient);
+    const pidResults = await Promise.all(
+      [setupClient, firstClient, secondClient].map((client) =>
+        client.query<{ backend_pid: number }>('SELECT pg_backend_pid() AS backend_pid')
+      )
+    );
+    backendPids = pidResults.map((result) => result.rows[0].backend_pid);
   }, 120_000);
 
   afterAll(async () => {
@@ -909,12 +988,64 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite', () => {
           }
         }
       }
+      if (setupClient && runtimeCaptured) {
+        const cleanupState = await setupClient.query<{
+          board_enabled: boolean;
+          writes_enabled: boolean;
+          plan_days: number;
+          visits: number;
+          assignments: number;
+          overrides: number;
+        }>(
+          `
+            SELECT
+              runtime.board_enabled,
+              runtime.writes_enabled,
+              (
+                SELECT COUNT(*)::int
+                FROM public.daily_allocation_plan_days
+                WHERE work_date = $1::date
+              ) AS plan_days,
+              (
+                SELECT COUNT(*)::int
+                FROM public.daily_allocation_visits
+                WHERE work_date = $1::date
+              ) AS visits,
+              (
+                SELECT COUNT(*)::int
+                FROM public.daily_allocation_visit_labour
+                WHERE work_date = $1::date
+              ) AS assignments,
+              (
+                SELECT COUNT(*)::int
+                FROM public.daily_allocation_conflict_overrides overrides
+                JOIN public.daily_allocation_plan_days plan_days
+                  ON plan_days.id = overrides.plan_day_id
+                WHERE plan_days.work_date = $1::date
+              ) AS overrides
+            FROM private.daily_allocation_v2_runtime runtime
+            WHERE runtime.singleton = TRUE
+          `,
+          [workDate]
+        );
+        expect(cleanupState.rows[0]).toEqual({
+          board_enabled: originalBoardEnabled,
+          writes_enabled: originalWritesEnabled,
+          plan_days: 0,
+          visits: 0,
+          assignments: 0,
+          overrides: 0,
+        });
+      }
     } finally {
       await Promise.allSettled(clients.map((client) => client.end()));
     }
   }, 30_000);
 
-  it('serializes simultaneous assignments of one employee without deadlock or lost update', async () => {
+  it('LTDB-CONC-001: serializes simultaneous assignments of one employee without deadlock or lost update', async () => {
+    expect(backendPids.every((pid) => Number.isInteger(pid) && pid > 0)).toBe(true);
+    expect(new Set(backendPids).size).toBe(3);
+
     const visits = await setupClient.query<{ id: string }>(
       `
         SELECT id::text
@@ -948,7 +1079,10 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite', () => {
 
     const fulfilled = settled.filter((result) => result.status === 'fulfilled');
     const rejected = settled.filter((result) => result.status === 'rejected');
-    expect(fulfilled).toHaveLength(1);
+    const rejectionSummary = rejected
+      .map((result) => (result.status === 'rejected' ? String(result.reason) : ''))
+      .join(' | ');
+    expect(fulfilled, `Concurrent assignment rejections: ${rejectionSummary}`).toHaveLength(1);
     expect(rejected).toHaveLength(1);
     expect(String(rejected[0].reason)).toMatch(/STALE_PLAN_VERSION|exclusion|overlap|23P01/i);
 
