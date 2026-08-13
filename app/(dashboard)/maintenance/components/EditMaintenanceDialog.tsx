@@ -227,6 +227,22 @@ export function EditMaintenanceDialog({
     if (effectiveMaintenanceItems.length > 0) return false;
     return defaultSystemFieldKeys.has(fieldKey);
   };
+  const initialCustomItemValues = useMemo(
+    () => effectiveMaintenanceItems
+      .filter(item => item.source === 'custom')
+      .map(item => ({
+        category_id: item.category_id,
+        category_name: item.category_name,
+        category_type: item.category_type,
+        due_date: formatDateForInput(item.due_date),
+        due_mileage: item.due_mileage,
+        last_mileage: item.last_mileage,
+        due_hours: item.due_hours,
+        last_hours: item.last_hours,
+        notes: null,
+      })),
+    [effectiveMaintenanceItems]
+  );
   const customItems = customItemValues.filter(item => !item.category_name.startsWith('__'));
 
   // Initialize form
@@ -281,24 +297,10 @@ export function EditMaintenanceDialog({
       setInitialNickname(nickname);
       setSelectedUserId(null);
       setHadSelectedUser(false);
-      setCustomItemValues(
-        effectiveMaintenanceItems
-          .filter(item => item.source === 'custom')
-          .map(item => ({
-            category_id: item.category_id,
-            category_name: item.category_name,
-            category_type: item.category_type,
-            due_date: formatDateForInput(item.due_date),
-            due_mileage: item.due_mileage,
-            last_mileage: item.last_mileage,
-            due_hours: item.due_hours,
-            last_hours: item.last_hours,
-            notes: null,
-          }))
-      );
+      setCustomItemValues(initialCustomItemValues);
       setCustomItemsDirty(false);
     }
-  }, [effectiveMaintenanceItems, vehicle, reset]);
+  }, [initialCustomItemValues, vehicle, reset]);
 
   useEffect(() => {
     if (!open || !fleetAssetId) {
@@ -344,10 +346,22 @@ export function EditMaintenanceDialog({
     onOpenChange(newOpen);
   };
 
+  const discardUnsavedChanges = () => {
+    reset();
+    setCustomItemValues(initialCustomItemValues);
+    setCustomItemsDirty(false);
+    setSelectedUserId(null);
+    setHadSelectedUser(false);
+    setPendingSubmitData(null);
+    setVrnComparison(null);
+    setVrnConfirmOpen(false);
+    setPendingUnlinkData(null);
+    setUnlinkConfirmOpen(false);
+  };
+
   // Handle explicit close button click - discard changes
   const handleDiscardChanges = () => {
-    reset(); // Reset form to original values
-    setCustomItemsDirty(false);
+    discardUnsavedChanges();
     onOpenChange(false);
   };
 
@@ -1081,11 +1095,6 @@ export function EditMaintenanceDialog({
               type="button"
               variant="outline"
               onClick={async () => {
-                if (isDirty) {
-                  triggerShakeAnimation(dialogContentRef.current);
-                  return;
-                }
-                
                 // Check for open workshop tasks across all asset types
                 const assetId = vehicle?.van_id || vehicle?.hgv_id;
                 const assetColumn = vehicle?.van_id ? 'van_id' : vehicle?.hgv_id ? 'hgv_id' : null;
@@ -1120,6 +1129,7 @@ export function EditMaintenanceDialog({
                   }
                 }
                 
+                discardUnsavedChanges();
                 onOpenChange(false);
                 onRetire?.();
               }}
