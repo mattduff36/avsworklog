@@ -300,20 +300,24 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
     }
   }
 
+  const scopedPublicationIds = new Set((issuedItems || []).map((item) => item.publication_id));
   const teamPublications = (publications || []).filter((row) => (
-    context.is_admin || !context.team_id || row.scope_team_id === context.team_id || row.published_by === context.user_id
+    context.is_admin
+    || !context.team_id
+    || row.scope_team_id === context.team_id
+    || row.published_by === context.user_id
+    || scopedPublicationIds.has(row.id)
   ));
   const latestPublication = teamPublications[0] || publications?.[0] || null;
 
-  let publishedByName: string | null = null;
-  if (latestPublication?.published_by) {
-    const { data: publisher } = await admin
+  const publisherIds = Array.from(new Set(teamPublications.map((publication) => publication.published_by)));
+  const { data: publishers } = publisherIds.length
+    ? await admin
       .from('profiles')
-      .select('full_name')
-      .eq('id', latestPublication.published_by)
-      .maybeSingle();
-    publishedByName = publisher?.full_name || null;
-  }
+      .select('id, full_name')
+      .in('id', publisherIds)
+    : { data: [] as Array<{ id: string; full_name: string }> };
+  const publisherNameById = new Map((publishers || []).map((publisher) => [publisher.id, publisher.full_name]));
 
   const labour: DailyLabourBoardRow[] = (profiles || [])
     .filter((profile) => !isHiddenSystemTestAccountProfile(profile))
@@ -414,7 +418,11 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
             identifier: registered?.plant_id || draft.plant_id || 'Plant',
             nickname: registered?.nickname,
           }),
-      owned_by_other_team: false,
+      owned_by_other_team: Boolean(
+        draft.owner_team_id
+        && context.team_id
+        && draft.owner_team_id !== context.team_id
+      ),
       can_reassign: context.is_admin,
       publish_ready: Boolean(draft.job_code && draft.site_address),
       warnings,
@@ -431,7 +439,7 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
         plant_id: conflict.plant_id,
         hired_serial: conflict.hired_serial,
         hired_description: null,
-        hired_company: null,
+        hired_company: conflict.hired_company,
         owner_team_id: conflict.owner_team_id,
         job_source_type: null,
         job_source_id: null,
@@ -464,14 +472,24 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
           id: latestPublication.id,
           revision_no: latestPublication.revision_no,
           published_at: latestPublication.published_at,
-          published_by_name: publishedByName,
+          published_by_name: publisherNameById.get(latestPublication.published_by) || null,
         }
       : null,
+    publication_history: teamPublications.map((publication) => ({
+      id: publication.id,
+      revision_no: publication.revision_no,
+      published_at: publication.published_at,
+      published_by_name: publisherNameById.get(publication.published_by) || null,
+      scope_team_id: publication.scope_team_id,
+    })),
     available_plant: (plants || []).map((row) => ({
       id: row.id,
       plant_id: row.plant_id,
       nickname: row.nickname,
     })),
+    available_teams: (teams || [])
+      .filter((team) => context.is_admin || team.id === context.team_id)
+      .map((team) => ({ id: team.id, name: team.name })),
   };
 }
 
@@ -543,9 +561,12 @@ export async function deleteLabourDraft(workDate: string, profileId: string): Pr
 
 export async function savePlantDraft(input: DailyPlantDraftInput): Promise<DailyPlantDraft> {
   const { supabase } = await requireDailyAllocationMutation();
-  const canManage = await canEffectiveRoleUseModuleLevel('daily-allocation', 4);
-  if (!canManage) throw new DailyAllocationError('Manager-level daily allocation access is required.', 403);
+  const accessLevel = await getEffectiveModuleAccessLevel('daily-allocation');
+  if (accessLevel < 4) throw new DailyAllocationError('Manager-level daily allocation access is required.', 403);
   if (!isWorkDate(input.work_date)) throw new DailyAllocationError('A valid work date is required.', 400);
+  if (input.owner_team_id && accessLevel < 5) {
+    throw new DailyAllocationError('Only level-5 administrators can reassign plant ownership.', 403);
+  }
 
   const payload = {
     work_date: input.work_date,
@@ -554,6 +575,7 @@ export async function savePlantDraft(input: DailyPlantDraftInput): Promise<Daily
     hired_serial: input.plant_kind === 'hired' ? blankToNull(input.hired_serial) : null,
     hired_description: input.plant_kind === 'hired' ? blankToNull(input.hired_description) : null,
     hired_company: input.plant_kind === 'hired' ? blankToNull(input.hired_company) : null,
+    ...(input.owner_team_id ? { owner_team_id: input.owner_team_id } : {}),
     job_source_type: input.job_source_type || null,
     job_source_id: input.job_source_id || null,
     job_code: blankToNull(input.job_code),
@@ -573,10 +595,13 @@ export async function savePlantDraft(input: DailyPlantDraftInput): Promise<Daily
     existingQuery = existingQuery.eq('plant_id', input.plant_id);
   } else {
     const hiredSerial = normalizeHiredPlantSerial(input.hired_serial);
-    if (!hiredSerial) {
+    const hiredCompany = normalizeHiredPlantSerial(input.hired_company);
+    if (!hiredSerial || !hiredCompany) {
       throw new DailyAllocationError('Hired plant needs a serial or ID, description, and hire company.', 400);
     }
-    existingQuery = existingQuery.eq('hired_serial_normalized', hiredSerial);
+    existingQuery = existingQuery
+      .eq('hired_serial_normalized', hiredSerial)
+      .eq('hired_company_normalized', hiredCompany);
   }
 
   const { data: existing } = await existingQuery.maybeSingle();
@@ -689,12 +714,11 @@ export async function loadMyAllocation(workDate?: string, itemId?: string): Prom
   const canView = await canEffectiveRoleUseModuleLevel('daily-allocation', 2);
   if (!canView) throw new DailyAllocationError('Daily allocation access required', 403);
 
-  let itemsQuery = supabase
+  const itemsQuery = supabase
     .from('daily_allocation_labour_items')
     .select('*')
     .eq('profile_id', user.id)
     .order('created_at', { ascending: false });
-  if (itemId) itemsQuery = itemsQuery.eq('id', itemId);
 
   const { data: items, error } = await itemsQuery;
   if (error) throw error;
@@ -721,7 +745,12 @@ export async function loadMyAllocation(workDate?: string, itemId?: string): Prom
       return right.revision_no - left.revision_no;
     });
 
-  const current = mapped[0] || null;
+  const requestedPublicationId = itemId
+    ? items.find((item) => item.id === itemId)?.publication_id
+    : null;
+  const current = requestedPublicationId
+    ? mapped.find((item) => item.publication_id === requestedPublicationId) || null
+    : mapped[0] || null;
   return { current, history: mapped };
 }
 
@@ -750,9 +779,10 @@ export function reconcilePlant(
 
   for (const item of planned) {
     const matches = submitted.filter((inspection) => {
+      if (!inspection.job_code) return false;
       if (item.plant_kind === 'registered') return inspection.plant_id === item.plant_id;
       return normalizeHiredPlantSerial(inspection.hired_plant_id_serial) === (item.hired_serial_normalized || '')
-        && normalizeHiredPlantSerial(inspection.hired_plant_hiring_company) === normalizeHiredPlantSerial(item.hired_company);
+        && normalizeHiredPlantSerial(inspection.hired_plant_hiring_company) === (item.hired_company_normalized || '');
     }).sort((left, right) => left.id.localeCompare(right.id));
     const uniqueByAsset = new Map<string, typeof matches[number]>();
     for (const match of matches) {
@@ -764,8 +794,14 @@ export function reconcilePlant(
     const actual = Array.from(uniqueByAsset.values())[0] || null;
     if (actual) usedInspectionIds.add(actual.id);
     matches.slice(1).forEach((match) => usedInspectionIds.add(match.id));
-    const actualJobs = Array.from(new Set(matches.map((match) => match.job_code).filter(Boolean)));
-    const actualJob = actual?.job_code || null;
+    const actualJobs = Array.from(new Set(
+      matches
+        .map((match) => match.job_code)
+        .filter((job): job is string => Boolean(job))
+    ));
+    const actualJob = actualJobs.length > 1
+      ? actualJobs.sort((left, right) => left.localeCompare(right)).join(', ')
+      : actual?.job_code || null;
     let status: DailyPlantReconciliationStatus = 'planned_only';
     if (actual && (actualJobs.length > 1 || (actualJob && actualJob !== item.job_code))) status = 'job_conflict';
     else if (actual) status = 'matched';
@@ -856,6 +892,32 @@ export async function loadJobSheet(jobCode: string): Promise<DailyJobSheetPayloa
         .in('work_date', relatedDates)
     : { data: relatedPublications || [] };
 
+  const publicationById = new Map((publications || []).map((row) => [row.id, row]));
+  const allPublicationIds = (publications || []).map((row) => row.id);
+  const { data: allLabourItems, error: allLabourError } = allPublicationIds.length
+    ? await supabase
+        .from('daily_allocation_labour_items')
+        .select('*')
+        .in('publication_id', allPublicationIds)
+    : { data: [] as LabourItemRow[], error: null };
+  if (allLabourError) throw allLabourError;
+
+  const latestLabourByDateProfile = new Map<string, LabourItemRow>();
+  for (const item of allLabourItems || []) {
+    const publication = publicationById.get(item.publication_id);
+    if (!publication) continue;
+    const key = `${publication.work_date}:${item.profile_id}`;
+    const current = latestLabourByDateProfile.get(key);
+    const currentRevision = current
+      ? publicationById.get(current.publication_id)?.revision_no || 0
+      : -1;
+    if (!current || publication.revision_no > currentRevision) {
+      latestLabourByDateProfile.set(key, item);
+    }
+  }
+  const latestLabour = Array.from(latestLabourByDateProfile.values())
+    .filter((item) => item.job_code === canonicalJobCode);
+
   const latestByDateTeam = new Map<string, { id: string; revision_no: number; work_date: string; scope_team_id: string | null }>();
   for (const publication of publications || []) {
     const key = `${publication.work_date}:${publication.scope_team_id || publication.id}`;
@@ -868,17 +930,23 @@ export async function loadJobSheet(jobCode: string): Promise<DailyJobSheetPayloa
   const latestPublicationIds = new Set(Array.from(latestByDateTeam.values()).map((row) => row.id));
   const plantItems = (plantItemsForJob || []).filter((item) => latestPublicationIds.has(item.publication_id));
 
+  const scopedProfileIds = await loadScopedProfileIds(supabase, context.is_admin);
+  const inspectionScope = scopedProfileIds.length
+    ? scopedProfileIds
+    : ['00000000-0000-0000-0000-000000000000'];
   const { data: jobInspections } = await admin
     .from('plant_inspections')
-    .select('id, inspection_date, plant_id, is_hired_plant, hired_plant_id_serial, hired_plant_hiring_company, hired_plant_description, job_code, status')
-    .eq('job_code', canonicalJobCode);
+    .select('id, user_id, inspection_date, plant_id, is_hired_plant, hired_plant_id_serial, hired_plant_hiring_company, hired_plant_description, job_code, status')
+    .eq('job_code', canonicalJobCode)
+    .in('user_id', inspectionScope);
   const inspectionDates = Array.from(new Set((jobInspections || []).map((row) => row.inspection_date)));
   const workDates = Array.from(new Set([...relatedDates, ...inspectionDates]));
   const { data: inspections } = workDates.length
     ? await admin
         .from('plant_inspections')
-        .select('id, inspection_date, plant_id, is_hired_plant, hired_plant_id_serial, hired_plant_hiring_company, hired_plant_description, job_code, status')
+        .select('id, user_id, inspection_date, plant_id, is_hired_plant, hired_plant_id_serial, hired_plant_hiring_company, hired_plant_description, job_code, status')
         .in('inspection_date', workDates)
+        .in('user_id', inspectionScope)
     : { data: jobInspections || [] };
 
   const { data: plants } = await admin
@@ -888,16 +956,9 @@ export async function loadJobSheet(jobCode: string): Promise<DailyJobSheetPayloa
 
   const { data: profiles } = await admin
     .from('profiles')
-    .select('id, full_name');
+    .select('id, full_name')
+    .in('id', inspectionScope);
   const nameById = new Map((profiles || []).map((row) => [row.id, row.full_name]));
-
-  const publicationById = new Map((publications || []).map((row) => [row.id, row]));
-  const latestLabour = (labourItems || []).filter((item) => {
-    const publication = publicationById.get(item.publication_id);
-    if (!publication) return false;
-    const key = `${publication.work_date}:${publication.scope_team_id || publication.id}`;
-    return latestByDateTeam.get(key)?.id === publication.id;
-  });
 
   const plantByPublicationDate = new Map<string, PlantItemRow[]>();
   for (const item of plantItems) {
@@ -918,9 +979,9 @@ export async function loadJobSheet(jobCode: string): Promise<DailyJobSheetPayloa
 
   const sourceHref = resolved.record
     ? resolved.record.source_type === 'live_quote'
-      ? `/quotes?quote=${resolved.record.source_id}`
+      ? `/quotes?quote_id=${resolved.record.source_id}`
       : resolved.record.source_type === 'project_number'
-        ? '/quotes?tab=project-numbers'
+        ? '/quotes?tab=projects'
         : '/quotes?tab=legacy'
     : null;
 

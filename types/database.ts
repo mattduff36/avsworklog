@@ -1525,6 +1525,7 @@ export type Database = {
           hired_description: string | null
           hired_company: string | null
           hired_serial_normalized: string | null
+          hired_company_normalized: string | null
           owner_team_id: string | null
           job_source_type: 'live_quote' | 'legacy_quote' | 'project_number' | null
           job_source_id: string | null
@@ -1542,6 +1543,7 @@ export type Database = {
           hired_description?: string | null
           hired_company?: string | null
           hired_serial_normalized?: string | null
+          hired_company_normalized?: string | null
           owner_team_id?: string | null
           job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
           job_source_id?: string | null
@@ -1559,6 +1561,7 @@ export type Database = {
           hired_description?: string | null
           hired_company?: string | null
           hired_serial_normalized?: string | null
+          hired_company_normalized?: string | null
           owner_team_id?: string | null
           job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
           job_source_id?: string | null
@@ -1703,6 +1706,7 @@ export type Database = {
           hired_description: string | null
           hired_company: string | null
           hired_serial_normalized: string | null
+          hired_company_normalized: string | null
           owner_team_id: string | null
           job_source_type: 'live_quote' | 'legacy_quote' | 'project_number' | null
           job_source_id: string | null
@@ -1723,6 +1727,8 @@ export type Database = {
           hired_serial?: string | null
           hired_description?: string | null
           hired_company?: string | null
+          hired_serial_normalized?: string | null
+          hired_company_normalized?: string | null
           owner_team_id?: string | null
           job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
           job_source_id?: string | null
@@ -1743,6 +1749,8 @@ export type Database = {
           hired_serial?: string | null
           hired_description?: string | null
           hired_company?: string | null
+          hired_serial_normalized?: string | null
+          hired_company_normalized?: string | null
           owner_team_id?: string | null
           job_source_type?: 'live_quote' | 'legacy_quote' | 'project_number' | null
           job_source_id?: string | null
@@ -11041,6 +11049,7 @@ export type Database = {
         Returns: {
           plant_id: string | null
           hired_serial: string | null
+          hired_company: string | null
           owner_team_id: string | null
         }[]
       }

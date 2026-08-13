@@ -18,6 +18,7 @@ export default function DailyAllocationJobSheetPage() {
   const code = decodeURIComponent(params.code || '');
   const [sheet, setSheet] = useState<DailyJobSheetPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasPermission || permissionLoading || !code) return;
@@ -29,7 +30,9 @@ export default function DailyAllocationJobSheetPage() {
         if (mounted) setSheet(payload);
       })
       .catch((error: unknown) => {
-        toast.error(error instanceof Error ? error.message : 'Unable to load this job sheet.');
+        const message = error instanceof Error ? error.message : 'Unable to load this job sheet.';
+        setLoadError(message);
+        toast.error(message);
       })
       .finally(() => {
         if (mounted) setLoading(false);
@@ -39,14 +42,32 @@ export default function DailyAllocationJobSheetPage() {
     };
   }, [code, hasPermission, permissionLoading]);
 
-  if (permissionLoading || !hasPermission || loading) {
+  if (permissionLoading) {
+    return <AppPageLoadingShell title="Job allocation sheet" message="Loading job allocation sheet..." />;
+  }
+
+  if (!hasPermission) {
+    return (
+      <AppPageShell>
+        <AppPageHeader
+          title="Job allocation sheet"
+          description="Daily Allocation is not enabled for your team or is awaiting post-deploy activation."
+        />
+      </AppPageShell>
+    );
+  }
+
+  if (loading) {
     return <AppPageLoadingShell title="Job allocation sheet" message="Loading job allocation sheet..." />;
   }
 
   if (!sheet) {
     return (
       <AppPageShell>
-        <AppPageHeader title="Job allocation sheet" description="This job code has no allocation records yet." />
+        <AppPageHeader
+          title={loadError ? 'Job allocation sheet unavailable' : 'Job allocation sheet'}
+          description={loadError || 'This job code has no allocation records yet.'}
+        />
       </AppPageShell>
     );
   }
@@ -109,13 +130,14 @@ export default function DailyAllocationJobSheetPage() {
                   <th className="py-2 pr-3">Plant</th>
                   <th className="py-2 pr-3">Planned job</th>
                   <th className="py-2 pr-3">Actual job</th>
-                  <th className="py-2">Status</th>
+                  <th className="py-2 pr-3">Status</th>
+                  <th className="py-2">Inspection</th>
                 </tr>
               </thead>
               <tbody>
                 {sheet.plant.length === 0 ? (
                   <tr>
-                    <td className="py-3 text-muted-foreground" colSpan={5}>No planned or actual plant for this job.</td>
+                    <td className="py-3 text-muted-foreground" colSpan={6}>No planned or actual plant for this job.</td>
                   </tr>
                 ) : sheet.plant.map((row) => (
                   <tr key={`${row.work_date}-${row.plant_label}-${row.inspection_id || row.plant_id || row.hired_serial}`} className="border-b">
@@ -123,7 +145,17 @@ export default function DailyAllocationJobSheetPage() {
                     <td className="py-2 pr-3">{row.plant_label}</td>
                     <td className="py-2 pr-3">{row.planned_job_code || '—'}</td>
                     <td className="py-2 pr-3">{row.actual_job_code || '—'}</td>
-                    <td className="py-2">{row.status.replaceAll('_', ' ')}</td>
+                    <td className="py-2 pr-3">{row.status.replaceAll('_', ' ')}</td>
+                    <td className="py-2">
+                      {row.inspection_id ? (
+                        <Link
+                          href={`/plant-inspections/${encodeURIComponent(row.inspection_id)}`}
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          View inspection
+                        </Link>
+                      ) : '—'}
+                    </td>
                   </tr>
                 ))}
               </tbody>

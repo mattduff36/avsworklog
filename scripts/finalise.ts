@@ -33,6 +33,19 @@ import {
   summarizeFinaliseChanges,
   type FinaliseTimingEntry,
 } from './finalise-summary';
+import {
+  decideFinaliseMigrationLedgerAction,
+  FINALISE_MIGRATION_LEDGER_SQL,
+  type FinaliseMigrationFile,
+  type FinaliseMigrationLedgerRow,
+  getFinaliseMigrationDiscoveryPaths,
+  getFinaliseMigrationFilesFromPaths,
+  getSafeDatabaseTargetIdentity,
+  getValidatedMigrationEvidencePaths,
+  loadFinaliseMigrationFiles,
+  requireSafeMigrationConnectionString,
+  stripOuterMigrationTransaction,
+} from './finalise-migrations';
 
 config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -119,6 +132,12 @@ interface ReleaseVersionState {
   major: number;
   minor: number;
   lastProcessedSha: string;
+}
+
+interface MigrationRunSummary {
+  applied: string[];
+  reused: string[];
+  deferred: string[];
 }
 
 function parseArgs(argv: string[]): FinaliseOptions {
@@ -582,62 +601,12 @@ function runUnloggedCommand(command: string, args: string[]): CommandResult {
   };
 }
 
-function collectMigrationFilesFromScript(filePath: string): string[] {
-  if (!existsSync(filePath)) {
-    return [];
-  }
-
-  const content = readFileSync(filePath, 'utf8');
-  const matches = content.match(/supabase\/[A-Za-z0-9_./-]+\.sql/gu) ?? [];
-
-  return matches
-    .map((relativePath) => relativePath.replace(/\\/g, '/'))
-    .filter((relativePath) => existsSync(path.join(REPO_ROOT, relativePath)));
-}
-
-function isLikelyMigrationScript(relativePath: string): boolean {
-  if (relativePath.startsWith('scripts/migrations/')) {
-    return false;
-  }
-
-  return (
-    /^scripts\/.+migration.+\.ts$/u.test(relativePath) ||
-    /^scripts\/.+migrations.+\.ts$/u.test(relativePath)
-  );
-}
-
-function isDirectMigrationSql(relativePath: string): boolean {
-  if (relativePath === 'supabase/schema.sql') {
-    return false;
-  }
-
-  return /^supabase\/migrations\/.+\.sql$/u.test(relativePath) || /^supabase\/[^/]+\.sql$/u.test(relativePath);
-}
-
-function getPendingMigrationFiles(changedFiles: string[]): string[] {
-  const pending = new Set<string>();
-
-  for (const relativePath of changedFiles) {
-    if (isDirectMigrationSql(relativePath) && existsSync(path.join(REPO_ROOT, relativePath))) {
-      pending.add(relativePath);
-      continue;
-    }
-
-    if (isLikelyMigrationScript(relativePath)) {
-      const absolutePath = path.join(REPO_ROOT, relativePath);
-      for (const migrationFile of collectMigrationFilesFromScript(absolutePath)) {
-        pending.add(migrationFile);
-      }
-    }
-  }
-
-  return Array.from(pending).sort((left, right) => left.localeCompare(right));
-}
-
 function migrationNeedsDbValidate(relativePath: string): boolean {
   const content = readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 
   return (
+    /\bcreate\s+(?:table|type|function|index|schema|trigger|policy)\b/iu.test(content) ||
+    /\balter\s+table\b/iu.test(content) ||
     /\balter\s+table\b[\s\S]{0,200}\brename\b/iu.test(content) ||
     /\bdrop\s+column\b/iu.test(content) ||
     /\bdrop\s+table\b/iu.test(content)
@@ -645,13 +614,7 @@ function migrationNeedsDbValidate(relativePath: string): boolean {
 }
 
 function getDbConnectionString(): string {
-  const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
-
-  if (!connectionString) {
-    throw new Error('POSTGRES_URL_NON_POOLING or POSTGRES_URL is not set in .env.local');
-  }
-
-  return connectionString;
+  return requireSafeMigrationConnectionString(process.env.POSTGRES_URL_NON_POOLING);
 }
 
 async function createDbClient(): Promise<pg.Client> {
@@ -671,18 +634,111 @@ async function createDbClient(): Promise<pg.Client> {
   return client;
 }
 
-async function runPendingMigrations(migrationFiles: string[]): Promise<void> {
-  const client = await createDbClient();
+async function readMigrationLedgerRows(
+  client: pg.Client,
+  migrationFiles: FinaliseMigrationFile[]
+): Promise<Map<string, FinaliseMigrationLedgerRow>> {
+  if (migrationFiles.length === 0) {
+    return new Map();
+  }
+  const ledgerExists = await client.query<{ ledger: string | null }>(
+    'SELECT to_regclass($1) AS ledger',
+    ['private.finalise_migration_ledger']
+  );
+  if (!ledgerExists.rows[0]?.ledger) {
+    return new Map();
+  }
+  const result = await client.query<FinaliseMigrationLedgerRow>(
+    `SELECT filename, checksum_sha256, phase, applied_at
+     FROM private.finalise_migration_ledger
+     WHERE filename = ANY($1::text[])`,
+    [migrationFiles.map((migration) => migration.relativePath)]
+  );
+  return new Map(result.rows.map((row) => [row.filename, row]));
+}
 
+async function inspectPendingMigrations(
+  migrationFiles: FinaliseMigrationFile[],
+  deferred: string[]
+): Promise<MigrationRunSummary> {
+  if (migrationFiles.length === 0) {
+    return { applied: [], reused: [], deferred };
+  }
+  const client = await createDbClient();
   try {
-    for (const relativePath of migrationFiles) {
-      const sql = readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
-      console.log(`\n==> Apply migration ${relativePath}`);
-      await client.query(sql);
+    const ledgerRows = await readMigrationLedgerRows(client, migrationFiles);
+    const summary: MigrationRunSummary = { applied: [], reused: [], deferred };
+    for (const migration of migrationFiles) {
+      const decision = decideFinaliseMigrationLedgerAction(
+        migration,
+        ledgerRows.get(migration.relativePath) ?? null
+      );
+      summary[decision === 'apply' ? 'applied' : 'reused'].push(migration.relativePath);
     }
+    return summary;
   } finally {
     await client.end();
   }
+}
+
+async function ensureMigrationLedger(client: pg.Client): Promise<void> {
+  await client.query(FINALISE_MIGRATION_LEDGER_SQL);
+}
+
+async function runPendingMigrations(
+  migrationFiles: FinaliseMigrationFile[],
+  deferred: string[]
+): Promise<MigrationRunSummary> {
+  const client = await createDbClient();
+  const summary: MigrationRunSummary = { applied: [], reused: [], deferred };
+
+  try {
+    for (const migration of migrationFiles) {
+      await client.query('BEGIN');
+      try {
+        await client.query(
+          "SELECT pg_advisory_xact_lock(hashtextextended('private.finalise_migration_ledger', 0))"
+        );
+        await ensureMigrationLedger(client);
+        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+          migration.relativePath,
+        ]);
+        const ledgerRows = await readMigrationLedgerRows(client, [migration]);
+        const decision = decideFinaliseMigrationLedgerAction(
+          migration,
+          ledgerRows.get(migration.relativePath) ?? null
+        );
+
+        if (decision === 'reuse') {
+          await client.query('COMMIT');
+          summary.reused.push(migration.relativePath);
+          console.log(`\n==> Reuse applied migration ${migration.relativePath}`);
+          continue;
+        }
+
+        console.log(`\n==> Apply migration ${migration.relativePath}`);
+        await client.query(stripOuterMigrationTransaction(migration.sql));
+        await client.query(
+          `INSERT INTO private.finalise_migration_ledger
+             (filename, checksum_sha256, phase)
+           VALUES ($1, $2, $3)`,
+          [migration.relativePath, migration.checksumSha256, migration.phase]
+        );
+        await client.query('COMMIT');
+        summary.applied.push(migration.relativePath);
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      }
+    }
+    return summary;
+  } finally {
+    await client.end();
+  }
+}
+
+function formatMigrationFiles(files: string[]): string {
+  return files.length > 0 ? `${files.length} (${files.join(', ')})` : '0 (none)';
 }
 
 function listProcesses(): ProcessInfo[] {
@@ -1011,8 +1067,26 @@ async function main(): Promise<void> {
 
     const changedFileStats = getChangedFileStats();
     const changedFiles = changedFileStats.map((entry) => entry.path);
-    const pendingMigrationFiles = getPendingMigrationFiles(changedFiles);
-    const shouldRunDbValidate = pendingMigrationFiles.some((relativePath) => migrationNeedsDbValidate(relativePath));
+    const migrationDiscoveryPaths = getFinaliseMigrationDiscoveryPaths(
+      REPO_ROOT,
+      (args) => runCommand('git', args, { captureOutput: true, allowFailure: true })
+    );
+    const pendingMigrationPaths = getFinaliseMigrationFilesFromPaths(
+      REPO_ROOT,
+      migrationDiscoveryPaths
+    );
+    const pendingMigrations = loadFinaliseMigrationFiles(REPO_ROOT, pendingMigrationPaths);
+    const predeployMigrations = pendingMigrations.filter(
+      (migration) => migration.phase === 'predeploy'
+    );
+    const deferredMigrationPaths = pendingMigrations
+      .filter((migration) => migration.phase === 'postdeploy')
+      .map((migration) => migration.relativePath);
+    const predeployMigrationPaths = predeployMigrations.map(
+      (migration) => migration.relativePath
+    );
+    const configuredConnectionString = process.env.POSTGRES_URL_NON_POOLING;
+    const databaseTargetIdentity = getSafeDatabaseTargetIdentity(configuredConnectionString);
     const devServerProcesses = getRepoDevServerProcesses();
     const branch = getCurrentBranch();
     const initialChangeSummary = summarizeFinaliseChanges(changedFileStats);
@@ -1020,33 +1094,47 @@ async function main(): Promise<void> {
       repoRoot: REPO_ROOT,
       mode: finaliseMode,
       changedFiles,
-      pendingMigrationFiles,
+      pendingMigrationFiles: predeployMigrationPaths,
       buildArtifactPath: NEXT_BUILD_ARTIFACT_PATH,
     });
-    const recentMigrationRun = pendingMigrationFiles.length > 0 ? skippableTasks.migrations : undefined;
-    const recentDbValidateRun = shouldRunDbValidate ? skippableTasks['db-validate'] : undefined;
+    const recentDbValidateRun = predeployMigrationPaths.some((relativePath) =>
+      migrationNeedsDbValidate(relativePath)
+    )
+      ? skippableTasks['db-validate']
+      : undefined;
     const recentBuildRun = skippableTasks.build;
     const recentTestRun = options.full ? skippableTasks['test-run'] : undefined;
     const recentTestsuiteRun = options.full ? skippableTasks.testsuite : undefined;
+    let migrationSummary: MigrationRunSummary = {
+      applied: [],
+      reused: [],
+      deferred: deferredMigrationPaths,
+    };
 
     if (options.dryRun) {
+      migrationSummary = await inspectPendingMigrations(
+        predeployMigrations,
+        deferredMigrationPaths
+      );
+      const dryRunNeedsDbValidate = getValidatedMigrationEvidencePaths(
+        migrationSummary
+      ).some((relativePath) => migrationNeedsDbValidate(relativePath));
       console.log(`Mode: ${getPushModeDescription(options)}`);
       console.log(`Branch: ${branch || '(detached HEAD)'}`);
-      console.log(`Dev server: ${devServerProcesses.length > 0 ? `would stop ${devServerProcesses.length} process(es)` : 'none running'}`);
       console.log(
-        `Migrations: ${
-          recentMigrationRun
-            ? `would skip; recent run found: ${formatRecentTask(recentMigrationRun)}`
-            : pendingMigrationFiles.length > 0
-            ? `would run ${pendingMigrationFiles.join(', ')}`
-            : 'none pending'
+        `Database target: ${
+          databaseTargetIdentity ?? 'not derivable without exposing connection details'
         }`
       );
+      console.log(`Dev server: ${devServerProcesses.length > 0 ? `would stop ${devServerProcesses.length} process(es)` : 'none running'}`);
+      console.log(`Migrations applied (would apply): ${formatMigrationFiles(migrationSummary.applied)}`);
+      console.log(`Migrations reused: ${formatMigrationFiles(migrationSummary.reused)}`);
+      console.log(`Migrations deferred (postdeploy): ${formatMigrationFiles(migrationSummary.deferred)}`);
       console.log(
         `DB validate: ${
-          recentDbValidateRun
+          dryRunNeedsDbValidate && recentDbValidateRun
             ? `would skip; recent run found: ${formatRecentTask(recentDbValidateRun)}`
-            : shouldRunDbValidate
+            : dryRunNeedsDbValidate
             ? 'would run'
             : 'not needed'
         }`
@@ -1114,34 +1202,48 @@ async function main(): Promise<void> {
       printProgress('No repo dev server detected.', 10);
     }
 
-    if (pendingMigrationFiles.length > 0) {
-      console.log(`\n==> Run pending local migrations (${pendingMigrationFiles.length})`);
-      if (recentMigrationRun) {
-        await run.step('Skip pending local migrations', () => undefined, {
-          ...getRecentTaskMetadata(recentMigrationRun),
-          migrationFiles: pendingMigrationFiles,
-        });
-        printProgress(`Reused recent migration run: ${formatRecentTask(recentMigrationRun)}.`, 20);
-      } else {
-        printProgress(`Running ${pendingMigrationFiles.length} pending migration${pendingMigrationFiles.length === 1 ? '' : 's'}...`, 12);
-        await runDeterministicFinaliseStep({
-          mode: finaliseMode,
-          task: 'migrations',
-          command: 'run-pending-migrations',
-          action: () =>
-            timeFinaliseStep(timingEntries, 'Run pending local migrations', () =>
-              run.step('Run pending local migrations', () => runPendingMigrations(pendingMigrationFiles), {
-                migrationFiles: pendingMigrationFiles,
-              })
-            ),
-        });
-        printProgress('Pending migrations applied.', 20);
-      }
-    } else {
-      console.log('\n==> Run pending local migrations');
-      printProgress('No pending local migration files detected.', 20);
+    if (deferredMigrationPaths.length > 0) {
+      console.log(
+        `\n==> Defer postdeploy migrations: ${deferredMigrationPaths.join(', ')}`
+      );
     }
 
+    if (predeployMigrations.length > 0) {
+      console.log(`\n==> Run pending predeploy migrations (${predeployMigrations.length})`);
+      printProgress(`Checking ${predeployMigrations.length} predeploy migration${predeployMigrations.length === 1 ? '' : 's'} against the protected ledger...`, 12);
+      migrationSummary = await runDeterministicFinaliseStep({
+        mode: finaliseMode,
+        task: 'migrations',
+        command: 'run-pending-migrations',
+        action: () =>
+          timeFinaliseStep(timingEntries, 'Run pending local migrations', () =>
+            run.step(
+              'Run pending local migrations',
+              () => runPendingMigrations(predeployMigrations, deferredMigrationPaths),
+              {
+                migrationFiles: predeployMigrationPaths,
+                deferredMigrationFiles: deferredMigrationPaths,
+              }
+            )
+          ),
+      });
+      printProgress(
+        `Migration ledger complete: ${migrationSummary.applied.length} applied, ${migrationSummary.reused.length} reused, ${migrationSummary.deferred.length} deferred.`,
+        20
+      );
+    } else {
+      console.log('\n==> Run pending local migrations');
+      printProgress(
+        deferredMigrationPaths.length > 0
+          ? 'No predeploy migrations; postdeploy migrations remain deferred.'
+          : 'No pending local migration files detected.',
+        20
+      );
+    }
+
+    const shouldRunDbValidate = getValidatedMigrationEvidencePaths(
+      migrationSummary
+    ).some((relativePath) => migrationNeedsDbValidate(relativePath));
     if (shouldRunDbValidate) {
       console.log('\n==> Validate database after schema-risk migration');
       if (recentDbValidateRun) {
@@ -1325,7 +1427,16 @@ async function main(): Promise<void> {
 
     console.log('\nFinalise complete.');
     console.log(`- Branch: ${branch || '(detached HEAD)'}`);
-    console.log(`- Migrations run: ${recentMigrationRun ? 'reused recent run' : pendingMigrationFiles.length}`);
+    console.log(
+      `- Database target: ${
+        databaseTargetIdentity ?? 'not derivable without exposing connection details'
+      }`
+    );
+    console.log(`- Migrations applied: ${formatMigrationFiles(migrationSummary.applied)}`);
+    console.log(`- Migrations reused: ${formatMigrationFiles(migrationSummary.reused)}`);
+    console.log(
+      `- Migrations deferred (postdeploy): ${formatMigrationFiles(migrationSummary.deferred)}`
+    );
     console.log(`- Build: ${recentBuildRun ? 'reused recent passed build' : 'passed'}`);
     console.log(
       `- Tests: ${

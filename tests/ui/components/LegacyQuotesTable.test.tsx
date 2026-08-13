@@ -227,6 +227,7 @@ describe('LegacyQuotesTable', () => {
         quote_manager_name: 'George Healey',
         quote_value_text: '£250.00',
         comments: 'Imported quote',
+        site_address: '',
       });
     });
   });

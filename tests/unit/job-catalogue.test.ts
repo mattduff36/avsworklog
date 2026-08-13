@@ -80,4 +80,29 @@ describe('CAT-003 ambiguous-code rejection', () => {
     expect(resolved.block_reason).toBe('ambiguous_sources');
     expect(listJobCatalogueOptions(records).every((option) => option.isAmbiguous)).toBe(true);
   });
+
+  it('rejects exact-source and alias collisions as ambiguous', () => {
+    const records = [
+      record({
+        source_type: 'live_quote',
+        source_id: 'quote-3',
+        job_code: '60200-MD',
+        aliases: ['60199-MD'],
+      }),
+      record({
+        source_type: 'project_number',
+        source_id: 'project-3',
+        job_code: '60199-MD',
+      }),
+    ];
+
+    const exact = resolveJobCatalogueRecord(records, {
+      sourceType: 'live_quote',
+      sourceId: 'quote-3',
+      jobCode: '60200-MD',
+    });
+    expect(exact.ok).toBe(false);
+    expect(exact.block_reason).toBe('ambiguous_sources');
+    expect(listJobCatalogueOptions(records).every((option) => option.isAmbiguous)).toBe(true);
+  });
 });

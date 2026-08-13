@@ -114,10 +114,21 @@ export interface DailyAllocationBoardPayload {
     published_at: string;
     published_by_name: string | null;
   } | null;
+  publication_history: Array<{
+    id: string;
+    revision_no: number;
+    published_at: string;
+    published_by_name: string | null;
+    scope_team_id: string | null;
+  }>;
   available_plant: Array<{
     id: string;
     plant_id: string;
     nickname: string | null;
+  }>;
+  available_teams: Array<{
+    id: string;
+    name: string;
   }>;
 }
 
@@ -167,6 +178,7 @@ export interface DailyPlantDraftInput {
   hired_serial?: string | null;
   hired_description?: string | null;
   hired_company?: string | null;
+  owner_team_id?: string | null;
   job_source_type?: JobCatalogueSourceType | null;
   job_source_id?: string | null;
   job_code?: string | null;

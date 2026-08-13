@@ -78,6 +78,20 @@ function identityKey(identity: JobCatalogueIdentity): string {
   return `${identity.source_type}:${identity.source_id}`;
 }
 
+function getLookupMatches(records: JobCatalogueRecord[], rawCode: string): Map<string, JobCatalogueRecord> {
+  const code = normalizeCatalogJobCode(rawCode);
+  const matches = records.filter((record) => (
+    normalizeCatalogJobCode(record.job_code) === code
+    || record.aliases.some((alias) => normalizeCatalogJobCode(alias) === code)
+  ));
+  return new Map(matches.map((record) => [identityKey(record), record]));
+}
+
+function recordHasAmbiguousLookup(records: JobCatalogueRecord[], record: JobCatalogueRecord): boolean {
+  return [record.job_code, ...record.aliases]
+    .some((code) => getLookupMatches(records, code).size > 1);
+}
+
 async function fetchAllPages<T>(
   loadPage: (from: number, to: number) => Promise<T[]>
 ): Promise<T[]> {
@@ -317,8 +331,8 @@ export function listJobCatalogueOptions(
   const options: JobCatalogueOption[] = [];
   for (const [jobCode, matches] of byCode.entries()) {
     const uniqueIdentities = new Map(matches.map((record) => [identityKey(record), record]));
-    const isAmbiguous = uniqueIdentities.size > 1;
     for (const record of uniqueIdentities.values()) {
+      const isAmbiguous = recordHasAmbiguousLookup(records, record);
       const haystack = [
         record.job_code,
         record.customer_name,
@@ -370,9 +384,10 @@ export function resolveJobCatalogueRecord(
         message: getJobCatalogueBlockMessage('not_found'),
       };
     }
-    const blockReason = exact.block_reason;
+    const isAmbiguous = recordHasAmbiguousLookup(records, exact);
+    const blockReason = getJobCatalogueBlockReason(exact, isAmbiguous);
     return {
-      ok: canAllocateJobCatalogueRecord(exact),
+      ok: canAllocateJobCatalogueRecord(exact) && !isAmbiguous,
       record: exact,
       block_reason: blockReason,
       message: getJobCatalogueBlockMessage(blockReason),
@@ -389,11 +404,7 @@ export function resolveJobCatalogueRecord(
     };
   }
 
-  const matches = records.filter((record) => {
-    if (record.job_code === jobCode) return true;
-    return record.aliases.some((alias) => normalizeCatalogJobCode(alias) === jobCode);
-  });
-  const unique = new Map(matches.map((record) => [identityKey(record), record]));
+  const unique = getLookupMatches(records, jobCode);
   if (unique.size === 0) {
     return {
       ok: false,

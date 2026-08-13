@@ -43,6 +43,7 @@ describe('RECON-001 registered planned versus actual', () => {
         hired_description: null,
         hired_company: null,
         hired_serial_normalized: null,
+        hired_company_normalized: null,
         owner_team_id: null,
         job_source_type: 'live_quote',
         job_source_id: 'quote-1',
@@ -83,6 +84,7 @@ describe('RECON-002 hired plant and unclassified actuals', () => {
         hired_description: '20T excavator',
         hired_company: 'Hire Co',
         hired_serial_normalized: 'HX-1',
+        hired_company_normalized: 'HIRE CO',
         owner_team_id: null,
         job_source_type: 'live_quote',
         job_source_id: 'quote-1',
@@ -131,6 +133,7 @@ describe('RECON-002 hired plant and unclassified actuals', () => {
         hired_description: null,
         hired_company: null,
         hired_serial_normalized: null,
+        hired_company_normalized: null,
         owner_team_id: null,
         job_source_type: 'live_quote',
         job_source_id: 'quote-1',
@@ -156,5 +159,44 @@ describe('RECON-002 hired plant and unclassified actuals', () => {
 
     expect(rows[0].status).toBe('planned_only');
     expect(rows).toHaveLength(1);
+  });
+
+  it('keeps a jobless check unclassified instead of matching the planned asset', () => {
+    const rows = reconcilePlant(
+      [{
+        id: 'plan-4',
+        publication_id: 'pub-1',
+        plant_kind: 'registered',
+        plant_id: 'plant-1',
+        hired_serial: null,
+        hired_description: null,
+        hired_company: null,
+        hired_serial_normalized: null,
+        hired_company_normalized: null,
+        owner_team_id: 'civils',
+        job_source_type: 'live_quote',
+        job_source_id: 'quote-1',
+        job_code: '60001-MD',
+        site_address: '12 High Street, Southwell',
+        notes: null,
+        created_at: '2026-08-13T00:00:00Z',
+      }],
+      [{
+        id: 'insp-jobless',
+        inspection_date: '2026-08-14',
+        plant_id: 'plant-1',
+        is_hired_plant: false,
+        hired_plant_id_serial: null,
+        hired_plant_hiring_company: null,
+        hired_plant_description: null,
+        job_code: null,
+        status: 'submitted',
+      }],
+      new Map([['plant-1', { plant_id: '574', nickname: 'Loader' }]]),
+      '2026-08-14'
+    );
+
+    expect(rows.map((row) => row.status)).toEqual(['planned_only', 'unclassified_actual']);
+    expect(rows[1].inspection_id).toBe('insp-jobless');
   });
 });

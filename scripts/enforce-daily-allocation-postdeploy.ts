@@ -6,7 +6,6 @@ import pg from 'pg';
 import {
   decideFinaliseMigrationLedgerAction,
   FINALISE_MIGRATION_LEDGER_SQL,
-  requireSafeMigrationConnectionString,
   stripOuterMigrationTransaction,
   type FinaliseMigrationFile,
   type FinaliseMigrationLedgerRow,
@@ -17,16 +16,22 @@ const { Client } = pg;
 config({ path: resolve(process.cwd(), '.env.local') });
 
 const connectionString = process.env.POSTGRES_URL_NON_POOLING;
-const sqlFile = 'supabase/migrations/20260813_daily_allocation_module.sql';
+const sqlFile = 'supabase/migrations/20260813_zz_daily_allocation_enforcement.sql';
 
-try {
-  requireSafeMigrationConnectionString(connectionString);
-} catch (error) {
-  console.error(error instanceof Error ? error.message : error);
+if (!connectionString) {
+  console.error('Missing POSTGRES_URL_NON_POOLING in .env.local.');
   process.exit(1);
 }
 
-async function runMigration(conn: string) {
+const configuredUrl = new URL(connectionString);
+const configuredPort = Number.parseInt(configuredUrl.port, 10) || 5432;
+
+if (configuredPort === 6543) {
+  console.error('Daily allocation enforcement cannot use Supavisor transaction mode on port 6543. Use direct or session mode on port 5432.');
+  process.exit(1);
+}
+
+async function runEnforcement(conn: string) {
   const url = new URL(conn);
   const client = new Client({
     host: url.hostname,
@@ -38,13 +43,13 @@ async function runMigration(conn: string) {
   });
 
   try {
-    console.log('Running daily allocation module migration...');
+    console.log('Running daily allocation post-deploy enforcement...');
     await client.connect();
     const sql = readFileSync(resolve(process.cwd(), sqlFile), 'utf8');
     const migration: FinaliseMigrationFile = {
       relativePath: sqlFile,
       checksumSha256: createHash('sha256').update(sql, 'utf8').digest('hex'),
-      phase: 'predeploy',
+      phase: 'postdeploy',
       sql,
     };
 
@@ -76,63 +81,41 @@ async function runMigration(conn: string) {
       await client.query('COMMIT');
       console.log(
         decision === 'apply'
-          ? 'Daily allocation expand migration applied and recorded.'
-          : 'Daily allocation expand migration already applied; ledger entry reused.'
+          ? 'Daily allocation enforcement applied and recorded.'
+          : 'Daily allocation enforcement already applied; ledger entry reused.'
       );
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
     }
 
-    const { rows } = await client.query<{
-      labour_drafts: boolean;
-      plant_drafts: boolean;
-      publications: boolean;
-      labour_items: boolean;
-      plant_items: boolean;
-      module_state_valid: boolean;
-      job_guard: boolean;
-    }>(`
+    const { rows } = await client.query<{ enabled_teams: number; trigger_installed: boolean }>(`
       SELECT
-        to_regclass('public.daily_labour_allocation_drafts') IS NOT NULL AS labour_drafts,
-        to_regclass('public.daily_plant_allocation_drafts') IS NOT NULL AS plant_drafts,
-        to_regclass('public.daily_allocation_publications') IS NOT NULL AS publications,
-        to_regclass('public.daily_allocation_labour_items') IS NOT NULL AS labour_items,
-        to_regclass('public.daily_allocation_plant_items') IS NOT NULL AS plant_items,
         (
-          NOT EXISTS (
-            SELECT 1 FROM public.permission_modules WHERE module_name = 'daily-allocation'
-          )
-          OR EXISTS (
-            SELECT 1
-            FROM public.team_module_permissions
-            WHERE module_name = 'daily-allocation'
-              AND enabled = TRUE
-          )
-        ) AS module_state_valid,
-        to_regprocedure('public.can_actor_manage_daily_allocation(uuid)') IS NOT NULL AS job_guard
+          SELECT COUNT(*)::INTEGER
+          FROM public.team_module_permissions
+          WHERE module_name = 'daily-allocation'
+            AND enabled = TRUE
+        ) AS enabled_teams,
+        EXISTS (
+          SELECT 1
+          FROM pg_trigger
+          WHERE tgname = 'plant_inspections_job_guard'
+            AND NOT tgisinternal
+        ) AS trigger_installed
     `);
 
-    const result = rows[0];
-    if (
-      !result?.labour_drafts
-      || !result.plant_drafts
-      || !result.publications
-      || !result.labour_items
-      || !result.plant_items
-      || !result.module_state_valid
-      || !result.job_guard
-    ) {
-      throw new Error('Daily allocation module migration verification failed.');
+    if (!rows[0]?.trigger_installed || rows[0].enabled_teams < 1) {
+      throw new Error('Daily allocation enforcement verification failed.');
     }
 
-    console.log('Daily allocation module migration complete.');
+    console.log('Daily allocation post-deploy enforcement complete.');
   } finally {
     await client.end();
   }
 }
 
-runMigration(connectionString!).catch((error: unknown) => {
+runEnforcement(connectionString).catch((error: unknown) => {
   console.error(error);
   process.exit(1);
 });

@@ -1,3 +1,4 @@
+-- finalise-phase: predeploy
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS private;
@@ -134,7 +135,10 @@ CREATE TABLE IF NOT EXISTS public.daily_plant_allocation_drafts (
   hired_serial_normalized TEXT GENERATED ALWAYS AS (
     NULLIF(UPPER(BTRIM(regexp_replace(COALESCE(hired_serial, ''), '\s+', ' ', 'g'))), '')
   ) STORED,
-  owner_team_id UUID REFERENCES public.org_teams(id) ON DELETE SET NULL,
+  hired_company_normalized TEXT GENERATED ALWAYS AS (
+    NULLIF(UPPER(BTRIM(regexp_replace(COALESCE(hired_company, ''), '\s+', ' ', 'g'))), '')
+  ) STORED,
+  owner_team_id TEXT REFERENCES public.org_teams(id) ON DELETE SET NULL,
   job_source_type TEXT,
   job_source_id UUID,
   job_code TEXT,
@@ -179,7 +183,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS daily_plant_allocation_drafts_registered_uniq
   WHERE plant_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS daily_plant_allocation_drafts_hired_uniq
-  ON public.daily_plant_allocation_drafts (work_date, hired_serial_normalized)
+  ON public.daily_plant_allocation_drafts (work_date, hired_serial_normalized, hired_company_normalized)
   WHERE plant_kind = 'hired';
 
 CREATE TABLE IF NOT EXISTS public.daily_allocation_publications (
@@ -189,7 +193,7 @@ CREATE TABLE IF NOT EXISTS public.daily_allocation_publications (
   idempotency_key TEXT NOT NULL,
   published_by UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
   published_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  scope_team_id UUID REFERENCES public.org_teams(id) ON DELETE SET NULL,
+  scope_team_id TEXT REFERENCES public.org_teams(id) ON DELETE SET NULL,
   scope_profile_ids UUID[] NOT NULL DEFAULT ARRAY[]::UUID[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT daily_allocation_publications_revision_unique UNIQUE (work_date, revision_no),
@@ -248,7 +252,8 @@ CREATE TABLE IF NOT EXISTS public.daily_allocation_plant_items (
   hired_description TEXT,
   hired_company TEXT,
   hired_serial_normalized TEXT,
-  owner_team_id UUID,
+  hired_company_normalized TEXT,
+  owner_team_id TEXT,
   job_source_type TEXT,
   job_source_id UUID,
   job_code TEXT NOT NULL,
@@ -256,7 +261,35 @@ CREATE TABLE IF NOT EXISTS public.daily_allocation_plant_items (
   notes TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT daily_allocation_plant_items_kind_check
-    CHECK (plant_kind IN ('registered', 'hired'))
+    CHECK (plant_kind IN ('registered', 'hired')),
+  CONSTRAINT daily_allocation_plant_items_shape_check
+    CHECK (
+      (
+        plant_kind = 'registered'
+        AND plant_id IS NOT NULL
+        AND hired_serial IS NULL
+        AND hired_description IS NULL
+        AND hired_company IS NULL
+        AND hired_serial_normalized IS NULL
+        AND hired_company_normalized IS NULL
+      )
+      OR (
+        plant_kind = 'hired'
+        AND plant_id IS NULL
+        AND NULLIF(BTRIM(hired_serial), '') IS NOT NULL
+        AND NULLIF(BTRIM(hired_description), '') IS NOT NULL
+        AND NULLIF(BTRIM(hired_company), '') IS NOT NULL
+        AND hired_serial_normalized IS NOT NULL
+        AND hired_company_normalized IS NOT NULL
+      )
+    ),
+  CONSTRAINT daily_allocation_plant_items_job_identity_check
+    CHECK (
+      job_source_type IN ('live_quote', 'legacy_quote', 'project_number')
+      AND job_source_id IS NOT NULL
+      AND NULLIF(BTRIM(job_code), '') IS NOT NULL
+      AND NULLIF(BTRIM(site_address), '') IS NOT NULL
+    )
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS daily_allocation_plant_items_registered_uniq
@@ -264,7 +297,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS daily_allocation_plant_items_registered_uniq
   WHERE plant_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS daily_allocation_plant_items_hired_uniq
-  ON public.daily_allocation_plant_items (publication_id, hired_serial_normalized)
+  ON public.daily_allocation_plant_items (
+    publication_id,
+    hired_serial_normalized,
+    hired_company_normalized
+  )
   WHERE plant_kind = 'hired';
 
 ALTER TABLE public.messages
@@ -302,8 +339,8 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   actor_id UUID := auth.uid();
-  actor_team_id UUID;
-  target_team_id UUID;
+  actor_team_id TEXT;
+  target_team_id TEXT;
 BEGIN
   IF actor_id IS NULL OR target_profile_id IS NULL THEN
     RETURN FALSE;
@@ -329,13 +366,14 @@ BEGIN
     FROM public.profile_reporting_lines lines
     WHERE lines.profile_id = target_profile_id
       AND lines.manager_profile_id = actor_id
+      AND lines.valid_from <= NOW()
       AND lines.valid_to IS NULL
       AND lines.relation_type IN ('primary', 'secondary')
   );
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.can_actor_manage_daily_allocation_team(target_team_id UUID)
+CREATE OR REPLACE FUNCTION public.can_actor_manage_daily_allocation_team(target_team_id TEXT)
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 STABLE
@@ -344,7 +382,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   actor_id UUID := auth.uid();
-  actor_team_id UUID;
+  actor_team_id TEXT;
 BEGIN
   IF actor_id IS NULL THEN
     RETURN FALSE;
@@ -381,10 +419,27 @@ $$;
 
 REVOKE ALL ON FUNCTION public.can_actor_manage_daily_allocation(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.can_actor_manage_daily_allocation(UUID) TO authenticated, service_role;
-REVOKE ALL ON FUNCTION public.can_actor_manage_daily_allocation_team(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.can_actor_manage_daily_allocation_team(UUID) TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.can_actor_manage_daily_allocation_team(TEXT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.can_actor_manage_daily_allocation_team(TEXT) TO authenticated, service_role;
 REVOKE ALL ON FUNCTION public.can_actor_view_daily_allocation(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.can_actor_view_daily_allocation(UUID) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION private.is_hidden_daily_allocation_profile(
+  p_employee_id TEXT,
+  p_full_name TEXT
+)
+RETURNS BOOLEAN
+LANGUAGE sql
+IMMUTABLE
+SET search_path = public, pg_temp
+AS $$
+  SELECT
+    COALESCE(p_employee_id, '') IN ('TS-ADM', 'TS-MGR', 'TS-EMP')
+    OR (
+      LOWER(BTRIM(COALESCE(p_full_name, ''))) = 'manager user'
+      AND UPPER(BTRIM(COALESCE(p_employee_id, ''))) = 'MGR001'
+    );
+$$;
 
 CREATE OR REPLACE FUNCTION public.list_daily_allocation_scope_profile_ids()
 RETURNS UUID[]
@@ -422,23 +477,6 @@ AS $$
     AND (
       ARRAY_LENGTH(regexp_split_to_array(BTRIM(p_site), E'\n+'), 1) >= 2
       OR ARRAY_LENGTH(regexp_split_to_array(BTRIM(regexp_replace(p_site, '\s+', ' ', 'g')), ' '), 1) >= 3
-    );
-$$;
-
-CREATE OR REPLACE FUNCTION private.is_hidden_daily_allocation_profile(
-  p_employee_id TEXT,
-  p_full_name TEXT
-)
-RETURNS BOOLEAN
-LANGUAGE sql
-IMMUTABLE
-SET search_path = public, pg_temp
-AS $$
-  SELECT
-    COALESCE(p_employee_id, '') IN ('TS-ADM', 'TS-MGR', 'TS-EMP')
-    OR (
-      LOWER(BTRIM(COALESCE(p_full_name, ''))) = 'manager user'
-      AND UPPER(BTRIM(COALESCE(p_employee_id, ''))) = 'MGR001'
     );
 $$;
 
@@ -525,10 +563,10 @@ BEGIN
     SELECT
       'live_quote'::TEXT,
       quotes.id,
-      COALESCE(NULLIF(BTRIM(quotes.base_quote_reference), ''), NULLIF(BTRIM(quotes.quote_reference), '')),
-      NULLIF(BTRIM(quotes.site_address), ''),
-      customers.company_name,
-      COALESCE(NULLIF(BTRIM(quotes.subject_line), ''), NULLIF(BTRIM(quotes.project_description), '')),
+      COALESCE(NULLIF(BTRIM(quotes.base_quote_reference), ''), NULLIF(BTRIM(quotes.quote_reference), ''))::TEXT,
+      NULLIF(BTRIM(quotes.site_address), '')::TEXT,
+      customers.company_name::TEXT,
+      COALESCE(NULLIF(BTRIM(quotes.subject_line), ''), NULLIF(BTRIM(quotes.project_description), ''))::TEXT,
       private.allocation_site_is_valid(quotes.site_address)
     FROM public.quotes
     JOIN public.customers ON customers.id = quotes.customer_id
@@ -568,10 +606,10 @@ BEGIN
     SELECT
       'project_number'::TEXT,
       quote_project_numbers.id,
-      quote_project_numbers.project_reference,
-      NULLIF(BTRIM(quote_project_numbers.site_address), ''),
+      quote_project_numbers.project_reference::TEXT,
+      NULLIF(BTRIM(quote_project_numbers.site_address), '')::TEXT,
       'Project number'::TEXT,
-      COALESCE(NULLIF(BTRIM(quote_project_numbers.title), ''), NULLIF(BTRIM(quote_project_numbers.description), '')),
+      COALESCE(NULLIF(BTRIM(quote_project_numbers.title), ''), NULLIF(BTRIM(quote_project_numbers.description), ''))::TEXT,
       private.allocation_site_is_valid(quote_project_numbers.site_address)
     FROM public.quote_project_numbers
     WHERE quote_project_numbers.id = p_source_id
@@ -585,10 +623,10 @@ BEGIN
     SELECT
       'legacy_quote'::TEXT,
       legacy_quotes.id,
-      legacy_quotes.quote_reference,
-      NULLIF(BTRIM(legacy_quotes.site_address), ''),
-      legacy_quotes.customer_name,
-      legacy_quotes.title,
+      legacy_quotes.quote_reference::TEXT,
+      NULLIF(BTRIM(legacy_quotes.site_address), '')::TEXT,
+      legacy_quotes.customer_name::TEXT,
+      legacy_quotes.title::TEXT,
       private.allocation_site_is_valid(legacy_quotes.site_address)
     FROM public.legacy_quotes
     WHERE legacy_quotes.id = p_source_id
@@ -610,10 +648,10 @@ BEGIN
       SELECT
         'live_quote'::TEXT AS source_type,
         quotes.id AS source_id,
-        COALESCE(NULLIF(BTRIM(quotes.base_quote_reference), ''), NULLIF(BTRIM(quotes.quote_reference), '')) AS job_code,
-        NULLIF(BTRIM(quotes.site_address), '') AS site_address,
-        customers.company_name AS customer_name,
-        COALESCE(NULLIF(BTRIM(quotes.subject_line), ''), NULLIF(BTRIM(quotes.project_description), '')) AS title,
+        COALESCE(NULLIF(BTRIM(quotes.base_quote_reference), ''), NULLIF(BTRIM(quotes.quote_reference), ''))::TEXT AS job_code,
+        NULLIF(BTRIM(quotes.site_address), '')::TEXT AS site_address,
+        customers.company_name::TEXT AS customer_name,
+        COALESCE(NULLIF(BTRIM(quotes.subject_line), ''), NULLIF(BTRIM(quotes.project_description), ''))::TEXT AS title,
         private.allocation_site_is_valid(quotes.site_address) AS address_valid
       FROM public.quotes
       JOIN public.customers ON customers.id = quotes.customer_id
@@ -727,6 +765,7 @@ AS $$
 DECLARE
   v_count INTEGER := 0;
   v_row private.allocation_job;
+  v_lookup_code TEXT;
 BEGIN
   SELECT COUNT(*)
   INTO v_count
@@ -753,6 +792,38 @@ BEGIN
     resolved.address_valid
   INTO v_row
   FROM private.resolve_allocation_job(p_source_type, p_source_id, p_job_code) AS resolved;
+
+  FOR v_lookup_code IN
+    SELECT v_row.job_code
+    UNION
+    SELECT aliases.alias_reference::TEXT
+    FROM public.quotes
+    JOIN public.quote_reference_aliases aliases
+      ON aliases.canonical_quote_thread_id = quotes.quote_thread_id
+    WHERE v_row.source_type = 'live_quote'
+      AND quotes.id = v_row.source_id
+    UNION
+    SELECT projects.project_reference::TEXT
+    FROM public.quote_project_numbers projects
+    WHERE (
+      v_row.source_type = 'live_quote'
+      AND projects.status = 'converted'
+      AND projects.converted_quote_id = v_row.source_id
+    )
+    OR (
+      v_row.source_type = 'project_number'
+      AND projects.status = 'merged'
+      AND projects.merged_into_project_number_id = v_row.source_id
+    )
+  LOOP
+    SELECT COUNT(*)
+    INTO v_count
+    FROM private.resolve_allocation_job(NULL, NULL, v_lookup_code);
+
+    IF v_count > 1 THEN
+      RAISE EXCEPTION 'JOB_AMBIGUOUS';
+    END IF;
+  END LOOP;
 
   IF p_require_valid AND NOT v_row.address_valid THEN
     RAISE EXCEPTION 'JOB_MISSING_SITE';
@@ -828,7 +899,10 @@ BEGIN
   END IF;
 
   IF TG_OP = 'INSERT' THEN
-    SELECT team_id INTO NEW.owner_team_id FROM public.profiles WHERE id = auth.uid();
+    IF public.effective_module_access_level('daily-allocation') < 5
+      OR NEW.owner_team_id IS NULL THEN
+      SELECT team_id INTO NEW.owner_team_id FROM public.profiles WHERE id = auth.uid();
+    END IF;
     IF NOT public.can_actor_manage_daily_allocation_team(NEW.owner_team_id)
       AND public.effective_module_access_level('daily-allocation') < 5 THEN
       RAISE EXCEPTION 'Not allowed to allocate plant';
@@ -887,16 +961,8 @@ DECLARE
 BEGIN
   IF NEW.job_source_type IS NULL AND NEW.job_source_id IS NULL AND NULLIF(BTRIM(COALESCE(NEW.job_code, '')), '') IS NULL THEN
     NEW.job_site_address := NULL;
-    IF NEW.status = 'submitted' THEN
-      IF TG_OP = 'UPDATE'
-        AND OLD.status = 'submitted'
-        AND OLD.job_source_type IS NULL
-        AND OLD.job_source_id IS NULL
-        AND NULLIF(BTRIM(COALESCE(OLD.job_code, '')), '') IS NULL THEN
-        RETURN NEW;
-      END IF;
-      RAISE EXCEPTION 'JOB_REQUIRED';
-    END IF;
+    -- Expand phase remains compatible with the currently deployed Plant
+    -- Daily Check UI. Submission enforcement is installed post-deploy.
     RETURN NEW;
   END IF;
 
@@ -969,7 +1035,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   actor_id UUID := auth.uid();
-  actor_team_id UUID;
+  actor_team_id TEXT;
   next_revision INTEGER;
 BEGIN
   IF actor_id IS NULL THEN
@@ -1217,6 +1283,7 @@ BEGIN
       hired_description,
       hired_company,
       hired_serial_normalized,
+      hired_company_normalized,
       owner_team_id,
       job_source_type,
       job_source_id,
@@ -1231,6 +1298,7 @@ BEGIN
       plant_row.hired_description,
       plant_row.hired_company,
       plant_row.hired_serial_normalized,
+      plant_row.hired_company_normalized,
       plant_row.owner_team_id,
       job_row.source_type,
       job_row.source_id,
@@ -1446,16 +1514,10 @@ CREATE POLICY daily_allocation_plant_items_select ON public.daily_allocation_pla
       FROM public.daily_allocation_publications publications
       WHERE publications.id = daily_allocation_plant_items.publication_id
         AND (
-          public.can_actor_manage_daily_allocation_team(publications.scope_team_id)
+          public.can_actor_manage_daily_allocation_team(daily_allocation_plant_items.owner_team_id)
           OR publications.published_by = auth.uid()
         )
         AND public.effective_has_module_level('daily-allocation', 4)
-    )
-    OR EXISTS (
-      SELECT 1
-      FROM public.daily_allocation_labour_items items
-      WHERE items.publication_id = daily_allocation_plant_items.publication_id
-        AND public.can_actor_manage_daily_allocation(items.profile_id)
     )
   );
 
@@ -1463,7 +1525,8 @@ CREATE OR REPLACE FUNCTION public.list_daily_allocation_plant_conflicts(p_work_d
 RETURNS TABLE (
   plant_id UUID,
   hired_serial TEXT,
-  owner_team_id UUID
+  hired_company TEXT,
+  owner_team_id TEXT
 )
 LANGUAGE sql
 STABLE
@@ -1473,6 +1536,7 @@ AS $$
   SELECT
     drafts.plant_id,
     drafts.hired_serial,
+    drafts.hired_company,
     drafts.owner_team_id
   FROM public.daily_plant_allocation_drafts drafts
   WHERE drafts.work_date = p_work_date
@@ -1545,30 +1609,11 @@ ALTER TABLE public.notification_preferences
   );
 
 -- ---------------------------------------------------------------------------
--- Permission module seed
+-- Permission activation is intentionally deferred
 -- ---------------------------------------------------------------------------
 
-INSERT INTO public.permission_modules (module_name, minimum_role_id, sort_order, access_mode)
-SELECT 'daily-allocation', roles.id, 206, 'team'
-FROM public.roles
-WHERE roles.name = 'contractor'
-ON CONFLICT (module_name) DO UPDATE
-SET minimum_role_id = EXCLUDED.minimum_role_id,
-    sort_order = EXCLUDED.sort_order,
-    access_mode = EXCLUDED.access_mode,
-    updated_at = NOW();
-
-INSERT INTO public.role_permissions (role_id, module_name, enabled)
-SELECT roles.id, 'daily-allocation', FALSE
-FROM public.roles
-ON CONFLICT (role_id, module_name) DO NOTHING;
-
-INSERT INTO public.team_module_permissions (team_id, module_name, enabled)
-SELECT org_teams.id, 'daily-allocation', TRUE
-FROM public.org_teams
-WHERE org_teams.active = TRUE
-ON CONFLICT (team_id, module_name) DO UPDATE
-SET enabled = EXCLUDED.enabled,
-    updated_at = NOW();
+-- The post-deploy migration creates the permission module and team grants.
+-- Keeping the module absent here prevents navigation discovery before the
+-- compatible application deployment is confirmed.
 
 COMMIT;
