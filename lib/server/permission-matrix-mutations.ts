@@ -363,7 +363,7 @@ export async function applyPermissionMatrixUpdatesAtomically(
         )
         VALUES (
           'user_module_permissions',
-          $1::text,
+          $1::uuid,
           $2::uuid,
           'permission_matrix_update',
           $3::jsonb

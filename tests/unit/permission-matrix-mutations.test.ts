@@ -7,6 +7,7 @@ import {
 class FakePermissionMatrixClient implements PermissionMatrixPgClient {
   readonly calls: Array<{ text: string; values?: unknown[] }> = [];
   failExplicitUserUpdate = false;
+  failAuditInsert = false;
 
   async connect() {}
 
@@ -54,6 +55,9 @@ class FakePermissionMatrixClient implements PermissionMatrixPgClient {
     ) {
       throw new Error('Simulated user permission failure');
     }
+    if (this.failAuditInsert && normalized.includes('INSERT INTO public.audit_log')) {
+      throw new Error('Simulated audit insert failure');
+    }
 
     return { rows: [] };
   }
@@ -76,7 +80,7 @@ const mutation = {
 };
 
 describe('atomic permission matrix mutations', () => {
-  it('PERM-TX-01 commits text-team and UUID-user changes in one serializable transaction', async () => {
+  it('PERM-TX-01 / PERM-AUDIT-UUID-01 commits typed changes and UUID audit bindings', async () => {
     const client = new FakePermissionMatrixClient();
     await applyPermissionMatrixUpdatesAtomically(mutation, () => client);
 
@@ -97,10 +101,14 @@ describe('atomic permission matrix mutations', () => {
       call.text.includes('INSERT INTO public.user_module_permissions')
       && call.values?.[2] === 4
     ))).toBe(true);
-    expect(client.calls.some((call) => (
+    const auditInsert = client.calls.find((call) => (
       call.text.includes('INSERT INTO public.audit_log')
-      && call.text.includes('permission_matrix_update')
-    ))).toBe(true);
+    ));
+    expect(auditInsert?.text).toContain('$1::uuid');
+    expect(auditInsert?.text).not.toContain('$1::text');
+    expect(auditInsert?.text).toContain('permission_matrix_update');
+    expect(auditInsert?.values?.[0]).toBe(mutation.actorUserId);
+    expect(auditInsert?.values?.[1]).toBe(mutation.actorUserId);
     expect(client.calls.at(-1)?.text).toBe('COMMIT');
   });
 
@@ -114,6 +122,22 @@ describe('atomic permission matrix mutations', () => {
 
     expect(client.calls.some((call) => (
       call.text.includes('INSERT INTO public.team_module_permissions')
+    ))).toBe(true);
+    expect(client.calls.at(-1)?.text).toBe('ROLLBACK');
+    expect(client.calls.some((call) => call.text === 'COMMIT')).toBe(false);
+  });
+
+  it('PERM-AUDIT-ROLLBACK-01 rolls back when the final audit insert fails', async () => {
+    const client = new FakePermissionMatrixClient();
+    client.failAuditInsert = true;
+
+    await expect(
+      applyPermissionMatrixUpdatesAtomically(mutation, () => client)
+    ).rejects.toThrow('Simulated audit insert failure');
+
+    expect(client.calls.some((call) => (
+      call.text.includes('INSERT INTO public.user_module_permissions')
+      && call.values?.[2] === 4
     ))).toBe(true);
     expect(client.calls.at(-1)?.text).toBe('ROLLBACK');
     expect(client.calls.some((call) => call.text === 'COMMIT')).toBe(false);
