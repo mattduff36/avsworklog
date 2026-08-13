@@ -9,8 +9,10 @@ import {
   getUsersWithModuleAccess,
   isFullAccessRole,
   normalizePermissionAccessLevel,
+  resolveModuleLevelForRoleRank,
   resolveModulesForRoleRank,
 } from '@/lib/server/team-permissions';
+import { isPermissionLevelAllowedForModule } from '@/lib/config/permission-access-rules';
 import { ALL_MODULES, type PermissionModuleMatrixColumn, type PermissionTierRole } from '@/types/roles';
 
 const roles: PermissionTierRole[] = [
@@ -115,6 +117,22 @@ const modules: PermissionModuleMatrixColumn[] = [
   },
 ];
 
+const dailyAllocationModule: PermissionModuleMatrixColumn = {
+  module_name: 'daily-allocation',
+  display_name: 'Daily Allocation',
+  short_name: 'Allocation',
+  description: 'Assign daily labour and plant to jobs',
+  color_var: '--daily-allocation-primary',
+  minimum_role_id: 'employee',
+  minimum_role_name: 'Employee',
+  minimum_hierarchy_rank: 2,
+  enforced_minimum_access_level: 2,
+  requires_full_access_role: false,
+  requires_sensitive_pin: false,
+  access_mode: 'team',
+  sort_order: 206,
+};
+
 describe('team permission helpers', () => {
   it('builds a permission record for a team row', () => {
     const record = buildTeamPermissionRecord(
@@ -178,6 +196,38 @@ describe('team permission helpers', () => {
         enabledByModule: new Map(),
       }).size
     ).toBeGreaterThan(modules.length);
+  });
+
+  it('PERM-DA-03 starts non-admins at zero while preserving future grants and admin bypass', () => {
+    expect(
+      resolveModuleLevelForRoleRank({
+        role: roles[1]!,
+        module: dailyAllocationModule,
+        enabled: false,
+      })
+    ).toBe(0);
+    expect(
+      resolveModuleLevelForRoleRank({
+        role: roles[1]!,
+        module: dailyAllocationModule,
+        enabled: true,
+      })
+    ).toBe(2);
+    expect(isPermissionLevelAllowedForModule(dailyAllocationModule, 1)).toBe(false);
+    expect(isPermissionLevelAllowedForModule(dailyAllocationModule, 2)).toBe(true);
+    expect(isPermissionLevelAllowedForModule(dailyAllocationModule, 4)).toBe(true);
+    expect(
+      resolveModuleLevelForRoleRank({
+        role: {
+          name: 'admin',
+          role_class: 'admin',
+          is_super_admin: false,
+          hierarchy_rank: 5,
+        },
+        module: dailyAllocationModule,
+        enabled: false,
+      })
+    ).toBe(5);
   });
 
   it('normalizes invalid user permission levels to no access', () => {

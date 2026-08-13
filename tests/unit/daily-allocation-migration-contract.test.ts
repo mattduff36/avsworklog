@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
@@ -18,6 +19,13 @@ const rollbackSql = readFileSync(
   resolve(process.cwd(), 'supabase/rollback/20260813_disable_daily_allocation.sql'),
   'utf8'
 );
+const permissionLockdownSql = readFileSync(
+  resolve(
+    process.cwd(),
+    'supabase/migrations/20260813102922_daily_allocation_admin_only_permissions.sql'
+  ),
+  'utf8'
+).replace(/\r\n/g, '\n');
 
 describe('daily allocation migration contract', () => {
   it('PUB-001 validates all-or-nothing publish incompleteness', () => {
@@ -121,7 +129,80 @@ describe('daily allocation migration contract', () => {
     );
     expect(enforcementRunner).toContain('20260813_zz_daily_allocation_enforcement.sql');
     expect(enforcementRunner).toContain('enabled_teams');
+    expect(enforcementRunner).toContain('module_exists');
+    expect(enforcementRunner).not.toContain('rows[0].enabled_teams < 1');
     expect(enforcementRunner).toContain('FINALISE_MIGRATION_LEDGER_SQL');
     expect(enforcementRunner).toContain('decideFinaliseMigrationLedgerAction');
+  });
+
+  it('PERM-DA-01 locks initial module permissions to admins without hiding the matrix column', () => {
+    expect(permissionLockdownSql).toContain('-- finalise-phase: predeploy');
+    expect(permissionLockdownSql).toContain('daily_allocation_permission_lockdown_snapshots');
+    expect(permissionLockdownSql).toContain('REVOKE ALL ON TABLE');
+    expect(permissionLockdownSql).toContain("'20260813102922_admin_only_permissions'");
+    expect(permissionLockdownSql).toContain("WHERE roles.name = 'employee'");
+    expect(permissionLockdownSql).toContain('AND roles.hierarchy_rank = 2');
+    expect(permissionLockdownSql).toContain("SELECT\n  'daily-allocation',");
+    expect(permissionLockdownSql).toContain('SET enabled = FALSE');
+    expect(permissionLockdownSql).toContain('SET access_level = 0');
+    expect(permissionLockdownSql).toContain('public.user_module_access_level(');
+    expect(permissionLockdownSql).toContain("<> 0");
+    expect(permissionLockdownSql).toContain("<> 5");
+    expect(permissionLockdownSql).not.toContain('DELETE FROM public.permission_modules');
+
+    const lockdownRunner = readFileSync(
+      resolve(process.cwd(), 'scripts/run-daily-allocation-permission-lockdown.ts'),
+      'utf8'
+    );
+    expect(lockdownRunner).toContain('POSTGRES_URL_NON_POOLING');
+    expect(lockdownRunner).toContain('requireSafeMigrationConnectionString');
+    expect(lockdownRunner).toContain('FINALISE_MIGRATION_LEDGER_SQL');
+    expect(lockdownRunner).toContain('effective_non_admins');
+    expect(lockdownRunner).toContain('effective_level_five_admins');
+    expect(lockdownRunner).toContain('snapshot_exists');
+  });
+
+  it('PERM-DA-04 verifies effective live access, not only stored permission rows', () => {
+    const lockdownRunner = readFileSync(
+      resolve(process.cwd(), 'scripts/run-daily-allocation-permission-lockdown.ts'),
+      'utf8'
+    );
+    expect(lockdownRunner).toContain('public.user_module_access_level(');
+    expect(lockdownRunner).toContain('result.effective_non_admins !== 0');
+    expect(lockdownRunner).toContain(
+      'result.effective_level_five_admins !== result.admin_profiles'
+    );
+  });
+
+  it('PERM-DA-06 keeps the applied activation immutable and its runner policy-neutral', () => {
+    expect(createHash('sha256').update(enforcementSql, 'utf8').digest('hex')).toBe(
+      '5e2496d5d8fbd67f2ee196ffa65c608ca17779671662cef06ed298c7cb6ea094'
+    );
+    const enforcementRunner = readFileSync(
+      resolve(process.cwd(), 'scripts/enforce-daily-allocation-postdeploy.ts'),
+      'utf8'
+    );
+    expect(enforcementRunner).toContain('module_exists');
+    expect(enforcementRunner).not.toContain('rows[0].enabled_teams < 1');
+  });
+
+  it('PERM-DA-07 captures an exact private before-image before permission mutation', () => {
+    const snapshotInsert = permissionLockdownSql.indexOf(
+      'INSERT INTO private.daily_allocation_permission_lockdown_snapshots'
+    );
+    const teamMutation = permissionLockdownSql.indexOf(
+      'INSERT INTO public.team_module_permissions'
+    );
+    const userMutation = permissionLockdownSql.indexOf(
+      'UPDATE public.user_module_permissions'
+    );
+
+    expect(snapshotInsert).toBeGreaterThan(-1);
+    expect(snapshotInsert).toBeLessThan(teamMutation);
+    expect(snapshotInsert).toBeLessThan(userMutation);
+    expect(permissionLockdownSql).toContain('TO_JSONB(permission_modules)');
+    expect(permissionLockdownSql).toContain('TO_JSONB(team_module_permissions)');
+    expect(permissionLockdownSql).toContain('TO_JSONB(user_module_permissions)');
+    expect(permissionLockdownSql).toContain('TO_JSONB(role_permissions)');
   });
 });

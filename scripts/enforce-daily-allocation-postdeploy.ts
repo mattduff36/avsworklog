@@ -89,7 +89,11 @@ async function runEnforcement(conn: string) {
       throw error;
     }
 
-    const { rows } = await client.query<{ enabled_teams: number; trigger_installed: boolean }>(`
+    const { rows } = await client.query<{
+      enabled_teams: number;
+      module_exists: boolean;
+      trigger_installed: boolean;
+    }>(`
       SELECT
         (
           SELECT COUNT(*)::INTEGER
@@ -99,17 +103,24 @@ async function runEnforcement(conn: string) {
         ) AS enabled_teams,
         EXISTS (
           SELECT 1
+          FROM public.permission_modules
+          WHERE module_name = 'daily-allocation'
+        ) AS module_exists,
+        EXISTS (
+          SELECT 1
           FROM pg_trigger
           WHERE tgname = 'plant_inspections_job_guard'
             AND NOT tgisinternal
         ) AS trigger_installed
     `);
 
-    if (!rows[0]?.trigger_installed || rows[0].enabled_teams < 1) {
+    if (!rows[0]?.trigger_installed || !rows[0].module_exists) {
       throw new Error('Daily allocation enforcement verification failed.');
     }
 
-    console.log('Daily allocation post-deploy enforcement complete.');
+    console.log(
+      `Daily allocation post-deploy enforcement complete (${rows[0].enabled_teams} enabled team defaults).`
+    );
   } finally {
     await client.end();
   }

@@ -33,6 +33,7 @@
     "db:validate": "tsx scripts/db-validate.ts",
     "daily-allocation:expand": "tsx scripts/run-daily-allocation-module-migration.ts",
     "daily-allocation:enforce": "tsx scripts/enforce-daily-allocation-postdeploy.ts",
+    "daily-allocation:lock-permissions": "tsx scripts/run-daily-allocation-permission-lockdown.ts",
     "permissions:migrate:team-matrix": "tsx scripts/run-team-permission-matrix-migration.ts",
     "hierarchy:preflight": "tsx scripts/hierarchy/preflight-organogram-check.ts",
     "hierarchy:migrate:bigbang": "tsx scripts/run-org-hierarchy-bigbang-migration.ts",

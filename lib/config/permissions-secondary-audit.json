@@ -1,6 +1,6 @@
 {
   "title": "Permissions Secondary Audit",
-  "auditDate": "2026-05-27",
+  "auditDate": "2026-08-13",
   "matrixRule": "For Contractor, Employee, Supervisor, and Manager, module access requires the user's team to have the module enabled and the user's hierarchy rank to meet the module minimum. Admin and super-admin roles are full-access roles and do not depend on the team matrix.",
   "modules": [
     {
@@ -287,6 +287,19 @@
         "Supervisor": "Same assigned-reminder workflow. No Actions module by rank in the live matrix, so cannot create/update reminder_actions or assign reminders.",
         "Manager": "Assigned-reminder workflow plus Actions-based manager creation/update/assignment of reminder actions and workflow settings.",
         "Admin": "Full reminder/action workflow control."
+      }
+    },
+    {
+      "displayName": "Daily Allocation",
+      "moduleName": "daily-allocation",
+      "matrixGate": "Admin automatic; non-admin disabled by default; explicit Level 2+ or team grants may be enabled later",
+      "minimumRole": "Employee",
+      "byRole": {
+        "Contractor": "No default access during the initial rollout. A future explicit Level 2+ grant permits the employee-facing view of own published allocations.",
+        "Employee": "No default access during the initial rollout. A future Level 2 grant permits the employee-facing view of own published allocations.",
+        "Supervisor": "No default access during the initial rollout. A future Level 3 grant permits the employee-facing view of own published allocations; manager-board operations still require Level 4.",
+        "Manager": "No default access during the initial rollout. A future explicit Level 4 grant permits scoped labour and plant allocation management for the manager's team/reporting lines.",
+        "Admin": "Automatic Level 5 access, including global allocation management and publication, independent of team defaults."
       }
     }
   ],

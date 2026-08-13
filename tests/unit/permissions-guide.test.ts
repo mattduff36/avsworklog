@@ -23,7 +23,7 @@ describe('permissions guide', () => {
     expect(usersSource).not.toContain('<PermissionsGuide');
   });
 
-  it('PERM-GUIDE-02: guide keeps role behavior descriptions from secondary audit JSON', () => {
+  it('PERM-GUIDE-02 / PERM-DA-02: guide keeps role behavior descriptions from secondary audit JSON', () => {
     const guideSource = fs.readFileSync(
       path.join(process.cwd(), 'components/admin/PermissionsGuide.tsx'),
       'utf-8'
@@ -48,6 +48,17 @@ describe('permissions guide', () => {
 
     expect(permissionsAudit.modules.length).toBeGreaterThan(0);
     expect(permissionsAudit.modules.some((module) => module.moduleName === 'reminders')).toBe(true);
+    const dailyAllocation = permissionsAudit.modules.find(
+      (module) => module.moduleName === 'daily-allocation'
+    );
+    expect(dailyAllocation).toBeTruthy();
+    expect(dailyAllocation?.minimumRole).toBe('Employee');
+    expect(dailyAllocation?.matrixGate).toContain('non-admin disabled by default');
+    expect(dailyAllocation?.byRole.Contractor).toContain('No default access');
+    expect(dailyAllocation?.byRole.Employee).toContain('No default access');
+    expect(dailyAllocation?.byRole.Supervisor).toContain('No default access');
+    expect(dailyAllocation?.byRole.Manager).toContain('No default access');
+    expect(dailyAllocation?.byRole.Admin).toContain('Automatic Level 5 access');
     for (const auditModule of permissionsAudit.modules) {
       expect(auditModule.byRole.Contractor).toBeTruthy();
       expect(auditModule.byRole.Employee).toBeTruthy();
