@@ -1,5 +1,28 @@
 [
   {
+    "version": "0826.29.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated Daily Allocation, Data storage, and Help and FAQ.",
+    "summary": "Updated Daily Allocation, Data storage, and Help and FAQ.",
+    "details": [
+      "Updated Daily Allocation, Data storage, and Help and FAQ, with changes to automation scripts, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to automated tests and data storage.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Daily Allocation",
+      "Data storage",
+      "Help",
+      "FAQ"
+    ],
+    "areaKeys": [
+      "daily-allocation",
+      "data-storage"
+    ],
+    "pushedAt": "2026-08-14T16:22:23.852Z"
+  },
+  {
     "version": "0826.28.0",
     "updateKind": "major",
     "title": "Daily Allocation update",

@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.29.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update Daily Allocation, Data storage, and Help and FAQ`
+
+**PUSHED AT**
+2026-08-14T16:22:23.852Z
+
+**WHAT CHANGED**
+Update Daily Allocation, Data storage, and Help and FAQ.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Allocation, Data storage, and Help and FAQ, with changes to automation scripts, automated tests, data storage, and documentation.
+- Updated data storage, with changes to automated tests and data storage.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update Daily Allocation, Data storage, and Help and FAQ`
+
 ## 0826.28.0
 
 **GIT COMMIT MESSAGE**
