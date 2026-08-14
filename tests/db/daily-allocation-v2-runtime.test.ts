@@ -24,6 +24,12 @@ import {
   findFreshnessViolations,
   validateLocalTestDatabaseUrl,
 } from '../../scripts/local-test-postgres';
+import {
+  acquireRolloutLock,
+  activateWithAutomaticDisable,
+  releaseRolloutLock,
+  type RolloutSnapshot,
+} from '../../scripts/manage-daily-allocation-v2-rollout';
 import type { PGlite } from '@electric-sql/pglite';
 
 const START = '2026-08-14 09:00:00+01';
@@ -81,7 +87,74 @@ describe('DA2 isolated PGlite runtime', () => {
     ).rejects.toThrow();
   });
 
-  it('keeps v1 labour draft writes working and blocks convert while the gate is closed', async () => {
+  it('executes the reviewed activation and runtime-only disable artifacts without v1 drift', async () => {
+    const before = await hashDailyAllocationV1Content(pg);
+    const grantMigration = readFileSync(
+      'supabase/migrations/20260814155048_daily_allocation_v2_rpc_only_grants.sql',
+      'utf8'
+    );
+    const activation = readFileSync(
+      'scripts/supabase/activate-daily-allocation-v2.sql',
+      'utf8'
+    );
+    const disable = readFileSync(
+      'supabase/rollback/20260813_zzz_disable_daily_allocation_v2.sql',
+      'utf8'
+    );
+
+    await pg.exec(`
+      GRANT INSERT, UPDATE, DELETE
+        ON TABLE public.daily_allocation_plan_days,
+          public.daily_allocation_visits,
+          public.daily_allocation_visit_labour,
+          public.daily_allocation_visit_plant,
+          public.daily_allocation_conflict_overrides
+        TO authenticated;
+    `);
+    await pg.exec(grantMigration);
+    const grants = await pg.query<{
+      relation_name: string;
+      can_select: boolean;
+      can_write: boolean;
+    }>(`
+      SELECT
+        relation_name,
+        has_table_privilege('authenticated', to_regclass(relation_name), 'SELECT') AS can_select,
+        has_table_privilege('authenticated', to_regclass(relation_name), 'INSERT')
+          OR has_table_privilege('authenticated', to_regclass(relation_name), 'UPDATE')
+          OR has_table_privilege('authenticated', to_regclass(relation_name), 'DELETE')
+          AS can_write
+      FROM unnest(ARRAY[
+        'public.daily_allocation_plan_days',
+        'public.daily_allocation_visits',
+        'public.daily_allocation_visit_labour',
+        'public.daily_allocation_visit_plant',
+        'public.daily_allocation_conflict_overrides'
+      ]) AS relation_name
+    `);
+    expect(grants.rows).toHaveLength(5);
+    expect(grants.rows.every((row) => row.can_select && !row.can_write)).toBe(true);
+
+    await pg.exec(activation);
+    const enabled = await withAuthenticatedRole(pg, DA2_ACTORS.manager, async () =>
+      pg.query<{ board_enabled: boolean; writes_enabled: boolean }>(
+        'SELECT * FROM public.get_daily_allocation_v2_runtime()'
+      )
+    );
+    expect(enabled.rows[0]).toEqual({ board_enabled: true, writes_enabled: true });
+    expect(await hashDailyAllocationV1Content(pg)).toEqual(before);
+
+    await pg.exec(disable);
+    const disabled = await withAuthenticatedRole(pg, DA2_ACTORS.manager, async () =>
+      pg.query<{ board_enabled: boolean; writes_enabled: boolean }>(
+        'SELECT * FROM public.get_daily_allocation_v2_runtime()'
+      )
+    );
+    expect(disabled.rows[0]).toEqual({ board_enabled: false, writes_enabled: false });
+    expect(await hashDailyAllocationV1Content(pg)).toEqual(before);
+  });
+
+  it('DA2A-GATE-001 keeps v1 drafts working and rejects v2 writes as V2_DISABLED while closed', async () => {
     await expect(
       withAuthenticatedRole(pg, DA2_ACTORS.manager, async () =>
         pg.query(`SELECT public.convert_daily_allocation_plan_day_v2('2026-08-14', 'team-1')`)
@@ -768,7 +841,7 @@ describe('DA2 isolated PGlite runtime', () => {
 
 const describeConcurrency = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 
-describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite [LTDB-CONC-001]', () => {
+describeConcurrency('DA2A-DB-001 disposable PostgreSQL suite [LTDB-CONC-001]', () => {
   const connectionString = process.env.TEST_DATABASE_URL || '';
   const clients: Client[] = [];
   let setupClient: Client;
@@ -834,6 +907,50 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite [LTDB-CONC-001]', (
     await client.query(`SET lock_timeout = '8s'`);
   }
 
+  async function captureRolloutSnapshot(): Promise<RolloutSnapshot> {
+    const runtime = await setupClient.query<{
+      board_enabled: boolean;
+      writes_enabled: boolean;
+      updated_at: string;
+      plan_days: number;
+      visits: number;
+      assignments: number;
+      v1_fingerprint: string;
+    }>(`
+      SELECT
+        runtime.board_enabled,
+        runtime.writes_enabled,
+        runtime.updated_at::text,
+        (SELECT COUNT(*)::int FROM public.daily_allocation_plan_days) AS plan_days,
+        (SELECT COUNT(*)::int FROM public.daily_allocation_visits) AS visits,
+        (SELECT COUNT(*)::int FROM public.daily_allocation_visit_labour) AS assignments,
+        md5(jsonb_build_object(
+          'labour', (SELECT COUNT(*) FROM public.daily_labour_allocation_drafts),
+          'plant', (SELECT COUNT(*) FROM public.daily_plant_allocation_drafts),
+          'publications', (SELECT COUNT(*) FROM public.daily_allocation_publications)
+        )::text) AS v1_fingerprint
+      FROM private.daily_allocation_v2_runtime runtime
+      WHERE runtime.singleton = TRUE
+    `);
+    const row = runtime.rows[0];
+    const counts = {
+      plan_days: row.plan_days,
+      visits: row.visits,
+      assignments: row.assignments,
+    };
+    return {
+      runtime: {
+        boardEnabled: row.board_enabled,
+        writesEnabled: row.writes_enabled,
+        updatedAt: new Date(row.updated_at).toISOString(),
+      },
+      permissionFingerprint: 'fixture-permissions',
+      v1Fingerprint: row.v1_fingerprint,
+      v2ContentFingerprint: JSON.stringify(counts),
+      v2Counts: counts,
+    };
+  }
+
   beforeAll(async () => {
     const provenance = requireRunnerProvenance();
     setupClient = await connectClient();
@@ -879,6 +996,81 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite [LTDB-CONC-001]', (
     await setupClient.query(readFileSync(DA2_PGLITE_BASE_PATH, 'utf8'));
     await setupClient.query(readFileSync(DA2_V2_MIGRATION_PATH, 'utf8'));
     await setupClient.query(readFileSync(DA2_V2_MIGRATION_PATH, 'utf8'));
+    await setupClient.query(`
+      GRANT INSERT, UPDATE, DELETE
+        ON TABLE public.daily_allocation_plan_days,
+          public.daily_allocation_visits,
+          public.daily_allocation_visit_labour,
+          public.daily_allocation_visit_plant,
+          public.daily_allocation_conflict_overrides,
+          public.daily_allocation_published_visits,
+          public.daily_allocation_published_labour,
+          public.daily_allocation_published_plant,
+          public.daily_allocation_published_overrides,
+          public.daily_allocation_publication_notifications
+        TO authenticated;
+      GRANT UPDATE (job_code) ON TABLE public.daily_allocation_visits TO authenticated;
+      GRANT SELECT (board_enabled) ON TABLE private.daily_allocation_v2_runtime
+        TO authenticated, anon;
+    `);
+    await setupClient.query(
+      readFileSync(
+        'supabase/migrations/20260814155048_daily_allocation_v2_rpc_only_grants.sql',
+        'utf8'
+      )
+    );
+    const hardenedGrants = await setupClient.query<{
+      relation_name: string;
+      authenticated_select: boolean;
+      authenticated_write: boolean;
+      authenticated_column_write: boolean;
+      anon_access: boolean;
+    }>(`
+      SELECT
+        relation_name,
+        has_table_privilege('authenticated', to_regclass(relation_name), 'SELECT')
+          AS authenticated_select,
+        has_table_privilege('authenticated', to_regclass(relation_name), 'INSERT')
+          OR has_table_privilege('authenticated', to_regclass(relation_name), 'UPDATE')
+          OR has_table_privilege('authenticated', to_regclass(relation_name), 'DELETE')
+          AS authenticated_write,
+        has_any_column_privilege('authenticated', to_regclass(relation_name), 'INSERT')
+          OR has_any_column_privilege('authenticated', to_regclass(relation_name), 'UPDATE')
+          AS authenticated_column_write,
+        has_table_privilege('anon', to_regclass(relation_name), 'SELECT')
+          OR has_table_privilege('anon', to_regclass(relation_name), 'INSERT')
+          OR has_table_privilege('anon', to_regclass(relation_name), 'UPDATE')
+          OR has_table_privilege('anon', to_regclass(relation_name), 'DELETE')
+          OR has_any_column_privilege('anon', to_regclass(relation_name), 'SELECT')
+          OR has_any_column_privilege('anon', to_regclass(relation_name), 'INSERT')
+          OR has_any_column_privilege('anon', to_regclass(relation_name), 'UPDATE')
+          AS anon_access
+      FROM unnest(ARRAY[
+        'public.daily_allocation_plan_days',
+        'public.daily_allocation_visits',
+        'public.daily_allocation_visit_labour',
+        'public.daily_allocation_visit_plant',
+        'public.daily_allocation_conflict_overrides',
+        'public.daily_allocation_published_visits',
+        'public.daily_allocation_published_labour',
+        'public.daily_allocation_published_plant',
+        'public.daily_allocation_published_overrides',
+        'public.daily_allocation_publication_notifications',
+        'private.daily_allocation_v2_runtime',
+        'private.daily_allocation_plant_day_jobs'
+      ]) AS relation_name
+    `);
+    expect(hardenedGrants.rows).toHaveLength(12);
+    expect(hardenedGrants.rows.every((row) =>
+      !row.authenticated_write
+      && !row.authenticated_column_write
+      && !row.anon_access
+      && (
+        row.relation_name.startsWith('public.')
+          ? row.authenticated_select
+          : !row.authenticated_select
+      )
+    )).toBe(true);
 
     const runtime = await setupClient.query<{
       board_enabled: boolean;
@@ -891,11 +1083,9 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite [LTDB-CONC-001]', (
     originalBoardEnabled = runtime.rows[0]?.board_enabled ?? false;
     originalWritesEnabled = runtime.rows[0]?.writes_enabled ?? false;
     runtimeCaptured = true;
-    await setupClient.query(`
-      UPDATE private.daily_allocation_v2_runtime
-      SET board_enabled = TRUE, writes_enabled = TRUE, updated_at = NOW()
-      WHERE singleton = TRUE
-    `);
+    await setupClient.query(
+      readFileSync('scripts/supabase/activate-daily-allocation-v2.sql', 'utf8')
+    );
 
     await authenticate(setupClient);
     const converted = await setupClient.query<{ plan_day_id: string }>(
@@ -947,14 +1137,23 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite [LTDB-CONC-001]', (
       if (setupClient) {
         await setupClient.query('RESET ROLE').catch(() => undefined);
         if (runtimeCaptured) {
-          await setupClient.query(
-            `
-              UPDATE private.daily_allocation_v2_runtime
-              SET board_enabled = $1, writes_enabled = $2, updated_at = NOW()
-              WHERE singleton = TRUE
-            `,
-            [originalBoardEnabled, originalWritesEnabled]
-          );
+          if (!originalBoardEnabled && !originalWritesEnabled) {
+            await setupClient.query(
+              readFileSync(
+                'supabase/rollback/20260813_zzz_disable_daily_allocation_v2.sql',
+                'utf8'
+              )
+            );
+          } else {
+            await setupClient.query(
+              `
+                UPDATE private.daily_allocation_v2_runtime
+                SET board_enabled = $1, writes_enabled = $2, updated_at = NOW()
+                WHERE singleton = TRUE
+              `,
+              [originalBoardEnabled, originalWritesEnabled]
+            );
+          }
         }
         if (planDayId) {
           await setupClient.query(
@@ -1102,5 +1301,73 @@ describeConcurrency('DA2 TEST_DATABASE_URL concurrency suite [LTDB-CONC-001]', (
       [planDayId, DA2_ACTORS.employeeA]
     );
     expect(state.rows[0]).toEqual({ plan_version: 4, assignments: 1 });
+  }, 30_000);
+
+  it('DA2A-LOCK-001 serializes rollout operations with a fail-fast session lock', async () => {
+    await setupClient.query('RESET ROLE');
+    await firstClient.query('RESET ROLE');
+
+    await acquireRolloutLock(setupClient);
+    await expect(acquireRolloutLock(firstClient)).rejects.toThrow(
+      /rollout operation is already running/iu
+    );
+    await releaseRolloutLock(setupClient);
+
+    await acquireRolloutLock(firstClient);
+    await releaseRolloutLock(firstClient);
+  });
+
+  it('DA2A-AUTO-DB-001 cancels an independent smoke session and disables on timeout', async () => {
+    await setupClient.query('RESET ROLE');
+    await secondClient.query('RESET ROLE');
+    await setupClient.query(
+      readFileSync('supabase/rollback/20260813_zzz_disable_daily_allocation_v2.sql', 'utf8')
+    );
+    await acquireRolloutLock(setupClient);
+
+    let smokePromise: Promise<unknown> | null = null;
+    try {
+      await expect(
+        activateWithAutomaticDisable({
+          captureSnapshot: captureRolloutSnapshot,
+          executeActivation: async () => {
+            await setupClient.query(
+              readFileSync('scripts/supabase/activate-daily-allocation-v2.sql', 'utf8')
+            );
+          },
+          executeDisable: async () => {
+            await setupClient.query(
+              readFileSync(
+                'supabase/rollback/20260813_zzz_disable_daily_allocation_v2.sql',
+                'utf8'
+              )
+            );
+          },
+          runSmokeChecks: async () => {
+            smokePromise = secondClient.query('SELECT pg_sleep(5)');
+            await smokePromise;
+          },
+          cancelSmoke: async () => {
+            await setupClient.query('SELECT pg_cancel_backend($1)', [backendPids[2]]);
+            await smokePromise?.catch(() => undefined);
+          },
+        }, 25)
+      ).rejects.toThrow(/automatically disabled.*timed out/iu);
+    } finally {
+      await releaseRolloutLock(setupClient);
+    }
+
+    const runtime = await setupClient.query<{
+      board_enabled: boolean;
+      writes_enabled: boolean;
+    }>(`
+      SELECT board_enabled, writes_enabled
+      FROM private.daily_allocation_v2_runtime
+      WHERE singleton = TRUE
+    `);
+    expect(runtime.rows[0]).toEqual({
+      board_enabled: false,
+      writes_enabled: false,
+    });
   }, 30_000);
 });

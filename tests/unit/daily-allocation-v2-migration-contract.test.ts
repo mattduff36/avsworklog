@@ -240,10 +240,14 @@ describe('DA2-PLANT-001 one job per plant/day', () => {
 });
 
 describe('DA2-ROLL-001 disable-and-forward-fix', () => {
-  it('disables v2 without destroying either model or reopening converted v1 writes', () => {
-    expect(rollbackSql).toContain("WHERE module_name = 'daily-allocation'");
+  it('disables only v2 runtime flags without changing permissions or reopening converted v1 writes', () => {
     expect(rollbackSql).toContain('writes_enabled = FALSE');
     expect(rollbackSql).toContain('board_enabled = FALSE');
+    expect(rollbackSql).toContain('IS DISTINCT FROM FALSE');
+    expect(rollbackSql).toContain('expected exactly one runtime singleton');
+    expect(rollbackSql).not.toMatch(
+      /permission_modules|team_module_permissions|user_module_permissions|role_permissions/iu
+    );
     expect(rollbackSql).not.toMatch(/^\s*DROP TABLE\b/m);
     expect(rollbackSql).not.toMatch(/\bUPDATE\b[\s\S]*\bsnapshot_version\b/i);
     expect(v2Sql).toContain('Converted daily allocation plan days cannot be deleted');
