@@ -1793,11 +1793,10 @@ function NewPlantInspectionContent() {
                 required
               />
             </div>
-          </div>
 
           {/* Hired Plant Details */}
           {isHiredPlant && (
-            <div className="p-4 bg-amber-500/5 border border-amber-500/30 rounded-lg space-y-4">
+            <div className="p-4 bg-amber-500/5 border border-amber-500/30 rounded-lg space-y-4 md:col-span-2">
               <p className="text-sm font-medium text-amber-400">Hired Plant Details</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -1847,12 +1846,15 @@ function NewPlantInspectionContent() {
           )}
 
           <div id="plant-job-code" className="space-y-2">
-            <Label className="text-foreground text-base">
-              Job code <span className="text-red-400">*</span>
+            <Label htmlFor="jobCode" className="text-foreground text-base flex items-center gap-2">
+              Job code
+              <span className="text-red-400">*</span>
             </Label>
             <JobCataloguePicker
+              id="jobCode"
               value={jobCode || null}
               sourceId={jobSourceId}
+              className="h-12 px-3 text-base bg-slate-900/50 border-slate-600 text-white hover:bg-slate-900/50 hover:text-white"
               onSelect={(option) => {
                 setJobSourceType(option?.source || null);
                 setJobSourceId(option?.sourceId || null);
@@ -1922,6 +1924,7 @@ function NewPlantInspectionContent() {
                 Optional for this draft (created before current hours was required)
               </p>
             )}
+          </div>
           </div>
           
           {checklistStarted && (

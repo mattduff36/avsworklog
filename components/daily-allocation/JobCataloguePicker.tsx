@@ -6,12 +6,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { getJobCatalogueBlockMessage } from '@/lib/utils/job-catalogue';
 import type { JobCatalogueOption } from '@/types/job-catalogue';
-import { ChevronsUpDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
 
 interface JobCataloguePickerProps {
   value: string | null;
   sourceId?: string | null;
   disabled?: boolean;
+  id?: string;
+  className?: string;
   onSelect: (option: JobCatalogueOption | null) => void;
 }
 
@@ -24,7 +27,7 @@ async function fetchJobCatalogueOptions(): Promise<JobCatalogueOption[]> {
   return payload.job_codes || [];
 }
 
-export function JobCataloguePicker({ value, sourceId, disabled, onSelect }: JobCataloguePickerProps) {
+export function JobCataloguePicker({ value, sourceId, disabled, id, className, onSelect }: JobCataloguePickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [options, setOptions] = useState<JobCatalogueOption[]>(cachedOptions || []);
@@ -68,10 +71,13 @@ export function JobCataloguePicker({ value, sourceId, disabled, onSelect }: JobC
           type="button"
           variant="outline"
           disabled={disabled}
-          className="w-full justify-between font-normal"
+          id={id}
+          className={cn('w-full justify-between font-normal', className)}
         >
-          <span className="truncate">{selected?.value || value || 'Select job code'}</span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className={cn('truncate', !(selected?.value || value) && 'text-muted-foreground')}>
+            {selected?.value || value || 'Select job code'}
+          </span>
+          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-[min(28rem,calc(100vw-2rem))] p-2" align="start">
