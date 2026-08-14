@@ -1,5 +1,28 @@
 [
   {
+    "version": "0826.28.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated Daily Allocation, Timesheets, and Daily Tasks. Align job code field with daily check grid.",
+    "summary": "Updated Daily Allocation, Timesheets, and Daily Tasks. Align job code field with daily check grid.",
+    "details": [
+      "Updated Daily Allocation, Timesheets, and Daily Tasks, with changes to interface components and automated tests.",
+      "Updated timesheets, with changes to interface components.",
+      "Align job code field with daily check grid, with changes to app screens."
+    ],
+    "areas": [
+      "Daily Allocation",
+      "Timesheets",
+      "Daily Tasks. Align job code field with daily check grid"
+    ],
+    "areaKeys": [
+      "daily-allocation",
+      "daily-tasks",
+      "timesheets"
+    ],
+    "pushedAt": "2026-08-14T11:46:08.898Z"
+  },
+  {
     "version": "0826.27.0",
     "updateKind": "major",
     "title": "Daily Allocation update",

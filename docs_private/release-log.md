@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.28.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update Daily Allocation, Timesheets, and Daily Tasks`
+
+**PUSHED AT**
+2026-08-14T11:46:08.898Z
+
+**WHAT CHANGED**
+Update Daily Allocation, Timesheets, and Daily Tasks. Align job code field with daily check grid.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Allocation, Timesheets, and Daily Tasks, with changes to interface components and automated tests.
+- Updated timesheets, with changes to interface components.
+- Align job code field with daily check grid, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update Daily Allocation, Timesheets, and Daily Tasks`
+- `fix(plant-inspections): align job code field with daily check grid`
+
 ## 0826.27.0
 
 **GIT COMMIT MESSAGE**
