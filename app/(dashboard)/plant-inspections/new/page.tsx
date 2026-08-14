@@ -1854,6 +1854,7 @@ function NewPlantInspectionContent() {
               id="jobCode"
               value={jobCode || null}
               sourceId={jobSourceId}
+              variant="timesheet-modal"
               className="h-12 px-3 text-base bg-slate-900/50 border-slate-600 text-white hover:bg-slate-900/50 hover:text-white"
               onSelect={(option) => {
                 setJobSourceType(option?.source || null);
@@ -1862,9 +1863,6 @@ function NewPlantInspectionContent() {
                 setJobSiteAddress(option?.siteAddress || null);
               }}
             />
-            <p className="text-sm text-muted-foreground">
-              Site: {jobSiteAddress || 'Derived from the selected catalogue job'}
-            </p>
           </div>
 
           {/* Current Hours */}

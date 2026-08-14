@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
+import { JobCodePicker } from '@/components/timesheets/JobCodeFields';
+import { useJobCatalogueOptions } from '@/lib/client/job-catalogue';
 import { getJobCatalogueBlockMessage } from '@/lib/utils/job-catalogue';
 import type { JobCatalogueOption } from '@/types/job-catalogue';
 import { ChevronDown } from 'lucide-react';
@@ -15,39 +17,22 @@ interface JobCataloguePickerProps {
   disabled?: boolean;
   id?: string;
   className?: string;
+  variant?: 'catalogue' | 'timesheet-modal';
   onSelect: (option: JobCatalogueOption | null) => void;
 }
 
-let cachedOptions: JobCatalogueOption[] | null = null;
-
-async function fetchJobCatalogueOptions(): Promise<JobCatalogueOption[]> {
-  const response = await fetch('/api/job-codes', { cache: 'no-store' });
-  const payload = await response.json() as { job_codes?: JobCatalogueOption[]; error?: string };
-  if (!response.ok) throw new Error(payload.error || 'Unable to load job codes');
-  return payload.job_codes || [];
-}
-
-export function JobCataloguePicker({ value, sourceId, disabled, id, className, onSelect }: JobCataloguePickerProps) {
+export function JobCataloguePicker({
+  value,
+  sourceId,
+  disabled,
+  id,
+  className,
+  variant = 'catalogue',
+  onSelect,
+}: JobCataloguePickerProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [options, setOptions] = useState<JobCatalogueOption[]>(cachedOptions || []);
-  const [loading, setLoading] = useState(!cachedOptions);
-
-  useEffect(() => {
-    let mounted = true;
-    fetchJobCatalogueOptions()
-      .then((next) => {
-        if (!mounted) return;
-        cachedOptions = next;
-        setOptions(next);
-      })
-      .finally(() => {
-        if (mounted) setLoading(false);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const { options, isLoading, error, retry } = useJobCatalogueOptions();
 
   const selected = options.find((option) => (
     sourceId ? option.sourceId === sourceId : option.value === value
@@ -63,6 +48,44 @@ export function JobCataloguePicker({ value, sourceId, disabled, id, className, o
       || (option.siteAddress || '').toLowerCase().includes(term)
     )).slice(0, 80);
   }, [options, query]);
+
+  const timesheetOptions = useMemo(() => {
+    const seen = new Set<string>();
+
+    return options.flatMap((option) => {
+      if (option.blockReason || seen.has(option.value)) return [];
+      seen.add(option.value);
+      return [{
+        value: option.value,
+        label: option.label,
+        customerName: option.customerName,
+        quoteTitle: option.quoteTitle,
+        source: option.source,
+      }];
+    });
+  }, [options]);
+
+  if (variant === 'timesheet-modal') {
+    return (
+      <JobCodePicker
+        id={id}
+        value={value || ''}
+        disabled={disabled}
+        inputClassName={cn('uppercase', className)}
+        jobCodeOptions={timesheetOptions}
+        jobCodeOptionsLoading={isLoading}
+        jobCodeOptionsError={error}
+        onRetryJobCodeOptions={retry}
+        showOptionDetails={false}
+        onChange={(nextValue) => {
+          const option = options.find((candidate) => (
+            !candidate.blockReason && candidate.value === nextValue
+          ));
+          onSelect(option || null);
+        }}
+      />
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -88,8 +111,16 @@ export function JobCataloguePicker({ value, sourceId, disabled, id, className, o
           className="mb-2"
         />
         <div className="max-h-72 space-y-1 overflow-y-auto">
-          {loading ? <p className="px-2 py-3 text-sm text-muted-foreground">Loading job codes…</p> : null}
-          {!loading && filtered.length === 0 ? (
+          {isLoading ? <p className="px-2 py-3 text-sm text-muted-foreground">Loading job codes…</p> : null}
+          {!isLoading && error ? (
+            <div className="space-y-2 rounded-md border border-destructive/40 p-3" role="alert">
+              <p className="text-sm text-destructive">{error}</p>
+              <Button type="button" variant="outline" size="sm" onClick={retry}>
+                Retry
+              </Button>
+            </div>
+          ) : null}
+          {!isLoading && !error && filtered.length === 0 ? (
             <p className="px-2 py-3 text-sm text-muted-foreground">No matching catalogue jobs.</p>
           ) : null}
           <button

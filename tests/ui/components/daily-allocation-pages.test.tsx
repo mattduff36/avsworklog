@@ -322,6 +322,9 @@ function renderBoardPage() {
 
 describe('daily allocation manager board', () => {
   beforeEach(() => {
+    // The board defaults to tomorrow; freeze the clock so the hard-coded
+    // 2026-08-14 plan fixture remains the selected converted date.
+    vi.setSystemTime(new Date('2026-08-13T12:00:00.000Z'));
     vi.clearAllMocks();
     mocks.accessLevel = 5;
     mocks.searchParams = '';
@@ -337,6 +340,7 @@ describe('daily allocation manager board', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   });
 

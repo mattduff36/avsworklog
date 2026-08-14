@@ -119,5 +119,21 @@ describe('PLANT-001 catalogue enforcement on Daily Checks', () => {
     expect(source).toContain('job_source_type');
     expect(source).toContain('Please select a catalogue job with a valid site address');
     expect(source).toContain('JobCataloguePicker');
+    expect(source).toContain('variant="timesheet-modal"');
+    expect(source).not.toContain("Site: {jobSiteAddress || 'Derived from the selected catalogue job'}");
+  });
+
+  it('PDC-JOB-005 keeps catalogue access independent of the quotes module and surfaces load failures', () => {
+    const route = readFileSync(resolve(process.cwd(), 'app/api/job-codes/route.ts'), 'utf8');
+    const picker = readFileSync(
+      resolve(process.cwd(), 'components/daily-allocation/JobCataloguePicker.tsx'),
+      'utf8'
+    );
+
+    expect(route).toContain("canEffectiveRoleAccessModule('plant-inspections')");
+    expect(route).not.toContain("canEffectiveRoleAccessModule('quotes')");
+    expect(picker).toContain('useJobCatalogueOptions');
+    expect(picker).toContain('role="alert"');
+    expect(picker).toContain('Retry');
   });
 });

@@ -31,10 +31,14 @@ interface JobCodePickerProps {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  id?: string;
   placeholder?: string;
   inputClassName?: string;
   jobCodeOptions?: TimesheetJobCodeOption[];
   jobCodeOptionsLoading?: boolean;
+  jobCodeOptionsError?: string | null;
+  onRetryJobCodeOptions?: () => void;
+  showOptionDetails?: boolean;
   ariaLabel?: string;
   onSearchChange?: (query: string) => void;
   serverSideFiltering?: boolean;
@@ -45,10 +49,14 @@ interface JobCodeFieldRowProps {
   value: string;
   onChange: (index: number, value: string) => void;
   disabled: boolean;
+  id?: string;
   placeholder?: string;
   inputClassName?: string;
   jobCodeOptions: TimesheetJobCodeOption[];
   jobCodeOptionsLoading: boolean;
+  jobCodeOptionsError?: string | null;
+  onRetryJobCodeOptions?: () => void;
+  showOptionDetails?: boolean;
   trailingControl?: ReactNode;
   autoOpen?: boolean;
   onAutoOpenComplete?: () => void;
@@ -129,10 +137,14 @@ function JobCodeFieldRow({
   value,
   onChange,
   disabled,
+  id,
   placeholder,
   inputClassName,
   jobCodeOptions,
   jobCodeOptionsLoading,
+  jobCodeOptionsError,
+  onRetryJobCodeOptions,
+  showOptionDetails = true,
   trailingControl,
   autoOpen,
   onAutoOpenComplete,
@@ -258,6 +270,15 @@ function JobCodeFieldRow({
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto">
           {jobCodeOptionsLoading ? (
             <p className="px-2 py-3 text-center text-sm text-slate-300">Loading job codes...</p>
+          ) : jobCodeOptionsError ? (
+            <div className="space-y-3 rounded-lg border border-red-500/40 px-4 py-5 text-center" role="alert">
+              <p className="text-sm text-red-300">{jobCodeOptionsError}</p>
+              {onRetryJobCodeOptions ? (
+                <Button type="button" variant="outline" size="sm" onClick={onRetryJobCodeOptions}>
+                  Retry
+                </Button>
+              ) : null}
+            </div>
           ) : !isFilterReady ? (
             <p className="rounded-lg border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-300">
               Start typing a job code, customer, or quote name to filter the list.
@@ -276,7 +297,9 @@ function JobCodeFieldRow({
               >
                 <span className="min-w-0">
                   <span className="block truncate font-mono text-lg font-semibold">{option.label}</span>
-                  <span className="block truncate text-sm text-slate-400">{getOptionDescription(option)}</span>
+                  {showOptionDetails ? (
+                    <span className="block truncate text-sm text-slate-400">{getOptionDescription(option)}</span>
+                  ) : null}
                 </span>
                 {normalizedValue === option.value && <Check className="h-5 w-5 shrink-0" />}
               </button>
@@ -313,6 +336,7 @@ function JobCodeFieldRow({
     <div className="relative min-w-0 flex-1">
       <button
         type="button"
+        id={id}
         disabled={disabled}
         aria-label={ariaLabel || (normalizedValue ? `Selected job code ${normalizedValue}` : 'Select job code')}
         onClick={openPicker}
@@ -336,10 +360,14 @@ export function JobCodePicker({
   value,
   onChange,
   disabled = false,
+  id,
   placeholder,
   inputClassName,
   jobCodeOptions = [],
   jobCodeOptionsLoading = false,
+  jobCodeOptionsError,
+  onRetryJobCodeOptions,
+  showOptionDetails = true,
   ariaLabel,
   onSearchChange,
   serverSideFiltering = false,
@@ -349,11 +377,15 @@ export function JobCodePicker({
       index={0}
       value={value}
       onChange={(_, nextValue) => onChange(nextValue)}
+      id={id}
       placeholder={placeholder}
       disabled={disabled}
       inputClassName={inputClassName}
       jobCodeOptions={jobCodeOptions}
       jobCodeOptionsLoading={jobCodeOptionsLoading}
+      jobCodeOptionsError={jobCodeOptionsError}
+      onRetryJobCodeOptions={onRetryJobCodeOptions}
+      showOptionDetails={showOptionDetails}
       ariaLabel={ariaLabel}
       onSearchChange={onSearchChange}
       serverSideFiltering={serverSideFiltering}
