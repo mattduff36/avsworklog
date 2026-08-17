@@ -2,6 +2,34 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.30.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update daily allocation`
+
+**PUSHED AT**
+2026-08-17T13:48:15.648Z
+
+**WHAT CHANGED**
+Update daily allocation. Keep snapshot bounds exact and drop FAQ network noise. Validate database URL before parsing. Allow legacy job codes and create missing-address actions. Allow submitted sheets to print after payroll cutover.
+
+**VERSION HISTORY DETAILS**
+- Updated actions, with changes to background routes, app screens, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated reminders, with changes to background routes, shared logic, shared typing, and automated tests.
+- Allow submitted sheets to print after payroll cutover, with changes to background routes, interface components, shared logic, and automated tests.
+- Updated PDF documents, with changes to background routes and automated tests.
+- Updated daily allocation, with changes to interface components and automated tests.
+- Updated error reporting, with changes to shared logic and automated tests.
+- Allow legacy job codes and create missing-address actions, with changes to app screens and shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update daily allocation`
+- `fix(fixerrors): keep snapshot bounds exact and drop FAQ network noise`
+- `fix(migrations): validate database URL before parsing`
+- `feat(plant-inspections): allow legacy job codes and create missing-address actions`
+- `fix(timesheets): allow submitted sheets to print after payroll cutover`
+
 ## 0826.29.0
 
 **GIT COMMIT MESSAGE**
