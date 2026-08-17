@@ -75,6 +75,8 @@ export async function GET(
           timesheet_entry_job_codes(job_number, display_order)
         ),
         current_payroll_snapshot:timesheet_payroll_snapshots!timesheets_current_payroll_snapshot_id_fkey(
+          id,
+          timesheet_id,
           revision,
           basic_minutes,
           overtime_minutes,
@@ -91,25 +93,40 @@ export async function GET(
       .eq('id', id)
       .single();
     const typedTimesheet = timesheet as {
+      id: string;
       user_id: string;
+      week_ending: string;
+      status: string;
+      current_payroll_snapshot_id?: string | null;
       entries?: unknown[];
-      current_payroll_snapshot?: PayrollSnapshotPdfData | null;
+      current_payroll_snapshot?: (PayrollSnapshotPdfData & {
+        id: string;
+        timesheet_id: string;
+      }) | null;
     } & Record<string, unknown>;
 
     if (timesheetError || !timesheet) {
       return NextResponse.json({ error: 'Timesheet not found' }, { status: 404 });
     }
 
-    if (!typedTimesheet.current_payroll_snapshot) {
+    const snapshot = typedTimesheet.current_payroll_snapshot;
+    const payrollSnapshot =
+      snapshot
+      && snapshot.id === typedTimesheet.current_payroll_snapshot_id
+      && snapshot.timesheet_id === typedTimesheet.id
+        ? snapshot
+        : null;
+
+    if (!payrollSnapshot) {
       const { data: applicableRollout, error: rolloutError } = await admin
         .from('payroll_rollout_activations')
         .select('id')
-        .lte('effective_week_ending', targetRow.week_ending)
+        .lte('effective_week_ending', typedTimesheet.week_ending)
         .limit(1);
       if (rolloutError) {
         return NextResponse.json({ error: 'Unable to verify payroll rollout configuration' }, { status: 500 });
       }
-      if ((applicableRollout || []).length > 0) {
+      if ((applicableRollout || []).length > 0 && typedTimesheet.status !== 'submitted') {
         return NextResponse.json(
           { error: 'This post-cutover timesheet has no payroll snapshot. PDF generation is blocked.' },
           { status: 409 }
@@ -176,13 +193,13 @@ export async function GET(
             timesheet: typedTimesheetData,
             employeeName: employeeName,
             offDayStates,
-            payrollSnapshot: typedTimesheet.current_payroll_snapshot,
+            payrollSnapshot,
           })
         : TimesheetPDF({
             timesheet: typedTimesheetData,
             employeeName: employeeName,
             offDayStates,
-            payrollSnapshot: typedTimesheet.current_payroll_snapshot,
+            payrollSnapshot,
           })
     );
 
