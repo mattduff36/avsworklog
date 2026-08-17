@@ -24,8 +24,20 @@ function uuid(index: number): string {
   return `00000000-0000-4000-8000-${index.toString().padStart(12, '0')}`;
 }
 
+function toCanonicalSnapshotTimestamp(value: string): string {
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/u.test(value)) {
+    return value;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(value)) {
+    throw new Error(`test timestamp is not canonicalizable: ${value}`);
+  }
+  return `${value.slice(0, -1)}000Z`;
+}
+
 function makeError(index: number, overrides: Partial<ErrorLogEntry> = {}): ErrorLogEntry {
-  const createdAt = new Date(EXPORT_TIME.getTime() - 60_000 + index).toISOString();
+  const createdAt = toCanonicalSnapshotTimestamp(
+    new Date(EXPORT_TIME.getTime() - 60_000 + index).toISOString()
+  );
   return {
     id: uuid(index),
     timestamp: createdAt,
@@ -43,7 +55,10 @@ function makeError(index: number, overrides: Partial<ErrorLogEntry> = {}): Error
   };
 }
 
-function compareRows(left: ErrorLogEntry, right: ErrorLogEntry): number {
+function compareRows(
+  left: Pick<ErrorLogEntry, 'created_at' | 'id'>,
+  right: Pick<ErrorLogEntry, 'created_at' | 'id'>
+): number {
   return left.created_at.localeCompare(right.created_at) || left.id.localeCompare(right.id);
 }
 
@@ -58,6 +73,7 @@ class ExportClient implements PgClientLike {
   private readonly failTag: string | null;
   private readonly afterBegin?: (rows: ErrorLogEntry[]) => void;
   private readonly countOverride: number | null;
+  private readonly dateTyped: 'boundary' | 'page' | null;
 
   constructor(
     rows: ErrorLogEntry[],
@@ -65,12 +81,14 @@ class ExportClient implements PgClientLike {
       failTag?: string;
       afterBegin?: (rows: ErrorLogEntry[]) => void;
       countOverride?: number;
+      dateTyped?: 'boundary' | 'page';
     } = {}
   ) {
     this.liveRows = [...rows];
     this.failTag = options.failTag ?? null;
     this.afterBegin = options.afterBegin;
     this.countOverride = options.countOverride ?? null;
+    this.dateTyped = options.dateTyped ?? null;
   }
 
   async query<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -94,31 +112,73 @@ class ExportClient implements PgClientLike {
     }
     if (text.includes('fixerrors:snapshot-boundary')) {
       const row = this.transactionRows.at(-1);
-      return result(row ? [{ id: row.id, created_at: row.created_at }] : []) as {
+      return result(
+        row
+          ? [
+              {
+                id: row.id,
+                created_at:
+                  this.dateTyped === 'boundary'
+                    ? new Date(row.created_at)
+                    : row.created_at,
+              },
+            ]
+          : []
+      ) as {
         rows: T[];
         rowCount: number;
       };
     }
     if (text.includes('fixerrors:snapshot-count')) {
+      const boundCreatedAt = values[0] as string | null;
+      const boundId = values[1] as string | null;
+      const counted = this.transactionRows.filter(
+        (row) =>
+          boundCreatedAt === null ||
+          compareRows(row, { created_at: boundCreatedAt, id: boundId ?? '' }) <= 0
+      ).length;
       return result([
-        { count: String(this.countOverride ?? this.transactionRows.length) },
+        { count: String(this.countOverride ?? counted) },
       ]) as {
         rows: T[];
         rowCount: number;
       };
     }
     if (text.includes('fixerrors:snapshot-page')) {
+      const boundCreatedAt = values[0] as string | null;
+      const boundId = values[1] as string | null;
       const cursorCreatedAt = values[2] as string | null;
       const cursorId = values[3] as string | null;
       const limit = values[4] as number;
       const rows = this.transactionRows
-        .filter(
-          (row) =>
+        .filter((row) => {
+          if (
+            boundCreatedAt !== null &&
+            compareRows(row, {
+              created_at: boundCreatedAt,
+              id: boundId ?? '',
+            }) > 0
+          ) {
+            return false;
+          }
+          return (
             cursorCreatedAt === null ||
-            row.created_at > cursorCreatedAt ||
-            (row.created_at === cursorCreatedAt && row.id > (cursorId ?? ''))
-        )
-        .slice(0, limit);
+            compareRows(row, {
+              created_at: cursorCreatedAt,
+              id: cursorId ?? '',
+            }) > 0
+          );
+        })
+        .slice(0, limit)
+        .map((row) =>
+          this.dateTyped === 'page'
+            ? {
+                ...row,
+                timestamp: new Date(row.timestamp),
+                created_at: new Date(row.created_at),
+              }
+            : row
+        );
       return result(rows) as unknown as { rows: T[]; rowCount: number };
     }
     return result([]) as { rows: T[]; rowCount: number };
@@ -369,8 +429,8 @@ describe('fixerrors transaction-consistent snapshot export', () => {
   it('FXERR-CONCURRENCY-002 excludes a concurrent backdated insert from the repeatable-read snapshot', async () => {
     const initial = [makeError(1), makeError(2), makeError(3)];
     const arrivedLater = makeError(4, {
-      created_at: '2020-01-01T00:00:00.000Z',
-      timestamp: '2020-01-01T00:00:00.000Z',
+      created_at: '2020-01-01T00:00:00.000000Z',
+      timestamp: '2020-01-01T00:00:00.000000Z',
     });
     const exportClient = new ExportClient(initial, {
       afterBegin: (rows) => rows.push(arrivedLater),
@@ -423,7 +483,7 @@ describe('fixerrors transaction-consistent snapshot export', () => {
         TARGET_FINGERPRINT,
         EXPORT_TIME
       )
-    ).rejects.toThrow('invalid ID');
+    ).rejects.toThrow(/invalid(?: boundary)? ID/iu);
     const failedPage = new ExportClient([makeError(1)], {
       failTag: 'fixerrors:snapshot-page',
     });
@@ -450,6 +510,93 @@ describe('fixerrors transaction-consistent snapshot export', () => {
         EXPORT_TIME
       )
     ).rejects.toThrow('count mismatch');
+  });
+
+  it('FXERR-TS-PREC-015 includes the microsecond boundary row and projects canonical text', async () => {
+    const earlier = makeError(1, {
+      created_at: '2026-08-10T21:50:14.694000Z',
+      timestamp: '2026-08-10T21:50:14.694000Z',
+    });
+    const latest = makeError(2, {
+      created_at: '2026-08-10T21:50:14.694888Z',
+      timestamp: '2026-08-10T21:50:14.694888Z',
+    });
+    const client = new ExportClient([earlier, latest]);
+    const snapshot = await fetchProductionErrorSnapshot(
+      client,
+      TARGET_FINGERPRINT,
+      EXPORT_TIME
+    );
+
+    expect(snapshot.rowCount).toBe(2);
+    expect(snapshot.boundary).toEqual({
+      id: latest.id,
+      createdAt: '2026-08-10T21:50:14.694888Z',
+    });
+    expect(snapshot.errors.at(-1)).toMatchObject({
+      id: latest.id,
+      created_at: '2026-08-10T21:50:14.694888Z',
+      timestamp: '2026-08-10T21:50:14.694888Z',
+    });
+    expect(
+      client.queryLog.some(
+        (query) =>
+          query.includes('fixerrors:snapshot-boundary') &&
+          query.includes("to_char(created_at AT TIME ZONE 'UTC'")
+      )
+    ).toBe(true);
+    expect(
+      client.queryLog.some(
+        (query) =>
+          query.includes('fixerrors:snapshot-page') &&
+          query.includes("to_char(timestamp AT TIME ZONE 'UTC'") &&
+          query.includes("to_char(created_at AT TIME ZONE 'UTC'")
+      )
+    ).toBe(true);
+    expect(
+      client.queryLog.some((query) =>
+        query.includes('ROW(error_logs.created_at, error_logs.id)')
+      )
+    ).toBe(true);
+  });
+
+  it('FXERR-TS-ORDER-016 keeps same-millisecond microsecond rows strictly ordered', async () => {
+    const first = makeError(1, {
+      created_at: '2026-08-10T21:50:14.694001Z',
+      timestamp: '2026-08-10T21:50:14.694001Z',
+    });
+    const second = makeError(2, {
+      created_at: '2026-08-10T21:50:14.694999Z',
+      timestamp: '2026-08-10T21:50:14.694999Z',
+    });
+    const snapshot = await fetchProductionErrorSnapshot(
+      new ExportClient([second, first]),
+      TARGET_FINGERPRINT,
+      EXPORT_TIME
+    );
+
+    expect(snapshot.exactIds).toEqual([first.id, second.id]);
+    expect(snapshot.errors.map((row) => row.created_at)).toEqual([
+      '2026-08-10T21:50:14.694001Z',
+      '2026-08-10T21:50:14.694999Z',
+    ]);
+  });
+
+  it('FXERR-TS-DATE-017 rejects Date-typed boundary and page-row timestamps', async () => {
+    await expect(
+      fetchProductionErrorSnapshot(
+        new ExportClient([makeError(1)], { dateTyped: 'boundary' }),
+        TARGET_FINGERPRINT,
+        EXPORT_TIME
+      )
+    ).rejects.toThrow('Date-typed boundary created_at');
+    await expect(
+      fetchProductionErrorSnapshot(
+        new ExportClient([makeError(1)], { dateTyped: 'page' }),
+        TARGET_FINGERPRINT,
+        EXPORT_TIME
+      )
+    ).rejects.toThrow('Date-typed timestamp');
   });
 });
 
@@ -484,6 +631,76 @@ describe('fixerrors exact transactional cleanup', () => {
       query.includes('fixerrors:delete-error-batch')
     );
     expect(batches).toHaveLength(3);
+  });
+
+  it('accepts Postgres text-array foreign-key catalogs from node-pg', async () => {
+    const rows = [makeError(1)];
+    const prepared = await analyzedSnapshot(rows);
+    const client = new CleanupClient({ rows });
+    client.foreignKeys = EXPECTED_FOREIGN_KEYS.map((foreignKey) => ({
+      ...foreignKey,
+      child_columns: `{${foreignKey.child_columns.join(',')}}`,
+      parent_columns: `{${foreignKey.parent_columns.join(',')}}`,
+    }));
+
+    const cleanup = await executeVerifiedSnapshotCleanup({
+      client,
+      confirmation: confirmation(prepared.snapshot),
+      databaseTargetFingerprint: TARGET_FINGERPRINT,
+      snapshotPath: SNAPSHOT_PATH,
+      latestSnapshotPath: null,
+      analysisPath: ANALYSIS_PATH,
+      io: prepared.io,
+      lock: new MemoryLock(),
+      now: EXPORT_TIME,
+    });
+
+    expect(cleanup.clearedCount).toBe(1);
+    expect(client.errorRows.size).toBe(0);
+  });
+
+  it('FXERR-TS-CLEANUP-018 preserves microsecond timestamps through locked-row checksum verification', async () => {
+    const rows = [
+      makeError(1, {
+        created_at: '2026-08-10T21:50:14.694001Z',
+        timestamp: '2026-08-10T21:50:14.694001Z',
+      }),
+      makeError(2, {
+        created_at: '2026-08-10T21:50:14.694888Z',
+        timestamp: '2026-08-10T21:50:14.694888Z',
+      }),
+    ];
+    const prepared = await analyzedSnapshot(rows);
+    expect(prepared.snapshot.errors.map((row) => row.created_at)).toEqual([
+      '2026-08-10T21:50:14.694001Z',
+      '2026-08-10T21:50:14.694888Z',
+    ]);
+    const client = new CleanupClient({ rows });
+    const cleanup = await executeVerifiedSnapshotCleanup({
+      client,
+      confirmation: confirmation(prepared.snapshot),
+      databaseTargetFingerprint: TARGET_FINGERPRINT,
+      snapshotPath: SNAPSHOT_PATH,
+      latestSnapshotPath: null,
+      analysisPath: ANALYSIS_PATH,
+      io: prepared.io,
+      lock: new MemoryLock(),
+      now: EXPORT_TIME,
+    });
+
+    expect(cleanup.clearedCount).toBe(2);
+    expect(client.errorRows.size).toBe(0);
+    expect(
+      client.queryLog.some(
+        (query) =>
+          query.includes('fixerrors:lock-target-rows') &&
+          query.includes("to_char(timestamp AT TIME ZONE 'UTC'") &&
+          query.includes("to_char(created_at AT TIME ZONE 'UTC'")
+      )
+    ).toBe(true);
+    expect(
+      client.queryLog.some((query) => query.includes('fixerrors:delete-error-batch'))
+    ).toBe(true);
   });
 
   it('FXERR-FAILURE-005 rolls back every batch when a later delete fails', async () => {
@@ -727,6 +944,42 @@ describe('fixerrors artifact and confirmation gate', () => {
       })
     ).rejects.toThrow('snapshot verification failed');
     expect(corruptedClient.queryLog).toHaveLength(0);
+  });
+
+  it('FXERR-V1-REJECT-019 rejects a stale v1 artifact before any database work', async () => {
+    const io = new MemoryIo();
+    const client = new CleanupClient({ rows: [makeError(1)] });
+    io.writeAtomic(
+      SNAPSHOT_PATH,
+      JSON.stringify({
+        version: 1,
+        exportedAt: '2026-08-11T06:22:57.300Z',
+        errors: [makeError(1)],
+      })
+    );
+    io.writeAtomic(ANALYSIS_PATH, '# leftover\n');
+    await expect(
+      executeVerifiedSnapshotCleanup({
+        client,
+        confirmation: {
+          snapshotId: uuid(1),
+          checksum: 'a'.repeat(64),
+          rowCount: 1,
+          databaseTargetFingerprint: TARGET_FINGERPRINT,
+          expiresAt: '2026-08-11T06:52:57.300Z',
+          safetyContract: 'fixerrors-exact-snapshot-v2',
+          manifestChecksum: 'b'.repeat(64),
+        },
+        databaseTargetFingerprint: TARGET_FINGERPRINT,
+        snapshotPath: SNAPSHOT_PATH,
+        latestSnapshotPath: null,
+        analysisPath: ANALYSIS_PATH,
+        io,
+        lock: new MemoryLock(),
+        now: EXPORT_TIME,
+      })
+    ).rejects.toThrow('snapshot verification failed');
+    expect(client.queryLog).toHaveLength(0);
   });
 
   it('FXERR-CONFIRM-013 blocks mismatched, stale, and report-corrupted confirmations', async () => {

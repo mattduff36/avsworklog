@@ -114,6 +114,14 @@ describe('error logger filtering', () => {
     ).toBe(true);
   });
 
+  it('ignores handled FAQ fetch network failures', () => {
+    expect(
+      shouldIgnoreConsoleErrorForLogging(
+        'Error fetching FAQ: TypeError: Load failed {\n  "errorContextId": "help-faq-fetch-error"\n}'
+      )
+    ).toBe(true);
+  });
+
   it('keeps application type errors without a transient network marker', () => {
     expect(
       shouldIgnoreConsoleErrorForLogging(

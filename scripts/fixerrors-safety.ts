@@ -209,6 +209,15 @@ function isUuid(value: string): boolean {
   );
 }
 
+function requireSnapshotUuid(value: unknown, field: string): string {
+  if (typeof value !== 'string' || !isUuid(value)) {
+    throw new Error(
+      `Production error snapshot contains an invalid ${field}; cleanup blocked`
+    );
+  }
+  return value;
+}
+
 export function getErrorSnapshotArtifactPath(snapshotId: string): string {
   if (!isUuid(snapshotId)) {
     throw new Error('Invalid fixerrors snapshot identifier');
@@ -232,12 +241,70 @@ function safeErrorMessage(error: unknown): string {
   return message.replace(/\s+/gu, ' ').slice(0, 500);
 }
 
-function normalizeTimestamp(value: unknown, field: string): string {
+const SNAPSHOT_TIMESTAMPTZ_TEXT_FORMAT = 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"';
+const SNAPSHOT_TIMESTAMP_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})\.(\d{6})Z$/u;
+
+function snapshotTimestamptzTextSql(
+  column: 'created_at' | 'timestamp'
+): string {
+  return `to_char(${column} AT TIME ZONE 'UTC', '${SNAPSHOT_TIMESTAMPTZ_TEXT_FORMAT}')`;
+}
+
+const ERROR_LOG_SNAPSHOT_PROJECTION = `
+            id::text AS id,
+            ${snapshotTimestamptzTextSql('timestamp')} AS timestamp,
+            ${snapshotTimestamptzTextSql('created_at')} AS created_at,
+            error_message,
+            error_stack,
+            error_type,
+            user_id,
+            user_email,
+            page_url,
+            user_agent,
+            component_name,
+            additional_data
+`;
+
+function normalizeOperationalTimestamp(value: unknown, field: string): string {
   const parsed = value instanceof Date ? value : new Date(String(value));
   if (Number.isNaN(parsed.getTime())) {
     throw new Error(`Production error snapshot contains invalid ${field}; cleanup blocked`);
   }
   return parsed.toISOString();
+}
+
+function canonicalizeSnapshotTimestamp(value: unknown, field: string): string {
+  if (value instanceof Date) {
+    throw new Error(
+      `Production error snapshot contains a Date-typed ${field}; cleanup blocked`
+    );
+  }
+  if (typeof value !== 'string') {
+    throw new Error(`Production error snapshot contains invalid ${field}; cleanup blocked`);
+  }
+  const match = SNAPSHOT_TIMESTAMP_PATTERN.exec(value);
+  if (!match) {
+    throw new Error(`Production error snapshot contains invalid ${field}; cleanup blocked`);
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const verified = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  if (
+    verified.getUTCFullYear() !== year ||
+    verified.getUTCMonth() !== month - 1 ||
+    verified.getUTCDate() !== day ||
+    verified.getUTCHours() !== hour ||
+    verified.getUTCMinutes() !== minute ||
+    verified.getUTCSeconds() !== second
+  ) {
+    throw new Error(`Production error snapshot contains invalid ${field}; cleanup blocked`);
+  }
+  return value;
 }
 
 function isValidIsoTimestamp(value: unknown): value is string {
@@ -254,8 +321,8 @@ function normalizeErrorRow(row: Record<string, unknown>): ErrorLogEntry {
   }
   return {
     id: row.id,
-    timestamp: normalizeTimestamp(row.timestamp, 'timestamp'),
-    created_at: normalizeTimestamp(row.created_at, 'created_at'),
+    timestamp: canonicalizeSnapshotTimestamp(row.timestamp, 'timestamp'),
+    created_at: canonicalizeSnapshotTimestamp(row.created_at, 'created_at'),
     error_message: String(row.error_message ?? ''),
     error_stack: row.error_stack == null ? null : String(row.error_stack),
     error_type: String(row.error_type ?? ''),
@@ -344,7 +411,7 @@ export async function fetchProductionErrorSnapshot(
     }>(
       '/* fixerrors:transaction-time */ SELECT transaction_timestamp() AS transaction_started_at'
     );
-    const transactionStartedAt = normalizeTimestamp(
+    const transactionStartedAt = normalizeOperationalTimestamp(
       transactionResult.rows[0]?.transaction_started_at,
       'transaction timestamp'
     );
@@ -353,16 +420,21 @@ export async function fetchProductionErrorSnapshot(
       created_at: unknown;
     }>(`
       /* fixerrors:snapshot-boundary */
-      SELECT id, created_at
+      SELECT
+        id::text AS id,
+        ${snapshotTimestamptzTextSql('created_at')} AS created_at
       FROM public.error_logs
-      ORDER BY created_at DESC, id DESC
+      ORDER BY error_logs.created_at DESC, error_logs.id DESC
       LIMIT 1
     `);
     const boundaryRow = boundaryResult.rows[0];
     const boundary = boundaryRow
       ? {
-          id: String(boundaryRow.id),
-          createdAt: normalizeTimestamp(boundaryRow.created_at, 'boundary created_at'),
+          id: requireSnapshotUuid(boundaryRow.id, 'boundary ID'),
+          createdAt: canonicalizeSnapshotTimestamp(
+            boundaryRow.created_at,
+            'boundary created_at'
+          ),
         }
       : null;
 
@@ -373,7 +445,7 @@ export async function fetchProductionErrorSnapshot(
         FROM public.error_logs
         WHERE (
           $1::timestamptz IS NULL
-          OR ROW(created_at, id) <= ROW($1::timestamptz, $2::uuid)
+          OR ROW(error_logs.created_at, error_logs.id) <= ROW($1::timestamptz, $2::uuid)
         )
       `,
       [boundary?.createdAt ?? null, boundary?.id ?? null]
@@ -393,28 +465,17 @@ export async function fetchProductionErrorSnapshot(
         `
           /* fixerrors:snapshot-page */
           SELECT
-            id,
-            timestamp,
-            created_at,
-            error_message,
-            error_stack,
-            error_type,
-            user_id,
-            user_email,
-            page_url,
-            user_agent,
-            component_name,
-            additional_data
+            ${ERROR_LOG_SNAPSHOT_PROJECTION}
           FROM public.error_logs
           WHERE (
             $1::timestamptz IS NULL
-            OR ROW(created_at, id) <= ROW($1::timestamptz, $2::uuid)
+            OR ROW(error_logs.created_at, error_logs.id) <= ROW($1::timestamptz, $2::uuid)
           )
           AND (
             $3::timestamptz IS NULL
-            OR ROW(created_at, id) > ROW($3::timestamptz, $4::uuid)
+            OR ROW(error_logs.created_at, error_logs.id) > ROW($3::timestamptz, $4::uuid)
           )
-          ORDER BY created_at ASC, id ASC
+          ORDER BY error_logs.created_at ASC, error_logs.id ASC
           LIMIT $5
         `,
         [
@@ -731,16 +792,42 @@ function foreignKeyKey(contract: ForeignKeyContract): string {
   ].join('.');
 }
 
+function parsePgNameArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(String);
+  }
+  if (typeof value !== 'string') {
+    return [];
+  }
+  const trimmed = value.trim();
+  if (trimmed === '' || trimmed === '{}') {
+    return [];
+  }
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+    return [];
+  }
+  const inner = trimmed.slice(1, -1);
+  if (inner === '') {
+    return [];
+  }
+  return inner.split(',').map((part) => {
+    const item = part.trim();
+    if (
+      (item.startsWith('"') && item.endsWith('"')) ||
+      (item.startsWith("'") && item.endsWith("'"))
+    ) {
+      return item.slice(1, -1);
+    }
+    return item;
+  });
+}
+
 function assertExpectedForeignKeys(rows: Array<Record<string, unknown>>): void {
   const actual = rows.map((row) => ({
     childSchema: String(row.child_schema),
     childTable: String(row.child_table),
-    childColumns: Array.isArray(row.child_columns)
-      ? row.child_columns.map(String)
-      : [],
-    parentColumns: Array.isArray(row.parent_columns)
-      ? row.parent_columns.map(String)
-      : [],
+    childColumns: parsePgNameArray(row.child_columns),
+    parentColumns: parsePgNameArray(row.parent_columns),
     deleteAction: String(row.delete_action),
   }));
   const expectedKeys = new Set(EXPECTED_FOREIGN_KEYS.map(foreignKeyKey));
@@ -877,21 +964,10 @@ async function clearProductionErrorLogs(
       `
         /* fixerrors:lock-target-rows */
         SELECT
-          id,
-          timestamp,
-          created_at,
-          error_message,
-          error_stack,
-          error_type,
-          user_id,
-          user_email,
-          page_url,
-          user_agent,
-          component_name,
-          additional_data
+          ${ERROR_LOG_SNAPSHOT_PROJECTION}
         FROM public.error_logs
-        WHERE id = ANY($1::uuid[])
-        ORDER BY created_at ASC, id ASC
+        WHERE error_logs.id = ANY($1::uuid[])
+        ORDER BY error_logs.created_at ASC, error_logs.id ASC
         FOR UPDATE
       `,
       [targetIds]

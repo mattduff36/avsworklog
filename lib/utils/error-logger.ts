@@ -113,6 +113,7 @@ export function shouldIgnoreConsoleErrorForLogging(errorMessage: string): boolea
     'failed to resolve timesheet off-day states:',
     'error loading previous defects:',
     'error fetching inventory data:',
+    'error fetching faq:',
   ].some((context) => normalized.includes(context));
 }
 
