@@ -35,6 +35,7 @@ function buildAction(overrides: Partial<ReminderActionWithAsset> = {}): Reminder
     ignored_by: null,
     first_detected_at: '2026-05-01T00:00:00.000Z',
     last_detected_at: '2026-05-01T00:00:00.000Z',
+    due_at: null,
     resolved_at: null,
     created_at: '2026-05-01T00:00:00.000Z',
     updated_at: '2026-05-01T00:00:00.000Z',
@@ -56,6 +57,21 @@ describe('reminder-action-filters', () => {
     expect(matchesReminderActionSearch(action, 'ab12')).toBe(true);
     expect(matchesReminderActionSearch(action, 'overdue van')).toBe(true);
     expect(matchesReminderActionSearch(action, 'plant')).toBe(false);
+  });
+
+  it('matches search against legacy job snapshot metadata', () => {
+    const action = buildAction({
+      title: 'Add a site address for legacy job 4323-GH',
+      metadata: {
+        job_code: '4323-GH',
+        customer_name: 'Omexom',
+        quote_title: 'ATV hire',
+      },
+    });
+
+    expect(matchesReminderActionSearch(action, '4323')).toBe(true);
+    expect(matchesReminderActionSearch(action, 'omexom')).toBe(true);
+    expect(matchesReminderActionSearch(action, 'atv hire')).toBe(true);
   });
 
   it('matches assignment states', () => {

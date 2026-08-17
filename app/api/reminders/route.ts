@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
           ignored_by,
           first_detected_at,
           last_detected_at,
+          due_at,
           resolved_at,
           created_at,
           updated_at

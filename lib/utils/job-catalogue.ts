@@ -1,4 +1,4 @@
-import type { JobCatalogueBlockReason, JobCatalogueRecord } from '@/types/job-catalogue';
+import type { JobCatalogueBlockReason, JobCatalogueOption, JobCatalogueRecord } from '@/types/job-catalogue';
 
 export function isReliableSiteAddress(value: string | null | undefined): boolean {
   const trimmed = (value || '').replace(/\s+/g, ' ').trim();
@@ -45,4 +45,16 @@ export function getJobCatalogueBlockMessage(reason: JobCatalogueBlockReason | nu
 
 export function canAllocateJobCatalogueRecord(record: JobCatalogueRecord | null): boolean {
   return Boolean(record && record.is_active && record.address_valid && !record.block_reason);
+}
+
+export function isPlantDailyCheckCatalogueOptionSelectable(
+  option: Pick<JobCatalogueOption, 'source' | 'blockReason'>
+): boolean {
+  if (option.source === 'legacy_quote') {
+    return option.blockReason === null
+      || option.blockReason === 'missing_site_address'
+      || option.blockReason === 'ambiguous_sources';
+  }
+
+  return option.blockReason === null;
 }

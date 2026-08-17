@@ -117,9 +117,9 @@ describe('PLANT-001 catalogue enforcement on Daily Checks', () => {
   it('persists server-owned job fields and requires a job on submit', () => {
     const source = readFileSync(resolve(process.cwd(), 'app/(dashboard)/plant-inspections/new/page.tsx'), 'utf8');
     expect(source).toContain('job_source_type');
-    expect(source).toContain('Please select a catalogue job with a valid site address');
+    expect(source).toContain('Please select a catalogue job');
     expect(source).toContain('JobCataloguePicker');
-    expect(source).toContain('variant="timesheet-modal"');
+    expect(source).toContain('variant="plant-modal"');
     expect(source).not.toContain("Site: {jobSiteAddress || 'Derived from the selected catalogue job'}");
   });
 

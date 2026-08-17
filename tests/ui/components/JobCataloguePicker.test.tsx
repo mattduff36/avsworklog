@@ -163,6 +163,99 @@ describe('JobCataloguePicker', () => {
     expect(onSelect).toHaveBeenCalledWith(selectableOption);
   });
 
+  it('PLC-001 selects exact missing-address and ambiguous legacy records in plant mode', async () => {
+    const missingAddressLegacy: JobCatalogueOption = {
+      ...selectableOption,
+      value: '4323-GH',
+      label: '4323-GH',
+      source: 'legacy_quote',
+      sourceId: 'legacy-1',
+      customerName: 'Omexom',
+      quoteTitle: 'ATV hire',
+      siteAddress: null,
+      addressValid: false,
+      blockReason: 'missing_site_address',
+    };
+    const ambiguousLegacy: JobCatalogueOption = {
+      ...missingAddressLegacy,
+      sourceId: 'legacy-2',
+      customerName: 'Arena Racing',
+      quoteTitle: 'Historic hire',
+      blockReason: 'ambiguous_sources',
+      isAmbiguous: true,
+    };
+    const onSelect = vi.fn();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse({ job_codes: [missingAddressLegacy, ambiguousLegacy] })
+    ));
+
+    render(
+      <JobCataloguePicker
+        value={null}
+        variant="plant-modal"
+        onSelect={onSelect}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select job code' }));
+    fireEvent.change(screen.getByPlaceholderText('Search code, customer, or name'), {
+      target: { value: '432' },
+    });
+
+    const optionButtons = await screen.findAllByRole('button', { name: /4323-GH/ });
+    expect(optionButtons).toHaveLength(2);
+    expect(screen.getByText('Omexom - ATV hire')).toBeInTheDocument();
+    expect(screen.getByText('Arena Racing - Historic hire')).toBeInTheDocument();
+
+    fireEvent.click(optionButtons[1]);
+    expect(onSelect).toHaveBeenCalledWith(ambiguousLegacy);
+  });
+
+  it('PLC-002 keeps blocked live and project options unselectable in plant mode', async () => {
+    const blockedLive: JobCatalogueOption = {
+      ...selectableOption,
+      value: '50001-LC',
+      label: '50001-LC',
+      source: 'live_quote',
+      sourceId: 'quote-blocked',
+      siteAddress: null,
+      addressValid: false,
+      blockReason: 'missing_site_address',
+    };
+    const blockedProject: JobCatalogueOption = {
+      ...selectableOption,
+      value: '60010-MD',
+      label: '60010-MD',
+      source: 'project_number',
+      sourceId: 'project-blocked',
+      blockReason: 'inactive_source',
+    };
+    const onSelect = vi.fn();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      jsonResponse({ job_codes: [blockedLive, blockedProject] })
+    ));
+
+    render(
+      <JobCataloguePicker
+        value={null}
+        variant="plant-modal"
+        onSelect={onSelect}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select job code' }));
+    fireEvent.change(screen.getByPlaceholderText('Search code, customer, or name'), {
+      target: { value: '500' },
+    });
+    expect(await screen.findByText('No matching job codes found.')).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText('Search code, customer, or name'), {
+      target: { value: '600' },
+    });
+    expect(await screen.findByText('No matching job codes found.')).toBeInTheDocument();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it('PDC-JOB-006 keeps blocked catalogue entries visible and unselectable', async () => {
     const blockedOption: JobCatalogueOption = {
       ...selectableOption,

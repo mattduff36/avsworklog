@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canIgnoreReminderAction } from '@/lib/utils/reminder-action-permissions';
 import type { IgnoreReminderActionRequest, ReminderActionIgnoreDuration } from '@/types/reminders';
 
 interface RouteContext {
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     const { data: action, error: actionError } = await admin
       .from('reminder_actions')
-      .select('id, status')
+      .select('id, status, workflow_key')
       .eq('id', id)
       .maybeSingle();
 
@@ -66,6 +67,12 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     if (action.status !== 'open') {
       return NextResponse.json({ error: 'Only open actions can be ignored' }, { status: 400 });
+    }
+    if (!canIgnoreReminderAction(action.workflow_key)) {
+      return NextResponse.json(
+        { error: 'This action cannot be ignored while its 48-hour address deadline is open.' },
+        { status: 400 },
+      );
     }
 
     const { error: updateError } = await admin

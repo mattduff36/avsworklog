@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { getJobCatalogueBlockReason, isReliableSiteAddress } from '@/lib/utils/job-catalogue';
+import {
+  getJobCatalogueBlockReason,
+  isPlantDailyCheckCatalogueOptionSelectable,
+  isReliableSiteAddress,
+} from '@/lib/utils/job-catalogue';
 import { listJobCatalogueOptions, resolveJobCatalogueRecord } from '@/lib/server/job-catalogue';
 import type { JobCatalogueRecord } from '@/types/job-catalogue';
 
@@ -104,5 +108,37 @@ describe('CAT-003 ambiguous-code rejection', () => {
     expect(exact.ok).toBe(false);
     expect(exact.block_reason).toBe('ambiguous_sources');
     expect(listJobCatalogueOptions(records).every((option) => option.isAmbiguous)).toBe(true);
+  });
+});
+
+describe('PLC plant daily-check catalogue selection', () => {
+  it('PLC-001 allows exact missing-address and ambiguous legacy sources', () => {
+    expect(isPlantDailyCheckCatalogueOptionSelectable({
+      source: 'legacy_quote',
+      blockReason: 'missing_site_address',
+    })).toBe(true);
+    expect(isPlantDailyCheckCatalogueOptionSelectable({
+      source: 'legacy_quote',
+      blockReason: 'ambiguous_sources',
+    })).toBe(true);
+    expect(isPlantDailyCheckCatalogueOptionSelectable({
+      source: 'legacy_quote',
+      blockReason: null,
+    })).toBe(true);
+  });
+
+  it('PLC-002 keeps blocked live and project options unselectable', () => {
+    expect(isPlantDailyCheckCatalogueOptionSelectable({
+      source: 'live_quote',
+      blockReason: 'missing_site_address',
+    })).toBe(false);
+    expect(isPlantDailyCheckCatalogueOptionSelectable({
+      source: 'project_number',
+      blockReason: 'ambiguous_sources',
+    })).toBe(false);
+    expect(isPlantDailyCheckCatalogueOptionSelectable({
+      source: 'live_quote',
+      blockReason: null,
+    })).toBe(true);
   });
 });

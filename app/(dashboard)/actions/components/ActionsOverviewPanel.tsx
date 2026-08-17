@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
 import type { ReminderOverviewTabConfig } from '@/lib/config/reminder-workflows';
 import {
   buildReminderActionsQueryParams,
@@ -104,6 +105,7 @@ export function ActionsOverviewPanel({
       <ActionsTable
         actions={actions}
         assetType={tab.assetType}
+        presentation={tab.workflowKey === PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY ? 'legacy-job' : 'fleet'}
         loading={loading}
         filters={filters}
         onFiltersChange={setFilters}

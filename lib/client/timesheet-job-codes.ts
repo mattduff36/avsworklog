@@ -8,6 +8,7 @@ export interface TimesheetJobCodeOption {
   customerName: string | null;
   quoteTitle: string | null;
   source: 'live_quote' | 'legacy_quote' | 'project_number' | 'timesheet';
+  sourceId?: string;
 }
 
 interface TimesheetJobCodeResponse {

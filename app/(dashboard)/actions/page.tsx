@@ -12,6 +12,7 @@ import {
   FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
   getReminderOverviewTab,
   isValidReminderOverviewTabId,
+  PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY,
   REMINDER_OVERVIEW_TABS,
 } from '@/lib/config/reminder-workflows';
 import {
@@ -104,20 +105,32 @@ function ActionsContent() {
     }
 
     try {
-      const searchParams = new URLSearchParams({
-        status: 'open',
-        workflow: FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
-        ensure_fresh: 'true',
-      });
-      const response = await fetch(`/api/actions?${searchParams.toString()}`, {
-        cache: 'no-store',
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load actions summary');
+      const [fleetResponse, legacyResponse] = await Promise.all([
+        fetch(`/api/actions?${new URLSearchParams({
+          status: 'open',
+          workflow: FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
+          ensure_fresh: 'true',
+        }).toString()}`, { cache: 'no-store' }),
+        fetch(`/api/actions?${new URLSearchParams({
+          status: 'open',
+          workflow: PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY,
+        }).toString()}`, { cache: 'no-store' }),
+      ]);
+      const [fleetPayload, legacyPayload] = await Promise.all([
+        fleetResponse.json(),
+        legacyResponse.json(),
+      ]);
+      if (!fleetResponse.ok) {
+        throw new Error(fleetPayload.error || 'Failed to load actions summary');
+      }
+      if (!legacyResponse.ok) {
+        throw new Error(legacyPayload.error || 'Failed to load actions summary');
       }
 
-      setSummary(buildActionsSummaryStats((payload.actions || []) as ReminderActionWithAsset[]));
+      setSummary(buildActionsSummaryStats([
+        ...((fleetPayload.actions || []) as ReminderActionWithAsset[]),
+        ...((legacyPayload.actions || []) as ReminderActionWithAsset[]),
+      ]));
     } catch (error) {
       console.error(error);
       setSummary(EMPTY_ACTIONS_SUMMARY);

@@ -7638,6 +7638,7 @@ export type Database = {
           resolved_by: string | null
           first_detected_at: string
           last_detected_at: string
+          due_at: string | null
           resolved_at: string | null
           created_at: string
           updated_at: string
@@ -7664,6 +7665,7 @@ export type Database = {
           resolved_by?: string | null
           first_detected_at?: string
           last_detected_at?: string
+          due_at?: string | null
           resolved_at?: string | null
           created_at?: string
           updated_at?: string
@@ -7690,6 +7692,7 @@ export type Database = {
           resolved_by?: string | null
           first_detected_at?: string
           last_detected_at?: string
+          due_at?: string | null
           resolved_at?: string | null
           created_at?: string
           updated_at?: string

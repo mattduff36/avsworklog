@@ -1081,7 +1081,7 @@ function NewPlantInspectionContent() {
     }
 
     if (!jobCode.trim() || !jobSourceType || !jobSourceId) {
-      setError('Please select a catalogue job with a valid site address');
+      setError('Please select a catalogue job');
       setShowConfirmSubmitDialog(false);
       scrollToTarget(document.getElementById('plant-job-code'));
       return;
@@ -1854,7 +1854,7 @@ function NewPlantInspectionContent() {
               id="jobCode"
               value={jobCode || null}
               sourceId={jobSourceId}
-              variant="timesheet-modal"
+              variant="plant-modal"
               className="h-12 px-3 text-base bg-slate-900/50 border-slate-600 text-white hover:bg-slate-900/50 hover:text-white"
               onSelect={(option) => {
                 setJobSourceType(option?.source || null);

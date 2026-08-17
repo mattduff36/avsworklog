@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Button } from '@/components/ui/button';
 import { JobCodePicker } from '@/components/timesheets/JobCodeFields';
 import { useJobCatalogueOptions } from '@/lib/client/job-catalogue';
-import { getJobCatalogueBlockMessage } from '@/lib/utils/job-catalogue';
+import { getJobCatalogueBlockMessage, isPlantDailyCheckCatalogueOptionSelectable } from '@/lib/utils/job-catalogue';
 import type { JobCatalogueOption } from '@/types/job-catalogue';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
@@ -17,7 +17,7 @@ interface JobCataloguePickerProps {
   disabled?: boolean;
   id?: string;
   className?: string;
-  variant?: 'catalogue' | 'timesheet-modal';
+  variant?: 'catalogue' | 'timesheet-modal' | 'plant-modal';
   onSelect: (option: JobCatalogueOption | null) => void;
 }
 
@@ -64,6 +64,46 @@ export function JobCataloguePicker({
       }];
     });
   }, [options]);
+
+  const plantOptions = useMemo(() => (
+    options.flatMap((option) => {
+      if (!isPlantDailyCheckCatalogueOptionSelectable(option)) return [];
+      return [{
+        value: option.value,
+        label: option.label,
+        customerName: option.customerName,
+        quoteTitle: option.quoteTitle,
+        source: option.source,
+        sourceId: option.sourceId,
+      }];
+    })
+  ), [options]);
+
+  if (variant === 'plant-modal') {
+    return (
+      <JobCodePicker
+        id={id}
+        value={value || ''}
+        disabled={disabled}
+        inputClassName={cn('uppercase', className)}
+        jobCodeOptions={plantOptions}
+        jobCodeOptionsLoading={isLoading}
+        jobCodeOptionsError={error}
+        onRetryJobCodeOptions={retry}
+        showOptionDetails
+        selectedSourceId={sourceId}
+        onChange={() => undefined}
+        onSelectOption={(picked) => {
+          const option = options.find((candidate) => (
+            isPlantDailyCheckCatalogueOptionSelectable(candidate)
+            && candidate.sourceId === picked.sourceId
+            && candidate.value === picked.value
+          ));
+          onSelect(option || null);
+        }}
+      />
+    );
+  }
 
   if (variant === 'timesheet-modal') {
     return (

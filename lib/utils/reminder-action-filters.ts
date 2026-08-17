@@ -27,11 +27,19 @@ export function isReminderActionActive(action: ReminderActionWithAsset): boolean
   return !isReminderActionActioned(action);
 }
 
+function getMetadataSearchValue(action: ReminderActionWithAsset, key: string): string {
+  const value = action.metadata?.[key];
+  return typeof value === 'string' ? value : '';
+}
+
 export function getReminderActionSearchHaystack(action: ReminderActionWithAsset): string {
   return [
     action.asset_label || '',
     action.title,
     action.description || '',
+    getMetadataSearchValue(action, 'job_code'),
+    getMetadataSearchValue(action, 'customer_name'),
+    getMetadataSearchValue(action, 'quote_title'),
   ]
     .join(' ')
     .toLowerCase();

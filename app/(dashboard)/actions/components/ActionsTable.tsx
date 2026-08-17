@@ -34,6 +34,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils/cn';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
+import { getReminderActionDueState } from '@/lib/utils/reminder-action-due';
+import { canIgnoreReminderAction } from '@/lib/utils/reminder-action-permissions';
 import { formatMileage, getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
 import {
   filterReminderActions,
@@ -50,7 +52,8 @@ const ASSIGNMENT_FILTERS: Array<{ value: ReminderAssignmentFilter; label: string
   { value: 'has_pending', label: 'Pending' },
 ];
 
-type SortField = 'asset_primary' | 'asset_nickname' | 'asset_usage' | 'status' | 'latest_submitted' | 'overdue';
+type SortField = 'asset_primary' | 'asset_nickname' | 'asset_usage' | 'status' | 'latest_submitted' | 'overdue' | 'job_code' | 'due_at';
+type ActionsTablePresentation = 'fleet' | 'legacy-job';
 type SortDirection = 'asc' | 'desc';
 
 interface ColumnVisibility {
@@ -218,6 +221,7 @@ function getAssignmentStatus(action: ReminderActionWithAsset): {
 interface ActionsTableProps {
   actions: ReminderActionWithAsset[];
   assetType?: ReminderAssetType;
+  presentation?: ActionsTablePresentation;
   loading: boolean;
   filters: ReminderActionFilterState;
   onFiltersChange: (filters: ReminderActionFilterState) => void;
@@ -327,9 +331,39 @@ function IgnoreActionPopover({
   );
 }
 
+function getLegacyJobCode(action: ReminderActionWithAsset): string {
+  return getMetadataString(action, 'job_code') || action.title.replace(/^Add a site address for legacy job\s+/i, '') || 'Unknown job';
+}
+
+function getLegacyJobDetails(action: ReminderActionWithAsset): string {
+  return [getMetadataString(action, 'customer_name'), getMetadataString(action, 'quote_title')]
+    .filter(Boolean)
+    .join(' · ') || 'No title';
+}
+
+function getLegacyInspectionLabel(action: ReminderActionWithAsset): string {
+  const value = getMetadataString(action, 'inspection_date');
+  if (!value) return 'Unknown inspection';
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date).replaceAll('/', '-');
+}
+
+function getLegacyInspectionHref(action: ReminderActionWithAsset): string | null {
+  const inspectionId = getMetadataString(action, 'inspection_id');
+  return inspectionId ? `/plant-inspections/${inspectionId}` : null;
+}
+
 export function ActionsTable({
   actions,
   assetType,
+  presentation = 'fleet',
   loading,
   filters,
   onFiltersChange,
@@ -337,7 +371,8 @@ export function ActionsTable({
   onIgnore,
 }: ActionsTableProps) {
   const router = useRouter();
-  const [sortField, setSortField] = useState<SortField>('overdue');
+  const isLegacyJobPresentation = presentation === 'legacy-job';
+  const [sortField, setSortField] = useState<SortField>(isLegacyJobPresentation ? 'due_at' : 'overdue');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [columnVisibility, setColumnVisibility] = useState<ColumnVisibility>(getInitialColumnVisibility);
 
@@ -356,7 +391,7 @@ export function ActionsTable({
     }
 
     setSortField(field);
-    setSortDirection(field === 'asset_usage' || field === 'latest_submitted' || field === 'overdue' ? 'desc' : 'asc');
+    setSortDirection(field === 'asset_usage' || field === 'latest_submitted' || field === 'overdue' || field === 'due_at' ? 'desc' : 'asc');
   }
 
   const filteredActions = useMemo(
@@ -381,6 +416,10 @@ export function ActionsTable({
           return multiplier * (getLatestSubmittedSortValue(left) - getLatestSubmittedSortValue(right));
         case 'overdue':
           return multiplier * (getOverdueSortValue(left) - getOverdueSortValue(right));
+        case 'job_code':
+          return multiplier * getLegacyJobCode(left).localeCompare(getLegacyJobCode(right));
+        case 'due_at':
+          return multiplier * (getReminderActionDueState(left.due_at).timestamp - getReminderActionDueState(right.due_at).timestamp);
         default:
           return 0;
       }
@@ -389,6 +428,7 @@ export function ActionsTable({
 
   const assetColumnLabels = getAssetColumnLabels(assetType);
   const paginationKey = [
+    presentation,
     assetType || 'all',
     filters.search.trim(),
     filters.assignment,
@@ -406,8 +446,9 @@ export function ActionsTable({
   }
 
   function openAssetHistory(action: ReminderActionWithAsset) {
-    if (action.asset_route) {
-      router.push(action.asset_route);
+    const href = isLegacyJobPresentation ? getLegacyInspectionHref(action) : action.asset_route;
+    if (href) {
+      router.push(href);
     }
   }
 
@@ -440,6 +481,7 @@ export function ActionsTable({
           </div>
         </div>
 
+        {!isLegacyJobPresentation ? (
         <div className="w-full space-y-2 lg:w-64">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Table columns</p>
           <DropdownMenu>
@@ -475,6 +517,7 @@ export function ActionsTable({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+        ) : null}
       </div>
 
       {loading ? (
@@ -492,111 +535,180 @@ export function ActionsTable({
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-700 hover:bg-transparent">
-                <TableHead
-                  className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
-                  onClick={() => handleSort('asset_primary')}
-                >
-                  <div className="flex items-center gap-2">
-                    {assetColumnLabels.primary}
-                    <SortIcon field="asset_primary" sortField={sortField} sortDirection={sortDirection} />
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
-                  onClick={() => handleSort('asset_nickname')}
-                >
-                  <div className="flex items-center gap-2">
-                    Nickname
-                    <SortIcon field="asset_nickname" sortField={sortField} sortDirection={sortDirection} />
-                  </div>
-                </TableHead>
-                <TableHead
-                  className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
-                  onClick={() => handleSort('asset_usage')}
-                >
-                  <div className="flex items-center gap-2">
-                    {assetColumnLabels.usage}
-                    <SortIcon field="asset_usage" sortField={sortField} sortDirection={sortDirection} />
-                  </div>
-                </TableHead>
-                {columnVisibility.status ? (
-                  <TableHead
-                    className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
-                    onClick={() => handleSort('status')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Status
-                      <SortIcon field="status" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </TableHead>
-                ) : null}
-                {columnVisibility.latest_submitted ? (
-                  <TableHead
-                    className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
-                    onClick={() => handleSort('latest_submitted')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Latest submitted
-                      <SortIcon field="latest_submitted" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </TableHead>
-                ) : null}
-                {columnVisibility.overdue ? (
-                  <TableHead
-                    className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
-                    onClick={() => handleSort('overdue')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Overdue
-                      <SortIcon field="overdue" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </TableHead>
-                ) : null}
+                {isLegacyJobPresentation ? (
+                  <>
+                    <TableHead
+                      className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
+                      onClick={() => handleSort('job_code')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Job code
+                        <SortIcon field="job_code" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
+                    </TableHead>
+                    <TableHead className="text-muted-foreground">Customer / title</TableHead>
+                    <TableHead className="text-muted-foreground">Inspection</TableHead>
+                    <TableHead
+                      className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
+                      onClick={() => handleSort('due_at')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Due
+                        <SortIcon field="due_at" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
+                      onClick={() => handleSort('status')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Status
+                        <SortIcon field="status" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
+                    </TableHead>
+                  </>
+                ) : (
+                  <>
+                    <TableHead
+                      className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
+                      onClick={() => handleSort('asset_primary')}
+                    >
+                      <div className="flex items-center gap-2">
+                        {assetColumnLabels.primary}
+                        <SortIcon field="asset_primary" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
+                      onClick={() => handleSort('asset_nickname')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Nickname
+                        <SortIcon field="asset_nickname" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
+                      onClick={() => handleSort('asset_usage')}
+                    >
+                      <div className="flex items-center gap-2">
+                        {assetColumnLabels.usage}
+                        <SortIcon field="asset_usage" sortField={sortField} sortDirection={sortDirection} />
+                      </div>
+                    </TableHead>
+                    {columnVisibility.status ? (
+                      <TableHead
+                        className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Status
+                          <SortIcon field="status" sortField={sortField} sortDirection={sortDirection} />
+                        </div>
+                      </TableHead>
+                    ) : null}
+                    {columnVisibility.latest_submitted ? (
+                      <TableHead
+                        className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
+                        onClick={() => handleSort('latest_submitted')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Latest submitted
+                          <SortIcon field="latest_submitted" sortField={sortField} sortDirection={sortDirection} />
+                        </div>
+                      </TableHead>
+                    ) : null}
+                    {columnVisibility.overdue ? (
+                      <TableHead
+                        className="cursor-pointer text-muted-foreground hover:bg-slate-800/80"
+                        onClick={() => handleSort('overdue')}
+                      >
+                        <div className="flex items-center gap-2">
+                          Overdue
+                          <SortIcon field="overdue" sortField={sortField} sortDirection={sortDirection} />
+                        </div>
+                      </TableHead>
+                    ) : null}
+                  </>
+                )}
                 <TableHead className="text-right text-muted-foreground">Actions</TableHead>
               </TableRow>
             </TableHeader>
               <TableBody>
-                {visibleActions.map((action) => (
+                {visibleActions.map((action) => {
+                const dueState = getReminderActionDueState(action.due_at);
+                const rowHref = isLegacyJobPresentation ? getLegacyInspectionHref(action) : action.asset_route;
+                return (
                 <TableRow
                   key={action.id}
                   className={cn(
                     'border-slate-700',
-                    action.asset_route && 'cursor-pointer hover:bg-slate-800/50',
+                    rowHref && 'cursor-pointer hover:bg-slate-800/50',
                   )}
                   onClick={() => openAssetHistory(action)}
                 >
-                  <TableCell className="font-medium text-foreground">
-                    {action.asset_type === 'plant' ? getPlantIdSerialDisplay(action) : getPrimaryAssetValue(action)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {getAssetNickname(action) || (
-                      <span className="text-slate-400 italic">No nickname</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {formatAssetUsage(action)}
-                  </TableCell>
-                  {columnVisibility.status ? (
-                    <TableCell>
-                      {getAssignmentStatus(action).label === 'Unassigned' ? (
-                        <span className="text-sm italic text-slate-400">Unassigned</span>
-                      ) : (
-                        <Badge variant={getAssignmentStatus(action).variant}>
-                          {getAssignmentStatus(action).label}
+                  {isLegacyJobPresentation ? (
+                    <>
+                      <TableCell className="font-mono font-medium text-foreground">
+                        {getLegacyJobCode(action)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {getLegacyJobDetails(action)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {getLegacyInspectionLabel(action)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={dueState.overdue ? 'warning' : 'secondary'}>
+                          {dueState.label}
                         </Badge>
-                      )}
-                    </TableCell>
-                  ) : null}
-                  {columnVisibility.latest_submitted ? (
-                    <TableCell className="text-sm text-muted-foreground">
-                      {getLatestInspectionLabel(action)}
-                    </TableCell>
-                  ) : null}
-                  {columnVisibility.overdue ? (
-                    <TableCell>
-                      {getOverdueBadge(action)}
-                    </TableCell>
-                  ) : null}
+                      </TableCell>
+                      <TableCell>
+                        {getAssignmentStatus(action).label === 'Unassigned' ? (
+                          <span className="text-sm italic text-slate-400">Unassigned</span>
+                        ) : (
+                          <Badge variant={getAssignmentStatus(action).variant}>
+                            {getAssignmentStatus(action).label}
+                          </Badge>
+                        )}
+                      </TableCell>
+                    </>
+                  ) : (
+                    <>
+                      <TableCell className="font-medium text-foreground">
+                        {action.asset_type === 'plant' ? getPlantIdSerialDisplay(action) : getPrimaryAssetValue(action)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {getAssetNickname(action) || (
+                          <span className="text-slate-400 italic">No nickname</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {formatAssetUsage(action)}
+                      </TableCell>
+                      {columnVisibility.status ? (
+                        <TableCell>
+                          {getAssignmentStatus(action).label === 'Unassigned' ? (
+                            <span className="text-sm italic text-slate-400">Unassigned</span>
+                          ) : (
+                            <Badge variant={getAssignmentStatus(action).variant}>
+                              {getAssignmentStatus(action).label}
+                            </Badge>
+                          )}
+                        </TableCell>
+                      ) : null}
+                      {columnVisibility.latest_submitted ? (
+                        <TableCell className="text-sm text-muted-foreground">
+                          {getLatestInspectionLabel(action)}
+                        </TableCell>
+                      ) : null}
+                      {columnVisibility.overdue ? (
+                        <TableCell>
+                          {getOverdueBadge(action)}
+                        </TableCell>
+                      ) : null}
+                    </>
+                  )}
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2" onClick={(event) => event.stopPropagation()}>
                       <Button
@@ -608,11 +720,14 @@ export function ActionsTable({
                       >
                         Assign
                       </Button>
-                      <IgnoreActionPopover action={action} onIgnore={onIgnore} />
+                      {canIgnoreReminderAction(action.workflow_key) ? (
+                        <IgnoreActionPopover action={action} onIgnore={onIgnore} />
+                      ) : null}
                     </div>
                   </TableCell>
                 </TableRow>
-                ))}
+                );
+                })}
               </TableBody>
             </Table>
           </div>

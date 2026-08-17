@@ -606,6 +606,7 @@ export function mapReminderActionWithAsset(
     ignored_by: action.ignored_by,
     first_detected_at: action.first_detected_at,
     last_detected_at: action.last_detected_at,
+    due_at: action.due_at ?? null,
     resolved_at: action.resolved_at,
     created_at: action.created_at,
     updated_at: action.updated_at,

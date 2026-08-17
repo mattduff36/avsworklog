@@ -42,6 +42,8 @@ interface JobCodePickerProps {
   ariaLabel?: string;
   onSearchChange?: (query: string) => void;
   serverSideFiltering?: boolean;
+  selectedSourceId?: string | null;
+  onSelectOption?: (option: TimesheetJobCodeOption) => void;
 }
 
 interface JobCodeFieldRowProps {
@@ -65,6 +67,8 @@ interface JobCodeFieldRowProps {
   ariaLabel?: string;
   onSearchChange?: (query: string) => void;
   serverSideFiltering?: boolean;
+  selectedSourceId?: string | null;
+  onSelectOption?: (option: TimesheetJobCodeOption) => void;
 }
 
 const JOB_CODE_FILTER_MIN_LENGTH = 3;
@@ -153,6 +157,8 @@ function JobCodeFieldRow({
   ariaLabel,
   onSearchChange,
   serverSideFiltering,
+  selectedSourceId,
+  onSelectOption,
 }: JobCodeFieldRowProps) {
   const shouldAutoOpen = Boolean(autoOpen && !disabled);
   const [isPickerOpen, setIsPickerOpen] = useState(shouldAutoOpen);
@@ -286,11 +292,12 @@ function JobCodeFieldRow({
           ) : filteredOptions.length > 0 ? (
             filteredOptions.map((option) => (
               <button
-                key={option.value}
+                key={option.sourceId ? `${option.source}:${option.sourceId}` : option.value}
                 type="button"
                 className="flex min-h-16 w-full items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-900 px-4 py-3 text-left text-white hover:bg-slate-800"
                 onClick={() => {
                   didSelectDuringOpenRef.current = true;
+                  onSelectOption?.(option);
                   onChange(index, option.value);
                   handlePickerOpenChange(false);
                 }}
@@ -301,7 +308,9 @@ function JobCodeFieldRow({
                     <span className="block truncate text-sm text-slate-400">{getOptionDescription(option)}</span>
                   ) : null}
                 </span>
-                {normalizedValue === option.value && <Check className="h-5 w-5 shrink-0" />}
+                {(selectedSourceId
+                  ? option.sourceId === selectedSourceId
+                  : normalizedValue === option.value) && <Check className="h-5 w-5 shrink-0" />}
               </button>
             ))
           ) : (
@@ -371,6 +380,8 @@ export function JobCodePicker({
   ariaLabel,
   onSearchChange,
   serverSideFiltering = false,
+  selectedSourceId,
+  onSelectOption,
 }: JobCodePickerProps) {
   return (
     <JobCodeFieldRow
@@ -389,6 +400,8 @@ export function JobCodePicker({
       ariaLabel={ariaLabel}
       onSearchChange={onSearchChange}
       serverSideFiltering={serverSideFiltering}
+      selectedSourceId={selectedSourceId}
+      onSelectOption={onSelectOption}
     />
   );
 }
