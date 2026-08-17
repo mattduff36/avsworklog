@@ -7,13 +7,17 @@ const { Client } = pg;
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
-const connectionString = process.env.POSTGRES_URL_NON_POOLING;
 const sqlFile = 'supabase/migrations/20260817_plant_legacy_missing_site_actions.sql';
 
-if (!connectionString) {
-  console.error('Missing POSTGRES_URL_NON_POOLING in .env.local');
-  process.exit(1);
+function getConnectionString(): string {
+  const value = process.env.POSTGRES_URL_NON_POOLING;
+  if (!value) {
+    throw new Error('Missing POSTGRES_URL_NON_POOLING in .env.local');
+  }
+  return value;
 }
+
+const connectionString = getConnectionString();
 
 async function runMigration() {
   const url = new URL(connectionString);
