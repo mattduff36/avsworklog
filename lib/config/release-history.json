@@ -1,5 +1,26 @@
 [
   {
+    "version": "0826.31.0",
+    "updateKind": "major",
+    "title": "PDF documents update",
+    "description": "Updated PDF document documents and Timesheets.",
+    "summary": "Updated PDF document documents and Timesheets.",
+    "details": [
+      "Updated PDF document documents and Timesheets, with changes to background routes, shared logic, and automated tests.",
+      "Updated timesheets, with changes to background routes, shared logic, and automated tests."
+    ],
+    "areas": [
+      "PDF documents",
+      "PDF document documents",
+      "Timesheets"
+    ],
+    "areaKeys": [
+      "pdf-documents",
+      "timesheets"
+    ],
+    "pushedAt": "2026-08-17T16:28:44.806Z"
+  },
+  {
     "version": "0826.30.0",
     "updateKind": "major",
     "title": "Daily Allocation update",

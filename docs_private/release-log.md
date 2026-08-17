@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.31.0
+
+**GIT COMMIT MESSAGE**
+`feat(pdf): update PDF documents and Timesheets`
+
+**PUSHED AT**
+2026-08-17T16:28:44.806Z
+
+**WHAT CHANGED**
+Update PDF documents and Timesheets.
+
+**VERSION HISTORY DETAILS**
+- Updated PDF documents and Timesheets, with changes to background routes, shared logic, and automated tests.
+- Updated timesheets, with changes to background routes, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(pdf): update PDF documents and Timesheets`
+
 ## 0826.30.0
 
 **GIT COMMIT MESSAGE**
