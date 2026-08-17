@@ -374,7 +374,7 @@ export function TimesheetPDF({
           </View>
         </View>
 
-        {payrollSnapshot && <PayrollSnapshotSummary snapshot={payrollSnapshot} />}
+        {payrollSnapshot ? <PayrollSnapshotSummary snapshot={payrollSnapshot} /> : null}
 
         {/* Footer */}
         <View style={styles.footer}>

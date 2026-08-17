@@ -16,6 +16,22 @@ import {
 } from '@/lib/utils/timesheet-off-days';
 import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import type { PayrollSnapshotPdfData } from '@/lib/pdf/payroll-snapshot-summary';
+import { previewTimesheetPayroll } from '@/lib/server/timesheet-payroll';
+import {
+  buildTimesheetPayrollPreviewDays,
+  toPayrollSnapshotPdfData,
+} from '@/lib/pdf/timesheet-payroll-pdf-data';
+
+const SNAPSHOTLESS_PDF_PREVIEW_STATUSES = ['submitted', 'adjusted'] as const;
+
+function allowsSnapshotlessPayrollPreview(status: string): boolean {
+  return (SNAPSHOTLESS_PDF_PREVIEW_STATUSES as readonly string[]).includes(status);
+}
+
+function shouldPrintLivePayrollPreview(status: string, hasFrozenSnapshot: boolean): boolean {
+  if (status === 'adjusted') return true;
+  return status === 'submitted' && !hasFrozenSnapshot;
+}
 
 export async function GET(
   request: NextRequest,
@@ -110,7 +126,7 @@ export async function GET(
     }
 
     const snapshot = typedTimesheet.current_payroll_snapshot;
-    const payrollSnapshot =
+    let payrollSnapshot: PayrollSnapshotPdfData | null =
       snapshot
       && snapshot.id === typedTimesheet.current_payroll_snapshot_id
       && snapshot.timesheet_id === typedTimesheet.id
@@ -126,7 +142,7 @@ export async function GET(
       if (rolloutError) {
         return NextResponse.json({ error: 'Unable to verify payroll rollout configuration' }, { status: 500 });
       }
-      if ((applicableRollout || []).length > 0 && typedTimesheet.status !== 'submitted') {
+      if ((applicableRollout || []).length > 0 && !allowsSnapshotlessPayrollPreview(typedTimesheet.status)) {
         return NextResponse.json(
           { error: 'This post-cutover timesheet has no payroll snapshot. PDF generation is blocked.' },
           { status: 409 }
@@ -179,12 +195,32 @@ export async function GET(
       { ensureRecords: false }
     );
     // Keep shift-aware leave overlays so paid-leave hours in daily_total are not
-    // misread as worked hours. Payroll money totals still come only from the snapshot.
+    // misread as worked hours. Approved totals still come from the snapshot.
+    // Submitted sheets without a snapshot, and all adjusted sheets, print the
+    // same live preview as the screen.
     const offDayStates = resolveTimesheetOffDayStates(
       typedTimesheetData.week_ending,
       approvedAbsences,
       shiftPatternMap.get(typedTimesheet.user_id) || null
     );
+
+    if (shouldPrintLivePayrollPreview(typedTimesheet.status, Boolean(payrollSnapshot))) {
+      try {
+        const preview = await previewTimesheetPayroll({
+          userId: typedTimesheet.user_id,
+          weekEnding: typedTimesheet.week_ending,
+          days: buildTimesheetPayrollPreviewDays(typedTimesheetData, offDayStates),
+        });
+        if (preview.breakdown) {
+          payrollSnapshot = toPayrollSnapshotPdfData(
+            preview.breakdown,
+            typedTimesheet.status === 'adjusted' ? 'reapproval' : 'provisional'
+          );
+        }
+      } catch (previewError) {
+        console.warn('Timesheet PDF payroll preview unavailable:', previewError);
+      }
+    }
 
     // Generate PDF
     const stream = await renderToStream(

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   filterReportScope: vi.fn(),
   loadShiftPatterns: vi.fn(),
   logServerError: vi.fn(),
+  previewTimesheetPayroll: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -43,6 +44,9 @@ vi.mock('@/lib/server/work-shifts', () => ({
 }));
 vi.mock('@/lib/utils/server-error-logger', () => ({
   logServerError: mocks.logServerError,
+}));
+vi.mock('@/lib/server/timesheet-payroll', () => ({
+  previewTimesheetPayroll: mocks.previewTimesheetPayroll,
 }));
 
 import { GET } from '@/app/api/timesheets/[id]/pdf/route';
@@ -162,6 +166,7 @@ describe('GET /api/timesheets/[id]/pdf payroll snapshot policy', () => {
     mocks.renderToStream.mockResolvedValue((async function* () {
       yield Buffer.from('%PDF-test');
     })());
+    mocks.previewTimesheetPayroll.mockResolvedValue({ legacy: true, breakdown: null });
   });
 
   it('PAY-PDF-SUBMITTED-001 prints a submitted post-cutover sheet without a snapshot', async () => {
@@ -177,7 +182,7 @@ describe('GET /api/timesheets/[id]/pdf payroll snapshot policy', () => {
     expect(mocks.renderToStream).toHaveBeenCalledOnce();
   });
 
-  it.each(['approved', 'processed', 'adjusted'])(
+  it.each(['approved', 'processed'])(
     'PAY-PDF-PROTECTED-001 blocks a post-cutover %s sheet without a snapshot',
     async (status) => {
       setupRoute({ status });
@@ -227,6 +232,134 @@ describe('GET /api/timesheets/[id]/pdf payroll snapshot policy', () => {
     expect(mocks.renderToStream).not.toHaveBeenCalled();
   });
 
+  it('PAY-PDF-PREVIEW-001 prints the on-screen provisional breakdown for submitted sheets', async () => {
+    mocks.previewTimesheetPayroll.mockResolvedValue({
+      legacy: false,
+      breakdown: {
+        ruleSetKey: 'civils',
+        weekEnding: '2026-08-16',
+        basicMinutes: 2400,
+        overtimeMinutes: 120,
+        doubleTimeMinutes: 0,
+        payableMinutes: 2520,
+        paidLeaveUnits: 0,
+        unpaidLeaveUnits: 0,
+        operatorTravelMinutes: 0,
+        iprUnits: 0,
+        subsistenceDays: 0,
+        subsistenceDayNames: [],
+        days: [],
+      },
+    });
+    setupRoute({ status: 'submitted' });
+
+    const response = await requestPdf();
+
+    expect(response.status).toBe(200);
+    expect(mocks.previewTimesheetPayroll).toHaveBeenCalledOnce();
+    expect(mocks.timesheetPdf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payrollSnapshot: expect.objectContaining({
+          kind: 'provisional',
+          basic_minutes: 2400,
+          overtime_minutes: 120,
+          rule_set: { name: 'Civils' },
+        }),
+      })
+    );
+  });
+
+  it('PAY-PDF-REAPPROVAL-001 prints the on-screen reapproval breakdown for adjusted sheets', async () => {
+    mocks.previewTimesheetPayroll.mockResolvedValue({
+      legacy: false,
+      breakdown: {
+        ruleSetKey: 'plant',
+        weekEnding: '2026-08-16',
+        basicMinutes: 1920,
+        overtimeMinutes: 180,
+        doubleTimeMinutes: 60,
+        payableMinutes: 2160,
+        paidLeaveUnits: 0,
+        unpaidLeaveUnits: 0,
+        operatorTravelMinutes: 90,
+        iprUnits: 0.8,
+        subsistenceDays: 0,
+        subsistenceDayNames: [],
+        days: [],
+      },
+    });
+    setupRoute({ status: 'adjusted' });
+
+    const response = await requestPdf();
+
+    expect(response.status).toBe(200);
+    expect(mocks.previewTimesheetPayroll).toHaveBeenCalledOnce();
+    expect(mocks.timesheetPdf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payrollSnapshot: expect.objectContaining({
+          kind: 'reapproval',
+          basic_minutes: 1920,
+          overtime_minutes: 180,
+          operator_travel_minutes: 90,
+          rule_set: { name: 'Plant' },
+        }),
+      })
+    );
+  });
+
+  it('PAY-PDF-REAPPROVAL-002 prefers the live reapproval preview over a retained snapshot', async () => {
+    mocks.previewTimesheetPayroll.mockResolvedValue({
+      legacy: false,
+      breakdown: {
+        ruleSetKey: 'plant',
+        weekEnding: '2026-08-16',
+        basicMinutes: 1980,
+        overtimeMinutes: 240,
+        doubleTimeMinutes: 0,
+        payableMinutes: 2220,
+        paidLeaveUnits: 0,
+        unpaidLeaveUnits: 0,
+        operatorTravelMinutes: 120,
+        iprUnits: 1,
+        subsistenceDays: 1,
+        subsistenceDayNames: ['Mon'],
+        days: [],
+      },
+    });
+    const snapshot = {
+      id: SNAPSHOT_ID,
+      timesheet_id: TIMESHEET_ID,
+      revision: 1,
+      basic_minutes: 2400,
+      overtime_minutes: 0,
+      double_time_minutes: 0,
+      paid_leave_units: 0,
+      unpaid_leave_units: 0,
+      operator_travel_minutes: 0,
+      ipr_units: 0,
+      subsistence_days: 0,
+      subsistence_day_names: [],
+      rule_set: { name: 'Plant' },
+    };
+    setupRoute({ status: 'adjusted', snapshot });
+
+    const response = await requestPdf();
+
+    expect(response.status).toBe(200);
+    expect(mocks.previewTimesheetPayroll).toHaveBeenCalledOnce();
+    expect(mocks.timesheetPdf).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payrollSnapshot: expect.objectContaining({
+          kind: 'reapproval',
+          basic_minutes: 1980,
+          overtime_minutes: 240,
+          operator_travel_minutes: 120,
+          rule_set: { name: 'Plant' },
+        }),
+      })
+    );
+  });
+
   it('PAY-PDF-SNAPSHOT-001 passes a valid immutable snapshot to the renderer', async () => {
     const snapshot = {
       id: SNAPSHOT_ID,
@@ -251,6 +384,7 @@ describe('GET /api/timesheets/[id]/pdf payroll snapshot policy', () => {
     expect(mocks.timesheetPdf).toHaveBeenCalledWith(
       expect.objectContaining({ payrollSnapshot: snapshot })
     );
+    expect(mocks.previewTimesheetPayroll).not.toHaveBeenCalled();
     expect(adminFrom).not.toHaveBeenCalledWith('payroll_rollout_activations');
     expect(rolloutLimit).not.toHaveBeenCalled();
   });

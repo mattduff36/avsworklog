@@ -2,7 +2,10 @@ import React from 'react';
 import { StyleSheet, Text, View } from '@react-pdf/renderer';
 import { minutesToHours } from '@/lib/payroll/calculate';
 
+export type PayrollSnapshotPdfKind = 'snapshot' | 'provisional' | 'reapproval';
+
 export interface PayrollSnapshotPdfData {
+  kind?: PayrollSnapshotPdfKind;
   revision: number;
   basic_minutes: number;
   overtime_minutes: number;
@@ -14,6 +17,17 @@ export interface PayrollSnapshotPdfData {
   subsistence_days: number;
   subsistence_day_names: string[];
   rule_set?: { name?: string | null } | null;
+}
+
+export function payrollSnapshotPdfTitle(snapshot: PayrollSnapshotPdfData): string {
+  const ruleName = snapshot.rule_set?.name || 'Configured Rule';
+  if (snapshot.kind === 'provisional') {
+    return `Provisional Payroll Breakdown — ${ruleName}`;
+  }
+  if (snapshot.kind === 'reapproval') {
+    return `Reapproval Payroll Breakdown — ${ruleName}`;
+  }
+  return `Payroll Breakdown — ${ruleName} — Revision ${snapshot.revision}`;
 }
 
 const styles = StyleSheet.create({
@@ -41,9 +55,9 @@ const styles = StyleSheet.create({
 
 export function PayrollSnapshotSummary({ snapshot }: { snapshot: PayrollSnapshotPdfData }) {
   return (
-    <View style={styles.container}>
+    <View style={styles.container} wrap={false}>
       <Text style={styles.title}>
-        Payroll Breakdown — {snapshot.rule_set?.name || 'Configured Rule'} — Revision {snapshot.revision}
+        {payrollSnapshotPdfTitle(snapshot)}
       </Text>
       <View style={styles.row}>
         <Text style={styles.item}>Basic: {minutesToHours(snapshot.basic_minutes).toFixed(2)}h</Text>

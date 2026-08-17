@@ -111,6 +111,7 @@ describe('payroll rollout contract', () => {
     expect(pdf).toContain('current_payroll_snapshot');
     expect(excel).toContain('current_payroll_snapshot');
     expect(pdf).toContain('payrollSnapshot');
+    expect(pdf).toContain('previewTimesheetPayroll');
     expect(pdf).toContain('loadEmployeeWorkShiftPatternMap');
     expect(pdf).toContain('resolveTimesheetOffDayStates');
     expect(excel).toContain('snapshot.basic_minutes');

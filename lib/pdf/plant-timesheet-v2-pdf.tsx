@@ -488,6 +488,8 @@ export function PlantTimesheetV2PDF({
           </View>
         </View>
 
+        {payrollSnapshot ? <PayrollSnapshotSummary snapshot={payrollSnapshot} /> : null}
+
         <View style={styles.footer}>
           <View style={styles.signatureRow}>
             <View style={styles.signatureBlock}>
@@ -520,8 +522,6 @@ export function PlantTimesheetV2PDF({
               </View>
             </View>
           </View>
-
-          {payrollSnapshot && <PayrollSnapshotSummary snapshot={payrollSnapshot} />}
 
           <View style={styles.declarationRow}>
             <Text style={styles.declarationText}>
