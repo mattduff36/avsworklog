@@ -262,6 +262,11 @@ const ORDINARY_REUSE_AMBIENT_ENV_PREFIXES = [
   'YARN_',
 ];
 
+const REPAIR_UNSTABLE_NPM_ENV_KEYS = new Set([
+  'NPM_LIFECYCLE_EVENT',
+  'NPM_LIFECYCLE_SCRIPT',
+]);
+
 function declaredEnvironmentKeys(repoRoot: string): Set<string> {
   const filePath = path.join(repoRoot, '.env.local');
   if (!existsSync(filePath)) return new Set();
@@ -298,6 +303,38 @@ function environmentFingerprint(repoRoot: string): string {
     `platform:${process.platform}`,
     `arch:${process.arch}`,
     `environment:${hashText(JSON.stringify(fingerprintedEnvironment))}`,
+    `envLocal:${hashFile(path.join(repoRoot, '.env.local'))}`,
+  ].join('|'));
+}
+
+export function getRepairSafetyEnvironmentEntries(
+  environment: NodeJS.ProcessEnv,
+  platform: NodeJS.Platform = process.platform
+): Array<[string, string]> {
+  const fingerprintedEnvironment = new Map<string, string>();
+  for (const [key, value] of Object.entries(environment)) {
+    const normalized = key.toUpperCase();
+    const unstableAmbientKey =
+      ORDINARY_REUSE_AMBIENT_ENV_KEYS.has(normalized) ||
+      REPAIR_UNSTABLE_NPM_ENV_KEYS.has(normalized) ||
+      ORDINARY_REUSE_AMBIENT_ENV_PREFIXES
+        .filter((prefix) => prefix !== 'VITEST' && prefix !== 'NPM_')
+        .some((prefix) => normalized.startsWith(prefix));
+    if (!unstableAmbientKey) {
+      fingerprintedEnvironment.set(platform === 'win32' ? normalized : key, value ?? '');
+    }
+  }
+  return Array.from(fingerprintedEnvironment.entries()).sort(([left], [right]) =>
+    left.localeCompare(right)
+  );
+}
+
+function repairSafetyEnvironmentFingerprint(repoRoot: string): string {
+  return hashText([
+    `node:${process.version}`,
+    `platform:${process.platform}`,
+    `arch:${process.arch}`,
+    `environment:${hashText(JSON.stringify(getRepairSafetyEnvironmentEntries(process.env)))}`,
     `envLocal:${hashFile(path.join(repoRoot, '.env.local'))}`,
   ].join('|'));
 }
@@ -380,18 +417,12 @@ function inputFingerprint(repoRoot: string): string {
   );
 }
 
-export function getFinaliseTaskFingerprint(params: {
-  repoRoot: string;
-  task: FinaliseTaskKey;
-  mode: FinaliseModeKey;
-  command: string;
-}): string {
-  const taskConfigPaths =
-    params.task === 'build'
+function getFinaliseTaskConfigPaths(task: FinaliseTaskKey): string[] {
+  return task === 'build'
       ? ['tsconfig.json', 'next.config.ts', 'next.config.js', 'next.config.mjs']
-      : params.task === 'test-run'
+      : task === 'test-run'
         ? ['tsconfig.json', 'tsconfig.tests.json', 'vitest.config.ts', 'vitest.workspace.ts']
-        : params.task === 'testsuite'
+        : task === 'testsuite'
           ? [
               'tsconfig.json',
               'tsconfig.tests.json',
@@ -399,6 +430,15 @@ export function getFinaliseTaskFingerprint(params: {
               'testsuite/config/playwright.config.ts',
             ]
           : [];
+}
+
+export function getFinaliseTaskFingerprint(params: {
+  repoRoot: string;
+  task: FinaliseTaskKey;
+  mode: FinaliseModeKey;
+  command: string;
+}): string {
+  const taskConfigPaths = getFinaliseTaskConfigPaths(params.task);
   return hashText(
     [
       `task:${params.task}`,
@@ -433,10 +473,10 @@ export function getFinaliseRepairSafetyFingerprint(params: {
       `head:${runGit(params.repoRoot, ['rev-parse', 'HEAD'])}`,
       `lock:${hashFile(path.join(params.repoRoot, 'package-lock.json'))}`,
       `pkg:${hashFile(path.join(params.repoRoot, 'package.json'))}`,
-      `tsconfig:${hashFile(path.join(params.repoRoot, 'tsconfig.json'))}`,
-      `next:${hashFile(path.join(params.repoRoot, 'next.config.ts'))}`,
-      `vitest:${hashFile(path.join(params.repoRoot, 'vitest.config.ts'))}`,
-      `env:${environmentFingerprint(params.repoRoot)}`,
+      ...getFinaliseTaskConfigPaths(params.task).map(
+        (relativePath) => `${relativePath}:${hashFile(path.join(params.repoRoot, relativePath))}`
+      ),
+      `env:${repairSafetyEnvironmentFingerprint(params.repoRoot)}`,
     ].join('\n')
   );
 }

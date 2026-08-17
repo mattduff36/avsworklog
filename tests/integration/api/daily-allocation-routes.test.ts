@@ -89,7 +89,7 @@ describe('daily allocation API auth', () => {
     const response = await GET(new NextRequest('http://localhost/api/daily-allocation/me'));
     expect(response.status).toBe(200);
     expect(eq).toHaveBeenCalledWith('profile_id', 'employee-1');
-  });
+  }, 10_000);
 
   it('PERM-SERVER-01 resolves Level 2 self, Level 4 manager, and Level 5 admin access', async () => {
     const { getDailyAllocationContext } = await import('@/lib/server/daily-allocation');

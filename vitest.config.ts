@@ -7,6 +7,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     globals: true,
+    // Avoid high-core machines starving individual tests under full-suite load.
+    maxWorkers: 4,
     setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',

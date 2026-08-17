@@ -1,5 +1,6 @@
 #!/usr/bin/env tsx
 import { spawnSync } from 'child_process';
+import { config } from 'dotenv';
 import path from 'path';
 import {
   getFinaliseRepairSafetyFingerprint,
@@ -19,6 +20,8 @@ import type { FinaliseTaskKey } from './finalise-recent-tasks';
 
 const REPO_ROOT = process.cwd();
 const MAX_ARTIFACT_AGE_MS = 24 * 60 * 60 * 1000;
+
+config({ path: path.resolve(REPO_ROOT, '.env.local') });
 
 interface RepairCommand {
   command: 'npm';

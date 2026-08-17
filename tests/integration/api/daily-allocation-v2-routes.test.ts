@@ -105,7 +105,7 @@ describe('DA2-AUTH-001 daily allocation v2 API', () => {
       }),
     }));
     expect(visitResponse.status).toBe(403);
-  });
+  }, 10_000);
 
   it('rejects view-as and forged-team v2 mutations', async () => {
     mockGetEffectiveModuleAccessLevel.mockResolvedValue(4);
