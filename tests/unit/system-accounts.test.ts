@@ -4,9 +4,11 @@ import { describe, expect, it } from 'vitest';
 import {
   filterSystemAccounts,
   filterSystemTeams,
+  getDisplayedTeamName,
   isSystemAccountProfile,
   isSystemTeam,
   SYSTEM_ACCOUNTS_TEAM_ID,
+  SYSTEM_TEAM_DISPLAY_NAME,
 } from '@/lib/utils/system-accounts';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
 import { getEffectiveAllowance } from '@/lib/utils/absence-carryover';
@@ -41,6 +43,8 @@ describe('SYSACC-01 system account helper', () => {
       { id: 'plant', is_system: false },
       { id: SYSTEM_ACCOUNTS_TEAM_ID, is_system: true },
     ]).map((team) => team.id)).toEqual(['plant']);
+    expect(getDisplayedTeamName({ id: SYSTEM_ACCOUNTS_TEAM_ID, name: 'System Accounts' })).toBe(SYSTEM_TEAM_DISPLAY_NAME);
+    expect(getDisplayedTeamName({ id: 'plant', is_system: false, name: 'Plant' })).toBe('Plant');
   });
 });
 
@@ -122,6 +126,10 @@ describe('SYSACC-05 migration contract', () => {
     expect(sql).toContain('FROM public.inventory_kiosk_config');
     expect(sql).not.toContain('yard-kiosk@squiresapp.com');
     expect(sql).toContain('private.system_account_absence_snapshots');
+    expect(sql.indexOf('INTO v_team_before')).toBeLessThan(sql.indexOf('INSERT INTO public.org_teams'));
+    expect(sql.indexOf('INSERT INTO private.system_account_migration_snapshots')).toBeLessThan(
+      sql.indexOf('INSERT INTO public.org_teams')
+    );
     expect(sql.indexOf('INSERT INTO private.system_account_absence_snapshots')).toBeLessThan(
       sql.indexOf('DELETE FROM public.absences')
     );
@@ -134,10 +142,140 @@ describe('SYSACC-05 migration contract', () => {
     expect(sql).toContain('ENABLE ROW LEVEL SECURITY');
     expect(sql).toContain('protect_system_account_identity');
     expect(sql).toContain('protect_system_team_permissions');
+    expect(sql).toContain('OLD.team_id');
+    expect(sql).toContain('System Accounts team defaults cannot be moved');
     expect(sql).toContain('COALESCE(NEW.snapshot_version, 1) <> 2');
     expect(sql).toContain('is_bank_holiday IS TRUE');
     expect(sql).toContain('FOR UPDATE');
     expect(sql).toContain('Configured kiosk has leave carryover');
+  });
+});
+
+describe('SYSACC-ID-01 kiosk identity', () => {
+  it('SYSACC-ID-01 targets only the configured kiosk_user_id with no email fallback', () => {
+    const sql = readSource('supabase/migrations/20260819170000_system_accounts.sql');
+    expect(sql).toContain('FROM public.inventory_kiosk_config');
+    expect(sql).toContain('kiosk_user_id');
+    expect(sql).not.toContain('yard-kiosk@squiresapp.com');
+    expect(sql).not.toContain('Yard Kiosk');
+    expect(sql.toLowerCase()).not.toContain("full_name ilike");
+  });
+});
+
+describe('SYSACC-SNAPSHOT-01 rollback snapshot', () => {
+  it('SYSACC-SNAPSHOT-01 captures team, profile, and absence rows before those mutations', () => {
+    const sql = readSource('supabase/migrations/20260819170000_system_accounts.sql');
+    expect(sql.indexOf('INTO v_team_before')).toBeLessThan(sql.indexOf('INSERT INTO public.org_teams'));
+    expect(sql.indexOf('INTO v_profile_before')).toBeLessThan(sql.indexOf('UPDATE public.profiles'));
+    expect(sql.indexOf('INSERT INTO private.system_account_absence_snapshots')).toBeLessThan(
+      sql.indexOf('DELETE FROM public.absences')
+    );
+    const reviewFixes = readSource('supabase/migrations/20260819180000_system_accounts_review_fixes.sql');
+    expect(reviewFixes).toContain("snapshot_key = 'yard-kiosk-system-accounts-v1'");
+    expect(reviewFixes).toContain('team_before = NULL');
+  });
+});
+
+describe('SYSACC-SCOPE-01 absence delete scope', () => {
+  it('SYSACC-SCOPE-01 deletes only the configured profile bank-holiday rows after snapshot IDs', () => {
+    const sql = readSource('supabase/migrations/20260819170000_system_accounts.sql');
+    expect(sql).toContain('AND absences.is_bank_holiday IS TRUE');
+    expect(sql).toContain('AND absences_archive.is_bank_holiday IS TRUE');
+    expect(sql).toContain('WHERE id IN (');
+    expect(sql).toContain('FROM private.system_account_absence_snapshots');
+    expect(sql).not.toContain('DELETE FROM public.absences\n  WHERE profile_id');
+  });
+});
+
+describe('SYSACC-RLS-01 mutation guards', () => {
+  it('SYSACC-RLS-01 blocks ordinary identity, team, and team-default writes', () => {
+    const sql = readSource('supabase/migrations/20260819170000_system_accounts.sql');
+    expect(sql).toContain('System accounts cannot be deleted');
+    expect(sql).toContain('System account identity cannot be changed');
+    expect(sql).toContain('System Accounts team cannot be deleted');
+    expect(sql).toContain('OLD.team_id');
+    expect(sql).toContain('System Accounts team defaults cannot be moved');
+    const adminUsers = readSource('app/api/admin/users/[id]/route.ts');
+    expect(adminUsers).toContain('System accounts cannot be edited from Admin Users');
+    expect(adminUsers).toContain('System accounts cannot be deleted');
+  });
+});
+
+describe('SYSACC-PERM-01 team defaults and inventory', () => {
+  it('SYSACC-PERM-01 keeps team defaults disabled and Inventory at exactly level 1', () => {
+    const sql = readSource('supabase/migrations/20260819170000_system_accounts.sql');
+    expect(sql).toContain('enabled = FALSE');
+    const configure = readSource('scripts/configure-inventory-yard-kiosk.ts');
+    expect(configure).toContain('const inventoryAccessLevel = 1');
+    expect(configure).toContain('inventory_access_level !== 1');
+    const mutations = readSource('lib/server/permission-matrix-mutations.ts');
+    expect(mutations).toContain('System Accounts team defaults cannot be changed');
+  });
+});
+
+describe('SYSACC-ADMIN-01 admin surfaces', () => {
+  it('SYSACC-ADMIN-01 shows muted System Accounts and rejects admin mutation bypasses', () => {
+    const matrix = readSource('components/admin/RoleManagement.tsx');
+    expect(matrix).toContain('group.isSystem');
+    expect(matrix).toContain('if (team.is_system) return');
+    const teamsTab = readSource('components/admin/TeamsTab.tsx');
+    expect(teamsTab).toContain('disabled={!canMutateTeams || isSystemTeam}');
+    const teamsApi = readSource('app/api/admin/hierarchy/teams/[id]/route.ts');
+    expect(teamsApi).toContain('System Accounts team cannot be changed');
+    expect(teamsApi).toContain('System Accounts team cannot be deleted');
+  });
+});
+
+describe('SYSACC-HIDE-01 operational hide', () => {
+  it('SYSACC-HIDE-01 filters operational people lists by is_system_account only', () => {
+    const helper = readSource('lib/utils/system-accounts.ts');
+    expect(helper).toContain('return candidate.is_system_account === true');
+    expect(helper).not.toContain('candidate.email');
+    const directory = readSource('app/api/users/directory/route.ts');
+    expect(directory).toContain("eq('is_system_account', false)");
+    const payroll = readSource('lib/server/payroll-admin.ts');
+    expect(payroll).toContain('filterSystemAccounts');
+  });
+});
+
+describe('SYSACC-DA-01 daily allocation', () => {
+  it('SYSACC-DA-01 excludes system accounts from list, publication, and labour assignment', () => {
+    const sql = readSource('supabase/migrations/20260819170000_system_accounts.sql');
+    expect(sql).toContain('private.filter_daily_allocation_scope_ids');
+    expect(sql).toContain('reject_system_account_labour_allocation');
+    expect(sql).toContain('COALESCE(profiles.is_system_account, FALSE) = FALSE');
+    const auth = readSource('lib/server/daily-allocation/auth.ts');
+    expect(auth).toContain('!isSystemAccountProfile(row)');
+  });
+});
+
+describe('SYSACC-YEAR-01 year close', () => {
+  it('SYSACC-YEAR-01 skips system profiles in the live year-close function', () => {
+    const sql = readSource('supabase/migrations/20260819170000_system_accounts.sql');
+    expect(sql).toContain('CREATE OR REPLACE FUNCTION public.close_absence_financial_year_bookings');
+    expect(sql).toContain('AND COALESCE(p.is_system_account, FALSE) = FALSE');
+    expect(sql).toContain('snapshot_financial_year_carryovers_before_close');
+  });
+});
+
+describe('SYSACC-TYPES-01 generated types', () => {
+  it('SYSACC-TYPES-01 includes the new profile and team flags', () => {
+    const database = readSource('types/database.ts');
+    expect(database).toContain('is_system_account: boolean');
+    expect(database).toContain('is_system: boolean');
+    const roles = readSource('types/roles.ts');
+    expect(roles).toContain('is_system_account: boolean');
+  });
+});
+
+describe('SYSACC-NONREG-01 kiosk pairing unchanged', () => {
+  it('SYSACC-NONREG-01 leaves pairing, trusted-device, and transfer RPC files untouched by hide logic', () => {
+    const pairing = readSource('lib/server/inventory-kiosk-devices.ts');
+    expect(pairing).not.toContain('is_system_account');
+    expect(pairing).not.toContain('system-accounts');
+    const configure = readSource('scripts/configure-inventory-yard-kiosk.ts');
+    expect(configure).not.toContain('inventory_kiosk_devices');
+    expect(configure).not.toContain('inventory_kiosk_execute_transfer');
   });
 });
 
@@ -147,17 +285,21 @@ describe('SYSACC-06 muted admin UI keeps system accounts visible', () => {
     expect(matrix).toContain('group.isSystem');
     expect(matrix).toContain('user.is_system_account');
     expect(matrix).toContain('if (team.is_system) return');
+    expect(matrix).toContain('getDisplayedTeamName');
     expect(matrix).toContain('System');
+    expect(matrix).not.toContain('normal-case italic leading-none text-slate-500');
     expect(matrix).not.toContain('filterSystemAccounts(');
 
     const adminUsers = readSource('app/(dashboard)/admin/users/page.tsx');
     expect(adminUsers).toContain('isSystemAccountProfile');
+    expect(adminUsers).toContain('getDisplayedTeamName');
     expect(adminUsers).toContain('System');
     expect(adminUsers).not.toContain('filterSystemAccounts(');
     expect(adminUsers).toContain('createUserTeamOptions');
 
     const teamsTab = readSource('components/admin/TeamsTab.tsx');
     expect(teamsTab).toContain('isSystemTeam');
+    expect(teamsTab).toContain('getDisplayedTeamName');
     expect(teamsTab).toContain('disabled={!canMutateTeams || isSystemTeam}');
   });
 });

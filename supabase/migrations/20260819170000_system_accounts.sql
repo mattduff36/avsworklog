@@ -124,20 +124,34 @@ LANGUAGE plpgsql
 SET search_path = public, pg_temp
 AS $$
 DECLARE
-  v_team_id TEXT;
-  v_enabled BOOLEAN;
+  v_old_is_system BOOLEAN := FALSE;
+  v_new_is_system BOOLEAN := FALSE;
 BEGIN
   IF COALESCE(current_setting('app.system_account_maintenance', true), '') = 'on' THEN
     RETURN COALESCE(NEW, OLD);
   END IF;
 
-  v_team_id := CASE WHEN TG_OP = 'DELETE' THEN OLD.team_id ELSE NEW.team_id END;
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.org_teams
-    WHERE id = v_team_id
-      AND (is_system = TRUE OR id = 'system_accounts')
-  ) THEN
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.org_teams
+      WHERE id = OLD.team_id
+        AND (is_system = TRUE OR id = 'system_accounts')
+    )
+    INTO v_old_is_system;
+  END IF;
+
+  IF TG_OP IN ('INSERT', 'UPDATE') THEN
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.org_teams
+      WHERE id = NEW.team_id
+        AND (is_system = TRUE OR id = 'system_accounts')
+    )
+    INTO v_new_is_system;
+  END IF;
+
+  IF NOT v_old_is_system AND NOT v_new_is_system THEN
     RETURN COALESCE(NEW, OLD);
   END IF;
 
@@ -145,8 +159,11 @@ BEGIN
     RAISE EXCEPTION 'System Accounts team defaults cannot be removed';
   END IF;
 
-  v_enabled := COALESCE(NEW.enabled, FALSE);
-  IF v_enabled THEN
+  IF TG_OP = 'UPDATE' AND NEW.team_id IS DISTINCT FROM OLD.team_id THEN
+    RAISE EXCEPTION 'System Accounts team defaults cannot be moved';
+  END IF;
+
+  IF COALESCE(NEW.enabled, FALSE) THEN
     RAISE EXCEPTION 'System Accounts team defaults cannot be enabled';
   END IF;
 
@@ -370,48 +387,6 @@ GRANT EXECUTE ON FUNCTION public.close_absence_financial_year_bookings(INTEGER, 
 SELECT set_config('app.system_account_maintenance', 'on', true);
 SELECT set_config('app.absence_historic_delete_bypass', 'on', true);
 
-INSERT INTO public.org_teams (
-  id,
-  name,
-  code,
-  active,
-  is_system,
-  timesheet_type,
-  manager_1_profile_id,
-  manager_2_profile_id
-)
-VALUES (
-  'system_accounts',
-  'System Accounts',
-  'system',
-  TRUE,
-  TRUE,
-  NULL,
-  NULL,
-  NULL
-)
-ON CONFLICT (id) DO UPDATE
-SET
-  name = EXCLUDED.name,
-  code = EXCLUDED.code,
-  active = TRUE,
-  is_system = TRUE,
-  timesheet_type = NULL,
-  manager_1_profile_id = NULL,
-  manager_2_profile_id = NULL;
-
-INSERT INTO public.team_module_permissions (team_id, module_name, enabled, updated_at)
-SELECT
-  'system_accounts',
-  permission_modules.module_name,
-  FALSE,
-  NOW()
-FROM public.permission_modules
-ON CONFLICT (team_id, module_name) DO UPDATE
-SET
-  enabled = FALSE,
-  updated_at = NOW();
-
 DO $$
 DECLARE
   v_kiosk_id UUID;
@@ -420,45 +395,6 @@ DECLARE
   v_team_before JSONB;
   v_team_permissions_before JSONB;
 BEGIN
-  SELECT kiosk_user_id
-  INTO v_kiosk_id
-  FROM public.inventory_kiosk_config
-  WHERE id = 1
-  FOR UPDATE;
-
-  IF v_kiosk_id IS NULL THEN
-    RETURN;
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM public.absence_allowance_carryovers
-    WHERE profile_id = v_kiosk_id
-  ) THEN
-    RAISE EXCEPTION 'Configured kiosk has leave carryover; refusing system-account migration';
-  END IF;
-
-  PERFORM 1 FROM public.profiles WHERE id = v_kiosk_id FOR UPDATE;
-  PERFORM 1
-  FROM public.absences
-  WHERE profile_id = v_kiosk_id
-    AND is_bank_holiday IS TRUE
-  FOR UPDATE;
-  PERFORM 1
-  FROM public.absences_archive
-  WHERE profile_id = v_kiosk_id
-    AND is_bank_holiday IS TRUE
-  FOR UPDATE;
-
-  SELECT to_jsonb(profiles.*)
-  INTO v_profile_before
-  FROM public.profiles
-  WHERE id = v_kiosk_id;
-
-  IF v_profile_before IS NULL THEN
-    RAISE EXCEPTION 'Configured kiosk profile was not found';
-  END IF;
-
   SELECT to_jsonb(org_teams.*)
   INTO v_team_before
   FROM public.org_teams
@@ -469,51 +405,134 @@ BEGIN
   FROM public.team_module_permissions
   WHERE team_id = 'system_accounts';
 
-  INSERT INTO private.system_account_migration_snapshots (
-    snapshot_key,
-    kiosk_user_id,
-    profile_before,
-    team_before,
-    team_permissions_before
+  SELECT kiosk_user_id
+  INTO v_kiosk_id
+  FROM public.inventory_kiosk_config
+  WHERE id = 1
+  FOR UPDATE;
+
+  IF v_kiosk_id IS NOT NULL THEN
+    IF EXISTS (
+      SELECT 1
+      FROM public.absence_allowance_carryovers
+      WHERE profile_id = v_kiosk_id
+    ) THEN
+      RAISE EXCEPTION 'Configured kiosk has leave carryover; refusing system-account migration';
+    END IF;
+
+    PERFORM 1 FROM public.profiles WHERE id = v_kiosk_id FOR UPDATE;
+    PERFORM 1
+    FROM public.absences
+    WHERE profile_id = v_kiosk_id
+      AND is_bank_holiday IS TRUE
+    FOR UPDATE;
+    PERFORM 1
+    FROM public.absences_archive
+    WHERE profile_id = v_kiosk_id
+      AND is_bank_holiday IS TRUE
+    FOR UPDATE;
+
+    SELECT to_jsonb(profiles.*)
+    INTO v_profile_before
+    FROM public.profiles
+    WHERE id = v_kiosk_id;
+
+    IF v_profile_before IS NULL THEN
+      RAISE EXCEPTION 'Configured kiosk profile was not found';
+    END IF;
+
+    INSERT INTO private.system_account_migration_snapshots (
+      snapshot_key,
+      kiosk_user_id,
+      profile_before,
+      team_before,
+      team_permissions_before
+    )
+    VALUES (
+      v_snapshot_key,
+      v_kiosk_id,
+      v_profile_before,
+      v_team_before,
+      v_team_permissions_before
+    )
+    ON CONFLICT (snapshot_key) DO NOTHING;
+
+    INSERT INTO private.system_account_absence_snapshots (
+      snapshot_key,
+      source_table,
+      absence_id,
+      row_data
+    )
+    SELECT v_snapshot_key, 'absences', absences.id, to_jsonb(absences.*)
+    FROM public.absences
+    WHERE absences.profile_id = v_kiosk_id
+      AND absences.is_bank_holiday IS TRUE
+      AND NOT EXISTS (
+        SELECT 1
+        FROM private.system_account_absence_snapshots AS existing
+        WHERE existing.snapshot_key = v_snapshot_key
+          AND existing.source_table = 'absences'
+          AND existing.absence_id = absences.id
+      )
+    UNION ALL
+    SELECT v_snapshot_key, 'absences_archive', absences_archive.id, to_jsonb(absences_archive.*)
+    FROM public.absences_archive
+    WHERE absences_archive.profile_id = v_kiosk_id
+      AND absences_archive.is_bank_holiday IS TRUE
+      AND NOT EXISTS (
+        SELECT 1
+        FROM private.system_account_absence_snapshots AS existing
+        WHERE existing.snapshot_key = v_snapshot_key
+          AND existing.source_table = 'absences_archive'
+          AND existing.absence_id = absences_archive.id
+      );
+  END IF;
+
+  INSERT INTO public.org_teams (
+    id,
+    name,
+    code,
+    active,
+    is_system,
+    timesheet_type,
+    manager_1_profile_id,
+    manager_2_profile_id
   )
   VALUES (
-    v_snapshot_key,
-    v_kiosk_id,
-    v_profile_before,
-    v_team_before,
-    v_team_permissions_before
+    'system_accounts',
+    'System Accounts',
+    'system',
+    TRUE,
+    TRUE,
+    NULL,
+    NULL,
+    NULL
   )
-  ON CONFLICT (snapshot_key) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE
+  SET
+    name = EXCLUDED.name,
+    code = EXCLUDED.code,
+    active = TRUE,
+    is_system = TRUE,
+    timesheet_type = NULL,
+    manager_1_profile_id = NULL,
+    manager_2_profile_id = NULL;
 
-  INSERT INTO private.system_account_absence_snapshots (
-    snapshot_key,
-    source_table,
-    absence_id,
-    row_data
-  )
-  SELECT v_snapshot_key, 'absences', absences.id, to_jsonb(absences.*)
-  FROM public.absences
-  WHERE absences.profile_id = v_kiosk_id
-    AND absences.is_bank_holiday IS TRUE
-    AND NOT EXISTS (
-      SELECT 1
-      FROM private.system_account_absence_snapshots AS existing
-      WHERE existing.snapshot_key = v_snapshot_key
-        AND existing.source_table = 'absences'
-        AND existing.absence_id = absences.id
-    )
-  UNION ALL
-  SELECT v_snapshot_key, 'absences_archive', absences_archive.id, to_jsonb(absences_archive.*)
-  FROM public.absences_archive
-  WHERE absences_archive.profile_id = v_kiosk_id
-    AND absences_archive.is_bank_holiday IS TRUE
-    AND NOT EXISTS (
-      SELECT 1
-      FROM private.system_account_absence_snapshots AS existing
-      WHERE existing.snapshot_key = v_snapshot_key
-        AND existing.source_table = 'absences_archive'
-        AND existing.absence_id = absences_archive.id
-    );
+  INSERT INTO public.team_module_permissions (team_id, module_name, enabled, updated_at)
+  SELECT
+    'system_accounts',
+    permission_modules.module_name,
+    FALSE,
+    NOW()
+  FROM public.permission_modules
+  ON CONFLICT (team_id, module_name) DO UPDATE
+  SET
+    enabled = FALSE,
+    updated_at = NOW();
+
+  IF v_kiosk_id IS NULL THEN
+    RETURN;
+  END IF;
 
   DELETE FROM public.absences
   WHERE id IN (
