@@ -55,6 +55,12 @@ active Inventory location.
 - Collect may instead type location details. That take moves stock to the
   singleton system `In transfer` location and opens an Actions item. The
   browser never sends the transfer location id.
+- A user with the Actions module allocates that item from `/actions` →
+  **Yard transfers**. Workshop staff without Actions cannot see that tab.
+  Allocate may pick an existing operational location or create one in that
+  dialog only. `POST /api/inventory/locations` stays inventory-manager only.
+- Resolved Yard takes stay on the Actioned tab. Remote control uses snapshot
+  schema v2 so a manager can operate the typed-location path.
 
 ### YK-003: Guided transfer
 
@@ -258,6 +264,14 @@ active Inventory location.
 - A selected legacy counterpart remains valid for the current basket,
   submission, and receipt. Server-side location-ID authorization remains
   unchanged.
+
+## Operational limits
+
+- Hardware quantities at In transfer are fungible. Allocate reconstructs the
+  original intake quantity from the take's hardware transactions.
+- Do not drop the In transfer location after first use. Disable the typed-take
+  UI and APIs if the feature must be withdrawn; remaining stock stays visible
+  until it is allocated.
 
 ## Non-goals
 

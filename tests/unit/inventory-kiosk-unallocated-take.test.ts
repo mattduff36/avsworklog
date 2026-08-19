@@ -149,6 +149,34 @@ describe('Yard kiosk unallocated take contract', () => {
     expect(reviewRunner).toContain('YK-AUTH-001');
   });
 
+  it('YK-AUTH-002 and YK-LOC-001 keep allocate on Actions and location create on that dialog only', () => {
+    const actionsPage = readFileSync(
+      resolve(process.cwd(), 'app/(dashboard)/actions/page.tsx'),
+      'utf8',
+    );
+    const locationsRoute = readFileSync(
+      resolve(process.cwd(), 'app/api/inventory/locations/route.ts'),
+      'utf8',
+    );
+    const allocateServer = readFileSync(
+      resolve(process.cwd(), 'lib/server/inventory-kiosk-allocate.ts'),
+      'utf8',
+    );
+    const actionedPanel = readFileSync(
+      resolve(process.cwd(), 'app/(dashboard)/actions/components/ActionedActionsPanel.tsx'),
+      'utf8',
+    );
+
+    expect(actionsPage).toContain("usePermissionCheck('actions'");
+    expect(actionedPanel).toContain('INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY');
+    expect(actionsPage).toContain('canViewActions');
+    expect(allocateApi).toContain("canEffectiveRoleAccessModule('actions')");
+    expect(allocateApi).not.toContain('requireInventoryManagerAccess');
+    expect(locationsRoute).toContain('requireInventoryManagerAccess');
+    expect(allocateServer).toContain("admin.rpc('inventory_allocate_unallocated_kiosk_take'");
+    expect(allocateServer).not.toContain(".from('inventory_locations')\n    .insert(");
+  });
+
   it('YK-REMOTE-001 accepts snapshot v1 during rollout and validates v2 typed-path controls', () => {
     expect(remoteServer).toContain('snapshot.schema_version !== 1 && snapshot.schema_version !== 2');
     expect(remoteServer).toContain("type === 'select_unallocated_location'");
@@ -174,9 +202,23 @@ describe('Yard kiosk unallocated take contract', () => {
     expect(reviewRunner).toContain('YK-INVAR-001');
   });
 
-  it('YK-RISK-003 records that RPC execution tests are not run against production', () => {
+  it('YK-RISK-003 runs take and allocate on disposable PGlite instead of production', () => {
+    const runtimeTest = readFileSync(
+      resolve(process.cwd(), 'tests/db/inventory-kiosk-unallocated-take-runtime.test.ts'),
+      'utf8',
+    );
+    const harness = readFileSync(
+      resolve(process.cwd(), 'tests/db/inventory-kiosk-unallocated-take-pglite-harness.ts'),
+      'utf8',
+    );
     expect(reviewRunner).not.toContain('inventory_kiosk_execute_unallocated_take(');
-    expect(reviewRunner).toContain('has_function_privilege');
-    expect(reviewRunner).toContain('YK-INVAR-001');
+    expect(runtimeTest).toContain('YK-RPC-TAKE-001');
+    expect(runtimeTest).toContain('YK-RPC-ALLOC-001');
+    expect(runtimeTest).toContain('YK-RPC-ALLOC-003');
+    expect(harness).toContain('inventory_kiosk_execute_unallocated_take');
+    expect(harness).toContain('inventory_allocate_unallocated_kiosk_take');
+    expect(harness).toContain('new PGlite');
+    expect(harness).not.toContain('POSTGRES_URL');
+    expect(runtimeTest).not.toContain('POSTGRES_URL');
   });
 });
