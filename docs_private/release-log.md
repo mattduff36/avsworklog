@@ -2,6 +2,35 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.32.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update Daily Allocation, Actions, and Daily Tasks`
+
+**PUSHED AT**
+2026-08-19T11:11:04.191Z
+
+**WHAT CHANGED**
+Update Daily Allocation, Actions, and Daily Tasks. Remove duplicate add timed visit control. Keep board toolbar controls on one row. Handle draft save misses without PGRST116. Fill viewport and hide unscheduled job rows. Remove retired TestSprite artifacts.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Allocation, Actions, and Daily Tasks, with changes to interface components and automated tests.
+- Updated workshop tasks across 4 changed files.
+- Updated navigation, with changes to interface components, shared logic, and automated tests.
+- Handled draft save misses without PGRST116, with changes to app screens, shared logic, and automated tests.
+- Updated help and FAQ, with changes to documentation.
+- Updated reports, with changes to documentation.
+- Updated sign in across 2 changed files.
+- Updated fleet across 2 changed files.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update Daily Allocation, Actions, and Daily Tasks`
+- `fix(daily-allocation): remove duplicate add timed visit control`
+- `fix(daily-allocation): keep board toolbar controls on one row`
+- `fix(hgv-inspections): handle draft save misses without PGRST116`
+- `fix(daily-allocation): fill viewport and hide unscheduled job rows`
+- `chore: remove retired TestSprite artifacts`
+
 ## 0826.31.0
 
 **GIT COMMIT MESSAGE**
