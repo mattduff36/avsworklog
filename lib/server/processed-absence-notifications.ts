@@ -188,9 +188,11 @@ export async function resolveProcessedAbsenceNotificationRecipientIds(
       id,
       team_id,
       super_admin,
+      is_system_account,
       team:org_teams!profiles_team_id_fkey(id, name),
       role:roles!profiles_role_id_fkey(name, hierarchy_rank, is_super_admin, role_class)
-    `);
+    `)
+    .eq('is_system_account', false);
 
   if (error) {
     throw new Error(error.message || 'Failed to resolve processed absence notification recipients');

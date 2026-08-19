@@ -9,6 +9,14 @@ function asAdminClient(value: unknown) {
   return value as never;
 }
 
+function mockProfilesListQuery(data: unknown[]) {
+  const eq = vi.fn().mockResolvedValue({ data, error: null });
+  return {
+    select: vi.fn(() => ({ eq })),
+    eq,
+  };
+}
+
 const recipientProfiles = [
   {
     id: 'accounts-supervisor',
@@ -59,14 +67,14 @@ describe('processed absence notifications', () => {
     vi.clearAllMocks();
   });
 
-  it('resolves Accounts supervisor+ recipients plus global admins', async () => {
+  it('SYSACC-R1-PAN-TEST-01 resolves Accounts supervisor+ recipients plus global admins', async () => {
+    const profilesQuery = mockProfilesListQuery(recipientProfiles);
     const admin = {
-      from: vi.fn(() => ({
-        select: vi.fn().mockResolvedValue({ data: recipientProfiles, error: null }),
-      })),
+      from: vi.fn(() => profilesQuery),
     };
 
     const recipients = await resolveProcessedAbsenceNotificationRecipientIds(asAdminClient(admin));
+    expect(profilesQuery.eq).toHaveBeenCalledWith('is_system_account', false);
 
     expect(recipients).toEqual([
       'accounts-supervisor',
@@ -86,9 +94,7 @@ describe('processed absence notifications', () => {
     const admin = {
       from: vi.fn((table: string) => {
         if (table === 'profiles') {
-          return {
-            select: vi.fn().mockResolvedValue({ data: recipientProfiles.slice(0, 2), error: null }),
-          };
+          return mockProfilesListQuery(recipientProfiles.slice(0, 2));
         }
 
         if (table === 'messages') {
@@ -168,9 +174,10 @@ describe('processed absence notifications', () => {
         maybeSingle: vi.fn().mockResolvedValue({ data: { full_name: 'Accounts User' }, error: null }),
       })),
     };
+    const recipientListQuery = mockProfilesListQuery(recipientProfiles.slice(0, 1));
     const profilesSelect = vi.fn((columns: string) => {
       if (columns === 'full_name') return actorProfileBuilder;
-      return Promise.resolve({ data: recipientProfiles.slice(0, 1), error: null });
+      return recipientListQuery;
     });
     const admin = {
       from: vi.fn((table: string) => {

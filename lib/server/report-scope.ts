@@ -70,6 +70,31 @@ export async function getReportScopeContext(): Promise<ReportScopeContext> {
   };
 }
 
+export function isProfileVisibleInReportScope(
+  profileId: string | null | undefined,
+  scopedProfileIds: Set<string> | null,
+  hiddenProfileIds: Set<string>
+): boolean {
+  if (!profileId || hiddenProfileIds.has(profileId)) {
+    return false;
+  }
+  if (!scopedProfileIds) {
+    return true;
+  }
+  return scopedProfileIds.has(profileId);
+}
+
+export function filterRowsForReportProfileScope<T>(
+  rows: T[],
+  scopedProfileIds: Set<string> | null,
+  hiddenProfileIds: Set<string>,
+  getProfileId: (row: T) => string | null | undefined
+): T[] {
+  return rows.filter((row) =>
+    isProfileVisibleInReportScope(getProfileId(row), scopedProfileIds, hiddenProfileIds)
+  );
+}
+
 export async function getScopedProfileIdsForModule(
   moduleName: ModuleName,
   context: ReportScopeContext
@@ -94,7 +119,8 @@ export async function getScopedProfileIdsForModule(
   const admin = createAdminClient();
   let profileQuery = admin
     .from('profiles')
-    .select('id, team_id')
+    .select('id, team_id, is_system_account')
+    .eq('is_system_account', false)
     .not('full_name', 'ilike', '%(Deleted User)%');
 
   if (context.shouldScopeToTeam) {

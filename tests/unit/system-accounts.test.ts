@@ -12,6 +12,7 @@ import {
 } from '@/lib/utils/system-accounts';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
 import { getEffectiveAllowance } from '@/lib/utils/absence-carryover';
+import { filterRowsForReportProfileScope, isProfileVisibleInReportScope } from '@/lib/server/report-scope';
 
 function readSource(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf8');
@@ -314,5 +315,96 @@ describe('SYSACC-07 configure-kiosk script', () => {
     expect(source).toContain("app.system_account_maintenance");
     expect(source).toContain('inventory_access_level !== 1');
     expect(source).not.toContain('minimum_role.hierarchy_rank');
+  });
+});
+
+describe('SYSACC-R1 remaining operational pickers', () => {
+  it('SYSACC-R1 omits system accounts from remaining report, scope, and settings lists', () => {
+    const stats = readSource('app/api/reports/stats/route.ts');
+    expect(stats).toContain("eq('is_system_account', false)");
+    expect(stats).toContain('isProfileVisibleInReportScope');
+
+    const timesheetScope = readSource('lib/server/reports-timesheet-scope.ts');
+    expect(timesheetScope).toContain('filterRowsForReportProfileScope');
+    expect(timesheetScope).toContain('getSystemAccountIds');
+
+    const reportScope = readSource('lib/server/report-scope.ts');
+    expect(reportScope).toContain("eq('is_system_account', false)");
+
+    const timesheetExceptions = readSource('lib/server/timesheet-type-exceptions.ts');
+    expect(timesheetExceptions).toContain("eq('is_system_account', false)");
+    expect(timesheetExceptions).toContain('isSystemAccountProfile(profile)');
+
+    const processedAbsence = readSource('lib/server/processed-absence-notifications.ts');
+    expect(processedAbsence).toContain("eq('is_system_account', false)");
+    const processedAbsenceTests = readSource('tests/unit/processed-absence-notifications.test.ts');
+    expect(processedAbsenceTests).toContain("toHaveBeenCalledWith('is_system_account', false)");
+
+    const operationalListSources = [
+      'app/api/users/directory/route.ts',
+      'app/api/permissions/users/route.ts',
+      'app/api/reports/absence-leave/allowance-totals/route.ts',
+      'app/api/reports/absence-leave/bookings/route.ts',
+      'lib/server/absence-weekly-print-report.ts',
+      'lib/services/absence-bank-holiday-sync.ts',
+      'lib/server/payroll-admin.ts',
+      'lib/server/daily-allocation/auth.ts',
+      'lib/server/daily-allocation/board.ts',
+      'app/api/messages/route.ts',
+      'app/api/quotes/metadata/route.ts',
+      'app/api/notification-preferences/admin/route.ts',
+      'app/api/timesheets/managers/route.ts',
+      'app/api/superadmin/active-users/route.ts',
+      'lib/server/team-permissions.ts',
+    ];
+    for (const relativePath of operationalListSources) {
+      const source = readSource(relativePath);
+      expect(
+        source.includes("eq('is_system_account', false)")
+        || source.includes('filterSystemAccounts')
+        || source.includes('filterOperationalProfiles')
+        || source.includes('getSystemAccountIds')
+        || source.includes('!isSystemAccountProfile')
+      ).toBe(true);
+    }
+  });
+});
+
+describe('SYSACC-R1-REPORT-UNSCOPED-01 unrestricted report hide', () => {
+  it('SYSACC-R1-REPORT-UNSCOPED-01 drops system accounts when report scope is unrestricted', () => {
+    const hiddenProfileIds = new Set(['kiosk']);
+    expect(isProfileVisibleInReportScope('kiosk', null, hiddenProfileIds)).toBe(false);
+    expect(isProfileVisibleInReportScope('employee', null, hiddenProfileIds)).toBe(true);
+    expect(isProfileVisibleInReportScope('employee', new Set(['employee']), hiddenProfileIds)).toBe(true);
+    expect(isProfileVisibleInReportScope('kiosk', new Set(['kiosk', 'employee']), hiddenProfileIds)).toBe(false);
+
+    const rows = filterRowsForReportProfileScope(
+      [{ user_id: 'kiosk' }, { user_id: 'employee' }],
+      null,
+      hiddenProfileIds,
+      (row) => row.user_id
+    );
+    expect(rows.map((row) => row.user_id)).toEqual(['employee']);
+  });
+});
+
+describe('SYSACC-R2 live allowance SQL', () => {
+  it('SYSACC-R2 excludes system accounts from carryover COALESCE-to-28', () => {
+    const sql = readSource('supabase/migrations/20260819190000_system_accounts_allowance_exclusions.sql');
+    expect(sql).toContain('CREATE OR REPLACE FUNCTION public.recalculate_financial_year_carryover_for_profile');
+    expect(sql).toContain('WHEN COALESCE(is_system_account, FALSE) THEN COALESCE(annual_holiday_allowance_days, 0)');
+    expect(sql).toContain('ELSE COALESCE(annual_holiday_allowance_days, 28)');
+    expect(sql).toContain('IF v_is_system_account THEN');
+    expect(sql.indexOf('IF v_is_system_account THEN')).toBeLessThan(
+      sql.indexOf('IF v_base_allowance IS NULL THEN')
+    );
+
+    const yearClose = readSource('supabase/migrations/20260819170000_system_accounts.sql');
+    expect(yearClose).toContain('AND COALESCE(p.is_system_account, FALSE) = FALSE');
+
+    const bankHoliday = readSource('lib/services/absence-bank-holiday-sync.ts');
+    expect(bankHoliday).toContain("eq('is_system_account', false)");
+    expect(getEffectiveAllowance(0)).toBe(0);
+    expect(getEffectiveAllowance(null)).toBe(28);
   });
 });

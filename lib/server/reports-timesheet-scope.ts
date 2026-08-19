@@ -1,4 +1,10 @@
-import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getSystemAccountIds } from '@/lib/server/system-accounts';
+import {
+  filterRowsForReportProfileScope,
+  getReportScopeContext,
+  getScopedProfileIdsForModule,
+} from '@/lib/server/report-scope';
 
 interface TimesheetScopeRow {
   user_id: string;
@@ -21,10 +27,15 @@ export async function filterTimesheetRowsForReportScope<T extends TimesheetScope
     return rows;
   }
 
-  const moduleScopedProfileIds = await getTimesheetReportScopedProfileIds();
-  if (!moduleScopedProfileIds) {
-    return rows;
-  }
+  const [moduleScopedProfileIds, hiddenProfileIds] = await Promise.all([
+    getTimesheetReportScopedProfileIds(),
+    getSystemAccountIds(createAdminClient()),
+  ]);
 
-  return rows.filter((row) => moduleScopedProfileIds.has(row.user_id));
+  return filterRowsForReportProfileScope(
+    rows,
+    moduleScopedProfileIds,
+    hiddenProfileIds,
+    (row) => row.user_id
+  );
 }

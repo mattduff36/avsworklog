@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { isProfileVisibleInReportScope } from '@/lib/server/report-scope';
 import { getTimesheetReportScopedProfileIds } from '@/lib/server/reports-timesheet-scope';
+import { getSystemAccountIds } from '@/lib/server/system-accounts';
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     const scopedIds = scopedProfileIds ? Array.from(scopedProfileIds) : null;
+    const hiddenProfileIds = await getSystemAccountIds(createAdminClient());
 
     const now = new Date();
     const startOfWeek = new Date(now);
@@ -52,13 +56,13 @@ export async function GET(request: NextRequest) {
 
     let weekTimesheetsQuery = db
       .from('timesheets')
-      .select('total_hours')
+      .select('user_id, total_hours')
       .eq('status', 'approved')
       .gte('week_ending', startOfWeek.toISOString())
       .lte('week_ending', endOfWeek.toISOString());
     let monthTimesheetsQuery = db
       .from('timesheets')
-      .select('total_hours')
+      .select('user_id, total_hours')
       .eq('status', 'approved')
       .gte('week_ending', startOfMonth.toISOString())
       .lte('week_ending', endOfMonth.toISOString());
@@ -69,7 +73,8 @@ export async function GET(request: NextRequest) {
     let activeEmployeesQuery = db
       .from('profiles')
       .select('id, roles!inner(is_manager_admin)', { count: 'exact' })
-      .eq('roles.is_manager_admin', false);
+      .eq('roles.is_manager_admin', false)
+      .eq('is_system_account', false);
 
     if (scopedIds) {
       weekTimesheetsQuery = weekTimesheetsQuery.in('user_id', scopedIds);
@@ -114,9 +119,11 @@ export async function GET(request: NextRequest) {
         .lte('inspection_date', endOfMonth.toISOString()),
     ]);
 
-    const weekHours = ((weekTimesheetsResult.data || []) as Array<{ total_hours?: number | null }>)
+    const weekHours = ((weekTimesheetsResult.data || []) as Array<{ user_id?: string | null; total_hours?: number | null }>)
+      .filter((t) => isProfileVisibleInReportScope(t.user_id, scopedProfileIds, hiddenProfileIds))
       .reduce((sum, t) => sum + (t.total_hours || 0), 0);
-    const monthHours = ((monthTimesheetsResult.data || []) as Array<{ total_hours?: number | null }>)
+    const monthHours = ((monthTimesheetsResult.data || []) as Array<{ user_id?: string | null; total_hours?: number | null }>)
+      .filter((t) => isProfileVisibleInReportScope(t.user_id, scopedProfileIds, hiddenProfileIds))
       .reduce((sum, t) => sum + (t.total_hours || 0), 0);
 
     const { data: inspectionItems } = await db

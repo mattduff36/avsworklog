@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 import {
   normalizeTimesheetExceptionOverrideType,
   normalizeTimesheetExceptionType,
@@ -12,6 +13,7 @@ interface ProfileWithDefaultsRow {
   full_name: string | null;
   employee_id: string | null;
   team_id: string | null;
+  is_system_account?: boolean | null;
   team?: {
     id?: string | null;
     name?: string | null;
@@ -73,8 +75,9 @@ export async function getTimesheetTypeExceptionMatrix(): Promise<TimesheetTypeEx
   const { data: profilesData, error: profilesError } = await admin
     .from('profiles')
     .select(
-      'id, full_name, employee_id, team_id, team:org_teams!profiles_team_id_fkey(id, name, timesheet_type), role:roles(name, display_name, timesheet_type)'
+      'id, full_name, employee_id, team_id, is_system_account, team:org_teams!profiles_team_id_fkey(id, name, timesheet_type), role:roles(name, display_name, timesheet_type)'
     )
+    .eq('is_system_account', false)
     .in('id', profileIds);
 
   if (profilesError) {
@@ -89,7 +92,7 @@ export async function getTimesheetTypeExceptionMatrix(): Promise<TimesheetTypeEx
   const rows = exceptionRows
     .map((exceptionRow) => {
       const profile = profilesById.get(exceptionRow.profile_id);
-      if (!profile) return null;
+      if (!profile || isSystemAccountProfile(profile)) return null;
 
       const defaultType = resolveDefaultTimesheetType({
         teamTimesheetType: profile.team?.timesheet_type,
