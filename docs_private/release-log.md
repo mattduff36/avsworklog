@@ -2,6 +2,32 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.33.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update Inventory and Help and FAQ`
+
+**PUSHED AT**
+2026-08-19T14:41:46.460Z
+
+**WHAT CHANGED**
+Update Inventory and Help and FAQ. Unallocated yard take via actions. Stop logging expected absence denials and profile network failures.
+
+**VERSION HISTORY DETAILS**
+- Updated Inventory and Help and FAQ, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated actions, with changes to background routes, app screens, and shared logic.
+- Updated reminders, with changes to shared logic.
+- Updated absence and leave, with changes to shared logic and automated tests.
+- Updated help and FAQ, with changes to documentation.
+- Updated fleet, with changes to background routes.
+- Updated profile, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update Inventory and Help and FAQ`
+- `feat(inventory): unallocated yard take via actions`
+- `fix(errors): stop logging expected absence denials and profile network failures`
+
 ## 0826.32.2
 
 **GIT COMMIT MESSAGE**

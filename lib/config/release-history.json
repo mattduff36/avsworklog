@@ -1,5 +1,34 @@
 [
   {
+    "version": "0826.33.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated Inventory and Help and FAQ. Unallocated yard take via actions. Stop logging expected absence denials and profile network failures.",
+    "summary": "Updated Inventory and Help and FAQ. Unallocated yard take via actions. Stop logging expected absence denials and profile network failures.",
+    "details": [
+      "Updated Inventory and Help and FAQ, with changes to background routes, app screens, shared logic, automation scripts, automated tests, data storage, and documentation.",
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Updated actions, with changes to background routes, app screens, and shared logic.",
+      "Updated reminders, with changes to shared logic.",
+      "Updated absence and leave, with changes to shared logic and automated tests.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated fleet, with changes to background routes.",
+      "Updated profile, with changes to app screens."
+    ],
+    "areas": [
+      "Inventory",
+      "Error reporting",
+      "Help",
+      "FAQ. Unallocated yard take via actions. Stop logging expected absence denials",
+      "Profile network failures"
+    ],
+    "areaKeys": [
+      "inventory",
+      "error-reporting"
+    ],
+    "pushedAt": "2026-08-19T14:41:46.460Z"
+  },
+  {
     "version": "0826.32.2",
     "updateKind": "minor",
     "title": "App reliability update",
