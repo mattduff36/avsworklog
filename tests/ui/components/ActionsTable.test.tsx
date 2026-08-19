@@ -1,7 +1,7 @@
 /** @vitest-environment happy-dom */
 /// <reference types="@testing-library/jest-dom/vitest" />
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ActionsTable } from '@/app/(dashboard)/actions/components/ActionsTable';
 import { PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
@@ -56,6 +56,15 @@ function buildLegacyAction(): ReminderActionWithAsset {
 }
 
 describe('ActionsTable legacy job presentation', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-19T08:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('UI-001 shows job details, unassigned state, and the 48-hour due target without ignore or resolve controls', () => {
     render(
       <ActionsTable

@@ -10,6 +10,7 @@ import type {
   DailyAllocationVisit,
 } from '@/types/daily-allocation';
 import { jobResourceKey } from '@/components/daily-allocation/board/board-dnd';
+import { isProvisionalDailyAllocationId } from '@/lib/client/daily-allocation';
 import { dailyAllocationIntervalsOverlap, getDailyAllocationTimeMinutes } from '@/lib/utils/daily-allocation-timeline';
 
 export const DAILY_ALLOCATION_MIDDAY_MINUTES = 12 * 60;
@@ -65,11 +66,18 @@ export function planDayForDate(
   return board.plan_days.find((planDay) => planDay.work_date === workDate);
 }
 
+export function authoritativePlanDayIdentity(
+  planDay: Pick<DailyAllocationPlanDay, 'id' | 'plan_version'> | null | undefined
+): Pick<DailyAllocationPlanDay, 'id' | 'plan_version'> | null {
+  if (!planDay || isProvisionalDailyAllocationId(planDay.id)) return null;
+  return { id: planDay.id, plan_version: planDay.plan_version };
+}
+
 export function isDateConverted(
   board: DailyAllocationRangeBoardPayload,
   workDate: string
 ): boolean {
-  return Boolean(planDayForDate(board, workDate));
+  return Boolean(authoritativePlanDayIdentity(planDayForDate(board, workDate)));
 }
 
 export function visitLabour(

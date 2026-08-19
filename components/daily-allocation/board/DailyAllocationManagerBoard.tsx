@@ -16,7 +16,6 @@ import { ResourceSidebar, type ResourceSidebarTab } from '@/components/daily-all
 import { JobsPanel } from '@/components/daily-allocation/board/JobsPanel';
 import {
   AssignResourcesDialog,
-  ConvertDialog,
   DeleteVisitDialog,
   OverrideDialog,
   PublishDialog,
@@ -37,6 +36,7 @@ import {
   buildJobRows,
   evaluateEmployeeAssignmentBlock,
   filterDailyAllocationBoardForTeam,
+  authoritativePlanDayIdentity,
   isDateConverted,
   latestPublicationForDate,
   planDayForDate,
@@ -86,23 +86,14 @@ type PublishAttempt = {
   key: string;
 };
 
-type PendingConvertAction =
-  | { type: 'open-visit'; form: VisitFormState; mode: 'add' | 'edit' }
-  | { type: 'create-visit'; form: VisitFormState }
-  | { type: 'move-visit'; visit: DailyAllocationVisit; workDate: string; startMinutes: number | null }
-  | { type: 'publish' };
-
 type AuthoritativePlanDay = Pick<DailyAllocationPlanDay, 'id' | 'plan_version'>;
 
 function toAuthoritativePlanDay(result: DailyAllocationConvertResult): AuthoritativePlanDay {
   return { id: result.plan_day_id, plan_version: result.plan_version };
 }
 
-function pendingConvertWorkDate(pending: PendingConvertAction | null, selectedDate: string): string {
-  if (!pending) return selectedDate;
-  if (pending.type === 'move-visit') return pending.workDate;
-  if (pending.type === 'create-visit' || pending.type === 'open-visit') return pending.form.workDate;
-  return selectedDate;
+function planEnsureKey(teamId: string, workDate: string) {
+  return `${teamId}:${workDate}`;
 }
 
 function jobToOption(job: DailyAllocationJobProjection): JobCatalogueOption {
@@ -165,7 +156,7 @@ export function DailyAllocationManagerBoard({
   const selectedDate = boardState.selectedDate;
   const pointerX = useRef<number | null>(null);
   const publishAttemptRef = useRef<PublishAttempt | null>(null);
-  const convertedPublishPlanDayRef = useRef<AuthoritativePlanDay | null>(null);
+  const ensurePlanDayInflight = useRef(new Map<string, Promise<AuthoritativePlanDay | null>>());
 
   const [resourceTab, setResourceTab] = useState<ResourceSidebarTab>('jobs');
   const [resourceSearch, setResourceSearch] = useState('');
@@ -176,7 +167,6 @@ export function DailyAllocationManagerBoard({
   const [visitForm, setVisitForm] = useState<VisitFormState>(emptyVisitForm(selectedDate));
   const [visitDialog, setVisitDialog] = useState<'add' | 'edit' | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
-  const [convertOpen, setConvertOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [unallocatedConfirm, setUnallocatedConfirm] = useState(false);
   const [publishFailed, setPublishFailed] = useState(false);
@@ -187,7 +177,6 @@ export function DailyAllocationManagerBoard({
     | { type: 'plant'; plantId: string; visit: DailyAllocationVisit }
     | null
   >(null);
-  const [pendingConvertAction, setPendingConvertAction] = useState<PendingConvertAction | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
 
   const activeTeamId = rawBoard
@@ -268,59 +257,45 @@ export function DailyAllocationManagerBoard({
     toast.error(message);
   }
 
-  function requireConverted(workDate: string, action: PendingConvertAction) {
-    if (!fullBoard) return false;
-    if (isDateConverted(fullBoard, workDate)) return true;
-    setPendingConvertAction(action);
-    setConvertOpen(true);
-    setStatusMessage(`Convert ${workDate} before making timed changes.`);
-    return false;
-  }
-
-  async function convertDate(workDate: string): Promise<DailyAllocationConvertResult | null> {
+  async function ensurePlanDay(workDate: string): Promise<AuthoritativePlanDay | null> {
     if (!fullBoard) return null;
-    const teamId = ownerTeamId || null;
-    const optimisticPlanDay: DailyAllocationPlanDay = {
-      id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'plan'),
-      work_date: workDate,
-      team_id: ownerTeamId,
-      plan_version: 1,
-      converted_at: new Date().toISOString(),
-      converted_by: fullBoard.context.user_id,
-      updated_at: new Date().toISOString(),
-    };
-    try {
-      const result = await mutations.convert.mutateAsync({
-        request: { work_date: workDate, team_id: teamId },
-        optimisticPlanDay,
-      });
-      toast.success(`Converted ${workDate} to timed visits.`);
-      setConvertOpen(false);
-      return result;
-    } catch (error) {
-      showMutationError(error, 'Unable to convert this date.');
+    const teamId = ownerTeamId;
+    if (!teamId) {
+      toast.error('A team is required to create this timed plan.');
       return null;
     }
-  }
+    const key = planEnsureKey(teamId, workDate);
+    const inflight = ensurePlanDayInflight.current.get(key);
+    if (inflight) return inflight;
+    const existing = authoritativePlanDayIdentity(planDayForDate(fullBoard, workDate));
+    if (existing) return existing;
 
-  async function handleConvertConfirm() {
-    const pending = pendingConvertAction;
-    const workDate = pendingConvertWorkDate(pending, selectedDate);
-    const converted = await convertDate(workDate);
-    if (!converted) return;
-    const convertedPlanDay = toAuthoritativePlanDay(converted);
-    setPendingConvertAction(null);
-    if (pending?.type === 'open-visit') {
-      setVisitForm(pending.form);
-      setVisitDialog(pending.mode);
-    } else if (pending?.type === 'create-visit') {
-      await submitVisitForm(pending.form, 'add', convertedPlanDay);
-    } else if (pending?.type === 'move-visit') {
-      await moveVisit(pending.visit, pending.workDate, pending.startMinutes, convertedPlanDay);
-    } else if (pending?.type === 'publish') {
-      convertedPublishPlanDayRef.current = convertedPlanDay;
-      setPublishOpen(true);
-    }
+    const request = (async (): Promise<AuthoritativePlanDay | null> => {
+      const optimisticPlanDay: DailyAllocationPlanDay = {
+        id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'plan'),
+        work_date: workDate,
+        team_id: teamId,
+        plan_version: 1,
+        converted_at: new Date().toISOString(),
+        converted_by: fullBoard.context.user_id,
+        updated_at: new Date().toISOString(),
+      };
+      try {
+        const result = await mutations.convert.mutateAsync({
+          request: { work_date: workDate, team_id: teamId },
+          optimisticPlanDay,
+        });
+        return toAuthoritativePlanDay(result);
+      } catch (error) {
+        showMutationError(error, 'Unable to create this timed plan.');
+        return null;
+      } finally {
+        ensurePlanDayInflight.current.delete(key);
+      }
+    })();
+
+    ensurePlanDayInflight.current.set(key, request);
+    return request;
   }
 
   function openAddVisit(jobKey: string, workDate: string, startTime?: string, endTime?: string) {
@@ -331,7 +306,6 @@ export function DailyAllocationManagerBoard({
       startTime: startTime || '08:00',
       endTime: endTime || '11:00',
     };
-    if (!requireConverted(form.workDate, { type: 'open-visit', form, mode: 'add' })) return;
     setVisitForm(form);
     setVisitDialog('add');
   }
@@ -369,16 +343,10 @@ export function DailyAllocationManagerBoard({
 
   async function submitVisitForm(
     form: VisitFormState,
-    mode: 'add' | 'edit',
-    convertedPlanDay?: AuthoritativePlanDay
+    mode: 'add' | 'edit'
   ) {
     if (!fullBoard || !form.job) {
       toast.error('Choose a catalogue job.');
-      return;
-    }
-    const planDay = convertedPlanDay ?? planDayForDate(fullBoard, form.workDate);
-    if (!planDay) {
-      if (!requireConverted(form.workDate, { type: 'create-visit', form })) return;
       return;
     }
     const startMinutes = Number(form.startTime.slice(0, 2)) * 60 + Number(form.startTime.slice(3, 5));
@@ -387,6 +355,10 @@ export function DailyAllocationManagerBoard({
       toast.error('End time must be after start time.');
       return;
     }
+    const planDay = authoritativePlanDayIdentity(planDayForDate(fullBoard, form.workDate)) ?? (
+      mode === 'add' ? await ensurePlanDay(form.workDate) : null
+    );
+    if (!planDay) return;
     const starts_at = toDailyAllocationLondonIsoFromMinutes(form.workDate, startMinutes);
     const ends_at = toDailyAllocationLondonIsoFromMinutes(form.workDate, endMinutes);
     const request = {
@@ -464,22 +436,18 @@ export function DailyAllocationManagerBoard({
       openAddVisit(jobResourceKey(job), workDate);
       return;
     }
-    if (!requireConverted(workDate, { type: 'create-visit', form })) return;
     await submitVisitForm(form, 'add');
   }
 
   async function moveVisit(
     visit: DailyAllocationVisit,
     workDate: string,
-    startMinutes: number | null,
-    convertedPlanDay?: AuthoritativePlanDay
+    startMinutes: number | null
   ) {
     if (!fullBoard) return;
-    const planDay = convertedPlanDay ?? planDayForDate(fullBoard, workDate);
-    if (!planDay) {
-      if (!requireConverted(workDate, { type: 'move-visit', visit, workDate, startMinutes })) return;
-      return;
-    }
+    const planDay = authoritativePlanDayIdentity(planDayForDate(fullBoard, workDate))
+      ?? await ensurePlanDay(workDate);
+    if (!planDay) return;
     const duration = getDailyAllocationTimeMinutes(visit.ends_at) - getDailyAllocationTimeMinutes(visit.starts_at);
     const start = startMinutes ?? getDailyAllocationTimeMinutes(visit.starts_at);
     const startsAt = toDailyAllocationLondonIsoFromMinutes(workDate, start);
@@ -779,11 +747,8 @@ export function DailyAllocationManagerBoard({
 
   async function publish(confirmUnallocated: boolean) {
     if (!fullBoard) return;
-    const planDay = convertedPublishPlanDayRef.current ?? planDayForDate(fullBoard, selectedDate);
-    if (!planDay) {
-      if (!requireConverted(selectedDate, { type: 'publish' })) return;
-      return;
-    }
+    const planDay = authoritativePlanDayIdentity(planDayForDate(fullBoard, selectedDate));
+    if (!planDay) return;
     const userId = fullBoard.context.user_id || 'unknown';
     const storedAttempt = readStoredPublishAttempt();
     const existingAttempt = publishAttemptRef.current || storedAttempt;
@@ -816,7 +781,6 @@ export function DailyAllocationManagerBoard({
         },
       });
       publishAttemptRef.current = null;
-      convertedPublishPlanDayRef.current = null;
       clearStoredPublishAttempt();
       setPublishFailed(false);
       setUnallocatedConfirm(false);
@@ -891,12 +855,6 @@ export function DailyAllocationManagerBoard({
   const converted = fullBoard ? isDateConverted(fullBoard, selectedDate) : false;
   const latestPublication = fullBoard ? latestPublicationForDate(fullBoard, selectedDate) : null;
   const history = fullBoard ? publicationsForDate(fullBoard, selectedDate) : [];
-  const legacy = fullBoard && !converted
-    ? {
-        labour: fullBoard.legacy.labour.filter((row) => row.work_date === selectedDate),
-        plant: fullBoard.legacy.plant.filter((row) => row.work_date === selectedDate),
-      }
-    : { labour: [], plant: [] };
   const selectedVisit = fullBoard?.visits.find((visit) => visit.id === selectedVisitId) || null;
 
   if (boardState.isBoardLoading && !fullBoard) {
@@ -962,13 +920,11 @@ export function DailyAllocationManagerBoard({
               onDateChange={handleDateChange}
               onViewChange={boardState.setView}
               onPublish={() => {
-                if (!converted) {
-                  requireConverted(selectedDate, { type: 'publish' });
-                  return;
-                }
                 setUnallocatedConfirm(false);
                 setPublishOpen(true);
               }}
+              publishDisabled={!converted}
+              publishDisabledReason={!converted ? 'Add a timed visit before publishing.' : undefined}
               publishing={mutations.publishV2.isPending}
               isLoading={boardState.isBoardLoading}
               isFetching={boardState.isBoardFetching}
@@ -992,42 +948,8 @@ export function DailyAllocationManagerBoard({
           ) : (
             <span>No published revision for this date yet.</span>
           )}
-          {converted ? <Badge>Timed plan</Badge> : <Badge variant="secondary">Legacy date</Badge>}
           {boardState.isBoardFetching ? <Badge variant="outline">Refreshing</Badge> : null}
         </div>
-
-        {!converted ? (
-          <Card className="border-amber-700/50 bg-amber-950/20 text-amber-50">
-            <CardHeader className="p-4">
-              <CardTitle className="text-base">Convert this date to timed visits</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 p-4 pt-0">
-              <p className="text-sm text-amber-100/90">
-                Untimed allocations stay visible until you convert. Conversion is explicit for this team and date. Historical end times are not inferred.
-              </p>
-              {legacy.labour.length === 0 && legacy.plant.length === 0 ? (
-                <p className="text-sm text-amber-100/80">No legacy allocations on this date.</p>
-              ) : (
-                <ul className="space-y-1 text-sm">
-                  {legacy.labour.map((row) => (
-                    <li key={row.id}>
-                      {fullBoard.resources.employees.find((item) => item.profile_id === row.profile_id)?.full_name || row.profile_id}
-                      {' · '}
-                      {row.job_code || 'No job'}
-                      {row.instructions.start_time ? ` · ${row.instructions.start_time}` : ' · untimed'}
-                    </li>
-                  ))}
-                  {legacy.plant.map((row) => (
-                    <li key={row.id}>{row.job_code} · {row.hired_description || row.plant_id}</li>
-                  ))}
-                </ul>
-              )}
-              <Button className={boardControlStyles.warning} onClick={() => setConvertOpen(true)}>
-                Convert {selectedDate}
-              </Button>
-            </CardContent>
-          </Card>
-        ) : null}
 
         <div className="grid gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
           <ResourceSidebar
@@ -1181,13 +1103,6 @@ export function DailyAllocationManagerBoard({
           }}
           onConfirm={(evidence) => void handleOverrideConfirm(evidence)}
           saving={mutations.createOverride.isPending}
-        />
-        <ConvertDialog
-          open={convertOpen}
-          workDate={pendingConvertWorkDate(pendingConvertAction, selectedDate)}
-          onOpenChange={setConvertOpen}
-          onConfirm={() => void handleConvertConfirm()}
-          converting={mutations.convert.isPending}
         />
         <PublishDialog
           open={publishOpen}

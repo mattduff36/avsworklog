@@ -1158,6 +1158,7 @@ function NewHgvInspectionContent() {
         throw new Error('Failed to resolve inspection id');
       }
 
+      const resolvedInspectionId = inspectionId;
       const dayOfWeek = getDayOfWeek(new Date(`${inspectionDate}T00:00:00`));
       const itemsToInsert: InspectionItemInsert[] = [];
       TRUCK_CHECKLIST_ITEMS.forEach((itemDescription, idx) => {
@@ -1170,7 +1171,7 @@ function NewHgvInspectionContent() {
         }
 
         itemsToInsert.push({
-          inspection_id: inspectionId,
+          inspection_id: resolvedInspectionId,
           item_number: itemNumber,
           item_description: itemDescription,
           day_of_week: dayOfWeek,

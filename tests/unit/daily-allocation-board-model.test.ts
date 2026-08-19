@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  authoritativePlanDayIdentity,
   buildJobRows,
   evaluateEmployeeAssignmentBlock,
   filterDailyAllocationBoardForTeam,
+  isDateConverted,
   planDayForDate,
   resolveDailyAllocationActiveTeamId,
   visitOverlapsHalfDaySession,
@@ -250,6 +252,11 @@ describe('filterDailyAllocationBoardForTeam', () => {
     const teamTwo = filterDailyAllocationBoardForTeam(board, 'team-2');
 
     expect(planDayForDate(board, '2026-08-14')?.id).toBe('plan-team-1');
+    expect(authoritativePlanDayIdentity(planDayForDate(board, '2026-08-14'))).toEqual({
+      id: 'plan-team-1',
+      plan_version: 3,
+    });
+    expect(isDateConverted(board, '2026-08-14')).toBe(true);
     expect(planDayForDate(teamOne, '2026-08-14')).toMatchObject({ id: 'plan-team-1', team_id: 'team-1', plan_version: 3 });
     expect(planDayForDate(teamTwo, '2026-08-14')).toMatchObject({ id: 'plan-team-2', team_id: 'team-2', plan_version: 7 });
     expect(teamOne.visits.map((item) => item.id)).toEqual(['visit-1']);
@@ -262,6 +269,27 @@ describe('filterDailyAllocationBoardForTeam', () => {
     expect(teamTwo.publications.map((item) => item.id)).toEqual(['publication-2']);
     expect(teamOne.conflicts).toHaveLength(0);
     expect(teamTwo.conflicts).toHaveLength(1);
+  });
+
+  it('ignores provisional plan days when resolving an authoritative identity', () => {
+    const board = boardFixture();
+    expect(authoritativePlanDayIdentity(undefined)).toBeNull();
+    expect(authoritativePlanDayIdentity({
+      id: 'optimistic:abc:plan',
+      plan_version: 1,
+    })).toBeNull();
+    expect(authoritativePlanDayIdentity({
+      id: 'plan-converted',
+      plan_version: 4,
+    })).toEqual({ id: 'plan-converted', plan_version: 4 });
+    expect(isDateConverted({
+      ...board,
+      plan_days: [{
+        ...board.plan_days[0],
+        id: 'optimistic:abc:plan',
+        plan_version: 1,
+      }],
+    }, '2026-08-14')).toBe(false);
   });
 
   it('derives active team as selected override then context then first team', () => {

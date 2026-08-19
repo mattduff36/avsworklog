@@ -409,7 +409,7 @@ describe('daily allocation manager board', () => {
     expect(publishBodies[2].idempotency_key).not.toContain('attempt-one');
   });
 
-  it('retries publish with the same key after unallocated confirmation', async () => {
+  it('DA2-PUB-EMPTY-002 retries publish with the same key after unallocated confirmation', async () => {
     const board = buildRangeBoard();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -535,32 +535,12 @@ describe('daily allocation manager board', () => {
     expect(screen.queryByText('Plant planning')).not.toBeInTheDocument();
   });
 
-  it('converts a legacy date before the first v2 write', async () => {
+  it('DA2-AUTO-001 initializes a plan then creates a visit with the authoritative identity', async () => {
     const unconverted = buildRangeBoard({
       plan_days: [],
       visits: [],
       labour_assignments: [],
       publications: [],
-      legacy: {
-        labour: [{
-          id: 'draft-1',
-          work_date: '2026-08-14',
-          profile_id: 'employee-1',
-          job_source_type: 'live_quote',
-          job_source_id: 'quote-1',
-          job_code: 'JOB-100',
-          site_address: '1 Test Street',
-          instructions: {
-            start_time: '07:30',
-            meeting_point: 'Yard',
-            meet_person: 'Sam',
-            notes: null,
-          },
-          row_version: 1,
-          updated_at: '2026-08-13T08:00:00.000Z',
-        }],
-        plant: [],
-      },
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -568,9 +548,33 @@ describe('daily allocation manager board', () => {
       if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
         return jsonResponse({
           plan_day_id: 'plan-converted',
-          plan_version: 1,
+          plan_version: 4,
           team_id: 'team-1',
           work_date: '2026-08-14',
+        });
+      }
+      if (url === '/api/daily-allocation/visits' && init?.method === 'POST') {
+        return jsonResponse({
+          visit_id: 'visit-2',
+          plan_day_id: 'plan-converted',
+          plan_version: 5,
+          visit: {
+            id: 'visit-2',
+            plan_day_id: 'plan-converted',
+            work_date: '2026-08-14',
+            owner_team_id: 'team-1',
+            job_source_type: 'live_quote',
+            job_source_id: 'quote-1',
+            job_code: 'JOB-100',
+            site_address: '1 Test Street',
+            starts_at: '2026-08-14T07:00:00.000Z',
+            ends_at: '2026-08-14T10:00:00.000Z',
+            meeting_point: null,
+            meet_person: null,
+            notes: null,
+            row_version: 1,
+            updated_at: '2026-08-14T08:00:00.000Z',
+          },
         });
       }
       throw new Error(`Unexpected request: ${url}`);
@@ -578,19 +582,31 @@ describe('daily allocation manager board', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     renderBoardPage();
-    expect(await screen.findByText(/Convert this date to timed visits/)).toBeInTheDocument();
-    expect(screen.getByText(/untimed/i)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Convert 2026-08-14/ }));
-    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Convert date' }));
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Add visit' }))[0]);
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/daily-allocation/convert')).toBe(false);
+    fireEvent.click(await screen.findByRole('button', { name: 'Select job code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create visit' }));
+
     await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/api/daily-allocation/convert',
-        expect.objectContaining({ method: 'POST' })
-      );
+      const convertBodies = fetchMock.mock.calls
+        .filter(([url, init]) => String(url) === '/api/daily-allocation/convert' && init?.method === 'POST')
+        .map(([, init]) => JSON.parse(String(init?.body)) as { work_date: string; team_id: string });
+      const visitBodies = fetchMock.mock.calls
+        .filter(([url, init]) => String(url) === '/api/daily-allocation/visits' && init?.method === 'POST')
+        .map(([, init]) => JSON.parse(String(init?.body)) as {
+          plan_day_id: string;
+          expected_plan_version: number;
+        });
+      expect(convertBodies).toEqual([{ work_date: '2026-08-14', team_id: 'team-1' }]);
+      expect(visitBodies).toEqual([expect.objectContaining({
+        plan_day_id: 'plan-converted',
+        expected_plan_version: 4,
+      })]);
+      expect(visitBodies[0]?.expected_plan_version).not.toBe(1);
     });
   });
 
-  it('uses the authoritative plan version 7 when convert-then-move follows an existing plan', async () => {
+  it('DA2-AUTO-003 initializes then moves with authoritative source and target versions', async () => {
     const convertedPlan = {
       id: 'plan-existing-v7',
       work_date: '2026-08-15',
@@ -651,7 +667,6 @@ describe('daily allocation manager board', () => {
         },
       });
     });
-    fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: 'Convert date' }));
 
     await waitFor(() => {
       const moveBodies = fetchMock.mock.calls
@@ -670,7 +685,7 @@ describe('daily allocation manager board', () => {
     });
   });
 
-  it('creates a visit from the explicit Add visit dialog', async () => {
+  it('DA2-AUTO-004 does not convert when adding a visit to an initialized date', async () => {
     const board = buildRangeBoard();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -701,6 +716,324 @@ describe('daily allocation manager board', () => {
         expect.objectContaining({ method: 'POST' })
       );
     });
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/daily-allocation/convert')).toBe(false);
+  });
+
+  it('DA2-AUTO-002 initializes then creates a timed visit when a job is dropped', async () => {
+    const unconverted = buildRangeBoard({
+      plan_days: [],
+      visits: [],
+      labour_assignments: [],
+      publications: [],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
+        return jsonResponse({
+          plan_day_id: 'plan-converted',
+          plan_version: 4,
+          team_id: 'team-1',
+          work_date: '2026-08-14',
+        });
+      }
+      if (url === '/api/daily-allocation/visits' && init?.method === 'POST') {
+        return jsonResponse({
+          visit_id: 'visit-2',
+          plan_day_id: 'plan-converted',
+          plan_version: 5,
+          visit: {
+            ...unconverted.jobs[0],
+            id: 'visit-2',
+            plan_day_id: 'plan-converted',
+            work_date: '2026-08-14',
+            owner_team_id: 'team-1',
+            job_source_type: 'live_quote',
+            job_source_id: 'quote-1',
+            job_code: 'JOB-100',
+            site_address: '1 Test Street',
+            starts_at: '2026-08-14T07:00:00.000Z',
+            ends_at: '2026-08-14T10:00:00.000Z',
+            meeting_point: null,
+            meet_person: null,
+            notes: null,
+            row_version: 1,
+            updated_at: '2026-08-14T08:00:00.000Z',
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderBoardPage();
+    expect(await screen.findByTestId('daily-allocation-toolbar')).toBeInTheDocument();
+    act(() => {
+      mocks.onDragEnd?.({
+        operation: {
+          source: { data: { source: { kind: 'job', job: unconverted.jobs[0] } } },
+          target: { data: { target: { surface: 'week-cell', workDate: '2026-08-14' } } },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/daily-allocation/convert')).toBe(true);
+      expect(fetchMock.mock.calls.some(([url, init]) =>
+        String(url) === '/api/daily-allocation/visits' && init?.method === 'POST'
+      )).toBe(true);
+    });
+  });
+
+  it('DA2-AUTO-005 does not create a visit when plan initialization fails', async () => {
+    const unconverted = buildRangeBoard({
+      plan_days: [],
+      visits: [],
+      labour_assignments: [],
+      publications: [],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
+        return jsonResponse({ error: 'Unable to convert this date.' }, 500);
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderBoardPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Add visit' }))[0]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Select job code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create visit' }));
+
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/daily-allocation/convert')).toBe(true);
+    });
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/daily-allocation/visits')).toBe(false);
+  });
+
+  it('DA2-AUTO-006 shares one in-flight conversion for the same team and date', async () => {
+    const unconverted = buildRangeBoard({
+      plan_days: [],
+      visits: [],
+      labour_assignments: [],
+      publications: [],
+    });
+    let releaseConvert: (() => void) | null = null;
+    const convertGate = new Promise<void>((resolve) => {
+      releaseConvert = resolve;
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
+        await convertGate;
+        return jsonResponse({
+          plan_day_id: 'plan-converted',
+          plan_version: 4,
+          team_id: 'team-1',
+          work_date: '2026-08-14',
+        });
+      }
+      if (url === '/api/daily-allocation/visits' && init?.method === 'POST') {
+        return jsonResponse({
+          visit_id: `visit-${globalThis.crypto.randomUUID()}`,
+          plan_day_id: 'plan-converted',
+          plan_version: 5,
+          visit: {
+            id: 'visit-2',
+            plan_day_id: 'plan-converted',
+            work_date: '2026-08-14',
+            owner_team_id: 'team-1',
+            job_source_type: 'live_quote',
+            job_source_id: 'quote-1',
+            job_code: 'JOB-100',
+            site_address: '1 Test Street',
+            starts_at: '2026-08-14T07:00:00.000Z',
+            ends_at: '2026-08-14T10:00:00.000Z',
+            meeting_point: null,
+            meet_person: null,
+            notes: null,
+            row_version: 1,
+            updated_at: '2026-08-14T08:00:00.000Z',
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const dropJobOnDate = () => {
+      mocks.onDragEnd?.({
+        operation: {
+          source: { data: { source: { kind: 'job', job: unconverted.jobs[0] } } },
+          target: { data: { target: { surface: 'week-cell', workDate: '2026-08-14' } } },
+        },
+      });
+    };
+
+    renderBoardPage();
+    expect(await screen.findByTestId('daily-allocation-toolbar')).toBeInTheDocument();
+    act(dropJobOnDate);
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/daily-allocation/convert')).toHaveLength(1);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    act(dropJobOnDate);
+    await waitFor(() => {
+      expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/daily-allocation/convert')).toHaveLength(1);
+    });
+    releaseConvert?.();
+    await waitFor(() => {
+      const visitBodies = fetchMock.mock.calls
+        .filter(([url, init]) => String(url) === '/api/daily-allocation/visits' && init?.method === 'POST')
+        .map(([, init]) => JSON.parse(String(init?.body)) as {
+          plan_day_id: string;
+          expected_plan_version: number;
+        });
+      expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/daily-allocation/convert')).toHaveLength(1);
+      expect(visitBodies).toEqual([
+        expect.objectContaining({ plan_day_id: 'plan-converted', expected_plan_version: 4 }),
+      ]);
+      expect(visitBodies[0]?.plan_day_id.startsWith('optimistic:')).toBe(false);
+      expect(visitBodies[0]?.expected_plan_version).not.toBe(1);
+    });
+    await waitFor(() => {
+      const messages = mocks.toastError.mock.calls.map((call) => String(call[0]));
+      expect(messages).toContain('Wait for the current daily allocation change to finish saving.');
+      expect(messages.join('\n')).not.toMatch(/plan_day_id/);
+    });
+  });
+
+  it('DA2-AUTO-007 initializes only the active team on a shared date', async () => {
+    const unconverted = buildRangeBoard({
+      plan_days: [],
+      visits: [],
+      labour_assignments: [],
+      publications: [],
+      resources: {
+        employees: [],
+        plant: [],
+        teams: [
+          { id: 'team-1', name: 'Team One' },
+          { id: 'team-2', name: 'Team Two' },
+        ],
+      },
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
+        return jsonResponse({
+          plan_day_id: 'plan-team-2',
+          plan_version: 4,
+          team_id: 'team-2',
+          work_date: '2026-08-14',
+        });
+      }
+      if (url === '/api/daily-allocation/visits' && init?.method === 'POST') {
+        return jsonResponse({
+          visit_id: 'visit-2',
+          plan_day_id: 'plan-team-2',
+          plan_version: 5,
+          visit: {
+            id: 'visit-2',
+            plan_day_id: 'plan-team-2',
+            work_date: '2026-08-14',
+            owner_team_id: 'team-2',
+            job_source_type: 'live_quote',
+            job_source_id: 'quote-1',
+            job_code: 'JOB-100',
+            site_address: '1 Test Street',
+            starts_at: '2026-08-14T07:00:00.000Z',
+            ends_at: '2026-08-14T10:00:00.000Z',
+            meeting_point: null,
+            meet_person: null,
+            notes: null,
+            row_version: 1,
+            updated_at: '2026-08-14T08:00:00.000Z',
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderBoardPage();
+    fireEvent.change(await screen.findByLabelText('Active team'), { target: { value: 'team-2' } });
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Add visit' }))[0]);
+    fireEvent.click(await screen.findByRole('button', { name: 'Select job code' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create visit' }));
+
+    await waitFor(() => {
+      const convertBodies = fetchMock.mock.calls
+        .filter(([url, init]) => String(url) === '/api/daily-allocation/convert' && init?.method === 'POST')
+        .map(([, init]) => JSON.parse(String(init?.body)) as { team_id: string; work_date: string });
+      expect(convertBodies).toEqual([{ team_id: 'team-2', work_date: '2026-08-14' }]);
+    });
+  });
+
+  it('DA2-PUB-EMPTY-001 does not convert or publish an uninitialized date', async () => {
+    const unconverted = buildRangeBoard({
+      plan_days: [],
+      visits: [],
+      labour_assignments: [],
+      publications: [],
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderBoardPage();
+    expect(await screen.findByTestId('daily-allocation-publish')).toBeDisabled();
+    expect(screen.getByTestId('daily-allocation-publish-reason')).toHaveTextContent(
+      'Add a timed visit before publishing.'
+    );
+    fireEvent.click(screen.getByTestId('daily-allocation-publish'));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/daily-allocation/convert')).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/daily-allocation/publish')).toBe(false);
+  });
+
+  it('DA2-UI-001 hides conversion prompts and status badges', async () => {
+    const unconverted = buildRangeBoard({
+      plan_days: [],
+      visits: [],
+      labour_assignments: [],
+      publications: [],
+    });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      throw new Error(`Unexpected request: ${String(input)}`);
+    }));
+
+    renderBoardPage();
+    expect(await screen.findByTestId('daily-allocation-toolbar')).toBeInTheDocument();
+    expect(screen.queryByText(/Convert this date to timed visits/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Convert 2026-08-14/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('Legacy date')).not.toBeInTheDocument();
+    expect(screen.queryByText('Timed plan')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alertdialog', { name: /Convert/ })).not.toBeInTheDocument();
+  });
+
+  it('DA2-EDIT-001 keeps the visit date read-only while editing', async () => {
+    const board = buildRangeBoard();
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).startsWith('/api/daily-allocation/board')) return jsonResponse(board);
+      throw new Error(`Unexpected request: ${String(input)}`);
+    }));
+
+    renderBoardPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: /Edit visit JOB-100/ }))[0]);
+    const dateField = await screen.findByLabelText('Date');
+    expect(dateField).toBeDisabled();
+    expect(dateField).toHaveValue('2026-08-14');
   });
 
   it('assigns an employee through the explicit assign dialog and can remove them', async () => {
@@ -1062,6 +1395,11 @@ describe('daily allocation manager board', () => {
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(empty)));
     renderBoardPage();
     expect((await screen.findAllByText(/No timed visits/)).length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByTestId('daily-allocation-daily-board')).getAllByRole('button', {
+        name: '+ Add timed visit',
+      })
+    ).toHaveLength(1);
     cleanup();
 
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'Board exploded.' }, 500)));

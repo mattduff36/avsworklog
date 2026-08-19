@@ -103,7 +103,11 @@ export function VisitEditorDialog({
                 id="daily-allocation-visit-date"
                 type="date"
                 value={form.workDate}
-                onChange={(event) => onFormChange({ ...form, workDate: event.target.value })}
+                disabled={mode === 'edit'}
+                onChange={(event) => {
+                  if (mode === 'edit') return;
+                  onFormChange({ ...form, workDate: event.target.value });
+                }}
               />
             </div>
             <div className="space-y-2">
@@ -365,45 +369,6 @@ export function OverrideDialog({
             }}
           >
             Confirm override
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-  );
-}
-
-export function ConvertDialog({
-  open,
-  workDate,
-  onOpenChange,
-  onConfirm,
-  converting,
-}: {
-  open: boolean;
-  workDate: string;
-  onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
-  converting?: boolean;
-}) {
-  return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Convert {workDate} to timed visits?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Legacy untimed allocations stay visible until you convert. Conversion is explicit for this team and date and is required before creating visits or publishing v2. Historical end times are not inferred.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={converting}
-            onClick={(event) => {
-              event.preventDefault();
-              onConfirm();
-            }}
-          >
-            {converting ? 'Converting…' : 'Convert date'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

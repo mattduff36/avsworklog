@@ -40,6 +40,7 @@ import {
   buildWorkflowReviewMetrics,
   computePlanRecommendationAdherence,
   detectWorkflowAnomalies,
+  formatWorkflowReviewDiagnostics,
   processWorkflowStopEvent,
 } from '@/scripts/automation/workflow-review';
 import type { WorkflowCompletionMarker, WorkflowStopEvent, WorkflowTranscriptSignals } from '@/scripts/automation/types';
@@ -827,6 +828,44 @@ describe('workflow-findings', () => {
 });
 
 describe('workflow events and lock', () => {
+  it('reports collector wiring and low-confidence telemetry during warm-up', () => {
+    const root = makeTempRoot('diagnostics');
+    mkdirSync(path.join(root, '.cursor', 'hooks'), { recursive: true });
+    mkdirSync(path.join(root, 'node_modules', 'tsx', 'dist'), { recursive: true });
+    writeFileSync(path.join(root, '.cursor', 'hooks.json'), '{}', 'utf8');
+    writeFileSync(path.join(root, '.cursor', 'hooks', 'workflow-stop.mjs'), '', 'utf8');
+    writeFileSync(path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs'), '', 'utf8');
+
+    expect(formatWorkflowReviewDiagnostics(root)).toContain('Collector wiring: ready');
+    expect(formatWorkflowReviewDiagnostics(root)).toContain('Telemetry confidence: none');
+
+    writeWorkflowEvent(getWorkflowPaths(root).eventsDirectory, {
+      schemaVersion: '2',
+      eventId: 'diagnostic-event',
+      recordedAt: '2026-08-19T10:00:00.000Z',
+      conversationHash: 'conversation',
+      generationHash: 'generation',
+      selectedModel: 'gpt-5.6-sol-high',
+      selectedModelSource: 'model_id',
+      selectedModelTier: 'premium',
+      status: 'completed',
+      loopCount: 0,
+      qualifies: true,
+      qualificationReasons: ['marker:present'],
+      marker: markerV4('fast'),
+      lane: 'fast',
+      markerStatus: 'present',
+      transcriptSignals: null,
+      findings: [],
+      monthKey: '2026-08',
+    });
+
+    const warming = formatWorkflowReviewDiagnostics(root);
+    expect(warming).toContain('Events: 1');
+    expect(warming).toContain('Latest event: 2026-08-19T10:00:00.000Z');
+    expect(warming).toContain('Telemetry confidence: warming-up');
+  });
+
   it('STATE-002 creates v2 state and migrates v1 state defaults', () => {
     expect(createEmptyWorkflowReviewState()).toMatchObject({
       schemaVersion: '2',

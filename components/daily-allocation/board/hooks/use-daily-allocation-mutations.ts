@@ -111,7 +111,10 @@ export function useConvertDailyAllocationPlanDay() {
       optimisticPlanDay: DailyAllocationPlanDay;
     }) => runMutation({
       kind: 'convert',
-      lockKeys: [`date:${input.request.work_date}`, `plan-tree:${input.optimisticPlanDay.id}`],
+      lockKeys: [
+        `team:${input.request.team_id || 'none'}:date:${input.request.work_date}`,
+        `plan-tree:${input.optimisticPlanDay.id}`,
+      ],
       apply: (state) => applyIfBoard(state.board, (board) =>
         patchBoardWithPlanDay(board, input.optimisticPlanDay)
       ),

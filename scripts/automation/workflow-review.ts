@@ -835,8 +835,25 @@ export function formatWorkflowReviewDiagnostics(repoRoot = process.cwd()): strin
   const paths = getWorkflowPaths(repoRoot);
   const state = loadWorkflowReviewState(paths.statePath);
   const events = listWorkflowEvents(paths.eventsDirectory);
+  const hookConfigPresent = existsSync(path.join(paths.repoRoot, '.cursor', 'hooks.json'));
+  const hookScriptPresent = existsSync(
+    path.join(paths.repoRoot, '.cursor', 'hooks', 'workflow-stop.mjs')
+  );
+  const hookRuntimePresent = existsSync(
+    path.join(paths.repoRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs')
+  );
+  const collectorWiringReady = hookConfigPresent && hookScriptPresent && hookRuntimePresent;
+  const latestEvent = events.at(-1);
+  const telemetryConfidence =
+    events.length === 0 ? 'none' : events.length < 5 ? 'warming-up' : 'usable';
   return [
+    `Collector wiring: ${collectorWiringReady ? 'ready' : 'incomplete'}`,
+    `Hook config: ${hookConfigPresent ? 'present' : 'missing'}`,
+    `Hook script: ${hookScriptPresent ? 'present' : 'missing'}`,
+    `Hook runtime: ${hookRuntimePresent ? 'present' : 'missing'}`,
     `Events: ${events.length}`,
+    `Latest event: ${latestEvent?.recordedAt ?? 'never'}`,
+    `Telemetry confidence: ${telemetryConfidence}`,
     `Unreviewed: ${state.unreviewedEventIds.length}`,
     `Last review: ${state.lastReviewAt ?? 'never'}`,
     `Pending follow-up: ${state.pendingFollowUpPath ?? 'none'}`,

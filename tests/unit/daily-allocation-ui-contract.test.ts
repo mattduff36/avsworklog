@@ -21,7 +21,11 @@ describe('DA2-UI-001 manager board contract', () => {
     );
     expect(board).toContain('confirm_unallocated');
     expect(board).toContain('CONFIRM_UNALLOCATED_REQUIRED');
-    expect(board).toContain('Convert this date to timed visits');
+    expect(board).toContain('ensurePlanDay');
+    expect(board).toContain('Add a timed visit before publishing.');
+    expect(board).not.toContain('Convert this date to timed visits');
+    expect(board).not.toContain('ConvertDialog');
+    expect(board).not.toContain('Legacy date');
     expect(board).toContain('Add visit');
     expect(board).toContain('Assign resources');
     expect(board).toContain('Publication history');
@@ -34,9 +38,11 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(toolbar).toContain('Weekly');
     expect(toolbar).toContain('Publish');
     expect(toolbar).toContain('Active team');
+    expect(toolbar).toContain('flex-nowrap');
+    expect(toolbar).toContain('date-input-compact');
 
     expect(board).toContain('dailyTimelineRangeLeft');
-    expect(board).toContain("type: 'move-visit'");
+    expect(board).toContain('source.kind === \'visit\'');
     expect(board).toContain('mutations.moveVisit.mutateAsync');
     expect(board).toContain('expected_source_plan_version');
     expect(board).toContain('expected_target_plan_version');
