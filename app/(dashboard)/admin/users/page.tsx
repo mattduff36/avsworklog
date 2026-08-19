@@ -76,7 +76,7 @@ import { calculateNewUserRemainingLeaveDefault, roundToNearestHalfDay } from '@/
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { formatDateTime } from '@/lib/utils/date';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
-import { isSystemAccountProfile, SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
+import { getDisplayedTeamName, isSystemAccountProfile, SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
 import {
   computeQuickEditFloatingPosition,
   type FloatingPositionResult,
@@ -475,7 +475,11 @@ export default function UsersAdminPage() {
     if (teamDirectory.length > 0) {
       return teamDirectory
         .filter((team) => team.active)
-        .map((team) => ({ id: team.id, name: team.name, is_system: Boolean(team.is_system) }))
+        .map((team) => ({
+          id: team.id,
+          name: getDisplayedTeamName(team),
+          is_system: Boolean(team.is_system) || team.id === SYSTEM_ACCOUNTS_TEAM_ID,
+        }))
         .sort((a, b) => {
           if (a.is_system !== b.is_system) return a.is_system ? 1 : -1;
           return a.name.localeCompare(b.name);
@@ -487,7 +491,7 @@ export default function UsersAdminPage() {
     });
     return Array.from(teams).sort().map((id) => ({
       id,
-      name: id,
+      name: getDisplayedTeamName({ id, name: id }),
       is_system: id === SYSTEM_ACCOUNTS_TEAM_ID,
     }));
   }, [teamDirectory, users]);

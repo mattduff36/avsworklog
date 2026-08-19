@@ -48,7 +48,7 @@ import type {
 } from '@/types/roles';
 import { MODULE_CSS_VAR, PERMISSION_LEVEL_LABELS } from '@/types/roles';
 import { cn } from '@/lib/utils';
-import { SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
+import { getDisplayedTeamName, SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
 
 const MODULE_GROUP_DIVIDER_CLASS = 'border-l border-slate-600/20';
 const PERMISSION_LEVELS: PermissionAccessLevel[] = [0, 1, 2, 3, 4, 5];
@@ -549,7 +549,11 @@ export function RoleManagement() {
 
       groups.set(teamKey, {
         teamKey,
-        teamLabel: user.team_name || 'Unassigned',
+        teamLabel: getDisplayedTeamName({
+          id: user.team_id,
+          is_system: Boolean(userTeamById.get(teamKey)?.is_system) || user.is_system_account === true,
+          name: user.team_name || 'Unassigned',
+        }),
         teamDefault: teamKey === 'unassigned' ? null : userTeamById.get(teamKey) ?? null,
         isSystem: Boolean(userTeamById.get(teamKey)?.is_system) || user.is_system_account === true,
         users: [user],
@@ -644,7 +648,7 @@ export function RoleManagement() {
 
       nextChanges[changeKey] = {
         teamId,
-        teamName: team.name,
+        teamName: getDisplayedTeamName(team),
         moduleName,
         moduleDisplayName: permissionModule.display_name,
         fromEnabled,
@@ -880,7 +884,7 @@ export function RoleManagement() {
 
         next[changeKey] = {
           teamId: team.id,
-          teamName: team.name,
+          teamName: getDisplayedTeamName(team),
           moduleName: module.module_name,
           moduleDisplayName: module.display_name,
           fromEnabled,
@@ -1231,7 +1235,7 @@ export function RoleManagement() {
                     ? { backgroundColor: color, boxShadow: `0 0 6px ${getModuleColorAlpha(module.module_name, 0.2)}` }
                     : { backgroundColor: 'transparent' }
                 }
-                aria-label={`${module.display_name} default for ${team.name}: ${isEnabled ? 'enabled' : 'disabled'}`}
+                aria-label={`${module.display_name} default for ${getDisplayedTeamName(team)}: ${isEnabled ? 'enabled' : 'disabled'}`}
               >
                 <span aria-hidden="true" className="absolute inset-0 bg-black/60" />
                 {isEnabled ? (
@@ -1244,7 +1248,7 @@ export function RoleManagement() {
           <TooltipContent side="top" className={MATRIX_DETAIL_TOOLTIP_CLASS}>
               <div className="space-y-1">
                 <div>
-                  {team.name} default for {module.display_name}:{' '}
+                  {getDisplayedTeamName(team)} default for {module.display_name}:{' '}
                   <span className="font-semibold">{isEnabled ? 'Enabled' : 'Disabled'}</span>
                 </div>
                 <div>

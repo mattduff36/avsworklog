@@ -31,6 +31,7 @@ import {
 } from '@/lib/admin/team-directory-client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { cn } from '@/lib/utils';
+import { getDisplayedTeamName } from '@/lib/utils/system-accounts';
 import {
   TimesheetTypeOptions,
   getTimesheetTypeLabel,
@@ -335,7 +336,7 @@ export function TeamsTab() {
                       isSystemTeam && 'italic text-slate-400'
                     )}>
                       <TableCell className={cn('font-medium text-white', isSystemTeam && 'text-slate-400')}>
-                        <div>{team.name}</div>
+                        <div>{getDisplayedTeamName(team)}</div>
                         <div className="text-xs text-muted-foreground font-mono">{team.id}</div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{team.code || '—'}</TableCell>

@@ -1,4 +1,5 @@
 export const SYSTEM_ACCOUNTS_TEAM_ID = 'system_accounts';
+export const SYSTEM_TEAM_DISPLAY_NAME = 'System';
 
 export interface SystemAccountCandidate {
   id?: string | null;
@@ -17,6 +18,13 @@ export function isSystemAccountProfile(candidate: SystemAccountCandidate): boole
 
 export function isSystemTeam(candidate: SystemTeamCandidate): boolean {
   return candidate.is_system === true || candidate.id === SYSTEM_ACCOUNTS_TEAM_ID;
+}
+
+export function getDisplayedTeamName(
+  team: SystemTeamCandidate & { name?: string | null }
+): string {
+  if (isSystemTeam(team)) return SYSTEM_TEAM_DISPLAY_NAME;
+  return team.name?.trim() || '';
 }
 
 export function filterSystemAccounts<T extends SystemAccountCandidate>(rows: T[]): T[] {
