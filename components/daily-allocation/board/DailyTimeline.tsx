@@ -87,8 +87,6 @@ function TimelineCell({
   startHour,
   endHour,
   children,
-  empty,
-  onAddVisit,
 }: {
   jobKey: string;
   date: string;
@@ -98,8 +96,6 @@ function TimelineCell({
   startHour: number;
   endHour: number;
   children: ReactNode;
-  empty: boolean;
-  onAddVisit: () => void;
 }) {
   const { ref, isDropTarget } = useDroppable({
     id: `timeline:${jobKey}:${date}`,
@@ -131,16 +127,6 @@ function TimelineCell({
       }}
     >
       {children}
-      {empty ? (
-        <Button
-          type="button"
-          variant="ghost"
-          className={cn(boardControlStyles.ghost, 'absolute inset-2 h-auto justify-start text-xs')}
-          onClick={onAddVisit}
-        >
-          + Add timed visit
-        </Button>
-      ) : null}
     </div>
   );
 }
@@ -305,8 +291,6 @@ export function DailyTimeline({
             hourWidth={hourWidth}
             startHour={startHour}
             endHour={endHour}
-            empty
-            onAddVisit={() => onAddVisit('', date)}
           >
             {null}
           </TimelineCell>
@@ -342,8 +326,6 @@ export function DailyTimeline({
               hourWidth={hourWidth}
               startHour={startHour}
               endHour={endHour}
-              empty={dayVisits.length === 0}
-              onAddVisit={() => onAddVisit(row.key, date)}
             >
               {placements.map(({ item: visit, lane }) => {
                 const shown = displayedVisit(visit);
