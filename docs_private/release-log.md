@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.32.1
+
+**GIT COMMIT MESSAGE**
+`fix(workflow): expose stale telemetry delivery`
+
+**PUSHED AT**
+2026-08-19T11:35:02.833Z
+
+**WHAT CHANGED**
+Fit the daily board when hour columns stay readable. Expose stale telemetry delivery.
+
+**VERSION HISTORY DETAILS**
+- Fit the daily board when hour columns stay readable, with changes to interface components and automated tests.
+- Updated navigation, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `fix(daily-allocation): fit the daily board when hour columns stay readable`
+- `fix(workflow): expose stale telemetry delivery`
+
 ## 0826.32.0
 
 **GIT COMMIT MESSAGE**

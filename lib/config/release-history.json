@@ -1,5 +1,23 @@
 [
   {
+    "version": "0826.32.1",
+    "updateKind": "minor",
+    "title": "Workflow improvements",
+    "description": "Fit the daily board when hour columns stay readable. Expose stale telemetry delivery.",
+    "summary": "Fit the daily board when hour columns stay readable. Expose stale telemetry delivery.",
+    "details": [
+      "Fit the daily board when hour columns stay readable, with changes to interface components and automated tests.",
+      "Updated navigation, with changes to interface components."
+    ],
+    "areas": [
+      "Daily Allocation"
+    ],
+    "areaKeys": [
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-08-19T11:35:02.833Z"
+  },
+  {
     "version": "0826.32.0",
     "updateKind": "major",
     "title": "Daily Allocation update",
