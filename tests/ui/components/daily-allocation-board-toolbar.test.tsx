@@ -43,6 +43,30 @@ describe('BoardToolbar', () => {
     expect(onDateChange).toHaveBeenCalledWith('2026-08-20');
   });
 
+  it('keeps view, date, team, and publish controls on one row', () => {
+    render(
+      <BoardToolbar
+        selectedDate="2026-08-13"
+        view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
+        onDateChange={vi.fn()}
+        onViewChange={vi.fn()}
+        onPublish={vi.fn()}
+        teams={[
+          { id: 'team-1', name: 'Team One' },
+          { id: 'team-2', name: 'Team Two' },
+        ]}
+        activeTeamId="team-1"
+      />
+    );
+
+    const toolbar = screen.getByTestId('daily-allocation-toolbar');
+    expect(toolbar).toHaveClass('flex-nowrap');
+    expect(toolbar.className.split(/\s+/)).not.toContain('flex-col');
+    expect(screen.getByLabelText('Selected date')).toHaveClass('date-input-compact');
+    expect(screen.getByLabelText('Active team')).toBeInTheDocument();
+    expect(screen.getByTestId('daily-allocation-publish')).toBeInTheDocument();
+  });
+
   it('shows a compact team selector only when more than one team is available', () => {
     const onTeamChange = vi.fn();
     const { rerender } = render(
@@ -76,5 +100,28 @@ describe('BoardToolbar', () => {
     );
     fireEvent.change(screen.getByLabelText('Active team'), { target: { value: 'team-2' } });
     expect(onTeamChange).toHaveBeenCalledWith('team-2');
+  });
+
+  it('explains why Publish is disabled on an uninitialized date', () => {
+    render(
+      <BoardToolbar
+        selectedDate="2026-08-13"
+        view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
+        onDateChange={vi.fn()}
+        onViewChange={vi.fn()}
+        onPublish={vi.fn()}
+        publishDisabled
+        publishDisabledReason="Add a timed visit before publishing."
+      />
+    );
+
+    expect(screen.getByTestId('daily-allocation-publish')).toBeDisabled();
+    expect(screen.getByTestId('daily-allocation-publish-reason')).toHaveTextContent(
+      'Add a timed visit before publishing.'
+    );
+    expect(screen.getByTestId('daily-allocation-publish')).toHaveAttribute(
+      'aria-describedby',
+      'daily-allocation-publish-reason'
+    );
   });
 });

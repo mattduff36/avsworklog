@@ -23,6 +23,7 @@ interface BoardToolbarProps {
   onViewChange: (view: DailyAllocationBoardView) => void;
   onPublish: () => void;
   publishDisabled?: boolean;
+  publishDisabledReason?: string;
   publishing?: boolean;
   isLoading?: boolean;
   isFetching?: boolean;
@@ -40,6 +41,7 @@ export function BoardToolbar({
   onViewChange,
   onPublish,
   publishDisabled,
+  publishDisabledReason,
   publishing,
   isLoading,
   isFetching,
@@ -77,92 +79,102 @@ export function BoardToolbar({
 
   return (
     <div
-      className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"
+      className="flex w-full min-w-0 flex-nowrap items-center gap-2 overflow-x-auto sm:gap-3"
       data-testid="daily-allocation-toolbar"
     >
-      <div className="flex flex-wrap items-center gap-3">
-        <Tabs value={view} onValueChange={handleViewChange}>
-          <TabsList aria-label="Allocation date range" className="grid h-9 grid-cols-2 gap-0 p-1">
-            <TabsTrigger value={DAILY_ALLOCATION_BOARD_VIEWS.daily} className="px-3">
-              Daily
-            </TabsTrigger>
-            <TabsTrigger value={DAILY_ALLOCATION_BOARD_VIEWS.weekly} className="px-3">
-              Weekly
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+      <Tabs value={view} onValueChange={handleViewChange} className="shrink-0">
+        <TabsList aria-label="Allocation date range" className="grid h-9 w-[8.5rem] grid-cols-2 gap-0 p-1">
+          <TabsTrigger value={DAILY_ALLOCATION_BOARD_VIEWS.daily} className="px-3">
+            Daily
+          </TabsTrigger>
+          <TabsTrigger value={DAILY_ALLOCATION_BOARD_VIEWS.weekly} className="px-3">
+            Weekly
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            variant="outline"
-            className={boardControlStyles.outline}
-            size="sm"
-            onClick={() => move(-1)}
-            aria-label={`Previous ${periodName}`}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            className={boardControlStyles.outline}
-            size="sm"
-            onClick={() => onDateChange(formatDailyAllocationDate(new Date()))}
-          >
-            Today
-          </Button>
-          <p
-            aria-live="polite"
-            className="min-w-44 text-center text-sm font-semibold text-slate-100"
-            data-testid="daily-allocation-period-label"
-          >
-            {periodLabel}
-          </p>
-          <Button
-            variant="outline"
-            className={boardControlStyles.outline}
-            size="sm"
-            onClick={() => move(1)}
-            aria-label={`Next ${periodName}`}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Input
-            type="date"
-            aria-label="Selected date"
-            value={selectedDate}
-            onChange={(event) => onDateChange(event.target.value)}
-            className="h-8 w-auto border-slate-500 bg-slate-900 text-slate-100"
-          />
-          {teams.length > 1 ? (
-            <select
-              aria-label="Active team"
-              data-testid="daily-allocation-team-selector"
-              value={activeTeamId || ''}
-              onChange={(event) => onTeamChange?.(event.target.value)}
-              className="h-8 max-w-44 rounded-md border border-slate-500 bg-slate-900 px-2 text-sm text-slate-100"
-            >
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {team.name}
-                </option>
-              ))}
-            </select>
-          ) : null}
-        </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <Button
+          variant="outline"
+          className={boardControlStyles.outline}
+          size="sm"
+          onClick={() => move(-1)}
+          aria-label={`Previous ${periodName}`}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="outline"
+          className={boardControlStyles.outline}
+          size="sm"
+          onClick={() => onDateChange(formatDailyAllocationDate(new Date()))}
+        >
+          Today
+        </Button>
+        <p
+          aria-live="polite"
+          className="min-w-44 whitespace-nowrap text-center text-sm font-semibold text-slate-100"
+          data-testid="daily-allocation-period-label"
+        >
+          {periodLabel}
+        </p>
+        <Button
+          variant="outline"
+          className={boardControlStyles.outline}
+          size="sm"
+          onClick={() => move(1)}
+          aria-label={`Next ${periodName}`}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <Input
+        type="date"
+        aria-label="Selected date"
+        value={selectedDate}
+        onChange={(event) => onDateChange(event.target.value)}
+        className="date-input-compact h-8 shrink-0 border-slate-500 bg-slate-900 text-slate-100"
+      />
+      {teams.length > 1 ? (
+        <select
+          aria-label="Active team"
+          data-testid="daily-allocation-team-selector"
+          value={activeTeamId || ''}
+          onChange={(event) => onTeamChange?.(event.target.value)}
+          className="h-8 w-auto max-w-44 shrink-0 rounded-md border border-slate-500 bg-slate-900 px-2 text-sm text-slate-100"
+        >
+          {teams.map((team) => (
+            <option key={team.id} value={team.id}>
+              {team.name}
+            </option>
+          ))}
+        </select>
+      ) : null}
+
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         <p
-          className="text-xs text-slate-300"
+          className="whitespace-nowrap text-xs text-slate-300"
           aria-live="polite"
           data-testid="daily-allocation-board-status"
         >
           {feedback || 'Board ready'}
         </p>
+        {publishDisabled && publishDisabledReason ? (
+          <p
+            id="daily-allocation-publish-reason"
+            className="max-w-48 truncate text-xs text-slate-400"
+            data-testid="daily-allocation-publish-reason"
+            title={publishDisabledReason}
+          >
+            {publishDisabledReason}
+          </p>
+        ) : null}
         <Button
           className={cn(boardControlStyles.primary, 'min-h-9')}
           onClick={onPublish}
           disabled={publishDisabled || publishing}
+          aria-describedby={publishDisabled && publishDisabledReason ? 'daily-allocation-publish-reason' : undefined}
           data-testid="daily-allocation-publish"
         >
           {publishing ? 'Publishing…' : 'Publish'}

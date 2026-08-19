@@ -626,6 +626,12 @@ input[type="date"] {
   appearance: none;
 }
 
+input[type="date"].date-input-compact {
+  display: inline-block !important;
+  width: 10.5rem !important;
+  max-width: 10.5rem !important;
+}
+
 input[type="time"]::-webkit-datetime-edit,
 input[type="date"]::-webkit-datetime-edit {
   max-width: 100% !important;
