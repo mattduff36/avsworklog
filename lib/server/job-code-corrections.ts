@@ -704,6 +704,7 @@ async function fetchProfileMatchedTimesheetIds(admin: AdminClient, query: string
   const { data, error } = await admin
     .from('profiles')
     .select('id')
+    .eq('is_system_account', false)
     .or(`full_name.ilike.%${query}%,employee_id.ilike.%${query}%`)
     .limit(100);
   throwIfSupabaseError(error);

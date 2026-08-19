@@ -123,7 +123,8 @@ export async function notifyAdminsOfSensitivePinEvent(
       full_name,
       super_admin,
       role:roles(name, role_class, is_super_admin)
-    `);
+    `)
+    .eq('is_system_account', false);
 
   if (profilesError) {
     console.warn('Failed to load admin profiles for sensitive PIN notification:', profilesError.message);

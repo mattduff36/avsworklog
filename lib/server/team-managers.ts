@@ -320,6 +320,7 @@ export async function reconcileTeamManagerAssignments(
   const { data: profilesData, error: profilesError } = await supabaseAdmin
     .from('profiles')
     .select('id, full_name, team_id, line_manager_id, secondary_manager_id, is_placeholder, role:roles(role_class)')
+    .eq('is_system_account', false)
     .eq('team_id', teamId);
 
   if (profilesError) {

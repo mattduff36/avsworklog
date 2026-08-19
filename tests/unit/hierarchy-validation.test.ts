@@ -39,7 +39,9 @@ function buildClient(
       if (table === 'profiles') {
         return {
           select: () => ({
-            order: async () => ({ data: rows, error }),
+            eq: () => ({
+              order: async () => ({ data: rows, error }),
+            }),
           }),
         };
       }

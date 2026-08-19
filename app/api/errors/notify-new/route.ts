@@ -103,6 +103,7 @@ export async function POST(request: NextRequest) {
     const { data: adminProfiles, error: adminProfilesError } = await supabase
       .from('profiles')
       .select('id, full_name, role_id')
+      .eq('is_system_account', false)
       .in('role_id', adminRoleIds);
 
     if (adminProfilesError || !adminProfiles || adminProfiles.length === 0) {

@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
         is_placeholder,
         role:roles(name, display_name, role_class, is_super_admin)
       `)
+      .eq('is_system_account', false)
       .order('full_name');
 
     if (profilesError) {

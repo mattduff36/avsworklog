@@ -784,6 +784,7 @@ export async function updateTeamModulePermissionDefaults(
   const { data: profiles, error: profilesError } = await supabaseAdmin
     .from('profiles')
     .select('id, team_id, role:roles(id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin)')
+    .eq('is_system_account', false)
     .in('team_id', teamIds);
 
   if (profilesError) {
@@ -1163,7 +1164,10 @@ export async function getUsersWithModuleAccess(
     return new Set<string>();
   }
 
-  const profilesQuery = supabaseAdmin.from('profiles').select('id, team_id, role_id, employee_id, full_name, is_placeholder, is_system_account');
+  const profilesQuery = supabaseAdmin
+    .from('profiles')
+    .select('id, team_id, role_id, employee_id, full_name, is_placeholder, is_system_account')
+    .eq('is_system_account', false);
   const scopedProfilesQuery = userIds?.length ? profilesQuery.in('id', userIds) : profilesQuery;
 
   const { data: profiles, error: profilesError } = await scopedProfilesQuery;

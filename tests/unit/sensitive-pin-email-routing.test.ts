@@ -64,10 +64,12 @@ describe('sensitive PIN email routing', () => {
       from: vi.fn((table: string) => {
         if (table === 'profiles') {
           return {
-            select: vi.fn().mockResolvedValue({
-              data: [{ id: 'admin-1', full_name: 'Admin User', super_admin: true, role: null }],
-              error: null,
-            }),
+            select: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ id: 'admin-1', full_name: 'Admin User', super_admin: true, role: null }],
+                error: null,
+              }),
+            })),
           };
         }
 

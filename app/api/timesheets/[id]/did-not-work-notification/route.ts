@@ -6,6 +6,7 @@ import { getCurrentUserWorkShift } from '@/lib/server/work-shifts';
 import { resolveTimesheetOffDayStates, type TimesheetEntryLike } from '@/lib/utils/timesheet-off-days';
 import { getScheduledDidNotWorkExceptions } from '@/lib/utils/timesheet-did-not-work-exceptions';
 import type { Database } from '@/types/database';
+import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 
 const CREATED_VIA = 'timesheet_did_not_work_exception';
 
@@ -25,6 +26,7 @@ interface ProfileRow {
   line_manager_id: string | null;
   secondary_manager_id: string | null;
   is_placeholder: boolean | null;
+  is_system_account?: boolean | null;
   super_admin?: boolean | null;
   role?: {
     name?: string | null;
@@ -117,13 +119,13 @@ async function getNotificationRecipients(admin: AdminClient, employeeProfile: Pr
 
   const { data, error } = await admin
     .from('profiles')
-    .select('id, is_placeholder, super_admin, role:roles(name, role_class, is_super_admin)');
+    .select('id, is_placeholder, is_system_account, super_admin, role:roles(name, role_class, is_super_admin)');
 
   if (error) throw error;
 
   const recipients = new Set<string>();
   for (const profile of (data || []) as unknown as ProfileRow[]) {
-    if (profile.is_placeholder || profile.id === employeeProfile.id) continue;
+    if (profile.is_placeholder || isSystemAccountProfile(profile) || profile.id === employeeProfile.id) continue;
     if (managerIds.has(profile.id) || isAdminProfile(profile)) {
       recipients.add(profile.id);
     }

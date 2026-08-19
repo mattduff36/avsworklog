@@ -152,7 +152,8 @@ export async function runHierarchyValidation(
       is_placeholder,
       is_system_account,
       role:roles(role_class)
-    `);
+    `)
+    .eq('is_system_account', false);
   const teamQuery = supabaseAdmin
     .from('org_teams')
     .select('id, name, manager_1_profile_id, manager_2_profile_id, is_system');

@@ -640,7 +640,9 @@ describe('team permission helpers', () => {
         if (table === 'profiles') {
           return {
             select: () => ({
-              in: async () => ({ data: profiles, error: null }),
+              eq: () => ({
+                in: async () => ({ data: profiles, error: null }),
+              }),
             }),
           };
         }
@@ -727,7 +729,9 @@ describe('team permission helpers', () => {
         if (table === 'profiles') {
           return {
             select: () => ({
-              in: async () => ({ data: profiles, error: null }),
+              eq: () => ({
+                in: async () => ({ data: profiles, error: null }),
+              }),
             }),
           };
         }

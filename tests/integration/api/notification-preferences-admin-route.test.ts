@@ -13,6 +13,11 @@ vi.mock('@/lib/server/system-test-accounts', () => ({
   filterHiddenSystemTestAccountProfiles: vi.fn(async (_client, profiles) => profiles),
 }));
 
+vi.mock('@/lib/server/system-accounts', () => ({
+  filterOperationalProfiles: vi.fn(async (_client, profiles) => profiles),
+  getSystemAccountIds: vi.fn(async () => new Set()),
+}));
+
 vi.mock('@/lib/utils/view-as', () => ({
   getEffectiveRole: vi.fn(),
 }));
@@ -63,7 +68,10 @@ describe('notification preferences admin route', () => {
       ],
       error: null,
     });
-    const selectProfiles = vi.fn(() => ({ order: orderProfiles }));
+    const selectProfiles = vi.fn(() => ({
+      eq: vi.fn(() => ({ order: orderProfiles })),
+      order: orderProfiles,
+    }));
     const selectPreferences = vi.fn().mockResolvedValue({
       data: [
         {

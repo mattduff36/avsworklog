@@ -72,6 +72,7 @@ export async function GET() {
           is_manager_admin
         )
       `)
+      .eq('is_system_account', false)
       .eq('roles.is_manager_admin', true)
       .order('full_name');
 
