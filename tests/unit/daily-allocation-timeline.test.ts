@@ -16,6 +16,9 @@ import {
 import {
   DAILY_TIMELINE_HOUR_WIDTH,
   DAILY_TIMELINE_JOB_COLUMN_WIDTH,
+  DAILY_TIMELINE_MIN_FIT_HOUR_WIDTH,
+  dailyTimelineFitMinContainerWidth,
+  dailyTimelineFitsContainer,
   dailyTimelineHourWidth,
   dailyTimelineRangeLeft,
 } from '@/components/daily-allocation/board/daily-timeline-layout';
@@ -63,9 +66,14 @@ describe('DA2-TIME-001 daily allocation timeline', () => {
     })).toBe(1170);
   });
 
-  it('widens hour columns to fill the available board width without shrinking below 96px', () => {
-    expect(dailyTimelineHourWidth(240 + 15 * 96, 15)).toBe(96);
-    expect(dailyTimelineHourWidth(240 + 15 * 80, 15)).toBe(96);
+  it('fills the board when hour columns stay readable, otherwise keeps the 96px scroll layout', () => {
+    expect(DAILY_TIMELINE_MIN_FIT_HOUR_WIDTH).toBe(48);
+    expect(dailyTimelineFitMinContainerWidth(15)).toBe(240 + 15 * 48);
+    expect(dailyTimelineFitsContainer(240 + 15 * 48, 15)).toBe(true);
+    expect(dailyTimelineFitsContainer(240 + 15 * 47, 15)).toBe(false);
+    expect(dailyTimelineHourWidth(240 + 15 * 80, 15)).toBe(80);
+    expect(dailyTimelineHourWidth(240 + 15 * 48, 15)).toBe(48);
+    expect(dailyTimelineHourWidth(240 + 15 * 47, 15)).toBe(96);
     expect(dailyTimelineHourWidth(240 + 15 * 120, 15)).toBe(120);
     expect(dailyTimelineHourWidth(1000, 0)).toBe(96);
   });

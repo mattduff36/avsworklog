@@ -27,6 +27,7 @@ import type { DailyAllocationRangeBoardPayload, DailyAllocationVisit } from '@/t
 import {
   DAILY_TIMELINE_HOUR_WIDTH,
   DAILY_TIMELINE_JOB_COLUMN_WIDTH,
+  dailyTimelineFitsContainer,
   dailyTimelineHourWidth,
 } from '@/components/daily-allocation/board/daily-timeline-layout';
 
@@ -50,11 +51,21 @@ interface DailyTimelineProps {
   onResizeVisit: (visit: DailyAllocationVisit, startsAt: string, endsAt: string) => void;
 }
 
-function TimelineHeader({ startHour, endHour, hourWidth }: { startHour: number; endHour: number; hourWidth: number }) {
+function TimelineHeader({
+  startHour,
+  endHour,
+  hourWidth,
+  fill,
+}: {
+  startHour: number;
+  endHour: number;
+  hourWidth: number;
+  fill: boolean;
+}) {
   const hours = Array.from({ length: endHour - startHour }, (_, index) => startHour + index);
   return (
     <div
-      className="sticky top-0 z-10 flex border-b border-slate-700 bg-slate-950"
+      className={cn('sticky top-0 z-10 flex border-b border-slate-700 bg-slate-950', fill && 'w-full')}
       data-testid="daily-allocation-daily-timeline-header"
     >
       <div
@@ -63,12 +74,18 @@ function TimelineHeader({ startHour, endHour, hourWidth }: { startHour: number; 
       >
         Job
       </div>
-      <div className="relative flex" style={{ width: hours.length * hourWidth }}>
+      <div
+        className={cn('relative flex min-w-0', fill && 'flex-1')}
+        style={fill ? undefined : { width: hours.length * hourWidth }}
+      >
         {hours.map((hour) => (
           <div
             key={hour}
-            className="border-l border-slate-800 px-1 py-2 text-[11px] tabular-nums text-slate-400"
-            style={{ width: hourWidth }}
+            className={cn(
+              'border-l border-slate-800 px-1 py-2 text-[11px] tabular-nums text-slate-400',
+              fill && 'min-w-0 flex-1'
+            )}
+            style={fill ? undefined : { width: hourWidth }}
           >
             {String(hour).padStart(2, '0')}:00
           </div>
@@ -86,6 +103,7 @@ function TimelineCell({
   hourWidth,
   startHour,
   endHour,
+  fill,
   children,
 }: {
   jobKey: string;
@@ -95,6 +113,7 @@ function TimelineCell({
   hourWidth: number;
   startHour: number;
   endHour: number;
+  fill: boolean;
   children: ReactNode;
 }) {
   const { ref, isDropTarget } = useDroppable({
@@ -117,10 +136,11 @@ function TimelineCell({
       data-timeline-end={`${String(endHour).padStart(2, '0')}:00`}
       className={cn(
         'relative border-l border-slate-800 bg-slate-950/60',
+        fill && 'min-w-0 flex-1',
         isDropTarget && 'bg-[hsl(var(--daily-allocation-primary)/0.12)]'
       )}
       style={{
-        width,
+        width: fill ? undefined : width,
         height,
         backgroundImage: 'linear-gradient(to right, rgb(51 65 85) 1px, transparent 1px)',
         backgroundSize: `${hourWidth}px 100%`,
@@ -154,7 +174,9 @@ export function DailyTimeline({
   const endHour = range.endHour || DAILY_ALLOCATION_DEFAULT_END_HOUR;
   const hourCount = Math.max(1, endHour - startHour);
   const boardRef = useRef<HTMLDivElement>(null);
-  const [hourWidth, setHourWidth] = useState(DAILY_TIMELINE_HOUR_WIDTH);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const fill = dailyTimelineFitsContainer(containerWidth, hourCount);
+  const hourWidth = dailyTimelineHourWidth(containerWidth, hourCount);
   const timelineWidth = hourCount * hourWidth;
   const [draftTimes, setDraftTimes] = useState<Record<string, { starts_at: string; ends_at: string }>>({});
 
@@ -162,14 +184,14 @@ export function DailyTimeline({
     const board = boardRef.current;
     if (!board || typeof ResizeObserver === 'undefined') return;
 
-    const updateHourWidth = () => {
-      setHourWidth(dailyTimelineHourWidth(board.clientWidth, hourCount));
+    const updateContainerWidth = () => {
+      setContainerWidth(board.clientWidth);
     };
-    updateHourWidth();
-    const observer = new ResizeObserver(updateHourWidth);
+    updateContainerWidth();
+    const observer = new ResizeObserver(updateContainerWidth);
     observer.observe(board);
     return () => observer.disconnect();
-  }, [hourCount]);
+  }, []);
 
   function displayedVisit(visit: DailyAllocationVisit): DailyAllocationVisit {
     const draft = draftTimes[visit.id];
@@ -259,12 +281,16 @@ export function DailyTimeline({
   return (
     <div
       ref={boardRef}
-      className="w-full overflow-x-auto rounded-lg border border-slate-700"
+      className={cn(
+        'w-full min-w-0 rounded-lg border border-slate-700',
+        fill ? 'overflow-x-hidden' : 'overflow-x-auto'
+      )}
       data-testid="daily-allocation-daily-board"
+      data-timeline-layout={fill ? 'fit' : 'scroll'}
     >
-      <TimelineHeader startHour={startHour} endHour={endHour} hourWidth={hourWidth} />
+      <TimelineHeader startHour={startHour} endHour={endHour} hourWidth={hourWidth} fill={fill} />
       {rows.length === 0 ? (
-        <div className="flex border-t border-slate-800">
+        <div className={cn('flex border-t border-slate-800', fill && 'w-full')}>
           <div
             className="shrink-0 space-y-1 border-r border-slate-700 bg-slate-900 p-3"
             style={{ width: DAILY_TIMELINE_JOB_COLUMN_WIDTH }}
@@ -291,6 +317,7 @@ export function DailyTimeline({
             hourWidth={hourWidth}
             startHour={startHour}
             endHour={endHour}
+            fill={fill}
           >
             {null}
           </TimelineCell>
@@ -300,7 +327,7 @@ export function DailyTimeline({
         const { placements, laneCount } = assignDailyAllocationLanes(dayVisits);
         const height = Math.max(ROW_MIN_HEIGHT, laneCount * LANE_HEIGHT + 16);
         return (
-          <div key={row.key} className="flex border-t border-slate-800">
+          <div key={row.key} className={cn('flex border-t border-slate-800', fill && 'w-full')}>
             <div
               className="shrink-0 space-y-1 border-r border-slate-700 bg-slate-900 p-3"
               style={{ width: DAILY_TIMELINE_JOB_COLUMN_WIDTH }}
@@ -326,6 +353,7 @@ export function DailyTimeline({
               hourWidth={hourWidth}
               startHour={startHour}
               endHour={endHour}
+              fill={fill}
             >
               {placements.map(({ item: visit, lane }) => {
                 const shown = displayedVisit(visit);

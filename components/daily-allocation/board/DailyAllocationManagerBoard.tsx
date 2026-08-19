@@ -951,7 +951,7 @@ export function DailyAllocationManagerBoard({
           {boardState.isBoardFetching ? <Badge variant="outline">Refreshing</Badge> : null}
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
           <ResourceSidebar
             tab={resourceTab}
             onTabChange={setResourceTab}

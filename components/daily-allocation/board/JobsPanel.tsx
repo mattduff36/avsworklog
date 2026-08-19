@@ -81,7 +81,7 @@ export function JobsPanel({
         </div>
       </div>
 
-      <div className="hidden lg:block">
+      <div className="hidden min-w-0 lg:block">
         {view === 'daily' ? (
           <DailyTimeline
             board={board}
