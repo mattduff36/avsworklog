@@ -8,5 +8,7 @@
 5. Produce established customer-facing development-session lines plus a separate final production-support line where appropriate. Sort by completion date and estimate conservatively from the calibrated recommendation.
 6. Show hours, line values, subtotals, total, and coverage notes.
 7. Save the exact response as `docs_private/invoices/invoice-<from>-to-<to>-final.md`.
+8. Export the companion JSON with the same formatting:
+   `npx tsx scripts/create-invoice.ts --export-final "docs_private/invoices/invoice-<from>-to-<to>-final.md"`
 
 Do not modify app code, commit, push, or run builds.
