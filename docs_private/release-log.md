@@ -2,6 +2,35 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.34.0
+
+**GIT COMMIT MESSAGE**
+`feat(notifications): update Notifications, Timesheets, Error reporting, and Reports`
+
+**PUSHED AT**
+2026-08-19T17:00:47.354Z
+
+**WHAT CHANGED**
+Update Notifications, Timesheets, Error reporting, and Reports. Hide kiosk from remaining reports and carryover sql. Close system-account review blockers. Show System as the system team label. Remove System badge from permission matrix teams. Hide yard kiosk from hr modules.
+
+**VERSION HISTORY DETAILS**
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Updated absence and leave, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated reports, with changes to background routes, app screens, and shared logic.
+- Updated Notifications, Timesheets, Error reporting, and Reports, with changes to background routes, shared logic, and automated tests.
+- Updated timesheets, with changes to background routes and shared logic.
+- Updated user management, with changes to background routes and app screens.
+- Updated quotes, with changes to background routes and shared logic.
+- Updated inventory, with changes to background routes and automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `feat(notifications): update Notifications, Timesheets, Error reporting, and Reports`
+- `fix(accounts): hide kiosk from remaining reports and carryover sql`
+- `fix(accounts): close system-account review blockers`
+- `fix(admin): show System as the system team label`
+- `fix(admin): remove System badge from permission matrix teams`
+- `fix(accounts): hide yard kiosk from hr modules`
+
 ## 0826.33.0
 
 **GIT COMMIT MESSAGE**

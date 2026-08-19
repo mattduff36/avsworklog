@@ -1,5 +1,34 @@
 [
   {
+    "version": "0826.34.0",
+    "updateKind": "major",
+    "title": "Notifications update",
+    "description": "Updated Notifications, Timesheets, Error reporting, and Reports. Hide kiosk from remaining reports and carryover sql. Close system-account review blockers. Show System as the system team label. Remove System badge from permission matrix teams. Hide yard kiosk from hr modules.",
+    "summary": "Updated Notifications, Timesheets, Error reporting, and Reports. Hide kiosk from remaining reports and carryover sql. Close system-account review blockers. Show System as the system team label. Remove System badge from permission matrix teams. Hide yard kiosk from hr modules.",
+    "details": [
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Updated absence and leave, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated reports, with changes to background routes, app screens, and shared logic.",
+      "Updated Notifications, Timesheets, Error reporting, and Reports, with changes to background routes, shared logic, and automated tests.",
+      "Updated timesheets, with changes to background routes and shared logic.",
+      "Updated user management, with changes to background routes and app screens.",
+      "Updated quotes, with changes to background routes and shared logic.",
+      "Updated inventory, with changes to background routes and automation scripts."
+    ],
+    "areas": [
+      "Notifications",
+      "Timesheets",
+      "Error reporting",
+      "Reports. Hide kiosk from remaining reports"
+    ],
+    "areaKeys": [
+      "notifications",
+      "timesheets",
+      "error-reporting"
+    ],
+    "pushedAt": "2026-08-19T17:00:47.354Z"
+  },
+  {
     "version": "0826.33.0",
     "updateKind": "major",
     "title": "Inventory update",
