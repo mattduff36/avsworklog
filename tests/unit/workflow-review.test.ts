@@ -836,8 +836,10 @@ describe('workflow events and lock', () => {
     writeFileSync(path.join(root, '.cursor', 'hooks', 'workflow-stop.mjs'), '', 'utf8');
     writeFileSync(path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs'), '', 'utf8');
 
-    expect(formatWorkflowReviewDiagnostics(root)).toContain('Collector wiring: ready');
-    expect(formatWorkflowReviewDiagnostics(root)).toContain('Telemetry confidence: none');
+    const now = () => new Date('2026-08-19T10:05:00.000Z');
+    expect(formatWorkflowReviewDiagnostics(root, now)).toContain('Collector wiring: ready');
+    expect(formatWorkflowReviewDiagnostics(root, now)).toContain('Hook delivery: unverified');
+    expect(formatWorkflowReviewDiagnostics(root, now)).toContain('Telemetry confidence: none');
 
     writeWorkflowEvent(getWorkflowPaths(root).eventsDirectory, {
       schemaVersion: '2',
@@ -860,9 +862,10 @@ describe('workflow events and lock', () => {
       monthKey: '2026-08',
     });
 
-    const warming = formatWorkflowReviewDiagnostics(root);
+    const warming = formatWorkflowReviewDiagnostics(root, now);
     expect(warming).toContain('Events: 1');
     expect(warming).toContain('Latest event: 2026-08-19T10:00:00.000Z');
+    expect(warming).toContain('Hook delivery: active');
     expect(warming).toContain('Telemetry confidence: warming-up');
   });
 

@@ -831,7 +831,10 @@ export async function processWorkflowStopEvent(
   });
 }
 
-export function formatWorkflowReviewDiagnostics(repoRoot = process.cwd()): string {
+export function formatWorkflowReviewDiagnostics(
+  repoRoot = process.cwd(),
+  now: () => Date = () => new Date()
+): string {
   const paths = getWorkflowPaths(repoRoot);
   const state = loadWorkflowReviewState(paths.statePath);
   const events = listWorkflowEvents(paths.eventsDirectory);
@@ -844,10 +847,23 @@ export function formatWorkflowReviewDiagnostics(repoRoot = process.cwd()): strin
   );
   const collectorWiringReady = hookConfigPresent && hookScriptPresent && hookRuntimePresent;
   const latestEvent = events.at(-1);
+  const latestEventTimestamp = latestEvent ? Date.parse(latestEvent.recordedAt) : Number.NaN;
+  const eventAgeMs = Number.isFinite(latestEventTimestamp)
+    ? now().getTime() - latestEventTimestamp
+    : Number.POSITIVE_INFINITY;
+  const hookDelivery =
+    !collectorWiringReady
+      ? 'unavailable'
+      : !latestEvent
+        ? 'unverified'
+        : eventAgeMs > 7 * 24 * 60 * 60 * 1_000
+          ? 'stale'
+          : 'active';
   const telemetryConfidence =
     events.length === 0 ? 'none' : events.length < 5 ? 'warming-up' : 'usable';
   return [
     `Collector wiring: ${collectorWiringReady ? 'ready' : 'incomplete'}`,
+    `Hook delivery: ${hookDelivery}`,
     `Hook config: ${hookConfigPresent ? 'present' : 'missing'}`,
     `Hook script: ${hookScriptPresent ? 'present' : 'missing'}`,
     `Hook runtime: ${hookRuntimePresent ? 'present' : 'missing'}`,
