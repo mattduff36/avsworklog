@@ -12,6 +12,7 @@ import {
 } from '@/lib/server/team-managers';
 import { ensureTeamPermissionRows } from '@/lib/server/team-permissions';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
+import { SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
 
 function getSupabaseAdmin() {
   return createSupabaseClient(
@@ -59,7 +60,7 @@ export async function GET() {
   const supabaseAdmin = getSupabaseAdmin();
   const { data: teamsData, error: teamsError } = await supabaseAdmin
     .from('org_teams')
-    .select('id, name, code, timesheet_type, active, manager_1_profile_id, manager_2_profile_id')
+    .select('id, name, code, timesheet_type, active, is_system, manager_1_profile_id, manager_2_profile_id')
     .order('name', { ascending: true });
 
   if (teamsError) {
@@ -80,6 +81,7 @@ export async function GET() {
       full_name,
       employee_id,
       is_placeholder,
+      is_system_account,
       team_id,
       line_manager_id,
       role:roles(role_class)
@@ -101,6 +103,7 @@ export async function GET() {
     full_name?: string | null;
     employee_id?: string | null;
     is_placeholder?: boolean | null;
+    is_system_account?: boolean | null;
     team_id?: string | null;
     line_manager_id?: string | null;
     role?: { role_class?: 'admin' | 'manager' | 'employee' } | null;
@@ -109,6 +112,7 @@ export async function GET() {
     full_name: row.full_name ?? null,
     employee_id: row.employee_id ?? null,
     is_placeholder: row.is_placeholder ?? null,
+    is_system_account: row.is_system_account ?? null,
     team_id: row.team_id ?? null,
     line_manager_id: row.line_manager_id ?? null,
     role: row.role ?? null,
@@ -127,6 +131,7 @@ export async function GET() {
     code: string | null;
     timesheet_type?: string | null;
     active: boolean;
+    is_system?: boolean | null;
     manager_1_profile_id?: string | null;
     manager_2_profile_id?: string | null;
   }>;
@@ -175,8 +180,9 @@ export async function GET() {
         id: team.team_id,
         name: teamRow?.name || team.team_id,
         code: teamRow?.code || null,
-        timesheet_type: teamRow?.timesheet_type || 'civils',
+        timesheet_type: teamRow?.timesheet_type || (teamRow?.is_system ? null : 'civils'),
         active: teamRow?.active ?? true,
+        is_system: Boolean(teamRow?.is_system),
         manager_1_id: manager1Id,
         manager_2_id: manager2Id,
         manager_1_name: manager1 ? formatManagerOptionLabel(manager1) : null,
@@ -226,6 +232,9 @@ export async function POST(request: Request) {
   }
   if (!teamId) {
     return NextResponse.json({ error: 'Team id is invalid' }, { status: 400 });
+  }
+  if (teamId === SYSTEM_ACCOUNTS_TEAM_ID) {
+    return NextResponse.json({ error: 'System Accounts team cannot be created from the application' }, { status: 400 });
   }
   if (!VALID_TIMESHEET_TYPES.has(timesheetType)) {
     return NextResponse.json({ error: 'Invalid timesheet type' }, { status: 400 });

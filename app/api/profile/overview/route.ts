@@ -9,6 +9,7 @@ import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
+import { filterSystemAccounts } from '@/lib/utils/system-accounts';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { getCurrentFleetAssignmentSummary } from '@/lib/server/profile-fleet-assignments';
 import type { ProfileOverviewPayload, ProfileTeamSummary } from '@/types/profile';
@@ -96,22 +97,26 @@ async function buildTeamSummary(
 
   const { data, error } = await admin
     .from('profiles')
-    .select('id, full_name, employee_id, is_placeholder')
+    .select('id, full_name, employee_id, is_placeholder, is_system_account')
     .eq('team_id', teamId)
-    .eq('is_placeholder', false);
+    .eq('is_placeholder', false)
+    .eq('is_system_account', false);
 
   if (error) throw error;
 
   return {
     team_id: teamId,
     team_name: teamName,
-    member_count: filterHiddenSystemTestAccounts(
+    member_count: filterSystemAccounts(
+      filterHiddenSystemTestAccounts(
       ((data || []) as Array<{
         id: string;
         full_name: string | null;
         employee_id: string | null;
         is_placeholder: boolean | null;
+        is_system_account?: boolean | null;
       }>)
+    )
     ).length,
   };
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
+import { filterOperationalProfiles } from '@/lib/server/system-accounts';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -72,7 +73,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Build response with users and their preferences
-    const visibleProfiles = await filterHiddenSystemTestAccountProfiles(adminClient, profiles || []);
+    const visibleProfiles = await filterOperationalProfiles(
+      adminClient,
+      await filterHiddenSystemTestAccountProfiles(adminClient, profiles || [])
+    );
 
     const users = visibleProfiles.map(p => {
       const role = p.role as {

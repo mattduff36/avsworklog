@@ -5020,6 +5020,7 @@ export type Database = {
           manager_1_profile_id: string | null
           manager_2_profile_id: string | null
           timesheet_type: 'civils' | 'plant' | null
+          is_system: boolean
         }
         Insert: {
           id: string
@@ -5031,6 +5032,7 @@ export type Database = {
           manager_1_profile_id?: string | null
           manager_2_profile_id?: string | null
           timesheet_type?: 'civils' | 'plant' | null
+          is_system?: boolean
         }
         Update: {
           id?: string
@@ -5042,6 +5044,7 @@ export type Database = {
           manager_1_profile_id?: string | null
           manager_2_profile_id?: string | null
           timesheet_type?: 'civils' | 'plant' | null
+          is_system?: boolean
         }
         Relationships: [
           {
@@ -5820,6 +5823,7 @@ export type Database = {
           line_manager_id: string | null
           secondary_manager_id: string | null
           is_placeholder: boolean
+          is_system_account: boolean
           placeholder_key: string | null
           avatar_url: string | null
           emergency_contact_name: string | null
@@ -5846,6 +5850,7 @@ export type Database = {
           line_manager_id?: string | null
           secondary_manager_id?: string | null
           is_placeholder?: boolean
+          is_system_account?: boolean
           placeholder_key?: string | null
           avatar_url?: string | null
           emergency_contact_name?: string | null
@@ -5872,6 +5877,7 @@ export type Database = {
           line_manager_id?: string | null
           secondary_manager_id?: string | null
           is_placeholder?: boolean
+          is_system_account?: boolean
           placeholder_key?: string | null
           avatar_url?: string | null
           emergency_contact_name?: string | null

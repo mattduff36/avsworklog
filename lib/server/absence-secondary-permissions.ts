@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getPermissionLevelsForUser } from '@/lib/server/team-permissions';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
+import { filterSystemAccounts } from '@/lib/utils/system-accounts';
 import {
   ABSENCE_SECONDARY_PERMISSION_HEADERS,
   ABSENCE_SECONDARY_PERMISSION_KEYS,
@@ -29,6 +30,7 @@ interface ProfileWithRoleRow {
   employee_id: string | null;
   team_id: string | null;
   role_id: string | null;
+  is_system_account?: boolean | null;
   team?: { id?: string | null; name?: string | null } | null;
   role?: RoleShape | null;
 }
@@ -279,14 +281,17 @@ export async function getAbsenceSecondaryExceptionMatrix(): Promise<AbsenceSecon
   const { data: profilesData, error: profilesError } = await admin
     .from('profiles')
     .select(
-      'id, full_name, employee_id, team_id, role_id, team:org_teams!profiles_team_id_fkey(id, name), role:roles(name, display_name, role_class, is_manager_admin, is_super_admin)'
+      'id, full_name, employee_id, team_id, role_id, is_system_account, team:org_teams!profiles_team_id_fkey(id, name), role:roles(name, display_name, role_class, is_manager_admin, is_super_admin)'
     )
+    .eq('is_system_account', false)
     .in('id', profileIds);
 
   if (profilesError) throw profilesError;
 
   const profileById = new Map<string, ProfileWithRoleRow>();
-  filterHiddenSystemTestAccounts((profilesData || []) as unknown as ProfileWithRoleRow[]).forEach((profile) => {
+  filterSystemAccounts(
+    filterHiddenSystemTestAccounts((profilesData || []) as unknown as ProfileWithRoleRow[])
+  ).forEach((profile) => {
     profileById.set(profile.id, profile);
   });
 

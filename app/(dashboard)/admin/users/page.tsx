@@ -76,6 +76,7 @@ import { calculateNewUserRemainingLeaveDefault, roundToNearestHalfDay } from '@/
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { formatDateTime } from '@/lib/utils/date';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
+import { isSystemAccountProfile, SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
 import {
   computeQuickEditFloatingPosition,
   type FloatingPositionResult,
@@ -336,6 +337,7 @@ export default function UsersAdminPage() {
     id: string;
     name: string;
     active: boolean;
+    is_system?: boolean;
     manager_1_id?: string | null;
     manager_2_id?: string | null;
     manager_1_name?: string | null;
@@ -473,15 +475,27 @@ export default function UsersAdminPage() {
     if (teamDirectory.length > 0) {
       return teamDirectory
         .filter((team) => team.active)
-        .map((team) => ({ id: team.id, name: team.name }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .map((team) => ({ id: team.id, name: team.name, is_system: Boolean(team.is_system) }))
+        .sort((a, b) => {
+          if (a.is_system !== b.is_system) return a.is_system ? 1 : -1;
+          return a.name.localeCompare(b.name);
+        });
     }
     const teams = new Set<string>();
     users.forEach((u) => {
       if (u.team_id) teams.add(u.team_id);
     });
-    return Array.from(teams).sort().map((id) => ({ id, name: id }));
+    return Array.from(teams).sort().map((id) => ({
+      id,
+      name: id,
+      is_system: id === SYSTEM_ACCOUNTS_TEAM_ID,
+    }));
   }, [teamDirectory, users]);
+
+  const createUserTeamOptions = useMemo(
+    () => teamOptions.filter((team) => !team.is_system),
+    [teamOptions]
+  );
 
   const teamNameById = useMemo(() => {
     const map = new Map<string, string>();
@@ -494,6 +508,7 @@ export default function UsersAdminPage() {
       id: string;
       name: string;
       active: boolean;
+      is_system?: boolean;
       manager_1_id?: string | null;
       manager_2_id?: string | null;
       manager_1_name?: string | null;
@@ -555,6 +570,7 @@ export default function UsersAdminPage() {
         secondary_manager_id,
         team_id,
         is_placeholder,
+        is_system_account,
         role:roles(
           name,
           display_name,
@@ -762,12 +778,13 @@ export default function UsersAdminPage() {
         if (Array.isArray(teamsData?.teams)) {
           const mapped = teamsData.teams
             .filter((team: { id?: string; team_id?: string }) => Boolean(team?.id || team?.team_id))
-            .map((team: { id?: string; team_id?: string; name?: string; active?: boolean }) => {
+            .map((team: { id?: string; team_id?: string; name?: string; active?: boolean; is_system?: boolean }) => {
               const teamId = team.id || team.team_id || '';
               return {
                 id: teamId,
                 name: team.name || teamId,
                 active: team.active !== false,
+                is_system: Boolean(team.is_system) || teamId === SYSTEM_ACCOUNTS_TEAM_ID,
                 manager_1_id: (team as { manager_1_id?: string | null }).manager_1_id || null,
                 manager_2_id: (team as { manager_2_id?: string | null }).manager_2_id || null,
                 manager_1_name: (team as { manager_1_name?: string | null }).manager_1_name || null,
@@ -828,8 +845,12 @@ export default function UsersAdminPage() {
     }
 
     const sorted = [...filtered].sort((a, b) => {
-      const teamA = a.team_id ? (teamNameById.get(a.team_id) || a.team_id) : 'ZZZ Unassigned';
-      const teamB = b.team_id ? (teamNameById.get(b.team_id) || b.team_id) : 'ZZZ Unassigned';
+      const teamA = isSystemAccountProfile(a)
+        ? 'zzz2 System Accounts'
+        : a.team_id ? (teamNameById.get(a.team_id) || a.team_id) : 'zzz1 Unassigned';
+      const teamB = isSystemAccountProfile(b)
+        ? 'zzz2 System Accounts'
+        : b.team_id ? (teamNameById.get(b.team_id) || b.team_id) : 'zzz1 Unassigned';
       const byTeam = teamA.localeCompare(teamB);
       if (byTeam !== 0) return byTeam;
 
@@ -1212,6 +1233,10 @@ export default function UsersAdminPage() {
   }
 
   function openEditDialog(userProfile: ProfileWithEmail) {
+    if (isSystemAccountProfile(userProfile)) {
+      toast.error('System accounts cannot be edited from Admin Users');
+      return;
+    }
     setSelectedUser(userProfile);
     // Email comes from auth (merged into ProfileWithEmail), not from the profiles table
     const authEmail = userProfile.email || '';
@@ -1236,6 +1261,10 @@ export default function UsersAdminPage() {
 
   // Open delete dialog
   function openDeleteDialog(userProfile: ProfileWithEmail) {
+    if (isSystemAccountProfile(userProfile)) {
+      toast.error('System accounts cannot be deleted');
+      return;
+    }
     setSelectedUser(userProfile);
     setFormError('');
     setDeleteOptionsDialogOpen(true);
@@ -1641,13 +1670,22 @@ export default function UsersAdminPage() {
                       const currentTeamKey = user.team_id || 'unassigned';
                       const previousTeamKey = index > 0 ? (filteredUsers[index - 1]?.team_id || 'unassigned') : null;
                       const startsNewTeam = index === 0 || currentTeamKey !== previousTeamKey;
+                      const isSystemUser = isSystemAccountProfile(user);
+                      const isSystemTeamGroup = isSystemUser || Boolean(user.team_id && teamDetailsById.get(user.team_id)?.is_system);
                       const teamLabel = user.team_id ? (teamNameById.get(user.team_id) || user.team_id) : 'Unassigned';
+                      const canEditIdentity = canQuickEditAssignments && !isSystemUser;
 
                       return (
                       <Fragment key={user.id}>
                         {startsNewTeam && (
-                          <TableRow key={`${currentTeamKey}-divider`} className="border-slate-600 bg-slate-950/40 hover:bg-slate-950/40">
-                            <TableCell colSpan={8} className="py-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                          <TableRow key={`${currentTeamKey}-divider`} className={cn(
+                            'border-slate-600 bg-slate-950/40 hover:bg-slate-950/40',
+                            isSystemTeamGroup && 'italic'
+                          )}>
+                            <TableCell colSpan={8} className={cn(
+                              'py-2 text-xs font-semibold uppercase tracking-wider text-slate-400',
+                              isSystemTeamGroup && 'text-slate-500'
+                            )}>
                               {teamLabel}
                             </TableCell>
                           </TableRow>
@@ -1655,11 +1693,19 @@ export default function UsersAdminPage() {
                       <TooltipProvider delayDuration={2000}>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <TableRow key={user.id} className="border-slate-700 hover:bg-slate-800/50">
-                        <TableCell className="font-medium text-white">
+                            <TableRow key={user.id} className={cn(
+                              'border-slate-700 hover:bg-slate-800/50',
+                              isSystemUser && 'text-slate-400'
+                            )}>
+                        <TableCell className={cn('font-medium text-white', isSystemUser && 'italic text-slate-400')}>
                           <div className="flex items-center gap-2 w-full cursor-default">
                             <UserTableAvatar user={user} />
                             {user.full_name || 'Unnamed User'}
+                            {isSystemUser && (
+                              <Badge variant="outline" className="text-[10px] italic text-slate-400">
+                                System
+                              </Badge>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
@@ -1671,8 +1717,8 @@ export default function UsersAdminPage() {
                         <TableCell>
                           <button
                             type="button"
-                            disabled={!canQuickEditAssignments}
-                            onClick={(event) => canQuickEditAssignments && openQuickEdit(user, 'role', event.currentTarget)}
+                            disabled={!canEditIdentity}
+                            onClick={(event) => canEditIdentity && openQuickEdit(user, 'role', event.currentTarget)}
                             className="disabled:cursor-default enabled:cursor-pointer"
                           >
                             <Badge
@@ -1700,8 +1746,8 @@ export default function UsersAdminPage() {
                         <TableCell className="text-muted-foreground">
                           <button
                             type="button"
-                            disabled={!canQuickEditAssignments}
-                            onClick={(event) => canQuickEditAssignments && openQuickEdit(user, 'team', event.currentTarget)}
+                            disabled={!canEditIdentity}
+                            onClick={(event) => canEditIdentity && openQuickEdit(user, 'team', event.currentTarget)}
                             className="text-left disabled:cursor-default enabled:cursor-pointer"
                           >
                             {user.team_id ? (teamNameById.get(user.team_id) || user.team_id) : 'Unassigned'}
@@ -1742,8 +1788,9 @@ export default function UsersAdminPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => openEditDialog(user)}
-                              className="text-blue-400 hover:text-blue-300 hover:bg-slate-800"
-                              title="Edit User"
+                              disabled={isSystemUser}
+                              className="text-blue-400 hover:text-blue-300 hover:bg-slate-800 disabled:opacity-30"
+                              title={isSystemUser ? 'System accounts cannot be edited here' : 'Edit User'}
                             >
                               <Edit className="h-3 w-3" />
                             </Button>
@@ -1769,9 +1816,9 @@ export default function UsersAdminPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => openDeleteDialog(user)}
-                              disabled={user.id === currentUser?.id} // Prevent self-deletion
+                              disabled={isSystemUser || user.id === currentUser?.id}
                               className="text-red-400 hover:text-red-300 hover:bg-slate-800 disabled:opacity-30"
-                              title="Delete User"
+                              title={isSystemUser ? 'System accounts cannot be deleted' : 'Delete User'}
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -1977,7 +2024,7 @@ export default function UsersAdminPage() {
                           <SelectValue placeholder="Select team" />
                         </SelectTrigger>
                         <SelectContent>
-                          {teamOptions.map((team) => (
+                          {createUserTeamOptions.map((team) => (
                             <SelectItem key={team.id} value={team.id}>
                               {team.name}
                             </SelectItem>

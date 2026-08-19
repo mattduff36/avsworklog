@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventorySupervisorAccess } from '@/lib/server/inventory-auth';
 import { enrichInventoryLocationRecords } from '@/lib/server/inventory-locations';
 import { getUsersWithPermission } from '@/lib/utils/permissions';
+import { filterOperationalProfiles } from '@/lib/server/system-accounts';
 import type { Database } from '@/types/database';
 
 type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
@@ -129,8 +130,9 @@ export async function GET(request?: NextRequest) {
     const users = inventoryUserIds.length > 0
       ? await admin
         .from('profiles')
-        .select('id, full_name, employee_id')
+        .select('id, full_name, employee_id, is_system_account')
         .in('id', inventoryUserIds)
+        .eq('is_system_account', false)
         .order('full_name', { ascending: true })
       : { data: [], error: null };
 
@@ -147,11 +149,13 @@ export async function GET(request?: NextRequest) {
       ],
     );
 
+    const visibleUsers = await filterOperationalProfiles(admin, users.data || []);
+
     return NextResponse.json({
       active_locations: activeLocations.map((location) => (
         enrichedLocationsById.get(location.id) || location
       )),
-      users: users.data || [],
+      users: visibleUsers,
       assignments: assignments.map((assignment) => ({
         ...assignment,
         location: assignment.location

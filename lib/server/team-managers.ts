@@ -4,12 +4,14 @@ export type HierarchyRoleClass = 'admin' | 'manager' | 'employee';
 type SupabaseAdminClient = SupabaseClient;
 
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
+import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 
 interface ManagerProfileRow {
   id: string;
   full_name: string | null;
   employee_id?: string | null;
   is_placeholder?: boolean | null;
+  is_system_account?: boolean | null;
   role?: { role_class?: HierarchyRoleClass | null } | null;
 }
 
@@ -122,7 +124,7 @@ export function formatManagerOptionLabel(option: TeamManagerOption): string {
 
 export function buildTeamManagerOptionsFromProfiles(rows: ManagerProfileRow[]): TeamManagerOption[] {
   return rows
-    .filter((row) => !isHiddenSystemTestAccountProfile(row))
+    .filter((row) => !isHiddenSystemTestAccountProfile(row) && !isSystemAccountProfile(row))
     .map(toManagerCandidate)
     .filter(isEligibleManager)
     .map((row) => ({
@@ -279,7 +281,7 @@ export async function getTeamManagerOptions(
 ): Promise<TeamManagerOption[]> {
   const { data, error } = await supabaseAdmin
     .from('profiles')
-    .select('id, full_name, employee_id, is_placeholder, role:roles(role_class)')
+    .select('id, full_name, employee_id, is_placeholder, is_system_account, role:roles(role_class)')
     .order('full_name', { ascending: true });
 
   if (error) {

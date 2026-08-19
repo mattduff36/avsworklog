@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { cloneWorkShiftPattern, STANDARD_WORK_SHIFT_PATTERN, calculateDurationDaysForShiftPattern, serializePatternToTemplateSlots } from '@/lib/utils/work-shifts';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
+import { filterSystemAccounts } from '@/lib/utils/system-accounts';
 import type {
   EmployeeWorkShiftRow,
   WorkShiftPattern,
@@ -53,6 +54,7 @@ interface ProfileDirectoryRow {
   full_name: string | null;
   employee_id: string | null;
   team_id: string | null;
+  is_system_account?: boolean | null;
   team?: { id?: string | null; name?: string | null } | null;
 }
 
@@ -452,7 +454,8 @@ export async function getWorkShiftMatrix(
   if (!enforceTeamScope || options?.teamId) {
     let profilesQuery = supabase
       .from('profiles')
-      .select('id, full_name, employee_id, team_id, team:org_teams!profiles_team_id_fkey(id, name)')
+      .select('id, full_name, employee_id, team_id, is_system_account, team:org_teams!profiles_team_id_fkey(id, name)')
+      .eq('is_system_account', false)
       .order('full_name', { ascending: true });
     if (enforceTeamScope && options?.teamId) {
       profilesQuery = profilesQuery.eq('team_id', options.teamId);
@@ -462,7 +465,9 @@ export async function getWorkShiftMatrix(
     if (profileError) {
       throw profileError;
     }
-    profileRows = filterHiddenSystemTestAccounts((profiles || []) as ProfileDirectoryRow[]);
+    profileRows = filterSystemAccounts(
+      filterHiddenSystemTestAccounts((profiles || []) as ProfileDirectoryRow[])
+    );
   }
   await ensureEmployeeWorkShiftRecords(
     supabase,

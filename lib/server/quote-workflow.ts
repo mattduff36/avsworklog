@@ -6,6 +6,7 @@ import { getQuoteResendEmailConfig } from '@/lib/server/resend-email-config';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
+import { getSystemAccountIds } from '@/lib/server/system-accounts';
 import { buildQuoteDisplayName, buildQuotePdfFilename } from '@/lib/quotes/quote-display-name';
 import { enrichQuoteTimelineEventDescriptions } from '@/lib/quotes/quote-timeline-comments';
 import {
@@ -268,8 +269,12 @@ export async function listQuoteManagerOptions(): Promise<QuoteManagerOption[]> {
   }
 
   const hiddenIds = await getHiddenSystemTestAccountIds(admin);
+  const systemAccountIds = await getSystemAccountIds(admin);
   const visibleOptions = ((data || []) as QuoteManagerOption[]).filter(
-    (option) => !hiddenIds.has(option.profile_id) && (!option.approver_profile_id || !hiddenIds.has(option.approver_profile_id))
+    (option) =>
+      !hiddenIds.has(option.profile_id) &&
+      !systemAccountIds.has(option.profile_id) &&
+      (!option.approver_profile_id || (!hiddenIds.has(option.approver_profile_id) && !systemAccountIds.has(option.approver_profile_id)))
   );
 
   return hydrateQuoteManagerAuthEmails(admin, visibleOptions);
@@ -1327,8 +1332,9 @@ export async function listQuoteNotificationRecipientOptions(
   const hiddenIds = await getHiddenSystemTestAccountIds(supabase);
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, employee_id, team_id, team:org_teams!profiles_team_id_fkey(name)')
+    .select('id, full_name, employee_id, team_id, is_system_account, team:org_teams!profiles_team_id_fkey(name)')
     .in('id', quoteUserIds)
+    .eq('is_system_account', false)
     .order('full_name', { ascending: true });
 
   if (error) {

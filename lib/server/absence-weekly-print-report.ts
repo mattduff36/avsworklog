@@ -2,6 +2,9 @@ import { createClient } from '@/lib/supabase/server';
 import { getActorAbsenceSecondaryPermissions, canActorUseScopedAbsencePermission } from '@/lib/server/absence-secondary-permissions';
 import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getSystemAccountIds } from '@/lib/server/system-accounts';
+import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 
 interface AbsenceReasonRow {
   name?: string | null;
@@ -13,6 +16,7 @@ interface ProfileRow {
   full_name?: string | null;
   employee_id?: string | null;
   team_id?: string | null;
+  is_system_account?: boolean | null;
 }
 
 interface AbsencePrintSourceRow {
@@ -171,8 +175,8 @@ async function fetchAbsenceRows(
   const reasonJoin = 'reason:absence_reasons(name,color,is_paid)';
   const employeeJoin =
     tableName === 'absences'
-      ? 'employee:profiles!absences_profile_id_fkey(full_name,employee_id,team_id)'
-      : 'employee:profiles!absences_archive_profile_id_fkey(full_name,employee_id,team_id)';
+      ? 'employee:profiles!absences_profile_id_fkey(full_name,employee_id,team_id,is_system_account)'
+      : 'employee:profiles!absences_archive_profile_id_fkey(full_name,employee_id,team_id,is_system_account)';
 
   const { data, error } = await supabase
     .from(tableName)
@@ -338,13 +342,16 @@ export async function getPrintableAbsenceWeeklyReportData(input: {
     throw new Error('Forbidden');
   }
 
-  const [activeRows, archivedRows, scopeContext] = await Promise.all([
+  const [activeRows, archivedRows, scopeContext, systemAccountIds] = await Promise.all([
     fetchAbsenceRows(supabase, 'absences', dateFrom, dateTo),
     fetchAbsenceRows(supabase, 'absences_archive', dateFrom, dateTo),
     getReportScopeContext(),
+    getSystemAccountIds(createAdminClient()),
   ]);
 
-  let scopedRows = [...activeRows, ...archivedRows].filter((row) => doesOverlapRange(row, dateFrom, dateTo));
+  let scopedRows = [...activeRows, ...archivedRows]
+    .filter((row) => doesOverlapRange(row, dateFrom, dateTo))
+    .filter((row) => !systemAccountIds.has(row.profile_id) && !isSystemAccountProfile(row.employee || {}));
 
   if (!scopeContext.isAdminTier) {
     const actorUserId = scopeContext.effectiveRole.user_id;

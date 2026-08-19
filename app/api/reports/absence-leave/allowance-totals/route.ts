@@ -8,6 +8,7 @@ import { generateExcelFile, formatExcelDate } from '@/lib/utils/excel';
 import { getFinancialYear } from '@/lib/utils/date';
 import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
+import { filterSystemAccounts } from '@/lib/utils/system-accounts';
 
 interface ProfileReportRow {
   id: string;
@@ -15,6 +16,7 @@ interface ProfileReportRow {
   employee_id?: string | null;
   team_id?: string | null;
   annual_holiday_allowance_days?: number | null;
+  is_system_account?: boolean | null;
 }
 
 interface ReasonRow {
@@ -138,7 +140,8 @@ export async function GET(request: NextRequest) {
 
     let baseProfilesQuery = supabase
       .from('profiles')
-      .select('id, full_name, employee_id, team_id, annual_holiday_allowance_days')
+      .select('id, full_name, employee_id, team_id, annual_holiday_allowance_days, is_system_account')
+      .eq('is_system_account', false)
       .not('full_name', 'ilike', '%(Deleted User)%')
       .order('full_name', { ascending: true });
 
@@ -183,7 +186,9 @@ export async function GET(request: NextRequest) {
         throw profileError;
       }
 
-      const scopedProfiles = filterHiddenSystemTestAccounts((profileRows || []) as ProfileReportRow[]).filter((profile) =>
+      const scopedProfiles = filterSystemAccounts(
+        filterHiddenSystemTestAccounts((profileRows || []) as ProfileReportRow[])
+      ).filter((profile) =>
         canActorUseScopedAbsencePermission({
           actorPermissions: actorAbsencePermissions,
           target: {
@@ -346,7 +351,9 @@ export async function GET(request: NextRequest) {
     if (profileError) {
       throw profileError;
     }
-    const allProfiles = filterHiddenSystemTestAccounts((profileRows || []) as ProfileReportRow[]);
+    const allProfiles = filterSystemAccounts(
+      filterHiddenSystemTestAccounts((profileRows || []) as ProfileReportRow[])
+    );
 
     if (allProfiles.length === 0) {
       return NextResponse.json({ error: 'No employees found for the selected criteria' }, { status: 404 });

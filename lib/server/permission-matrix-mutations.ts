@@ -11,6 +11,7 @@ import {
   InvalidPermissionLevelError,
 } from '@/lib/server/team-permissions';
 import { hasRoleFullAccess } from '@/lib/utils/role-access';
+import { SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
 
 const { Client } = pg;
 
@@ -130,6 +131,10 @@ export async function applyPermissionMatrixUpdatesAtomically(
   createClient: PermissionMatrixPgClientFactory = createPermissionMatrixPgClient
 ): Promise<void> {
   if (!input.userUpdates.length && !input.teamDefaultUpdates.length) return;
+
+  if (input.teamDefaultUpdates.some((update) => update.team_id === SYSTEM_ACCOUNTS_TEAM_ID)) {
+    throw new Error('System Accounts team defaults cannot be changed');
+  }
 
   const client = createClient();
   await client.connect();

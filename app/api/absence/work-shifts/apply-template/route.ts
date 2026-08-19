@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getWorkShiftAccessContext } from '@/lib/server/work-shift-access';
 import { applyTemplateToProfiles } from '@/lib/server/work-shifts';
+import { getSystemAccountIds } from '@/lib/server/system-accounts';
 import type { ApplyWorkShiftTemplateRequest } from '@/types/work-shifts';
 
 export async function POST(request: NextRequest) {
@@ -32,8 +33,8 @@ export async function POST(request: NextRequest) {
         profileIds = [];
       } else {
         const profilesQuery = hasGlobalEditScope
-          ? admin.from('profiles').select('id')
-          : admin.from('profiles').select('id').eq('team_id', access.context.teamId as string);
+          ? admin.from('profiles').select('id').eq('is_system_account', false)
+          : admin.from('profiles').select('id').eq('team_id', access.context.teamId as string).eq('is_system_account', false);
         const { data, error } = await profilesQuery;
         if (error) {
           throw error;
@@ -50,6 +51,7 @@ export async function POST(request: NextRequest) {
         .from('profiles')
         .select('id')
         .eq('team_id', access.context.teamId)
+        .eq('is_system_account', false)
         .in('id', profileIds);
       if (scopedError) {
         throw scopedError;
@@ -60,6 +62,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Forbidden: One or more employees are outside your team scope' }, { status: 403 });
       }
     }
+
+    const systemAccountIds = await getSystemAccountIds(admin);
+    profileIds = profileIds.filter((profileId) => !systemAccountIds.has(profileId));
 
     if (profileIds.length === 0) {
       return NextResponse.json({ error: 'At least one employee is required' }, { status: 400 });

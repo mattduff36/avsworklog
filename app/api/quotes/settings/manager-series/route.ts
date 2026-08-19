@@ -7,6 +7,7 @@ import {
 } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
+import { filterOperationalProfiles } from '@/lib/server/system-accounts';
 import { isEffectiveRoleAdminOrSuper } from '@/lib/utils/rbac';
 
 async function requireQuoteSettingsContext() {
@@ -83,7 +84,10 @@ async function getManagerSeriesPayload(admin: ReturnType<typeof createAdminClien
   ]);
 
   if (approversResult.error) throw approversResult.error;
-  const approvers = await filterHiddenSystemTestAccountProfiles(admin, approversResult.data || []);
+  const approvers = await filterOperationalProfiles(
+    admin,
+    await filterHiddenSystemTestAccountProfiles(admin, approversResult.data || [])
+  );
 
   return {
     can_manage: canManage,

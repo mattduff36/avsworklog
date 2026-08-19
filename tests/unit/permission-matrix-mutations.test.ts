@@ -127,19 +127,21 @@ describe('atomic permission matrix mutations', () => {
     expect(client.calls.some((call) => call.text === 'COMMIT')).toBe(false);
   });
 
-  it('PERM-AUDIT-ROLLBACK-01 rolls back when the final audit insert fails', async () => {
+  it('SYSACC-PERM-01 rejects System Accounts team default updates before opening a transaction', async () => {
     const client = new FakePermissionMatrixClient();
-    client.failAuditInsert = true;
 
     await expect(
-      applyPermissionMatrixUpdatesAtomically(mutation, () => client)
-    ).rejects.toThrow('Simulated audit insert failure');
+      applyPermissionMatrixUpdatesAtomically({
+        actorUserId: mutation.actorUserId,
+        userUpdates: [],
+        teamDefaultUpdates: [{
+          team_id: 'system_accounts',
+          module_name: 'inventory',
+          enabled: true,
+        }],
+      }, () => client)
+    ).rejects.toThrow('System Accounts team defaults cannot be changed');
 
-    expect(client.calls.some((call) => (
-      call.text.includes('INSERT INTO public.user_module_permissions')
-      && call.values?.[2] === 4
-    ))).toBe(true);
-    expect(client.calls.at(-1)?.text).toBe('ROLLBACK');
-    expect(client.calls.some((call) => call.text === 'COMMIT')).toBe(false);
+    expect(client.calls).toEqual([]);
   });
 });

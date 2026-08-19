@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
+import { filterOperationalProfiles } from '@/lib/server/system-accounts';
 import { listQuoteManagerOptions } from '@/lib/server/quote-workflow';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
 
@@ -58,7 +59,10 @@ export async function GET(request: NextRequest) {
       throw customersResult.error;
     }
 
-    const approvers = await filterHiddenSystemTestAccountProfiles(admin, approversResult.data || []);
+    const approvers = await filterOperationalProfiles(
+      admin,
+      await filterHiddenSystemTestAccountProfiles(admin, approversResult.data || [])
+    );
 
     const metadata = {
       managerOptions,

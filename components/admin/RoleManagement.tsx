@@ -48,6 +48,7 @@ import type {
 } from '@/types/roles';
 import { MODULE_CSS_VAR, PERMISSION_LEVEL_LABELS } from '@/types/roles';
 import { cn } from '@/lib/utils';
+import { SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
 
 const MODULE_GROUP_DIVIDER_CLASS = 'border-l border-slate-600/20';
 const PERMISSION_LEVELS: PermissionAccessLevel[] = [0, 1, 2, 3, 4, 5];
@@ -97,6 +98,7 @@ type UserPermissionTeamGroup = {
   teamKey: string;
   teamLabel: string;
   teamDefault: UserPermissionTeamDefaultRow | null;
+  isSystem: boolean;
   users: UserPermissionMatrixRow[];
 };
 
@@ -148,7 +150,10 @@ function getPermissionKeyRoleBadge(level: PermissionAccessLevel): {
 }
 
 function getUserPermissionTeamSortName(user: UserPermissionMatrixRow): string {
-  return user.team_name || user.team_id || 'ZZZ Unassigned';
+  if (user.is_system_account || user.team_id === SYSTEM_ACCOUNTS_TEAM_ID) {
+    return 'zzz2 System Accounts';
+  }
+  return user.team_name || user.team_id || 'zzz1 Unassigned';
 }
 
 function getRoleDefaultLevelForUser(
@@ -546,11 +551,15 @@ export function RoleManagement() {
         teamKey,
         teamLabel: user.team_name || 'Unassigned',
         teamDefault: teamKey === 'unassigned' ? null : userTeamById.get(teamKey) ?? null,
+        isSystem: Boolean(userTeamById.get(teamKey)?.is_system) || user.is_system_account === true,
         users: [user],
       });
     });
 
-    return Array.from(groups.values());
+    return Array.from(groups.values()).sort((left, right) => {
+      if (left.isSystem !== right.isSystem) return left.isSystem ? 1 : -1;
+      return left.teamLabel.localeCompare(right.teamLabel);
+    });
   }, [filteredUsers, userTeamById]);
 
   const hasActiveUserSearch = userSearchQuery.trim().length > 0;
@@ -821,6 +830,7 @@ export function RoleManagement() {
 
   const handleTeamDefaultChange = useCallback(
     (team: UserPermissionTeamDefaultRow, module: PermissionModuleMatrixColumn, nextEnabled: boolean) => {
+      if (team.is_system) return;
       const currentEnabled = getDisplayedTeamDefault(team, module.module_name);
       if (currentEnabled === nextEnabled) return;
 
@@ -1210,8 +1220,12 @@ export function RoleManagement() {
           <TooltipTrigger asChild>
             <button
                 type="button"
+                disabled={team.is_system}
                 onClick={() => handleTeamDefaultChange(team, module, !isEnabled)}
-                className="relative mx-auto flex h-7 w-9 items-center justify-center overflow-hidden rounded border border-black/60 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                className={cn(
+                  'relative mx-auto flex h-7 w-9 items-center justify-center overflow-hidden rounded border border-black/60 text-sm font-bold transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+                  team.is_system && 'cursor-not-allowed opacity-50'
+                )}
                 style={
                   isEnabled
                     ? { backgroundColor: color, boxShadow: `0 0 6px ${getModuleColorAlpha(module.module_name, 0.2)}` }
@@ -1382,8 +1396,14 @@ export function RoleManagement() {
                     {visibleTeamGroups.map((group) => {
                       return (
                         <Fragment key={group.teamKey}>
-                          <tr className="border-b border-slate-700 bg-slate-950/60 hover:bg-slate-950/60">
-                            <td className="sticky left-0 z-20 bg-slate-950/95 p-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                          <tr className={cn(
+                            'border-b border-slate-700 bg-slate-950/60 hover:bg-slate-950/60',
+                            group.isSystem && 'text-slate-500'
+                          )}>
+                            <td className={cn(
+                              'sticky left-0 z-20 bg-slate-950/95 p-0 text-[11px] font-semibold uppercase tracking-wider text-slate-400',
+                              group.isSystem && 'italic text-slate-500'
+                            )}>
                               <button
                                 type="button"
                                 onClick={() => toggleTeamExpanded(group.teamKey)}
@@ -1397,6 +1417,11 @@ export function RoleManagement() {
                                   <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                                 )}
                                 <span className="min-w-0 truncate">{group.teamLabel}</span>
+                                {group.isSystem && (
+                                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] font-normal normal-case italic leading-none text-slate-500">
+                                    System
+                                  </span>
+                                )}
                                 <span className="ml-auto rounded border border-slate-700 px-1.5 py-0.5 text-[10px] leading-none text-slate-500">
                                   {group.users.length}
                                 </span>
@@ -1416,9 +1441,15 @@ export function RoleManagement() {
                               return (
                                 <tr
                                   key={user.id}
-                                  className="border-b border-slate-700/50 transition-colors hover:bg-slate-800/40"
+                                  className={cn(
+                                    'border-b border-slate-700/50 transition-colors hover:bg-slate-800/40',
+                                    user.is_system_account && 'text-slate-400'
+                                  )}
                                 >
-                                  <td className="sticky left-0 z-10 bg-slate-900/95 px-2 py-2 font-medium text-white">
+                                  <td className={cn(
+                                    'sticky left-0 z-10 bg-slate-900/95 px-2 py-2 font-medium text-white',
+                                    user.is_system_account && 'italic text-slate-400'
+                                  )}>
                                     <div className="flex items-start justify-between gap-2">
                                       <div className="min-w-0">
                                         <div className="truncate text-xs">
@@ -1428,10 +1459,10 @@ export function RoleManagement() {
                                           <button
                                             type="button"
                                             onClick={(event) => openQuickRoleEdit(user, event.currentTarget)}
-                                            disabled={user.is_locked_admin && !canManageAdminRoles}
+                                            disabled={user.is_system_account || (user.is_locked_admin && !canManageAdminRoles)}
                                             className={cn(
                                               'cursor-pointer',
-                                              user.is_locked_admin && !canManageAdminRoles && 'cursor-not-allowed opacity-60'
+                                              (user.is_system_account || (user.is_locked_admin && !canManageAdminRoles)) && 'cursor-not-allowed opacity-60'
                                             )}
                                           >
                                             <Badge
@@ -1441,6 +1472,11 @@ export function RoleManagement() {
                                               {roleBadge.label}
                                             </Badge>
                                           </button>
+                                          {user.is_system_account && (
+                                            <Badge variant="outline" className="text-[9px] italic text-slate-400">
+                                              System
+                                            </Badge>
+                                          )}
                                         </div>
                                       </div>
                                       {user.is_locked_admin && (

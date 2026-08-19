@@ -7,6 +7,7 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
+import { filterOperationalProfiles } from '@/lib/server/system-accounts';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
 
 const ACTION_ASSIGNMENT_MODULES: readonly ModuleName[] = [
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Math.max(Number.parseInt(request.nextUrl.searchParams.get('limit') || '200', 10) || 200, 1), 500);
   const offset = Math.max(Number.parseInt(request.nextUrl.searchParams.get('offset') || '0', 10) || 0, 0);
 
-  const fields = ['id', 'full_name', 'employee_id', 'is_placeholder', 'super_admin', 'team:org_teams!profiles_team_id_fkey(id, name)'];
+  const fields = ['id', 'full_name', 'employee_id', 'is_placeholder', 'is_system_account', 'super_admin', 'team:org_teams!profiles_team_id_fkey(id, name)'];
 
   if (includeAllowance) {
     fields.push('annual_holiday_allowance_days');
@@ -108,7 +109,7 @@ export async function GET(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  let query = admin.from('profiles').select(fields.join(', '));
+  let query = admin.from('profiles').select(fields.join(', ')).eq('is_system_account', false);
 
   if (shouldScopeToTeam) {
     if (effectiveRole.team_id) {
@@ -138,8 +139,15 @@ export async function GET(request: NextRequest) {
     ? await getUsersWithModuleAccess(moduleName as ModuleName, ids.length > 0 ? ids : undefined, admin)
     : null;
 
-  const userRows = ((data || []) as unknown) as Array<Record<string, unknown>>;
-  const visibleUserRows = await filterHiddenSystemTestAccountProfiles(admin, userRows);
+  const userRows = ((data || []) as unknown) as Array<Record<string, unknown> & {
+    id?: string | null;
+    full_name?: string | null;
+    is_system_account?: boolean | null;
+  }>;
+  const visibleUserRows = await filterOperationalProfiles(
+    admin,
+    await filterHiddenSystemTestAccountProfiles(admin, userRows)
+  );
   const filtered = includeDeleted
     ? visibleUserRows
     : visibleUserRows.filter((row) => !isDeletedUserName(String(row.full_name || '')));

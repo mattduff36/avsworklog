@@ -5,6 +5,7 @@ import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/
 import { getCrossFinancialYearAbsenceError } from '@/lib/utils/absence-financial-year';
 import { getBankHolidaysForYear } from '@/lib/utils/bank-holidays';
 import { calculateDurationDays } from '@/lib/utils/date';
+import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -325,17 +326,26 @@ async function getAnnualLeaveReasonId(supabase: AnySupabase): Promise<string> {
   return data.id;
 }
 
+interface EligibleEmployeeRow {
+  id: string;
+  annual_holiday_allowance_days?: number | null;
+  is_system_account?: boolean | null;
+}
+
 async function getEligibleEmployees(supabase: AnySupabase): Promise<Array<{ id: string }>> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, annual_holiday_allowance_days')
+    .select('id, annual_holiday_allowance_days, is_system_account')
+    .eq('is_system_account', false)
     .gt('annual_holiday_allowance_days', 0);
 
   if (error) {
     throw error;
   }
 
-  return (data || []).map((row: { id: string }) => ({ id: row.id }));
+  return ((data || []) as EligibleEmployeeRow[])
+    .filter((row) => !isSystemAccountProfile(row))
+    .map((row) => ({ id: row.id }));
 }
 
 export async function generateFinancialYearCarryovers(
@@ -357,7 +367,8 @@ export async function generateFinancialYearCarryovers(
     await Promise.all([
       supabase
         .from('profiles')
-        .select('id, annual_holiday_allowance_days')
+        .select('id, annual_holiday_allowance_days, is_system_account')
+        .eq('is_system_account', false)
         .order('id'),
       supabase
         .from('absences')
@@ -392,7 +403,12 @@ export async function generateFinancialYearCarryovers(
     carryInByProfile.set(row.profile_id, row.carried_days || 0);
   }
 
-  const rowsToInsert = ((profiles || []) as Array<{ id: string; annual_holiday_allowance_days: number | null }>)
+  const rowsToInsert = ((profiles || []) as Array<{
+    id: string;
+    annual_holiday_allowance_days: number | null;
+    is_system_account?: boolean | null;
+  }>)
+    .filter((profile) => !isSystemAccountProfile(profile))
     .map((profile) => {
       const baseAllowance = profile.annual_holiday_allowance_days ?? 28;
       const carryIn = carryInByProfile.get(profile.id) || 0;
@@ -465,15 +481,18 @@ async function getEligibleEmployeesByIds(
 
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, annual_holiday_allowance_days')
+    .select('id, annual_holiday_allowance_days, is_system_account')
     .in('id', uniqueProfileIds)
+    .eq('is_system_account', false)
     .gt('annual_holiday_allowance_days', 0);
 
   if (error) {
     throw error;
   }
 
-  return (data || []).map((row: { id: string }) => ({ id: row.id }));
+  return ((data || []) as EligibleEmployeeRow[])
+    .filter((row) => !isSystemAccountProfile(row))
+    .map((row) => ({ id: row.id }));
 }
 
 export async function seedFinancialYearBankHolidays(
@@ -1005,7 +1024,8 @@ async function getAbsenceReasonById(
 async function getBulkAbsenceEmployees(supabase: AnySupabase): Promise<BulkAbsenceEmployee[]> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, full_name, employee_id, annual_holiday_allowance_days, roles(id, name, display_name)')
+    .select('id, full_name, employee_id, annual_holiday_allowance_days, is_system_account, roles(id, name, display_name)')
+    .eq('is_system_account', false)
     .gt('annual_holiday_allowance_days', 0)
     .order('full_name');
 
@@ -1013,7 +1033,9 @@ async function getBulkAbsenceEmployees(supabase: AnySupabase): Promise<BulkAbsen
     throw error;
   }
 
-  return ((data || []) as Array<Record<string, unknown>>).map((row) => {
+  return ((data || []) as Array<Record<string, unknown>>)
+    .filter((row) => !isSystemAccountProfile({ is_system_account: row.is_system_account as boolean | null }))
+    .map((row) => {
     const roleRef = row.roles as { id?: string; name?: string; display_name?: string } | null;
     return {
       id: String(row.id || ''),

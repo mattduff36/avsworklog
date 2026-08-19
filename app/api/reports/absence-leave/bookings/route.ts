@@ -5,6 +5,9 @@ import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/serve
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { generateExcelFile, formatExcelDate, formatExcelStatus } from '@/lib/utils/excel';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getSystemAccountIds } from '@/lib/server/system-accounts';
+import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 
 interface AbsenceReasonRow {
   name?: string | null;
@@ -15,6 +18,7 @@ interface ProfileRow {
   full_name?: string | null;
   employee_id?: string | null;
   team_id?: string | null;
+  is_system_account?: boolean | null;
 }
 
 interface ApproverRow {
@@ -108,7 +112,7 @@ async function fetchApprovedActiveAbsences(
       notes,
       approved_at,
       reason:absence_reasons(name, is_paid),
-      employee:profiles!absences_profile_id_fkey(full_name, employee_id, team_id),
+      employee:profiles!absences_profile_id_fkey(full_name, employee_id, team_id, is_system_account),
       approver:profiles!absences_approved_by_fkey(full_name)
     `)
     .in('status', ['approved', 'processed'])
@@ -144,7 +148,7 @@ async function fetchApprovedArchivedAbsences(
       notes,
       approved_at,
       reason:absence_reasons(name, is_paid),
-      employee:profiles!absences_archive_profile_id_fkey(full_name, employee_id, team_id),
+      employee:profiles!absences_archive_profile_id_fkey(full_name, employee_id, team_id, is_system_account),
       approver:profiles!absences_archive_approved_by_fkey(full_name)
     `)
     .in('status', ['approved', 'processed'])
@@ -195,12 +199,15 @@ export async function GET(request: NextRequest) {
     }
 
     const scopeContext = await getReportScopeContext();
-    const [activeRows, archivedRows] = await Promise.all([
+    const [activeRows, archivedRows, systemAccountIds] = await Promise.all([
       fetchApprovedActiveAbsences(supabase, dateTo),
       fetchApprovedArchivedAbsences(supabase, dateTo),
+      getSystemAccountIds(createAdminClient()),
     ]);
 
-    let scopedRows = [...activeRows, ...archivedRows].filter((row) => doesOverlapRange(row, dateFrom, dateTo));
+    let scopedRows = [...activeRows, ...archivedRows]
+      .filter((row) => doesOverlapRange(row, dateFrom, dateTo))
+      .filter((row) => !systemAccountIds.has(row.profile_id) && !isSystemAccountProfile(row.employee || {}));
 
     if (!scopeContext.isAdminTier) {
       const actorUserId = scopeContext.effectiveRole.user_id;

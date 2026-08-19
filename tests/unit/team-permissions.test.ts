@@ -712,6 +712,14 @@ describe('team permission helpers', () => {
       { id: 'employee-2', team_id: null, role_id: null, full_name: 'Blake Baker', employee_id: 'E002' },
       { id: 'deleted-1', team_id: null, role_id: null, full_name: 'Pat Placeholder (Deleted User)', employee_id: 'E003' },
       { id: 'hidden-1', team_id: null, role_id: null, full_name: 'Test Employee', employee_id: 'TS-EMP' },
+      {
+        id: 'kiosk-1',
+        team_id: 'system_accounts',
+        role_id: null,
+        full_name: 'Yard Kiosk',
+        employee_id: 'KIOSK',
+        is_system_account: true,
+      },
     ];
 
     const supabaseAdmin = {

@@ -15,6 +15,7 @@ import type {
   PayrollTeamAssignmentInput,
   PayrollTeamOption,
 } from '@/types/payroll-admin';
+import { filterSystemAccounts, filterSystemTeams } from '@/lib/utils/system-accounts';
 
 const { Client } = pg;
 
@@ -133,8 +134,8 @@ export async function loadPayrollAdminMatrix(): Promise<PayrollAdminMatrix> {
     admin.from('payroll_rule_sets').select('*').order('name'),
     admin.from('payroll_rule_versions').select('*').order('version_number', { ascending: false }),
     admin.from('payroll_rule_day_bands').select('*').order('day_of_week'),
-    admin.from('org_teams').select('id, name').eq('active', true).order('name'),
-    admin.from('profiles').select('id, full_name, employee_id, team_id').eq('is_placeholder', false).order('full_name'),
+    admin.from('org_teams').select('id, name, is_system').eq('active', true).order('name'),
+    admin.from('profiles').select('id, full_name, employee_id, team_id, is_system_account').eq('is_placeholder', false).eq('is_system_account', false).order('full_name'),
     admin.from('payroll_team_rule_assignments').select('team_id, rule_set_id, effective_week_ending'),
     admin
       .from('payroll_profile_rule_assignments')
@@ -205,8 +206,8 @@ export async function loadPayrollAdminMatrix(): Promise<PayrollAdminMatrix> {
 
   return {
     rules,
-    teams: (teamsResult.data || []) as PayrollTeamOption[],
-    profiles: (profilesResult.data || []) as PayrollProfileOption[],
+    teams: filterSystemTeams(((teamsResult.data || []) as Array<PayrollTeamOption & { is_system?: boolean | null }>)),
+    profiles: filterSystemAccounts(((profilesResult.data || []) as Array<PayrollProfileOption & { is_system_account?: boolean | null }>)),
     teamAssignments: ((teamAssignmentsResult.data || []) as Array<{
       team_id: string;
       rule_set_id: string;

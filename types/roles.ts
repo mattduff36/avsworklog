@@ -118,6 +118,7 @@ export interface UserPermissionMatrixRow {
   is_super_admin: boolean;
   is_manager_admin: boolean;
   is_locked_admin: boolean;
+  is_system_account: boolean;
   permissions: Record<ModuleName, PermissionAccessLevel>;
   inherited_permissions: Record<ModuleName, PermissionAccessLevel>;
 }
@@ -125,6 +126,7 @@ export interface UserPermissionMatrixRow {
 export interface UserPermissionTeamDefaultRow {
   id: string;
   name: string;
+  is_system: boolean;
   permissions: Record<ModuleName, boolean>;
 }
 

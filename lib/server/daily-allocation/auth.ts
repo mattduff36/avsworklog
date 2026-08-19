@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleUseModuleLevel, getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
+import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import type { DailyAllocationContext } from '@/types/daily-allocation';
 
@@ -212,11 +213,12 @@ export async function loadScopedProfileIds(supabase: AuthedClient, isAdmin: bool
     const admin = createAdminClient();
     const { data, error } = await admin
       .from('profiles')
-      .select('id, full_name, employee_id')
-      .eq('is_placeholder', false);
+      .select('id, full_name, employee_id, is_system_account')
+      .eq('is_placeholder', false)
+      .eq('is_system_account', false);
     if (error) throw error;
     return (data || [])
-      .filter((row) => !isHiddenSystemTestAccountProfile(row))
+      .filter((row) => !isHiddenSystemTestAccountProfile(row) && !isSystemAccountProfile(row))
       .map((row) => row.id);
   }
 

@@ -3,6 +3,8 @@ import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getSystemAccountIds } from '@/lib/server/system-accounts';
 
 export async function POST(
   request: NextRequest,
@@ -110,6 +112,14 @@ export async function POST(
 
     // Only process assignments if there are employees to assign
     if (employee_ids.length > 0) {
+      const systemAccountIds = await getSystemAccountIds(createAdminClient());
+      if (employee_ids.some((employeeId: string) => systemAccountIds.has(employeeId))) {
+        return NextResponse.json(
+          { error: 'System accounts cannot be assigned to RAMS documents' },
+          { status: 400 }
+        );
+      }
+
       // Verify all employee IDs exist
       const { data: employees, error: empError } = await db
         .from('profiles')

@@ -7,6 +7,7 @@ import { requireAdminUsersModuleAccess } from '@/lib/server/admin-users-module-a
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { isMissingTeamManagerSchemaError, reconcileProfileHierarchy } from '@/lib/server/team-managers';
 import { hasRoleFullAccess } from '@/lib/utils/role-access';
+import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 
 function isMissingHierarchySchemaError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -175,6 +176,13 @@ export async function PUT(
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
+      );
+    }
+
+    if (isSystemAccountProfile(existingUser)) {
+      return NextResponse.json(
+        { error: 'System accounts cannot be edited from Admin Users' },
+        { status: 400 }
       );
     }
 
@@ -389,12 +397,19 @@ export async function DELETE(
     // Get user's current name for the "(Deleted User)" suffix
     const { data: userProfile } = await supabaseAdmin
       .from('profiles')
-      .select('full_name')
+      .select('full_name, is_system_account')
       .eq('id', userId)
       .single();
 
     if (!userProfile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (isSystemAccountProfile(userProfile)) {
+      return NextResponse.json(
+        { error: 'System accounts cannot be deleted' },
+        { status: 403 }
+      );
     }
 
     const { data: targetProfileRole } = await supabaseAdmin

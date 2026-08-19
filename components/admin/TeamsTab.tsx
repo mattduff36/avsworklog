@@ -30,6 +30,7 @@ import {
   invalidateAdminTeamDirectoryCache,
 } from '@/lib/admin/team-directory-client';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { cn } from '@/lib/utils';
 import {
   TimesheetTypeOptions,
   getTimesheetTypeLabel,
@@ -42,6 +43,7 @@ type TeamRow = {
   code?: string | null;
   timesheet_type?: string | null;
   active: boolean;
+  is_system?: boolean;
   member_count: number;
   manager_count: number;
   without_manager_count: number;
@@ -89,10 +91,16 @@ export function TeamsTab() {
       setLoading(true);
       const data = await fetchAdminTeamDirectory({ force });
       const rows = Array.isArray(data?.teams) ? data.teams : [];
-      const mapped: TeamRow[] = rows.map((row: TeamRow & { team_id?: string }) => ({
-        ...row,
-        id: row.id || row.team_id || '',
-      }));
+      const mapped: TeamRow[] = rows
+        .map((row: TeamRow & { team_id?: string }) => ({
+          ...row,
+          id: row.id || row.team_id || '',
+          is_system: Boolean(row.is_system),
+        }))
+        .sort((left, right) => {
+          if (Boolean(left.is_system) !== Boolean(right.is_system)) return left.is_system ? 1 : -1;
+          return left.name.localeCompare(right.name);
+        });
       setTeams(mapped);
       setManagerOptions(Array.isArray(data?.manager_options) ? data.manager_options : []);
     } catch (error) {
@@ -108,14 +116,18 @@ export function TeamsTab() {
   }, [fetchTeams]);
 
   const filteredTeams = useMemo(() => {
-    if (!search.trim()) return teams;
-    const query = search.toLowerCase();
-    return teams.filter(
-      (team) =>
-        team.name.toLowerCase().includes(query) ||
-        team.id.toLowerCase().includes(query) ||
-        (team.code || '').toLowerCase().includes(query)
-    );
+    const visible = !search.trim()
+      ? teams
+      : teams.filter(
+          (team) =>
+            team.name.toLowerCase().includes(search.toLowerCase()) ||
+            team.id.toLowerCase().includes(search.toLowerCase()) ||
+            (team.code || '').toLowerCase().includes(search.toLowerCase())
+        );
+    return [...visible].sort((left, right) => {
+      if (Boolean(left.is_system) !== Boolean(right.is_system)) return left.is_system ? 1 : -1;
+      return left.name.localeCompare(right.name);
+    });
   }, [search, teams]);
 
   const stats = useMemo(
@@ -132,6 +144,10 @@ export function TeamsTab() {
   }
 
   function openEdit(team: TeamRow) {
+    if (team.is_system) {
+      toast.error('System Accounts team cannot be changed');
+      return;
+    }
     setSelectedTeam(team);
     setFormData({
       id: team.id,
@@ -219,6 +235,10 @@ export function TeamsTab() {
   }
 
   async function handleDeleteTeam(team: TeamRow) {
+    if (team.is_system) {
+      toast.error('System Accounts team cannot be deleted');
+      return;
+    }
     if (!confirm(`Delete "${team.name}"? This is blocked if users are still assigned.`)) return;
     try {
       const response = await fetch(`/api/admin/hierarchy/teams/${team.id}`, {
@@ -307,9 +327,14 @@ export function TeamsTab() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredTeams.map((team) => (
-                    <TableRow key={team.id} className="border-slate-700 hover:bg-slate-800/50">
-                      <TableCell className="font-medium text-white">
+                  {filteredTeams.map((team) => {
+                    const isSystemTeam = Boolean(team.is_system);
+                    return (
+                    <TableRow key={team.id} className={cn(
+                      'border-slate-700 hover:bg-slate-800/50',
+                      isSystemTeam && 'italic text-slate-400'
+                    )}>
+                      <TableCell className={cn('font-medium text-white', isSystemTeam && 'text-slate-400')}>
                         <div>{team.name}</div>
                         <div className="text-xs text-muted-foreground font-mono">{team.id}</div>
                       </TableCell>
@@ -317,17 +342,17 @@ export function TeamsTab() {
                       <TableCell className="text-slate-300">
                         <div className="flex items-center gap-1.5">
                           <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                          {getTimesheetTypeLabel(team.timesheet_type || 'civils')}
+                          {isSystemTeam ? '—' : getTimesheetTypeLabel(team.timesheet_type || 'civils')}
                         </div>
                       </TableCell>
                       <TableCell>
                         <span className={team.manager_1_name ? 'text-white' : 'text-slate-500'}>
-                          {team.manager_1_name || 'No Manager 1'}
+                          {isSystemTeam ? '—' : (team.manager_1_name || 'No Manager 1')}
                         </span>
                       </TableCell>
                       <TableCell>
                         <span className={team.manager_2_name ? 'text-white' : 'text-slate-500'}>
-                          {team.manager_2_name || 'No Manager 2'}
+                          {isSystemTeam ? '—' : (team.manager_2_name || 'No Manager 2')}
                         </span>
                       </TableCell>
                       <TableCell className="text-center text-white">{team.member_count}</TableCell>
@@ -336,7 +361,7 @@ export function TeamsTab() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={!canMutateTeams}
+                            disabled={!canMutateTeams || isSystemTeam}
                             onClick={() => openEdit(team)}
                             className="text-blue-400 hover:text-blue-300 hover:bg-slate-800 disabled:opacity-40"
                           >
@@ -345,7 +370,7 @@ export function TeamsTab() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={!canMutateTeams}
+                            disabled={!canMutateTeams || isSystemTeam}
                             onClick={() => handleDeleteTeam(team)}
                             className="text-red-400 hover:text-red-300 hover:bg-slate-800 disabled:opacity-40"
                           >
@@ -354,7 +379,8 @@ export function TeamsTab() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -8,6 +8,7 @@ import type { CreateMessageInput, CreateMessageResponse, MessagePriority, Messag
 import { normalizeRoleInternalName } from '@/lib/utils/role-name';
 import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
+import { filterOperationalProfiles } from '@/lib/server/system-accounts';
 
 type StoredMessagePriority = Exclude<MessagePriority, 'MEDIUM'>;
 
@@ -161,7 +162,10 @@ export async function POST(request: NextRequest) {
           .select('id, full_name, employee_id, is_placeholder')
           .in('role_id', roleIds);
         if (roleUsersError) throw roleUsersError;
-        const visibleRoleUsers = await filterHiddenSystemTestAccountProfiles(admin, roleUsers || []);
+        const visibleRoleUsers = await filterOperationalProfiles(
+          admin,
+          await filterHiddenSystemTestAccountProfiles(admin, roleUsers || [])
+        );
         recipientUserIds = visibleRoleUsers.map((u) => u.id);
       }
 
@@ -173,7 +177,10 @@ export async function POST(request: NextRequest) {
 
       if (allError) throw allError;
 
-      const visibleAllUsers = await filterHiddenSystemTestAccountProfiles(admin, allUsers || []);
+      const visibleAllUsers = await filterOperationalProfiles(
+        admin,
+        await filterHiddenSystemTestAccountProfiles(admin, allUsers || [])
+      );
       recipientUserIds = visibleAllUsers.map(u => u.id);
     }
 

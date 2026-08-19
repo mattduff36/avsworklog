@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
+import { isSystemAccountProfile, isSystemTeam, SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
 import { hasRoleFullAccess } from '@/lib/utils/role-access';
 import {
   getModuleAccessMode,
@@ -60,6 +61,7 @@ type TeamRow = {
   name: string;
   code: string | null;
   active: boolean;
+  is_system?: boolean | null;
 };
 
 type UserModulePermissionRow = {
@@ -83,8 +85,9 @@ type ProfilePermissionRow = {
   line_manager_id?: string | null;
   role_id: string | null;
   is_placeholder?: boolean | null;
+  is_system_account?: boolean | null;
   role?: RoleRow | RoleRow[] | null;
-  team?: { id?: string | null; name?: string | null } | Array<{ id?: string | null; name?: string | null }> | null;
+  team?: { id?: string | null; name?: string | null; is_system?: boolean | null } | Array<{ id?: string | null; name?: string | null; is_system?: boolean | null }> | null;
 };
 
 export class InvalidPermissionLevelError extends Error {
@@ -598,12 +601,12 @@ export async function getUserPermissionMatrix(
       .order('display_name', { ascending: true }),
     supabaseAdmin
       .from('org_teams')
-      .select('id, name, code, active')
+      .select('id, name, code, active, is_system')
       .order('name', { ascending: true }),
     supabaseAdmin
       .from('profiles')
       .select(
-        'id, full_name, phone_number, employee_id, team_id, line_manager_id, role_id, is_placeholder, team:org_teams!profiles_team_id_fkey(id, name), role:roles(id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin)'
+        'id, full_name, phone_number, employee_id, team_id, line_manager_id, role_id, is_placeholder, is_system_account, team:org_teams!profiles_team_id_fkey(id, name, is_system), role:roles(id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin)'
       )
       .order('full_name', { ascending: true }),
     supabaseAdmin
@@ -646,11 +649,20 @@ export async function getUserPermissionMatrix(
     display_name: role.display_name,
     role_class: role.role_class,
   }));
-  const teams = activeTeams.map((team) => ({
-    id: team.id,
-    name: team.name,
-    permissions: buildTeamPermissionRecord(modules, enabledByTeam.get(team.id)),
-  }));
+  const teams = activeTeams
+    .slice()
+    .sort((left, right) => {
+      const leftSystem = isSystemTeam(left) ? 1 : 0;
+      const rightSystem = isSystemTeam(right) ? 1 : 0;
+      if (leftSystem !== rightSystem) return leftSystem - rightSystem;
+      return left.name.localeCompare(right.name);
+    })
+    .map((team) => ({
+      id: team.id,
+      name: team.name,
+      is_system: isSystemTeam(team),
+      permissions: buildTeamPermissionRecord(modules, enabledByTeam.get(team.id)),
+    }));
 
   const users = visibleProfiles.map((profile) => {
     const role = getProfileRole(profile);
@@ -685,6 +697,7 @@ export async function getUserPermissionMatrix(
       is_super_admin: role?.is_super_admin === true,
       is_manager_admin: role?.is_manager_admin === true,
       is_locked_admin: role ? isFullAccessRole(role) : false,
+      is_system_account: isSystemAccountProfile(profile),
       permissions,
       inherited_permissions: inheritedPermissions,
     } satisfies UserPermissionMatrixRow;
@@ -700,6 +713,9 @@ export async function updateTeamModulePermissions(
 ): Promise<void> {
   if (!permissions.length) {
     return;
+  }
+  if (teamId === SYSTEM_ACCOUNTS_TEAM_ID) {
+    throw new Error('System Accounts team defaults cannot be changed');
   }
 
   const rows = permissions.map((permission) => ({
@@ -725,6 +741,9 @@ export async function updateTeamModulePermissionDefaults(
 ): Promise<void> {
   if (!updates.length) {
     return;
+  }
+  if (updates.some((update) => update.team_id === SYSTEM_ACCOUNTS_TEAM_ID)) {
+    throw new Error('System Accounts team defaults cannot be changed');
   }
 
   const modules = await getPermissionModules(supabaseAdmin);
@@ -1144,7 +1163,7 @@ export async function getUsersWithModuleAccess(
     return new Set<string>();
   }
 
-  const profilesQuery = supabaseAdmin.from('profiles').select('id, team_id, role_id, employee_id, full_name, is_placeholder');
+  const profilesQuery = supabaseAdmin.from('profiles').select('id, team_id, role_id, employee_id, full_name, is_placeholder, is_system_account');
   const scopedProfilesQuery = userIds?.length ? profilesQuery.in('id', userIds) : profilesQuery;
 
   const { data: profiles, error: profilesError } = await scopedProfilesQuery;
@@ -1160,11 +1179,16 @@ export async function getUsersWithModuleAccess(
     employee_id?: string | null;
     full_name: string | null;
     is_placeholder?: boolean | null;
+    is_system_account?: boolean | null;
   }>;
 
   const hiddenIds = await getHiddenSystemTestAccountIds(supabaseAdmin as Parameters<typeof getHiddenSystemTestAccountIds>[0]);
   const visibleProfiles = typedProfiles.filter(
-    (profile) => !hiddenIds.has(profile.id) && !isHiddenSystemTestAccountProfile(profile) && !isDeletedProfile(profile)
+    (profile) =>
+      !hiddenIds.has(profile.id) &&
+      !isHiddenSystemTestAccountProfile(profile) &&
+      !isDeletedProfile(profile) &&
+      !isSystemAccountProfile(profile)
   );
 
   if (isUniversalPermissionModule(moduleName)) {

@@ -57,17 +57,9 @@ async function configureKiosk() {
       throw new Error('The kiosk profile must have a job role before it can use Inventory');
     }
 
-    const { rows: permissionRows } = await client.query<{ access_level: number }>(`
-      SELECT minimum_role.hierarchy_rank::INTEGER AS access_level
-      FROM public.permission_modules AS module
-      JOIN public.roles AS minimum_role
-        ON minimum_role.id = module.minimum_role_id
-      WHERE module.module_name = 'inventory'
-    `);
-    const inventoryAccessLevel = permissionRows[0]?.access_level || 0;
-    if (inventoryAccessLevel < 1 || inventoryAccessLevel > 3) {
-      throw new Error('Inventory must allow a non-manager access level for the dedicated kiosk account');
-    }
+    const inventoryAccessLevel = 1;
+
+    await client.query(`SELECT set_config('app.system_account_maintenance', 'on', true)`);
 
     await client.query(`
       INSERT INTO public.user_module_permissions (
@@ -82,6 +74,15 @@ async function configureKiosk() {
           updated_by = EXCLUDED.updated_by,
           updated_at = NOW()
     `, [kioskUserId, inventoryAccessLevel]);
+
+    await client.query(`
+      UPDATE public.profiles
+      SET
+        team_id = 'system_accounts',
+        is_system_account = TRUE,
+        annual_holiday_allowance_days = 0
+      WHERE id = $1
+    `, [kioskUserId]);
 
     await client.query(`
       INSERT INTO public.inventory_kiosk_config (
@@ -108,6 +109,9 @@ async function configureKiosk() {
     const { rows: verificationRows } = await client.query<{
       configured: boolean;
       inventory_access_level: number;
+      is_system_account: boolean;
+      team_id: string | null;
+      annual_holiday_allowance_days: string | null;
     }>(`
       SELECT
         EXISTS (
@@ -122,12 +126,20 @@ async function configureKiosk() {
           FROM public.user_module_permissions
           WHERE user_id = $1
             AND module_name = 'inventory'
-        ), 0)::INTEGER AS inventory_access_level
+        ), 0)::INTEGER AS inventory_access_level,
+        profile.is_system_account,
+        profile.team_id,
+        profile.annual_holiday_allowance_days::TEXT
+      FROM public.profiles AS profile
+      WHERE profile.id = $1
     `, [kioskUserId]);
 
     if (
       verificationRows[0]?.configured !== true
-      || verificationRows[0]?.inventory_access_level !== inventoryAccessLevel
+      || verificationRows[0]?.inventory_access_level !== 1
+      || verificationRows[0]?.is_system_account !== true
+      || verificationRows[0]?.team_id !== 'system_accounts'
+      || Number(verificationRows[0]?.annual_holiday_allowance_days) !== 0
     ) {
       throw new Error('The Yard kiosk configuration could not be verified');
     }

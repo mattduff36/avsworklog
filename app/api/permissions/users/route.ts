@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
+import { filterOperationalProfiles } from '@/lib/server/system-accounts';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
 import { getUsersWithPermission } from '@/lib/utils/permissions';
 
@@ -34,19 +35,24 @@ export async function GET(request: NextRequest) {
       full_name,
       employee_id,
       is_placeholder,
+      is_system_account,
       role:roles(
         name,
         display_name
       )
     `)
     .in('id', allowedUserIds)
+    .eq('is_system_account', false)
     .order('full_name', { ascending: true });
 
   if (error) {
     return NextResponse.json({ error: error.message || 'Failed to load users' }, { status: 500 });
   }
 
-  const users = await filterHiddenSystemTestAccountProfiles(admin, data || []);
+  const users = await filterOperationalProfiles(
+    admin,
+    await filterHiddenSystemTestAccountProfiles(admin, data || [])
+  );
 
   return NextResponse.json({
     success: true,

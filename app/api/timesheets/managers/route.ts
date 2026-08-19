@@ -5,6 +5,7 @@ import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { isHiddenSystemTestAccountEmail, isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
+import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 
 type Manager = {
   id: string;
@@ -64,6 +65,7 @@ export async function GET() {
         full_name,
         employee_id,
         is_placeholder,
+        is_system_account,
         roles!inner(
           name,
           display_name,
@@ -104,7 +106,11 @@ export async function GET() {
     const data = ((profilesData ?? []) as Array<{ id: string; full_name: string; employee_id: string | null; is_placeholder: boolean | null; roles: { name: string; display_name: string; is_manager_admin: boolean } | null }>).map((profile) => ({
       ...profile,
       email: emailMap.get(profile.id) || null,
-    })).filter((profile) => !isHiddenSystemTestAccountEmail(profile.email) && !isHiddenSystemTestAccountProfile(profile));
+    })).filter((profile) =>
+      !isHiddenSystemTestAccountEmail(profile.email) &&
+      !isHiddenSystemTestAccountProfile(profile) &&
+      !isSystemAccountProfile(profile)
+    );
 
     const rawManagers = (data ?? []) as Array<{
       id: string;

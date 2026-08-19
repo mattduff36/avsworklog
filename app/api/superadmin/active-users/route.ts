@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getSystemAccountIds } from '@/lib/server/system-accounts';
 
 const ACTIVE_WINDOW_MINUTES = 5;
 const MAX_VISITS_TO_SCAN = 5000;
@@ -183,6 +184,10 @@ export async function GET() {
   const resolvedExcludedUserId = await resolveExcludedUserId(admin);
   if (resolvedExcludedUserId) {
     excludedUserIds.add(resolvedExcludedUserId);
+  }
+  const systemAccountIds = await getSystemAccountIds(admin);
+  for (const systemAccountId of systemAccountIds) {
+    excludedUserIds.add(systemAccountId);
   }
 
   const latestByUserId = new Map<string, ActiveUserSummary>();

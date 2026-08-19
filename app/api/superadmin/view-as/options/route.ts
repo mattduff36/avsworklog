@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
+import { filterSystemTeams } from '@/lib/utils/system-accounts';
 
 export async function GET() {
   const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
@@ -50,7 +51,7 @@ export async function GET() {
       .order('display_name', { ascending: true }),
     admin
       .from('org_teams')
-      .select('id, name, code, active')
+      .select('id, name, code, active, is_system')
       .eq('active', true)
       .order('name', { ascending: true }),
   ]);
@@ -65,6 +66,6 @@ export async function GET() {
   return NextResponse.json({
     success: true,
     roles: roles || [],
-    teams: teams || [],
+    teams: filterSystemTeams(teams || []),
   });
 }

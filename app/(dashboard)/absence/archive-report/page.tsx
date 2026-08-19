@@ -77,7 +77,8 @@ export default function AbsenceArchiveReportPage() {
     async function fetchProfiles() {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, full_name, employee_id')
+        .select('id, full_name, employee_id, is_system_account')
+        .eq('is_system_account', false)
         .order('full_name');
       if (error) {
         console.error('Error fetching archive report profiles:', error);

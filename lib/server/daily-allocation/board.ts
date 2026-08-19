@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
+import { filterSystemTeams, isSystemAccountProfile } from '@/lib/utils/system-accounts';
 import { loadJobCatalogueRecords } from '@/lib/server/job-catalogue';
 import { getJobCatalogueBlockReason } from '@/lib/utils/job-catalogue';
 import {
@@ -311,7 +312,7 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
   ] = await Promise.all([
     admin
       .from('profiles')
-      .select('id, full_name, employee_id, team_id')
+      .select('id, full_name, employee_id, team_id, is_system_account')
       .in('id', scopedIds.length ? scopedIds : ['00000000-0000-0000-0000-000000000000'])
       .order('full_name'),
     supabase
@@ -348,7 +349,7 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
       .eq('status', 'active'),
     admin
       .from('org_teams')
-      .select('id, name'),
+      .select('id, name, is_system'),
     supabase
       .rpc('list_daily_allocation_plant_conflicts', { p_work_date: workDate }),
   ]);
@@ -362,7 +363,9 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
   if (teamError) throw teamError;
   if (plantConflictError) throw plantConflictError;
 
-  const teamNameById = new Map((teams || []).map((team) => [team.id, team.name]));
+  const teamNameById = new Map(
+    filterSystemTeams(teams || []).map((team) => [team.id, team.name])
+  );
   const labourByProfile = new Map((labourDrafts || []).map((row) => [row.profile_id, mapLabourDraft(row)]));
   const publicationIds = (publications || []).map((row) => row.id);
   const { data: issuedItems, error: issuedError } = publicationIds.length
@@ -405,7 +408,7 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
   const publisherNameById = new Map((publishers || []).map((publisher) => [publisher.id, publisher.full_name]));
 
   const labour: DailyLabourBoardRow[] = (profiles || [])
-    .filter((profile) => !isHiddenSystemTestAccountProfile(profile))
+    .filter((profile) => !isHiddenSystemTestAccountProfile(profile) && !isSystemAccountProfile(profile))
     .map((profile) => {
     const profileAbsences = (absences || []).filter((absence) => absence.profile_id === profile.id);
     const reasonOf = (absence: (typeof profileAbsences)[number]) => {
@@ -614,7 +617,7 @@ export async function loadDailyAllocationBoardRange(
   ] = await Promise.all([
     admin
       .from('profiles')
-      .select('id, full_name, employee_id, team_id')
+      .select('id, full_name, employee_id, team_id, is_system_account')
       .in('id', scopeIds)
       .order('full_name'),
     admin
@@ -643,7 +646,7 @@ export async function loadDailyAllocationBoardRange(
       .eq('status', 'active'),
     admin
       .from('org_teams')
-      .select('id, name'),
+      .select('id, name, is_system'),
     fromUntyped<PlanDayRow>(supabase, 'daily_allocation_plan_days')
       .select('id, work_date, team_id, plan_version, converted_at, converted_by, updated_at')
       .gte('work_date', range.start)
@@ -711,7 +714,9 @@ export async function loadDailyAllocationBoardRange(
     .map(mapOverride);
 
   const profileById = new Map((profilesResult.data || []).map((profile) => [profile.id, profile]));
-  const teamNameById = new Map((teamsResult.data || []).map((team) => [team.id, team.name]));
+  const teamNameById = new Map(
+    filterSystemTeams(teamsResult.data || []).map((team) => [team.id, team.name])
+  );
   const shiftsByProfile = new Map<string, WorkShiftPattern>();
   for (const row of (shiftsResult.data || []) as ShiftRowInput[]) {
     shiftsByProfile.set(row.profile_id, shiftPatternFromRow(row));
@@ -784,7 +789,7 @@ export async function loadDailyAllocationBoardRange(
     }));
 
   const employees = (profilesResult.data || [])
-    .filter((profile) => !isHiddenSystemTestAccountProfile(profile))
+    .filter((profile) => !isHiddenSystemTestAccountProfile(profile) && !isSystemAccountProfile(profile))
     .map((profile) => ({
       profile_id: profile.id,
       full_name: profile.full_name,
@@ -832,7 +837,7 @@ export async function loadDailyAllocationBoardRange(
         plant_id: row.plant_id,
         nickname: row.nickname,
       })),
-      teams: (teamsResult.data || [])
+      teams: filterSystemTeams(teamsResult.data || [])
         .filter((team) => context.is_admin || team.id === context.team_id)
         .map((team) => ({ id: team.id, name: team.name })),
     },

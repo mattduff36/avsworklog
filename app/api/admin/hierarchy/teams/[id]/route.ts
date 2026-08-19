@@ -8,6 +8,7 @@ import {
   reconcileTeamManagerAssignments,
   validateTeamManagerSelection,
 } from '@/lib/server/team-managers';
+import { SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
 
 function getSupabaseAdmin() {
   return createSupabaseClient(
@@ -84,6 +85,9 @@ export async function PATCH(
   if (accessError) return accessError;
 
   const teamId = (await params).id;
+  if (teamId === SYSTEM_ACCOUNTS_TEAM_ID) {
+    return NextResponse.json({ error: 'System Accounts team cannot be changed' }, { status: 403 });
+  }
   const body = await request.json();
 
   const name = typeof body?.name === 'string' ? body.name.trim() : undefined;
@@ -201,6 +205,9 @@ export async function DELETE(
   if (accessError) return accessError;
 
   const teamId = (await params).id;
+  if (teamId === SYSTEM_ACCOUNTS_TEAM_ID) {
+    return NextResponse.json({ error: 'System Accounts team cannot be deleted' }, { status: 403 });
+  }
   const supabaseAdmin = getSupabaseAdmin();
 
   const { count, error: countError } = await supabaseAdmin

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getRoleClass as getTeamRoleClass, shouldClearOwnManagers } from '@/lib/server/team-managers';
+import { isSystemAccountProfile, isSystemTeam } from '@/lib/utils/system-accounts';
 
 export type HierarchyValidationIssueCode =
   | 'MISSING_TEAM'
@@ -27,6 +28,7 @@ interface ProfileValidationRow {
   line_manager_id?: string | null;
   secondary_manager_id?: string | null;
   is_placeholder?: boolean | null;
+  is_system_account?: boolean | null;
   role?: { role_class?: 'admin' | 'manager' | 'employee' } | null;
 }
 
@@ -35,6 +37,7 @@ interface TeamValidationRow {
   name: string;
   manager_1_profile_id?: string | null;
   manager_2_profile_id?: string | null;
+  is_system?: boolean | null;
 }
 
 interface ReportingLineValidationRow {
@@ -147,11 +150,12 @@ export async function runHierarchyValidation(
       line_manager_id,
       secondary_manager_id,
       is_placeholder,
+      is_system_account,
       role:roles(role_class)
     `);
   const teamQuery = supabaseAdmin
     .from('org_teams')
-    .select('id, name, manager_1_profile_id, manager_2_profile_id');
+    .select('id, name, manager_1_profile_id, manager_2_profile_id, is_system');
   const reportingQuery = supabaseAdmin
     .from('profile_reporting_lines')
     .select('profile_id, manager_profile_id, relation_type')
@@ -179,8 +183,12 @@ export async function runHierarchyValidation(
     throw compositeError;
   }
 
-  const rows = (profilesResult.data || []) as ProfileValidationRow[];
-  const teams = (teamsResult.data || []) as TeamValidationRow[];
+  const rows = ((profilesResult.data || []) as ProfileValidationRow[]).filter(
+    (row) => !isSystemAccountProfile(row)
+  );
+  const teams = ((teamsResult.data || []) as TeamValidationRow[]).filter(
+    (team) => !isSystemTeam(team)
+  );
   const reportingRows = (reportingResult.data || []) as ReportingLineValidationRow[];
 
   const rowsById = new Map(rows.map((row) => [row.id, row]));
