@@ -18,4 +18,9 @@ describe('http error transient classification', () => {
   it('reads common statusCode fields from error-like objects', () => {
     expect(getErrorStatus({ message: 'Unauthorized', statusCode: 401 })).toBe(401);
   });
+
+  it('treats session-expired messages as auth failures', () => {
+    expect(getErrorStatus(new Error('Your session expired. Please sign in and try again.'))).toBe(401);
+    expect(isAuthErrorStatus(getErrorStatus(new Error('Your session expired. Please sign in and try again.')))).toBe(true);
+  });
 });

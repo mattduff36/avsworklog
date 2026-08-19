@@ -3,6 +3,7 @@ import {
   getInspectionErrorMessage,
   isDuplicateInspectionError,
   isMissingDraftError,
+  isPostgrestNoRowError,
 } from '@/lib/utils/inspection-error-handling';
 
 describe('inspection-error-handling', () => {
@@ -45,5 +46,27 @@ describe('inspection-error-handling', () => {
 
   it('does not treat unrelated missing data as a stale draft', () => {
     expect(isMissingDraftError(new Error('Plant not found'))).toBe(false);
+  });
+
+  it('maps PostgREST coerce / PGRST116 write misses to a user-facing save message', () => {
+    const coerceError = {
+      code: 'PGRST116',
+      details: 'The result contains 0 rows',
+      message: 'Cannot coerce the result to a single JSON object',
+    };
+
+    expect(isPostgrestNoRowError(coerceError)).toBe(true);
+    expect(isMissingDraftError(coerceError)).toBe(true);
+    expect(getInspectionErrorMessage(coerceError, 'Failed to save inspection')).toBe(
+      'This draft could not be saved. It may have been submitted, removed, or your session may have expired. Refresh and try again.'
+    );
+  });
+
+  it('treats zero-row update messages as expected draft misses', () => {
+    expect(
+      isMissingDraftError(
+        new Error('Failed to update inspection - no rows returned. You may not have permission to edit this inspection.')
+      )
+    ).toBe(true);
   });
 });

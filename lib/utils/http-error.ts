@@ -37,6 +37,7 @@ export function getErrorStatus(error: unknown): number | null {
     if (message.includes('unauthorized')) return 401;
     if (message.includes('not authenticated')) return 401;
     if (message.includes('jwt expired')) return 401;
+    if (message.includes('session expired')) return 401;
     return null;
   }
 
@@ -57,6 +58,7 @@ export function getErrorStatus(error: unknown): number | null {
   if (message.includes('unauthorized')) return 401;
   if (message.includes('not authenticated')) return 401;
   if (message.includes('jwt expired')) return 401;
+  if (message.includes('session expired')) return 401;
   return null;
 }
 

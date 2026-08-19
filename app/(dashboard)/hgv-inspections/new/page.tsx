@@ -47,7 +47,8 @@ import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTi
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
-import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
+import { createStatusError, getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
+import { getInspectionErrorMessage, isMissingDraftError } from '@/lib/utils/inspection-error-handling';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
@@ -508,10 +509,10 @@ function NewHgvInspectionContent() {
             inspector_comments: inspectorComments.trim() || null,
           })
           .select('id')
-          .single();
+          .maybeSingle();
 
-        if (draftError) {
-          if (draftError.code === '23505') {
+        if (draftError || !draft) {
+          if (draftError?.code === '23505') {
             const inspectionConflict = await findExistingInspectionConflict();
             if (inspectionConflict) {
               if (inspectionConflict.status === 'draft') {
@@ -522,7 +523,7 @@ function NewHgvInspectionContent() {
               return null;
             }
           }
-          throw draftError;
+          throw draftError || new Error('Draft not found');
         }
 
         const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
@@ -597,7 +598,7 @@ function NewHgvInspectionContent() {
         .select('id, hgv_id, user_id, inspection_date, current_mileage, inspector_comments')
         .eq('id', id)
         .eq('status', 'draft')
-        .single();
+        .maybeSingle();
 
       if (draftError || !draft) {
         setExistingInspectionId(null);
@@ -1131,23 +1132,19 @@ function NewHgvInspectionContent() {
       let inspectionId = existingInspectionId;
 
       if (existingInspectionId) {
-        const { data: updatedInspection, error: updateError } = await supabase
-          .from('hgv_inspections')
-          .update(inspectionPayload)
-          .eq('id', existingInspectionId)
-          .select('id')
-          .single();
-
-        if (updateError || !updatedInspection) {
-          throw updateError || new Error('Failed to update inspection');
+        const { error: deleteItemsError } = await supabase
+          .from('inspection_items')
+          .delete()
+          .eq('inspection_id', existingInspectionId);
+        if (deleteItemsError) {
+          throw deleteItemsError;
         }
-        inspectionId = updatedInspection.id;
       } else {
         const { data: newInspection, error: insertInspectionError } = await supabase
           .from('hgv_inspections')
           .insert(inspectionPayload)
           .select('id')
-          .single();
+          .maybeSingle();
 
         if (insertInspectionError || !newInspection) {
           throw insertInspectionError || new Error('Failed to create inspection');
@@ -1159,16 +1156,6 @@ function NewHgvInspectionContent() {
 
       if (!inspectionId) {
         throw new Error('Failed to resolve inspection id');
-      }
-
-      if (existingInspectionId) {
-        const { error: deleteItemsError } = await supabase
-          .from('inspection_items')
-          .delete()
-          .eq('inspection_id', existingInspectionId);
-        if (deleteItemsError) {
-          throw deleteItemsError;
-        }
       }
 
       const dayOfWeek = getDayOfWeek(new Date(`${inspectionDate}T00:00:00`));
@@ -1212,6 +1199,53 @@ function NewHgvInspectionContent() {
           throw insertItemsError;
         }
         insertedItems = (data || []) as InsertedItem[];
+      }
+
+      if (existingInspectionId) {
+        const { data: updatedInspection, error: updateError } = await supabase
+          .from('hgv_inspections')
+          .update(inspectionPayload)
+          .eq('id', existingInspectionId)
+          .eq('status', 'draft')
+          .select('id')
+          .maybeSingle();
+
+        if (updateError) {
+          throw updateError;
+        }
+
+        if (!updatedInspection) {
+          const { data: sessionData } = await supabase.auth.getSession();
+          if (!sessionData.session) {
+            throw createStatusError('Your session expired. Please sign in and try again.', 401);
+          }
+
+          const { data: current } = await supabase
+            .from('hgv_inspections')
+            .select('id, status')
+            .eq('id', existingInspectionId)
+            .maybeSingle();
+
+          if (current?.status === 'submitted' && status === 'submitted') {
+            toast.success('HGV inspection submitted successfully');
+            if (typeof window !== 'undefined') {
+              window.sessionStorage.removeItem(getInspectionTimerStorageKey(existingInspectionId));
+            }
+            allowNavigationRef.current = true;
+            router.push(`/hgv-inspections/${existingInspectionId}`);
+            return;
+          }
+
+          if (!current) {
+            throw new Error('Draft not found');
+          }
+
+          throw new Error(
+            'Failed to update inspection - no rows returned. You may not have permission to edit this inspection.'
+          );
+        }
+
+        inspectionId = updatedInspection.id;
       }
 
       if (status === 'submitted') {
@@ -1286,9 +1320,11 @@ function NewHgvInspectionContent() {
       const isNetworkError = isNetworkFetchError(err);
       const message = isNetworkError
         ? 'Could not save inspection because the network request failed. Please check your connection and try again.'
-        : err instanceof Error ? err.message : 'Failed to save inspection';
+        : getInspectionErrorMessage(err, 'Failed to save inspection');
       if (isNetworkError) {
         console.warn('HGV inspection save failed due transient network error', { errorContextId });
+      } else if (isMissingDraftError(err)) {
+        console.warn('HGV inspection save skipped because the draft could not be updated', { errorContextId });
       } else if (!isAuthErrorStatus(getErrorStatus(err))) {
         console.error('Error saving HGV inspection:', err, { errorContextId });
       }
