@@ -1417,11 +1417,6 @@ export function RoleManagement() {
                                   <ChevronRight className="h-3.5 w-3.5 shrink-0" />
                                 )}
                                 <span className="min-w-0 truncate">{group.teamLabel}</span>
-                                {group.isSystem && (
-                                  <span className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] font-normal normal-case italic leading-none text-slate-500">
-                                    System
-                                  </span>
-                                )}
                                 <span className="ml-auto rounded border border-slate-700 px-1.5 py-0.5 text-[10px] leading-none text-slate-500">
                                   {group.users.length}
                                 </span>
