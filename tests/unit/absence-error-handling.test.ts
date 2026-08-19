@@ -24,6 +24,22 @@ describe('absence-error-handling', () => {
     ).toBe(false);
   });
 
+  it('treats absence status-transition authorisation denials as expected access errors', () => {
+    expect(
+      isExpectedAbsenceAccessError(
+        new Error('Not authorised to approve, reject, or process this absence')
+      )
+    ).toBe(true);
+    expect(
+      shouldLogAbsenceManageError(
+        new Error('Not authorised to approve, reject, or process this absence')
+      )
+    ).toBe(false);
+    expect(shouldLogAbsenceManageError(new Error('Not authorised to cancel this absence'))).toBe(
+      false
+    );
+  });
+
   it('treats closed financial year write attempts as expected validation errors', () => {
     expect(
       shouldLogAbsenceManageError(new Error('Cannot modify absences from a closed financial year'))

@@ -21,6 +21,9 @@ const EXPECTED_ABSENCE_ACCESS_MESSAGES = [
   'Session is locked',
   'JWT expired',
   'We could not verify your session, so data loading has been paused.',
+  'Not authorised to approve, reject, or process this absence',
+  'Not authorised to approve or reject this absence',
+  'Not authorised to cancel this absence',
 ];
 
 function extractErrorMessage(error: unknown): string {

@@ -216,7 +216,9 @@ function ProfilePageContent() {
       setPreferences(payload.preferences || []);
     } catch (error) {
       const errorContextId = 'profile-load-preferences-error';
-      console.error('Error loading profile notification preferences:', error, { errorContextId });
+      if (!isAuthErrorStatus(getErrorStatus(error)) && !isNetworkFetchError(error)) {
+        console.error('Error loading profile notification preferences:', error, { errorContextId });
+      }
       toast.error('Failed to load notification preferences', { id: errorContextId });
     } finally {
       setLoadingPreferences(false);
