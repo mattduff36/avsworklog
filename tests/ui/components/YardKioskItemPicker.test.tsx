@@ -267,18 +267,7 @@ describe('Yard kiosk item result threshold', () => {
         <div className="min-w-0 overflow-hidden">
           <YardKioskBasket
             direction="take"
-            counterpart={{
-              id: 'site-one',
-              name: 'Site One',
-              description: null,
-              location_type: 'site',
-              source_type: 'manual',
-              external_reference: null,
-              linked_asset_label: null,
-              linked_asset_nickname: null,
-              primary_user_names: [],
-              secondary_user_names: [],
-            }}
+            destinationLabel="Site One"
             basket={[basketLine]}
             offline={false}
             submitting={false}

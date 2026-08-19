@@ -195,13 +195,39 @@ describe('YardKioskApp', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Collect/ }));
-    expect(screen.getByRole('status')).toHaveTextContent('Select the destination location');
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Select the destination, or type the location details',
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Back to direction selection' }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^Return/ }));
     expect(screen.getByRole('status')).toHaveTextContent('Select the source location');
+  });
+
+  it('loads Yard stock after Collect typed location details', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ items: [] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<YardKioskApp bootstrap={bootstrap} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Collect/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Type location details' }));
+    fireEvent.change(screen.getByPlaceholderText(/Type the van, site, job or person/i), {
+      target: { value: 'Job van, not listed' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Continue with these details' }));
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('unallocated=true'),
+      expect.anything(),
+    );
+    expect(screen.getByTestId('yard-kiosk-items-layout')).toBeInTheDocument();
   });
 
   it('keeps fixed header slots while workflow controls change by step', () => {

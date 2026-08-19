@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
+import { INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
 import { getReminderActionRequiredModule } from '@/lib/utils/reminder-action-permissions';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     const { data: action, error: actionError } = await admin
       .from('reminder_actions')
-      .select('id, status, asset_type')
+      .select('id, status, asset_type, workflow_key')
       .eq('id', actionId)
       .maybeSingle();
 
@@ -53,6 +54,9 @@ export async function POST(request: NextRequest) {
 
     if (action.status !== 'open') {
       return NextResponse.json({ error: 'Only open actions can be assigned' }, { status: 400 });
+    }
+    if (action.workflow_key === INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY) {
+      return NextResponse.json({ error: 'Yard transfer actions are allocated, not assigned' }, { status: 400 });
     }
 
     const requiredModule = getReminderActionRequiredModule(action.asset_type);

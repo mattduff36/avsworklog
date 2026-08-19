@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
-import { INVENTORY_UNKNOWN_LOCATION_NAME, isUnknownInventoryLocationName } from '@/app/(dashboard)/inventory/utils';
+import {
+  INVENTORY_TRANSFER_LOCATION_NAME,
+  INVENTORY_UNKNOWN_LOCATION_NAME,
+  isInventoryTransferLocation,
+  isUnknownInventoryLocationName,
+} from '@/app/(dashboard)/inventory/utils';
 import type { FleetAssetLinkType } from '@/app/(dashboard)/inventory/types';
 import {
   buildLinkedAssetColumns,
@@ -43,6 +48,13 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Location not found' }, { status: 404 });
       }
       throw currentLocationError;
+    }
+
+    if (isInventoryTransferLocation(currentLocation)) {
+      return NextResponse.json(
+        { error: `${INVENTORY_TRANSFER_LOCATION_NAME} is a system location and cannot be changed` },
+        { status: 400 }
+      );
     }
 
     if (
@@ -132,6 +144,13 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
         return NextResponse.json({ error: 'Location not found' }, { status: 404 });
       }
       throw locationError;
+    }
+
+    if (isInventoryTransferLocation(location)) {
+      return NextResponse.json(
+        { error: `${INVENTORY_TRANSFER_LOCATION_NAME} is a system location and cannot be removed` },
+        { status: 400 }
+      );
     }
 
     if (location.location_type === 'unknown' || isUnknownInventoryLocationName(location.name)) {

@@ -60,7 +60,7 @@ type SortField = InventoryTableSortField;
 type SortDir = InventoryTableSortDir;
 const NO_LOCATION_FILTER = '__no_location__';
 const INVENTORY_STATUS_FILTER_ORDER: InventoryCheckStatus[] = ['overdue', 'due_soon', 'needs_check', 'not_required', 'ok'];
-const LOCATION_FILTER_GROUP_ORDER = ['manual', 'van', 'site', 'legacy_quote', 'hgv', 'plant', 'unknown'] as const;
+const LOCATION_FILTER_GROUP_ORDER = ['manual', 'van', 'site', 'legacy_quote', 'hgv', 'plant', 'unknown', 'transfer'] as const;
 const COLLAPSIBLE_LOCATION_FILTER_GROUPS = ['Vans', 'Sites', 'Legacy Sites', 'HGVs', 'Plant'] as const;
 const LOCATION_FILTER_MINIMUM_SEARCH_CHARACTERS = {
   'Legacy Sites': 3,
@@ -145,6 +145,7 @@ function getLocationFilterGroupKey(location: InventoryLocation): (typeof LOCATIO
   if (location.location_type === 'hgv') return 'hgv';
   if (location.location_type === 'plant') return 'plant';
   if (location.location_type === 'unknown') return 'unknown';
+  if (location.location_type === 'transfer') return 'transfer';
   return 'manual';
 }
 
@@ -156,6 +157,7 @@ function getLocationFilterGroupLabel(location: InventoryLocation): string {
   if (groupKey === 'hgv') return 'HGVs';
   if (groupKey === 'plant') return 'Plant';
   if (groupKey === 'unknown') return 'Unknown';
+  if (groupKey === 'transfer') return 'In transfer';
   return 'Manual Locations';
 }
 

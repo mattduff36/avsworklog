@@ -51,6 +51,22 @@ describe('Yard kiosk state', () => {
     expect(locationState.loadingStock).toBe(true);
   });
 
+  it('keeps typed Collect details without inventing a counterpart', () => {
+    const directionState = yardKioskReducer(INITIAL_YARD_KIOSK_STATE, {
+      type: 'SELECT_DIRECTION',
+      direction: 'take',
+    });
+    const unallocatedState = yardKioskReducer(directionState, {
+      type: 'SELECT_UNALLOCATED_LOCATION',
+      details: 'Job van, not on the list',
+    });
+
+    expect(unallocatedState.phase).toBe('items');
+    expect(unallocatedState.counterpart).toBeNull();
+    expect(unallocatedState.unallocatedDetails).toBe('Job van, not on the list');
+    expect(unallocatedState.loadingStock).toBe(true);
+  });
+
   it('adds serialized and bounded Hardware quantities to one basket', () => {
     let state = yardKioskReducer(INITIAL_YARD_KIOSK_STATE, {
       type: 'ADD_SERIALIZED',
@@ -183,7 +199,7 @@ describe('Yard kiosk state', () => {
       ...INITIAL_YARD_KIOSK_STATE,
       phase: 'location',
       direction: 'take',
-    }).message).toBe('Select the destination location');
+    }).message).toBe('Select the destination, or type the location details');
     expect(getYardKioskGuidance({
       ...INITIAL_YARD_KIOSK_STATE,
       phase: 'location',

@@ -1,3 +1,4 @@
+import { INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
 import type { ReminderActionWithAsset } from '@/types/reminders';
 
 export type ReminderAssignmentFilter = 'all' | 'unassigned' | 'has_pending' | 'fully_actioned';
@@ -20,10 +21,16 @@ export function getReminderAssignmentFilterValue(action: ReminderActionWithAsset
 }
 
 export function isReminderActionActioned(action: ReminderActionWithAsset): boolean {
+  if (action.workflow_key === INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY) {
+    return action.status === 'resolved';
+  }
   return getReminderAssignmentFilterValue(action) === 'fully_actioned';
 }
 
 export function isReminderActionActive(action: ReminderActionWithAsset): boolean {
+  if (action.workflow_key === INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY) {
+    return action.status === 'open';
+  }
   return !isReminderActionActioned(action);
 }
 
@@ -40,6 +47,7 @@ export function getReminderActionSearchHaystack(action: ReminderActionWithAsset)
     getMetadataSearchValue(action, 'job_code'),
     getMetadataSearchValue(action, 'customer_name'),
     getMetadataSearchValue(action, 'quote_title'),
+    getMetadataSearchValue(action, 'location_details'),
   ]
     .join(' ')
     .toLowerCase();

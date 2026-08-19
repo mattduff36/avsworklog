@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { Check, RotateCcw } from 'lucide-react';
 import type {
   YardKioskDirection,
-  YardKioskLocation,
   YardKioskReceipt as YardKioskReceiptData,
 } from '@/lib/inventory/kiosk-types';
 
@@ -12,7 +11,8 @@ const RESET_SECONDS = 8;
 
 interface YardKioskReceiptProps {
   direction: YardKioskDirection;
-  counterpart: YardKioskLocation;
+  destinationLabel: string;
+  unallocated?: boolean;
   receipt: YardKioskReceiptData;
   onReset: () => void;
   autoReset?: boolean;
@@ -20,7 +20,8 @@ interface YardKioskReceiptProps {
 
 export function YardKioskReceipt({
   direction,
-  counterpart,
+  destinationLabel,
+  unallocated = false,
   receipt,
   onReset,
   autoReset = true,
@@ -50,9 +51,16 @@ export function YardKioskReceipt({
         </span>
         <h2 className="mt-5 text-5xl font-black tracking-tight text-white">Transfer complete</h2>
         <p className="mt-2 text-xl text-emerald-100/80">
-          {direction === 'take' ? 'Stock moved from Yard to ' : 'Stock returned to Yard from '}
-          <strong className="text-white">{counterpart.name}</strong>
+          {unallocated
+            ? 'Stock left Yard and is waiting for the workshop to allocate '
+            : direction === 'take' ? 'Stock moved from Yard to ' : 'Stock returned to Yard from '}
+          <strong className="text-white">{destinationLabel}</strong>
         </p>
+        {unallocated ? (
+          <p className="mt-2 text-base text-emerald-100/70">
+            An action was created for the workshop team to move this stock to the real location.
+          </p>
+        ) : null}
 
         <div className="mx-auto mt-6 grid max-w-xl grid-cols-2 gap-3">
           <div className="rounded-2xl border border-white/10 bg-black/20 p-4">

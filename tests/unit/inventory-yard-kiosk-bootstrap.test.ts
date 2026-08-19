@@ -15,6 +15,7 @@ function buildLocationQuery(data: unknown[]) {
     select: vi.fn(),
     eq: vi.fn(),
     neq: vi.fn(),
+    not: vi.fn(),
     order: vi.fn(),
     limit: vi.fn(),
     range: vi.fn(),
@@ -22,6 +23,7 @@ function buildLocationQuery(data: unknown[]) {
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
   query.neq.mockReturnValue(query);
+  query.not.mockReturnValue(query);
   query.order.mockReturnValue(query);
   query.limit.mockResolvedValue({ data, error: null });
   query.range.mockImplementation((from: number, to: number) => Promise.resolve({
@@ -116,6 +118,7 @@ describe('Yard kiosk bootstrap location assignees', () => {
     expect(primaryQuery.select.mock.calls[0]?.[0]).toContain('(full_name)');
     expect(secondaryQuery.select.mock.calls[0]?.[0]).toContain('(full_name)');
     expect(locationQuery.neq).toHaveBeenCalledWith('source_type', 'legacy_quote');
+    expect(locationQuery.not).toHaveBeenCalledWith('location_type', 'in', '(unknown,transfer)');
     expect(bootstrap.locations).toEqual([{
       id: location.id,
       name: location.name,

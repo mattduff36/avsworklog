@@ -72,7 +72,10 @@ function getWorkflowState(
   ) {
     return null;
   }
-  return state;
+  return {
+    ...state,
+    unallocatedDetails: state.unallocatedDetails ?? null,
+  };
 }
 
 export function YardKioskController() {
@@ -250,6 +253,15 @@ export function YardKioskController() {
       void sendAction({
         type: 'set_include_legacy_quotes',
         enabled: next.include_legacy_quotes,
+      });
+    } else if (
+      next.unallocated_entry_open !== (current.unallocated_entry_open ?? false)
+    ) {
+      void sendAction({ type: 'select_unallocated_location' });
+    } else if (next.unallocated_details !== (current.unallocated_details ?? '')) {
+      void sendAction({
+        type: 'set_unallocated_details',
+        details: next.unallocated_details,
       });
     } else {
       const changedPin = [...next.pinned_ids, ...current.pinned_ids]
@@ -479,6 +491,11 @@ export function YardKioskController() {
                         location_id: location.id,
                       });
                     }}
+                    onSelectUnallocated={state.direction === 'take'
+                      ? () => {
+                        void sendAction({ type: 'confirm_unallocated_details' });
+                      }
+                      : undefined}
                     onIncludeLegacyQuotesChange={async () => undefined}
                     persistPreferences={false}
                   />
@@ -486,7 +503,7 @@ export function YardKioskController() {
 
                 {(state.phase === 'items' || state.phase === 'submitting')
                   && state.direction
-                  && state.counterpart ? (
+                  && (state.counterpart || state.unallocatedDetails) ? (
                   <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_21rem] gap-4 overflow-hidden p-4">
                     <div className="min-h-0 min-w-0 overflow-hidden">
                       <YardKioskItemPicker
@@ -519,7 +536,7 @@ export function YardKioskController() {
                     <div className="min-h-0 min-w-0 overflow-hidden">
                       <YardKioskBasket
                         direction={state.direction}
-                        counterpart={state.counterpart}
+                        destinationLabel={state.unallocatedDetails || state.counterpart?.name || ''}
                         basket={state.basket}
                         offline={!isTabletOnline || snapshot.offline}
                         submitting={state.phase === 'submitting'}
@@ -533,11 +550,12 @@ export function YardKioskController() {
 
                 {state.phase === 'receipt'
                   && state.direction
-                  && state.counterpart
+                  && (state.counterpart || state.unallocatedDetails)
                   && state.receipt ? (
                   <YardKioskReceipt
                     direction={state.direction}
-                    counterpart={state.counterpart}
+                    destinationLabel={state.unallocatedDetails || state.counterpart?.name || ''}
+                    unallocated={Boolean(state.unallocatedDetails)}
                     receipt={state.receipt}
                     onReset={() => void sendAction({ type: 'reset' })}
                     autoReset={false}

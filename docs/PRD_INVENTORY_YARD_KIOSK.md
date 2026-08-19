@@ -50,14 +50,18 @@ active Inventory location.
 
 - Exactly one active `inventory_locations` row may have `location_type = 'yard'`.
 - The kiosk resolves that Yard automatically. Users never choose the Yard.
-- Every kiosk transfer has Yard on exactly one side and one active non-Yard
-  counterpart location on the other side.
+- Every allocated kiosk transfer has Yard on exactly one side and one active
+  non-Yard, non-Unknown, non-transfer counterpart location on the other side.
+- Collect may instead type location details. That take moves stock to the
+  singleton system `In transfer` location and opens an Actions item. The
+  browser never sends the transfer location id.
 
 ### YK-003: Guided transfer
 
 - A transaction begins with the user-facing choice Collect from Yard or Return
   to Yard. The Collect choice retains the internal `take` direction value.
-- The user chooses one counterpart location for the whole basket.
+- The user chooses one counterpart location for the whole basket, or on Collect
+  types location details instead of picking a location.
 - Collect (`take`) uses Yard as source; Return uses the counterpart as source.
 - The available catalogue contains only active serialized items and positive
   Hardware balances at that source.
@@ -74,9 +78,9 @@ active Inventory location.
 ### YK-005: Safety checks
 
 - Existing serialized movement-check rules remain mandatory.
-- A serialized item cannot leave Yard when it has never been checked or its
-  check is overdue.
-- The kiosk identifies blocked items but cannot record or override checks.
+- A serialized item leaving Yard shows the existing inventory-check warning and
+  may continue after explicit confirmation, including typed-location Collect.
+- The kiosk does not record inventory checks.
 - Hardware does not use serialized check rules.
 
 ### YK-006: Authorization and audit

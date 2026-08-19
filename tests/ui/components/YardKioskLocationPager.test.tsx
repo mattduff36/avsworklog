@@ -28,6 +28,8 @@ function createUiState(): YardKioskLocationUiState {
     include_legacy_quotes: false,
     recent_ids: getRecentYardKioskLocationIds(),
     pinned_ids: getPinnedYardKioskLocationIds(),
+    unallocated_details: '',
+    unallocated_entry_open: false,
   };
 }
 
@@ -51,25 +53,30 @@ function makeLocation(
   };
 }
 
-function renderPager(locations: YardKioskLocation[]) {
+function renderPager(locations: YardKioskLocation[], direction: 'take' | 'return' = 'take') {
   const onIncludeLegacyQuotesChange = vi.fn(async () => undefined);
+  const onSelectUnallocated = vi.fn();
   const result = render(
     <ControlledLocationPager
       locations={locations}
+      direction={direction}
       onIncludeLegacyQuotesChange={onIncludeLegacyQuotesChange}
+      onSelectUnallocated={onSelectUnallocated}
     />,
   );
-  return { ...result, onIncludeLegacyQuotesChange };
+  return { ...result, onIncludeLegacyQuotesChange, onSelectUnallocated };
 }
 
 function ControlledLocationPager({
   locations,
   direction = 'take',
   onIncludeLegacyQuotesChange = vi.fn(async () => undefined),
+  onSelectUnallocated,
 }: {
   locations: YardKioskLocation[];
   direction?: 'take' | 'return';
   onIncludeLegacyQuotesChange?: (enabled: boolean) => Promise<void>;
+  onSelectUnallocated?: (details: string) => void;
 }) {
   const [uiState, setUiState] = useState(createUiState);
   return (
@@ -79,6 +86,7 @@ function ControlledLocationPager({
       uiState={uiState}
       onUiStateChange={setUiState}
       onSelect={vi.fn()}
+      onSelectUnallocated={direction === 'take' ? onSelectUnallocated : undefined}
       onIncludeLegacyQuotesChange={onIncludeLegacyQuotesChange}
     />
   );
@@ -111,6 +119,24 @@ function LegacyLocationHarness({
 }
 
 describe('Yard kiosk location selection', () => {
+  it('lets Collect type location details and requires text before continuing', () => {
+    const { onSelectUnallocated } = renderPager([
+      makeLocation('Van AB12 CDE', 'van'),
+    ]);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Type location details' }));
+    const details = screen.getByPlaceholderText(/Type the van, site, job or person/i);
+    expect(screen.getByRole('button', { name: 'Continue with these details' })).toBeDisabled();
+    fireEvent.change(details, { target: { value: 'Job van, not listed' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue with these details' }));
+    expect(onSelectUnallocated).toHaveBeenCalledWith('Job van, not listed');
+  });
+
+  it('hides typed location details on Return', () => {
+    renderPager([makeLocation('Van AB12 CDE', 'van')], 'return');
+    expect(screen.queryByRole('button', { name: 'Type location details' })).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     window.localStorage.clear();
   });

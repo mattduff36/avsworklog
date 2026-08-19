@@ -53,6 +53,7 @@ function createAdminMock() {
       const locationChain = {
         eq: () => locationChain,
         neq: () => locationChain,
+        not: () => locationChain,
         single: async () => ({
           data: {
             id: counterpartId,

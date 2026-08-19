@@ -125,6 +125,9 @@ export async function POST(request: NextRequest) {
     if (!name) {
       return NextResponse.json({ error: 'Location name is required' }, { status: 400 });
     }
+    if (['yard', 'unknown', 'in transfer'].includes(name.toLowerCase())) {
+      return NextResponse.json({ error: 'That location name is reserved' }, { status: 400 });
+    }
 
     const admin = createAdminClient();
     const { data, error } = await admin

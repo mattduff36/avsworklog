@@ -15,7 +15,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
+import {
+  FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
+  INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY,
+} from '@/lib/config/reminder-workflows';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 import { cn } from '@/lib/utils/cn';
 import { isReminderActionActioned } from '@/lib/utils/reminder-action-filters';
@@ -23,6 +26,14 @@ import type { ReminderActionWithAsset } from '@/types/reminders';
 import { toast } from 'sonner';
 
 function formatLatestSubmitted(action: ReminderActionWithAsset): string {
+  if (action.workflow_key === INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY) {
+    const allocated = action.metadata?.allocated_location_name;
+    if (typeof allocated === 'string' && allocated.trim()) return allocated;
+    const details = action.metadata?.location_details;
+    if (typeof details === 'string' && details.trim()) return details;
+    return 'Allocated';
+  }
+
   const value = action.metadata?.last_submitted_inspection_date;
   if (typeof value !== 'string' || !value) return 'Never';
 
@@ -48,20 +59,36 @@ export function ActionedActionsPanel() {
   const loadActionedActions = useCallback(async () => {
     setLoading(true);
     try {
-      const searchParams = new URLSearchParams({
-        workflow: FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
-        status: 'all',
-      });
+      const [fleetParams, yardParams] = [
+        new URLSearchParams({
+          workflow: FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
+          status: 'all',
+        }),
+        new URLSearchParams({
+          workflow: INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY,
+          status: 'resolved',
+        }),
+      ];
 
-      const response = await fetch(`/api/actions?${searchParams.toString()}`, {
-        cache: 'no-store',
-      });
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || 'Failed to load actioned reminders');
+      const [fleetResponse, yardResponse] = await Promise.all([
+        fetch(`/api/actions?${fleetParams.toString()}`, { cache: 'no-store' }),
+        fetch(`/api/actions?${yardParams.toString()}`, { cache: 'no-store' }),
+      ]);
+      const [fleetPayload, yardPayload] = await Promise.all([
+        fleetResponse.json(),
+        yardResponse.json(),
+      ]);
+      if (!fleetResponse.ok) {
+        throw new Error(fleetPayload.error || 'Failed to load actioned reminders');
+      }
+      if (!yardResponse.ok) {
+        throw new Error(yardPayload.error || 'Failed to load actioned reminders');
       }
 
-      setActions(((payload.actions || []) as ReminderActionWithAsset[]).filter(isReminderActionActioned));
+      setActions([
+        ...((fleetPayload.actions || []) as ReminderActionWithAsset[]),
+        ...((yardPayload.actions || []) as ReminderActionWithAsset[]),
+      ].filter(isReminderActionActioned));
     } catch (error) {
       console.error(error);
       toast.error(error instanceof Error ? error.message : 'Failed to load actioned reminders');

@@ -38,7 +38,21 @@ describe('Inventory Hardware mutation routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     rpc.mockResolvedValue({ data: 'batch-1', error: null });
-    vi.mocked(createAdminClient).mockReturnValue({ rpc } as never);
+    vi.mocked(createAdminClient).mockReturnValue({
+      rpc,
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          in: vi.fn(async (_column: string, ids: string[]) => ({
+            data: ids.map((id) => ({
+              id,
+              name: id,
+              location_type: id.includes('transfer') ? 'transfer' : 'manual',
+            })),
+            error: null,
+          })),
+        })),
+      })),
+    } as never);
   });
 
   it('requires manager access for stock adjustments', async () => {
@@ -208,5 +222,26 @@ describe('Inventory Hardware mutation routes', () => {
     expect(rpc).toHaveBeenCalledWith('inventory_transfer_hardware_stock', expect.objectContaining({
       p_actor: 'employee-1',
     }));
+  });
+
+  it('blocks Hardware transfers from In transfer', async () => {
+    vi.mocked(requireInventoryAccess).mockResolvedValue({
+      allowed: true,
+      status: 200,
+      userId: 'manager-1',
+      isManagerOrAdmin: true,
+    });
+
+    const response = await transferHardware(buildRequest('/api/inventory/hardware/transfers', {
+      lines: [{
+        item_id: 'item-1',
+        from_location_id: 'transfer-location',
+        to_location_id: 'site-location',
+        quantity: 1,
+      }],
+    }));
+
+    expect(response.status).toBe(400);
+    expect(rpc).not.toHaveBeenCalled();
   });
 });

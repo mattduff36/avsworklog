@@ -7,6 +7,7 @@ import {
   InventoryKioskDeviceError,
   revokeInventoryKioskDevice,
 } from '@/lib/server/inventory-kiosk-devices';
+import { YARD_KIOSK_UNALLOCATED_DETAILS_MAX } from '@/lib/inventory/kiosk-types';
 import {
   YARD_KIOSK_DESTRUCTIVE_COMMANDS,
   YARD_KIOSK_ONLINE_THRESHOLD_MS,
@@ -120,7 +121,7 @@ export function validateYardKioskWorkflowSnapshot(
 
   const snapshot = input as Partial<YardKioskWorkflowSnapshot>;
   if (
-    snapshot.schema_version !== 1
+    (snapshot.schema_version !== 1 && snapshot.schema_version !== 2)
     || !Number.isSafeInteger(snapshot.revision)
     || Number(snapshot.revision) < 0
     || !snapshot.state
@@ -140,6 +141,14 @@ export function validateYardKioskWorkflowSnapshot(
 
   const locationUi = snapshot.location_ui;
   const itemUi = snapshot.item_ui;
+  const hasUnallocatedDetails = Object.prototype.hasOwnProperty.call(
+    locationUi,
+    'unallocated_details',
+  );
+  const hasUnallocatedEntry = Object.prototype.hasOwnProperty.call(
+    locationUi,
+    'unallocated_entry_open',
+  );
   if (
     typeof locationUi.query !== 'string'
     || locationUi.query.length > 200
@@ -153,6 +162,17 @@ export function validateYardKioskWorkflowSnapshot(
     || locationUi.pinned_ids.length > 100
     || locationUi.recent_ids.some((id) => !isUuid(id))
     || locationUi.pinned_ids.some((id) => !isUuid(id))
+    || (snapshot.schema_version === 2 && (
+      typeof locationUi.unallocated_details !== 'string'
+      || locationUi.unallocated_details.length > YARD_KIOSK_UNALLOCATED_DETAILS_MAX
+      || typeof locationUi.unallocated_entry_open !== 'boolean'
+    ))
+    || (snapshot.schema_version === 1 && hasUnallocatedDetails && (
+      typeof locationUi.unallocated_details !== 'string'
+      || locationUi.unallocated_details.length > YARD_KIOSK_UNALLOCATED_DETAILS_MAX
+    ))
+    || (snapshot.schema_version === 1 && hasUnallocatedEntry
+      && typeof locationUi.unallocated_entry_open !== 'boolean')
     || !Number.isSafeInteger(itemUi.page_index)
     || itemUi.page_index < 0
     || (itemUi.hardware_item_id !== null && !isUuid(itemUi.hardware_item_id))
@@ -219,6 +239,16 @@ export function validateYardKioskControlAction(input: unknown): YardKioskControl
   }
   if (type === 'set_include_legacy_quotes' && typeof action.enabled === 'boolean') {
     return { type, enabled: action.enabled };
+  }
+  if (type === 'select_unallocated_location' || type === 'confirm_unallocated_details') {
+    return { type };
+  }
+  if (
+    type === 'set_unallocated_details'
+    && typeof action.details === 'string'
+    && action.details.length <= YARD_KIOSK_UNALLOCATED_DETAILS_MAX
+  ) {
+    return { type, details: action.details };
   }
 
   throw new InventoryKioskDeviceError('Unsupported or invalid kiosk control action');
@@ -912,6 +942,7 @@ export async function listInventoryKioskOperationalDevices(): Promise<YardKioskD
     pending_commands: commandsByDevice.get(device.id) || [],
     workflow_snapshot:
       device.last_workflow_snapshot?.schema_version === 1
+      || device.last_workflow_snapshot?.schema_version === 2
         ? device.last_workflow_snapshot as unknown as YardKioskWorkflowSnapshot
         : null,
     workflow_state_version: device.workflow_state_version,

@@ -1,4 +1,8 @@
-import { getInventoryCheckStatus, requiresInventoryMoveCheckWarning } from '@/app/(dashboard)/inventory/utils';
+import {
+  getInventoryCheckStatus,
+  isInventoryTransferLocation,
+  requiresInventoryMoveCheckWarning,
+} from '@/app/(dashboard)/inventory/utils';
 import type { InventoryLocation } from '@/app/(dashboard)/inventory/types';
 import {
   INVENTORY_CHECK_WARNING_REQUIRED,
@@ -253,12 +257,19 @@ export async function prepareInventoryMove(
   if (itemsResult.error) throw itemsResult.error;
 
   const destinationLocation = destinationResult.data as MoveLocationRow;
+  if (isInventoryTransferLocation(destinationLocation)) {
+    throw new InventoryMoveError('In transfer stock can only be allocated from Actions', 400);
+  }
   const moveItems = ((itemsResult.data || []) as MoveItemRow[])
     .slice()
     .sort((left, right) => left.id.localeCompare(right.id));
 
   if (moveItems.length !== itemIds.length) {
     throw new InventoryMoveError('One or more inventory items could not be found', 404);
+  }
+
+  if (moveItems.some((item) => isInventoryTransferLocation(normalizeMoveItemLocation(item.location)))) {
+    throw new InventoryMoveError('In transfer stock can only be allocated from Actions', 400);
   }
 
   const sameLocationCount = moveItems.filter((item) => normalizeMoveItemLocation(item.location)?.id === destinationLocationId).length;

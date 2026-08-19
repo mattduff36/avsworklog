@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { Json } from '@/types/database';
 import type { InventoryHardwareTransferPayload } from '@/app/(dashboard)/inventory/types';
+import { isInventoryTransferLocation } from '@/app/(dashboard)/inventory/utils';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryAccess } from '@/lib/server/inventory-auth';
 import {
@@ -46,6 +47,22 @@ export async function POST(request: NextRequest) {
     }
 
     const admin = createAdminClient();
+    const locationIds = Array.from(new Set(body.lines.flatMap((line) => [
+      line.from_location_id,
+      line.to_location_id,
+    ])));
+    const { data: transferLocations, error: transferLocationError } = await admin
+      .from('inventory_locations')
+      .select('id, name, location_type')
+      .in('id', locationIds);
+    if (transferLocationError) throw transferLocationError;
+    if ((transferLocations || []).some((location) => isInventoryTransferLocation(location))) {
+      return NextResponse.json(
+        { error: 'In transfer stock can only be allocated from Actions' },
+        { status: 400 },
+      );
+    }
+
     if (!access.isManagerOrAdmin) {
       const responsibleLocationIds = new Set(
         await getResponsibleHardwareLocationIds(admin, access.userId),

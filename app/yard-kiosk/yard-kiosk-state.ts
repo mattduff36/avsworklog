@@ -13,6 +13,7 @@ export interface YardKioskState {
   phase: YardKioskPhase;
   direction: YardKioskDirection | null;
   counterpart: YardKioskLocation | null;
+  unallocatedDetails: string | null;
   stock: YardKioskStockItem[];
   basket: YardKioskBasketLine[];
   searchQuery: string;
@@ -33,6 +34,7 @@ export const INITIAL_YARD_KIOSK_STATE: YardKioskState = {
   phase: 'mode',
   direction: null,
   counterpart: null,
+  unallocatedDetails: null,
   stock: [],
   basket: [],
   searchQuery: '',
@@ -46,6 +48,7 @@ export const INITIAL_YARD_KIOSK_STATE: YardKioskState = {
 export type YardKioskAction =
   | { type: 'SELECT_DIRECTION'; direction: YardKioskDirection }
   | { type: 'SELECT_LOCATION'; location: YardKioskLocation }
+  | { type: 'SELECT_UNALLOCATED_LOCATION'; details: string }
   | { type: 'STOCK_LOADED'; stock: YardKioskStockItem[] }
   | { type: 'STOCK_FAILED'; message: string; userError?: YardKioskUserError }
   | { type: 'SET_SEARCH'; query: string }
@@ -83,6 +86,21 @@ export function yardKioskReducer(
         ...state,
         phase: 'items',
         counterpart: action.location,
+        unallocatedDetails: null,
+        stock: [],
+        basket: [],
+        searchQuery: '',
+        category: 'all',
+        loadingStock: true,
+        error: null,
+        userError: null,
+      };
+    case 'SELECT_UNALLOCATED_LOCATION':
+      return {
+        ...state,
+        phase: 'items',
+        counterpart: null,
+        unallocatedDetails: action.details,
         stock: [],
         basket: [],
         searchQuery: '',
@@ -241,7 +259,7 @@ export function getYardKioskGuidance(state: YardKioskState): YardKioskGuidance {
     return direction === 'take'
       ? {
           instructionKey: 'location:take',
-          message: 'Select the destination location',
+          message: 'Select the destination, or type the location details',
           stepLabel: 'Choose destination',
         }
       : {

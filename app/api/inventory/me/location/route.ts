@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
-import { canShareInventoryPrimaryLocation } from '@/app/(dashboard)/inventory/utils';
+import {
+  canShareInventoryPrimaryLocation,
+  isInventoryTransferLocation,
+} from '@/app/(dashboard)/inventory/utils';
 import {
   clearUserInventoryLocationWithFleetAssignment,
   getCurrentFleetAssignmentSummary,
@@ -23,7 +26,7 @@ interface ExistingUserLocationRow {
 interface InventoryLocationRow {
   id: string;
   name: string;
-  location_type: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual';
+  location_type: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual' | 'transfer';
   is_active: boolean | null;
   linked_van_id: string | null;
   linked_hgv_id: string | null;
@@ -111,6 +114,12 @@ export async function PATCH(request: NextRequest) {
     if (typedLocation.location_type === 'site') {
       return NextResponse.json(
         { error: 'Site locations can only be assigned as secondary locations by a supervisor or higher' },
+        { status: 400 }
+      );
+    }
+    if (isInventoryTransferLocation(typedLocation)) {
+      return NextResponse.json(
+        { error: 'In transfer cannot be assigned as a user location' },
         { status: 400 }
       );
     }

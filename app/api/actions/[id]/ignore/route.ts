@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
     if (!canIgnoreReminderAction(action.workflow_key)) {
       return NextResponse.json(
-        { error: 'This action cannot be ignored while its 48-hour address deadline is open.' },
+        { error: 'This action cannot be ignored.' },
         { status: 400 },
       );
     }
@@ -137,6 +137,22 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
     const { id } = await context.params;
     const nowIso = new Date().toISOString();
     const admin = createAdminClient();
+
+    const { data: action, error: actionError } = await admin
+      .from('reminder_actions')
+      .select('id, workflow_key')
+      .eq('id', id)
+      .maybeSingle();
+    if (actionError) throw actionError;
+    if (!action) {
+      return NextResponse.json({ error: 'Action not found' }, { status: 404 });
+    }
+    if (!canIgnoreReminderAction(action.workflow_key)) {
+      return NextResponse.json(
+        { error: 'Yard transfer actions are allocated, not ignored' },
+        { status: 400 },
+      );
+    }
 
     const { data, error } = await admin
       .from('reminder_actions')

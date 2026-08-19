@@ -34,6 +34,7 @@ interface InventoryLocationSelectProps {
   disabled?: boolean;
   extraOptions?: InventoryLocationSelectExtraOption[];
   serverSearch?: boolean;
+  searchEndpoint?: string;
   locationFilter?: (location: InventoryLocation) => boolean;
   allowLegacyQuoteOptIn?: boolean;
   includeLegacyQuotes?: boolean;
@@ -104,6 +105,7 @@ export function InventoryLocationSelect({
   disabled = false,
   extraOptions = [],
   serverSearch = false,
+  searchEndpoint = '/api/inventory/locations',
   locationFilter,
   allowLegacyQuoteOptIn = true,
   includeLegacyQuotes: controlledIncludeLegacyQuotes,
@@ -232,7 +234,7 @@ export function InventoryLocationSelect({
     void (async () => {
       try {
         const response = await fetch(
-          `/api/inventory/locations?id=${encodeURIComponent(value)}`,
+          `${searchEndpoint}?id=${encodeURIComponent(value)}`,
           { cache: 'no-store', signal: controller.signal },
         );
         const payload = await response.json();
@@ -247,7 +249,7 @@ export function InventoryLocationSelect({
     })();
 
     return () => controller.abort();
-  }, [locations, searchResults, serverSearch, value]);
+  }, [locations, searchEndpoint, searchResults, serverSearch, value]);
 
   useEffect(() => {
     if (!serverSearch || !open || normalizedSearchQuery.length < MINIMUM_SERVER_SEARCH_CHARACTERS) {
@@ -269,7 +271,7 @@ export function InventoryLocationSelect({
         });
         if (includeLegacyQuotes) params.set('includeLegacyQuotes', 'true');
         const response = await fetch(
-          `/api/inventory/locations?${params}`,
+          `${searchEndpoint}?${params}`,
           { cache: 'no-store', signal: controller.signal },
         );
         const payload = await response.json();
@@ -288,7 +290,7 @@ export function InventoryLocationSelect({
       window.clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [includeLegacyQuotes, normalizedSearchQuery, open, serverSearch]);
+  }, [includeLegacyQuotes, normalizedSearchQuery, open, searchEndpoint, serverSearch]);
 
   const options = useMemo<InventoryLocationSelectOption[]>(() => {
     const mergeLocations = (

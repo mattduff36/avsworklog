@@ -3397,6 +3397,14 @@ export type Database = {
           note: string | null
           created_by: string
           created_at: string
+          location_details: string | null
+          reminder_action_id: string | null
+          allocation_status: 'pending' | 'allocated'
+          allocated_location_id: string | null
+          allocation_movement_batch_id: string | null
+          allocation_hardware_batch_id: string | null
+          allocated_by: string | null
+          allocated_at: string | null
         }
         Insert: {
           id?: string
@@ -3408,6 +3416,14 @@ export type Database = {
           note?: string | null
           created_by: string
           created_at?: string
+          location_details?: string | null
+          reminder_action_id?: string | null
+          allocation_status?: 'pending' | 'allocated'
+          allocated_location_id?: string | null
+          allocation_movement_batch_id?: string | null
+          allocation_hardware_batch_id?: string | null
+          allocated_by?: string | null
+          allocated_at?: string | null
         }
         Update: {
           id?: string
@@ -3419,6 +3435,14 @@ export type Database = {
           note?: string | null
           created_by?: string
           created_at?: string
+          location_details?: string | null
+          reminder_action_id?: string | null
+          allocation_status?: 'pending' | 'allocated'
+          allocated_location_id?: string | null
+          allocation_movement_batch_id?: string | null
+          allocation_hardware_batch_id?: string | null
+          allocated_by?: string | null
+          allocated_at?: string | null
         }
         Relationships: [
           {
@@ -3706,7 +3730,7 @@ export type Database = {
       inventory_item_movement_batches: {
         Row: {
           id: string
-          move_scope: 'single' | 'bulk' | 'group' | 'claim'
+          move_scope: 'single' | 'bulk' | 'group' | 'claim' | 'kiosk' | 'kiosk_allocate'
           group_id: string | null
           destination_location_id: string
           note: string | null
@@ -3715,7 +3739,7 @@ export type Database = {
         }
         Insert: {
           id?: string
-          move_scope?: 'single' | 'bulk' | 'group' | 'claim'
+          move_scope?: 'single' | 'bulk' | 'group' | 'claim' | 'kiosk' | 'kiosk_allocate'
           group_id?: string | null
           destination_location_id: string
           note?: string | null
@@ -3724,7 +3748,7 @@ export type Database = {
         }
         Update: {
           id?: string
-          move_scope?: 'single' | 'bulk' | 'group' | 'claim'
+          move_scope?: 'single' | 'bulk' | 'group' | 'claim' | 'kiosk' | 'kiosk_allocate'
           group_id?: string | null
           destination_location_id?: string
           note?: string | null
@@ -3993,7 +4017,7 @@ export type Database = {
           linked_van_id: string | null
           linked_hgv_id: string | null
           linked_plant_id: string | null
-          location_type: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual'
+          location_type: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual' | 'transfer'
           source_type: 'system' | 'fleet' | 'quote' | 'project_number' | 'legacy_quote' | 'manual' | null
           source_id: string | null
           external_reference: string | null
@@ -4012,7 +4036,7 @@ export type Database = {
           linked_van_id?: string | null
           linked_hgv_id?: string | null
           linked_plant_id?: string | null
-          location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual'
+          location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual' | 'transfer'
           source_type?: 'system' | 'fleet' | 'quote' | 'project_number' | 'legacy_quote' | 'manual' | null
           source_id?: string | null
           external_reference?: string | null
@@ -4031,7 +4055,7 @@ export type Database = {
           linked_van_id?: string | null
           linked_hgv_id?: string | null
           linked_plant_id?: string | null
-          location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual'
+          location_type?: 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual' | 'transfer'
           source_type?: 'system' | 'fleet' | 'quote' | 'project_number' | 'legacy_quote' | 'manual' | null
           source_id?: string | null
           external_reference?: string | null
@@ -11174,6 +11198,38 @@ export type Database = {
           hardware_line_count: number
         }[]
       }
+      inventory_kiosk_execute_unallocated_take: {
+        Args: {
+          p_actor: string
+          p_serialized_item_ids: string[]
+          p_hardware_lines: Json
+          p_location_details: string
+          p_note: string | null
+        }
+        Returns: {
+          kiosk_batch_id: string
+          movement_batch_id: string | null
+          hardware_batch_id: string | null
+          reminder_action_id: string
+          serialized_count: number
+          hardware_line_count: number
+        }[]
+      }
+      inventory_allocate_unallocated_kiosk_take: {
+        Args: {
+          p_actor: string
+          p_action_id: string
+          p_destination_location_id: string | null
+          p_new_location: Json | null
+        }
+        Returns: {
+          kiosk_batch_id: string
+          allocated_location_id: string
+          allocation_movement_batch_id: string | null
+          allocation_hardware_batch_id: string | null
+          created_location: boolean
+        }[]
+      }
       inventory_search_locations: {
         Args: {
           p_search?: string
@@ -11293,7 +11349,7 @@ export type Database = {
       check__inspection_items__status: 'ok' | 'attention' | 'defect' | 'na'
       check__inspection_orphan_children_archive__child_table: 'inspection_items' | 'inspection_photos'
       check__inventory_item_groups__status: 'active' | 'inactive'
-      check__inventory_item_movement_batches__move_scope: 'single' | 'bulk' | 'group' | 'claim' | 'kiosk'
+      check__inventory_item_movement_batches__move_scope: 'single' | 'bulk' | 'group' | 'claim' | 'kiosk' | 'kiosk_allocate'
       check__inventory_items__status: 'active' | 'retired'
       check__inventory_kiosk_pairing_sessions__status: 'active' | 'confirmed' | 'consumed' | 'cancelled' | 'expired'
       check__inventory_location_requests__status: 'pending' | 'approved' | 'rejected' | 'duplicate'

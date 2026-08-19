@@ -102,6 +102,26 @@ describe('Yard kiosk remote recovery', () => {
       type: 'select_location',
       location_id: '22222222-2222-4222-8222-222222222222',
     });
+    expect(validateYardKioskWorkflowSnapshot({
+      ...snapshot,
+      schema_version: 2,
+      location_ui: {
+        ...snapshot.location_ui,
+        unallocated_details: 'Job van',
+        unallocated_entry_open: true,
+      },
+    }).schema_version).toBe(2);
+    expect(validateYardKioskControlAction({ type: 'select_unallocated_location' }))
+      .toEqual({ type: 'select_unallocated_location' });
+    expect(validateYardKioskControlAction({
+      type: 'set_unallocated_details',
+      details: 'Job van',
+    })).toEqual({
+      type: 'set_unallocated_details',
+      details: 'Job van',
+    });
+    expect(validateYardKioskControlAction({ type: 'confirm_unallocated_details' }))
+      .toEqual({ type: 'confirm_unallocated_details' });
     expect(() => validateYardKioskControlAction({
       type: 'set_hardware_quantity',
       item_id: 'not-a-uuid',

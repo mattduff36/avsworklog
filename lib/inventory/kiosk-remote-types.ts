@@ -39,6 +39,9 @@ export interface YardKioskRemoteCommandView {
 export type YardKioskControlAction =
   | { type: 'select_direction'; direction: 'take' | 'return' }
   | { type: 'select_location'; location_id: string }
+  | { type: 'select_unallocated_location' }
+  | { type: 'set_unallocated_details'; details: string }
+  | { type: 'confirm_unallocated_details' }
   | { type: 'set_location_search'; query: string }
   | { type: 'set_location_filter'; filter: 'all' | 'manual' | 'vans' | 'sites' }
   | { type: 'set_location_page'; page_index: number }
@@ -66,6 +69,8 @@ export interface YardKioskLocationUiState {
   include_legacy_quotes: boolean;
   recent_ids: string[];
   pinned_ids: string[];
+  unallocated_details: string;
+  unallocated_entry_open: boolean;
 }
 
 export interface YardKioskItemUiState {
@@ -75,7 +80,7 @@ export interface YardKioskItemUiState {
 }
 
 export interface YardKioskWorkflowSnapshot {
-  schema_version: 1;
+  schema_version: 1 | 2;
   revision: number;
   state: Record<string, unknown>;
   bootstrap: YardKioskBootstrapResponse;

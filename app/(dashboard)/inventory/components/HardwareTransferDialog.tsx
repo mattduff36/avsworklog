@@ -29,6 +29,7 @@ import type {
 } from '../types';
 import {
   formatInventoryLocationContextLabel,
+  isInventoryTransferLocation,
   isLegacyQuoteInventoryLocation,
 } from '../utils';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
@@ -79,10 +80,13 @@ export function HardwareTransferDialog({
   );
   const discoverableActiveLocations = useMemo(
     () => activeLocations.filter((location) => (
-      includeLegacyQuotes
-      || !isLegacyQuoteInventoryLocation(location)
-      || location.id === fromLocationId
-      || location.id === toLocationId
+      !isInventoryTransferLocation(location)
+      && (
+        includeLegacyQuotes
+        || !isLegacyQuoteInventoryLocation(location)
+        || location.id === fromLocationId
+        || location.id === toLocationId
+      )
     )),
     [activeLocations, fromLocationId, includeLegacyQuotes, toLocationId],
   );
@@ -318,6 +322,7 @@ export function HardwareTransferDialog({
                 serverSearch={sourceIsResponsible}
                 locationFilter={(location) => (
                   location.id !== fromLocationId
+                  && location.location_type !== 'transfer'
                   && (sourceIsResponsible || responsibleIds.has(location.id))
                 )}
                 allowLegacyQuoteOptIn={false}

@@ -90,6 +90,8 @@ export function getHardwareDatabaseErrorMessage(error: unknown): string {
     'Both Hardware transfer locations must be active',
     'Hardware transfer locations must be different',
     'Duplicate Hardware',
+    'In transfer stock can only be allocated from Actions',
+    'Hardware at In transfer can only be moved by Yard allocation',
   ];
   return knownMessages.find((knownMessage) => message.includes(knownMessage))
     || 'Unable to update Hardware stock';

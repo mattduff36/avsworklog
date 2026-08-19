@@ -6,12 +6,13 @@ import {
   requiresInventoryMoveCheckWarning,
 } from '@/app/(dashboard)/inventory/utils';
 import type { InventoryLocation } from '@/app/(dashboard)/inventory/types';
-import type {
-  YardKioskBootstrapResponse,
-  YardKioskDirection,
-  YardKioskReceipt,
-  YardKioskStockItem,
-  YardKioskSubmitPayload,
+import {
+  YARD_KIOSK_UNALLOCATED_DETAILS_MAX,
+  type YardKioskBootstrapResponse,
+  type YardKioskDirection,
+  type YardKioskReceipt,
+  type YardKioskStockItem,
+  type YardKioskSubmitPayload,
 } from '@/lib/inventory/kiosk-types';
 import {
   INVENTORY_CHECK_WARNING_REQUIRED,
@@ -186,6 +187,7 @@ async function loadKioskLocations(
     if (!includeLegacyQuotes) {
       query = query.neq('source_type', 'legacy_quote');
     }
+    query = query.not('location_type', 'in', '(unknown,transfer)');
     const { data, error } = await query
       .order('location_type', { ascending: true })
       .order('name', { ascending: true })
@@ -356,7 +358,7 @@ async function resolveCounterpart(
     .select('id, name, description, location_type, source_type, external_reference, is_active')
     .eq('id', counterpartId)
     .eq('is_active', true)
-    .neq('location_type', 'yard')
+    .not('location_type', 'in', '(yard,unknown,transfer)')
     .single();
 
   if (error || !data) {
@@ -369,16 +371,29 @@ export async function getYardKioskStock(
   access: InventoryKioskAccessResult,
   direction: YardKioskDirection,
   counterpartId: string,
+  options?: { unallocated?: boolean },
 ): Promise<{ source_location_id: string; items: YardKioskStockItem[] }> {
   assertKioskAccess(access);
   if (direction !== 'take' && direction !== 'return') {
     throw new InventoryKioskError('Direction must be take or return', 400);
   }
+  if (options?.unallocated && direction !== 'take') {
+    throw new InventoryKioskError('Typed location details are only available when collecting from Yard', 400);
+  }
+  if (options?.unallocated && counterpartId) {
+    throw new InventoryKioskError('Typed location takes cannot include a counterpart location', 400);
+  }
 
   const admin = createAdminClient();
-  const counterpart = await resolveCounterpart(admin, access.yard.id, counterpartId);
-  const source = direction === 'take' ? access.yard : counterpart;
-  const destination = direction === 'take' ? counterpart : access.yard;
+  const counterpart = options?.unallocated
+    ? null
+    : await resolveCounterpart(admin, access.yard.id, counterpartId);
+  const source = direction === 'take' ? access.yard : counterpart!;
+  const destination = options?.unallocated
+    ? { ...access.yard, id: 'unallocated', name: 'Typed location', location_type: 'manual' as const }
+    : direction === 'take'
+      ? counterpart!
+      : access.yard;
 
   const [{ data: serialized, error: serializedError }, { data: hardware, error: hardwareError }] = await Promise.all([
     admin
@@ -441,11 +456,34 @@ export function validateYardKioskSubmitPayload(input: unknown): YardKioskSubmitP
     throw new InventoryKioskError('Invalid Yard kiosk basket', 400);
   }
 
-  const payload = input as Partial<YardKioskSubmitPayload>;
+  const payload = input as Partial<YardKioskSubmitPayload> & {
+    unallocated_location_details?: unknown;
+    counterpart_location_id?: unknown;
+  };
   if (payload.direction !== 'take' && payload.direction !== 'return') {
     throw new InventoryKioskError('Direction must be take or return', 400);
   }
-  if (!isUuid(payload.counterpart_location_id)) {
+
+  const unallocatedDetails = typeof payload.unallocated_location_details === 'string'
+    ? payload.unallocated_location_details.trim()
+    : '';
+  const hasUnallocatedDetails = unallocatedDetails.length > 0;
+  const hasCounterpart = typeof payload.counterpart_location_id === 'string'
+    && payload.counterpart_location_id.length > 0;
+
+  if (hasUnallocatedDetails && hasCounterpart) {
+    throw new InventoryKioskError('Choose a location or type the details, not both', 400);
+  }
+  if (hasUnallocatedDetails && payload.direction !== 'take') {
+    throw new InventoryKioskError('Typed location details are only available when collecting from Yard', 400);
+  }
+  if (hasUnallocatedDetails && (
+    unallocatedDetails.length < 1
+    || unallocatedDetails.length > YARD_KIOSK_UNALLOCATED_DETAILS_MAX
+  )) {
+    throw new InventoryKioskError('Enter location details in 500 characters or fewer', 400);
+  }
+  if (!hasUnallocatedDetails && !isUuid(payload.counterpart_location_id)) {
     throw new InventoryKioskError('Choose a valid counterpart location', 400);
   }
 
@@ -505,9 +543,25 @@ export function validateYardKioskSubmitPayload(input: unknown): YardKioskSubmitP
     };
   }
 
+  if (hasUnallocatedDetails) {
+    return {
+      direction: 'take',
+      unallocated_location_details: unallocatedDetails,
+      serialized_item_ids: serializedIds,
+      hardware_lines: hardwareLines.map((line) => ({
+        item_id: line.item_id,
+        quantity: line.quantity,
+      })),
+      ...(note ? { note } : {}),
+      ...(checkWarningConfirmation
+        ? { check_warning_confirmation: checkWarningConfirmation }
+        : {}),
+    };
+  }
+
   return {
     direction: payload.direction,
-    counterpart_location_id: payload.counterpart_location_id,
+    counterpart_location_id: payload.counterpart_location_id as string,
     serialized_item_ids: serializedIds,
     hardware_lines: hardwareLines.map((line) => ({
       item_id: line.item_id,
@@ -523,10 +577,15 @@ export function validateYardKioskSubmitPayload(input: unknown): YardKioskSubmitP
 async function getCheckWarningItems(
   admin: InventoryAdminClient,
   yard: KioskLocationRow,
-  counterpart: KioskLocationRow,
+  counterpart: Pick<KioskLocationRow, 'id' | 'name' | 'location_type'> | null,
   payload: YardKioskSubmitPayload,
 ): Promise<InventoryMoveCheckWarningItem[]> {
   if (payload.direction !== 'take' || payload.serialized_item_ids.length === 0) return [];
+  const destination = counterpart || {
+    id: 'unallocated',
+    name: 'Typed location',
+    location_type: 'manual' as const,
+  };
 
   const { data, error } = await admin
     .from('inventory_items')
@@ -539,7 +598,10 @@ async function getCheckWarningItems(
 
   return ((data || []) as KioskSerializedRow[]).flatMap((item) => {
     const statusItem = { ...item, location: toKioskLocation(yard) };
-    if (!requiresInventoryMoveCheckWarning(statusItem, toKioskLocation(counterpart))) return [];
+    if (!requiresInventoryMoveCheckWarning(statusItem, {
+      name: destination.name,
+      location_type: destination.location_type,
+    })) return [];
     return [{
       id: item.id,
       item_number: item.item_number,
@@ -556,11 +618,14 @@ export async function submitYardKioskBasket(
   assertKioskAccess(access);
   const payload = validateYardKioskSubmitPayload(input);
   const admin = createAdminClient();
-  const counterpart = await resolveCounterpart(
-    admin,
-    access.yard.id,
-    payload.counterpart_location_id,
-  );
+  const isUnallocated = 'unallocated_location_details' in payload;
+  const counterpart = isUnallocated
+    ? null
+    : await resolveCounterpart(
+      admin,
+      access.yard.id,
+      payload.counterpart_location_id,
+    );
   const warningItems = await getCheckWarningItems(admin, access.yard, counterpart, payload);
   const moveItemIds = Array.from(new Set([
     ...payload.serialized_item_ids,
@@ -599,14 +664,22 @@ export async function submitYardKioskBasket(
     }
   }
 
-  const { data, error } = await admin.rpc('inventory_kiosk_execute_transfer_basket', {
-    p_actor: access.userId,
-    p_direction: payload.direction,
-    p_counterpart_location_id: payload.counterpart_location_id,
-    p_serialized_item_ids: payload.serialized_item_ids,
-    p_hardware_lines: payload.hardware_lines as unknown as Json,
-    p_note: payload.note || null,
-  });
+  const { data, error } = isUnallocated
+    ? await admin.rpc('inventory_kiosk_execute_unallocated_take', {
+      p_actor: access.userId,
+      p_serialized_item_ids: payload.serialized_item_ids,
+      p_hardware_lines: payload.hardware_lines as unknown as Json,
+      p_location_details: payload.unallocated_location_details,
+      p_note: payload.note || null,
+    })
+    : await admin.rpc('inventory_kiosk_execute_transfer_basket', {
+      p_actor: access.userId,
+      p_direction: payload.direction,
+      p_counterpart_location_id: payload.counterpart_location_id,
+      p_serialized_item_ids: payload.serialized_item_ids,
+      p_hardware_lines: payload.hardware_lines as unknown as Json,
+      p_note: payload.note || null,
+    });
 
   if (error) {
     if (error.message?.includes('Yard kiosk access denied')) {
@@ -631,7 +704,7 @@ export async function submitYardKioskBasket(
       actor: access.userId,
       surface: 'yard-kiosk',
       warning_item_ids: warningItems.map((item) => item.id),
-      destination_location_id: counterpart.id,
+      destination_location_id: counterpart?.id || 'unallocated',
       movement_batch_id: row.movement_batch_id,
       kiosk_batch_id: row.kiosk_batch_id,
     });

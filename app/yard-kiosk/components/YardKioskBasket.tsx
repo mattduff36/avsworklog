@@ -12,13 +12,12 @@ import {
 import type {
   YardKioskBasketLine,
   YardKioskDirection,
-  YardKioskLocation,
 } from '@/lib/inventory/kiosk-types';
 import { getBasketSummary } from '../yard-kiosk-state';
 
 interface YardKioskBasketProps {
   direction: YardKioskDirection;
-  counterpart: YardKioskLocation;
+  destinationLabel: string;
   basket: YardKioskBasketLine[];
   offline: boolean;
   submitting: boolean;
@@ -29,7 +28,7 @@ interface YardKioskBasketProps {
 
 export function YardKioskBasket({
   direction,
-  counterpart,
+  destinationLabel,
   basket,
   offline,
   submitting,
@@ -53,7 +52,7 @@ export function YardKioskBasket({
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
               {direction === 'take' ? 'Collecting for' : 'Returning from'}
             </p>
-            <h2 className="truncate text-xl font-black text-white">{counterpart.name}</h2>
+            <h2 className="truncate text-xl font-black text-white">{destinationLabel}</h2>
           </div>
         </div>
       </div>

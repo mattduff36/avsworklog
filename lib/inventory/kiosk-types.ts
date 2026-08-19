@@ -86,9 +86,9 @@ export type YardKioskBasketLine =
   | YardKioskSerializedBasketLine
   | YardKioskHardwareBasketLine;
 
-export interface YardKioskSubmitPayload {
-  direction: YardKioskDirection;
-  counterpart_location_id: string;
+export const YARD_KIOSK_UNALLOCATED_DETAILS_MAX = 500;
+
+interface YardKioskSubmitBase {
   serialized_item_ids: string[];
   hardware_lines: Array<{
     item_id: string;
@@ -98,10 +98,27 @@ export interface YardKioskSubmitPayload {
   check_warning_confirmation?: InventoryMoveCheckConfirmation;
 }
 
+export interface YardKioskAllocatedSubmitPayload extends YardKioskSubmitBase {
+  direction: YardKioskDirection;
+  counterpart_location_id: string;
+  unallocated_location_details?: never;
+}
+
+export interface YardKioskUnallocatedSubmitPayload extends YardKioskSubmitBase {
+  direction: 'take';
+  counterpart_location_id?: never;
+  unallocated_location_details: string;
+}
+
+export type YardKioskSubmitPayload =
+  | YardKioskAllocatedSubmitPayload
+  | YardKioskUnallocatedSubmitPayload;
+
 export interface YardKioskReceipt {
   kiosk_batch_id: string;
   movement_batch_id: string | null;
   hardware_batch_id: string | null;
+  reminder_action_id?: string | null;
   serialized_count: number;
   hardware_line_count: number;
 }

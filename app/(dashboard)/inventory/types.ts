@@ -10,7 +10,7 @@ export type InventoryCheckStatus = 'ok' | 'due_soon' | 'overdue' | 'needs_check'
 
 export type FleetAssetLinkType = 'van' | 'hgv' | 'plant';
 
-export type InventoryLocationType = 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual';
+export type InventoryLocationType = 'yard' | 'unknown' | 'van' | 'hgv' | 'plant' | 'site' | 'manual' | 'transfer';
 
 export type InventoryLocationSourceType = 'system' | 'fleet' | 'quote' | 'project_number' | 'legacy_quote' | 'manual';
 

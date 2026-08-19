@@ -11,10 +11,12 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import {
   FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
   getReminderOverviewTab,
+  INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY,
   isValidReminderOverviewTabId,
   PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY,
   REMINDER_OVERVIEW_TABS,
 } from '@/lib/config/reminder-workflows';
+import { YardTransfersPanel } from './components/YardTransfersPanel';
 import {
   buildActionsSummaryStats,
   EMPTY_ACTIONS_SUMMARY,
@@ -105,7 +107,7 @@ function ActionsContent() {
     }
 
     try {
-      const [fleetResponse, legacyResponse] = await Promise.all([
+      const [fleetResponse, legacyResponse, yardResponse] = await Promise.all([
         fetch(`/api/actions?${new URLSearchParams({
           status: 'open',
           workflow: FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
@@ -115,10 +117,15 @@ function ActionsContent() {
           status: 'open',
           workflow: PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY,
         }).toString()}`, { cache: 'no-store' }),
+        fetch(`/api/actions?${new URLSearchParams({
+          status: 'open',
+          workflow: INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY,
+        }).toString()}`, { cache: 'no-store' }),
       ]);
-      const [fleetPayload, legacyPayload] = await Promise.all([
+      const [fleetPayload, legacyPayload, yardPayload] = await Promise.all([
         fleetResponse.json(),
         legacyResponse.json(),
+        yardResponse.json(),
       ]);
       if (!fleetResponse.ok) {
         throw new Error(fleetPayload.error || 'Failed to load actions summary');
@@ -126,10 +133,14 @@ function ActionsContent() {
       if (!legacyResponse.ok) {
         throw new Error(legacyPayload.error || 'Failed to load actions summary');
       }
+      if (!yardResponse.ok) {
+        throw new Error(yardPayload.error || 'Failed to load actions summary');
+      }
 
       setSummary(buildActionsSummaryStats([
         ...((fleetPayload.actions || []) as ReminderActionWithAsset[]),
         ...((legacyPayload.actions || []) as ReminderActionWithAsset[]),
+        ...((yardPayload.actions || []) as ReminderActionWithAsset[]),
       ]));
     } catch (error) {
       console.error(error);
@@ -173,6 +184,15 @@ function ActionsContent() {
     }
 
     if (!activeOverviewTab) return null;
+
+    if (activeOverviewTab.workflowKey === INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY) {
+      return (
+        <YardTransfersPanel
+          refreshToken={refreshToken}
+          onActionsChanged={handleActionsChanged}
+        />
+      );
+    }
 
     return (
       <ActionsOverviewPanel

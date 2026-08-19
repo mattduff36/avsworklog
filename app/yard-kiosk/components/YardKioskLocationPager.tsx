@@ -10,7 +10,11 @@ import {
   Truck,
   Warehouse,
 } from 'lucide-react';
-import type { YardKioskDirection, YardKioskLocation } from '@/lib/inventory/kiosk-types';
+import {
+  YARD_KIOSK_UNALLOCATED_DETAILS_MAX,
+  type YardKioskDirection,
+  type YardKioskLocation,
+} from '@/lib/inventory/kiosk-types';
 import type { YardKioskLocationUiState } from '@/lib/inventory/kiosk-remote-types';
 import { cn } from '@/lib/utils';
 import { getInventoryLocationTypePresentation } from '@/app/(dashboard)/inventory/utils';
@@ -49,6 +53,7 @@ interface YardKioskLocationPagerProps {
   uiState: YardKioskLocationUiState;
   onUiStateChange: (state: YardKioskLocationUiState) => void;
   onSelect: (location: YardKioskLocation) => void;
+  onSelectUnallocated?: (details: string) => void;
   onIncludeLegacyQuotesChange: (includeLegacyQuotes: boolean) => Promise<void>;
   persistPreferences?: boolean;
 }
@@ -91,6 +96,7 @@ export function YardKioskLocationPager({
   uiState,
   onUiStateChange,
   onSelect,
+  onSelectUnallocated,
   onIncludeLegacyQuotesChange,
   persistPreferences = true,
 }: YardKioskLocationPagerProps) {
@@ -103,6 +109,8 @@ export function YardKioskLocationPager({
     include_legacy_quotes: includeLegacyQuotes,
     recent_ids: recentIds,
     pinned_ids: pinnedIds,
+    unallocated_details: unallocatedDetails = '',
+    unallocated_entry_open: unallocatedEntryOpen = false,
   } = uiState;
 
   useEffect(() => {
@@ -264,6 +272,22 @@ export function YardKioskLocationPager({
           </h2>
         </div>
         <div className="flex flex-none flex-row flex-nowrap items-center gap-2">
+          {direction === 'take' && onSelectUnallocated ? (
+            <button
+              type="button"
+              onClick={() => onUiStateChange({
+                ...uiState,
+                unallocated_entry_open: !unallocatedEntryOpen,
+              })}
+              className={`${YARD_KIOSK_INLINE_CONTROL_HEIGHT} ${YARD_KIOSK_INLINE_CONTROL_RADIUS} border px-4 text-sm font-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 ${
+                unallocatedEntryOpen
+                  ? 'border-amber-300 bg-amber-300 text-slate-950'
+                  : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'
+              }`}
+            >
+              Type location details
+            </button>
+          ) : null}
           <LegacyQuoteLocationOptIn
             enabled={includeLegacyQuotes}
             onEnabledChange={(enabled) => { void handleIncludeLegacyQuotesChange(enabled); }}
@@ -287,6 +311,37 @@ export function YardKioskLocationPager({
         </div>
       </div>
 
+      {direction === 'take' && onSelectUnallocated && unallocatedEntryOpen ? (
+        <div className="grid min-h-0 grid-rows-[1fr_auto] gap-3">
+          <label className="grid min-h-0">
+            <span className="sr-only">Location details</span>
+            <textarea
+              value={unallocatedDetails}
+              onChange={(event) => onUiStateChange({
+                ...uiState,
+                unallocated_details: event.target.value.slice(0, YARD_KIOSK_UNALLOCATED_DETAILS_MAX),
+              })}
+              placeholder="Type the van, site, job or person these items are going to…"
+              maxLength={YARD_KIOSK_UNALLOCATED_DETAILS_MAX}
+              className="min-h-40 w-full resize-none rounded-3xl border border-white/10 bg-slate-900/80 p-5 text-lg text-white outline-none placeholder:text-slate-500 focus:border-amber-300/70 focus:ring-2 focus:ring-amber-300/20"
+            />
+          </label>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-bold text-slate-400">
+              {unallocatedDetails.trim().length}/{YARD_KIOSK_UNALLOCATED_DETAILS_MAX}
+            </p>
+            <button
+              type="button"
+              disabled={unallocatedDetails.trim().length < 1}
+              onClick={() => onSelectUnallocated(unallocatedDetails.trim())}
+              className="h-14 rounded-2xl bg-amber-300 px-6 text-lg font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-100"
+            >
+              Continue with these details
+            </button>
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="flex flex-nowrap items-center gap-3 max-[900px]:flex-wrap">
         <label className="relative min-w-0 flex-1 max-[900px]:w-full max-[900px]:flex-none">
           <Search className="pointer-events-none absolute left-5 top-1/2 h-6 w-6 -translate-y-1/2 text-slate-400" />
@@ -439,6 +494,8 @@ export function YardKioskLocationPager({
           />
         ))}
       </div>
+      </>
+      )}
     </section>
   );
 }

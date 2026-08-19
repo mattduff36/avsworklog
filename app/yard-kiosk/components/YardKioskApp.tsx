@@ -83,6 +83,8 @@ const INITIAL_LOCATION_UI_STATE: YardKioskLocationUiState = {
   include_legacy_quotes: false,
   recent_ids: [],
   pinned_ids: [],
+  unallocated_details: '',
+  unallocated_entry_open: false,
 };
 
 const INITIAL_ITEM_UI_STATE: YardKioskItemUiState = {
@@ -148,13 +150,16 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
 
   const loadStock = useCallback(async (
     direction: YardKioskDirection,
-    counterpart: YardKioskLocation,
+    counterpart: YardKioskLocation | null,
     expectedSessionId = workflowSessionIdRef.current,
+    unallocated = false,
   ) => {
     try {
       const params = new URLSearchParams({
         direction,
-        counterpart_location_id: counterpart.id,
+        ...(unallocated
+          ? { unallocated: 'true' }
+          : { counterpart_location_id: counterpart?.id || '' }),
       });
       const response = await fetch(`/api/inventory/kiosk/stock?${params}`, {
         cache: 'no-store',
@@ -221,6 +226,19 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     setPendingSubmitPayload(null);
     dispatch({ type: 'SELECT_LOCATION', location });
     void loadStock(state.direction, location, workflowSessionIdRef.current);
+  }
+
+  function handleUnallocatedLocation(details: string) {
+    if (!state.direction || state.direction !== 'take') return;
+    legacyLocationRequestIdRef.current += 1;
+    submissionGenerationRef.current += 1;
+    submittingRef.current = false;
+    setLocations(bootstrap.locations);
+    setItemUiState(INITIAL_ITEM_UI_STATE);
+    setCheckWarningPayload(null);
+    setPendingSubmitPayload(null);
+    dispatch({ type: 'SELECT_UNALLOCATED_LOCATION', details });
+    void loadStock(state.direction, null, workflowSessionIdRef.current, true);
   }
 
   async function handleLegacyQuoteLocationOptIn(includeLegacyQuotes: boolean) {
@@ -306,9 +324,17 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
         void logYardKioskHandledError(userError, { action: 'submit', httpStatus: response.status });
         if (
           response.status === 409
-          && state.counterpart?.id === requestPayload.counterpart_location_id
+          && (
+            ('unallocated_location_details' in requestPayload && Boolean(state.unallocatedDetails))
+            || state.counterpart?.id === requestPayload.counterpart_location_id
+          )
         ) {
-          void loadStock(requestPayload.direction, state.counterpart, expectedSessionId);
+          void loadStock(
+            requestPayload.direction,
+            state.counterpart,
+            expectedSessionId,
+            Boolean(state.unallocatedDetails),
+          );
         }
         return;
       }
@@ -339,14 +365,12 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   function handleSubmit() {
     if (
       !state.direction
-      || !state.counterpart
+      || (!state.counterpart && !state.unallocatedDetails)
       || state.basket.length === 0
       || state.phase === 'submitting'
     ) return;
 
-    void submitBasket({
-      direction: state.direction,
-      counterpart_location_id: state.counterpart.id,
+    const lines = {
       serialized_item_ids: state.basket.flatMap((line) => (
         line.kind === 'serialized' ? [line.item_id] : []
       )),
@@ -355,6 +379,22 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
           ? [{ item_id: line.item_id, quantity: line.quantity }]
           : []
       )),
+    };
+
+    if (state.unallocatedDetails) {
+      void submitBasket({
+        direction: 'take',
+        unallocated_location_details: state.unallocatedDetails,
+        ...lines,
+      });
+      return;
+    }
+
+    if (!state.counterpart) return;
+    void submitBasket({
+      direction: state.direction,
+      counterpart_location_id: state.counterpart.id,
+      ...lines,
     });
   }
 
@@ -437,7 +477,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
       snapshotRevisionRef.current + 1,
     );
     return {
-      schema_version: 1,
+      schema_version: 2,
       revision: snapshotRevisionRef.current,
       state: state as unknown as Record<string, unknown>,
       bootstrap,
@@ -476,11 +516,30 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
           setLocationUiState((current) => ({
             ...current,
             recent_ids: rememberYardKioskLocation(location.id),
+            unallocated_entry_open: false,
           }));
           handleLocation(location);
         }
         break;
       }
+      case 'select_unallocated_location':
+        setLocationUiState((current) => ({
+          ...current,
+          unallocated_entry_open: !current.unallocated_entry_open,
+        }));
+        break;
+      case 'set_unallocated_details':
+        setLocationUiState((current) => ({
+          ...current,
+          unallocated_details: action.details,
+          unallocated_entry_open: true,
+        }));
+        break;
+      case 'confirm_unallocated_details':
+        if (locationUiState.unallocated_details.trim()) {
+          handleUnallocatedLocation(locationUiState.unallocated_details.trim());
+        }
+        break;
       case 'set_location_search':
         setLocationUiState((current) => ({
           ...current,
@@ -610,8 +669,13 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     workflowSnapshot,
     onResetWorkflow: handleWorkflowReset,
     onReloadStock: () => {
-      if (state.direction && state.counterpart) {
-        void loadStock(state.direction, state.counterpart);
+      if (state.direction && (state.counterpart || state.unallocatedDetails)) {
+        void loadStock(
+          state.direction,
+          state.counterpart,
+          workflowSessionIdRef.current,
+          Boolean(state.unallocatedDetails),
+        );
       }
     },
     onControlAction: handleControlAction,
@@ -768,13 +832,14 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
             uiState={locationUiState}
             onUiStateChange={setLocationUiState}
             onSelect={handleLocation}
+            onSelectUnallocated={state.direction === 'take' ? handleUnallocatedLocation : undefined}
             onIncludeLegacyQuotesChange={handleLegacyQuoteLocationOptIn}
           />
         ) : null}
 
         {(state.phase === 'items' || state.phase === 'submitting')
           && state.direction
-          && state.counterpart ? (
+          && (state.counterpart || state.unallocatedDetails) ? (
           <div
             data-testid="yard-kiosk-items-layout"
             className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_21rem] gap-4 overflow-hidden p-4"
@@ -805,7 +870,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
             >
               <YardKioskBasket
                 direction={state.direction}
-                counterpart={state.counterpart}
+                destinationLabel={state.unallocatedDetails || state.counterpart?.name || ''}
                 basket={state.basket}
                 offline={offline}
                 submitting={state.phase === 'submitting'}
@@ -819,11 +884,12 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
 
         {state.phase === 'receipt'
           && state.direction
-          && state.counterpart
+          && (state.counterpart || state.unallocatedDetails)
           && state.receipt ? (
           <YardKioskReceiptView
             direction={state.direction}
-            counterpart={state.counterpart}
+            destinationLabel={state.unallocatedDetails || state.counterpart?.name || ''}
+            unallocated={Boolean(state.unallocatedDetails)}
             receipt={state.receipt}
             onReset={handleWorkflowReset}
           />
@@ -855,12 +921,17 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
                 ) : null}
               </div>
               {(state.loadingStock || state.userError?.retryable)
-                && state.counterpart
+                && (state.counterpart || state.unallocatedDetails)
                 && state.direction ? (
                 <button
                   type="button"
                   aria-label="Retry loading stock"
-                  onClick={() => void loadStock(state.direction!, state.counterpart!)}
+                  onClick={() => void loadStock(
+                    state.direction!,
+                    state.counterpart,
+                    workflowSessionIdRef.current,
+                    Boolean(state.unallocatedDetails),
+                  )}
                   className="grid h-11 w-11 place-items-center rounded-xl bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200"
                 >
                   <RefreshCw className="h-5 w-5" />

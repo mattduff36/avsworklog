@@ -85,6 +85,62 @@ describe('Inventory Yard kiosk validation', () => {
   ])('rejects $name before database mutation', ({ payload }) => {
     expect(() => validateYardKioskSubmitPayload(payload)).toThrow(InventoryKioskError);
   });
+
+  it('accepts a Collect typed-location basket without a counterpart', () => {
+    expect(validateYardKioskSubmitPayload({
+      direction: 'take',
+      unallocated_location_details: '  Van not listed  ',
+      serialized_item_ids: [serializedId],
+      hardware_lines: [],
+    })).toEqual({
+      direction: 'take',
+      unallocated_location_details: 'Van not listed',
+      serialized_item_ids: [serializedId],
+      hardware_lines: [],
+    });
+  });
+
+  it.each([
+    {
+      name: 'Return plus typed details',
+      payload: {
+        direction: 'return',
+        unallocated_location_details: 'Somewhere',
+        serialized_item_ids: [serializedId],
+        hardware_lines: [],
+      },
+    },
+    {
+      name: 'counterpart and typed details together',
+      payload: {
+        direction: 'take',
+        counterpart_location_id: counterpartId,
+        unallocated_location_details: 'Somewhere',
+        serialized_item_ids: [serializedId],
+        hardware_lines: [],
+      },
+    },
+    {
+      name: 'empty typed details',
+      payload: {
+        direction: 'take',
+        unallocated_location_details: '   ',
+        serialized_item_ids: [serializedId],
+        hardware_lines: [],
+      },
+    },
+    {
+      name: 'overlong typed details',
+      payload: {
+        direction: 'take',
+        unallocated_location_details: 'x'.repeat(501),
+        serialized_item_ids: [serializedId],
+        hardware_lines: [],
+      },
+    },
+  ])('rejects $name', ({ payload }) => {
+    expect(() => validateYardKioskSubmitPayload(payload)).toThrow(InventoryKioskError);
+  });
 });
 
 describe('Inventory Yard kiosk migration contract', () => {

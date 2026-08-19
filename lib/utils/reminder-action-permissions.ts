@@ -1,4 +1,7 @@
-import { PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY } from '@/lib/config/reminder-workflows';
+import {
+  INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY,
+  PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY,
+} from '@/lib/config/reminder-workflows';
 import type { ModuleName } from '@/types/roles';
 
 export function getReminderActionRequiredModule(assetType: string | null | undefined): ModuleName {
@@ -9,5 +12,6 @@ export function getReminderActionRequiredModule(assetType: string | null | undef
 }
 
 export function canIgnoreReminderAction(workflowKey: string | null | undefined): boolean {
-  return workflowKey !== PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY;
+  return workflowKey !== PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY
+    && workflowKey !== INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY;
 }

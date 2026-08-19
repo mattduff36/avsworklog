@@ -16,7 +16,8 @@ export async function GET(request: NextRequest) {
 
     const direction = request.nextUrl.searchParams.get('direction') as YardKioskDirection;
     const counterpartId = request.nextUrl.searchParams.get('counterpart_location_id') || '';
-    return NextResponse.json(await getYardKioskStock(access, direction, counterpartId));
+    const unallocated = request.nextUrl.searchParams.get('unallocated') === 'true';
+    return NextResponse.json(await getYardKioskStock(access, direction, counterpartId, { unallocated }));
   } catch (error) {
     if (error instanceof InventoryKioskError) {
       const response = toInventoryKioskErrorResponse(error);

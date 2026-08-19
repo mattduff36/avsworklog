@@ -365,7 +365,7 @@ export function normalizeExternalReference(reference: string | null | undefined)
 }
 
 export function isGeneratedInventoryLocation(location: Pick<InventoryLocationRow, 'location_type'>): boolean {
-  return ['van', 'hgv', 'plant', 'site', 'yard', 'unknown'].includes(location.location_type);
+  return ['van', 'hgv', 'plant', 'site', 'yard', 'unknown', 'transfer'].includes(location.location_type);
 }
 
 export function canManuallyRelinkInventoryLocation(location: Pick<InventoryLocationRow, 'location_type'>): boolean {

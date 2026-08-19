@@ -46,6 +46,8 @@ const snapshot = {
     include_legacy_quotes: false,
     recent_ids: [],
     pinned_ids: [],
+    unallocated_details: '',
+    unallocated_entry_open: false,
   },
   item_ui: {
     page_index: 0,

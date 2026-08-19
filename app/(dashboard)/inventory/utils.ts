@@ -33,6 +33,7 @@ export const CHECK_INTERVAL_DAYS = SMALL_TOOLS_CHECK_INTERVAL_DAYS;
 export const DUE_SOON_DAYS = 7;
 export const INVENTORY_UNKNOWN_LOCATION_NAME = 'Unknown';
 export const INVENTORY_YARD_LOCATION_NAME = 'Yard';
+export const INVENTORY_TRANSFER_LOCATION_NAME = 'In transfer';
 export const INVENTORY_WORKSHOP_TEAM_ID = 'workshop_yard';
 
 interface InventoryCheckScheduleItem {
@@ -104,6 +105,31 @@ export function isInventoryYardLocation(
   return isYardInventoryLocationName(location?.name);
 }
 
+export function isInventoryTransferLocationName(name: string | null | undefined): boolean {
+  return name?.trim().toLowerCase() === INVENTORY_TRANSFER_LOCATION_NAME.toLowerCase();
+}
+
+export function isInventoryTransferLocation(
+  location: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type'>> | null | undefined
+): boolean {
+  if (location?.location_type === 'transfer') return true;
+  return isInventoryTransferLocationName(location?.name);
+}
+
+export function isOperationalInventoryLocation(
+  location: Pick<InventoryLocation, 'name'> & Partial<Pick<InventoryLocation, 'location_type' | 'is_active'>> | null | undefined
+): boolean {
+  if (!location || location.is_active === false) return false;
+  if (
+    isInventoryYardLocation(location)
+    || isInventoryUnknownLocation(location)
+    || isInventoryTransferLocation(location)
+  ) {
+    return false;
+  }
+  return ['van', 'hgv', 'plant', 'site', 'manual'].includes(location.location_type || 'manual');
+}
+
 export function isLegacyQuoteInventoryLocation(
   location: Partial<Pick<InventoryLocation, 'source_type'>> | null | undefined
 ): boolean {
@@ -129,6 +155,7 @@ export function canSelectInventoryPrimaryLocation(
   context: InventoryPrimaryLocationSelectionContext
 ): boolean {
   if (location.is_active === false) return false;
+  if (isInventoryTransferLocation(location) || isInventoryUnknownLocation(location)) return false;
   if (location.location_type === 'site') return false;
   if (location.id === context.currentLocationId) return true;
   if (canShareInventoryPrimaryLocation(location, context)) return true;
@@ -349,6 +376,12 @@ const INVENTORY_LOCATION_TYPE_PRESENTATION = {
     badgeClassName: 'border-slate-500/40 bg-slate-700/30 text-slate-200',
     iconClassName: 'text-slate-400',
   },
+  transfer: {
+    surfaceClassName: 'border-amber-400/40 bg-amber-400/10 hover:bg-amber-400/18',
+    optionClassName: 'border-amber-400/35 bg-amber-400/10 hover:bg-amber-400/16 focus:bg-amber-400/16',
+    badgeClassName: 'border-amber-300/40 bg-amber-300/15 text-amber-100',
+    iconClassName: 'text-amber-200',
+  },
 } satisfies Record<InventoryLocationType, InventoryLocationTypePresentation>;
 
 export function getInventoryLocationTypePresentation(
@@ -378,6 +411,7 @@ function getInventoryLocationTypeLabel(location: Pick<InventoryLocation, 'locati
   if (location.location_type === 'hgv') return 'HGV';
   if (location.location_type === 'plant') return 'Plant';
   if (location.location_type === 'site') return 'Site';
+  if (location.location_type === 'transfer') return 'In transfer';
   return 'Manual';
 }
 

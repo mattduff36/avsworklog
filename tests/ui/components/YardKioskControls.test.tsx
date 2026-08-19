@@ -37,7 +37,7 @@ describe('Yard kiosk touch controls', () => {
     render(
       <YardKioskBasket
         direction="take"
-        counterpart={counterpart}
+        destinationLabel={counterpart.name}
         basket={[
           {
             kind: 'serialized',
@@ -74,7 +74,7 @@ describe('Yard kiosk touch controls', () => {
     render(
       <YardKioskBasket
         direction="return"
-        counterpart={counterpart}
+        destinationLabel={counterpart.name}
         basket={[{
           kind: 'serialized',
           item_id: '22222222-2222-4222-8222-222222222222',
@@ -101,7 +101,7 @@ describe('Yard kiosk touch controls', () => {
     render(
       <YardKioskBasket
         direction="take"
-        counterpart={counterpart}
+        destinationLabel={counterpart.name}
         basket={[{
           kind: 'serialized',
           item_id: '22222222-2222-4222-8222-222222222222',
@@ -135,6 +135,8 @@ describe('Yard kiosk touch controls', () => {
           include_legacy_quotes: false,
           recent_ids: [],
           pinned_ids: [],
+          unallocated_details: '',
+          unallocated_entry_open: false,
         }}
         onUiStateChange={vi.fn()}
         onSelect={vi.fn()}

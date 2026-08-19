@@ -1,4 +1,4 @@
-import { HardHat, MapPin, Truck } from 'lucide-react';
+import { HardHat, MapPin, Package, Truck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReminderAssetType } from '@/types/reminders';
 
@@ -6,6 +6,7 @@ export const FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY = 'fleet_inspection_overdue';
 export const VAN_DRAFT_SUBMISSION_WORKFLOW_KEY = 'van_draft_submission';
 export const TOOLBOX_TALK_MANUAL_REMINDER_WORKFLOW_KEY = 'toolbox_talk_manual';
 export const PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY = 'plant_legacy_missing_site';
+export const INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY = 'inventory_kiosk_unallocated_take';
 
 export interface ReminderOverviewTabConfig {
   id: string;
@@ -49,6 +50,12 @@ export const REMINDER_OVERVIEW_TABS: ReminderOverviewTabConfig[] = [
     label: 'Legacy job addresses',
     icon: MapPin,
     workflowKey: PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY,
+  },
+  {
+    id: 'yard-transfers',
+    label: 'Yard transfers',
+    icon: Package,
+    workflowKey: INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY,
   },
 ];
 
