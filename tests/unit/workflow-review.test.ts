@@ -1081,6 +1081,20 @@ describe('workflow-review cadence', () => {
     );
     expect(hook.status).toBe(0);
     expect(hook.stdout.trim()).toBe('{}');
+
+    const bomHook = spawnSync(
+      process.execPath,
+      [path.join(process.cwd(), '.cursor', 'hooks', 'workflow-stop.mjs')],
+      {
+        cwd: process.cwd(),
+        input: '\uFEFF{"status":"cancelled"}',
+        encoding: 'utf8',
+        shell: false,
+      }
+    );
+    expect(bomHook.status).toBe(0);
+    expect(bomHook.stdout.trim()).toBe('{}');
+    expect(bomHook.stderr).not.toContain('invalid JSON stdin');
   });
 
   it('records deterministic anomaly signals without launching a review', () => {

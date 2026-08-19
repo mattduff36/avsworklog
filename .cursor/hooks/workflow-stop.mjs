@@ -26,7 +26,8 @@ async function main() {
   const raw = await readStdin();
   let input;
   try {
-    input = raw.trim() ? JSON.parse(raw) : {};
+    const normalized = raw.trim();
+    input = normalized ? JSON.parse(normalized) : {};
   } catch (error) {
     process.stderr.write(`workflow-stop: invalid JSON stdin: ${error instanceof Error ? error.message : String(error)}\n`);
     writeHookJson({});
