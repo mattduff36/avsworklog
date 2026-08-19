@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildJobRows,
   evaluateEmployeeAssignmentBlock,
   filterDailyAllocationBoardForTeam,
   planDayForDate,
@@ -202,6 +203,45 @@ function employee(
     }],
   };
 }
+
+describe('buildJobRows', () => {
+  it('shows only jobs that already have a timed visit, optionally scoped to one date', () => {
+    const board = boardFixture();
+    board.jobs = [
+      {
+        source_type: 'live_quote',
+        source_id: 'JOB-100',
+        job_code: 'JOB-100',
+        customer_name: 'One',
+        title: 'One',
+        site_address: 'Site',
+        source_href: null,
+      },
+      {
+        source_type: 'live_quote',
+        source_id: 'JOB-900',
+        job_code: 'JOB-900',
+        customer_name: 'Catalogue only',
+        title: 'Unused',
+        site_address: 'Nowhere',
+        source_href: null,
+      },
+    ];
+    board.visits = [
+      visit('visit-1', 'plan-team-1', 'team-1', 'JOB-100', 8 * 60, 11 * 60),
+      {
+        ...visit('visit-wed', 'plan-team-1', 'team-1', 'JOB-300', 8 * 60, 11 * 60),
+        work_date: '2026-08-12',
+        job_source_id: 'JOB-300',
+      },
+    ];
+
+    expect(buildJobRows(board).map((row) => row.job.job_code)).toEqual(['JOB-100', 'JOB-300']);
+    expect(buildJobRows(board, { workDate: '2026-08-14' }).map((row) => row.job.job_code)).toEqual(['JOB-100']);
+    expect(buildJobRows(board, { workDate: '2026-08-12' }).map((row) => row.job.job_code)).toEqual(['JOB-300']);
+    expect(buildJobRows({ ...board, visits: [] })).toEqual([]);
+  });
+});
 
 describe('filterDailyAllocationBoardForTeam', () => {
   it('does not mix same-date plans from two teams', () => {

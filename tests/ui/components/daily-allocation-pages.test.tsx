@@ -331,6 +331,7 @@ describe('daily allocation manager board', () => {
     mocks.onDragEnd = null;
     mocks.fetchRuntime.mockResolvedValue({ board_enabled: true, writes_enabled: true });
     window.sessionStorage.clear();
+    window.localStorage.clear();
     mocks.randomUUID
       .mockReturnValueOnce('attempt-one')
       .mockReturnValueOnce('attempt-two')
@@ -1015,6 +1016,42 @@ describe('daily allocation manager board', () => {
     expect(mouse.some((constraint) => constraint instanceof PointerActivationConstraints.Distance)).toBe(true);
   });
 
+  it('keeps catalogue jobs off the calendar until a timed visit exists', async () => {
+    const board = buildRangeBoard({
+      jobs: [
+        {
+          source_type: 'live_quote',
+          source_id: 'quote-1',
+          job_code: 'JOB-100',
+          customer_name: 'Test Customer',
+          title: 'Site works',
+          site_address: '1 Test Street',
+          source_href: '/quotes/quote-1',
+        },
+        {
+          source_type: 'live_quote',
+          source_id: 'quote-900',
+          job_code: 'JOB-900',
+          customer_name: 'Unused Customer',
+          title: 'Unused works',
+          site_address: '9 Empty Street',
+          source_href: '/quotes/quote-900',
+        },
+      ],
+    });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).startsWith('/api/daily-allocation/board')) return jsonResponse(board);
+      throw new Error(`Unexpected request: ${String(input)}`);
+    }));
+
+    renderBoardPage();
+    const resources = await screen.findByTestId('daily-allocation-resources');
+    expect(within(resources).getByText('JOB-900')).toBeInTheDocument();
+    expect((await screen.findAllByTestId('daily-allocation-visit-visit-1')).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('daily-allocation-timeline-live_quote:quote-900-2026-08-14')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('daily-allocation-week-cell-live_quote:quote-900-2026-08-14')).not.toBeInTheDocument();
+  });
+
   it('shows the empty and error board states', async () => {
     const empty = buildRangeBoard({
       visits: [],
@@ -1024,7 +1061,7 @@ describe('daily allocation manager board', () => {
     });
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(empty)));
     renderBoardPage();
-    expect(await screen.findByText(/No catalogue jobs on this board yet/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/No timed visits/)).length).toBeGreaterThan(0);
     cleanup();
 
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'Board exploded.' }, 500)));

@@ -10,9 +10,10 @@ import {
 
 interface DashboardContentProps {
   children: React.ReactNode;
+  fullWidth?: boolean;
 }
 
-export function DashboardContent({ children }: DashboardContentProps) {
+export function DashboardContent({ children, fullWidth = false }: DashboardContentProps) {
   const { isManager, isActualSuperAdmin } = useAuth();
   const { tabletModeEnabled } = useTabletMode();
   const [appWidescreenEnabled, setAppWidescreenEnabled] = useState(false);
@@ -41,6 +42,7 @@ export function DashboardContent({ children }: DashboardContentProps) {
   }, [appWidescreenEnabled]);
 
   const shouldApplySidebarOffset = !tabletModeEnabled && (isManager || isActualSuperAdmin);
+  const expandToViewport = appWidescreenEnabled || fullWidth;
 
   return (
     <div className={`transition-all duration-300 ${shouldApplySidebarOffset ? 'md:pl-16' : ''}`}>
@@ -48,8 +50,11 @@ export function DashboardContent({ children }: DashboardContentProps) {
         className={`app-content relative pt-[calc(68px+2rem)] pb-8 md:py-8 ${
           appWidescreenEnabled
             ? 'max-w-none mx-0'
-            : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
+            : fullWidth
+              ? 'max-w-none mx-0 px-4 sm:px-6 lg:px-8'
+              : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
         }`}
+        data-content-width={expandToViewport ? 'full' : 'default'}
         style={
           appWidescreenEnabled
             ? {

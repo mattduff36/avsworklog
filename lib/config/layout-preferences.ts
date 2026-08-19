@@ -2,6 +2,10 @@ export const APP_WIDESCREEN_STORAGE_KEY = 'app-widescreen-view';
 export const LEGACY_WORKSHOP_WIDESCREEN_STORAGE_KEY = 'workshop-tasks-widescreen-view';
 export const APP_WIDESCREEN_CHANGED_EVENT = 'app-widescreen-changed';
 
+export function isDashboardFullWidthPath(pathname: string | null | undefined): boolean {
+  return pathname === '/daily-allocation';
+}
+
 export function readAppWidescreenPreference(): boolean {
   if (typeof window === 'undefined') return false;
 

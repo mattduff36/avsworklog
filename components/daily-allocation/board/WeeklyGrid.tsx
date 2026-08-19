@@ -91,8 +91,24 @@ export function WeeklyGrid({
           </div>
         ))}
         {rows.length === 0 ? (
-          <div className="col-span-full p-6 text-sm text-slate-400">
-            No catalogue jobs on this board yet. Use Add visit or drag a job from Resources.
+          <div className="contents">
+            <div className="sticky left-0 z-10 space-y-1 border-t border-r border-slate-700 bg-slate-900 p-3">
+              <p className="text-sm font-semibold text-slate-50">No timed visits</p>
+              <p className="text-xs text-slate-400">Drag a job from Resources or use Add visit.</p>
+            </div>
+            {dates.map((date) => (
+              <WeekCell key={`empty:${date}`} jobKey="" date={date}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className={cn(boardControlStyles.ghost, 'h-8 w-full justify-start text-xs')}
+                  onClick={() => onAddVisit('', date)}
+                >
+                  + Add timed visit
+                </Button>
+              </WeekCell>
+            ))}
           </div>
         ) : rows.map((row) => (
           <div key={row.key} className="contents">

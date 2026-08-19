@@ -16,6 +16,7 @@ import {
 import {
   DAILY_TIMELINE_HOUR_WIDTH,
   DAILY_TIMELINE_JOB_COLUMN_WIDTH,
+  dailyTimelineHourWidth,
   dailyTimelineRangeLeft,
 } from '@/components/daily-allocation/board/daily-timeline-layout';
 
@@ -60,6 +61,13 @@ describe('DA2-TIME-001 daily allocation timeline', () => {
       startHour: 5,
       endHour: 20,
     })).toBe(1170);
+  });
+
+  it('widens hour columns to fill the available board width without shrinking below 96px', () => {
+    expect(dailyTimelineHourWidth(240 + 15 * 96, 15)).toBe(96);
+    expect(dailyTimelineHourWidth(240 + 15 * 80, 15)).toBe(96);
+    expect(dailyTimelineHourWidth(240 + 15 * 120, 15)).toBe(120);
+    expect(dailyTimelineHourWidth(1000, 0)).toBe(96);
   });
 
   it('maps the first timeline pixel to 05:00 using the job column width, then snaps to 30 minutes', () => {

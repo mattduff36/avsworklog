@@ -220,13 +220,16 @@ export function DailyAllocationManagerBoard({
   const rows = useMemo(() => {
     if (!board) return [];
     const term = jobSearch.trim().toLowerCase();
-    return buildJobRows(board).filter((row) => {
+    return buildJobRows(
+      board,
+      boardState.view === 'daily' ? { workDate: selectedDate } : undefined
+    ).filter((row) => {
       if (!term) return true;
       return [row.job.job_code, row.job.customer_name, row.job.title, row.job.site_address]
         .filter(Boolean)
         .some((value) => value!.toLowerCase().includes(term));
     });
-  }, [board, jobSearch]);
+  }, [board, boardState.view, jobSearch, selectedDate]);
 
   function labourNames(visitId: string) {
     if (!fullBoard) return [];

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { useDroppable } from '@dnd-kit/react';
 import { Button } from '@/components/ui/button';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
@@ -27,6 +27,7 @@ import type { DailyAllocationRangeBoardPayload, DailyAllocationVisit } from '@/t
 import {
   DAILY_TIMELINE_HOUR_WIDTH,
   DAILY_TIMELINE_JOB_COLUMN_WIDTH,
+  dailyTimelineHourWidth,
 } from '@/components/daily-allocation/board/daily-timeline-layout';
 
 export { DAILY_TIMELINE_HOUR_WIDTH, DAILY_TIMELINE_JOB_COLUMN_WIDTH };
@@ -165,9 +166,24 @@ export function DailyTimeline({
   );
   const startHour = range.startHour || DAILY_ALLOCATION_DEFAULT_START_HOUR;
   const endHour = range.endHour || DAILY_ALLOCATION_DEFAULT_END_HOUR;
-  const hourWidth = DAILY_TIMELINE_HOUR_WIDTH;
-  const timelineWidth = (endHour - startHour) * hourWidth;
+  const hourCount = Math.max(1, endHour - startHour);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const [hourWidth, setHourWidth] = useState(DAILY_TIMELINE_HOUR_WIDTH);
+  const timelineWidth = hourCount * hourWidth;
   const [draftTimes, setDraftTimes] = useState<Record<string, { starts_at: string; ends_at: string }>>({});
+
+  useEffect(() => {
+    const board = boardRef.current;
+    if (!board || typeof ResizeObserver === 'undefined') return;
+
+    const updateHourWidth = () => {
+      setHourWidth(dailyTimelineHourWidth(board.clientWidth, hourCount));
+    };
+    updateHourWidth();
+    const observer = new ResizeObserver(updateHourWidth);
+    observer.observe(board);
+    return () => observer.disconnect();
+  }, [hourCount]);
 
   function displayedVisit(visit: DailyAllocationVisit): DailyAllocationVisit {
     const draft = draftTimes[visit.id];
@@ -255,10 +271,46 @@ export function DailyTimeline({
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-700" data-testid="daily-allocation-daily-board">
+    <div
+      ref={boardRef}
+      className="w-full overflow-x-auto rounded-lg border border-slate-700"
+      data-testid="daily-allocation-daily-board"
+    >
       <TimelineHeader startHour={startHour} endHour={endHour} hourWidth={hourWidth} />
       {rows.length === 0 ? (
-        <p className="p-6 text-sm text-slate-400">No catalogue jobs on this board yet. Use Add visit or drag a job from Resources.</p>
+        <div className="flex border-t border-slate-800">
+          <div
+            className="shrink-0 space-y-1 border-r border-slate-700 bg-slate-900 p-3"
+            style={{ width: DAILY_TIMELINE_JOB_COLUMN_WIDTH }}
+          >
+            <p className="text-sm font-semibold text-slate-50">No timed visits</p>
+            <p className="text-xs text-slate-400">
+              Drag a job from Resources or use Add visit.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              className={cn(boardControlStyles.ghost, 'h-8 px-2 text-xs')}
+              onClick={() => onAddVisit('', date)}
+            >
+              + Add timed visit
+            </Button>
+          </div>
+          <TimelineCell
+            jobKey=""
+            date={date}
+            width={timelineWidth}
+            height={ROW_MIN_HEIGHT}
+            hourWidth={hourWidth}
+            startHour={startHour}
+            endHour={endHour}
+            empty
+            onAddVisit={() => onAddVisit('', date)}
+          >
+            {null}
+          </TimelineCell>
+        </div>
       ) : rows.map((row) => {
         const dayVisits = row.visits.filter((visit) => visit.work_date === date);
         const { placements, laneCount } = assignDailyAllocationLanes(dayVisits);

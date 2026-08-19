@@ -22,6 +22,7 @@ import {
   applyMobileTextSizePreference,
   readMobileTextSizePreference,
 } from '@/lib/config/mobile-text-size-preference';
+import { isDashboardFullWidthPath } from '@/lib/config/layout-preferences';
 
 const PAGE_VISIT_DEBOUNCE_MS = 250;
 const PAGE_VISIT_HEARTBEAT_MS = 5 * 60_000;
@@ -319,7 +320,7 @@ function DashboardLayoutShell({
       
       <Navbar />
       <PullToRefresh />
-      <DashboardContent>
+      <DashboardContent fullWidth={isDashboardFullWidthPath(pathname)}>
         {children}
       </DashboardContent>
       

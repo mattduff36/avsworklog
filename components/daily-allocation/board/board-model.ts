@@ -20,24 +20,28 @@ export interface DailyAllocationJobRow {
   visits: DailyAllocationVisit[];
 }
 
-export function buildJobRows(board: DailyAllocationRangeBoardPayload): DailyAllocationJobRow[] {
+export function buildJobRows(
+  board: DailyAllocationRangeBoardPayload,
+  options?: { workDate?: string }
+): DailyAllocationJobRow[] {
+  const visits = options?.workDate
+    ? board.visits.filter((visit) => visit.work_date === options.workDate)
+    : board.visits;
+  const catalogueByKey = new Map(board.jobs.map((job) => [jobResourceKey(job), job]));
   const jobs = new Map<string, DailyAllocationJobProjection>();
-  for (const job of board.jobs) {
-    jobs.set(jobResourceKey(job), job);
-  }
-  for (const visit of board.visits) {
+
+  for (const visit of visits) {
     const key = `${visit.job_source_type}:${visit.job_source_id}`;
-    if (!jobs.has(key)) {
-      jobs.set(key, {
-        source_type: visit.job_source_type,
-        source_id: visit.job_source_id,
-        job_code: visit.job_code,
-        customer_name: null,
-        title: null,
-        site_address: visit.site_address,
-        source_href: null,
-      });
-    }
+    if (jobs.has(key)) continue;
+    jobs.set(key, catalogueByKey.get(key) || {
+      source_type: visit.job_source_type,
+      source_id: visit.job_source_id,
+      job_code: visit.job_code,
+      customer_name: null,
+      title: null,
+      site_address: visit.site_address,
+      source_href: null,
+    });
   }
 
   return [...jobs.values()]
@@ -47,7 +51,7 @@ export function buildJobRows(board: DailyAllocationRangeBoardPayload): DailyAllo
       return {
         key,
         job,
-        visits: board.visits.filter(
+        visits: visits.filter(
           (visit) => `${visit.job_source_type}:${visit.job_source_id}` === key
         ),
       };
