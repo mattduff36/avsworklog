@@ -209,31 +209,49 @@ const EXPECTED_FOREIGN_KEYS = [
   },
 ];
 
+type CleanupRow = ErrorLogEntry & {
+  status: 'active' | 'archived';
+};
+
 class CleanupClient implements PgClientLike {
   readonly queryLog: string[] = [];
   readonly unrelatedData = new Set(['application-row']);
-  readonly errorRows: Map<string, ErrorLogEntry>;
+  readonly errorRows: Map<string, CleanupRow>;
   readonly alerts: Set<string>;
   readonly serviceReferences: Set<string>;
   readonly usageReferences: Set<string>;
   foreignKeys = [...EXPECTED_FOREIGN_KEYS];
   triggerRows: Array<{ trigger_name: string }> = [];
-  failDeleteBatch: number | null = null;
+  failArchiveBatch: number | null = null;
+  schemaColumns = ['archived_at', 'status'];
   commitThenThrow = false;
-  private workingRows = new Map<string, ErrorLogEntry>();
+  private workingRows = new Map<string, CleanupRow>();
   private workingAlerts = new Set<string>();
-  private deleteBatch = 0;
+  private archiveBatch = 0;
 
   constructor(options: {
     rows: ErrorLogEntry[];
     alerts?: string[];
     serviceReferences?: string[];
     usageReferences?: string[];
+    archivedIds?: string[];
   }) {
-    this.errorRows = new Map(options.rows.map((row) => [row.id, row]));
+    const archived = new Set(options.archivedIds ?? []);
+    this.errorRows = new Map(
+      options.rows.map((row) => [
+        row.id,
+        { ...row, status: archived.has(row.id) ? 'archived' : 'active' },
+      ])
+    );
     this.alerts = new Set(options.alerts ?? []);
     this.serviceReferences = new Set(options.serviceReferences ?? []);
     this.usageReferences = new Set(options.usageReferences ?? []);
+  }
+
+  activeIds(): string[] {
+    return [...this.errorRows.values()]
+      .filter((row) => row.status === 'active')
+      .map((row) => row.id);
   }
 
   async query<T extends Record<string, unknown> = Record<string, unknown>>(
@@ -246,6 +264,12 @@ class CleanupClient implements PgClientLike {
       this.workingAlerts = new Set(this.alerts);
       return result([]) as { rows: T[]; rowCount: number };
     }
+    if (text.includes('fixerrors:archive-schema')) {
+      return result(this.schemaColumns.map((column_name) => ({ column_name }))) as {
+        rows: T[];
+        rowCount: number;
+      };
+    }
     if (text.includes('fixerrors:fk-catalog')) {
       return result(this.foreignKeys) as unknown as { rows: T[]; rowCount: number };
     }
@@ -256,54 +280,30 @@ class CleanupClient implements PgClientLike {
       const ids = values[0] as string[];
       const rows = ids
         .map((id) => this.workingRows.get(id))
-        .filter((row): row is ErrorLogEntry => Boolean(row))
+        .filter((row): row is CleanupRow => Boolean(row))
         .sort(compareRows);
       return result(rows) as unknown as { rows: T[]; rowCount: number };
     }
-    if (text.includes('fixerrors:service-reference-check')) {
-      const ids = values[0] as string[];
-      const id = ids.find((candidate) => this.serviceReferences.has(candidate));
-      return result(id ? [{ id: 'service-reference' }] : []) as {
-        rows: T[];
-        rowCount: number;
-      };
-    }
-    if (text.includes('fixerrors:usage-reference-check')) {
-      const ids = values[0] as string[];
-      const id = ids.find((candidate) => this.usageReferences.has(candidate));
-      return result(id ? [{ id: 'usage-reference' }] : []) as {
-        rows: T[];
-        rowCount: number;
-      };
-    }
-    if (text.includes('fixerrors:alert-reference-check')) {
-      const ids = values[0] as string[];
-      const rows = ids
-        .filter((id) => this.workingAlerts.has(id))
-        .sort()
-        .map((error_log_id) => ({ error_log_id }));
-      return result(rows) as unknown as { rows: T[]; rowCount: number };
-    }
-    if (text.includes('fixerrors:delete-alerts')) {
-      const ids = values[0] as string[];
-      const rows = ids
-        .filter((id) => this.workingAlerts.delete(id))
-        .map((error_log_id) => ({ error_log_id }));
-      return result(rows) as unknown as { rows: T[]; rowCount: number };
-    }
-    if (text.includes('fixerrors:delete-error-batch')) {
-      this.deleteBatch += 1;
-      if (this.failDeleteBatch === this.deleteBatch) {
+    if (text.includes('fixerrors:archive-error-batch')) {
+      this.archiveBatch += 1;
+      if (this.failArchiveBatch === this.archiveBatch) {
         throw new Error('forced batch failure');
       }
       const ids = values[0] as string[];
       const rows = ids
-        .filter((id) => this.workingRows.delete(id))
-        .map((id) => ({ id }));
+        .map((id) => this.workingRows.get(id))
+        .filter((row): row is CleanupRow => Boolean(row) && row.status === 'active')
+        .map((row) => {
+          this.workingRows.set(row.id, { ...row, status: 'archived' });
+          return { id: row.id };
+        });
       return result(rows) as unknown as { rows: T[]; rowCount: number };
     }
     if (text.includes('fixerrors:remaining-count')) {
-      return result([{ count: String(this.workingRows.size) }]) as {
+      const activeCount = [...this.workingRows.values()].filter(
+        (row) => row.status === 'active'
+      ).length;
+      return result([{ count: String(activeCount) }]) as {
         rows: T[];
         rowCount: number;
       };
@@ -424,6 +424,13 @@ describe('fixerrors transaction-consistent snapshot export', () => {
       client.queryLog.filter((query) => query.includes('fixerrors:snapshot-page'))
     ).toHaveLength(pages);
     expect(client.queryLog.some((query) => /\bOFFSET\b/iu.test(query))).toBe(false);
+    expect(
+      client.queryLog.some(
+        (query) =>
+          query.includes('fixerrors:snapshot-count') &&
+          query.includes("error_logs.status = 'active'")
+      )
+    ).toBe(true);
   });
 
   it('FXERR-CONCURRENCY-002 excludes a concurrent backdated insert from the repeatable-read snapshot', async () => {
@@ -465,7 +472,10 @@ describe('fixerrors transaction-consistent snapshot export', () => {
       now: EXPORT_TIME,
     });
     expect(cleanup.clearedCount).toBe(3);
-    expect([...cleanupClient.errorRows.keys()]).toEqual([arrivedLater.id]);
+    expect(cleanup.reconciliationState).toBe('archived');
+    expect(cleanupClient.activeIds()).toEqual([arrivedLater.id]);
+    expect(cleanupClient.errorRows.size).toBe(4);
+    expect(cleanupClient.alerts.size).toBe(0);
   });
 
   it('fails closed on duplicate/invalid rows and page retrieval failure', async () => {
@@ -600,8 +610,8 @@ describe('fixerrors transaction-consistent snapshot export', () => {
   });
 });
 
-describe('fixerrors exact transactional cleanup', () => {
-  it('FXERR-DELETE-004 deletes exact IDs in batches and only registered dependent diagnostics', async () => {
+describe('fixerrors exact transactional archive', () => {
+  it('FE-SAFE-001 archives exact IDs in batches and leaves alerts and extras untouched', async () => {
     const rows = Array.from({ length: 205 }, (_, index) => makeError(index + 1));
     const extra = makeError(999);
     const prepared = await analyzedSnapshot(rows);
@@ -623,14 +633,22 @@ describe('fixerrors exact transactional cleanup', () => {
     });
 
     expect(cleanup.clearedCount).toBe(205);
-    expect(cleanup.clearedAlertCount).toBe(2);
-    expect([...client.errorRows.keys()]).toEqual([extra.id]);
-    expect(client.alerts.size).toBe(0);
+    expect(cleanup.reconciliationState).toBe('archived');
+    expect(cleanup.remainingCount).toBe(1);
+    expect(client.activeIds()).toEqual([extra.id]);
+    expect(client.errorRows.size).toBe(206);
+    expect(client.alerts.size).toBe(2);
     expect([...client.unrelatedData]).toEqual(['application-row']);
     const batches = client.queryLog.filter((query) =>
-      query.includes('fixerrors:delete-error-batch')
+      query.includes('fixerrors:archive-error-batch')
     );
     expect(batches).toHaveLength(3);
+    expect(
+      client.queryLog.some((query) => query.includes('DELETE FROM public.error_logs'))
+    ).toBe(false);
+    expect(
+      client.queryLog.some((query) => query.includes('fixerrors:delete-alerts'))
+    ).toBe(false);
   });
 
   it('accepts Postgres text-array foreign-key catalogs from node-pg', async () => {
@@ -656,7 +674,8 @@ describe('fixerrors exact transactional cleanup', () => {
     });
 
     expect(cleanup.clearedCount).toBe(1);
-    expect(client.errorRows.size).toBe(0);
+    expect(client.activeIds()).toEqual([]);
+    expect(client.errorRows.size).toBe(1);
   });
 
   it('FXERR-TS-CLEANUP-018 preserves microsecond timestamps through locked-row checksum verification', async () => {
@@ -689,7 +708,8 @@ describe('fixerrors exact transactional cleanup', () => {
     });
 
     expect(cleanup.clearedCount).toBe(2);
-    expect(client.errorRows.size).toBe(0);
+    expect(client.activeIds()).toEqual([]);
+    expect(client.errorRows.size).toBe(2);
     expect(
       client.queryLog.some(
         (query) =>
@@ -699,7 +719,7 @@ describe('fixerrors exact transactional cleanup', () => {
       )
     ).toBe(true);
     expect(
-      client.queryLog.some((query) => query.includes('fixerrors:delete-error-batch'))
+      client.queryLog.some((query) => query.includes('fixerrors:archive-error-batch'))
     ).toBe(true);
   });
 
@@ -707,7 +727,7 @@ describe('fixerrors exact transactional cleanup', () => {
     const rows = Array.from({ length: 205 }, (_, index) => makeError(index + 1));
     const prepared = await analyzedSnapshot(rows);
     const client = new CleanupClient({ rows, alerts: [rows[0].id] });
-    client.failDeleteBatch = 2;
+    client.failArchiveBatch = 2;
 
     await expect(
       executeVerifiedSnapshotCleanup({
@@ -726,31 +746,33 @@ describe('fixerrors exact transactional cleanup', () => {
       attemptedErrorLogIds: rows.slice(0, 200).map((row) => row.id),
     });
     expect(client.errorRows.size).toBe(205);
+    expect(client.activeIds()).toHaveLength(205);
     expect(client.alerts).toContain(rows[0].id);
     expect([...client.unrelatedData]).toEqual(['application-row']);
   });
 
-  it('FXERR-COLLATERAL-006 / FXERR-SCHEMA-012 blocks application references and unknown schema scope', async () => {
+  it('FE-SAFE-001 allows application references and blocks unknown schema scope', async () => {
     const rows = [makeError(1)];
     const applicationPrepared = await analyzedSnapshot(rows);
     const applicationReference = new CleanupClient({
       rows,
       serviceReferences: [rows[0].id],
+      usageReferences: [rows[0].id],
     });
-    await expect(
-      executeVerifiedSnapshotCleanup({
-        client: applicationReference,
-        confirmation: confirmation(applicationPrepared.snapshot),
-        databaseTargetFingerprint: TARGET_FINGERPRINT,
-        snapshotPath: SNAPSHOT_PATH,
-        latestSnapshotPath: null,
-        analysisPath: ANALYSIS_PATH,
-        io: applicationPrepared.io,
-        lock: new MemoryLock(),
-        now: EXPORT_TIME,
-      })
-    ).rejects.toThrow('Application data references');
+    const referenced = await executeVerifiedSnapshotCleanup({
+      client: applicationReference,
+      confirmation: confirmation(applicationPrepared.snapshot),
+      databaseTargetFingerprint: TARGET_FINGERPRINT,
+      snapshotPath: SNAPSHOT_PATH,
+      latestSnapshotPath: null,
+      analysisPath: ANALYSIS_PATH,
+      io: applicationPrepared.io,
+      lock: new MemoryLock(),
+      now: EXPORT_TIME,
+    });
+    expect(referenced.clearedCount).toBe(1);
     expect(applicationReference.errorRows.size).toBe(1);
+    expect(applicationReference.activeIds()).toEqual([]);
 
     const unknownPrepared = await analyzedSnapshot(rows);
     const unknownForeignKey = new CleanupClient({ rows });
@@ -776,7 +798,7 @@ describe('fixerrors exact transactional cleanup', () => {
     ).rejects.toThrow('foreign-key safety contract changed');
     expect(
       unknownForeignKey.queryLog.some((query) =>
-        query.includes('fixerrors:delete-error-batch')
+        query.includes('fixerrors:archive-error-batch')
       )
     ).toBe(false);
 
@@ -798,7 +820,7 @@ describe('fixerrors exact transactional cleanup', () => {
     ).rejects.toThrow('trigger safety contract changed');
     expect(
       unexpectedTrigger.queryLog.some((query) =>
-        query.includes('fixerrors:delete-error-batch')
+        query.includes('fixerrors:archive-error-batch')
       )
     ).toBe(false);
   });
@@ -944,6 +966,48 @@ describe('fixerrors artifact and confirmation gate', () => {
       })
     ).rejects.toThrow('snapshot verification failed');
     expect(corruptedClient.queryLog).toHaveLength(0);
+  });
+
+  it('FE-SAFE-001 rejects a stale v2 delete artifact before any database work', async () => {
+    const io = new MemoryIo();
+    const client = new CleanupClient({ rows: [makeError(1)] });
+    io.writeAtomic(
+      SNAPSHOT_PATH,
+      JSON.stringify({
+        version: 2,
+        commandId: 'fixerrors',
+        safetyContract: 'fixerrors-exact-snapshot-v2',
+        snapshotId: uuid(1),
+        cleanup: {
+          status: 'not_started',
+          deletedErrorLogIds: [],
+          deletedAlertIds: [],
+        },
+      })
+    );
+    io.writeAtomic(ANALYSIS_PATH, '# leftover\n');
+    await expect(
+      executeVerifiedSnapshotCleanup({
+        client,
+        confirmation: {
+          snapshotId: uuid(1),
+          checksum: 'a'.repeat(64),
+          rowCount: 1,
+          databaseTargetFingerprint: TARGET_FINGERPRINT,
+          expiresAt: '2026-08-11T06:52:57.300Z',
+          safetyContract: 'fixerrors-exact-snapshot-v2',
+          manifestChecksum: 'b'.repeat(64),
+        },
+        databaseTargetFingerprint: TARGET_FINGERPRINT,
+        snapshotPath: SNAPSHOT_PATH,
+        latestSnapshotPath: null,
+        analysisPath: ANALYSIS_PATH,
+        io,
+        lock: new MemoryLock(),
+        now: EXPORT_TIME,
+      })
+    ).rejects.toThrow('snapshot verification failed');
+    expect(client.queryLog).toHaveLength(0);
   });
 
   it('FXERR-V1-REJECT-019 rejects a stale v1 artifact before any database work', async () => {
@@ -1201,9 +1265,155 @@ describe('fixerrors artifact and confirmation gate', () => {
         now: EXPORT_TIME,
       })
     ).rejects.toMatchObject({ outcome: 'indeterminate' });
-    expect(client.errorRows.size).toBe(0);
+    expect(client.errorRows.size).toBe(1);
+    expect(client.activeIds()).toEqual([]);
     expect(readAndVerifyErrorSnapshot(SNAPSHOT_PATH, prepared.io).cleanup.status).toBe(
       'indeterminate'
     );
+  });
+
+  it('FE-SAFE-001 reconciles an in-progress snapshot whose rows are already archived', async () => {
+    const rows = [makeError(1)];
+    const prepared = await analyzedSnapshot(rows);
+    const raw = JSON.parse(
+      prepared.io.files.get(SNAPSHOT_PATH) ?? '{}'
+    ) as ErrorSnapshotExport;
+    raw.cleanup = {
+      status: 'in_progress',
+      attemptedAt: EXPORT_TIME.toISOString(),
+      completedAt: null,
+      archivedErrorLogIds: [],
+      attemptedErrorLogIds: [],
+      reconciliationState: 'not_started',
+      remainingActiveCount: null,
+      error: null,
+    };
+    prepared.io.files.set(SNAPSHOT_PATH, JSON.stringify(raw));
+    const client = new CleanupClient({
+      rows,
+      archivedIds: rows.map((row) => row.id),
+    });
+    const cleanup = await executeVerifiedSnapshotCleanup({
+      client,
+      confirmation: confirmation(prepared.snapshot),
+      databaseTargetFingerprint: TARGET_FINGERPRINT,
+      snapshotPath: SNAPSHOT_PATH,
+      latestSnapshotPath: null,
+      analysisPath: ANALYSIS_PATH,
+      io: prepared.io,
+      lock: new MemoryLock(),
+      now: EXPORT_TIME,
+    });
+    expect(cleanup.reconciliationState).toBe('already_archived');
+    expect(
+      client.queryLog.some((query) => query.includes('fixerrors:archive-error-batch'))
+    ).toBe(false);
+    expect(readAndVerifyErrorSnapshot(SNAPSHOT_PATH, prepared.io).cleanup.status).toBe(
+      'completed'
+    );
+  });
+
+  it('FE-SAFE-001 reconciles an indeterminate snapshot by archiving remaining active rows', async () => {
+    const rows = [makeError(1)];
+    const prepared = await analyzedSnapshot(rows);
+    const raw = JSON.parse(
+      prepared.io.files.get(SNAPSHOT_PATH) ?? '{}'
+    ) as ErrorSnapshotExport;
+    raw.cleanup = {
+      status: 'indeterminate',
+      attemptedAt: EXPORT_TIME.toISOString(),
+      completedAt: null,
+      archivedErrorLogIds: [],
+      attemptedErrorLogIds: [rows[0].id],
+      reconciliationState: 'indeterminate',
+      remainingActiveCount: null,
+      error: 'Post-commit artifact update failed: connection lost',
+    };
+    prepared.io.files.set(SNAPSHOT_PATH, JSON.stringify(raw));
+    const client = new CleanupClient({ rows });
+    const cleanup = await executeVerifiedSnapshotCleanup({
+      client,
+      confirmation: confirmation(prepared.snapshot),
+      databaseTargetFingerprint: TARGET_FINGERPRINT,
+      snapshotPath: SNAPSHOT_PATH,
+      latestSnapshotPath: null,
+      analysisPath: ANALYSIS_PATH,
+      io: prepared.io,
+      lock: new MemoryLock(),
+      now: EXPORT_TIME,
+    });
+    expect(cleanup.reconciliationState).toBe('archived');
+    expect(client.activeIds()).toEqual([]);
+    expect(readAndVerifyErrorSnapshot(SNAPSHOT_PATH, prepared.io).cleanup.status).toBe(
+      'completed'
+    );
+  });
+
+  it('FE-SAFE-001 completes already-archived snapshot rows without rewriting them', async () => {
+    const rows = [makeError(1), makeError(2)];
+    const prepared = await analyzedSnapshot(rows);
+    const client = new CleanupClient({ rows, archivedIds: rows.map((row) => row.id) });
+    const cleanup = await executeVerifiedSnapshotCleanup({
+      client,
+      confirmation: confirmation(prepared.snapshot),
+      databaseTargetFingerprint: TARGET_FINGERPRINT,
+      snapshotPath: SNAPSHOT_PATH,
+      latestSnapshotPath: null,
+      analysisPath: ANALYSIS_PATH,
+      io: prepared.io,
+      lock: new MemoryLock(),
+      now: EXPORT_TIME,
+    });
+    expect(cleanup.reconciliationState).toBe('already_archived');
+    expect(cleanup.clearedCount).toBe(2);
+    expect(
+      client.queryLog.some((query) => query.includes('fixerrors:archive-error-batch'))
+    ).toBe(false);
+  });
+
+  it('FE-SAFE-001 fails closed on mixed archive state', async () => {
+    const rows = [makeError(1), makeError(2)];
+    const prepared = await analyzedSnapshot(rows);
+    const client = new CleanupClient({ rows, archivedIds: [rows[0].id] });
+    await expect(
+      executeVerifiedSnapshotCleanup({
+        client,
+        confirmation: confirmation(prepared.snapshot),
+        databaseTargetFingerprint: TARGET_FINGERPRINT,
+        snapshotPath: SNAPSHOT_PATH,
+        latestSnapshotPath: null,
+        analysisPath: ANALYSIS_PATH,
+        io: prepared.io,
+        lock: new MemoryLock(),
+        now: EXPORT_TIME,
+      })
+    ).rejects.toThrow('mixed archive state');
+    expect(client.activeIds()).toEqual([rows[1].id]);
+  });
+
+  it('FE-SAFE-001 reuses a held artifact lock for same-run archive', async () => {
+    const rows = [makeError(1)];
+    const prepared = await analyzedSnapshot(rows);
+    const client = new CleanupClient({ rows });
+    const lock = new MemoryLock();
+    const release = lock.acquire();
+    try {
+      const cleanup = await executeVerifiedSnapshotCleanup({
+        client,
+        confirmation: confirmation(prepared.snapshot),
+        databaseTargetFingerprint: TARGET_FINGERPRINT,
+        snapshotPath: SNAPSHOT_PATH,
+        latestSnapshotPath: null,
+        analysisPath: ANALYSIS_PATH,
+        io: prepared.io,
+        lock,
+        lockAlreadyHeld: true,
+        now: EXPORT_TIME,
+      });
+      expect(cleanup.clearedCount).toBe(1);
+      expect(lock.held).toBe(true);
+    } finally {
+      release();
+    }
   });
 });

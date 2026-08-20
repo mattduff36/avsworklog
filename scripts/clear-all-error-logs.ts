@@ -29,29 +29,32 @@ async function clearAllErrorLogs() {
     // Count current errors
     const { data: current } = await supabase
       .from('error_logs')
-      .select('id');
+      .select('id')
+      .eq('status', 'active');
 
     const currentCount = current?.length || 0;
 
     if (currentCount === 0) {
-      console.log('✅ Error log is already empty!\n');
+      console.log('✅ Error log has no active rows!\n');
       return;
     }
 
-    console.log(`Found ${currentCount} error log entries to clear\n`);
+    console.log(`Found ${currentCount} active error log entries to archive\n`);
 
-    // Delete all
     const { error } = await supabase
       .from('error_logs')
-      .delete()
-      .gte('timestamp', '1970-01-01');
+      .update({
+        status: 'archived',
+        archived_at: new Date().toISOString(),
+      })
+      .eq('status', 'active');
 
     if (error) {
-      console.error('❌ Error clearing logs:', error);
+      console.error('❌ Error archiving logs:', error);
       return;
     }
 
-    console.log(`✅ Cleared all ${currentCount} error log entries\n`);
+    console.log(`✅ Archived ${currentCount} error log entries\n`);
     console.log('Fresh start! 🎉\n');
 
   } catch (error) {

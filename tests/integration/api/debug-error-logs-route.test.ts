@@ -73,7 +73,8 @@ describe('debug error logs route', () => {
       error: null,
     });
     const order = vi.fn(() => ({ limit }));
-    const selectErrorLogs = vi.fn(() => ({ order }));
+    const eq = vi.fn(() => ({ order }));
+    const selectErrorLogs = vi.fn(() => ({ eq, order }));
     const inProfiles = vi.fn().mockResolvedValue({
       data: [{ id: 'user-1', full_name: 'Client User' }],
       error: null,
@@ -126,6 +127,7 @@ describe('debug error logs route', () => {
         user_name: 'Client User',
       }),
     ]);
+    expect(eq).toHaveBeenCalledWith('status', 'active');
   });
 
   it('returns enriched error logs for Charlotte debug access', async () => {
@@ -152,7 +154,8 @@ describe('debug error logs route', () => {
       error: null,
     });
     const order = vi.fn(() => ({ limit }));
-    const selectErrorLogs = vi.fn(() => ({ order }));
+    const eq = vi.fn(() => ({ order }));
+    const selectErrorLogs = vi.fn(() => ({ eq, order }));
     const inProfiles = vi.fn().mockResolvedValue({
       data: [{ id: 'user-2', full_name: 'Support User' }],
       error: null,
@@ -205,14 +208,37 @@ describe('debug error logs route', () => {
         user_name: 'Support User',
       }),
     ]);
+    expect(eq).toHaveBeenCalledWith('status', 'active');
   });
 
-  it('clears error logs for an actual superadmin', async () => {
+  it('FE-DEBUG-001 includes archived rows when requested', async () => {
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const { getEffectiveRole } = await import('@/lib/utils/view-as');
 
-    const gte = vi.fn().mockResolvedValue({ error: null });
-    const deleteLogs = vi.fn(() => ({ gte }));
+    const limit = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: 'log-archived',
+          timestamp: '2026-04-22T09:00:00.000Z',
+          error_message: 'Old error',
+          error_stack: null,
+          error_type: 'Error',
+          user_id: null,
+          user_email: null,
+          page_url: 'https://example.com/debug',
+          user_agent: 'Browser UA',
+          component_name: '/api/debug/error-logs',
+          additional_data: null,
+          created_at: '2026-04-22T09:00:00.000Z',
+          status: 'archived',
+          archived_at: '2026-04-22T10:00:00.000Z',
+        },
+      ],
+      error: null,
+    });
+    const order = vi.fn(() => ({ limit }));
+    const eq = vi.fn(() => ({ order }));
+    const selectErrorLogs = vi.fn(() => ({ eq, order }));
 
     vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
       profile: { id: 'admin-1' },
@@ -234,7 +260,57 @@ describe('debug error logs route', () => {
     vi.mocked(createAdminClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === 'error_logs') {
-          return { delete: deleteLogs };
+          return { select: selectErrorLogs };
+        }
+        if (table === 'permission_modules') {
+          return sensitiveAccessMocks.permissionModules;
+        }
+        if (table === 'profile_sensitive_pins') {
+          return sensitiveAccessMocks.sensitivePins;
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    } as never);
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/debug/error-logs?limit=25&includeArchived=1')
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.logs[0].id).toBe('log-archived');
+    expect(eq).not.toHaveBeenCalled();
+  });
+
+  it('clears error logs for an actual superadmin', async () => {
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { getEffectiveRole } = await import('@/lib/utils/view-as');
+
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const updateLogs = vi.fn(() => ({ eq }));
+
+    vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({
+      profile: { id: 'admin-1' },
+    } as never);
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      role_id: 'role-1',
+      role_name: 'super_admin',
+      display_name: 'Super Admin',
+      role_class: 'admin',
+      is_manager_admin: true,
+      is_super_admin: true,
+      is_viewing_as: false,
+      is_actual_super_admin: true,
+      user_id: 'admin-1',
+      team_id: null,
+      team_name: null,
+    });
+    const sensitiveAccessMocks = createSensitivePinAccessMocks();
+    vi.mocked(createAdminClient).mockReturnValue({
+      from: vi.fn((table: string) => {
+        if (table === 'error_logs') {
+          return { update: updateLogs };
         }
         if (table === 'permission_modules') {
           return sensitiveAccessMocks.permissionModules;
@@ -252,6 +328,10 @@ describe('debug error logs route', () => {
 
     expect(response.status).toBe(200);
     expect(payload.success).toBe(true);
-    expect(gte).toHaveBeenCalledWith('timestamp', '1970-01-01');
+    expect(updateLogs).toHaveBeenCalledWith({
+      status: 'archived',
+      archived_at: expect.any(String),
+    });
+    expect(eq).toHaveBeenCalledWith('status', 'active');
   });
 });

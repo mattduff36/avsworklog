@@ -17,6 +17,11 @@ function getRequestedLimit(request: NextRequest): number {
   return Number.isFinite(parsed) ? parsed : 200;
 }
 
+function getIncludeArchived(request: NextRequest): boolean {
+  const raw = request.nextUrl.searchParams.get('includeArchived');
+  return raw === '1' || raw === 'true';
+}
+
 export async function GET(request: NextRequest) {
   const access = await requireErrorLogAdminAccess();
   if (!access.ok) {
@@ -24,7 +29,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const logs = await listErrorLogs(getRequestedLimit(request));
+    const logs = await listErrorLogs(getRequestedLimit(request), {
+      includeArchived: getIncludeArchived(request),
+    });
     return NextResponse.json({
       success: true,
       logs,

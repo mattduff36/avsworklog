@@ -15,7 +15,8 @@ import type { ErrorLogEntry } from './fixerrors';
 import { TRUSTED_OPERATIONAL_ACTIONS } from './automation/trusted-operational-actions';
 
 export const ERROR_FETCH_PAGE_SIZE = 200;
-export const ERROR_DELETE_BATCH_SIZE = 100;
+export const ERROR_ARCHIVE_BATCH_SIZE = 100;
+export const ERROR_DELETE_BATCH_SIZE = ERROR_ARCHIVE_BATCH_SIZE;
 export const ERROR_SNAPSHOT_MAX_AGE_MS = 30 * 60 * 1000;
 export const ERROR_SNAPSHOT_PATH = resolve(
   process.cwd(),
@@ -47,18 +48,26 @@ export type ErrorSnapshotBoundary = {
   id: string;
 };
 
+export type ErrorSnapshotReconciliationState =
+  | 'not_started'
+  | 'archived'
+  | 'already_archived'
+  | 'failed'
+  | 'indeterminate';
+
 export type ErrorSnapshotCleanup = {
   status: 'not_started' | 'in_progress' | 'completed' | 'failed' | 'indeterminate';
   attemptedAt: string | null;
   completedAt: string | null;
-  deletedErrorLogIds: string[];
-  deletedAlertIds: string[];
+  archivedErrorLogIds: string[];
   attemptedErrorLogIds: string[];
+  reconciliationState: ErrorSnapshotReconciliationState;
+  remainingActiveCount: number | null;
   error: string | null;
 };
 
 export type ErrorSnapshotExport = {
-  version: 2;
+  version: 3;
   commandId: 'fixerrors';
   safetyContract: string;
   snapshotId: string;
@@ -106,10 +115,9 @@ export type CleanupConfirmation = {
 
 export type ErrorLogClearResult = {
   clearedCount: number;
-  clearedAlertCount: number;
   remainingCount: number;
-  deletedErrorLogIds: string[];
-  deletedAlertIds: string[];
+  archivedErrorLogIds: string[];
+  reconciliationState: 'archived' | 'already_archived';
 };
 
 type ForeignKeyContract = {
@@ -377,12 +385,15 @@ function emptyCleanup(): ErrorSnapshotCleanup {
     status: 'not_started',
     attemptedAt: null,
     completedAt: null,
-    deletedErrorLogIds: [],
-    deletedAlertIds: [],
+    archivedErrorLogIds: [],
     attemptedErrorLogIds: [],
+    reconciliationState: 'not_started',
+    remainingActiveCount: null,
     error: null,
   };
 }
+
+const ACTIVE_ERROR_LOG_PREDICATE = `error_logs.status = 'active'`;
 
 export function createDatabaseTargetFingerprint(connectionString: string): string {
   const url = new URL(connectionString);
@@ -424,6 +435,7 @@ export async function fetchProductionErrorSnapshot(
         id::text AS id,
         ${snapshotTimestamptzTextSql('created_at')} AS created_at
       FROM public.error_logs
+      WHERE ${ACTIVE_ERROR_LOG_PREDICATE}
       ORDER BY error_logs.created_at DESC, error_logs.id DESC
       LIMIT 1
     `);
@@ -443,7 +455,8 @@ export async function fetchProductionErrorSnapshot(
         /* fixerrors:snapshot-count */
         SELECT COUNT(*)::text AS count
         FROM public.error_logs
-        WHERE (
+        WHERE ${ACTIVE_ERROR_LOG_PREDICATE}
+        AND (
           $1::timestamptz IS NULL
           OR ROW(error_logs.created_at, error_logs.id) <= ROW($1::timestamptz, $2::uuid)
         )
@@ -467,7 +480,8 @@ export async function fetchProductionErrorSnapshot(
           SELECT
             ${ERROR_LOG_SNAPSHOT_PROJECTION}
           FROM public.error_logs
-          WHERE (
+          WHERE ${ACTIVE_ERROR_LOG_PREDICATE}
+          AND (
             $1::timestamptz IS NULL
             OR ROW(error_logs.created_at, error_logs.id) <= ROW($1::timestamptz, $2::uuid)
           )
@@ -532,7 +546,7 @@ export async function fetchProductionErrorSnapshot(
       ErrorSnapshotExport,
       'manifestChecksum'
     > = {
-      version: 2,
+      version: 3,
       commandId: 'fixerrors',
       safetyContract: OPERATION.safetyContract,
       snapshotId: randomUUID(),
@@ -608,28 +622,35 @@ export function verifyErrorSnapshot(
     'indeterminate',
   ]);
   const cleanup = verified.cleanup;
+  const validReconciliationStates = new Set<ErrorSnapshotReconciliationState>([
+    'not_started',
+    'archived',
+    'already_archived',
+    'failed',
+    'indeterminate',
+  ]);
   const cleanupArraysValid =
     cleanup &&
-    Array.isArray(cleanup.deletedErrorLogIds) &&
-    cleanup.deletedErrorLogIds.every((id) => typeof id === 'string') &&
-    new Set(cleanup.deletedErrorLogIds).size ===
-      cleanup.deletedErrorLogIds.length &&
-    Array.isArray(cleanup.deletedAlertIds) &&
-    cleanup.deletedAlertIds.every((id) => typeof id === 'string') &&
-    new Set(cleanup.deletedAlertIds).size === cleanup.deletedAlertIds.length &&
+    Array.isArray(cleanup.archivedErrorLogIds) &&
+    cleanup.archivedErrorLogIds.every((id) => typeof id === 'string') &&
+    new Set(cleanup.archivedErrorLogIds).size ===
+      cleanup.archivedErrorLogIds.length &&
     Array.isArray(cleanup.attemptedErrorLogIds) &&
     cleanup.attemptedErrorLogIds.every((id) => typeof id === 'string') &&
     new Set(cleanup.attemptedErrorLogIds).size ===
       cleanup.attemptedErrorLogIds.length &&
-    cleanup.deletedErrorLogIds.every((id) => uniqueIds.has(id)) &&
-    cleanup.deletedAlertIds.every((id) => uniqueIds.has(id)) &&
+    cleanup.archivedErrorLogIds.every((id) => uniqueIds.has(id)) &&
     cleanup.attemptedErrorLogIds.every((id) => uniqueIds.has(id)) &&
+    validReconciliationStates.has(cleanup.reconciliationState) &&
+    (cleanup.remainingActiveCount === null ||
+      (Number.isSafeInteger(cleanup.remainingActiveCount) &&
+        cleanup.remainingActiveCount >= 0)) &&
     (cleanup.error === null || typeof cleanup.error === 'string');
   const emptyCleanupArrays =
     cleanupArraysValid &&
-    cleanup.deletedErrorLogIds.length === 0 &&
-    cleanup.deletedAlertIds.length === 0 &&
-    cleanup.attemptedErrorLogIds.length === 0;
+    cleanup.archivedErrorLogIds.length === 0 &&
+    cleanup.attemptedErrorLogIds.length === 0 &&
+    cleanup.remainingActiveCount === null;
   const cleanupStateValid =
     cleanupArraysValid &&
     (
@@ -637,30 +658,37 @@ export function verifyErrorSnapshot(
         cleanup.attemptedAt === null &&
         cleanup.completedAt === null &&
         cleanup.error === null &&
+        cleanup.reconciliationState === 'not_started' &&
         emptyCleanupArrays) ||
       (cleanup.status === 'in_progress' &&
         isValidIsoTimestamp(cleanup.attemptedAt) &&
         cleanup.completedAt === null &&
         cleanup.error === null &&
+        cleanup.reconciliationState === 'not_started' &&
         emptyCleanupArrays) ||
       (cleanup.status === 'completed' &&
         isValidIsoTimestamp(cleanup.attemptedAt) &&
         isValidIsoTimestamp(cleanup.completedAt) &&
         cleanup.error === null &&
+        (cleanup.reconciliationState === 'archived' ||
+          cleanup.reconciliationState === 'already_archived') &&
+        Number.isSafeInteger(cleanup.remainingActiveCount) &&
+        (cleanup.remainingActiveCount ?? -1) >= 0 &&
         cleanup.attemptedErrorLogIds.length === ids.length &&
         cleanup.attemptedErrorLogIds.every((id, index) => id === ids[index]) &&
-        cleanup.deletedErrorLogIds.length === ids.length &&
-        cleanup.deletedErrorLogIds.every((id, index) => id === ids[index])) ||
+        cleanup.archivedErrorLogIds.length === ids.length &&
+        cleanup.archivedErrorLogIds.every((id, index) => id === ids[index])) ||
       ((cleanup.status === 'failed' || cleanup.status === 'indeterminate') &&
         isValidIsoTimestamp(cleanup.attemptedAt) &&
         cleanup.completedAt === null &&
         typeof cleanup.error === 'string' &&
         cleanup.error.length > 0 &&
-        cleanup.deletedErrorLogIds.length === 0 &&
-        cleanup.deletedAlertIds.length === 0)
+        cleanup.archivedErrorLogIds.length === 0 &&
+        (cleanup.reconciliationState === 'failed' ||
+          cleanup.reconciliationState === 'indeterminate'))
     );
   const structurallyValid =
-    verified.version === 2 &&
+    verified.version === 3 &&
     verified.commandId === 'fixerrors' &&
     verified.safetyContract === OPERATION.safetyContract &&
     verified.table === 'public.error_logs' &&
@@ -775,9 +803,10 @@ export function markSnapshotCleanupNotRequired(
     status: 'completed',
     attemptedAt: completedAt,
     completedAt,
-    deletedErrorLogIds: [],
-    deletedAlertIds: [],
+    archivedErrorLogIds: [],
     attemptedErrorLogIds: [],
+    reconciliationState: 'already_archived',
+    remainingActiveCount: 0,
     error: null,
   });
 }
@@ -856,6 +885,33 @@ export class ErrorCleanupTransactionError extends Error {
   }
 }
 
+async function countRemainingActiveRows(client: PgClientLike): Promise<number> {
+  const remaining = await client.query<{ count: unknown }>(
+    `/* fixerrors:remaining-count */ SELECT COUNT(*)::text AS count FROM public.error_logs WHERE ${ACTIVE_ERROR_LOG_PREDICATE}`
+  );
+  const remainingCount = Number(remaining.rows[0]?.count ?? Number.NaN);
+  if (!Number.isSafeInteger(remainingCount) || remainingCount < 0) {
+    throw new Error('Remaining active error log count is invalid; cleanup rolled back');
+  }
+  return remainingCount;
+}
+
+async function assertArchiveSchemaContract(client: PgClientLike): Promise<void> {
+  const columns = await client.query<{ column_name: unknown }>(`
+    /* fixerrors:archive-schema */
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'error_logs'
+      AND column_name IN ('status', 'archived_at')
+    ORDER BY column_name
+  `);
+  const names = columns.rows.map((row) => String(row.column_name)).sort();
+  if (names.length !== 2 || names[0] !== 'archived_at' || names[1] !== 'status') {
+    throw new Error('error_logs archive schema contract changed; cleanup blocked');
+  }
+}
+
 async function clearProductionErrorLogs(
   client: PgClientLike,
   snapshot: ErrorSnapshotExport
@@ -863,7 +919,8 @@ async function clearProductionErrorLogs(
   const verified = verifyErrorSnapshot(snapshot);
   if (
     verified.analysis.status !== 'completed' ||
-    verified.cleanup.status !== 'in_progress'
+    (verified.cleanup.status !== 'in_progress' &&
+      verified.cleanup.status !== 'indeterminate')
   ) {
     throw new Error(
       'Cleanup requires a verified analyzed snapshot with durable in-progress evidence'
@@ -887,6 +944,7 @@ async function clearProductionErrorLogs(
         public.user_usage_events
       IN SHARE ROW EXCLUSIVE MODE
     `);
+    await assertArchiveSchemaContract(client);
     const foreignKeys = await client.query<Record<string, unknown>>(`
       /* fixerrors:fk-catalog */
       SELECT
@@ -942,21 +1000,14 @@ async function clearProductionErrorLogs(
     }
 
     if (targetIds.length === 0) {
-      const remaining = await client.query<{ count: unknown }>(
-        '/* fixerrors:remaining-count */ SELECT COUNT(*)::text AS count FROM public.error_logs'
-      );
-      const remainingCount = Number(remaining.rows[0]?.count ?? Number.NaN);
-      if (!Number.isSafeInteger(remainingCount) || remainingCount < 0) {
-        throw new Error('Remaining error log count is invalid; cleanup rolled back');
-      }
+      const remainingCount = await countRemainingActiveRows(client);
       commitAttempted = true;
       await client.query('/* fixerrors:cleanup-commit */ COMMIT');
       return {
         clearedCount: 0,
-        clearedAlertCount: 0,
         remainingCount,
-        deletedErrorLogIds: [],
-        deletedAlertIds: [],
+        archivedErrorLogIds: [],
+        reconciliationState: 'already_archived',
       };
     }
 
@@ -964,7 +1015,8 @@ async function clearProductionErrorLogs(
       `
         /* fixerrors:lock-target-rows */
         SELECT
-          ${ERROR_LOG_SNAPSHOT_PROJECTION}
+          ${ERROR_LOG_SNAPSHOT_PROJECTION},
+          error_logs.status::text AS status
         FROM public.error_logs
         WHERE error_logs.id = ANY($1::uuid[])
         ORDER BY error_logs.created_at ASC, error_logs.id ASC
@@ -972,117 +1024,75 @@ async function clearProductionErrorLogs(
       `,
       [targetIds]
     );
+    if (currentRowsResult.rows.length !== targetIds.length) {
+      throw new Error('Verified snapshot rows changed or are missing; cleanup blocked');
+    }
     const currentRows = currentRowsResult.rows.map(normalizeErrorRow);
-    if (
-      currentRows.length !== targetIds.length ||
-      snapshotChecksum(currentRows) !== verified.checksum
-    ) {
+    const statuses = currentRowsResult.rows.map((row) => String(row.status ?? ''));
+    const allActive = statuses.every((status) => status === 'active');
+    const allArchived = statuses.every((status) => status === 'archived');
+    if (!allActive && !allArchived) {
+      throw new Error('Verified snapshot rows have mixed archive state; cleanup blocked');
+    }
+    if (snapshotChecksum(currentRows) !== verified.checksum) {
       throw new Error('Verified snapshot rows changed or are missing; cleanup blocked');
     }
 
-    const serviceReferences = await client.query<{ id: unknown }>(
-      `
-        /* fixerrors:service-reference-check */
-        SELECT id
-        FROM public.service_health_events
-        WHERE recovery_error_log_id = ANY($1::uuid[])
-        LIMIT 1
-      `,
-      [targetIds]
-    );
-    const usageReferences = await client.query<{ id: unknown }>(
-      `
-        /* fixerrors:usage-reference-check */
-        SELECT id
-        FROM public.user_usage_events
-        WHERE error_log_id = ANY($1::uuid[])
-        LIMIT 1
-      `,
-      [targetIds]
-    );
-    if (serviceReferences.rows.length > 0 || usageReferences.rows.length > 0) {
-      throw new Error('Application data references exported error logs; cleanup blocked');
+    if (allArchived) {
+      const remainingCount = await countRemainingActiveRows(client);
+      commitAttempted = true;
+      await client.query('/* fixerrors:cleanup-commit */ COMMIT');
+      return {
+        clearedCount: targetIds.length,
+        remainingCount,
+        archivedErrorLogIds: [...targetIds],
+        reconciliationState: 'already_archived',
+      };
     }
 
-    const expectedAlerts = await client.query<{ error_log_id: unknown }>(
-      `
-        /* fixerrors:alert-reference-check */
-        SELECT error_log_id
-        FROM public.error_log_alerts
-        WHERE error_log_id = ANY($1::uuid[])
-        ORDER BY error_log_id
-      `,
-      [targetIds]
-    );
-    const expectedAlertIds = expectedAlerts.rows.map((row) =>
-      String(row.error_log_id)
-    );
-    const deletedAlerts = await client.query<{ error_log_id: unknown }>(
-      `
-        /* fixerrors:delete-alerts */
-        DELETE FROM public.error_log_alerts
-        WHERE error_log_id = ANY($1::uuid[])
-        RETURNING error_log_id
-      `,
-      [targetIds]
-    );
-    const deletedAlertIds = deletedAlerts.rows
-      .map((row) => String(row.error_log_id))
-      .sort();
-    if (
-      deletedAlertIds.length !== expectedAlertIds.length ||
-      deletedAlertIds.some((id, index) => id !== expectedAlertIds[index])
-    ) {
-      throw new Error('Dependent diagnostic alert deletion mismatch; cleanup rolled back');
-    }
-
-    const deletedErrorLogIds: string[] = [];
+    const archivedErrorLogIds: string[] = [];
     for (
       let index = 0;
       index < targetIds.length;
-      index += ERROR_DELETE_BATCH_SIZE
+      index += ERROR_ARCHIVE_BATCH_SIZE
     ) {
-      const batchIds = targetIds.slice(index, index + ERROR_DELETE_BATCH_SIZE);
+      const batchIds = targetIds.slice(index, index + ERROR_ARCHIVE_BATCH_SIZE);
       attemptedErrorLogIds.push(...batchIds);
-      const deleted = await client.query<{ id: unknown }>(
+      const archived = await client.query<{ id: unknown }>(
         `
-          /* fixerrors:delete-error-batch */
-          DELETE FROM public.error_logs
+          /* fixerrors:archive-error-batch */
+          UPDATE public.error_logs
+          SET status = 'archived',
+              archived_at = NOW()
           WHERE id = ANY($1::uuid[])
+            AND status = 'active'
           RETURNING id
         `,
         [batchIds]
       );
-      const deletedIds = deleted.rows.map((row) => String(row.id));
-      const deletedIdSet = new Set(deletedIds);
+      const archivedIds = archived.rows.map((row) => String(row.id));
+      const archivedIdSet = new Set(archivedIds);
       if (
-        deletedIds.length !== batchIds.length ||
-        deletedIdSet.size !== batchIds.length ||
-        batchIds.some((id) => !deletedIdSet.has(id))
+        archivedIds.length !== batchIds.length ||
+        archivedIdSet.size !== batchIds.length ||
+        batchIds.some((id) => !archivedIdSet.has(id))
       ) {
         throw new Error(
-          `Deleted ${deletedIds.length} of ${batchIds.length} exported error logs; cleanup rolled back`
+          `Archived ${archivedIds.length} of ${batchIds.length} exported error logs; cleanup rolled back`
         );
       }
-      deletedErrorLogIds.push(...batchIds);
+      archivedErrorLogIds.push(...batchIds);
     }
 
-    const remaining = await client.query<{ count: unknown }>(
-      '/* fixerrors:remaining-count */ SELECT COUNT(*)::text AS count FROM public.error_logs'
-    );
-    const remainingCount = Number(remaining.rows[0]?.count ?? Number.NaN);
-    if (!Number.isSafeInteger(remainingCount) || remainingCount < 0) {
-      throw new Error('Remaining error log count is invalid; cleanup rolled back');
-    }
+    const remainingCount = await countRemainingActiveRows(client);
 
     commitAttempted = true;
     await client.query('/* fixerrors:cleanup-commit */ COMMIT');
     return {
-      clearedCount: deletedErrorLogIds.length,
-      clearedAlertCount: deletedAlertIds.length,
+      clearedCount: archivedErrorLogIds.length,
       remainingCount,
-      deletedErrorLogIds,
-      deletedAlertIds,
+      archivedErrorLogIds,
+      reconciliationState: 'archived',
     };
   } catch (error) {
     if (!commitAttempted) {
@@ -1126,6 +1136,7 @@ type VerifiedSnapshotCleanupCoreOptions = {
   io?: SnapshotIo;
   lock?: SnapshotLock;
   lockPath?: string;
+  lockAlreadyHeld?: boolean;
   now?: Date;
 };
 
@@ -1144,11 +1155,13 @@ async function executeVerifiedSnapshotCleanupCore(
   const analysisPath = options.analysisPath ?? ERROR_ANALYSIS_PATH;
   const io = options.io ?? DEFAULT_SNAPSHOT_IO;
   const now = options.now ?? new Date();
-  const releaseLock = acquireErrorSnapshotArtifactLock(
-    options.confirmation.snapshotId,
-    options.lock ?? DEFAULT_SNAPSHOT_LOCK,
-    options.lockPath ?? ERROR_SNAPSHOT_PATH
-  );
+  const releaseLock = options.lockAlreadyHeld
+    ? () => undefined
+    : acquireErrorSnapshotArtifactLock(
+        options.confirmation.snapshotId,
+        options.lock ?? DEFAULT_SNAPSHOT_LOCK,
+        options.lockPath ?? ERROR_SNAPSHOT_PATH
+      );
   const persist = (snapshot: ErrorSnapshotExport): ErrorSnapshotExport => {
     const verified = writeAndVerifyErrorSnapshot(snapshot, snapshotPath, io);
     if (latestSnapshotPath && latestSnapshotPath !== snapshotPath) {
@@ -1197,30 +1210,33 @@ async function executeVerifiedSnapshotCleanupCore(
     if (snapshot.cleanup.status === 'completed') {
       throw new Error('Snapshot cleanup has already completed');
     }
-    if (
-      snapshot.cleanup.status === 'in_progress' ||
-      snapshot.cleanup.status === 'indeterminate'
-    ) {
-      throw new Error('Snapshot cleanup outcome requires manual investigation');
-    }
 
-    const attemptedAt = now.toISOString();
-    const inProgress = persist(
-      withCleanupState(snapshot, {
-        ...emptyCleanup(),
-        status: 'in_progress',
-        attemptedAt,
-      })
-    );
+    const resumeExistingAttempt =
+      snapshot.cleanup.status === 'in_progress' ||
+      snapshot.cleanup.status === 'indeterminate';
+    const attemptedAt =
+      resumeExistingAttempt && isValidIsoTimestamp(snapshot.cleanup.attemptedAt)
+        ? snapshot.cleanup.attemptedAt
+        : now.toISOString();
+    const inProgress = resumeExistingAttempt
+      ? snapshot
+      : persist(
+          withCleanupState(snapshot, {
+            ...emptyCleanup(),
+            status: 'in_progress',
+            attemptedAt,
+          })
+        );
     try {
       const result = await clearProductionErrorLogs(options.client, inProgress);
       const completed = withCleanupState(inProgress, {
         status: 'completed',
         attemptedAt,
         completedAt: new Date().toISOString(),
-        deletedErrorLogIds: result.deletedErrorLogIds,
-        deletedAlertIds: result.deletedAlertIds,
-        attemptedErrorLogIds: result.deletedErrorLogIds,
+        archivedErrorLogIds: result.archivedErrorLogIds,
+        attemptedErrorLogIds: result.archivedErrorLogIds,
+        reconciliationState: result.reconciliationState,
+        remainingActiveCount: result.remainingCount,
         error: null,
       });
       try {
@@ -1230,9 +1246,10 @@ async function executeVerifiedSnapshotCleanupCore(
           status: 'indeterminate',
           attemptedAt,
           completedAt: null,
-          deletedErrorLogIds: [],
-          deletedAlertIds: [],
-          attemptedErrorLogIds: result.deletedErrorLogIds,
+          archivedErrorLogIds: [],
+          attemptedErrorLogIds: result.archivedErrorLogIds,
+          reconciliationState: 'indeterminate',
+          remainingActiveCount: null,
           error: `Post-commit artifact update failed: ${safeErrorMessage(artifactError)}`,
         });
         try {
@@ -1249,9 +1266,10 @@ async function executeVerifiedSnapshotCleanupCore(
         status: error.outcome,
         attemptedAt,
         completedAt: null,
-        deletedErrorLogIds: [],
-        deletedAlertIds: [],
+        archivedErrorLogIds: [],
         attemptedErrorLogIds: error.attemptedErrorLogIds,
+        reconciliationState: error.outcome,
+        remainingActiveCount: null,
         error: safeErrorMessage(error),
       });
       try {
@@ -1270,11 +1288,13 @@ export function executeVerifiedSnapshotCleanup(options: {
   client: PgClientLike;
   confirmation: CleanupConfirmation;
   databaseTargetFingerprint: string;
+  lockAlreadyHeld?: boolean;
 }): Promise<ErrorLogClearResult> {
   return executeVerifiedSnapshotCleanupCore({
     client: options.client,
     confirmation: options.confirmation,
     databaseTargetFingerprint: options.databaseTargetFingerprint,
+    lockAlreadyHeld: options.lockAlreadyHeld === true,
   });
 }
 

@@ -31,6 +31,7 @@ async function clearNetworkErrors() {
     const { data: errors, error: fetchError } = await supabase
       .from('error_logs')
       .select('*')
+      .eq('status', 'active')
       .ilike('error_message', '%Failed to fetch%')
       .ilike('error_message', '%/api/messages/notifications%')
       .order('created_at', { ascending: false });
@@ -54,7 +55,11 @@ async function clearNetworkErrors() {
     const errorIds = errors.map(e => e.id);
     const { error: deleteError } = await supabase
       .from('error_logs')
-      .delete()
+      .update({
+        status: 'archived',
+        archived_at: new Date().toISOString(),
+      })
+      .eq('status', 'active')
       .in('id', errorIds);
 
     if (deleteError) {

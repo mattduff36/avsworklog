@@ -3,9 +3,11 @@ export type TrustedOperationalCommandId = 'fixerrors';
 export type OperationalMutation = {
   schema: string;
   table: string;
-  operation: 'delete';
+  operation: 'delete' | 'update';
   identityColumn: string;
   purpose: 'primary-diagnostic' | 'dependent-diagnostic';
+  updatedColumns?: readonly string[];
+  targetPredicate?: string;
 };
 
 export type TrustedOperationalAction = {
@@ -18,22 +20,17 @@ export type TrustedOperationalAction = {
 export const TRUSTED_OPERATIONAL_ACTIONS = {
   fixerrors: {
     commandId: 'fixerrors',
-    safetyContract: 'fixerrors-exact-snapshot-v2',
+    safetyContract: 'fixerrors-exact-snapshot-v3',
     trustedOperationalAction: true,
     allowedMutations: [
       {
         schema: 'public',
         table: 'error_logs',
-        operation: 'delete',
+        operation: 'update',
         identityColumn: 'id',
         purpose: 'primary-diagnostic',
-      },
-      {
-        schema: 'public',
-        table: 'error_log_alerts',
-        operation: 'delete',
-        identityColumn: 'error_log_id',
-        purpose: 'dependent-diagnostic',
+        updatedColumns: ['status', 'archived_at'],
+        targetPredicate: "status = 'active'",
       },
     ],
   },
@@ -71,6 +68,8 @@ function mutationsMatch(
       mutation.operation,
       mutation.identityColumn,
       mutation.purpose,
+      (mutation.updatedColumns ?? []).join(','),
+      mutation.targetPredicate ?? '',
     ].join(':');
   const allowedKeys = new Set(allowed.map(mutationKey));
   return requested.every((mutation) => allowedKeys.has(mutationKey(mutation)));

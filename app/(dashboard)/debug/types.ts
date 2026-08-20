@@ -65,6 +65,8 @@ export interface ErrorLogEntry {
   user_agent: string;
   component_name: string | null;
   additional_data: ErrorAdditionalData | null;
+  status?: 'active' | 'archived';
+  archived_at?: string | null;
 }
 
 export interface UsageAnalyticsSummary {

@@ -30,6 +30,7 @@ async function clearLocalhostErrors() {
     const { data: localhostErrors } = await supabase
       .from('error_logs')
       .select('id')
+      .eq('status', 'active')
       .ilike('page_url', '%localhost%');
 
     const localhostCount = localhostErrors?.length || 0;
@@ -44,7 +45,11 @@ async function clearLocalhostErrors() {
     // Delete them
     const { error: deleteError } = await supabase
       .from('error_logs')
-      .delete()
+      .update({
+        status: 'archived',
+        archived_at: new Date().toISOString(),
+      })
+      .eq('status', 'active')
       .ilike('page_url', '%localhost%');
 
     if (deleteError) {
@@ -58,6 +63,7 @@ async function clearLocalhostErrors() {
     const { data: remaining } = await supabase
       .from('error_logs')
       .select('id, timestamp, error_message, page_url')
+      .eq('status', 'active')
       .order('timestamp', { ascending: false })
       .limit(10);
 

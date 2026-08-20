@@ -253,6 +253,7 @@ export function ErrorLogsDebugPanel() {
   const [searchQuery, setSearchQuery] = useState('');
   const [errorSummaryExpanded, setErrorSummaryExpanded] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('viewedErrorLogs');
@@ -269,7 +270,7 @@ export function ErrorLogsDebugPanel() {
   useEffect(() => {
     void fetchErrorLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [showArchived]);
 
   useEffect(() => {
     return () => {
@@ -283,7 +284,11 @@ export function ErrorLogsDebugPanel() {
     setLoadingErrorLogs(true);
 
     try {
-      const response = await fetch('/api/debug/error-logs?limit=200', {
+      const params = new URLSearchParams({ limit: '200' });
+      if (showArchived) {
+        params.set('includeArchived', '1');
+      }
+      const response = await fetch(`/api/debug/error-logs?${params.toString()}`, {
         cache: 'no-store',
       });
       const payload = await response.json().catch(() => ({}));
@@ -387,16 +392,16 @@ export function ErrorLogsDebugPanel() {
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload?.error || 'Failed to clear error logs');
+        throw new Error(payload?.error || 'Failed to archive error logs');
       }
 
-      toast.success('All error logs cleared successfully');
+      toast.success('Active error logs archived successfully');
       setLastCheckedErrorId(null);
       lastNotifiedErrorIdRef.current = null;
       fetchErrorLogs();
     } catch (error) {
       console.error('Error clearing error logs:', error);
-      toast.error('Failed to clear error logs');
+      toast.error('Failed to archive error logs');
     } finally {
       setClearingErrors(false);
     }
@@ -576,6 +581,14 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
             <CardDescription>Track all application errors and exceptions (Last 200 entries)</CardDescription>
           </div>
           <div className="flex gap-2">
+            <Button
+              onClick={() => setShowArchived((current) => !current)}
+              variant="outline"
+              size="sm"
+              aria-pressed={showArchived}
+            >
+              {showArchived ? 'Hide archived' : 'Show archived'}
+            </Button>
             <Button onClick={fetchErrorLogs} variant="outline" size="sm">
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
@@ -584,7 +597,10 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
               onClick={clearAllErrorLogs}
               variant={confirmClearAll ? 'outline' : 'destructive'}
               size="sm"
-              disabled={clearingErrors || errorLogs.length === 0}
+              disabled={
+                clearingErrors ||
+                errorLogs.filter((log) => log.status !== 'archived').length === 0
+              }
               className={
                 confirmClearAll
                   ? 'border-red-500 text-red-300 bg-red-500/10 hover:bg-red-500/20'
@@ -592,7 +608,7 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
               }
             >
               {clearingErrors ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash className="h-4 w-4 mr-2" />}
-              {clearingErrors ? 'Clearing...' : confirmClearAll ? 'Confirm?' : 'Clear All'}
+              {clearingErrors ? 'Archiving...' : confirmClearAll ? 'Confirm?' : 'Clear All'}
             </Button>
           </div>
         </div>

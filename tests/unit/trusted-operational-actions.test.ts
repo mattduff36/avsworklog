@@ -10,7 +10,7 @@ function trustedExecution(
 ): OperationalClassificationInput {
   return {
     commandId: 'fixerrors',
-    safetyContract: 'fixerrors-exact-snapshot-v2',
+    safetyContract: 'fixerrors-exact-snapshot-v3',
     intent: 'execute',
     explicitlyRequested: true,
     confirmationBoundToSnapshot: true,
@@ -21,17 +21,31 @@ function trustedExecution(
 }
 
 describe('TEE V2.2 trusted operational action policy', () => {
-  it('TEE22-TRUST-008 treats registered safeguarded fixerrors execution as operational, not CRITICAL engineering', () => {
+  it('FE-TRUST-001 treats registered safeguarded fixerrors archive execution as operational, not CRITICAL engineering', () => {
+    expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract).toBe(
+      'fixerrors-exact-snapshot-v3'
+    );
+    expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations).toEqual([
+      {
+        schema: 'public',
+        table: 'error_logs',
+        operation: 'update',
+        identityColumn: 'id',
+        purpose: 'primary-diagnostic',
+        updatedColumns: ['status', 'archived_at'],
+        targetPredicate: "status = 'active'",
+      },
+    ]);
     expect(classifyOperationalAction(trustedExecution())).toMatchObject({
       kind: 'operational_execution',
       lane: null,
       trusted: true,
       trustSuspended: false,
-      safetyContract: 'fixerrors-exact-snapshot-v2',
+      safetyContract: 'fixerrors-exact-snapshot-v3',
     });
   });
 
-  it('keeps modification of fixerrors destructive logic CRITICAL', () => {
+  it('keeps modification of fixerrors archive logic CRITICAL', () => {
     expect(
       classifyOperationalAction(trustedExecution({ intent: 'modify' }))
     ).toMatchObject({
@@ -88,7 +102,7 @@ describe('TEE V2.2 trusted operational action policy', () => {
   it('suspends trust when the registered command safety-contract version differs', () => {
     expect(
       classifyOperationalAction(
-        trustedExecution({ safetyContract: 'fixerrors-exact-snapshot-v1' })
+        trustedExecution({ safetyContract: 'fixerrors-exact-snapshot-v2' })
       )
     ).toMatchObject({
       kind: 'engineering_task',
@@ -98,7 +112,27 @@ describe('TEE V2.2 trusted operational action policy', () => {
     });
   });
 
-  it('suspends trust when execution requests wider production mutation scope', () => {
+  it('suspends trust when execution requests delete, extra tables, or wider columns', () => {
+    expect(
+      classifyOperationalAction(
+        trustedExecution({
+          requestedMutations: [
+            {
+              schema: 'public',
+              table: 'error_logs',
+              operation: 'delete',
+              identityColumn: 'id',
+              purpose: 'primary-diagnostic',
+            },
+          ],
+        })
+      )
+    ).toMatchObject({
+      kind: 'engineering_task',
+      lane: 'critical',
+      trustSuspended: true,
+      reason: 'trusted-operational-scope-mismatch',
+    });
     expect(
       classifyOperationalAction(
         trustedExecution({
@@ -106,10 +140,32 @@ describe('TEE V2.2 trusted operational action policy', () => {
             ...TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations,
             {
               schema: 'public',
-              table: 'user_usage_events',
+              table: 'error_log_alerts',
               operation: 'delete',
+              identityColumn: 'error_log_id',
+              purpose: 'dependent-diagnostic',
+            },
+          ],
+        })
+      )
+    ).toMatchObject({
+      kind: 'engineering_task',
+      lane: 'critical',
+      trustSuspended: true,
+      reason: 'trusted-operational-scope-mismatch',
+    });
+    expect(
+      classifyOperationalAction(
+        trustedExecution({
+          requestedMutations: [
+            {
+              schema: 'public',
+              table: 'error_logs',
+              operation: 'update',
               identityColumn: 'id',
               purpose: 'primary-diagnostic',
+              updatedColumns: ['status', 'archived_at', 'error_message'],
+              targetPredicate: "status = 'active'",
             },
           ],
         })

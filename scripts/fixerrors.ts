@@ -8,7 +8,7 @@
  * 4. Groups errors into patterns (by type + normalized message + component)
  * 5. Writes a structured markdown report to docs_private/error-analysis.md
  * 6. Updates the JSON tracking data in docs_private/error-fix-log.md
- * 7. Clears the production error_logs table after successful analysis
+ * 7. Archives the exact exported active error_logs rows after successful analysis
  * 8. Prints a concise terminal summary
  *
  * Usage: npm run fixerrors
@@ -1211,12 +1211,10 @@ async function main() {
           },
         });
         console.log(
-          `  Cleared ${clearResult.clearedCount} exact exported error log entr${clearResult.clearedCount === 1 ? 'y' : 'ies'}`
+          `  Archived ${clearResult.clearedCount} exact exported error log entr${clearResult.clearedCount === 1 ? 'y' : 'ies'}`
         );
-        console.log(
-          `  Cleared ${clearResult.clearedAlertCount} dependent diagnostic alert entr${clearResult.clearedAlertCount === 1 ? 'y' : 'ies'}`
-        );
-        console.log(`  Newer/unexported error logs remaining: ${clearResult.remainingCount}`);
+        console.log(`  Reconciliation: ${clearResult.reconciliationState}`);
+        console.log(`  Remaining active error logs: ${clearResult.remainingCount}`);
         await run.finish('passed');
         return;
       } catch (error) {
@@ -1380,6 +1378,41 @@ async function main() {
       }
     );
 
+    let archiveResult: {
+      clearedCount: number;
+      remainingCount: number;
+      reconciliationState: string;
+    } | null = null;
+    if (snapshot.rowCount > 0) {
+      archiveResult = await run.step(
+        'Archive verified snapshot rows',
+        () =>
+          executeVerifiedSnapshotCleanup({
+            client: databaseClient,
+            confirmation: {
+              snapshotId: snapshot.snapshotId,
+              checksum: snapshot.checksum,
+              rowCount: snapshot.rowCount,
+              databaseTargetFingerprint: snapshot.databaseTargetFingerprint,
+              expiresAt: snapshot.expiresAt,
+              safetyContract: snapshot.safetyContract,
+              manifestChecksum: snapshot.manifestChecksum,
+            },
+            databaseTargetFingerprint,
+            lockAlreadyHeld: true,
+          }),
+        {
+          operationalCommand: TRUSTED_OPERATIONAL_ACTIONS.fixerrors.commandId,
+          operationalSafetyContract:
+            TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract,
+          operationalExecutionCandidate: true,
+          confirmationBoundToSnapshot: true,
+          snapshotId: snapshot.snapshotId,
+          rowCount: snapshot.rowCount,
+        }
+      );
+    }
+
     console.log('\n=============================================');
     console.log('EXPORT SUMMARY');
     console.log('=============================================');
@@ -1387,22 +1420,13 @@ async function main() {
     console.log(`  After filtering:     ${errors.length}`);
     console.log(`  Patterns found:      ${patterns.length}`);
     console.log(`  Root-cause clusters: ${clusters.length}`);
-    console.log(
-      snapshot.rowCount === 0
-        ? '  Production rows cleared: 0 (no cleanup required)'
-        : '  Production rows cleared: 0 (confirmation required)'
-    );
-
-    if (snapshot.rowCount === 0) {
-      console.log('\nNo cleanup is required; production error_logs is empty.');
+    if (archiveResult) {
+      console.log(
+        `  Production rows archived: ${archiveResult.clearedCount} (${archiveResult.reconciliationState})`
+      );
+      console.log(`  Remaining active:    ${archiveResult.remainingCount}`);
     } else {
-      console.log('\nCleanup is ready but has not run.');
-      console.log(
-        'After confirming the displayed snapshot, run this exact bound command:'
-      );
-      console.log(
-        `npm run fixerrors -- --cleanup --snapshot-id=${snapshot.snapshotId} --checksum=${snapshot.checksum} --row-count=${snapshot.rowCount} --target=${snapshot.databaseTargetFingerprint} --expires-at=${snapshot.expiresAt} --safety-contract=${snapshot.safetyContract} --manifest=${snapshot.manifestChecksum}`
-      );
+      console.log('  Production rows archived: 0 (no active rows)');
     }
     console.log('=============================================\n');
     await run.finish('passed');
