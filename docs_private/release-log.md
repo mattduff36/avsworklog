@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.38.1
+
+**GIT COMMIT MESSAGE**
+`fix(migrations): harden explicit migration execution`
+
+**PUSHED AT**
+2026-08-20T19:32:49.597Z
+
+**WHAT CHANGED**
+Reject transaction control at EOF. Remove trailing whitespace. Establish current-truth guidance. Harden explicit migration execution.
+
+**VERSION HISTORY DETAILS**
+- Updated data storage, with changes to automation scripts, automated tests, data storage, and documentation.
+- Updated help and FAQ, with changes to data storage and documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(migrations): reject transaction control at EOF`
+- `test(migrations): remove trailing whitespace`
+- `docs(project): establish current-truth guidance`
+- `fix(migrations): harden explicit migration execution`
+
 ## 0826.38.0
 
 **GIT COMMIT MESSAGE**

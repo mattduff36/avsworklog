@@ -1,5 +1,19 @@
 [
   {
+    "version": "0826.38.1",
+    "updateKind": "minor",
+    "title": "Migrations improvements",
+    "description": "Reject transaction control at EOF. Remove trailing whitespace. Establish current-truth guidance. Harden explicit migration execution.",
+    "summary": "Reject transaction control at EOF. Remove trailing whitespace. Establish current-truth guidance. Harden explicit migration execution.",
+    "details": [
+      "Updated data storage, with changes to automation scripts, automated tests, data storage, and documentation.",
+      "Updated help and FAQ, with changes to data storage and documentation."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-08-20T19:32:49.597Z"
+  },
+  {
     "version": "0826.38.0",
     "updateKind": "major",
     "title": "Error reporting update",
