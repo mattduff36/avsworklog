@@ -738,4 +738,3 @@ describe('MIG-DOCS-001 active migration docs', () => {
     expect(scriptsReadme).toMatch(/dry-run does not load `\.env\.local`/i);
   });
 });
-
