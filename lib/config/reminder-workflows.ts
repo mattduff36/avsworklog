@@ -23,7 +23,7 @@ export interface ReminderWorkflowConfig {
   settingsPanelId: string;
 }
 
-export const REMINDER_OVERVIEW_TABS: ReminderOverviewTabConfig[] = [
+export const REMINDER_DAILY_CHECK_TABS: ReminderOverviewTabConfig[] = [
   {
     id: 'vans',
     label: 'Vans',
@@ -45,6 +45,9 @@ export const REMINDER_OVERVIEW_TABS: ReminderOverviewTabConfig[] = [
     workflowKey: FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
     assetType: 'hgv',
   },
+];
+
+export const REMINDER_CATEGORY_TABS: ReminderOverviewTabConfig[] = [
   {
     id: 'legacy-job-addresses',
     label: 'Legacy job addresses',
@@ -59,6 +62,11 @@ export const REMINDER_OVERVIEW_TABS: ReminderOverviewTabConfig[] = [
   },
 ];
 
+export const REMINDER_OVERVIEW_TABS: ReminderOverviewTabConfig[] = [
+  ...REMINDER_DAILY_CHECK_TABS,
+  ...REMINDER_CATEGORY_TABS,
+];
+
 export const REMINDER_WORKFLOWS: ReminderWorkflowConfig[] = [
   {
     key: FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
@@ -68,6 +76,8 @@ export const REMINDER_WORKFLOWS: ReminderWorkflowConfig[] = [
   },
 ];
 
+export const REMINDER_DAILY_CHECK_TAB_IDS = REMINDER_DAILY_CHECK_TABS.map((tab) => tab.id);
+export const REMINDER_CATEGORY_TAB_IDS = REMINDER_CATEGORY_TABS.map((tab) => tab.id);
 export const REMINDER_OVERVIEW_TAB_IDS = REMINDER_OVERVIEW_TABS.map((tab) => tab.id);
 
 export function getReminderOverviewTab(id: string): ReminderOverviewTabConfig | undefined {
@@ -76,6 +86,14 @@ export function getReminderOverviewTab(id: string): ReminderOverviewTabConfig | 
 
 export function getReminderWorkflow(key: string): ReminderWorkflowConfig | undefined {
   return REMINDER_WORKFLOWS.find((workflow) => workflow.key === key);
+}
+
+export function isReminderDailyCheckTabId(id: string): id is (typeof REMINDER_DAILY_CHECK_TABS)[number]['id'] {
+  return REMINDER_DAILY_CHECK_TAB_IDS.includes(id);
+}
+
+export function isReminderCategoryTabId(id: string): id is (typeof REMINDER_CATEGORY_TABS)[number]['id'] {
+  return REMINDER_CATEGORY_TAB_IDS.includes(id);
 }
 
 export function isValidReminderOverviewTabId(id: string): boolean {

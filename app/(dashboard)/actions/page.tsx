@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BellRing, CheckCircle2, ClipboardList, EyeOff, Settings } from 'lucide-react';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
@@ -12,9 +12,13 @@ import {
   FLEET_INSPECTION_OVERDUE_WORKFLOW_KEY,
   getReminderOverviewTab,
   INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY,
+  isReminderCategoryTabId,
+  isReminderDailyCheckTabId,
   isValidReminderOverviewTabId,
   PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY,
-  REMINDER_OVERVIEW_TABS,
+  REMINDER_CATEGORY_TABS,
+  REMINDER_DAILY_CHECK_TABS,
+  type ReminderOverviewTabConfig,
 } from '@/lib/config/reminder-workflows';
 import { YardTransfersPanel } from './components/YardTransfersPanel';
 import {
@@ -45,7 +49,8 @@ const ACTIONS_ARCHIVE_TABS = [
 ] as const;
 
 type ActionsArchiveTabId = (typeof ACTIONS_ARCHIVE_TABS)[number]['id'];
-type ActionsOverviewTabId = string | ActionsArchiveTabId;
+type ActionsDailyCheckTabId = string | ActionsArchiveTabId;
+type ActionsPageTabId = 'overview' | 'settings' | (typeof REMINDER_CATEGORY_TABS)[number]['id'];
 
 function isActionsArchiveTabId(value: string): value is ActionsArchiveTabId {
   return ACTIONS_ARCHIVE_TABS.some((tab) => tab.id === value);
@@ -53,6 +58,20 @@ function isActionsArchiveTabId(value: string): value is ActionsArchiveTabId {
 
 function isValidActionsOverviewTabId(value: string): boolean {
   return isValidReminderOverviewTabId(value) || isActionsArchiveTabId(value);
+}
+
+function getActionsPageTab(requestedTab: string, canManage: boolean): ActionsPageTabId {
+  if (requestedTab === 'settings' && canManage) return 'settings';
+  if (isReminderCategoryTabId(requestedTab)) return requestedTab;
+  return 'overview';
+}
+
+function getActionsDailyCheckTab(requestedTab: string): ActionsDailyCheckTabId {
+  if (isReminderDailyCheckTabId(requestedTab) || isActionsArchiveTabId(requestedTab)) {
+    return requestedTab;
+  }
+
+  return REMINDER_DAILY_CHECK_TABS[0]?.id || 'vans';
 }
 
 function ActionsContent() {
@@ -66,15 +85,14 @@ function ActionsContent() {
   const [summaryRefreshToken, setSummaryRefreshToken] = useState(0);
   const [summary, setSummary] = useState<ActionsSummaryStats>(EMPTY_ACTIONS_SUMMARY);
   const requestedTab = searchParams.get('tab') || 'vans';
-  const pageTab: 'overview' | 'settings' = requestedTab === 'settings' && canManage ? 'settings' : 'overview';
-  const overviewTab: ActionsOverviewTabId = isValidActionsOverviewTabId(requestedTab)
-    ? requestedTab
-    : REMINDER_OVERVIEW_TABS[0]?.id || 'vans';
+  const pageTab = getActionsPageTab(requestedTab, canManage);
+  const dailyCheckTab = getActionsDailyCheckTab(requestedTab);
+  const lastDailyCheckTabRef = useRef<ActionsDailyCheckTabId>(dailyCheckTab);
+  const activeDailyCheckTab = getReminderOverviewTab(dailyCheckTab);
 
-  const activeOverviewTab = useMemo(
-    () => getReminderOverviewTab(overviewTab),
-    [overviewTab],
-  );
+  if (isReminderDailyCheckTabId(requestedTab) || isActionsArchiveTabId(requestedTab)) {
+    lastDailyCheckTabRef.current = requestedTab;
+  }
 
   useEffect(() => {
     if (!actionsPermissionLoading && !canViewActions) {
@@ -158,10 +176,15 @@ function ActionsContent() {
       return;
     }
 
-    router.push(`/actions?tab=${overviewTab}`, { scroll: false });
+    if (isReminderCategoryTabId(value)) {
+      router.push(`/actions?tab=${value}`, { scroll: false });
+      return;
+    }
+
+    router.push(`/actions?tab=${lastDailyCheckTabRef.current}`, { scroll: false });
   }
 
-  function handleOverviewTabChange(value: string) {
+  function handleDailyCheckTabChange(value: string) {
     router.push(`/actions?tab=${value}`, { scroll: false });
   }
 
@@ -174,18 +197,29 @@ function ActionsContent() {
     setSummaryRefreshToken((current) => current + 1);
   }
 
-  function renderOverviewContent() {
-    if (overviewTab === 'ignored-reminders') {
+  function renderDailyCheckContent() {
+    if (dailyCheckTab === 'ignored-reminders') {
       return <IgnoredActionsPanel onRestored={handleSettingsSaved} />;
     }
 
-    if (overviewTab === 'actioned-reminders') {
+    if (dailyCheckTab === 'actioned-reminders') {
       return <ActionedActionsPanel />;
     }
 
-    if (!activeOverviewTab) return null;
+    if (!activeDailyCheckTab) return null;
 
-    if (activeOverviewTab.workflowKey === INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY) {
+    return (
+      <ActionsOverviewPanel
+        key={activeDailyCheckTab.id}
+        tab={activeDailyCheckTab}
+        refreshToken={refreshToken}
+        onActionsChanged={handleActionsChanged}
+      />
+    );
+  }
+
+  function renderCategoryContent(tab: ReminderOverviewTabConfig) {
+    if (tab.workflowKey === INVENTORY_KIOSK_UNALLOCATED_TAKE_WORKFLOW_KEY) {
       return (
         <YardTransfersPanel
           refreshToken={refreshToken}
@@ -196,8 +230,8 @@ function ActionsContent() {
 
     return (
       <ActionsOverviewPanel
-        key={activeOverviewTab.id}
-        tab={activeOverviewTab}
+        key={tab.id}
+        tab={tab}
         refreshToken={refreshToken}
         onActionsChanged={handleActionsChanged}
       />
@@ -241,24 +275,33 @@ function ActionsContent() {
       <ActionsSummaryCards summary={summary} />
 
       <Tabs value={pageTab} onValueChange={handlePageTabChange}>
-        {canManage ? (
-          <TabsList>
-            <TabsTrigger value="overview" className={tabTriggerClassName}>
-              <ClipboardList className="h-4 w-4" />
-              Daily Checks
-            </TabsTrigger>
+        <TabsList>
+          <TabsTrigger value="overview" className={tabTriggerClassName}>
+            <ClipboardList className="h-4 w-4" />
+            Daily Checks
+          </TabsTrigger>
+          {REMINDER_CATEGORY_TABS.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <TabsTrigger key={tab.id} value={tab.id} className={tabTriggerClassName}>
+                <Icon className="h-4 w-4" />
+                {tab.label}
+              </TabsTrigger>
+            );
+          })}
+          {canManage ? (
             <TabsTrigger value="settings" className={tabTriggerClassName}>
               <Settings className="h-4 w-4" />
               Settings
             </TabsTrigger>
-          </TabsList>
-        ) : null}
+          ) : null}
+        </TabsList>
 
         {pageTab === 'overview' ? (
           <div className="mt-3 flex justify-end">
-            <Tabs value={overviewTab} onValueChange={handleOverviewTabChange}>
+            <Tabs value={dailyCheckTab} onValueChange={handleDailyCheckTabChange}>
               <TabsList>
-                {REMINDER_OVERVIEW_TABS.map((tab) => {
+                {REMINDER_DAILY_CHECK_TABS.map((tab) => {
                   const Icon = tab.icon;
                   return (
                     <TabsTrigger key={tab.id} value={tab.id} className={tabTriggerClassName}>
@@ -286,8 +329,14 @@ function ActionsContent() {
         ) : null}
 
         <TabsContent value="overview" className="mt-0 space-y-6">
-          {renderOverviewContent()}
+          {renderDailyCheckContent()}
         </TabsContent>
+
+        {REMINDER_CATEGORY_TABS.map((tab) => (
+          <TabsContent key={tab.id} value={tab.id} className="mt-0 space-y-6">
+            {renderCategoryContent(tab)}
+          </TabsContent>
+        ))}
 
         {canManage ? (
           <TabsContent value="settings" className="mt-0 space-y-6">
