@@ -25,14 +25,23 @@ function createNotificationsSupabaseMock(
 function createNotificationCountSupabaseMock(
   count: number | null,
   error: { message?: string | null } | null = null,
-  deferredRows: unknown[] = []
+  deferredRows: unknown[] = [],
+  preferences: unknown[] = [],
+  hiddenCount: number | null = null
 ) {
   const pendingResponse = { count, error };
-  const pendingQuery = createSupabaseQueryMock(pendingResponse, ['select', 'eq', 'gte', 'is']);
+  const pendingQuery = createSupabaseQueryMock(pendingResponse, ['select', 'eq', 'gte', 'is', 'in']);
+  const hiddenQuery = createSupabaseQueryMock({ count: hiddenCount, error: null }, ['select', 'eq', 'gte', 'is', 'in']);
   const deferredQuery = createSupabaseQueryMock({ data: deferredRows, error: null }, ['select', 'eq', 'gte', 'is']);
-  const from = vi.fn()
-    .mockReturnValueOnce(pendingQuery)
-    .mockReturnValueOnce(deferredQuery);
+  const prefsQuery = createSupabaseQueryMock({ data: preferences, error: null }, ['select', 'eq', 'in']);
+  let recipientCalls = 0;
+  const from = vi.fn((table: string) => {
+    if (table === 'notification_preferences') return prefsQuery;
+    recipientCalls += 1;
+    if (recipientCalls === 1) return pendingQuery;
+    if (hiddenCount !== null && recipientCalls === 2) return hiddenQuery;
+    return deferredQuery;
+  });
 
   return {
     supabase: {
@@ -40,7 +49,9 @@ function createNotificationCountSupabaseMock(
     },
     query: pendingQuery,
     pendingQuery,
+    hiddenQuery,
     deferredQuery,
+    prefsQuery,
   };
 }
 
@@ -121,6 +132,78 @@ describe('listNotificationsForUser', () => {
     expect(query.select).toHaveBeenCalledWith(expect.stringContaining('acceptance_delay_minutes'));
     expect(query.select).toHaveBeenCalledWith(expect.stringContaining('module_key'));
   });
+
+  it('hides Did Not Work alerts when timesheet in-app notifications are disabled', async () => {
+    const recipientQuery = createSupabaseQueryMock(
+      {
+        data: [
+          {
+            id: 'recipient-dnw',
+            message_id: 'message-dnw',
+            status: 'PENDING',
+            signed_at: null,
+            first_shown_at: null,
+            signature_data: null,
+            messages: {
+              type: 'NOTIFICATION',
+              priority: 'HIGH',
+              created_via: 'timesheet_did_not_work_exception',
+              module_key: 'timesheets',
+              subject: 'Did Not Work selected on scheduled shift: Richard Beaken',
+              body: 'Richard Beaken selected Did Not Work.',
+              pdf_file_path: null,
+              acceptance_delay_minutes: 0,
+              sender_id: 'sender-1',
+              created_at: '2026-08-20T15:23:00.000Z',
+              sender: { full_name: 'Richard Beaken' },
+            },
+          },
+          {
+            id: 'recipient-talk',
+            message_id: 'message-talk',
+            status: 'PENDING',
+            signed_at: null,
+            first_shown_at: null,
+            signature_data: null,
+            messages: {
+              type: 'TOOLBOX_TALK',
+              priority: 'HIGH',
+              created_via: 'web',
+              module_key: 'toolbox_talks',
+              subject: 'Harness safety',
+              body: 'Read the attached document.',
+              pdf_file_path: null,
+              acceptance_delay_minutes: 0,
+              sender_id: 'sender-1',
+              created_at: '2026-08-20T15:00:00.000Z',
+              sender: { full_name: 'Site Manager' },
+            },
+          },
+        ],
+        error: null,
+      },
+      ['select', 'eq', 'gte', 'is', 'order', 'limit']
+    );
+    const prefsQuery = createSupabaseQueryMock(
+      {
+        data: [{ module_key: 'timesheets', notify_in_app: false }],
+        error: null,
+      },
+      ['select', 'eq', 'in']
+    );
+    const supabase = {
+      from: vi.fn((table: string) => (
+        table === 'notification_preferences' ? prefsQuery : recipientQuery
+      )),
+    };
+
+    await expect(listNotificationsForUser(supabase as never, 'user-1')).resolves.toMatchObject([
+      {
+        id: 'recipient-talk',
+        module_key: 'toolbox_talks',
+      },
+    ]);
+  });
 });
 
 describe('countUnreadNotificationsForUser', () => {
@@ -129,7 +212,7 @@ describe('countUnreadNotificationsForUser', () => {
 
     await expect(countUnreadNotificationsForUser(supabase as never, 'user-1')).resolves.toBe(0);
 
-    expect(supabase.from).toHaveBeenCalledTimes(2);
+    expect(supabase.from).toHaveBeenCalledWith('notification_preferences');
     expect(supabase.from).toHaveBeenCalledWith('message_recipients');
     expect(pendingQuery.select).toHaveBeenCalledWith('id, messages!inner(id)', { count: 'exact', head: true });
     expect(pendingQuery.eq).toHaveBeenNthCalledWith(1, 'user_id', 'user-1');
@@ -158,5 +241,18 @@ describe('countUnreadNotificationsForUser', () => {
     );
 
     await expect(countUnreadNotificationsForUser(supabase as never, 'user-1')).resolves.toBe(3);
+  });
+
+  it('excludes pending notifications for modules the user has disabled in-app', async () => {
+    const { supabase, hiddenQuery } = createNotificationCountSupabaseMock(
+      3,
+      null,
+      [],
+      [{ module_key: 'timesheets', notify_in_app: false }],
+      2
+    );
+
+    await expect(countUnreadNotificationsForUser(supabase as never, 'user-1')).resolves.toBe(1);
+    expect(hiddenQuery.in).toHaveBeenCalledWith('messages.module_key', ['timesheets']);
   });
 });

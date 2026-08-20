@@ -1,4 +1,5 @@
 import type { NotificationItem } from '@/types/messages';
+import type { NotificationModuleKey } from '@/types/notifications';
 
 /**
  * Resolve which notification to open based on a recipient ID from a deep-link.
@@ -21,6 +22,44 @@ export function isUnreadNotification(notification: Pick<NotificationItem, 'statu
   return notification.status === 'SHOWN'
     && notification.type === 'TOOLBOX_TALK'
     && notification.priority === 'LOW';
+}
+
+export function resolveNotificationModuleKey(
+  notification: Pick<NotificationItem, 'type' | 'created_via'> & {
+    module_key?: NotificationModuleKey | null;
+  }
+): NotificationModuleKey {
+  if (notification.module_key) return notification.module_key;
+
+  const createdVia = notification.created_via ?? '';
+
+  if (notification.type === 'TOOLBOX_TALK') return 'toolbox_talks';
+  if (createdVia.startsWith('toolbox-talks')) return 'toolbox_talks';
+  if (createdVia === 'sensitive_pin_security') return 'sensitive_pin_security';
+  if (createdVia === 'maintenance_reminder') return 'maintenance';
+  if (createdVia.includes('error')) return 'errors';
+  if (createdVia.includes('quote')) return 'quotes';
+  if (createdVia.startsWith('suggestion:')) return 'suggestions';
+  if (createdVia === 'absence_contact_line_manager') return 'absence';
+  if (
+    createdVia === 'timesheet_did_not_work_exception' ||
+    createdVia === 'timesheet_adjustment' ||
+    createdVia === 'timesheet_rejection'
+  ) {
+    return 'timesheets';
+  }
+  if (createdVia === 'timesheet_training_decline') return 'training';
+  if (createdVia === 'inventory_location_request') return 'inventory';
+  if (
+    createdVia === 'processed_absence_change' ||
+    createdVia === 'processed_absence_timesheet_adjustment' ||
+    createdVia.startsWith('processed_absence_')
+  ) {
+    return 'processed_absence';
+  }
+  if (notification.type === 'REMINDER') return 'reminders';
+
+  return 'general_notifications';
 }
 
 export function dailyAllocationNotificationHref(

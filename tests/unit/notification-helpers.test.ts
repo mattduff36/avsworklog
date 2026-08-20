@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isUnreadNotification, resolveNotificationToOpen, dailyAllocationNotificationHref } from '@/lib/utils/notification-helpers';
+import {
+  isUnreadNotification,
+  resolveNotificationModuleKey,
+  resolveNotificationToOpen,
+  dailyAllocationNotificationHref,
+} from '@/lib/utils/notification-helpers';
 import type { NotificationItem } from '@/types/messages';
 
 function makeNotification(overrides: Partial<NotificationItem> = {}): NotificationItem {
@@ -69,6 +74,28 @@ describe('resolveNotificationToOpen', () => {
     const result = resolveNotificationToOpen('dup', dupes);
     expect(result).not.toBeNull();
     expect(result!.subject).toBe('First match');
+  });
+});
+
+describe('resolveNotificationModuleKey', () => {
+  it('classifies Did Not Work alerts as timesheets even without a stored module key', () => {
+    expect(
+      resolveNotificationModuleKey({
+        type: 'NOTIFICATION',
+        created_via: 'timesheet_did_not_work_exception',
+        module_key: null,
+      })
+    ).toBe('timesheets');
+  });
+
+  it('keeps an explicit module key', () => {
+    expect(
+      resolveNotificationModuleKey({
+        type: 'NOTIFICATION',
+        created_via: 'timesheet_did_not_work_exception',
+        module_key: 'timesheets',
+      })
+    ).toBe('timesheets');
   });
 });
 

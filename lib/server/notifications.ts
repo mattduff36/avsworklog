@@ -2,7 +2,8 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import type { NotificationItem } from '@/types/messages';
 import type { NotificationModuleKey } from '@/types/notifications';
-import { isUnreadNotification } from '@/lib/utils/notification-helpers';
+import { isUnreadNotification, resolveNotificationModuleKey } from '@/lib/utils/notification-helpers';
+import { getDisabledInAppNotificationModuleKeys } from '@/lib/server/notification-preference-delivery';
 
 type ServerSupabaseClient = SupabaseClient<Database>;
 
@@ -130,6 +131,7 @@ export async function listNotificationsForUser(
 ): Promise<NotificationItem[]> {
   const sinceIso = buildNotificationSinceIso();
   const limit = parseNotificationLimit(options?.limit ? String(options.limit) : null);
+  const disabledModuleKeys = await getDisabledInAppNotificationModuleKeys(supabase, userId);
   const { data: recipients, error: fetchError } = await withRetry<RecipientQueryResult>(async () => {
     const result = (await supabase
       .from('message_recipients')
@@ -187,13 +189,20 @@ export async function listNotificationsForUser(
       if (!message?.type || !message.priority || !message.created_at) return null;
 
       const sender = pickSender(message.sender);
+      const moduleKey = resolveNotificationModuleKey({
+        type: message.type,
+        created_via: message.created_via ?? null,
+        module_key: message.module_key,
+      });
+      if (disabledModuleKeys.has(moduleKey)) return null;
+
       return {
         id: item.id ?? '',
         message_id: item.message_id ?? '',
         type: message.type,
         priority: message.priority,
         created_via: message.created_via ?? null,
-        module_key: message.module_key ?? 'general_notifications',
+        module_key: moduleKey,
         subject: message.subject ?? '',
         body: message.body ?? '',
         pdf_file_path: message.pdf_file_path ?? null,
@@ -217,6 +226,7 @@ export async function countUnreadNotificationsForUser(
   userId: string
 ): Promise<number> {
   const sinceIso = buildNotificationSinceIso();
+  const disabledModuleKeys = await getDisabledInAppNotificationModuleKeys(supabase, userId);
   const { count, error } = await withRetry<NotificationCountQueryResult>(async () => {
     const result = (await supabase
       .from('message_recipients')
@@ -238,6 +248,33 @@ export async function countUnreadNotificationsForUser(
 
   if (error) {
     throw new Error(error.message || 'Failed to count notifications');
+  }
+
+  let pendingCount = count || 0;
+  if (disabledModuleKeys.size > 0 && pendingCount > 0) {
+    const { count: hiddenCount, error: hiddenError } = await withRetry<NotificationCountQueryResult>(async () => {
+      const result = (await supabase
+        .from('message_recipients')
+        .select('id, messages!inner(id)', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('status', 'PENDING')
+        .in('messages.module_key', Array.from(disabledModuleKeys))
+        .gte('messages.created_at', sinceIso)
+        .is('cleared_from_inbox_at', null)
+        .is('messages.deleted_at', null)) as NotificationCountQueryResult;
+
+      if (result.error && isTransientFetchError(result.error.message || '')) {
+        throw new Error(result.error.message || 'Transient hidden notification count failure');
+      }
+
+      return result;
+    });
+
+    if (hiddenError) {
+      throw new Error(hiddenError.message || 'Failed to count hidden notifications');
+    }
+
+    pendingCount = Math.max(0, pendingCount - (hiddenCount || 0));
   }
 
   const { data: deferredToolboxTalks, error: deferredFetchError } = await withRetry<DeferredToolboxTalkCountQueryResult>(async () => {
@@ -278,5 +315,5 @@ export async function countUnreadNotificationsForUser(
     });
   }).length;
 
-  return (count || 0) + deferredCount;
+  return pendingCount + deferredCount;
 }

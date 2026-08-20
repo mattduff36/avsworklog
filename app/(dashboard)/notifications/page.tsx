@@ -8,7 +8,11 @@ import { useQueryState } from 'nuqs';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
-import { isUnreadNotification, resolveNotificationToOpen } from '@/lib/utils/notification-helpers';
+import {
+  isUnreadNotification,
+  resolveNotificationModuleKey,
+  resolveNotificationToOpen,
+} from '@/lib/utils/notification-helpers';
 import {
   getNotificationPreference,
   NotificationPreferencesCard,
@@ -54,35 +58,6 @@ function isDismissibleNotification(notification: NotificationItem) {
 
 function buildToolboxTalkPdfUrl(pdfFilePath: string) {
   return `/api/toolbox-talk-pdf/${pdfFilePath}`;
-}
-
-function resolveNotificationModuleKey(notification: NotificationItem): NotificationModuleKey {
-  if (notification.module_key) return notification.module_key;
-
-  const createdVia = notification.created_via ?? '';
-
-  if (notification.type === 'TOOLBOX_TALK') return 'toolbox_talks';
-  if (createdVia.startsWith('toolbox-talks')) return 'toolbox_talks';
-  if (createdVia === 'sensitive_pin_security') return 'sensitive_pin_security';
-  if (createdVia === 'maintenance_reminder') return 'maintenance';
-  if (createdVia.includes('error')) return 'errors';
-  if (createdVia.includes('quote')) return 'quotes';
-  if (createdVia.startsWith('suggestion:')) return 'suggestions';
-  if (createdVia === 'absence_contact_line_manager') return 'absence';
-  if (createdVia === 'timesheet_did_not_work_exception' || createdVia === 'timesheet_adjustment' || createdVia === 'timesheet_rejection') {
-    return 'timesheets';
-  }
-  if (createdVia === 'timesheet_training_decline') return 'training';
-  if (createdVia === 'inventory_location_request') return 'inventory';
-  if (createdVia === 'processed_absence_change' || createdVia === 'processed_absence_timesheet_adjustment') return 'processed_absence';
-  if (
-    createdVia.startsWith('processed_absence_')
-  ) {
-    return 'processed_absence';
-  }
-  if (notification.type === 'REMINDER') return 'reminders';
-
-  return 'general_notifications';
 }
 
 function buildProfileNotificationSettingsHref(moduleKey?: NotificationModuleKey) {

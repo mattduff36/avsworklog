@@ -7,6 +7,7 @@ import { resolveTimesheetOffDayStates, type TimesheetEntryLike } from '@/lib/uti
 import { getScheduledDidNotWorkExceptions } from '@/lib/utils/timesheet-did-not-work-exceptions';
 import type { Database } from '@/types/database';
 import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
+import { filterInAppRecipientIds } from '@/lib/server/notification-preference-delivery';
 
 const CREATED_VIA = 'timesheet_did_not_work_exception';
 
@@ -249,7 +250,11 @@ export async function POST(
       return NextResponse.json({ success: true, notified: false, reason: 'no-exceptions' });
     }
 
-    const recipients = await getNotificationRecipients(admin, employeeProfile);
+    const recipients = await filterInAppRecipientIds(
+      admin,
+      'timesheets',
+      await getNotificationRecipients(admin, employeeProfile)
+    );
     if (recipients.length === 0) {
       return NextResponse.json({ success: true, notified: false, reason: 'no-recipients' });
     }
