@@ -1,5 +1,31 @@
 [
   {
+    "version": "0826.39.0",
+    "updateKind": "major",
+    "title": "Daily Tasks update",
+    "description": "Updated daily tasks. Assemble dummy Postgres URLs without credential literals. Archive stale standards and scope UI rule reads. Shorten Resources helper copy. Remove leftover page scrollbar. Keep board actions inside the viewport. Constrain Resources column to the viewport.",
+    "summary": "Updated daily tasks. Assemble dummy Postgres URLs without credential literals. Archive stale standards and scope UI rule reads. Shorten Resources helper copy. Remove leftover page scrollbar. Keep board actions inside the viewport. Constrain Resources column to the viewport.",
+    "details": [
+      "Shorten Resources helper copy, with changes to interface components and automated tests.",
+      "Updated navigation, with changes to interface components and automated tests.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated data storage, with changes to automated tests and data storage.",
+      "Updated daily tasks, with changes to automated tests.",
+      "Updated projects, with changes to documentation."
+    ],
+    "areas": [
+      "Daily Tasks",
+      "App reliability",
+      "Daily Allocation"
+    ],
+    "areaKeys": [
+      "daily-tasks",
+      "app-reliability",
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-08-20T21:19:41.126Z"
+  },
+  {
     "version": "0826.38.2",
     "updateKind": "minor",
     "title": "Dashboard maintenance update",

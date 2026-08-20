@@ -2,6 +2,34 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.39.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-tasks): update daily tasks`
+
+**PUSHED AT**
+2026-08-20T21:19:41.126Z
+
+**WHAT CHANGED**
+Update daily tasks. Assemble dummy Postgres URLs without credential literals. Archive stale standards and scope UI rule reads. Shorten Resources helper copy. Remove leftover page scrollbar. Keep board actions inside the viewport. Constrain Resources column to the viewport.
+
+**VERSION HISTORY DETAILS**
+- Shorten Resources helper copy, with changes to interface components and automated tests.
+- Updated navigation, with changes to interface components and automated tests.
+- Updated help and FAQ, with changes to documentation.
+- Updated data storage, with changes to automated tests and data storage.
+- Updated daily tasks, with changes to automated tests.
+- Updated projects, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-tasks): update daily tasks`
+- `fix(tests): assemble dummy Postgres URLs without credential literals`
+- `docs(current-truth): archive stale standards and scope UI rule reads`
+- `fix(daily-allocation): shorten Resources helper copy`
+- `fix(daily-allocation): remove leftover page scrollbar`
+- `fix(daily-allocation): keep board actions inside the viewport`
+- `fix(daily-allocation): constrain Resources column to the viewport`
+
 ## 0826.38.2
 
 **GIT COMMIT MESSAGE**
