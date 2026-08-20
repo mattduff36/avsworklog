@@ -88,7 +88,7 @@ Historical documents and completed items:
 ```
 docs/
 ├── README.md (this file)
-├── SQUIRES_APP_PROPOSAL.md (main PRD)
+├── SQUIRES_APP_PROPOSAL.md (historical proposal)
 │
 ├── guides/          # How-to guides
 ├── features/        # Feature documentation
