@@ -29,6 +29,7 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(board).toContain('Add visit');
     expect(board).toContain('Assign resources');
     expect(board).toContain('Publication history');
+    expect(board).toContain('xl:h-[calc(100dvh-var(--top-nav-h)-4rem)]');
 
     const toolbar = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/BoardToolbar.tsx'),
@@ -48,6 +49,15 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(board).toContain('expected_target_plan_version');
     expect(board).toContain('planDay.plan_version + 1');
     expect(board).not.toMatch(/openAddVisit\(`\$\{visit\.job_source_type\}:\$\{visit\.job_source_id\}`/);
+
+    const resources = readFileSync(
+      resolve(process.cwd(), 'components/daily-allocation/board/ResourceSidebar.tsx'),
+      'utf8'
+    );
+    expect(resources).toContain('daily-allocation-resources-list');
+    expect(resources).toContain('overflow-y-auto');
+    expect(resources).toContain('xl:max-h-none');
+    expect(resources).not.toContain('h-fit');
 
     const timeline = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/DailyTimeline.tsx'),

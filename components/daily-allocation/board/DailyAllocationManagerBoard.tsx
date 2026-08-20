@@ -906,95 +906,97 @@ export function DailyAllocationManagerBoard({
           pointerX.current = event.clientX;
         }}
       >
-        <AppPageHeader
-          className="border-slate-700 bg-slate-900 p-4 text-slate-50 dark:bg-slate-950"
-          title="Daily Allocation"
-          titleMeta={dailyAllocationBetaBadge}
-          description="Place timed visits against catalogue jobs, assign people and plant, then publish an immutable allocation."
-          icon={<CalendarDays className="h-5 w-5" />}
-          iconContainerClassName="bg-[hsl(var(--daily-allocation-primary)/0.15)] text-[hsl(var(--daily-allocation-primary))]"
-          footer={
-            <BoardToolbar
-              selectedDate={selectedDate}
-              view={boardState.view}
-              onDateChange={handleDateChange}
-              onViewChange={boardState.setView}
-              onPublish={() => {
-                setUnallocatedConfirm(false);
-                setPublishOpen(true);
-              }}
-              publishDisabled={!converted}
-              publishDisabledReason={!converted ? 'Add a timed visit before publishing.' : undefined}
-              publishing={mutations.publishV2.isPending}
-              isLoading={boardState.isBoardLoading}
-              isFetching={boardState.isBoardFetching}
-              isStale={Boolean(boardState.mutationError)}
-              statusMessage={statusMessage}
-              teams={rawBoard?.resources.teams || []}
-              activeTeamId={activeTeamId}
-              onTeamChange={setSelectedTeamOverride}
-            />
-          }
-        />
-
-        <div className="sr-only" aria-live="polite">{statusMessage}</div>
-
-        <div className="flex flex-wrap items-center gap-3 text-sm text-slate-300">
-          {latestPublication ? (
-            <span>
-              Latest published revision {latestPublication.revision_no}
-              {latestPublication.published_by_name ? ` by ${latestPublication.published_by_name}` : ''}
-            </span>
-          ) : (
-            <span>No published revision for this date yet.</span>
-          )}
-          {boardState.isBoardFetching ? <Badge variant="outline">Refreshing</Badge> : null}
-        </div>
-
-        <div className="grid min-w-0 gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
-          <ResourceSidebar
-            tab={resourceTab}
-            onTabChange={setResourceTab}
-            search={resourceSearch}
-            onSearchChange={setResourceSearch}
-            selectedDate={selectedDate}
-            jobs={fullBoard.jobs}
-            employees={fullBoard.resources.employees}
-            plant={fullBoard.resources.plant}
-            selectedResourceId={
-              selectedResource?.kind === 'job'
-                ? jobResourceKey(selectedResource.job)
-                : selectedResource?.kind === 'employee'
-                  ? selectedResource.profileId
-                  : selectedResource?.kind === 'plant'
-                    ? selectedResource.plantId
-                    : null
+        <div className="flex min-h-0 flex-col gap-4 xl:h-[calc(100dvh-var(--top-nav-h)-4rem)]">
+          <AppPageHeader
+            className="shrink-0 border-slate-700 bg-slate-900 p-4 text-slate-50 dark:bg-slate-950"
+            title="Daily Allocation"
+            titleMeta={dailyAllocationBetaBadge}
+            description="Place timed visits against catalogue jobs, assign people and plant, then publish an immutable allocation."
+            icon={<CalendarDays className="h-5 w-5" />}
+            iconContainerClassName="bg-[hsl(var(--daily-allocation-primary)/0.15)] text-[hsl(var(--daily-allocation-primary))]"
+            footer={
+              <BoardToolbar
+                selectedDate={selectedDate}
+                view={boardState.view}
+                onDateChange={handleDateChange}
+                onViewChange={boardState.setView}
+                onPublish={() => {
+                  setUnallocatedConfirm(false);
+                  setPublishOpen(true);
+                }}
+                publishDisabled={!converted}
+                publishDisabledReason={!converted ? 'Add a timed visit before publishing.' : undefined}
+                publishing={mutations.publishV2.isPending}
+                isLoading={boardState.isBoardLoading}
+                isFetching={boardState.isBoardFetching}
+                isStale={Boolean(boardState.mutationError)}
+                statusMessage={statusMessage}
+                teams={rawBoard?.resources.teams || []}
+                activeTeamId={activeTeamId}
+                onTeamChange={setSelectedTeamOverride}
+              />
             }
-            onSelectResource={setSelectedResource}
           />
-          <JobsPanel
-            board={board}
-            view={boardState.view}
-            selectedDate={selectedDate}
-            dates={board.dates}
-            rows={rows}
-            jobSearch={jobSearch}
-            onJobSearchChange={setJobSearch}
-            selectedVisitId={selectedVisitId}
-            labourNames={labourNames}
-            plantLabels={plantLabels}
-            onAddVisit={openAddVisit}
-            onSelectVisit={(visit) => setSelectedVisitId(visit.id)}
-            onEditVisit={openEditVisit}
-            onDeleteVisit={setDeleteVisit}
-            onAssignVisit={(visit) => {
-              setSelectedVisitId(visit.id);
-              setAssignOpen(true);
-            }}
-            onResizeVisit={(visit, startsAt, endsAt) => {
-              void resizeVisit(visit, startsAt, endsAt);
-            }}
-          />
+
+          <div className="sr-only" aria-live="polite">{statusMessage}</div>
+
+          <div className="flex shrink-0 flex-wrap items-center gap-3 text-sm text-slate-300">
+            {latestPublication ? (
+              <span>
+                Latest published revision {latestPublication.revision_no}
+                {latestPublication.published_by_name ? ` by ${latestPublication.published_by_name}` : ''}
+              </span>
+            ) : (
+              <span>No published revision for this date yet.</span>
+            )}
+            {boardState.isBoardFetching ? <Badge variant="outline">Refreshing</Badge> : null}
+          </div>
+
+          <div className="grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
+            <ResourceSidebar
+              tab={resourceTab}
+              onTabChange={setResourceTab}
+              search={resourceSearch}
+              onSearchChange={setResourceSearch}
+              selectedDate={selectedDate}
+              jobs={fullBoard.jobs}
+              employees={fullBoard.resources.employees}
+              plant={fullBoard.resources.plant}
+              selectedResourceId={
+                selectedResource?.kind === 'job'
+                  ? jobResourceKey(selectedResource.job)
+                  : selectedResource?.kind === 'employee'
+                    ? selectedResource.profileId
+                    : selectedResource?.kind === 'plant'
+                      ? selectedResource.plantId
+                      : null
+              }
+              onSelectResource={setSelectedResource}
+            />
+            <JobsPanel
+              board={board}
+              view={boardState.view}
+              selectedDate={selectedDate}
+              dates={board.dates}
+              rows={rows}
+              jobSearch={jobSearch}
+              onJobSearchChange={setJobSearch}
+              selectedVisitId={selectedVisitId}
+              labourNames={labourNames}
+              plantLabels={plantLabels}
+              onAddVisit={openAddVisit}
+              onSelectVisit={(visit) => setSelectedVisitId(visit.id)}
+              onEditVisit={openEditVisit}
+              onDeleteVisit={setDeleteVisit}
+              onAssignVisit={(visit) => {
+                setSelectedVisitId(visit.id);
+                setAssignOpen(true);
+              }}
+              onResizeVisit={(visit, startsAt, endsAt) => {
+                void resizeVisit(visit, startsAt, endsAt);
+              }}
+            />
+          </div>
         </div>
 
         {selectedVisit && selectedResource?.kind !== 'job' ? (

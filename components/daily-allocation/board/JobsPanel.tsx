@@ -59,8 +59,8 @@ export function JobsPanel({
     : board.visits;
 
   return (
-    <section className="min-w-0 space-y-3" data-testid="daily-allocation-jobs-panel">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <section className="flex h-full min-h-0 min-w-0 flex-col space-y-3" data-testid="daily-allocation-jobs-panel">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-slate-100" data-testid="daily-allocation-view-heading">
             {view === 'daily' ? 'Daily job board' : 'Weekly job board'}
@@ -81,7 +81,7 @@ export function JobsPanel({
         </div>
       </div>
 
-      <div className="hidden min-w-0 lg:block">
+      <div className="hidden min-h-0 min-w-0 flex-1 overflow-auto lg:block">
         {view === 'daily' ? (
           <DailyTimeline
             board={board}

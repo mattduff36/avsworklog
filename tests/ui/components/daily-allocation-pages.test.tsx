@@ -1379,6 +1379,7 @@ describe('daily allocation manager board', () => {
 
     renderBoardPage();
     const resources = await screen.findByTestId('daily-allocation-resources');
+    expect(within(resources).getByTestId('daily-allocation-resources-list')).toBeInTheDocument();
     expect(within(resources).getByText('JOB-900')).toBeInTheDocument();
     expect((await screen.findAllByTestId('daily-allocation-visit-visit-1')).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('daily-allocation-timeline-live_quote:quote-900-2026-08-14')).not.toBeInTheDocument();

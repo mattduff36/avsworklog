@@ -187,12 +187,16 @@ export function ResourceSidebar({
 
   return (
     <Card
-      className="h-fit border-slate-700 bg-slate-900 text-slate-100 xl:sticky xl:top-4"
+      className="flex h-full min-h-0 max-h-[min(36rem,70dvh)] flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-100 xl:max-h-none"
       data-testid="daily-allocation-resources"
     >
-      <CardHeader className="space-y-3 p-4">
-        <CardTitle className="text-base">Resources</CardTitle>
-        <Tabs value={tab} onValueChange={(value) => onTabChange(value as ResourceSidebarTab)}>
+      <Tabs
+        value={tab}
+        onValueChange={(value) => onTabChange(value as ResourceSidebarTab)}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <CardHeader className="shrink-0 space-y-3 p-4 pb-0">
+          <CardTitle className="text-base">Resources</CardTitle>
           <TabsList aria-label="Resource type" className="grid h-9 w-full grid-cols-3 gap-0 p-1">
             <TabsTrigger value="jobs">Jobs ({filteredJobs.length})</TabsTrigger>
             <TabsTrigger value="employees">Employees ({filteredEmployees.length})</TabsTrigger>
@@ -201,7 +205,7 @@ export function ResourceSidebar({
           <p className="pt-2 text-xs text-slate-300">
             Drag a job onto the timeline to create a timed visit. Drag an employee or registered plant onto a visit to assign. Keyboard users can select a resource, then use Assign.
           </p>
-          <div className="relative pt-2">
+          <div className="relative pt-2 pb-3">
             <Search className="pointer-events-none absolute left-2.5 top-4 h-4 w-4 text-slate-400" aria-hidden="true" />
             <Input
               value={search}
@@ -211,7 +215,12 @@ export function ResourceSidebar({
               className="h-9 border-slate-600 bg-slate-950 pl-8 text-slate-100"
             />
           </div>
-          <TabsContent value="jobs" className="mt-3 space-y-2">
+        </CardHeader>
+        <CardContent
+          className="relative min-h-0 flex-1 overflow-hidden px-4 pb-0 pt-0"
+          data-testid="daily-allocation-resources-list"
+        >
+          <TabsContent value="jobs" className="absolute inset-0 mt-0 space-y-2 overflow-y-auto overscroll-contain">
             {filteredJobs.length === 0 ? (
               <p className="text-sm text-slate-400">No catalogue jobs match this search.</p>
             ) : filteredJobs.map((job) => {
@@ -233,7 +242,7 @@ export function ResourceSidebar({
               );
             })}
           </TabsContent>
-          <TabsContent value="employees" className="mt-3 space-y-2">
+          <TabsContent value="employees" className="absolute inset-0 mt-0 space-y-2 overflow-y-auto overscroll-contain">
             {filteredEmployees.length === 0 ? (
               <p className="text-sm text-slate-400">No employees match this search.</p>
             ) : filteredEmployees.map((employee) => {
@@ -266,7 +275,7 @@ export function ResourceSidebar({
               );
             })}
           </TabsContent>
-          <TabsContent value="plant" className="mt-3 space-y-2">
+          <TabsContent value="plant" className="absolute inset-0 mt-0 space-y-2 overflow-y-auto overscroll-contain">
             {filteredPlant.length === 0 ? (
               <p className="text-sm text-slate-400">No registered plant match this search.</p>
             ) : filteredPlant.map((item) => {
@@ -288,13 +297,11 @@ export function ResourceSidebar({
               );
             })}
           </TabsContent>
-        </Tabs>
-      </CardHeader>
-      <CardContent className="px-4 pb-4 pt-0">
-        <p className="text-[11px] text-slate-400">
+        </CardContent>
+        <p className="shrink-0 px-4 py-3 text-[11px] text-slate-400">
           Touch: press and hold the grip handle to drag. Keyboard: select, then use Add visit or Assign resources.
         </p>
-      </CardContent>
+      </Tabs>
     </Card>
   );
 }
