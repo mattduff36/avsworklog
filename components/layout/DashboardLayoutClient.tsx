@@ -23,6 +23,7 @@ import {
   readMobileTextSizePreference,
 } from '@/lib/config/mobile-text-size-preference';
 import { isDashboardFullWidthPath } from '@/lib/config/layout-preferences';
+import { cn } from '@/lib/utils/cn';
 
 const PAGE_VISIT_DEBOUNCE_MS = 250;
 const PAGE_VISIT_HEARTBEAT_MS = 5 * 60_000;
@@ -307,9 +308,14 @@ function DashboardLayoutShell({
     return <PageLoader message="Loading SquiresApp" />;
   }
 
+  const lockViewport = isDashboardFullWidthPath(pathname);
+
   return (
     <div 
-      className="min-h-dvh bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 relative"
+      className={cn(
+        'relative min-h-dvh bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950',
+        lockViewport && 'xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden',
+      )}
       data-accent={accent}
       data-tablet-mode={tabletModeEnabled ? 'on' : undefined}
     >

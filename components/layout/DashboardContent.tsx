@@ -7,6 +7,7 @@ import {
   APP_WIDESCREEN_CHANGED_EVENT,
   readAppWidescreenPreference,
 } from '@/lib/config/layout-preferences';
+import { cn } from '@/lib/utils/cn';
 
 interface DashboardContentProps {
   children: React.ReactNode;
@@ -45,15 +46,23 @@ export function DashboardContent({ children, fullWidth = false }: DashboardConte
   const expandToViewport = appWidescreenEnabled || fullWidth;
 
   return (
-    <div className={`transition-all duration-300 ${shouldApplySidebarOffset ? 'md:pl-16' : ''}`}>
+    <div
+      className={cn(
+        'transition-all duration-300',
+        shouldApplySidebarOffset && 'md:pl-16',
+        fullWidth && 'xl:flex xl:min-h-0 xl:flex-1 xl:flex-col',
+      )}
+    >
       <main
-        className={`app-content relative pt-[calc(68px+2rem)] pb-8 md:py-8 ${
+        className={cn(
+          'app-content relative pt-[calc(68px+2rem)] pb-8 md:py-8',
           appWidescreenEnabled
-            ? 'max-w-none mx-0'
+            ? 'mx-0 max-w-none'
             : fullWidth
-              ? 'max-w-none mx-0 px-4 sm:px-6 lg:px-8'
-              : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'
-        }`}
+              ? 'mx-0 max-w-none px-4 sm:px-6 lg:px-8'
+              : 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8',
+          fullWidth && 'xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-hidden',
+        )}
         data-content-width={expandToViewport ? 'full' : 'default'}
         style={
           appWidescreenEnabled

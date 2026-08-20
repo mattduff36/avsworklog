@@ -901,7 +901,7 @@ export function DailyAllocationManagerBoard({
     >
       <AppPageShell
         width="full"
-        className="flex min-h-0 flex-col gap-4 space-y-0 xl:h-[calc(100dvh-var(--top-nav-h)-4rem)] xl:overflow-hidden"
+        className="flex min-h-0 flex-col gap-4 space-y-0 xl:min-h-0 xl:flex-1 xl:overflow-hidden"
         onPointerMoveCapture={(event) => {
           pointerX.current = event.clientX;
         }}

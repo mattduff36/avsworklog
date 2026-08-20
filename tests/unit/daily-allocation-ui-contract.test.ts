@@ -29,9 +29,16 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(board).toContain('Add visit');
     expect(board).toContain('Assign resources');
     expect(board).toContain('Publication history');
-    expect(board).toContain('xl:h-[calc(100dvh-var(--top-nav-h)-4rem)]');
+    expect(board).toContain('xl:flex-1');
     expect(board).toContain('xl:overflow-hidden');
     expect(board).toContain('flex shrink-0 flex-wrap gap-2');
+
+    const layout = readFileSync(
+      resolve(process.cwd(), 'components/layout/DashboardLayoutClient.tsx'),
+      'utf8'
+    );
+    expect(layout).toContain('xl:h-dvh');
+    expect(layout).toContain('xl:overflow-hidden');
 
     const toolbar = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/BoardToolbar.tsx'),

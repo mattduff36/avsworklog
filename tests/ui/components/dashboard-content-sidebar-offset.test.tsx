@@ -107,6 +107,11 @@ describe('DashboardContent sidebar offset', () => {
     const fullMain = container.querySelector('main') as HTMLElement;
     expect(fullMain.className).toContain('max-w-none');
     expect(fullMain.className).not.toContain('max-w-7xl');
+    expect(fullMain.className).toContain('xl:overflow-hidden');
+    expect(fullMain.className).toContain('xl:flex-1');
     expect(fullMain).toHaveAttribute('data-content-width', 'full');
+
+    const fullWrapper = container.firstElementChild as HTMLElement;
+    expect(fullWrapper.className).toContain('xl:flex-1');
   });
 });
