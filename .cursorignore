@@ -22,3 +22,6 @@ docs_private/automation/workflow-events/**
 docs_private/automation/reviews/*/20*/events.json
 .cursor/debug*.log
 docs/archived/**
+.env
+.env.*
+!.env.example

@@ -95,6 +95,35 @@ describe('TEE V2 project context', () => {
       expect(existsSync(path.join(root, relativePath)), relativePath).toBe(true);
     }
 
+    expect(existsSync(path.join(root, 'docs/PROJECT_RULES_SUMMARY.md'))).toBe(false);
+    expect(existsSync(path.join(root, 'docs/DEVELOPMENT_STANDARDS_AND_TEMPLATES.md'))).toBe(
+      false
+    );
+    expect(
+      existsSync(path.join(root, 'docs/archived/PROJECT_RULES_SUMMARY_NOV_2025.md'))
+    ).toBe(true);
+    expect(
+      existsSync(
+        path.join(root, 'docs/archived/DEVELOPMENT_STANDARDS_AND_TEMPLATES_DEC_2025.md')
+      )
+    ).toBe(true);
+
+    const development = readFileSync(path.join(root, 'docs/DEVELOPMENT.md'), 'utf8');
+    expect(development).toContain('docs/archived/DEVELOPMENT_STANDARDS_AND_TEMPLATES_DEC_2025.md');
+    expect(development).not.toContain('docs/DEVELOPMENT_STANDARDS_AND_TEMPLATES.md');
+    expect(development).toContain('This file (`docs/DEVELOPMENT.md`) replaces it as current guidance');
+
+    const ignored = readFileSync(path.join(root, '.cursorignore'), 'utf8');
+    expect(ignored).toContain('docs/archived/**');
+    expect(ignored).toMatch(/^\.env$/m);
+    expect(ignored).toMatch(/^\.env\.\*$/m);
+    expect(ignored).toContain('!.env.example');
+
+    const uiDesign = readFileSync(path.join(root, '.cursor', 'rules', 'ui-design.mdc'), 'utf8');
+    expect(uiDesign).toContain('globs: "{app,components}/**/*.{tsx,css}"');
+    expect(uiDesign).toMatch(/alwaysApply:\s*false/);
+    expect(uiDesign).toMatch(/trivial local/i);
+
     for (const rule of ['ui-design.mdc', 'architecture.mdc', 'security-data.mdc']) {
       const text = readFileSync(path.join(root, '.cursor', 'rules', rule), 'utf8');
       expect(text.startsWith('---')).toBe(true);

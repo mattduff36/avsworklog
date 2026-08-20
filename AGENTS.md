@@ -18,11 +18,12 @@ Token-Efficient Engineering V2.2 is the active engineering workflow (global Skil
 
 ## Documentation precedence
 
-1. **Live code** is source truth for current behaviour. Inspect the implementation before changing it.
+1. **Live code and migrations** are current implementation evidence. Inspect them before changing behaviour. If they conflict with a current-truth document, investigate the discrepancy; do not assume either side is automatically correct.
 2. **`PRODUCT.md`** is current product/domain authority for confirmed Daily Allocation and platform facts.
-3. **`DESIGN.md` / `ARCHITECTURE.md` / `docs/DEVELOPMENT.md` / `docs/SECURITY.md`** are current engineering authority.
-4. **Current module PRDs and operational guides** (for example `docs/PRD_*.md`, `docs/guides/ADDING_A_NEW_MODULE_WITH_PERMISSIONS.md`, migration guides, Daily Allocation rollout) apply only to that module or process.
-5. **Dated reports, session summaries, bug-fix logs, old audits, old status docs, and past plans are historical evidence.** Do not treat them as current standards unless the task explicitly targets that file.
+3. **`DESIGN.md`** is current visual authority for generic page chrome, layout, styling, and reusable patterns.
+4. **`ARCHITECTURE.md` / `docs/DEVELOPMENT.md` / `docs/SECURITY.md`** are current engineering authority.
+5. **Current module PRDs and operational guides** (for example `docs/PRD_*.md`, `docs/guides/ADDING_A_NEW_MODULE_WITH_PERMISSIONS.md`, migration guides, Daily Allocation rollout) apply only to that module or process.
+6. **Dated reports, session summaries, bug-fix logs, old audits, old status docs, and past plans are historical evidence.** Do not treat them as current standards unless the task explicitly targets that file.
 
 `docs/README.md` is an index, not a standards document. Do not create another summary document for a small task.
 
@@ -37,7 +38,7 @@ Token-Efficient Engineering V2.2 is the active engineering workflow (global Skil
 
 ## What to load for a task
 
-- **UI / Tailwind / layout / cards / tabs / filters / mobile:** `DESIGN.md` and `.cursor/rules/ui-design.mdc`. Keep using `.cursor/rules/app-page-shell.mdc` and `.cursor/rules/tabs-styling.mdc` when those files are in scope.
+- **Substantial UI / Tailwind / layout / cards / tabs / filters / mobile:** `DESIGN.md` and `.cursor/rules/ui-design.mdc`. Keep using `.cursor/rules/app-page-shell.mdc` and `.cursor/rules/tabs-styling.mdc` when those files are in scope. Trivial copy, one-property styling, or logic-only TSX may follow the attached UI rule plus the local canonical implementation without loading all of `DESIGN.md`.
 - **New routes, providers, services, data/state, cross-module structure:** `ARCHITECTURE.md` and `.cursor/rules/architecture.mdc`.
 - **Auth, permissions, APIs, Supabase, RLS, service role, financial or destructive work:** `docs/SECURITY.md` and `.cursor/rules/security-data.mdc`.
 - **A named module PRD or runbook:** read that file after the current-truth layer, then inspect live code.
@@ -46,6 +47,8 @@ Do not require chat phrases such as “Rule active”.
 
 ## Mixed generations
 
-This repository contains several generations of UI and data-access patterns. Follow the **current pattern in the module you are editing**. Do not start a broad migration because a neighbouring page looks newer.
+This repository contains several generations of data access, server/client architecture, state management, module workflows, and module-specific interactions. Preserve the current module’s domain behaviour, data-access architecture, workflow, and intentional module-specific interaction patterns. Do not start a broad migration because a neighbouring page looks newer.
+
+For new generic page chrome, layout, styling, and reusable visual patterns, follow `DESIGN.md` and its named canonical references. Do not reproduce a documented legacy or non-canonical visual pattern merely because it already exists in the module. Intentional specialised UI (for example a manager board or kiosk) can remain specialised.
 
 Daily Allocation product invariants stay in `PRODUCT.md`. Do not copy that PRD into architecture notes or invent a second allocation model. Inspect the live board and transactional RPCs before changing schedule behaviour.

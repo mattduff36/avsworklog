@@ -5,7 +5,7 @@ Working guide for Squires. Commands come from root `package.json`. TEE V2.2 owns
 ## Working method
 
 1. Read `AGENTS.md`, then only the current-truth doc that matches the task (`DESIGN.md`, `ARCHITECTURE.md`, `docs/SECURITY.md`, or `PRODUCT.md`).
-2. Inspect the live module and one canonical neighbour. Follow that module’s current pattern.
+2. Inspect the live module and one canonical neighbour. Preserve that module’s domain behaviour, data-access architecture, workflow, and intentional module-specific interactions. For new generic page chrome, layout, styling, and reusable visual patterns, follow `DESIGN.md` and its named canonical references — do not copy a documented legacy or non-canonical visual pattern just because it already exists in the module.
 3. Change the smallest cohesive set of files. Do not refactor because a file is long.
 4. Update targeted tests when behaviour changes.
 5. Commit locally when the coding task is finished unless the user said not to, or the task is planning/review-only. Do not push unless explicitly authorised.
@@ -24,7 +24,7 @@ Working guide for Squires. Commands come from root `package.json`. TEE V2.2 owns
 
 ## Claims that are no longer true
 
-These appear in `docs/DEVELOPMENT_STANDARDS_AND_TEMPLATES.md` and the former `public/.cursorrules` file (removed because Next.js would serve it). Do not enforce them:
+These appear in `docs/archived/DEVELOPMENT_STANDARDS_AND_TEMPLATES_DEC_2025.md` and the former `public/.cursorrules` file (removed because Next.js would serve it). Do not enforce them:
 
 | Old claim | Live reality |
 | --- | --- |
@@ -37,11 +37,13 @@ These appear in `docs/DEVELOPMENT_STANDARDS_AND_TEMPLATES.md` and the former `pu
 | Start every chat with “Rule active” | Not required. |
 | SSH to `mpdee-server` for builds | Not part of the current project workflow. Builds run only when the user authorises a test build. |
 
-`docs/DEVELOPMENT_STANDARDS_AND_TEMPLATES.md` remains historical evidence. This file replaces it as current guidance.
+`docs/archived/DEVELOPMENT_STANDARDS_AND_TEMPLATES_DEC_2025.md` remains historical evidence. This file (`docs/DEVELOPMENT.md`) replaces it as current guidance.
 
 ## UI
 
-Read `DESIGN.md`. New pages: `AppPageShell` + `AppPageHeader`. Keep `.cursor/rules/app-page-shell.mdc` and `.cursor/rules/tabs-styling.mdc`.
+`DESIGN.md` governs generic visual language. Read the relevant sections when creating a page or changing page chrome, layout, responsive/mobile behaviour, navigation, cards, tabs, forms, tables, filters, interaction patterns, reusable styling, or accessibility-sensitive UI. Trivial copy, one-property styling, or logic-only TSX may follow `.cursor/rules/ui-design.mdc` plus the local canonical implementation.
+
+New pages: `AppPageShell` + `AppPageHeader`. Keep `.cursor/rules/app-page-shell.mdc` and `.cursor/rules/tabs-styling.mdc`. Do not reproduce a documented legacy or specialised look merely because it already exists in the module.
 
 ## Data, forms, errors
 

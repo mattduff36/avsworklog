@@ -1,16 +1,18 @@
 ---
-description: Squires UI/design for pages, TSX, Tailwind/CSS, layout, cards, tabs, filters, dialogs, responsive, mobile, PWA, and accessibility. Read DESIGN.md before changing UI.
+description: Squires UI/design for pages, TSX, Tailwind/CSS, layout, cards, tabs, filters, dialogs, responsive, mobile, PWA, and accessibility. Load DESIGN.md for substantial UI work, not trivial local edits.
 globs: "{app,components}/**/*.{tsx,css}"
 alwaysApply: false
 ---
 
 # UI / design
 
-Read `DESIGN.md` before changing UI. It describes the live application, not a generic shadcn theme.
-
 Keep these scoped rules when they attach:
 
 - `.cursor/rules/app-page-shell.mdc` for new `app/**/page.tsx` shells
 - `.cursor/rules/tabs-styling.mdc` for tab lists
 
-Do not treat Inventory mobile chrome, Workshop’s hand-rolled header, or tablet-mode experiments as the default page recipe. Named references and anti-patterns are in `DESIGN.md`.
+Read the relevant sections of `DESIGN.md` for substantial UI work: new pages; page chrome; material layout, responsive/mobile, or navigation changes; cards, tabs, forms, tables, filters/search toolbars; interaction patterns; reusable styling/components; accessibility-sensitive UI.
+
+For trivial local work (copy/text, one-property styling, tiny isolated fixes, or logic-only edits inside a TSX component), follow this rule plus the local canonical implementation. Load `DESIGN.md` only if the change is uncertain.
+
+Do not treat Inventory mobile chrome, Workshop’s hand-rolled header, or tablet-mode experiments as the default page recipe. Named references and anti-patterns are in `DESIGN.md`. For new generic chrome and reusable visual patterns, follow `DESIGN.md` even when the current module already contains a documented legacy or specialised look.
