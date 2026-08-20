@@ -901,14 +901,13 @@ export function DailyAllocationManagerBoard({
     >
       <AppPageShell
         width="full"
-        className="space-y-4"
+        className="flex min-h-0 flex-col gap-4 space-y-0 xl:h-[calc(100dvh-var(--top-nav-h)-4rem)] xl:overflow-hidden"
         onPointerMoveCapture={(event) => {
           pointerX.current = event.clientX;
         }}
       >
-        <div className="flex min-h-0 flex-col gap-4 xl:h-[calc(100dvh-var(--top-nav-h)-4rem)]">
-          <AppPageHeader
-            className="shrink-0 border-slate-700 bg-slate-900 p-4 text-slate-50 dark:bg-slate-950"
+        <AppPageHeader
+          className="shrink-0 border-slate-700 bg-slate-900 p-4 text-slate-50 dark:bg-slate-950"
             title="Daily Allocation"
             titleMeta={dailyAllocationBetaBadge}
             description="Place timed visits against catalogue jobs, assign people and plant, then publish an immutable allocation."
@@ -997,10 +996,9 @@ export function DailyAllocationManagerBoard({
               }}
             />
           </div>
-        </div>
 
         {selectedVisit && selectedResource?.kind !== 'job' ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             <Button
               className={boardControlStyles.outline}
               onClick={() => {
@@ -1016,7 +1014,7 @@ export function DailyAllocationManagerBoard({
             </Button>
           </div>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             <Button className={boardControlStyles.outline} onClick={() => openAddVisit(
               selectedResource?.kind === 'job' ? jobResourceKey(selectedResource.job) : '',
               selectedDate
@@ -1030,7 +1028,7 @@ export function DailyAllocationManagerBoard({
         )}
 
         {history.length > 0 ? (
-          <Card className="border-slate-700 bg-slate-900 text-slate-100">
+          <Card className="min-h-0 shrink-0 overflow-y-auto border-slate-700 bg-slate-900 text-slate-100 xl:max-h-36">
             <CardHeader>
               <CardTitle>Publication history</CardTitle>
             </CardHeader>

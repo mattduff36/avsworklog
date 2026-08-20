@@ -30,6 +30,8 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(board).toContain('Assign resources');
     expect(board).toContain('Publication history');
     expect(board).toContain('xl:h-[calc(100dvh-var(--top-nav-h)-4rem)]');
+    expect(board).toContain('xl:overflow-hidden');
+    expect(board).toContain('flex shrink-0 flex-wrap gap-2');
 
     const toolbar = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/BoardToolbar.tsx'),
