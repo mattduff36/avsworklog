@@ -1,5 +1,29 @@
 [
   {
+    "version": "0826.35.0",
+    "updateKind": "major",
+    "title": "Absence & Leave update",
+    "description": "Updated Absence & Leave, Quotes, Actions, and Inventory. Restore yard transfer allocate contrast. Export companion JSON from final invoice markdown.",
+    "summary": "Updated Absence & Leave, Quotes, Actions, and Inventory. Restore yard transfer allocate contrast. Export companion JSON from final invoice markdown.",
+    "details": [
+      "Updated Absence & Leave, Quotes, Actions, and Inventory, with changes to automated tests.",
+      "Updated quotes, with changes to automated tests.",
+      "Restore yard transfer allocate contrast, with changes to app screens and automated tests.",
+      "Updated inventory, with changes to automated tests."
+    ],
+    "areas": [
+      "Absence & Leave",
+      "Actions",
+      "Quotes"
+    ],
+    "areaKeys": [
+      "absence",
+      "actions",
+      "quotes"
+    ],
+    "pushedAt": "2026-08-20T13:32:05.114Z"
+  },
+  {
     "version": "0826.34.0",
     "updateKind": "major",
     "title": "Notifications update",

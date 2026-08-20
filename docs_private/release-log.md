@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.35.0
+
+**GIT COMMIT MESSAGE**
+`feat(absence): update Absence & Leave, Quotes, Actions, and Inventory`
+
+**PUSHED AT**
+2026-08-20T13:32:05.114Z
+
+**WHAT CHANGED**
+Update Absence & Leave, Quotes, Actions, and Inventory. Restore yard transfer allocate contrast. Export companion JSON from final invoice markdown.
+
+**VERSION HISTORY DETAILS**
+- Updated Absence & Leave, Quotes, Actions, and Inventory, with changes to automated tests.
+- Updated quotes, with changes to automated tests.
+- Restore yard transfer allocate contrast, with changes to app screens and automated tests.
+- Updated inventory, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(absence): update Absence & Leave, Quotes, Actions, and Inventory`
+- `fix(actions): restore yard transfer allocate contrast`
+- `feat(invoices): export companion JSON from final invoice markdown`
+
 ## 0826.34.0
 
 **GIT COMMIT MESSAGE**
