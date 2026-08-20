@@ -1,8 +1,13 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import {
+  ERROR_LOG_RETENTION_MONTHS,
   __testOnlyExecuteVerifiedSnapshotCleanup as executeVerifiedSnapshotCleanup,
   executeVerifiedSnapshotCleanup as executeProductionSnapshotCleanup,
   fetchProductionErrorSnapshot,
   markSnapshotAnalysisCompleted,
+  purgeExpiredArchivedErrorLogs,
+  runRetentionAfterArchivePhase,
   readAndVerifyErrorSnapshot,
   writeAndVerifyErrorSnapshot,
   writeAndVerifyTextArtifactAtomic,
@@ -1010,6 +1015,31 @@ describe('fixerrors artifact and confirmation gate', () => {
     expect(client.queryLog).toHaveLength(0);
   });
 
+  it('FE-TRUST-002 rejects leftover v3 artifacts before any database work', async () => {
+    const { snapshot, io } = await analyzedSnapshot([makeError(1)]);
+    const leftover = JSON.parse(io.read(SNAPSHOT_PATH)) as ErrorSnapshotExport;
+    leftover.safetyContract = 'fixerrors-exact-snapshot-v3';
+    io.writeAtomic(SNAPSHOT_PATH, JSON.stringify(leftover));
+    const client = new CleanupClient({ rows: [makeError(1)] });
+    await expect(
+      executeVerifiedSnapshotCleanup({
+        client,
+        confirmation: {
+          ...confirmation(snapshot),
+          safetyContract: 'fixerrors-exact-snapshot-v3',
+        },
+        databaseTargetFingerprint: TARGET_FINGERPRINT,
+        snapshotPath: SNAPSHOT_PATH,
+        latestSnapshotPath: null,
+        analysisPath: ANALYSIS_PATH,
+        io,
+        lock: new MemoryLock(),
+        now: EXPORT_TIME,
+      })
+    ).rejects.toThrow('snapshot verification failed');
+    expect(client.queryLog).toHaveLength(0);
+  });
+
   it('FXERR-V1-REJECT-019 rejects a stale v1 artifact before any database work', async () => {
     const io = new MemoryIo();
     const client = new CleanupClient({ rows: [makeError(1)] });
@@ -1415,5 +1445,260 @@ describe('fixerrors artifact and confirmation gate', () => {
     } finally {
       release();
     }
+  });
+});
+
+type RetentionRow = ErrorLogEntry & {
+  status: 'active' | 'archived';
+  archived_at: string | null;
+};
+
+class RetentionClient implements PgClientLike {
+  readonly queryLog: string[] = [];
+  readonly errorRows: Map<string, RetentionRow>;
+  readonly alerts: Set<string>;
+  readonly serviceReferences: Set<string>;
+  readonly usageReferences: Set<string>;
+  foreignKeys = [...EXPECTED_FOREIGN_KEYS];
+  triggerRows: Array<{ trigger_name: string }> = [];
+  schemaColumns = ['archived_at', 'status'];
+  cutoff = '2025-08-20T12:00:00.000000Z';
+  failDelete = false;
+  deleteFewerThanRequested = false;
+  remainingExpiredOverride: number | null = null;
+  commitThenThrow = false;
+  private workingRows = new Map<string, RetentionRow>();
+  private workingAlerts = new Set<string>();
+  private workingService = new Set<string>();
+  private workingUsage = new Set<string>();
+
+  constructor(rows: RetentionRow[], options: { alerts?: string[]; service?: string[]; usage?: string[] } = {}) {
+    this.errorRows = new Map(rows.map((row) => [row.id, row]));
+    this.alerts = new Set(options.alerts ?? []);
+    this.serviceReferences = new Set(options.service ?? []);
+    this.usageReferences = new Set(options.usage ?? []);
+  }
+
+  activeCount(): number {
+    return [...this.errorRows.values()].filter((row) => row.status === 'active').length;
+  }
+
+  async query<T extends Record<string, unknown> = Record<string, unknown>>(
+    text: string,
+    values: unknown[] = []
+  ): Promise<{ rows: T[]; rowCount: number | null }> {
+    this.queryLog.push(text);
+    if (text.includes('fixerrors:retention-begin')) {
+      this.workingRows = new Map(this.errorRows);
+      this.workingAlerts = new Set(this.alerts);
+      this.workingService = new Set(this.serviceReferences);
+      this.workingUsage = new Set(this.usageReferences);
+      return result([]) as { rows: T[]; rowCount: number };
+    }
+    if (text.includes('fixerrors:archive-schema')) {
+      return result(this.schemaColumns.map((column_name) => ({ column_name }))) as {
+        rows: T[];
+        rowCount: number;
+      };
+    }
+    if (text.includes('fixerrors:retention-fk-catalog')) {
+      return result(this.foreignKeys) as unknown as { rows: T[]; rowCount: number };
+    }
+    if (text.includes('fixerrors:retention-trigger-catalog')) {
+      return result(this.triggerRows) as unknown as { rows: T[]; rowCount: number };
+    }
+    if (text.includes('fixerrors:retention-cutoff')) {
+      expect(values[0]).toBe(ERROR_LOG_RETENTION_MONTHS);
+      return result([{ cutoff: this.cutoff }]) as { rows: T[]; rowCount: number };
+    }
+    if (text.includes('fixerrors:retention-eligible')) {
+      const cutoff = String(values[0]);
+      const rows = [...this.workingRows.values()]
+        .filter(
+          (row) =>
+            row.status === 'archived' &&
+            row.archived_at !== null &&
+            row.archived_at < cutoff
+        )
+        .sort((left, right) =>
+          (left.archived_at ?? '').localeCompare(right.archived_at ?? '') ||
+          left.id.localeCompare(right.id)
+        )
+        .map((row) => ({ id: row.id }));
+      return result(rows) as unknown as { rows: T[]; rowCount: number };
+    }
+    if (text.includes('fixerrors:retention-active-before') || text.includes('fixerrors:retention-active-after')) {
+      const count = [...this.workingRows.values()].filter((row) => row.status === 'active').length;
+      return result([{ count: String(count) }]) as { rows: T[]; rowCount: number };
+    }
+    if (text.includes('fixerrors:retention-delete-batch')) {
+      if (this.failDelete) throw new Error('forced retention delete failure');
+      if (this.deleteFewerThanRequested) {
+        return result([]) as unknown as { rows: T[]; rowCount: number };
+      }
+      const ids = values[0] as string[];
+      const cutoff = String(values[1]);
+      const deleted = ids.filter((id) => {
+        const row = this.workingRows.get(id);
+        if (
+          !row ||
+          row.status !== 'archived' ||
+          !row.archived_at ||
+          row.archived_at >= cutoff
+        ) {
+          return false;
+        }
+        this.workingRows.delete(id);
+        this.workingAlerts.delete(id);
+        this.workingService.delete(id);
+        this.workingUsage.delete(id);
+        return true;
+      });
+      return result(deleted.map((id) => ({ id }))) as unknown as { rows: T[]; rowCount: number };
+    }
+    if (text.includes('fixerrors:retention-remaining-expired')) {
+      if (this.remainingExpiredOverride !== null) {
+        return result([{ count: String(this.remainingExpiredOverride) }]) as {
+          rows: T[];
+          rowCount: number;
+        };
+      }
+      const cutoff = String(values[0]);
+      const count = [...this.workingRows.values()].filter(
+        (row) =>
+          row.status === 'archived' &&
+          row.archived_at !== null &&
+          row.archived_at < cutoff
+      ).length;
+      return result([{ count: String(count) }]) as { rows: T[]; rowCount: number };
+    }
+    if (text.includes('fixerrors:retention-rollback')) {
+      this.workingRows = new Map(this.errorRows);
+      this.workingAlerts = new Set(this.alerts);
+      this.workingService = new Set(this.serviceReferences);
+      this.workingUsage = new Set(this.usageReferences);
+      return result([]) as { rows: T[]; rowCount: number };
+    }
+    if (text.includes('fixerrors:retention-commit')) {
+      this.errorRows.clear();
+      for (const [id, row] of this.workingRows) this.errorRows.set(id, row);
+      this.alerts.clear();
+      for (const id of this.workingAlerts) this.alerts.add(id);
+      this.serviceReferences.clear();
+      for (const id of this.workingService) this.serviceReferences.add(id);
+      this.usageReferences.clear();
+      for (const id of this.workingUsage) this.usageReferences.add(id);
+      if (this.commitThenThrow) throw new Error('connection lost during retention commit');
+      return result([]) as { rows: T[]; rowCount: number };
+    }
+    return result([]) as { rows: T[]; rowCount: number };
+  }
+}
+
+function retentionRow(
+  index: number,
+  status: 'active' | 'archived',
+  archivedAt: string | null
+): RetentionRow {
+  return {
+    ...makeError(index),
+    status,
+    archived_at: archivedAt,
+  };
+}
+
+describe('fixerrors 12-month archived retention', () => {
+  it('FE-RETENTION-EMPTY-003 still runs independently safeguarded purge after an empty snapshot', async () => {
+    const recent = retentionRow(1, 'archived', '2025-09-01T00:00:00.000000Z');
+    const client = new RetentionClient([recent]);
+    let purgeCalls = 0;
+    const purged = await runRetentionAfterArchivePhase('empty-noop', async () => {
+      purgeCalls += 1;
+      return purgeExpiredArchivedErrorLogs(client);
+    });
+    expect(purgeCalls).toBe(1);
+    expect(purged?.reconciliationState).toBe('none_eligible');
+    expect(purged?.purgedCount).toBe(0);
+    expect(client.errorRows.size).toBe(1);
+    expect(client.queryLog.some((query) => query.includes('fixerrors:retention-fk-catalog'))).toBe(true);
+    expect(client.queryLog.some((query) => query.includes('fixerrors:retention-trigger-catalog'))).toBe(true);
+    expect(client.queryLog.some((query) => query.includes('fixerrors:retention-delete-batch'))).toBe(false);
+
+    let skippedCalls = 0;
+    const skipped = await runRetentionAfterArchivePhase('not-ready', async () => {
+      skippedCalls += 1;
+      return purgeExpiredArchivedErrorLogs(client);
+    });
+    expect(skipped).toBeNull();
+    expect(skippedCalls).toBe(0);
+  });
+
+  it('FE-RETENTION-TXN-002 rolls purge back on mismatch and preserves a committed archive', async () => {
+    const expired = retentionRow(1, 'archived', '2024-08-01T00:00:00.000000Z');
+
+    const mismatched = new RetentionClient([expired]);
+    mismatched.remainingExpiredOverride = 1;
+    await expect(
+      runRetentionAfterArchivePhase('committed', () =>
+        purgeExpiredArchivedErrorLogs(mismatched)
+      )
+    ).rejects.toMatchObject({ outcome: 'failed' });
+    expect(mismatched.errorRows.size).toBe(1);
+    expect(mismatched.queryLog.some((query) => query.includes('fixerrors:retention-rollback'))).toBe(
+      true
+    );
+
+    const shortDelete = new RetentionClient([expired]);
+    shortDelete.deleteFewerThanRequested = true;
+    await expect(purgeExpiredArchivedErrorLogs(shortDelete)).rejects.toMatchObject({
+      outcome: 'failed',
+    });
+    expect(shortDelete.errorRows.size).toBe(1);
+
+    const uncertain = new RetentionClient([expired]);
+    uncertain.commitThenThrow = true;
+    await expect(purgeExpiredArchivedErrorLogs(uncertain)).rejects.toMatchObject({
+      outcome: 'indeterminate',
+    });
+    expect(uncertain.errorRows.size).toBe(0);
+  });
+
+  it('FE-RETENTION-TXN-002 blocks unknown foreign keys before any delete', async () => {
+    const expired = retentionRow(1, 'archived', '2024-08-01T00:00:00.000000Z');
+    const client = new RetentionClient([expired]);
+    client.foreignKeys.push({
+      child_schema: 'public',
+      child_table: 'unexpected_table',
+      child_columns: ['error_id'],
+      parent_columns: ['id'],
+      delete_action: 'CASCADE',
+    });
+    await expect(purgeExpiredArchivedErrorLogs(client)).rejects.toThrow(
+      'foreign-key safety contract changed'
+    );
+    expect(client.queryLog.some((query) => query.includes('fixerrors:retention-delete-batch'))).toBe(false);
+    expect(client.errorRows.size).toBe(1);
+  });
+
+  it('FE-RETENTION-MIG-004 documents a valid archived_at partial index and non-pooling runner', () => {
+    const sql = readFileSync(
+      resolve(process.cwd(), 'supabase/migrations/20260820_error_logs_archived_retention_index.sql'),
+      'utf8'
+    );
+    const runner = readFileSync(
+      resolve(process.cwd(), 'scripts/run-error-logs-archived-retention-index-migration.ts'),
+      'utf8'
+    );
+    expect(sql).toContain('CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_error_logs_archived_at');
+    expect(sql).toContain('WHERE status = \'archived\'');
+    expect(runner).toContain('POSTGRES_URL_NON_POOLING');
+    expect(runner).not.toContain('POSTGRES_URL ||');
+    expect(runner).toContain('CREATE INDEX CONCURRENTLY IF NOT EXISTS');
+    expect(runner).toContain('pg_get_indexdef');
+    expect(runner).toContain(
+      "CREATE INDEX idx_error_logs_archived_at ON public.error_logs USING btree (archived_at) WHERE (status = \\'archived\\'::text)"
+    );
+    expect(runner).toContain('indisvalid');
+    expect(ERROR_LOG_RETENTION_MONTHS).toBe(12);
   });
 });

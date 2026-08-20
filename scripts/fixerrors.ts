@@ -31,6 +31,8 @@ import {
   getErrorSnapshotArtifactPath,
   markSnapshotAnalysisCompleted,
   markSnapshotCleanupNotRequired,
+  purgeExpiredArchivedErrorLogs,
+  runRetentionAfterArchivePhase,
   writeAndVerifyErrorSnapshot,
   writeAndVerifyTextArtifactAtomic,
   type CleanupConfirmation,
@@ -1141,6 +1143,27 @@ function parseCleanupConfirmation(args: string[]): CleanupConfirmation | null {
   };
 }
 
+const ARCHIVE_MUTATION = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.find(
+  (mutation) => mutation.operation === 'update'
+);
+const RETENTION_MUTATION = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.find(
+  (mutation) => mutation.purpose === 'expired-archived-retention'
+);
+
+function retentionStepMetadata() {
+  if (!RETENTION_MUTATION) {
+    throw new Error('fixerrors retention mutation is not registered');
+  }
+  return {
+    operationalCommand: TRUSTED_OPERATIONAL_ACTIONS.fixerrors.commandId,
+    operationalSafetyContract: TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract,
+    operationalExecutionCandidate: true,
+    confirmationBoundToSnapshot: false,
+    retentionBoundToCandidateSet: true,
+    requestedMutations: [RETENTION_MUTATION],
+  };
+}
+
 function summarizeClusterLanes(clusters: ErrorRootCauseCluster[]): Record<string, number> {
   return clusters.reduce<Record<string, number>>((summary, cluster) => {
     summary[cluster.lane] = (summary[cluster.lane] ?? 0) + 1;
@@ -1194,6 +1217,7 @@ async function main() {
               TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract,
             operationalExecutionCandidate: true,
             confirmationBoundToSnapshot: true,
+            requestedMutations: ARCHIVE_MUTATION ? [ARCHIVE_MUTATION] : [],
           }
         );
         run.recordStep({
@@ -1215,6 +1239,23 @@ async function main() {
         );
         console.log(`  Reconciliation: ${clearResult.reconciliationState}`);
         console.log(`  Remaining active error logs: ${clearResult.remainingCount}`);
+        const retention = await run.step(
+          'Purge archived error logs older than 12 months',
+          async () => {
+            const purged = await runRetentionAfterArchivePhase(
+              'committed',
+              () => purgeExpiredArchivedErrorLogs(databaseClient)
+            );
+            if (!purged) {
+              throw new Error('Retention skipped after a committed archive');
+            }
+            return purged;
+          },
+          retentionStepMetadata()
+        );
+        console.log(
+          `  Retention purged: ${retention.purgedCount} (eligible ${retention.eligibleCount}, cutoff ${retention.cutoffAt})`
+        );
         await run.finish('passed');
         return;
       } catch (error) {
@@ -1407,6 +1448,7 @@ async function main() {
             TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract,
           operationalExecutionCandidate: true,
           confirmationBoundToSnapshot: true,
+          requestedMutations: ARCHIVE_MUTATION ? [ARCHIVE_MUTATION] : [],
           snapshotId: snapshot.snapshotId,
           rowCount: snapshot.rowCount,
         }
@@ -1427,6 +1469,32 @@ async function main() {
       console.log(`  Remaining active:    ${archiveResult.remainingCount}`);
     } else {
       console.log('  Production rows archived: 0 (no active rows)');
+    }
+
+    try {
+      const retention = await run.step(
+        'Purge archived error logs older than 12 months',
+        async () => {
+          const purged = await runRetentionAfterArchivePhase(
+            snapshot.rowCount === 0 ? 'empty-noop' : 'committed',
+            () => purgeExpiredArchivedErrorLogs(databaseClient)
+          );
+          if (!purged) {
+            throw new Error('Retention skipped after a successful archive phase');
+          }
+          return purged;
+        },
+        retentionStepMetadata()
+      );
+      console.log(
+        `  Retention purged:     ${retention.purgedCount} (eligible ${retention.eligibleCount})`
+      );
+      console.log(`  Retention cutoff:     ${retention.cutoffAt}`);
+    } catch (error) {
+      console.log(
+        '  Retention purge failed; archived snapshot rows were left in place'
+      );
+      throw error;
     }
     console.log('=============================================\n');
     await run.finish('passed');

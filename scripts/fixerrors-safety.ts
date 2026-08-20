@@ -17,6 +17,7 @@ import { TRUSTED_OPERATIONAL_ACTIONS } from './automation/trusted-operational-ac
 export const ERROR_FETCH_PAGE_SIZE = 200;
 export const ERROR_ARCHIVE_BATCH_SIZE = 100;
 export const ERROR_DELETE_BATCH_SIZE = ERROR_ARCHIVE_BATCH_SIZE;
+export const ERROR_LOG_RETENTION_MONTHS = 12;
 export const ERROR_SNAPSHOT_MAX_AGE_MS = 30 * 60 * 1000;
 export const ERROR_SNAPSHOT_PATH = resolve(
   process.cwd(),
@@ -1306,4 +1307,262 @@ export function __testOnlyExecuteVerifiedSnapshotCleanup(
     throw new Error('The fixerrors cleanup test harness is unavailable');
   }
   return executeVerifiedSnapshotCleanupCore(options);
+}
+
+export type ErrorLogRetentionResult = {
+  eligibleCount: number;
+  purgedCount: number;
+  remainingExpiredCount: number;
+  remainingActiveCount: number;
+  cutoffAt: string;
+  reconciliationState: 'purged' | 'none_eligible';
+};
+
+export type RetentionArchivePhase = 'committed' | 'empty-noop' | 'not-ready';
+
+export async function runRetentionAfterArchivePhase<T>(
+  archivePhase: RetentionArchivePhase,
+  purge: () => Promise<T>
+): Promise<T | null> {
+  if (archivePhase === 'not-ready') {
+    return null;
+  }
+  return purge();
+}
+
+async function assertErrorLogCatalogContracts(client: PgClientLike): Promise<void> {
+  await assertArchiveSchemaContract(client);
+  const foreignKeys = await client.query<Record<string, unknown>>(`
+    /* fixerrors:retention-fk-catalog */
+    SELECT
+      child_ns.nspname AS child_schema,
+      child.relname AS child_table,
+      ARRAY(
+        SELECT child_column.attname
+        FROM unnest(constraint_row.conkey) WITH ORDINALITY AS child_key(attnum, position)
+        JOIN pg_attribute child_column
+          ON child_column.attrelid = child.oid
+         AND child_column.attnum = child_key.attnum
+        ORDER BY child_key.position
+      ) AS child_columns,
+      ARRAY(
+        SELECT parent_column.attname
+        FROM unnest(constraint_row.confkey) WITH ORDINALITY AS parent_key(attnum, position)
+        JOIN pg_attribute parent_column
+          ON parent_column.attrelid = parent.oid
+         AND parent_column.attnum = parent_key.attnum
+        ORDER BY parent_key.position
+      ) AS parent_columns,
+      CASE constraint_row.confdeltype
+        WHEN 'a' THEN 'NO ACTION'
+        WHEN 'r' THEN 'RESTRICT'
+        WHEN 'c' THEN 'CASCADE'
+        WHEN 'n' THEN 'SET NULL'
+        WHEN 'd' THEN 'SET DEFAULT'
+      END AS delete_action
+    FROM pg_constraint constraint_row
+    JOIN pg_class parent ON parent.oid = constraint_row.confrelid
+    JOIN pg_namespace parent_ns ON parent_ns.oid = parent.relnamespace
+    JOIN pg_class child ON child.oid = constraint_row.conrelid
+    JOIN pg_namespace child_ns ON child_ns.oid = child.relnamespace
+    WHERE constraint_row.contype = 'f'
+      AND parent_ns.nspname = 'public'
+      AND parent.relname = 'error_logs'
+    ORDER BY child_ns.nspname, child.relname
+  `);
+  assertExpectedForeignKeys(foreignKeys.rows);
+  const unexpectedTriggers = await client.query<{ trigger_name: unknown }>(`
+    /* fixerrors:retention-trigger-catalog */
+    SELECT trigger_row.tgname AS trigger_name
+    FROM pg_trigger trigger_row
+    JOIN pg_class table_row ON table_row.oid = trigger_row.tgrelid
+    JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
+    WHERE schema_row.nspname = 'public'
+      AND table_row.relname = 'error_logs'
+      AND NOT trigger_row.tgisinternal
+    ORDER BY trigger_row.tgname
+  `);
+  if (unexpectedTriggers.rows.length > 0) {
+    throw new Error('error_logs trigger safety contract changed; cleanup blocked');
+  }
+}
+
+async function countMatchingErrorLogs(
+  client: PgClientLike,
+  tag: string,
+  sql: string,
+  values: unknown[] = []
+): Promise<number> {
+  const counted = await client.query<{ count: unknown }>(
+    `/* ${tag} */ ${sql}`,
+    values
+  );
+  const count = Number(counted.rows[0]?.count ?? Number.NaN);
+  if (!Number.isSafeInteger(count) || count < 0) {
+    throw new Error('Retention count is invalid; purge rolled back');
+  }
+  return count;
+}
+
+export async function purgeExpiredArchivedErrorLogs(
+  client: PgClientLike
+): Promise<ErrorLogRetentionResult> {
+  let commitAttempted = false;
+  await client.query(
+    '/* fixerrors:retention-begin */ BEGIN ISOLATION LEVEL SERIALIZABLE'
+  );
+  try {
+    await client.query(
+      "/* fixerrors:retention-timeouts */ SET LOCAL lock_timeout = '5s'; SET LOCAL statement_timeout = '30s'"
+    );
+    await client.query(`
+      /* fixerrors:retention-lock */
+      LOCK TABLE
+        public.error_logs,
+        public.error_log_alerts,
+        public.service_health_events,
+        public.user_usage_events
+      IN SHARE ROW EXCLUSIVE MODE
+    `);
+    await assertErrorLogCatalogContracts(client);
+
+    const cutoffResult = await client.query<{ cutoff: unknown }>(
+      `
+        /* fixerrors:retention-cutoff */
+        SELECT
+          to_char(
+            (transaction_timestamp() - ($1::int * INTERVAL '1 month')) AT TIME ZONE 'UTC',
+            'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+          ) AS cutoff
+      `,
+      [ERROR_LOG_RETENTION_MONTHS]
+    );
+    const cutoffAt = canonicalizeSnapshotTimestamp(
+      cutoffResult.rows[0]?.cutoff,
+      'retention cutoff'
+    );
+    const eligible = await client.query<{ id: unknown }>(
+      `
+        /* fixerrors:retention-eligible */
+        SELECT id::text AS id
+        FROM public.error_logs
+        WHERE status = 'archived'
+          AND archived_at IS NOT NULL
+          AND archived_at < $1::timestamptz
+        ORDER BY archived_at ASC, id ASC
+      `,
+      [cutoffAt]
+    );
+    const eligibleIds = eligible.rows.map((row) =>
+      requireSnapshotUuid(row.id, 'retention candidate ID')
+    );
+    if (new Set(eligibleIds).size !== eligibleIds.length) {
+      throw new Error('Retention candidate set contained duplicate IDs; purge rolled back');
+    }
+    const activeBefore = await countMatchingErrorLogs(
+      client,
+      'fixerrors:retention-active-before',
+      `SELECT COUNT(*)::text AS count FROM public.error_logs WHERE ${ACTIVE_ERROR_LOG_PREDICATE}`
+    );
+
+    if (eligibleIds.length === 0) {
+      commitAttempted = true;
+      await client.query('/* fixerrors:retention-commit */ COMMIT');
+      return {
+        eligibleCount: 0,
+        purgedCount: 0,
+        remainingExpiredCount: 0,
+        remainingActiveCount: activeBefore,
+        cutoffAt,
+        reconciliationState: 'none_eligible',
+      };
+    }
+
+    let purgedCount = 0;
+    for (
+      let index = 0;
+      index < eligibleIds.length;
+      index += ERROR_ARCHIVE_BATCH_SIZE
+    ) {
+      const batchIds = eligibleIds.slice(index, index + ERROR_ARCHIVE_BATCH_SIZE);
+      const deleted = await client.query<{ id: unknown }>(
+        `
+          /* fixerrors:retention-delete-batch */
+          DELETE FROM public.error_logs
+          WHERE id = ANY($1::uuid[])
+            AND status = 'archived'
+            AND archived_at IS NOT NULL
+            AND archived_at < $2::timestamptz
+          RETURNING id
+        `,
+        [batchIds, cutoffAt]
+      );
+      if (deleted.rows.length !== batchIds.length) {
+        throw new Error(
+          `Retention deleted ${deleted.rows.length} of ${batchIds.length} eligible rows; purge rolled back`
+        );
+      }
+      purgedCount += deleted.rows.length;
+    }
+
+    const remainingExpiredCount = await countMatchingErrorLogs(
+      client,
+      'fixerrors:retention-remaining-expired',
+      `
+        SELECT COUNT(*)::text AS count
+        FROM public.error_logs
+        WHERE status = 'archived'
+          AND archived_at IS NOT NULL
+          AND archived_at < $1::timestamptz
+      `,
+      [cutoffAt]
+    );
+    const remainingActiveCount = await countMatchingErrorLogs(
+      client,
+      'fixerrors:retention-active-after',
+      `SELECT COUNT(*)::text AS count FROM public.error_logs WHERE ${ACTIVE_ERROR_LOG_PREDICATE}`
+    );
+    if (
+      purgedCount !== eligibleIds.length ||
+      remainingExpiredCount !== 0 ||
+      remainingActiveCount !== activeBefore
+    ) {
+      throw new Error('Retention reconciliation mismatch; purge rolled back');
+    }
+
+    commitAttempted = true;
+    await client.query('/* fixerrors:retention-commit */ COMMIT');
+    return {
+      eligibleCount: eligibleIds.length,
+      purgedCount,
+      remainingExpiredCount,
+      remainingActiveCount,
+      cutoffAt,
+      reconciliationState: 'purged',
+    };
+  } catch (error) {
+    if (!commitAttempted) {
+      try {
+        await client.query('/* fixerrors:retention-rollback */ ROLLBACK');
+      } catch {
+        throw new ErrorCleanupTransactionError(
+          `Retention commit outcome is indeterminate after rollback failure: ${safeErrorMessage(error)}`,
+          'indeterminate',
+          []
+        );
+      }
+      throw error instanceof ErrorCleanupTransactionError
+        ? error
+        : new ErrorCleanupTransactionError(
+            safeErrorMessage(error),
+            'failed',
+            []
+          );
+    }
+    throw new ErrorCleanupTransactionError(
+      `Retention commit outcome is indeterminate: ${safeErrorMessage(error)}`,
+      'indeterminate',
+      []
+    );
+  }
 }

@@ -5,7 +5,7 @@ export type OperationalMutation = {
   table: string;
   operation: 'delete' | 'update';
   identityColumn: string;
-  purpose: 'primary-diagnostic' | 'dependent-diagnostic';
+  purpose: 'primary-diagnostic' | 'dependent-diagnostic' | 'expired-archived-retention';
   updatedColumns?: readonly string[];
   targetPredicate?: string;
 };
@@ -17,10 +17,13 @@ export type TrustedOperationalAction = {
   allowedMutations: readonly OperationalMutation[];
 };
 
+export const ERROR_LOG_RETENTION_PREDICATE =
+  "status = 'archived' AND archived_at < now() - interval '12 months'";
+
 export const TRUSTED_OPERATIONAL_ACTIONS = {
   fixerrors: {
     commandId: 'fixerrors',
-    safetyContract: 'fixerrors-exact-snapshot-v3',
+    safetyContract: 'fixerrors-exact-snapshot-v4',
     trustedOperationalAction: true,
     allowedMutations: [
       {
@@ -32,6 +35,14 @@ export const TRUSTED_OPERATIONAL_ACTIONS = {
         updatedColumns: ['status', 'archived_at'],
         targetPredicate: "status = 'active'",
       },
+      {
+        schema: 'public',
+        table: 'error_logs',
+        operation: 'delete',
+        identityColumn: 'id',
+        purpose: 'expired-archived-retention',
+        targetPredicate: ERROR_LOG_RETENTION_PREDICATE,
+      },
     ],
   },
 } as const satisfies Record<TrustedOperationalCommandId, TrustedOperationalAction>;
@@ -42,6 +53,7 @@ export type OperationalClassificationInput = {
   intent: 'execute' | 'modify';
   explicitlyRequested: boolean;
   confirmationBoundToSnapshot: boolean;
+  retentionBoundToCandidateSet?: boolean;
   runtimeSafetyChecksPassed: boolean;
   requestedMutations: readonly OperationalMutation[];
 };
@@ -55,22 +67,23 @@ export type OperationalClassification = {
   reason: string;
 };
 
-function mutationsMatch(
+function mutationKey(mutation: OperationalMutation): string {
+  return [
+    mutation.schema,
+    mutation.table,
+    mutation.operation,
+    mutation.identityColumn,
+    mutation.purpose,
+    (mutation.updatedColumns ?? []).join(','),
+    mutation.targetPredicate ?? '',
+  ].join(':');
+}
+
+function requestedMutationsAllowed(
   requested: readonly OperationalMutation[],
   allowed: readonly OperationalMutation[]
 ): boolean {
-  if (requested.length !== allowed.length) return false;
-
-  const mutationKey = (mutation: OperationalMutation) =>
-    [
-      mutation.schema,
-      mutation.table,
-      mutation.operation,
-      mutation.identityColumn,
-      mutation.purpose,
-      (mutation.updatedColumns ?? []).join(','),
-      mutation.targetPredicate ?? '',
-    ].join(':');
+  if (requested.length === 0) return false;
   const allowedKeys = new Set(allowed.map(mutationKey));
   return requested.every((mutation) => allowedKeys.has(mutationKey(mutation)));
 }
@@ -103,14 +116,23 @@ export function classifyOperationalAction(
     };
   }
 
-  const scopeMatches = mutationsMatch(
+  const scopeMatches = requestedMutationsAllowed(
     input.requestedMutations,
     registered.allowedMutations
   );
+  const needsSnapshotBind = input.requestedMutations.some(
+    (mutation) => mutation.operation === 'update'
+  );
+  const needsRetentionBind = input.requestedMutations.some(
+    (mutation) => mutation.purpose === 'expired-archived-retention'
+  );
+  const bindingHolds =
+    (!needsSnapshotBind || input.confirmationBoundToSnapshot) &&
+    (!needsRetentionBind || input.retentionBoundToCandidateSet === true);
   const eligible =
     input.safetyContract === registered.safetyContract &&
     input.explicitlyRequested &&
-    input.confirmationBoundToSnapshot &&
+    bindingHolds &&
     input.runtimeSafetyChecksPassed &&
     scopeMatches;
 

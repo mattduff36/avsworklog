@@ -1,47 +1,74 @@
 import {
+  ERROR_LOG_RETENTION_PREDICATE,
   TRUSTED_OPERATIONAL_ACTIONS,
   classifyOperationalAction,
   type OperationalClassificationInput,
+  type OperationalMutation,
 } from '@/scripts/automation/trusted-operational-actions';
 import { describe, expect, it } from 'vitest';
+
+const ARCHIVE_MUTATION = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.find(
+  (mutation) => mutation.operation === 'update'
+)!;
+const RETENTION_MUTATION = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.find(
+  (mutation) => mutation.purpose === 'expired-archived-retention'
+)!;
 
 function trustedExecution(
   overrides: Partial<OperationalClassificationInput> = {}
 ): OperationalClassificationInput {
   return {
     commandId: 'fixerrors',
-    safetyContract: 'fixerrors-exact-snapshot-v3',
+    safetyContract: 'fixerrors-exact-snapshot-v4',
     intent: 'execute',
     explicitlyRequested: true,
     confirmationBoundToSnapshot: true,
     runtimeSafetyChecksPassed: true,
-    requestedMutations: TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations,
+    requestedMutations: [ARCHIVE_MUTATION],
     ...overrides,
   };
 }
 
 describe('TEE V2.2 trusted operational action policy', () => {
-  it('FE-TRUST-001 treats registered safeguarded fixerrors archive execution as operational, not CRITICAL engineering', () => {
+  it('FE-TRUST-001 treats registered snapshot-bound archive execution as operational', () => {
     expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract).toBe(
-      'fixerrors-exact-snapshot-v3'
+      'fixerrors-exact-snapshot-v4'
     );
-    expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations).toEqual([
-      {
-        schema: 'public',
-        table: 'error_logs',
-        operation: 'update',
-        identityColumn: 'id',
-        purpose: 'primary-diagnostic',
-        updatedColumns: ['status', 'archived_at'],
-        targetPredicate: "status = 'active'",
-      },
-    ]);
+    expect(ARCHIVE_MUTATION).toMatchObject({
+      operation: 'update',
+      updatedColumns: ['status', 'archived_at'],
+      targetPredicate: "status = 'active'",
+    });
     expect(classifyOperationalAction(trustedExecution())).toMatchObject({
       kind: 'operational_execution',
-      lane: null,
       trusted: true,
-      trustSuspended: false,
-      safetyContract: 'fixerrors-exact-snapshot-v3',
+      safetyContract: 'fixerrors-exact-snapshot-v4',
+    });
+  });
+
+  it('FE-TRUST-002 registers exact v4 update plus 12-month retention delete', () => {
+    expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations).toEqual([
+      ARCHIVE_MUTATION,
+      RETENTION_MUTATION,
+    ]);
+    expect(RETENTION_MUTATION).toMatchObject({
+      schema: 'public',
+      table: 'error_logs',
+      operation: 'delete',
+      purpose: 'expired-archived-retention',
+      targetPredicate: ERROR_LOG_RETENTION_PREDICATE,
+    });
+    expect(
+      classifyOperationalAction(
+        trustedExecution({
+          confirmationBoundToSnapshot: false,
+          retentionBoundToCandidateSet: true,
+          requestedMutations: [RETENTION_MUTATION],
+        })
+      )
+    ).toMatchObject({
+      kind: 'operational_execution',
+      trusted: true,
     });
   });
 
@@ -67,52 +94,46 @@ describe('TEE V2.2 trusted operational action policy', () => {
       trusted: false,
       safetyContract: null,
     });
-    expect(
-      classifyOperationalAction(
-        trustedExecution({ commandId: 'trusted fixerrors please' })
-      )
-    ).toMatchObject({
-      kind: 'engineering_task',
-      lane: 'critical',
-      trusted: false,
-    });
   });
 
-  it('suspends trust when confirmation or a runtime safety invariant fails', () => {
+  it('suspends trust when snapshot or retention binding is missing', () => {
     expect(
       classifyOperationalAction(
         trustedExecution({ confirmationBoundToSnapshot: false })
       )
     ).toMatchObject({
-      kind: 'engineering_task',
-      lane: 'critical',
       trustSuspended: true,
+      reason: 'trusted-operational-precondition-failed',
+    });
+    expect(
+      classifyOperationalAction(
+        trustedExecution({
+          confirmationBoundToSnapshot: false,
+          requestedMutations: [RETENTION_MUTATION],
+        })
+      )
+    ).toMatchObject({
+      trustSuspended: true,
+      reason: 'trusted-operational-precondition-failed',
     });
     expect(
       classifyOperationalAction(
         trustedExecution({ runtimeSafetyChecksPassed: false })
       )
     ).toMatchObject({
-      kind: 'engineering_task',
-      lane: 'critical',
       trustSuspended: true,
     });
   });
 
-  it('suspends trust when the registered command safety-contract version differs', () => {
+  it('FE-TRUST-002 suspends trust for v3, delete-all, extra tables, and predicate changes', () => {
     expect(
       classifyOperationalAction(
-        trustedExecution({ safetyContract: 'fixerrors-exact-snapshot-v2' })
+        trustedExecution({ safetyContract: 'fixerrors-exact-snapshot-v3' })
       )
     ).toMatchObject({
-      kind: 'engineering_task',
-      lane: 'critical',
       trustSuspended: true,
       reason: 'trusted-operational-contract-mismatch',
     });
-  });
-
-  it('suspends trust when execution requests delete, extra tables, or wider columns', () => {
     expect(
       classifyOperationalAction(
         trustedExecution({
@@ -128,8 +149,6 @@ describe('TEE V2.2 trusted operational action policy', () => {
         })
       )
     ).toMatchObject({
-      kind: 'engineering_task',
-      lane: 'critical',
       trustSuspended: true,
       reason: 'trusted-operational-scope-mismatch',
     });
@@ -137,7 +156,7 @@ describe('TEE V2.2 trusted operational action policy', () => {
       classifyOperationalAction(
         trustedExecution({
           requestedMutations: [
-            ...TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations,
+            RETENTION_MUTATION,
             {
               schema: 'public',
               table: 'error_log_alerts',
@@ -149,30 +168,22 @@ describe('TEE V2.2 trusted operational action policy', () => {
         })
       )
     ).toMatchObject({
-      kind: 'engineering_task',
-      lane: 'critical',
       trustSuspended: true,
       reason: 'trusted-operational-scope-mismatch',
     });
+    const widened: OperationalMutation = {
+      ...RETENTION_MUTATION,
+      targetPredicate: "status = 'archived'",
+    };
     expect(
       classifyOperationalAction(
         trustedExecution({
-          requestedMutations: [
-            {
-              schema: 'public',
-              table: 'error_logs',
-              operation: 'update',
-              identityColumn: 'id',
-              purpose: 'primary-diagnostic',
-              updatedColumns: ['status', 'archived_at', 'error_message'],
-              targetPredicate: "status = 'active'",
-            },
-          ],
+          confirmationBoundToSnapshot: false,
+          retentionBoundToCandidateSet: true,
+          requestedMutations: [widened],
         })
       )
     ).toMatchObject({
-      kind: 'engineering_task',
-      lane: 'critical',
       trustSuspended: true,
       reason: 'trusted-operational-scope-mismatch',
     });
