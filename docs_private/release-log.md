@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.36.0
+
+**GIT COMMIT MESSAGE**
+`feat(errors): purge archived error logs after 12 months`
+
+**PUSHED AT**
+2026-08-20T17:12:18.262Z
+
+**WHAT CHANGED**
+Purge archived error logs after 12 months. Promote legacy and yard tabs to main categories. Archive processed error logs instead of deleting them.
+
+**VERSION HISTORY DETAILS**
+- Purge archived error logs after 12 months, with changes to background routes, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to shared typing, automation scripts, and data storage.
+- Promote legacy and yard tabs to main categories, with changes to app screens, automation scripts, and automated tests.
+- Updated debug tools, with changes to background routes, app screens, and automated tests.
+- Updated reminders, with changes to shared logic and automated tests.
+- Updated maintenance, with changes to automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `feat(errors): purge archived error logs after 12 months`
+- `fix(actions): promote legacy and yard tabs to main categories`
+- `feat(errors): archive processed error logs instead of deleting them`
+
 ## 0826.35.0
 
 **GIT COMMIT MESSAGE**

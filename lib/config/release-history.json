@@ -1,5 +1,30 @@
 [
   {
+    "version": "0826.36.0",
+    "updateKind": "major",
+    "title": "Error reporting update",
+    "description": "Purge archived error logs after 12 months. Promote legacy and yard tabs to main categories. Archive processed error logs instead of deleting them.",
+    "summary": "Purge archived error logs after 12 months. Promote legacy and yard tabs to main categories. Archive processed error logs instead of deleting them.",
+    "details": [
+      "Purge archived error logs after 12 months, with changes to background routes, shared logic, automation scripts, automated tests, and data storage.",
+      "Updated data storage, with changes to shared typing, automation scripts, and data storage.",
+      "Promote legacy and yard tabs to main categories, with changes to app screens, automation scripts, and automated tests.",
+      "Updated debug tools, with changes to background routes, app screens, and automated tests.",
+      "Updated reminders, with changes to shared logic and automated tests.",
+      "Updated maintenance, with changes to automation scripts."
+    ],
+    "areas": [
+      "Error reporting",
+      "Actions",
+      "Purge archived error logs after 12 months. Promote legacy"
+    ],
+    "areaKeys": [
+      "error-reporting",
+      "actions"
+    ],
+    "pushedAt": "2026-08-20T17:12:18.262Z"
+  },
+  {
     "version": "0826.35.0",
     "updateKind": "major",
     "title": "Absence & Leave update",
