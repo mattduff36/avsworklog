@@ -76,6 +76,8 @@ function isQualifyingStatus(status: string | undefined, loopCount: number): bool
   return status === 'completed' && loopCount === 0;
 }
 
+export const FIXERRORS_COMMAND_MANDATED_REVIEW_REASON = 'fixerrors-command-mandated';
+
 export function detectWorkflowAnomalies(
   event: Pick<
     WorkflowStopEvent,
@@ -83,8 +85,12 @@ export function detectWorkflowAnomalies(
   >
 ): string[] {
   const flags = new Set<string>();
+  const commandMandatedReview = Boolean(
+    event.marker?.reviewEscalationReasons?.includes(FIXERRORS_COMMAND_MANDATED_REVIEW_REASON)
+  );
   if (
     (event.lane === 'fast' || event.lane === 'standard') &&
+    !commandMandatedReview &&
     (event.transcriptSignals?.architectureGateTask ||
       event.transcriptSignals?.finalDiffReviewerTask ||
       event.marker?.reviewPasses?.some((pass) => pass.tier === 'premium'))

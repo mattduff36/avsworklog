@@ -710,7 +710,6 @@ function generateReport(patterns: ErrorPattern[], totalFetched: number, totalFil
   lines.push(`> **Errors fetched from DB:** ${totalFetched} | **After filtering:** ${totalFiltered} | **Patterns found:** ${patterns.length}`);
   lines.push('');
   lines.push('This file is overwritten each time `npm run fixerrors` runs.');
-  lines.push('Use it as context for Cursor AI to analyze and fix codebase issues.');
   lines.push('');
 
   if (patterns.length === 0) {
@@ -720,6 +719,11 @@ function generateReport(patterns: ErrorPattern[], totalFetched: number, totalFil
     lines.push('');
     return lines.join('\n');
   }
+
+  lines.push(
+    'Mechanical clusters and TEE lanes below are advisory input for the premium analysis step, which writes `docs_private/error-analysis-decision.md`.'
+  );
+  lines.push('');
 
   const clusters = clusterErrorPatterns(patterns);
   lines.push('## Root Cause Clusters and TEE Routing');

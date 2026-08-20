@@ -37,6 +37,7 @@ import {
   extractPlanContractMarker,
 } from '@/scripts/automation/workflow-plan-contract';
 import {
+  FIXERRORS_COMMAND_MANDATED_REVIEW_REASON,
   buildWorkflowReviewMetrics,
   computePlanRecommendationAdherence,
   detectWorkflowAnomalies,
@@ -1117,6 +1118,32 @@ describe('workflow-review cadence', () => {
       findings: [],
     });
     expect(flags).toContain('unexpected-premium-review');
+  });
+
+  it('does not flag a command-mandated fixerrors final-diff-reviewer as unexpected', () => {
+    const flags = detectWorkflowAnomalies({
+      lane: 'fast',
+      marker: markerV4('fast', {
+        independentReviewRequired: true,
+        reviewEscalationReasons: [FIXERRORS_COMMAND_MANDATED_REVIEW_REASON],
+        reviewPasses: [
+          {
+            passId: 'fixerrors-review',
+            stage: 'final-diff-reviewer',
+            source: 'independent_subagent',
+            tier: 'premium',
+            iteration: 1,
+            result: 'passed',
+          },
+        ],
+      }),
+      markerStatus: 'present',
+      transcriptSignals: {
+        finalDiffReviewerTask: true,
+      } as WorkflowTranscriptSignals,
+      findings: [],
+    });
+    expect(flags).not.toContain('unexpected-premium-review');
   });
 
   it('detects malformed critical evidence even when lane parsing failed', () => {
