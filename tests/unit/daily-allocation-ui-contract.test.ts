@@ -67,6 +67,8 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(resources).toContain('overflow-y-auto');
     expect(resources).toContain('xl:max-h-none');
     expect(resources).not.toContain('h-fit');
+    expect(resources).toContain('Drag onto the board, or select then Add visit / Assign.');
+    expect(resources).not.toContain('Touch: press and hold the grip handle');
 
     const timeline = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/DailyTimeline.tsx'),

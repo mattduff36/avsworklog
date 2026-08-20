@@ -203,7 +203,7 @@ export function ResourceSidebar({
             <TabsTrigger value="plant">Plant ({filteredPlant.length})</TabsTrigger>
           </TabsList>
           <p className="pt-2 text-xs text-slate-300">
-            Drag a job onto the timeline to create a timed visit. Drag an employee or registered plant onto a visit to assign. Keyboard users can select a resource, then use Assign.
+            Drag onto the board, or select then Add visit / Assign.
           </p>
           <div className="relative pt-2 pb-3">
             <Search className="pointer-events-none absolute left-2.5 top-4 h-4 w-4 text-slate-400" aria-hidden="true" />
@@ -298,9 +298,6 @@ export function ResourceSidebar({
             })}
           </TabsContent>
         </CardContent>
-        <p className="shrink-0 px-4 py-3 text-[11px] text-slate-400">
-          Touch: press and hold the grip handle to drag. Keyboard: select, then use Add visit or Assign resources.
-        </p>
       </Tabs>
     </Card>
   );
