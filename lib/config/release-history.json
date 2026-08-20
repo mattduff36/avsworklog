@@ -1,5 +1,26 @@
 [
   {
+    "version": "0826.38.2",
+    "updateKind": "minor",
+    "title": "Dashboard maintenance update",
+    "description": "Pin beta badges and color My Allocation nav icon.",
+    "summary": "Pin beta badges and color My Allocation nav icon.",
+    "details": [
+      "Pin beta badges and color My Allocation nav icon, with changes to app screens.",
+      "Updated daily allocation, with changes to automated tests.",
+      "Updated navigation, with changes to interface components."
+    ],
+    "areas": [
+      "Dashboard",
+      "Pin beta badges",
+      "Color My Allocation nav icon"
+    ],
+    "areaKeys": [
+      "dashboard"
+    ],
+    "pushedAt": "2026-08-20T20:00:45.200Z"
+  },
+  {
     "version": "0826.38.1",
     "updateKind": "minor",
     "title": "Migrations improvements",

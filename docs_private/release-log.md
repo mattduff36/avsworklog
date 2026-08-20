@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.38.2
+
+**GIT COMMIT MESSAGE**
+`style(dashboard): pin beta badges and color My Allocation nav icon`
+
+**PUSHED AT**
+2026-08-20T20:00:45.200Z
+
+**WHAT CHANGED**
+Pin beta badges and color My Allocation nav icon.
+
+**VERSION HISTORY DETAILS**
+- Pin beta badges and color My Allocation nav icon, with changes to app screens.
+- Updated daily allocation, with changes to automated tests.
+- Updated navigation, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `style(dashboard): pin beta badges and color My Allocation nav icon`
+
 ## 0826.38.1
 
 **GIT COMMIT MESSAGE**
