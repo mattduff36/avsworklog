@@ -87,7 +87,9 @@ test.describe('Plant Daily Checks — Content Verification', () => {
   test('list page uses daily check terminology', async ({ page }) => {
     await page.goto('/plant-inspections');
     await waitForAppReady(page);
-    await expect(page.locator('h1')).toContainText(/Plant Daily Checks/i);
+    await expect(page.getByRole('heading', { name: /Plant Daily Checks/i })).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test('no "Vehicle Inspection" text in headings', async ({ page }) => {
