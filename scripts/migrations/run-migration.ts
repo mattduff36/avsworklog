@@ -1,3 +1,13 @@
+/**
+ * HISTORICAL / DO NOT EXECUTE
+ *
+ * This file is a historical migration runner. It must not be wired to npm
+ * and must not be used against a live database.
+ *
+ * It is superseded by `npm run finalise` for normal branch execution, the
+ * safe explicit runner (`npm run migrate -- supabase/migrations/<file>.sql`),
+ * or a reviewed feature-specific runner for postdeploy/non-transactional SQL.
+ */
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { readFileSync } from 'fs';

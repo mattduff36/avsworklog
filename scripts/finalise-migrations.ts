@@ -289,18 +289,24 @@ export function stripOuterMigrationTransaction(sql: string): string {
   return sql.replace(leadingTransaction, '$1').replace(trailingTransaction, '$1');
 }
 
-export function getSafeDatabaseTargetIdentity(connectionString: string | null | undefined): string | null {
+export function getSafeDatabaseProjectRef(
+  connectionString: string | null | undefined
+): string | null {
   if (!connectionString) return null;
   try {
     const url = new URL(connectionString);
     const username = decodeURIComponent(url.username);
     const usernameProjectRef = username.match(/^postgres\.([a-z0-9]+)$/iu)?.[1];
     const hostnameProjectRef = url.hostname.match(/^db\.([a-z0-9]+)\.supabase\.co$/iu)?.[1];
-    const projectRef = usernameProjectRef ?? hostnameProjectRef;
-    return projectRef ? `Supabase project ${projectRef}` : null;
+    return usernameProjectRef ?? hostnameProjectRef ?? null;
   } catch {
     return null;
   }
+}
+
+export function getSafeDatabaseTargetIdentity(connectionString: string | null | undefined): string | null {
+  const projectRef = getSafeDatabaseProjectRef(connectionString);
+  return projectRef ? `Supabase project ${projectRef}` : null;
 }
 
 export function requireSafeMigrationConnectionString(

@@ -35,17 +35,18 @@ import {
 } from './finalise-summary';
 import {
   decideFinaliseMigrationLedgerAction,
-  FINALISE_MIGRATION_LEDGER_SQL,
   type FinaliseMigrationFile,
-  type FinaliseMigrationLedgerRow,
   getFinaliseMigrationDiscoveryPaths,
   getFinaliseMigrationFilesFromPaths,
   getSafeDatabaseTargetIdentity,
   getValidatedMigrationEvidencePaths,
   loadFinaliseMigrationFiles,
   requireSafeMigrationConnectionString,
-  stripOuterMigrationTransaction,
 } from './finalise-migrations';
+import {
+  applyMigrationWithLedger,
+  readMigrationLedgerRows,
+} from './migration-executor';
 
 config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -634,29 +635,6 @@ async function createDbClient(): Promise<pg.Client> {
   return client;
 }
 
-async function readMigrationLedgerRows(
-  client: pg.Client,
-  migrationFiles: FinaliseMigrationFile[]
-): Promise<Map<string, FinaliseMigrationLedgerRow>> {
-  if (migrationFiles.length === 0) {
-    return new Map();
-  }
-  const ledgerExists = await client.query<{ ledger: string | null }>(
-    'SELECT to_regclass($1) AS ledger',
-    ['private.finalise_migration_ledger']
-  );
-  if (!ledgerExists.rows[0]?.ledger) {
-    return new Map();
-  }
-  const result = await client.query<FinaliseMigrationLedgerRow>(
-    `SELECT filename, checksum_sha256, phase, applied_at
-     FROM private.finalise_migration_ledger
-     WHERE filename = ANY($1::text[])`,
-    [migrationFiles.map((migration) => migration.relativePath)]
-  );
-  return new Map(result.rows.map((row) => [row.filename, row]));
-}
-
 async function inspectPendingMigrations(
   migrationFiles: FinaliseMigrationFile[],
   deferred: string[]
@@ -681,10 +659,6 @@ async function inspectPendingMigrations(
   }
 }
 
-async function ensureMigrationLedger(client: pg.Client): Promise<void> {
-  await client.query(FINALISE_MIGRATION_LEDGER_SQL);
-}
-
 async function runPendingMigrations(
   migrationFiles: FinaliseMigrationFile[],
   deferred: string[]
@@ -694,42 +668,19 @@ async function runPendingMigrations(
 
   try {
     for (const migration of migrationFiles) {
-      await client.query('BEGIN');
-      try {
-        await client.query(
-          "SELECT pg_advisory_xact_lock(hashtextextended('private.finalise_migration_ledger', 0))"
-        );
-        await ensureMigrationLedger(client);
-        await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
-          migration.relativePath,
-        ]);
-        const ledgerRows = await readMigrationLedgerRows(client, [migration]);
-        const decision = decideFinaliseMigrationLedgerAction(
-          migration,
-          ledgerRows.get(migration.relativePath) ?? null
-        );
-
-        if (decision === 'reuse') {
-          await client.query('COMMIT');
-          summary.reused.push(migration.relativePath);
-          console.log(`\n==> Reuse applied migration ${migration.relativePath}`);
-          continue;
-        }
-
-        console.log(`\n==> Apply migration ${migration.relativePath}`);
-        await client.query(stripOuterMigrationTransaction(migration.sql));
-        await client.query(
-          `INSERT INTO private.finalise_migration_ledger
-             (filename, checksum_sha256, phase)
-           VALUES ($1, $2, $3)`,
-          [migration.relativePath, migration.checksumSha256, migration.phase]
-        );
-        await client.query('COMMIT');
-        summary.applied.push(migration.relativePath);
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
-        throw error;
+      const result = await applyMigrationWithLedger(client, migration, {
+        onDecision: (decision) => {
+          if (decision === 'apply') {
+            console.log(`\n==> Apply migration ${migration.relativePath}`);
+          }
+        },
+      });
+      if (result.action === 'reuse') {
+        summary.reused.push(migration.relativePath);
+        console.log(`\n==> Reuse applied migration ${migration.relativePath}`);
+        continue;
       }
+      summary.applied.push(migration.relativePath);
     }
     return summary;
   } finally {

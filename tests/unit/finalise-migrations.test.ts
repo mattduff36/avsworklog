@@ -8,6 +8,7 @@ import {
   FINALISE_MIGRATION_LEDGER_SQL,
   getFinaliseMigrationDiscoveryPaths,
   getFinaliseMigrationFilesFromPaths,
+  getSafeDatabaseProjectRef,
   getSafeDatabaseTargetIdentity,
   getValidatedMigrationEvidencePaths,
   loadFinaliseMigrationFiles,
@@ -140,7 +141,7 @@ describe('finalise migration discovery', () => {
   });
 });
 
-describe('finalise migration metadata and ledger', () => {
+describe('MIG-REGRESSION-001 finalise migration metadata and ledger', () => {
   it('parses explicit phase metadata and defaults to predeploy', () => {
     expect(parseFinaliseMigrationPhase('-- finalise-phase: postdeploy\nSELECT 1;')).toBe(
       'postdeploy'
@@ -216,12 +217,20 @@ describe('finalise migration metadata and ledger', () => {
 
   it('reports only a non-secret Supabase project identity', () => {
     expect(
+      getSafeDatabaseProjectRef(
+        'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:5432/postgres'
+      )
+    ).toBe('projectref');
+    expect(
       getSafeDatabaseTargetIdentity(
         'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:5432/postgres'
       )
     ).toBe('Supabase project projectref');
     expect(
       getSafeDatabaseTargetIdentity('postgresql://user:secret@internal.example/db')
+    ).toBeNull();
+    expect(
+      getSafeDatabaseProjectRef('postgresql://user:secret@internal.example/db')
     ).toBeNull();
   });
 

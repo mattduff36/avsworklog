@@ -5,9 +5,10 @@ This directory contains utility scripts for database management, testing, and ma
 ## Directory Structure
 
 ### `/migrations`
-Database migration scripts. These should be run in order.
+Historical feature runners and one-off scripts. They are **not** a “run in order / run all” tool.
 - **Pattern:** `run-*-migration.ts`, `add-*-migration.ts`, `migrate-*.ts`
-- **Usage:** `npm run migrate` or `tsx scripts/migrations/<script-name>.ts`
+- **Current execution:** `npm run finalise` for branch files; `npm run migrate -- supabase/migrations/<file>.sql` for one explicit predeploy transactional file
+- **Do not use:** `scripts/migrations/run-migration.ts` and `scripts/migrations/run-day-of-week-migration.ts` are historical, unwired, and must not be run against a live database
 
 ### `/seed`
 Data seeding scripts for development and testing.
@@ -35,8 +36,8 @@ Historical fix scripts kept for reference.
 ## Common Commands
 
 ```bash
-# Run a migration
-tsx scripts/migrations/run-migration.ts
+# Validate one explicit predeploy migration (no connection)
+npm run migrate -- supabase/migrations/<file>.sql
 
 # Seed sample data
 npm run seed:sample-data
@@ -53,7 +54,7 @@ tsx scripts/testing/test-reports.ts
 
 ## Guidelines
 
-1. **Migrations:** Should be idempotent and include rollback logic
+1. **Migrations:** Forward-only dated files under `supabase/migrations/`. Do not edit shipped SQL or ledger evidence; add a corrective migration. The generic runner is predeploy/transaction-only and requires `--apply --confirm-target <project-ref>` before it will connect.
 2. **Seed scripts:** Should check for existing data before inserting
 3. **Maintenance:** Should require confirmation for destructive operations
 4. **Testing:** Should not modify production data
@@ -61,8 +62,12 @@ tsx scripts/testing/test-reports.ts
 
 ## Environment Variables
 
-All scripts require `.env.local` with:
-- `POSTGRES_URL_NON_POOLING` - Direct database connection
+Finalise and generic-runner **apply** require `.env.local` with:
+- `POSTGRES_URL_NON_POOLING` - session-mode database connection
+
+The generic runner's default dry-run does not load `.env.local` or any connection configuration.
+
+Other operational scripts may also need:
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anon key
 
