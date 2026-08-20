@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.37.0
+
+**GIT COMMIT MESSAGE**
+`feat(notifications): update Notifications, Help and FAQ, and Timesheets`
+
+**PUSHED AT**
+2026-08-20T17:23:12.416Z
+
+**WHAT CHANGED**
+Update Notifications, Help and FAQ, and Timesheets. Treat Manager Approved status conflicts as expected.
+
+**VERSION HISTORY DETAILS**
+- Updated Notifications, Help and FAQ, and Timesheets, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated timesheets, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated help and FAQ, with changes to shared logic and automated tests.
+- Treat Manager Approved status conflicts as expected, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(notifications): update Notifications, Help and FAQ, and Timesheets`
+- `fix(approvals): treat Manager Approved status conflicts as expected`
+
 ## 0826.36.0
 
 **GIT COMMIT MESSAGE**

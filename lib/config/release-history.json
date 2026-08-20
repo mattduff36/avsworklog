@@ -1,5 +1,30 @@
 [
   {
+    "version": "0826.37.0",
+    "updateKind": "major",
+    "title": "Notifications update",
+    "description": "Updated Notifications, Help and FAQ, and Timesheets. Treat Manager Approved status conflicts as expected.",
+    "summary": "Updated Notifications, Help and FAQ, and Timesheets. Treat Manager Approved status conflicts as expected.",
+    "details": [
+      "Updated Notifications, Help and FAQ, and Timesheets, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated timesheets, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated help and FAQ, with changes to shared logic and automated tests.",
+      "Treat Manager Approved status conflicts as expected, with changes to app screens."
+    ],
+    "areas": [
+      "Notifications",
+      "Approvals",
+      "Help",
+      "FAQ",
+      "Timesheets. Treat Manager Approved status conflicts as expected"
+    ],
+    "areaKeys": [
+      "notifications",
+      "approvals"
+    ],
+    "pushedAt": "2026-08-20T17:23:12.416Z"
+  },
+  {
     "version": "0826.36.0",
     "updateKind": "major",
     "title": "Error reporting update",
