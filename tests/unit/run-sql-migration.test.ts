@@ -333,6 +333,16 @@ describe('MIG-PHASE-001 sql rejection', () => {
         writeMigration(repoRoot, '20260118_comment_dollar.sql', '-- $$\nCOMMIT;\n-- $$\n')
       )
     ).toThrow(/transaction-control/iu);
+    expect(() =>
+      assertGenericRunnerMigrationAllowed(
+        writeMigration(repoRoot, '20260119_commit_eof.sql', 'SELECT 1;\nCOMMIT')
+      )
+    ).toThrow(/transaction-control/iu);
+    expect(() =>
+      assertGenericRunnerMigrationAllowed(
+        writeMigration(repoRoot, '20260120_rollback_eof.sql', 'SELECT 1;\nROLLBACK\n')
+      )
+    ).toThrow(/transaction-control/iu);
 
     expect(() =>
       assertGenericRunnerMigrationAllowed(

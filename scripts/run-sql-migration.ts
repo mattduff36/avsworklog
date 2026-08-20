@@ -295,7 +295,7 @@ function stripSqlForTransactionScan(sql: string): string {
 }
 
 const REMAINING_TRANSACTION_CONTROL =
-  /\b(?:PREPARE\s+TRANSACTION|START\s+TRANSACTION|(?:BEGIN|COMMIT|ROLLBACK|ABORT|END)(?:\s+(?:WORK|TRANSACTION))?)(?:\s+AND\s+(?:NO\s+)?CHAIN)?\s*;/iu;
+  /\b(?:PREPARE\s+TRANSACTION|START\s+TRANSACTION|(?:BEGIN|COMMIT|ROLLBACK|ABORT|END)(?:\s+(?:WORK|TRANSACTION))?)(?:\s+AND\s+(?:NO\s+)?CHAIN)?\s*(?:;|$)/iu;
 
 export function assertGenericRunnerMigrationAllowed(migration: FinaliseMigrationFile): void {
   if (migration.phase !== 'predeploy') {
