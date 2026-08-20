@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { GET } from '@/app/api/quotes/metadata/route';
+import { createInventoryKioskConfigTableMock } from '@/tests/utils/supabase-query-mock';
 
 const {
   mockCreateClient,
@@ -37,7 +38,11 @@ vi.mock('@/lib/server/sensitive-module-access', () => ({
 
 function createOrderedQuery(rows: Array<Record<string, unknown>>) {
   const order = vi.fn().mockResolvedValue({ data: rows, error: null });
-  const select = vi.fn().mockReturnValue({ order });
+  const chain = {
+    eq: vi.fn(() => chain),
+    order,
+  };
+  const select = vi.fn().mockReturnValue(chain);
 
   return { select, order };
 }
@@ -61,6 +66,7 @@ describe('GET /api/quotes/metadata', () => {
     const profilesQuery = createOrderedQuery([]);
     const from = vi.fn((table: string) => {
       if (table === 'profiles') return { select: profilesQuery.select };
+      if (table === 'inventory_kiosk_config') return createInventoryKioskConfigTableMock();
       throw new Error(`Unexpected table: ${table}`);
     });
     mockCreateAdminClient.mockReturnValue({ from } as unknown as SupabaseClient);
@@ -84,6 +90,7 @@ describe('GET /api/quotes/metadata', () => {
     const from = vi.fn((table: string) => {
       if (table === 'profiles') return { select: profilesQuery.select };
       if (table === 'customers') return { select: customersQuery.select };
+      if (table === 'inventory_kiosk_config') return createInventoryKioskConfigTableMock();
       throw new Error(`Unexpected table: ${table}`);
     });
     mockCreateAdminClient.mockReturnValue({ from } as unknown as SupabaseClient);

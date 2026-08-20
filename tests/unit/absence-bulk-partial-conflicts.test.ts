@@ -74,13 +74,17 @@ function buildMockSupabase(options: BuildMockSupabaseOptions) {
         return {
           select() {
             return {
-              gt(_field: string, value: number) {
-                const filteredProfiles = options.profiles.filter(
-                  (profile) => (profile.annual_holiday_allowance_days ?? 0) > value
-                );
+              eq() {
                 return {
-                  async order() {
-                    return { data: filteredProfiles, error: null };
+                  gt(_field: string, value: number) {
+                    const filteredProfiles = options.profiles.filter(
+                      (profile) => (profile.annual_holiday_allowance_days ?? 0) > value
+                    );
+                    return {
+                      async order() {
+                        return { data: filteredProfiles, error: null };
+                      },
+                    };
                   },
                 };
               },

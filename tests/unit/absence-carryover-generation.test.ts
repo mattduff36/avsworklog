@@ -31,14 +31,18 @@ function buildMockSupabase() {
         return {
           select() {
             return {
-              async order() {
+              eq() {
                 return {
-                  data: [
-                    { id: 'emp-a', annual_holiday_allowance_days: 28 },
-                    { id: 'emp-b', annual_holiday_allowance_days: 20 },
-                    { id: 'emp-c', annual_holiday_allowance_days: 28 },
-                  ],
-                  error: null,
+                  async order() {
+                    return {
+                      data: [
+                        { id: 'emp-a', annual_holiday_allowance_days: 28 },
+                        { id: 'emp-b', annual_holiday_allowance_days: 20 },
+                        { id: 'emp-c', annual_holiday_allowance_days: 28 },
+                      ],
+                      error: null,
+                    };
+                  },
                 };
               },
             };

@@ -48,8 +48,12 @@ describe('absence onboarding action services', () => {
               return {
                 in() {
                   return {
-                    async gt() {
-                      return { data: [{ id: 'profile-1' }], error: null };
+                    eq() {
+                      return {
+                        async gt() {
+                          return { data: [{ id: 'profile-1' }], error: null };
+                        },
+                      };
                     },
                   };
                 },

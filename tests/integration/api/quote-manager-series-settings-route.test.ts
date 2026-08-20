@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { createInventoryKioskConfigTableMock } from '@/tests/utils/supabase-query-mock';
 
 const {
   mockCreateClient,
@@ -89,6 +90,7 @@ describe('/api/quotes/settings/manager-series', () => {
         if (table === 'profiles') {
           return {
             select: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
               order: vi.fn().mockResolvedValue({
                 data: [{ id: 'approver-1', full_name: 'Approver One', employee_id: 'A1' }],
                 error: null,
@@ -96,6 +98,7 @@ describe('/api/quotes/settings/manager-series', () => {
             })),
           };
         }
+        if (table === 'inventory_kiosk_config') return createInventoryKioskConfigTableMock();
         throw new Error(`Unexpected table ${table}`);
       }),
     };

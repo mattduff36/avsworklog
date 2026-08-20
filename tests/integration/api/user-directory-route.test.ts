@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { EffectiveRoleInfo } from '@/lib/utils/view-as';
 import { GET } from '@/app/api/users/directory/route';
+import { createInventoryKioskConfigTableMock } from '@/tests/utils/supabase-query-mock';
 
 vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/supabase/admin');
@@ -26,6 +27,15 @@ describe('GET /api/users/directory', () => {
     };
 
     return { query, order, range };
+  }
+
+  function mockAdminFrom(select: ReturnType<typeof vi.fn>) {
+    return vi.fn((table: string) => {
+      if (table === 'inventory_kiosk_config') {
+        return createInventoryKioskConfigTableMock();
+      }
+      return { select };
+    });
   }
 
   async function mockEffectiveRole(overrides: Partial<EffectiveRoleInfo> = {}) {
@@ -110,7 +120,7 @@ describe('GET /api/users/directory', () => {
       { id: 'user-2', full_name: 'Blake Blocked', employee_id: 'E002' },
     ]);
     const select = vi.fn().mockReturnValue(query);
-    const from = vi.fn().mockReturnValue({ select });
+    const from = mockAdminFrom(select);
 
     vi.mocked(createAdminClient).mockReturnValue({ from } as never);
 
@@ -164,7 +174,7 @@ describe('GET /api/users/directory', () => {
       { id: 'user-2', full_name: 'Blake Baker', employee_id: 'E002', team: { id: 'team-fleet', name: 'Fleet' } },
     ]);
     const select = vi.fn().mockReturnValue(query);
-    const from = vi.fn().mockReturnValue({ select });
+    const from = mockAdminFrom(select);
 
     vi.mocked(createAdminClient).mockReturnValue({ from } as never);
 
@@ -211,7 +221,7 @@ describe('GET /api/users/directory', () => {
       { id: 'user-2', full_name: 'Blake Baker', employee_id: 'E002', team: { id: 'team-fleet', name: 'Fleet' } },
     ]);
     const select = vi.fn().mockReturnValue(query);
-    const from = vi.fn().mockReturnValue({ select });
+    const from = mockAdminFrom(select);
 
     vi.mocked(createAdminClient).mockReturnValue({ from } as never);
 
@@ -248,7 +258,7 @@ describe('GET /api/users/directory', () => {
       { id: 'user-2', full_name: 'Pat Placeholder (Deleted User)', employee_id: 'E002' },
     ]);
     const select = vi.fn().mockReturnValue(query);
-    const from = vi.fn().mockReturnValue({ select });
+    const from = mockAdminFrom(select);
 
     vi.mocked(createAdminClient).mockReturnValue({ from } as never);
 
@@ -280,7 +290,7 @@ describe('GET /api/users/directory', () => {
       { id: 'user-1', full_name: 'Alex Able', employee_id: 'E001' },
     ]);
     const select = vi.fn().mockReturnValue(query);
-    const from = vi.fn().mockReturnValue({ select });
+    const from = mockAdminFrom(select);
 
     vi.mocked(createAdminClient).mockReturnValue({ from } as never);
 
@@ -317,7 +327,7 @@ describe('GET /api/users/directory', () => {
       { id: 'user-2', full_name: 'Pat Placeholder (Deleted User)', employee_id: 'E002' },
     ]);
     const select = vi.fn().mockReturnValue(query);
-    const from = vi.fn().mockReturnValue({ select });
+    const from = mockAdminFrom(select);
 
     vi.mocked(createAdminClient).mockReturnValue({ from } as never);
 

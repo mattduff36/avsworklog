@@ -23,3 +23,22 @@ export function createSupabaseQueryMock<T>(
 
   return query;
 }
+
+export function createInventoryKioskConfigTableMock(kioskUserId: string | null = null) {
+  return {
+    select() {
+      return {
+        eq() {
+          return {
+            async maybeSingle() {
+              return {
+                data: kioskUserId ? { kiosk_user_id: kioskUserId } : null,
+                error: null,
+              };
+            },
+          };
+        },
+      };
+    },
+  };
+}

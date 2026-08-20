@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QuoteBundle } from '@/lib/server/quote-workflow';
+import { createInventoryKioskConfigTableMock } from '@/tests/utils/supabase-query-mock';
 
 vi.mock('server-only', () => ({}));
 
@@ -431,14 +432,20 @@ describe('createQuoteNotification', () => {
         if (table === 'profiles') {
           return {
             select: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({ data: [], error: null }),
               in: vi.fn(() => ({
-                order: vi.fn().mockResolvedValue({
-                  data: [{ id: 'copy-1', full_name: 'Copy User', employee_id: null, team_id: 'accounts' }],
-                  error: null,
-                }),
+                eq: vi.fn(() => ({
+                  order: vi.fn().mockResolvedValue({
+                    data: [{ id: 'copy-1', full_name: 'Copy User', employee_id: null, team_id: 'accounts' }],
+                    error: null,
+                  }),
+                })),
               })),
             })),
           };
+        }
+        if (table === 'inventory_kiosk_config') {
+          return createInventoryKioskConfigTableMock();
         }
         if (table === 'notification_preferences') {
           return {

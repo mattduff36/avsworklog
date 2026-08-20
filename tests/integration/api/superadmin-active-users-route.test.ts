@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 import { GET } from '@/app/api/superadmin/active-users/route';
+import { createInventoryKioskConfigTableMock } from '@/tests/utils/supabase-query-mock';
 
 vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/supabase/admin');
@@ -58,6 +59,10 @@ function createAdminClientMock(visits: MockVisitRow[], isSuperAdmin = true, auth
             };
           },
         };
+      }
+
+      if (table === 'inventory_kiosk_config') {
+        return createInventoryKioskConfigTableMock();
       }
 
       if (table === 'user_page_visits') {
