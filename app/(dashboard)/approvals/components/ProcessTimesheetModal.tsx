@@ -40,9 +40,14 @@ export function ProcessTimesheetModal({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel className="border-border text-foreground">Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={processing} className="border-border text-foreground">
+            Cancel
+          </AlertDialogCancel>
           <AlertDialogAction
-            onClick={onConfirm}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
             disabled={processing}
             className="bg-avs-yellow hover:bg-avs-yellow-hover text-slate-900"
           >

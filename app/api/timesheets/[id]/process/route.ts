@@ -3,6 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import {
+  TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
+  resolveTimesheetProcessAction,
+} from '@/lib/utils/timesheet-process';
 
 export async function POST(
   request: NextRequest,
@@ -45,9 +49,17 @@ export async function POST(
       );
     }
 
-    if (typedTarget.status !== 'approved') {
+    const processDecision = resolveTimesheetProcessAction(typedTarget.status);
+    if (processDecision.type === 'already_processed') {
+      return NextResponse.json({ success: true, alreadyProcessed: true });
+    }
+    if (processDecision.type === 'conflict') {
       return NextResponse.json(
-        { error: 'Only approved timesheets can be processed' },
+        {
+          error: processDecision.message,
+          code: TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
+          currentStatus: typedTarget.status,
+        },
         { status: 409 }
       );
     }
@@ -67,8 +79,19 @@ export async function POST(
       throw updateError;
     }
     if (!updated) {
+      const { data: latest } = await admin
+        .from('timesheets')
+        .select('status')
+        .eq('id', timesheetId)
+        .maybeSingle();
+      if (latest?.status === 'processed') {
+        return NextResponse.json({ success: true, alreadyProcessed: true });
+      }
       return NextResponse.json(
-        { error: 'Timesheet status changed before it could be processed' },
+        {
+          error: 'Timesheet status changed before it could be processed',
+          code: TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
+        },
         { status: 409 }
       );
     }

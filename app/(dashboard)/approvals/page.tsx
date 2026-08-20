@@ -71,6 +71,10 @@ import {
   createApprovalInFlightGuard,
   isAlreadyApprovedConflict,
 } from './approvals-quick-approve';
+import {
+  TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
+  isTimesheetProcessConflict,
+} from '@/lib/utils/timesheet-process';
 
 const APPROVALS_PAGE_SIZE = 50;
 const approvalsTabTriggerClassName = 'gap-2 data-[state=active]:bg-avs-yellow data-[state=active]:text-slate-900';
@@ -162,6 +166,7 @@ function ApprovalsContent() {
   const [employees, setEmployees] = useState<FilterEmployee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const approveInFlightRef = useRef(createApprovalInFlightGuard());
+  const processInFlightRef = useRef(createApprovalInFlightGuard());
   const [busyTimesheetIds, setBusyTimesheetIds] = useState<ReadonlySet<string>>(() => new Set());
 
   // View mode (cards vs table) - persisted to localStorage per tab
@@ -761,25 +766,59 @@ function ApprovalsContent() {
   };
 
   const handleConfirmProcess = async () => {
-    if (!processingTimesheetId) return;
+    const timesheetId = processingTimesheetId;
+    if (!timesheetId || !processInFlightRef.current.tryBegin(timesheetId)) {
+      return;
+    }
 
     try {
       setProcessingInProgress(true);
-      const response = await fetch(`/api/timesheets/${processingTimesheetId}/process`, {
+      const response = await fetch(`/api/timesheets/${timesheetId}/process`, {
         method: 'POST',
       });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'Failed to process timesheet');
+      const payload = (await response.json()) as {
+        error?: string;
+        code?: string;
+        alreadyProcessed?: boolean;
+      };
+      if (!response.ok) {
+        const conflict = new Error(payload.error || 'Failed to process timesheet');
+        if (
+          payload.code === TIMESHEET_PROCESS_STATUS_CONFLICT_CODE ||
+          isTimesheetProcessConflict(conflict)
+        ) {
+          toast.error(conflict.message, { id: 'approvals-process-timesheet-error' });
+          await fetchApprovals();
+          return;
+        }
+        throw conflict;
+      }
 
-      toast.success('Timesheet marked as Manager Approved');
+      toast.success(
+        payload.alreadyProcessed
+          ? 'Timesheet already marked as Manager Approved'
+          : 'Timesheet marked as Manager Approved'
+      );
       setProcessModalOpen(false);
       setProcessingTimesheetId(null);
       await fetchApprovals();
     } catch (error) {
       const errorContextId = 'approvals-process-timesheet-error';
+      if (isTimesheetProcessConflict(error)) {
+        toast.error(
+          error instanceof Error ? error.message : 'This timesheet can no longer be marked as Manager Approved',
+          { id: errorContextId }
+        );
+        await fetchApprovals();
+        return;
+      }
       console.error('Error processing timesheet:', error, { errorContextId });
-      toast.error('Failed to mark timesheet as Manager Approved', { id: errorContextId });
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to mark timesheet as Manager Approved',
+        { id: errorContextId }
+      );
     } finally {
+      processInFlightRef.current.end(timesheetId);
       setProcessingInProgress(false);
     }
   };
@@ -1398,6 +1437,9 @@ function ApprovalsContent() {
       <ProcessTimesheetModal
         open={processModalOpen}
         onOpenChange={(open) => {
+          if (!open && processingInProgress) {
+            return;
+          }
           setProcessModalOpen(open);
           if (!open) setProcessingTimesheetId(null);
         }}
