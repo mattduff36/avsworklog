@@ -111,11 +111,16 @@ describe('UI-004 beta badges', () => {
   it('marks dashboard tiles and employee form config as beta', () => {
     const dashboard = readFileSync(resolve(process.cwd(), 'app/(dashboard)/dashboard/page.tsx'), 'utf8');
     const forms = readFileSync(resolve(process.cwd(), 'lib/config/forms.ts'), 'utf8');
+    const navbar = readFileSync(resolve(process.cwd(), 'components/layout/Navbar.tsx'), 'utf8');
     expect(dashboard).toContain("formType.id === 'daily-allocation'");
     expect(dashboard).toContain("link.href === '/daily-allocation'");
     expect(dashboard).toContain('DailyAllocationBetaBadge');
+    expect(dashboard).toContain('absolute top-2 right-2');
     expect(forms).toContain("id: 'daily-allocation'");
     expect(forms).toContain("href: '/daily-allocation/my'");
+    expect(navbar).toContain("href.startsWith('/daily-allocation')");
+    expect(navbar).toContain('text-daily-allocation');
+    expect(navbar).toContain('bg-daily-allocation');
   });
 });
 

@@ -719,15 +719,15 @@ export default function DashboardPage() {
                         {badgeCount > 99 ? '99+' : badgeCount}
                       </div>
                     )}
-                    <Icon className={tabletModeEnabled ? 'h-12 w-12' : 'h-8 w-8'} />
-                    <div className="flex flex-col items-center gap-1">
-                      <span className={`font-semibold leading-tight ${tabletModeEnabled ? 'text-base' : 'text-2xl'}`}>
-                        {formType.title}
-                      </span>
-                      {showDailyAllocationBetaBadge ? (
+                    {showDailyAllocationBetaBadge ? (
+                      <div className="absolute top-2 right-2">
                         <DailyAllocationBetaBadge tone="onColor" />
-                      ) : null}
-                    </div>
+                      </div>
+                    ) : null}
+                    <Icon className={tabletModeEnabled ? 'h-12 w-12' : 'h-8 w-8'} />
+                    <span className={`font-semibold leading-tight ${tabletModeEnabled ? 'text-base' : 'text-2xl'}`}>
+                      {formType.title}
+                    </span>
                     {formType.subtitle && (
                       <span
                         className={`pointer-events-none absolute bottom-2 left-2 right-2 truncate leading-tight opacity-90 max-[350px]:hidden ${tabletModeEnabled ? 'text-xs' : 'text-base'} ${textColorClass}`}
@@ -777,6 +777,11 @@ export default function DashboardPage() {
                             {badgeCount > 99 ? '99+' : badgeCount}
                           </div>
                         ) : null}
+                        {link.href === '/daily-allocation' ? (
+                          <div className="absolute top-2 right-2">
+                            <DailyAllocationBetaBadge tone="onColor" />
+                          </div>
+                        ) : null}
                         {showSensitivePinIndicator && (
                           <span
                             role="img"
@@ -789,14 +794,9 @@ export default function DashboardPage() {
                         )}
                         <div className="flex flex-col items-start justify-between h-full">
                           <Icon className="h-6 w-6 text-muted-foreground" />
-                          <div className="flex flex-col items-start gap-1">
-                            <span className="text-white font-semibold text-base leading-tight">
-                              {link.label}
-                            </span>
-                            {link.href === '/daily-allocation' ? (
-                              <DailyAllocationBetaBadge tone="onColor" />
-                            ) : null}
-                          </div>
+                          <span className="text-white font-semibold text-base leading-tight">
+                            {link.label}
+                          </span>
                         </div>
                       </div>
                     </Link>

@@ -142,6 +142,9 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   if (href.startsWith('/reminders')) {
     return { bg: 'bg-reminders', text: 'text-white' };
   }
+  if (href.startsWith('/daily-allocation')) {
+    return { bg: 'bg-daily-allocation', text: 'text-white' };
+  }
   // Default - Brand yellow
   return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
 }
@@ -163,6 +166,7 @@ function getNavItemIconColor(href: string): string {
   if (href.startsWith('/reports')) return 'text-avs-yellow';
   if (href.startsWith('/inventory')) return 'text-inventory';
   if (href.startsWith('/reminders')) return 'text-reminders';
+  if (href.startsWith('/daily-allocation')) return 'text-daily-allocation';
   return 'text-avs-yellow';
 }
 
