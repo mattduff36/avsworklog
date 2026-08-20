@@ -115,7 +115,13 @@ export function YardTransfersPanel({
                       {getSnapshotCount(action, 'hardware_lines')} hardware
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button type="button" size="sm" onClick={() => setSelectedAction(action)}>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setSelectedAction(action)}
+                        className="border-slate-600 text-white hover:bg-slate-800"
+                      >
                         Allocate
                       </Button>
                     </TableCell>

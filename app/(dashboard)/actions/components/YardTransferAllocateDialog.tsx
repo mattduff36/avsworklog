@@ -229,6 +229,7 @@ export function YardTransferAllocateDialog({
                 ? !locationId
                 : !name.trim() || (linkedAssetType !== 'none' && !linkedAssetId))
             }
+            className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover"
           >
             {saving ? 'Allocating…' : 'Allocate location'}
           </Button>
