@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.38.0
+
+**GIT COMMIT MESSAGE**
+`feat(errors): route fixerrors analysis and review through premium subagents`
+
+**PUSHED AT**
+2026-08-20T17:35:57.615Z
+
+**WHAT CHANGED**
+Update help and FAQ. Route fixerrors analysis and review through premium subagents.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `docs(help): update help and FAQ`
+- `feat(errors): route fixerrors analysis and review through premium subagents`
+
 ## 0826.37.0
 
 **GIT COMMIT MESSAGE**

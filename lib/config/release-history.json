@@ -1,5 +1,26 @@
 [
   {
+    "version": "0826.38.0",
+    "updateKind": "major",
+    "title": "Error reporting update",
+    "description": "Updated help and FAQ. Route fixerrors analysis and review through premium subagents.",
+    "summary": "Updated help and FAQ. Route fixerrors analysis and review through premium subagents.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Help and FAQ",
+      "Error reporting",
+      "FAQ. Route fixerrors analysis",
+      "Review through premium subagents"
+    ],
+    "areaKeys": [
+      "help",
+      "error-reporting"
+    ],
+    "pushedAt": "2026-08-20T17:35:57.615Z"
+  },
+  {
     "version": "0826.37.0",
     "updateKind": "major",
     "title": "Notifications update",
