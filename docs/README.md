@@ -2,10 +2,23 @@
 
 Welcome to the Squires App documentation. This folder contains all guides, feature documentation, and project status information.
 
+## Authoritative current docs
+
+Start here. These describe the **live** product and engineering contracts:
+
+- [Product](../PRODUCT.md)
+- [Design](../DESIGN.md)
+- [Architecture](../ARCHITECTURE.md)
+- [Development](./DEVELOPMENT.md)
+- [Security](./SECURITY.md)
+- [Agent router](../AGENTS.md)
+
+Dated implementation reports, bug-fix notes, session summaries, and old status files are **historical** unless a task explicitly names them. Current module PRDs and operational guides below still apply to their own module.
+
 ## 📚 Quick Navigation
 
 ### 🚀 Getting Started
-- **[Main PRD](./SQUIRES_APP_PROPOSAL.md)** - Complete project proposal and requirements
+- **[Original proposal](./SQUIRES_APP_PROPOSAL.md)** - Historical requirements document (current product authority is [`PRODUCT.md`](../PRODUCT.md))
 - **[Setup Guide](./setup/SETUP_COMPLETE.md)** - Initial project setup instructions
 - **[Deployment Guide](./setup/DEPLOYMENT_COMPLETE.md)** - Production deployment information
 
@@ -44,7 +57,7 @@ Detailed documentation for each feature:
 - **[Password Management](./features/PASSWORD_MANAGEMENT_IMPLEMENTATION.md)** - Password reset and management
 
 ### 📊 Project Status
-Current implementation status and development plans:
+Historical status snapshots and older plans. For live product/engineering contracts, use the authoritative docs above:
 
 - **[PRD Implementation Status](./status/PRD_IMPLEMENTATION_STATUS.md)** - Overall project completion status
 - **[Implementation Status](./status/IMPLEMENTATION_STATUS.md)** - Detailed feature-by-feature status
@@ -74,8 +87,9 @@ Historical documents and completed items:
 2. **[Migrations Guide](./guides/MIGRATIONS_GUIDE.md)** - Full documentation
 
 ### For Understanding Features
-1. **[PRD Implementation Status](./status/PRD_IMPLEMENTATION_STATUS.md)** - See what's complete
-2. **[Main PRD](./SQUIRES_APP_PROPOSAL.md)** - Original requirements
+1. **[Product](../PRODUCT.md)** - Current product authority
+2. **[Original proposal](./SQUIRES_APP_PROPOSAL.md)** - Historical requirements
+3. **[PRD Implementation Status](./status/PRD_IMPLEMENTATION_STATUS.md)** - Dated completion snapshot
 
 ### For Setup
 1. **[Setup Complete](./setup/SETUP_COMPLETE.md)** - Initial setup
@@ -105,7 +119,7 @@ docs/
 → See **[guides/HOW_TO_RUN_MIGRATIONS.md](./guides/HOW_TO_RUN_MIGRATIONS.md)**
 
 ### "What features are implemented?"
-→ See **[status/PRD_IMPLEMENTATION_STATUS.md](./status/PRD_IMPLEMENTATION_STATUS.md)**
+→ Start with **[PRODUCT.md](../PRODUCT.md)**; dated snapshots live in **[status/PRD_IMPLEMENTATION_STATUS.md](./status/PRD_IMPLEMENTATION_STATUS.md)**
 
 ### "How does the payroll system work?"
 → See **[features/PAYROLL_UPDATE_SUMMARY.md](./features/PAYROLL_UPDATE_SUMMARY.md)**
@@ -121,12 +135,9 @@ docs/
 ## 📝 Document Maintenance
 
 - **Guides**: Updated when processes change
-- **Features**: Updated as features are implemented
-- **Status**: Updated after each development session
+- **Features**: Historical implementation notes unless a current module PRD or operational guide is named
+- **Status**: Historical snapshots; not current-truth and not refreshed after each session
 - **Archived**: Historical documents, not actively maintained
 
----
-
-**Last Updated**: December 2025  
-**Maintained By**: Development Team
+This index is not engineering authority. Use `AGENTS.md`, `PRODUCT.md`, `DESIGN.md`, `ARCHITECTURE.md`, `docs/DEVELOPMENT.md`, and `docs/SECURITY.md` for current truth.
 

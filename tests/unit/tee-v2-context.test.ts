@@ -83,4 +83,22 @@ describe('TEE V2 project context', () => {
     expect(existsSync(path.join(root, '.cursor', 'commands', 'ffap.md'))).toBe(true);
     expect(existsSync(path.join(root, 'scripts', 'automation'))).toBe(true);
   });
+
+  it('TEE-V2-CURRENT-TRUTH-001 keeps current-truth docs and rule frontmatter', () => {
+    for (const relativePath of [
+      'AGENTS.md',
+      'DESIGN.md',
+      'ARCHITECTURE.md',
+      'docs/DEVELOPMENT.md',
+      'docs/SECURITY.md',
+    ]) {
+      expect(existsSync(path.join(root, relativePath)), relativePath).toBe(true);
+    }
+
+    for (const rule of ['ui-design.mdc', 'architecture.mdc', 'security-data.mdc']) {
+      const text = readFileSync(path.join(root, '.cursor', 'rules', rule), 'utf8');
+      expect(text.startsWith('---')).toBe(true);
+      expect(text).toMatch(/^---\r?\n[\s\S]*?\r?\n---/u);
+    }
+  });
 });

@@ -1,0 +1,15 @@
+---
+description: Squires architecture for new routes/modules, providers, shared abstractions, services, data/state, and cross-module refactors. Read ARCHITECTURE.md before changing structure.
+globs: "{app,lib,components,types}/**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Architecture
+
+Read `ARCHITECTURE.md` before adding routes, providers, services, or shared data/state.
+
+Inspect the current module’s pattern before introducing a new one. Mixed React Query, `fetch`, and browser Supabase access already coexist; do not “standardise” the repository in the same change.
+
+Auth is a custom app session plus a short-lived Supabase data token. Do not describe or implement it as “Supabase Auth is the browser session.”
+
+Daily Allocation product invariants live in `PRODUCT.md`. Do not copy that PRD into new architecture notes.

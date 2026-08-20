@@ -1,0 +1,14 @@
+---
+description: Required for auth, permissions, APIs, Supabase, RLS, migrations, service role, production data, financial, or destructive work. Read docs/SECURITY.md before acting.
+alwaysApply: false
+---
+
+# Security / data
+
+Read `docs/SECURITY.md` before changing auth, permissions, APIs, Supabase clients, RLS, storage, payroll/quotes money paths, or production data.
+
+For schema, SQL, RLS, backfill, or production-data work, also load `.cursor/rules/database-migrations.mdc` and the migration guides. Do not invent an alternate migration method.
+
+Client permission hooks and nav filters are UX only. Server authorization and RLS are the security boundaries. Do not treat JWT `user_metadata` or editable profile fields as permission truth.
+
+View As must use the effective role/team snapshot and must not restore the actor’s real Level 5 access.
