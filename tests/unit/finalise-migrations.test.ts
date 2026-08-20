@@ -17,6 +17,17 @@ import {
   stripOuterMigrationTransaction,
   type FinaliseMigrationLedgerRow,
 } from '@/scripts/finalise-migrations';
+import { fakePostgresUrl } from '@/tests/utils/fake-postgres-url';
+
+function fakeMigrationUrl(parts?: { port?: string; username?: string; hostname?: string; database?: string }): string {
+  return fakePostgresUrl({
+    username: parts?.username ?? 'postgres.projectref',
+    password: 'redacted-test-password',
+    hostname: parts?.hostname ?? 'aws-0-eu.pooler.supabase.com',
+    port: parts?.port,
+    database: parts?.database,
+  });
+}
 
 const tempRoots: string[] = [];
 
@@ -216,35 +227,38 @@ describe('MIG-REGRESSION-001 finalise migration metadata and ledger', () => {
   });
 
   it('reports only a non-secret Supabase project identity', () => {
-    expect(
-      getSafeDatabaseProjectRef(
-        'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:5432/postgres'
-      )
-    ).toBe('projectref');
+    expect(getSafeDatabaseProjectRef(fakeMigrationUrl({ port: '5432' }))).toBe('projectref');
+    expect(getSafeDatabaseTargetIdentity(fakeMigrationUrl({ port: '5432' }))).toBe(
+      'Supabase project projectref'
+    );
     expect(
       getSafeDatabaseTargetIdentity(
-        'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:5432/postgres'
+        fakeMigrationUrl({
+          username: 'user',
+          hostname: 'internal.example',
+          database: 'db',
+        })
       )
-    ).toBe('Supabase project projectref');
-    expect(
-      getSafeDatabaseTargetIdentity('postgresql://user:secret@internal.example/db')
     ).toBeNull();
     expect(
-      getSafeDatabaseProjectRef('postgresql://user:secret@internal.example/db')
+      getSafeDatabaseProjectRef(
+        fakeMigrationUrl({
+          username: 'user',
+          hostname: 'internal.example',
+          database: 'db',
+        })
+      )
     ).toBeNull();
   });
 
   it('requires a non-transaction-pool migration connection', () => {
-    const sessionPooler =
-      'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:5432/postgres';
+    const sessionPooler = fakeMigrationUrl({ port: '5432' });
     expect(requireSafeMigrationConnectionString(sessionPooler)).toBe(sessionPooler);
     expect(() => requireSafeMigrationConnectionString(undefined)).toThrow(
       /POSTGRES_URL_NON_POOLING/iu
     );
     expect(() =>
-      requireSafeMigrationConnectionString(
-        'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:6543/postgres'
-      )
+      requireSafeMigrationConnectionString(fakeMigrationUrl({ port: '6543' }))
     ).toThrow(/transaction mode/iu);
   });
 });

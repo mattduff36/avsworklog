@@ -12,6 +12,7 @@ import {
   snapshotsPreserveProtectedState,
   type RolloutSnapshot,
 } from '../../scripts/manage-daily-allocation-v2-rollout';
+import { fakePostgresUrl } from '@/tests/utils/fake-postgres-url';
 
 const activationPath = resolve(
   process.cwd(),
@@ -217,26 +218,49 @@ describe('Daily Allocation v2 production rollout controls', () => {
   });
 
   it('fails closed unless the direct database target is the approved production project', () => {
-    const approved =
-      `postgresql://postgres:secret@db.${DAILY_ALLOCATION_PROJECT_REF}.supabase.co:5432/postgres`;
+    const approved = fakePostgresUrl({
+      username: 'postgres',
+      password: 'redacted-test-password',
+      hostname: `db.${DAILY_ALLOCATION_PROJECT_REF}.supabase.co`,
+      port: '5432',
+    });
     expect(requireDailyAllocationProductionTarget(approved)).toBe(approved);
-    const approvedSession =
-      `postgresql://postgres.${DAILY_ALLOCATION_PROJECT_REF}:secret@aws-0-eu-west-2.pooler.supabase.com:5432/postgres`;
+    const approvedSession = fakePostgresUrl({
+      username: `postgres.${DAILY_ALLOCATION_PROJECT_REF}`,
+      password: 'redacted-test-password',
+      hostname: 'aws-0-eu-west-2.pooler.supabase.com',
+      port: '5432',
+    });
     expect(requireDailyAllocationProductionTarget(approvedSession)).toBe(approvedSession);
 
     expect(() =>
       requireDailyAllocationProductionTarget(
-        'postgresql://postgres:secret@db.wrongproject.supabase.co:5432/postgres'
+        fakePostgresUrl({
+          username: 'postgres',
+          password: 'redacted-test-password',
+          hostname: 'db.wrongproject.supabase.co',
+          port: '5432',
+        })
       )
     ).toThrow(/expected Supabase project/iu);
     expect(() =>
       requireDailyAllocationProductionTarget(
-        `postgresql://postgres.${DAILY_ALLOCATION_PROJECT_REF}:secret@pooler.supabase.com:6543/postgres`
+        fakePostgresUrl({
+          username: `postgres.${DAILY_ALLOCATION_PROJECT_REF}`,
+          password: 'redacted-test-password',
+          hostname: 'pooler.supabase.com',
+          port: '6543',
+        })
       )
     ).toThrow(/port 6543|port 5432/iu);
     expect(() =>
       requireDailyAllocationProductionTarget(
-        `postgresql://postgres.${DAILY_ALLOCATION_PROJECT_REF}:secret@attacker.example:5432/postgres`
+        fakePostgresUrl({
+          username: `postgres.${DAILY_ALLOCATION_PROJECT_REF}`,
+          password: 'redacted-test-password',
+          hostname: 'attacker.example',
+          port: '5432',
+        })
       )
     ).toThrow(/expected Supabase project/iu);
     expect(() => requireDailyAllocationProductionTarget(undefined)).toThrow(

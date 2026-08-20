@@ -31,6 +31,25 @@ import {
   runSqlMigrationMain,
   type MigrationPathFs,
 } from '@/scripts/run-sql-migration';
+import { fakePostgresUrl } from '@/tests/utils/fake-postgres-url';
+
+const SECRET_MARKER = 'redacted-test-password';
+
+function fakeMigrationUrl(parts?: {
+  username?: string;
+  hostname?: string;
+  port?: string;
+  database?: string;
+  password?: string;
+}): string {
+  return fakePostgresUrl({
+    username: parts?.username ?? 'postgres.projectref',
+    password: parts?.password ?? SECRET_MARKER,
+    hostname: parts?.hostname ?? 'aws-0-eu.pooler.supabase.com',
+    port: parts?.port ?? '5432',
+    database: parts?.database ?? 'postgres',
+  });
+}
 
 const tempRoots: string[] = [];
 
@@ -115,8 +134,8 @@ describe('MIG-CLI-001 argument parsing', () => {
       ok: false,
       message: 'unknown flag',
     });
-    expect(JSON.stringify(parseMigrateCliArgs(['supabase/migrations/a.sql', '--super-secret-pass']))).not.toContain(
-      'super-secret-pass'
+    expect(JSON.stringify(parseMigrateCliArgs(['supabase/migrations/a.sql', `--${SECRET_MARKER}`]))).not.toContain(
+      SECRET_MARKER
     );
 
     const dryRun = parseMigrateCliArgs(['supabase/migrations/a.sql']);
@@ -497,7 +516,7 @@ describe('MIG-DRY-001 and MIG-APPLY-001 CLI orchestration', () => {
       },
       getEnv: () => {
         readEnv = true;
-        return 'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:5432/postgres';
+        return fakeMigrationUrl();
       },
       createClient: async () => {
         createdClient = true;
@@ -555,8 +574,7 @@ describe('MIG-DRY-001 and MIG-APPLY-001 CLI orchestration', () => {
       await run(
         ['supabase/migrations/20260101_ok.sql', '--apply', '--confirm-target', 'projectref'],
         {
-          POSTGRES_URL_NON_POOLING:
-            'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:6543/postgres',
+          POSTGRES_URL_NON_POOLING: fakeMigrationUrl({ port: '6543' }),
         }
       )
     ).toBe(1);
@@ -567,8 +585,10 @@ describe('MIG-DRY-001 and MIG-APPLY-001 CLI orchestration', () => {
       await run(
         ['supabase/migrations/20260101_ok.sql', '--apply', '--confirm-target', 'projectref'],
         {
-          POSTGRES_URL_NON_POOLING:
-            'postgresql://user:secret@aws-0-eu.pooler.supabase.com:5432/db',
+          POSTGRES_URL_NON_POOLING: fakeMigrationUrl({
+            username: 'user',
+            database: 'db',
+          }),
         }
       )
     ).toBe(1);
@@ -579,8 +599,7 @@ describe('MIG-DRY-001 and MIG-APPLY-001 CLI orchestration', () => {
       await run(
         ['supabase/migrations/20260101_ok.sql', '--apply', '--confirm-target', 'otherref'],
         {
-          POSTGRES_URL_NON_POOLING:
-            'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:5432/postgres',
+          POSTGRES_URL_NON_POOLING: fakeMigrationUrl(),
         }
       )
     ).toBe(1);
@@ -591,8 +610,9 @@ describe('MIG-DRY-001 and MIG-APPLY-001 CLI orchestration', () => {
       await run(
         ['supabase/migrations/20260101_ok.sql', '--apply', '--confirm-target', 'projectref'],
         {
-          POSTGRES_URL_NON_POOLING:
-            'postgresql://postgres.projectref:secret@evil.example.com:5432/postgres',
+          POSTGRES_URL_NON_POOLING: fakeMigrationUrl({
+            hostname: 'evil.example.com',
+          }),
         }
       )
     ).toBe(1);
@@ -609,8 +629,7 @@ describe('MIG-DRY-001 and MIG-APPLY-001 CLI orchestration', () => {
         'projectref',
       ],
       loadEnvLocal: () => undefined,
-      getEnv: () =>
-        'postgresql://postgres.projectref:secret@aws-0-eu.pooler.supabase.com:5432/postgres',
+      getEnv: () => fakeMigrationUrl(),
       createClient: async () => {
         createdClient = true;
         const mock = createMockClient();
@@ -634,8 +653,9 @@ describe('MIG-SECRET-001 sanitized output', () => {
       '20260101_ok.sql',
       "SELECT 'secret-sql-payload';\n"
     );
-    const secretUrl =
-      'postgresql://postgres.projectref:super-secret-pass@db.projectref.supabase.co:5432/postgres';
+    const secretUrl = fakeMigrationUrl({
+      hostname: 'db.projectref.supabase.co',
+    });
     const output: string[] = [];
 
     const success = await runSqlMigrationMain({
@@ -669,10 +689,10 @@ describe('MIG-SECRET-001 sanitized output', () => {
           failOn: (sql) => {
             if (sql === 'BEGIN' || sql === 'ROLLBACK') return null;
             const error = new Error(
-              `password=super-secret-pass url=${secretUrl} sql=SELECT 1`
+              `password=${SECRET_MARKER} url=${secretUrl} sql=SELECT 1`
             );
             Object.assign(error, {
-              detail: 'raw-detail-super-secret-pass',
+              detail: `raw-detail-${SECRET_MARKER}`,
               code: 'XX000',
               stack: 'secret-stack',
             });
@@ -685,11 +705,11 @@ describe('MIG-SECRET-001 sanitized output', () => {
     expect(failure).toBe(1);
 
     const text = output.join('\n');
-    expect(text).not.toContain('super-secret-pass');
+    expect(text).not.toContain(SECRET_MARKER);
     expect(text).not.toContain(secretUrl);
     expect(text).not.toContain('postgresql://');
     expect(text).not.toContain('secret-sql-payload');
-    expect(text).not.toContain('raw-detail-super-secret-pass');
+    expect(text).not.toContain(`raw-detail-${SECRET_MARKER}`);
     expect(text).not.toContain('secret-stack');
     expect(text).not.toContain('XX000');
     expect(text).toContain('outcome=applied');
@@ -698,7 +718,7 @@ describe('MIG-SECRET-001 sanitized output', () => {
     const flagged: string[] = [];
     await runSqlMigrationMain({
       repoRoot,
-      argv: ['supabase/migrations/20260101_ok.sql', '--super-secret-pass'],
+      argv: ['supabase/migrations/20260101_ok.sql', `--${SECRET_MARKER}`],
       loadEnvLocal: () => undefined,
       getEnv: () => secretUrl,
       createClient: async () => {
@@ -707,14 +727,14 @@ describe('MIG-SECRET-001 sanitized output', () => {
       writeLine: (line) => flagged.push(line),
       writeError: (line) => flagged.push(line),
     });
-    expect(flagged.join('\n')).not.toContain('super-secret-pass');
+    expect(flagged.join('\n')).not.toContain(SECRET_MARKER);
     expect(flagged.join('\n')).toContain('unknown flag');
 
     const drift = sanitizeMigrationExecutorError(
-      new Error('Migration checksum drift detected for supabase/migrations/x.sql; password=super-secret-pass')
+      new Error(`Migration checksum drift detected for supabase/migrations/x.sql; password=${SECRET_MARKER}`)
     );
     expect(drift.message).toBe('Migration ledger drift detected');
-    expect(drift.message).not.toContain('super-secret-pass');
+    expect(drift.message).not.toContain(SECRET_MARKER);
     expect(formatMigrationCliResult({ outcome: 'rejected', message: 'safe' })).not.toContain(
       'password'
     );
