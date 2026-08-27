@@ -5,9 +5,12 @@ import {
   activatePayrollRollout,
   archivePayrollRuleVersion,
   deletePayrollRuleDraft,
+  isPayrollAssignmentConflictError,
   loadPayrollAdminMatrix,
+  savePayrollProfileAssignment,
   savePayrollRuleDraft,
 } from '@/lib/server/payroll-admin';
+import type { PayrollRuleSetKey } from '@/lib/payroll/types';
 import { requireAdminSettingsAccess } from '@/lib/server/admin-settings-access';
 import type {
   PayrollProfileAssignmentInput,
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = (await request.json()) as {
-      action?: 'test' | 'activate' | 'archive_version' | 'delete_draft';
+      action?: 'test' | 'activate' | 'archive_version' | 'delete_draft' | 'save_profile_assignment';
       configuration?: PayrollRuleConfiguration;
       weekEnding?: string;
       days?: PayrollDayInput[];
@@ -61,6 +64,8 @@ export async function POST(request: NextRequest) {
       teamAssignments?: PayrollTeamAssignmentInput[];
       profileAssignments?: PayrollProfileAssignmentInput[];
       versionId?: string;
+      profileId?: string;
+      ruleSetKey?: PayrollRuleSetKey | 'none';
     };
     if (body.action === 'test') {
       if (!body.configuration || !body.weekEnding || !body.days) {
@@ -101,9 +106,31 @@ export async function POST(request: NextRequest) {
       await archivePayrollRuleVersion(body.versionId, access.userId);
       return NextResponse.json({ success: true, ...(await loadPayrollAdminMatrix()) });
     }
+    if (body.action === 'save_profile_assignment') {
+      if (!body.profileId || !body.ruleSetKey || !body.effectiveWeekEnding) {
+        return NextResponse.json(
+          { error: 'profileId, ruleSetKey and effectiveWeekEnding are required' },
+          { status: 400 }
+        );
+      }
+      const saved = await savePayrollProfileAssignment({
+        profileId: body.profileId,
+        ruleSetKey: body.ruleSetKey,
+        effectiveWeekEnding: body.effectiveWeekEnding,
+        actorId: access.userId,
+      });
+      return NextResponse.json({
+        success: true,
+        alreadyExists: saved.alreadyExists,
+        ...(await loadPayrollAdminMatrix()),
+      });
+    }
     return NextResponse.json({ error: 'Unknown payroll action' }, { status: 400 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Payroll action failed';
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      { error: message },
+      { status: isPayrollAssignmentConflictError(error) ? 409 : 400 }
+    );
   }
 }

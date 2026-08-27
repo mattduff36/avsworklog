@@ -21,7 +21,8 @@ import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 
 const { Client } = pg;
-const ENGINE_VERSION = 1;
+export const PAYROLL_ENGINE_VERSION = 2;
+const ENGINE_VERSION = PAYROLL_ENGINE_VERSION;
 const MAX_SERIALIZATION_RETRIES = 3;
 
 interface QueryResult<Row> {

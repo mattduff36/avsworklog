@@ -733,3 +733,179 @@ export async function archivePayrollRuleVersion(versionId: string, actorId: stri
     await client.end();
   }
 }
+
+export class PayrollAssignmentConflictError extends Error {
+  readonly statusCode = 409;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'PayrollAssignmentConflictError';
+  }
+}
+
+export function isPayrollAssignmentConflictError(
+  error: unknown
+): error is PayrollAssignmentConflictError {
+  return error instanceof PayrollAssignmentConflictError;
+}
+
+const PROFILE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PROFILE_RULE_KEYS: PayrollRuleSetKey[] = ['lorries', 'civils', 'plant', 'others'];
+
+function formatLocalIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getCurrentPayrollWeekEndingSunday(now = new Date()): string {
+  const local = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const daysUntilSunday = (7 - local.getDay()) % 7;
+  const sunday = new Date(local);
+  sunday.setDate(local.getDate() + daysUntilSunday);
+  return formatLocalIsoDate(sunday);
+}
+
+function isSundayIsoDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day &&
+    date.getDay() === 0
+  );
+}
+
+export function validatePayrollProfileAssignmentInput(input: {
+  profileId: string;
+  ruleSetKey: PayrollRuleSetKey | 'none';
+  effectiveWeekEnding: string;
+  now?: Date;
+}): {
+  profileId: string;
+  ruleSetKey: PayrollRuleSetKey | 'none';
+  effectiveWeekEnding: string;
+} {
+  if (!PROFILE_ID_PATTERN.test(input.profileId)) {
+    throw new Error('A valid employee profile is required.');
+  }
+  if (input.ruleSetKey !== 'none' && !PROFILE_RULE_KEYS.includes(input.ruleSetKey)) {
+    throw new Error('A valid payroll rule is required.');
+  }
+  if (!isSundayIsoDate(input.effectiveWeekEnding)) {
+    throw new Error('Employee overrides must start on a Sunday week ending.');
+  }
+  const currentWeekEnding = getCurrentPayrollWeekEndingSunday(input.now);
+  if (input.effectiveWeekEnding < currentWeekEnding) {
+    throw new Error(`Employee overrides cannot start before the current week ending (${currentWeekEnding}).`);
+  }
+  return {
+    profileId: input.profileId,
+    ruleSetKey: input.ruleSetKey,
+    effectiveWeekEnding: input.effectiveWeekEnding,
+  };
+}
+
+export function decidePayrollAssignmentWrite(input: {
+  existing: { ruleSetId: string | null; isActive: boolean } | null;
+  nextRuleSetId: string | null;
+  nextIsActive: boolean;
+}): 'insert' | 'already_exists' | 'conflict' {
+  if (!input.existing) return 'insert';
+  const sameAssignment =
+    input.existing.isActive === input.nextIsActive &&
+    (input.existing.ruleSetId || null) === input.nextRuleSetId;
+  return sameAssignment ? 'already_exists' : 'conflict';
+}
+
+export async function savePayrollProfileAssignment(input: {
+  profileId: string;
+  ruleSetKey: PayrollRuleSetKey | 'none';
+  effectiveWeekEnding: string;
+  actorId: string;
+}): Promise<{ alreadyExists: boolean }> {
+  const validated = validatePayrollProfileAssignmentInput(input);
+
+  const client = createPayrollAdminPgClient();
+  await client.connect();
+  try {
+    await client.query('BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+    const profileResult = await client.query<{ id: string }>(
+      `
+        SELECT id
+        FROM public.profiles
+        WHERE id = $1
+          AND COALESCE(is_placeholder, false) = false
+          AND COALESCE(is_system_account, false) = false
+        FOR UPDATE
+      `,
+      [validated.profileId]
+    );
+    if (!profileResult.rows[0]) {
+      throw new Error('Every payroll profile override must reference an active employee profile.');
+    }
+
+    let ruleSetId: string | null = null;
+    if (input.ruleSetKey !== 'none') {
+      const ruleResult = await client.query<{ id: string }>(
+        `SELECT id FROM public.payroll_rule_sets WHERE rule_key = $1 FOR UPDATE`,
+        [input.ruleSetKey]
+      );
+      ruleSetId = ruleResult.rows[0]?.id ?? null;
+      if (!ruleSetId) throw new Error('The selected payroll rule was not found.');
+    }
+
+    const existing = await client.query<{
+      id: string;
+      rule_set_id: string | null;
+      is_active: boolean;
+    }>(
+      `
+        SELECT id, rule_set_id, is_active
+        FROM public.payroll_profile_rule_assignments
+        WHERE profile_id = $1
+          AND effective_week_ending = $2::date
+        FOR UPDATE
+      `,
+      [validated.profileId, validated.effectiveWeekEnding]
+    );
+    const current = existing.rows[0];
+    const nextIsActive = validated.ruleSetKey !== 'none';
+    const writeDecision = decidePayrollAssignmentWrite({
+      existing: current
+        ? { ruleSetId: current.rule_set_id, isActive: current.is_active }
+        : null,
+      nextRuleSetId: ruleSetId,
+      nextIsActive,
+    });
+    if (writeDecision === 'already_exists') {
+      await client.query('COMMIT');
+      return { alreadyExists: true };
+    }
+    if (writeDecision === 'conflict') {
+      throw new PayrollAssignmentConflictError(
+        'An override already exists for this employee and Sunday. Choose a later Sunday to change it.'
+      );
+    }
+
+    await client.query(
+      `
+        INSERT INTO public.payroll_profile_rule_assignments (
+          profile_id, rule_set_id, is_active, effective_week_ending, created_by
+        )
+        VALUES ($1, $2, $3, $4, $5)
+      `,
+      [validated.profileId, ruleSetId, nextIsActive, validated.effectiveWeekEnding, input.actorId]
+    );
+    await client.query('COMMIT');
+    return { alreadyExists: false };
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}

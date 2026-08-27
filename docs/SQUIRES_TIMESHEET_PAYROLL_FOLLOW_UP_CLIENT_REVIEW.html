@@ -1,0 +1,1223 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>Squires App — Timesheet &amp; Payroll Follow-up — Client Review</title>
+  <style>
+    :root {
+      --ink: #0f172a;
+      --steel: #334155;
+      --muted: #64748b;
+      --line: #cbd5e1;
+      --paper: #ffffff;
+      --canvas: #e8edf2;
+      --yellow: #f1d64a;
+      --yellow-soft: #fff8d6;
+      --yellow-deep: #b49300;
+      --blue-soft: #eff6ff;
+      --blue: #1d4ed8;
+      --green-soft: #ecfdf5;
+      --green: #047857;
+      --red-soft: #fff1f2;
+      --red: #be123c;
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(135deg, rgba(15, 23, 42, 0.06) 25%, transparent 25%) 0 0 / 24px 24px,
+        var(--canvas);
+      color: var(--ink);
+      font-family: "Aptos", "Segoe UI", sans-serif;
+      font-size: 10.5pt;
+      line-height: 1.55;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .document {
+      width: min(210mm, calc(100% - 32px));
+      margin: 32px auto;
+      overflow: hidden;
+      background: var(--paper);
+      box-shadow: 0 24px 70px rgba(15, 23, 42, 0.2);
+    }
+
+    .cover {
+      position: relative;
+      min-height: 282mm;
+      padding: 24mm 20mm 20mm;
+      overflow: hidden;
+      color: #fff;
+      background:
+        linear-gradient(120deg, rgba(241, 214, 74, 0.05), transparent 48%),
+        var(--ink);
+    }
+
+    .cover::before {
+      position: absolute;
+      top: -105mm;
+      right: -70mm;
+      width: 190mm;
+      height: 190mm;
+      border: 2px solid rgba(241, 214, 74, 0.34);
+      border-radius: 50%;
+      content: "";
+    }
+
+    .cover::after {
+      position: absolute;
+      right: -28mm;
+      bottom: -42mm;
+      width: 126mm;
+      height: 126mm;
+      background: var(--yellow);
+      clip-path: polygon(24% 0, 100% 0, 76% 100%, 0 100%);
+      content: "";
+      opacity: 0.96;
+    }
+
+    .brand {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 58px;
+      height: 58px;
+      place-items: center;
+      border-radius: 8px 8px 20px 8px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-family: "Bahnschrift Condensed", "Aptos Display", sans-serif;
+      font-size: 21px;
+      font-weight: 900;
+      letter-spacing: -1px;
+      box-shadow: 8px 8px 0 rgba(241, 214, 74, 0.14);
+    }
+
+    .brand-name {
+      font-family: "Bahnschrift", "Aptos Display", sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      display: block;
+      margin-top: 2px;
+      color: #94a3b8;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+    }
+
+    .cover-content {
+      position: relative;
+      z-index: 1;
+      max-width: 148mm;
+      margin-top: 56mm;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin: 0 0 18px;
+      padding: 6px 10px 5px;
+      border: 1px solid rgba(241, 214, 74, 0.5);
+      color: var(--yellow);
+      font-family: "Bahnschrift", "Aptos Display", sans-serif;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4 {
+      font-family: "Bahnschrift", "Aptos Display", sans-serif;
+      line-height: 1.15;
+    }
+
+    h1 {
+      max-width: 150mm;
+      margin: 0;
+      color: #fff;
+      font-size: 36pt;
+      font-weight: 800;
+      letter-spacing: -0.035em;
+    }
+
+    .cover-lead {
+      max-width: 126mm;
+      margin: 18px 0 0;
+      color: #cbd5e1;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 15pt;
+      line-height: 1.5;
+    }
+
+    .cover-meta {
+      position: absolute;
+      z-index: 2;
+      right: 20mm;
+      bottom: 22mm;
+      left: 20mm;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr;
+      gap: 1px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(8px);
+    }
+
+    .cover-meta div {
+      padding: 12px 14px;
+      background: rgba(15, 23, 42, 0.82);
+    }
+
+    .cover-meta strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--yellow);
+      font-size: 7.5pt;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .cover-meta span {
+      font-size: 9.5pt;
+    }
+
+    main {
+      padding: 17mm 17mm 20mm;
+    }
+
+    .section {
+      margin-bottom: 16mm;
+    }
+
+    .section-heading {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 18px;
+    }
+
+    .section-number {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border-radius: 4px 4px 12px 4px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-family: "Bahnschrift", sans-serif;
+      font-size: 11pt;
+      font-weight: 800;
+    }
+
+    h2 {
+      margin: 0;
+      color: var(--ink);
+      font-size: 20pt;
+      letter-spacing: -0.02em;
+    }
+
+    .section-intro {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 11pt;
+    }
+
+    h3 {
+      margin: 24px 0 10px;
+      color: var(--ink);
+      font-size: 13pt;
+    }
+
+    h4 {
+      margin: 0 0 6px;
+      color: var(--steel);
+      font-size: 10.5pt;
+      letter-spacing: 0.02em;
+    }
+
+    p {
+      margin: 0 0 10px;
+    }
+
+    .lead {
+      color: var(--steel);
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 12.5pt;
+      line-height: 1.6;
+    }
+
+    .callout {
+      margin: 18px 0;
+      padding: 16px 18px;
+      border-left: 5px solid var(--yellow);
+      border-radius: 0 var(--radius) var(--radius) 0;
+      background: var(--yellow-soft);
+    }
+
+    .callout strong {
+      color: #715d00;
+    }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 20px 0;
+    }
+
+    .status-card {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #f8fafc;
+    }
+
+    .status-card .value {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--ink);
+      font-family: "Bahnschrift", sans-serif;
+      font-size: 18pt;
+      font-weight: 800;
+    }
+
+    .status-card .label {
+      color: var(--muted);
+      font-size: 8.5pt;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .rule-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    .rule-card {
+      position: relative;
+      overflow: hidden;
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+      break-inside: avoid;
+    }
+
+    .rule-card::before {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: var(--yellow);
+      content: "";
+    }
+
+    .rule-card h3 {
+      margin: 0 0 12px;
+      font-size: 15pt;
+    }
+
+    .rule-list,
+    .scope-list,
+    .check-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .rule-list li,
+    .scope-list li,
+    .check-list li {
+      position: relative;
+      margin: 0 0 8px;
+      padding-left: 18px;
+    }
+
+    .rule-list li::before,
+    .scope-list li::before {
+      position: absolute;
+      top: 0.55em;
+      left: 0;
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: var(--yellow);
+      content: "";
+      transform: rotate(45deg);
+    }
+
+    .tag {
+      display: inline-block;
+      margin: 3px 4px 3px 0;
+      padding: 3px 7px;
+      border: 1px solid #dbe4ee;
+      border-radius: 999px;
+      background: #f8fafc;
+      color: var(--steel);
+      font-size: 8pt;
+      font-weight: 700;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      margin: 14px 0;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      font-size: 9pt;
+    }
+
+    th,
+    td {
+      padding: 10px 11px;
+      border-bottom: 1px solid #e2e8f0;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--ink);
+      color: #fff;
+      font-family: "Bahnschrift", sans-serif;
+      font-size: 8pt;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    td:first-child {
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .question {
+      margin: 0 0 18px;
+      overflow: hidden;
+      border: 2px solid #efc919;
+      border-radius: var(--radius);
+      background: #fff;
+      break-inside: avoid;
+    }
+
+    .question-header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      padding: 13px 16px;
+      background: var(--yellow);
+    }
+
+    .question-id {
+      display: grid;
+      flex: 0 0 27px;
+      width: 27px;
+      height: 27px;
+      place-items: center;
+      border-radius: 50%;
+      background: var(--ink);
+      color: #fff;
+      font-family: "Bahnschrift", sans-serif;
+      font-weight: 800;
+    }
+
+    .question-header h3 {
+      margin: 0;
+      font-size: 12pt;
+    }
+
+    .question-body {
+      padding: 16px;
+    }
+
+    .evidence {
+      margin: 12px 0;
+      padding: 12px 14px;
+      border-left: 3px solid var(--blue);
+      background: var(--blue-soft);
+      color: #1e3a8a;
+    }
+
+    .choice {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      margin: 9px 0;
+      padding: 9px 10px;
+      border: 1px solid #dbe4ee;
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .choice input {
+      width: 16px;
+      height: 16px;
+      margin: 2px 0 0;
+      accent-color: var(--yellow-deep);
+    }
+
+    .choice label {
+      flex: 1;
+      cursor: pointer;
+    }
+
+    .answer-label {
+      display: block;
+      margin: 14px 0 5px;
+      color: var(--steel);
+      font-size: 8.5pt;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .answer-line,
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid #94a3b8;
+      border-radius: 7px;
+      background: #fff;
+      color: var(--ink);
+    }
+
+    .answer-line {
+      min-height: 40px;
+      padding: 9px 10px;
+    }
+
+    textarea {
+      min-height: 68px;
+      padding: 9px 10px;
+      resize: vertical;
+    }
+
+    select {
+      min-height: 38px;
+      padding: 7px 9px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 5px;
+      color: var(--steel);
+      font-size: 8.5pt;
+      font-weight: 800;
+    }
+
+    .steps {
+      position: relative;
+      margin: 20px 0 0;
+    }
+
+    .step {
+      display: grid;
+      grid-template-columns: 37px 1fr;
+      gap: 13px;
+      padding-bottom: 17px;
+      break-inside: avoid;
+    }
+
+    .step-marker {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      width: 37px;
+      height: 37px;
+      place-items: center;
+      border: 2px solid var(--ink);
+      border-radius: 50%;
+      background: #fff;
+      font-family: "Bahnschrift", sans-serif;
+      font-weight: 800;
+    }
+
+    .step:not(:last-child) .step-marker::after {
+      position: absolute;
+      top: 35px;
+      left: 16px;
+      width: 2px;
+      height: 36px;
+      background: var(--line);
+      content: "";
+    }
+
+    .step h3 {
+      margin: 1px 0 3px;
+      font-size: 11pt;
+    }
+
+    .step p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .decision {
+      padding: 13px 14px;
+      border: 1px solid #a7f3d0;
+      border-radius: 10px;
+      background: var(--green-soft);
+      break-inside: avoid;
+    }
+
+    .decision strong {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--green);
+    }
+
+    .risk {
+      padding: 13px 14px;
+      border: 1px solid #fecdd3;
+      border-radius: 10px;
+      background: var(--red-soft);
+      color: #881337;
+    }
+
+    .check-list li {
+      padding-left: 24px;
+    }
+
+    .check-list li::before {
+      position: absolute;
+      top: 1px;
+      left: 0;
+      color: var(--green);
+      content: "✓";
+      font-size: 12pt;
+      font-weight: 900;
+    }
+
+    .approval {
+      margin-top: 24px;
+      padding: 18px;
+      border: 2px solid var(--ink);
+      border-radius: var(--radius);
+    }
+
+    .signature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      margin-top: 28px;
+    }
+
+    .signature-line {
+      min-height: 42px;
+      border-bottom: 1px solid var(--ink);
+    }
+
+    .signature-caption {
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 8pt;
+    }
+
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 13px 17mm;
+      border-top: 1px solid var(--line);
+      background: #f8fafc;
+      color: var(--muted);
+      font-size: 8pt;
+    }
+
+    .print-button {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 10;
+      padding: 11px 16px;
+      border: 0;
+      border-radius: 999px;
+      background: var(--yellow);
+      color: var(--ink);
+      font-weight: 800;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+      cursor: pointer;
+    }
+
+    .print-button:hover {
+      background: #e3c534;
+      transform: translateY(-1px);
+    }
+
+    .page-break {
+      break-before: page;
+    }
+
+    .keep-together {
+      break-inside: avoid;
+    }
+
+    @page {
+      size: A4;
+      margin: 12mm;
+    }
+
+    @media (max-width: 760px) {
+      .document {
+        width: 100%;
+        margin: 0;
+      }
+
+      .cover {
+        min-height: 100vh;
+        padding: 28px 24px;
+      }
+
+      .cover-content {
+        margin-top: 24vh;
+      }
+
+      h1 {
+        font-size: 29pt;
+      }
+
+      .cover-meta {
+        right: 24px;
+        bottom: 28px;
+        left: 24px;
+        grid-template-columns: 1fr;
+      }
+
+      main {
+        padding: 28px 20px;
+      }
+
+      .rule-grid,
+      .decision-grid,
+      .field-grid,
+      .status-strip,
+      .signature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .print-button {
+        right: 14px;
+        bottom: 14px;
+      }
+    }
+
+    @media print {
+      body {
+        background: #fff;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+
+      .document {
+        width: auto;
+        margin: 0;
+        overflow: visible;
+        box-shadow: none;
+      }
+
+      .cover {
+        min-height: 270mm;
+        break-after: page;
+      }
+
+      main {
+        padding: 4mm;
+      }
+
+      .print-button {
+        display: none;
+      }
+
+      .section {
+        margin-bottom: 12mm;
+      }
+
+      .question,
+      .rule-card,
+      .decision,
+      .approval,
+      .table-wrap {
+        break-inside: avoid;
+      }
+
+      footer {
+        padding-right: 4mm;
+        padding-left: 4mm;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="print-button" type="button" onclick="window.print()">Print / Save as PDF</button>
+
+  <article class="document">
+    <header class="cover">
+      <div class="brand">
+        <div class="brand-mark" aria-label="AVS">AVS</div>
+        <div class="brand-name">
+          Squires App
+          <span class="brand-subtitle">A&amp;V Squires Plant Co. Ltd.</span>
+        </div>
+      </div>
+
+      <div class="cover-content">
+        <p class="eyebrow">Follow-up / change notice · Client review</p>
+        <h1>Timesheet &amp; Payroll Follow-up</h1>
+        <p class="cover-lead">
+          An update after the signed July 2026 rules went live, covering later emails
+          and the checks we have now completed.
+        </p>
+      </div>
+
+      <div class="cover-meta">
+        <div>
+          <strong>Prepared for</strong>
+          <span>Suzanne and Charlotte · A&amp;V Squires Plant Co. Ltd.</span>
+        </div>
+        <div>
+          <strong>Date</strong>
+          <span>27 August 2026</span>
+        </div>
+        <div>
+          <strong>Status</strong>
+          <span>Client review</span>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">01</span>
+          <div>
+            <h2>Purpose of this follow-up</h2>
+            <p class="section-intro">This is a change notice, not a rewrite of the signed July rules.</p>
+          </div>
+        </div>
+
+        <p class="lead">
+          The signed July 2026 payroll matrix is already in use. After it went live, later emails
+          asked about the timesheet PDF, overnight Double Time, who can mark Payroll Received,
+          and paying named Civils employees on Plant rates. This document records what we have
+          now changed, what we checked, and the answers we still need from you.
+        </p>
+
+        <div class="callout">
+          <strong>The July Version 2 document remains the signed rules summary.</strong>
+          This follow-up only records later adjustments and outstanding questions. Already-approved
+          weeks have not been recalculated.
+        </div>
+
+        <div class="status-strip" aria-label="Review summary">
+          <div class="status-card">
+            <span class="value">4</span>
+            <span class="label">Shipped changes</span>
+          </div>
+          <div class="status-card">
+            <span class="value">6</span>
+            <span class="label">Checks completed</span>
+          </div>
+          <div class="status-card">
+            <span class="value">6</span>
+            <span class="label">Open client questions</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">02</span>
+          <div>
+            <h2>What changed</h2>
+            <p class="section-intro">One card for each item that is now in the Squires App.</p>
+          </div>
+        </div>
+
+        <div class="rule-grid">
+          <article class="rule-card">
+            <h3>Generic timesheet PDF</h3>
+            <ul class="rule-list">
+              <li>The old <strong>Working in Yard</strong> column is now <strong>Job number / Yard</strong>.</li>
+              <li>If a job number is entered, it appears in that column.</li>
+              <li>If there is no job number and the day was yard work, the cell shows <strong>Yard</strong>.</li>
+              <li>Remarks now hold comments, leave text and subsistence only.</li>
+              <li>The Plant timesheet PDF is unchanged.</li>
+            </ul>
+            <span class="tag">Civils / Transport form</span>
+            <span class="tag">On-screen tick still says Working in Yard</span>
+          </article>
+
+          <article class="rule-card">
+            <h3>Overnight Double Time</h3>
+            <ul class="rule-list">
+              <li>If finish is earlier than start (a shift that crosses midnight), Civils, Plant and Others now pay the whole shift as Double Time, even if Night Shift was not ticked.</li>
+              <li>The manual Night Shift tick still works for same-day nights.</li>
+              <li>Transport / Lorries still has no night premium. Those hours stay on the usual weekday / Saturday / Sunday bands.</li>
+              <li>Bank holidays are still Double Time for every rule set.</li>
+            </ul>
+            <span class="tag">Differs from the signed “employee ticks Night Shift” wording</span>
+          </article>
+
+          <article class="rule-card">
+            <h3>Payroll Received</h3>
+            <ul class="rule-list">
+              <li>Only Accounts and Admin can mark <strong>Payroll Received</strong>.</li>
+              <li>Team managers, including Neil, can only mark <strong>Manager Approved</strong> after Accounts have acted.</li>
+              <li>Transport sheets stay in Pending until Accounts mark Payroll Received.</li>
+              <li>The designed order is unchanged: submit → Payroll Received → Manager Approved.</li>
+            </ul>
+            <span class="tag">Applies to every team</span>
+          </article>
+
+          <article class="rule-card">
+            <h3>Individual payroll overrides</h3>
+            <ul class="rule-list">
+              <li>Accounts / Admin can now save an employee override without a full rules activation.</li>
+              <li>An employee can stay on their operational team (for example Civils) and still be paid on Plant, Transport, Civils or Others.</li>
+              <li><strong>Paul Jankiewicz</strong> and <strong>Dave Johnson</strong> are ready to be set to Plant payroll, but have <strong>not</strong> been written on the live accounts yet. That wait is for your go-ahead and the Sunday the change should start.</li>
+            </ul>
+            <span class="tag">Pending your go-ahead</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="section page-break">
+        <div class="section-heading">
+          <span class="section-number">03</span>
+          <div>
+            <h2>What we checked / confirmed</h2>
+            <p class="section-intro">Plain-language results from the August 2026 follow-up work.</p>
+          </div>
+        </div>
+
+        <ul class="check-list">
+          <li>The signed July 2026 matrix is still in force: Lorries, Civils, Plant (39 hours via 8 hours Monday–Thursday and 7 hours Friday), and Others; a 30-minute unpaid break after more than 6 hours; bank holiday Double Time; leave reported as days; Basic, Overtime and Double Time kept as separate raw hours; Plant travel and IPR at 0.2 per worked day, capped at 1.0.</li>
+          <li>A Saturday 16:00 overnight 12-hour shift now calculates as Double Time for Civils, Plant and Others (the Adrian-style case), including the 30-minute break. It is no longer treated as Saturday Overtime when the shift crosses midnight.</li>
+          <li>Transport approval order is Payroll Received first (Accounts or Admin only), then Manager Approved. A team manager can no longer mark Payroll Received.</li>
+          <li>The Plant override path for named employees exists in Admin Settings. Paul Jankiewicz and Dave Johnson have <strong>not</strong> been set on the live system. The next Sunday from this document is <strong>30 August 2026</strong>, if you confirm those names and that start week.</li>
+          <li>The generic timesheet PDF now shows job numbers in <strong>Job number / Yard</strong>, and remarks no longer start with “Job number”.</li>
+          <li>Already-approved and already-processed weeks were <strong>not</strong> recalculated. Historical snapshots stay as stored, including any week that already showed the overnight problem.</li>
+        </ul>
+
+        <div class="risk" style="margin-top: 18px;">
+          <strong>Historical weeks stay locked.</strong>
+          If a past week was already marked Payroll Received or Manager Approved, the stored breakdown remains. We will only reopen specific weeks if you ask us to.
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">04</span>
+          <div>
+            <h2>Still outstanding / needs a client answer</h2>
+            <p class="section-intro">Please mark a preference on each card before we change anything further.</p>
+          </div>
+        </div>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">1</span>
+            <h3>Part-time / work-shift weekly basic hours</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              Work shifts in the app are still morning / afternoon flags only. Payroll does not
+              currently scale the weekly basic pot for a 3-day or 24-hour contracted employee.
+              We have not changed this.
+            </p>
+            <div class="evidence">
+              Please tell us how weekly basic should be derived for part-time people before we
+              change any calculation.
+            </div>
+            <div class="choice">
+              <input id="q1-a" name="q1" type="radio">
+              <label for="q1-a">Keep the current full-week bands. Do not pro-rata weekly basic from work shifts.</label>
+            </div>
+            <div class="choice">
+              <input id="q1-b" name="q1" type="radio">
+              <label for="q1-b">Scale weekly basic from the employee’s work-shift pattern (for example 3 days / 24 hours).</label>
+            </div>
+            <div class="choice">
+              <input id="q1-c" name="q1" type="radio">
+              <label for="q1-c">Use another formula. Details are supplied below.</label>
+            </div>
+            <label class="answer-label" for="q1-notes">Preferred formula / comments</label>
+            <textarea id="q1-notes"></textarea>
+          </div>
+        </article>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">2</span>
+            <h3>Plant timesheet PDF job numbers</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              Charlotte’s extra job-number column was applied to the generic timesheet PDF only.
+              The Plant PDF still puts job numbers in Remarks.
+            </p>
+            <div class="choice">
+              <input id="q2-a" name="q2" type="radio">
+              <label for="q2-a">Leave the Plant PDF as it is.</label>
+            </div>
+            <div class="choice">
+              <input id="q2-b" name="q2" type="radio">
+              <label for="q2-b">Apply the same Job number / Yard column to the Plant PDF as well.</label>
+            </div>
+            <div class="choice">
+              <input id="q2-c" name="q2" type="radio">
+              <label for="q2-c">Add a separate Job number column on the Plant PDF, and keep Remarks for comments only.</label>
+            </div>
+          </div>
+        </article>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">3</span>
+            <h3>Historical weeks already approved</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              Weeks already marked Payroll Received or Manager Approved stay as stored. That includes
+              Adrian’s problem week unless you ask us to reopen named weeks.
+            </p>
+            <div class="choice">
+              <input id="q3-a" name="q3" type="radio">
+              <label for="q3-a">Leave all historical weeks as stored. Apply the new overnight rule from future weeks only.</label>
+            </div>
+            <div class="choice">
+              <input id="q3-b" name="q3" type="radio">
+              <label for="q3-b">Please reopen specific weeks. Names and week-ending Sundays are listed below.</label>
+            </div>
+            <label class="answer-label" for="q3-notes">Named weeks to reopen, if any</label>
+            <textarea id="q3-notes"></textarea>
+          </div>
+        </article>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">4</span>
+            <h3>Automatic overnight Double Time</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              The signed July wording said Night Shift is selected by the employee. The live system
+              now also treats a midnight-crossing shift as Night Shift for Civils, Plant and Others.
+              Please confirm you accept that difference.
+            </p>
+            <div class="choice">
+              <input id="q4-a" name="q4" type="radio">
+              <label for="q4-a">Accepted. Overnight shifts should be Double Time even if Night Shift was not ticked.</label>
+            </div>
+            <div class="choice">
+              <input id="q4-b" name="q4" type="radio">
+              <label for="q4-b">Not accepted. Revert to the signed rule: Night Shift only when the employee ticks it.</label>
+            </div>
+          </div>
+        </article>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">5</span>
+            <h3>Named Plant overrides and start Sunday</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              Confirm the people who should be paid on Plant while remaining on their operational team,
+              and the Sunday the override should start. Nothing has been written on the live accounts yet.
+            </p>
+            <div class="evidence">
+              Suggested start, if you agree: week ending Sunday 30 August 2026.
+            </div>
+            <div class="choice">
+              <input id="q5-a" name="q5" type="radio">
+              <label for="q5-a">Set Paul Jankiewicz and Dave Johnson to Plant from Sunday 30 August 2026.</label>
+            </div>
+            <div class="choice">
+              <input id="q5-b" name="q5" type="radio">
+              <label for="q5-b">Set those two people to Plant, but from a different Sunday (write it below).</label>
+            </div>
+            <div class="choice">
+              <input id="q5-c" name="q5" type="radio">
+              <label for="q5-c">Change the names and/or add others. Details are supplied below.</label>
+            </div>
+            <label class="answer-label" for="q5-notes">Names, Sunday, and any extra people</label>
+            <textarea id="q5-notes"></textarea>
+          </div>
+        </article>
+
+        <article class="question">
+          <div class="question-header">
+            <span class="question-id">6</span>
+            <h3>Generic PDF column layout</h3>
+          </div>
+          <div class="question-body">
+            <p>
+              The generic PDF now uses one combined <strong>Job number / Yard</strong> column.
+              Charlotte originally asked for a separate Job number column.
+            </p>
+            <div class="choice">
+              <input id="q6-a" name="q6" type="radio">
+              <label for="q6-a">The combined Job number / Yard column is acceptable.</label>
+            </div>
+            <div class="choice">
+              <input id="q6-b" name="q6" type="radio">
+              <label for="q6-b">Please still add a separate Job number column on the generic PDF.</label>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="section page-break">
+        <div class="section-heading">
+          <span class="section-number">05</span>
+          <div>
+            <h2>How to use the new admin control</h2>
+            <p class="section-intro">Assign an employee to a payroll rule without moving their operational team.</p>
+          </div>
+        </div>
+
+        <p class="lead">
+          Accounts and Admin can now save individual payroll overrides from
+          <strong>Admin Settings → Timesheets</strong>, under Individual payroll overrides.
+          Plant, Transport, Civils and Others overrides are all normal. This does not publish
+          new payroll rule versions.
+        </p>
+
+        <div class="steps">
+          <div class="step">
+            <span class="step-marker">1</span>
+            <div>
+              <h3>Find the employee</h3>
+              <p>Search by name. Keep them on their current operational team if that is still correct.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-marker">2</span>
+            <div>
+              <h3>Choose the payroll rule</h3>
+              <p>Select Plant, Transport, Civils or Others, or “Use team rule” to remove an override.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-marker">3</span>
+            <div>
+              <h3>Choose the Sunday</h3>
+              <p>Pick the week-ending Sunday the change should start. The same Sunday cannot later be rewritten for that person.</p>
+            </div>
+          </div>
+          <div class="step">
+            <span class="step-marker">4</span>
+            <div>
+              <h3>Save employee overrides</h3>
+              <p>Use the separate Save employee overrides action. Do not use Activate new payroll versions for a two-person exception.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-heading">
+          <span class="section-number">06</span>
+          <div>
+            <h2>Manager sign-off</h2>
+            <p class="section-intro">Confirm this follow-up or record required amendments.</p>
+          </div>
+        </div>
+
+        <div class="approval">
+          <p>
+            Please confirm that the shipped changes in Section 02, together with the checks in
+            Section 03, are accepted, and that any answers in Section 04 may be used for the
+            next piece of work.
+          </p>
+
+          <div class="choice">
+            <input id="approval-a" name="approval" type="radio">
+            <label for="approval-a">Approved as specified in this follow-up document.</label>
+          </div>
+          <div class="choice">
+            <input id="approval-b" name="approval" type="radio">
+            <label for="approval-b">Amendments are required; details are supplied below.</label>
+          </div>
+
+          <label class="answer-label" for="approval-notes">Additional amendments / comments</label>
+          <textarea id="approval-notes"></textarea>
+
+          <div class="signature-grid">
+            <div>
+              <div class="signature-line"></div>
+              <div class="signature-caption">Name and position</div>
+            </div>
+            <div>
+              <div class="signature-line"></div>
+              <div class="signature-caption">Date</div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>Squires App · Timesheet &amp; Payroll Follow-up · Client review</span>
+      <span>Prepared for A&amp;V Squires Plant Co. Ltd. · 27 August 2026</span>
+    </footer>
+  </article>
+</body>
+</html>

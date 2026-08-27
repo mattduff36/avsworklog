@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { getAbsenceSecondaryDefaultMap } from '@/types/absence-permissions';
 import {
   canActorAuthoriseTimesheetTarget,
+  canActorMarkTimesheetPayrollReceived,
+  canActorShowTimesheetPayrollReceived,
   canShowTimesheetInList,
   hasAccountsTimesheetFullVisibilityOverride,
 } from '@/lib/utils/timesheet-visibility';
@@ -105,6 +107,57 @@ describe('hasAccountsTimesheetFullVisibilityOverride', () => {
 
   it('returns false for Accounts employee', () => {
     expect(hasAccountsTimesheetFullVisibilityOverride('employee', 'Accounts')).toBe(false);
+  });
+});
+
+describe('canActorMarkTimesheetPayrollReceived', () => {
+  it('PAY-APPROVE-PAYROLL-ACTOR-001 allows admin and Accounts manager or supervisor', () => {
+    expect(canActorMarkTimesheetPayrollReceived({
+      hasFullAdminAccess: true,
+      roleName: 'employee',
+      teamName: 'Transport',
+    })).toBe(true);
+    expect(canActorMarkTimesheetPayrollReceived({
+      hasFullAdminAccess: false,
+      roleName: 'manager',
+      teamName: 'Accounts',
+    })).toBe(true);
+    expect(canActorMarkTimesheetPayrollReceived({
+      hasFullAdminAccess: false,
+      roleName: 'Supervisor',
+      teamName: 'accounts',
+    })).toBe(true);
+  });
+
+  it('PAY-APPROVE-MANAGER-DENIED-001 denies team managers outside Accounts', () => {
+    expect(canActorMarkTimesheetPayrollReceived({
+      hasFullAdminAccess: false,
+      roleName: 'manager',
+      teamName: 'Transport',
+    })).toBe(false);
+    expect(canActorMarkTimesheetPayrollReceived({
+      hasFullAdminAccess: false,
+      roleName: 'manager',
+      teamName: 'Plant',
+    })).toBe(false);
+  });
+
+  it('PAY-UI-AUTHZ-001 hides Payroll Received on the actor’s own timesheet', () => {
+    expect(canActorShowTimesheetPayrollReceived({
+      canMarkPayrollReceived: true,
+      actorProfileId: 'accounts-1',
+      targetProfileId: 'accounts-1',
+    })).toBe(false);
+    expect(canActorShowTimesheetPayrollReceived({
+      canMarkPayrollReceived: true,
+      actorProfileId: 'accounts-1',
+      targetProfileId: 'employee-2',
+    })).toBe(true);
+    expect(canActorShowTimesheetPayrollReceived({
+      canMarkPayrollReceived: false,
+      actorProfileId: 'accounts-1',
+      targetProfileId: 'employee-2',
+    })).toBe(false);
   });
 });
 

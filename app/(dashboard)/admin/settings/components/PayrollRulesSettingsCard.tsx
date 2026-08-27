@@ -447,6 +447,8 @@ export function PayrollRulesSettingsCard() {
   const [profileAssignments, setProfileAssignments] = useState<PayrollProfileAssignmentInput[]>([]);
   const [profileSearch, setProfileSearch] = useState('');
   const [activating, setActivating] = useState(false);
+  const [savingOverrides, setSavingOverrides] = useState(false);
+  const [overrideSaveConfirmed, setOverrideSaveConfirmed] = useState(false);
   const [testRuleKey, setTestRuleKey] = useState<PayrollRuleSetKey>('plant');
   const [testDay, setTestDay] = useState('1');
   const [testStart, setTestStart] = useState('07:30');
@@ -567,6 +569,84 @@ export function PayrollRulesSettingsCard() {
       toast.error(error instanceof Error ? error.message : 'Payroll activation failed');
     } finally {
       setActivating(false);
+    }
+  }
+
+  function getChangedProfileAssignments(): Array<{
+    profileId: string;
+    ruleSetKey: PayrollRuleSetKey | 'none';
+  }> {
+    if (!matrix) return [];
+    const currentByProfile = new Map(
+      matrix.profileAssignments.map((assignment) => [assignment.profileId, assignment.ruleSetKey])
+    );
+    const nextByProfile = new Map(
+      profileAssignments.map((assignment) => [assignment.profileId, assignment.ruleSetKey])
+    );
+    const profileIds = new Set([...currentByProfile.keys(), ...nextByProfile.keys()]);
+    const changes: Array<{ profileId: string; ruleSetKey: PayrollRuleSetKey | 'none' }> = [];
+    profileIds.forEach((profileId) => {
+      const next = nextByProfile.get(profileId) || 'none';
+      const current = currentByProfile.get(profileId) || 'none';
+      if (next !== current) {
+        changes.push({ profileId, ruleSetKey: next });
+      }
+    });
+    return changes;
+  }
+
+  async function saveEmployeeOverrides() {
+    if (!matrix || !effectiveWeekEnding) return;
+    const changes = getChangedProfileAssignments();
+    if (changes.length === 0) {
+      toast.error('No employee override changes to save');
+      return;
+    }
+    setSavingOverrides(true);
+    let savedCount = 0;
+    try {
+      let lastMatrix: PayrollAdminMatrix | null = null;
+      for (const change of changes) {
+        const payload = await parseResponse(await fetch('/api/admin/settings/payroll-rules', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'save_profile_assignment',
+            profileId: change.profileId,
+            ruleSetKey: change.ruleSetKey,
+            effectiveWeekEnding,
+          }),
+        }));
+        lastMatrix = payload as PayrollAdminMatrix;
+        savedCount += 1;
+      }
+      if (lastMatrix) {
+        setMatrix(lastMatrix);
+        setProfileAssignments(lastMatrix.profileAssignments.map((assignment) => ({
+          profileId: assignment.profileId,
+          ruleSetKey: assignment.ruleSetKey,
+        })));
+      }
+      setOverrideSaveConfirmed(false);
+      toast.success(
+        changes.length === 1
+          ? 'Employee payroll override saved'
+          : `${changes.length} employee payroll overrides saved`
+      );
+    } catch (error) {
+      const remaining = changes.length - savedCount;
+      toast.error(
+        savedCount === 0
+          ? (error instanceof Error ? error.message : 'Failed to save employee overrides')
+          : `Saved ${savedCount} of ${changes.length} overrides, then stopped. ${remaining} left unsaved. Each save is independent and cannot be undone for the same Sunday.`
+      );
+      try {
+        await load();
+      } catch {
+        // Keep the in-progress form values if reload fails.
+      }
+    } finally {
+      setSavingOverrides(false);
     }
   }
 
@@ -827,7 +907,7 @@ export function PayrollRulesSettingsCard() {
                       <div>
                         <h5 className="font-semibold text-foreground">Individual payroll overrides</h5>
                         <p className={HELPER_TEXT_CLASS}>
-                          Optional exceptions. Assign employees to Others only when they should not use their team rule.
+                          Optional exceptions. Assign an employee to Plant, Transport, Civils or Others without moving their operational team. Each employee is saved separately from the chosen Sunday; a later failure does not undo people already saved.
                         </p>
                       </div>
                     </div>
@@ -865,6 +945,33 @@ export function PayrollRulesSettingsCard() {
                       {filteredProfiles.length === 0 ? (
                         <p className="p-4 text-center text-sm text-muted-foreground">No employees match this search.</p>
                       ) : null}
+                    </div>
+                    <div className="space-y-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
+                      <p className="text-xs leading-relaxed text-muted-foreground">
+                        Saving an override does not activate new payroll rule versions. It writes one dated
+                        assignment per employee. The same Sunday cannot be corrected later; choose a later
+                        Sunday to change it.
+                      </p>
+                      <label className="flex items-start gap-2 text-sm text-foreground">
+                        <Checkbox
+                          checked={overrideSaveConfirmed}
+                          onCheckedChange={(value) => setOverrideSaveConfirmed(value === true)}
+                        />
+                        <span>I understand these overrides cannot be edited for the same Sunday once saved.</span>
+                      </label>
+                      <Button
+                        variant="outline"
+                        onClick={() => { void saveEmployeeOverrides(); }}
+                        disabled={
+                          savingOverrides ||
+                          !effectiveWeekEnding ||
+                          !overrideSaveConfirmed ||
+                          getChangedProfileAssignments().length === 0
+                        }
+                      >
+                        {savingOverrides ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CalendarCheck className="mr-2 h-4 w-4" />}
+                        Save employee overrides
+                      </Button>
                     </div>
                   </div>
                 </div>

@@ -67,6 +67,7 @@ interface TimesheetsApprovalTableProps {
   columnVisibility: ColumnVisibility;
   visibleCount?: number;
   busyTimesheetIds?: ReadonlySet<string>;
+  showPayrollReceived?: boolean;
 }
 
 type SortField = 'name' | 'date' | 'totalHours' | 'status' | 'submittedAt';
@@ -94,6 +95,7 @@ export function TimesheetsApprovalTable({
   columnVisibility,
   visibleCount,
   busyTimesheetIds,
+  showPayrollReceived = true,
 }: TimesheetsApprovalTableProps) {
   const router = useRouter();
   const [sortField, setSortField] = useState<SortField>('date');
@@ -326,6 +328,7 @@ export function TimesheetsApprovalTable({
                         <TimesheetSubmittedActions
                           timesheetId={ts.id}
                           busy={Boolean(busyTimesheetIds?.has(ts.id))}
+                          showPayrollReceived={showPayrollReceived}
                           onApprove={onApprove}
                           onReject={onReject}
                           rejectClassName="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all h-8 px-2"

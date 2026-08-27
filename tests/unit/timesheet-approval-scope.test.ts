@@ -15,7 +15,10 @@ vi.mock('@/lib/utils/view-as', () => ({
 }));
 
 import { getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
-import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
+import {
+  canCurrentActorAuthoriseTimesheetTarget,
+  canCurrentActorMarkTimesheetPayrollReceived,
+} from '@/lib/server/timesheet-approval-scope';
 import { getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
 import { getEffectiveRole, type EffectiveRoleInfo } from '@/lib/utils/view-as';
 
@@ -138,5 +141,21 @@ describe('canCurrentActorAuthoriseTimesheetTarget', () => {
         teamId: adminRole.team_id,
       })
     ).resolves.toBe(false);
+  });
+
+  it('PAY-APPROVE-PAYROLL-ACTOR-001 and PAY-APPROVE-MANAGER-DENIED-001 gate Payroll Received by effective role', async () => {
+    await expect(canCurrentActorMarkTimesheetPayrollReceived()).resolves.toBe(false);
+
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      ...supervisorRole,
+      role_name: 'manager',
+      team_name: 'Accounts',
+      is_viewing_as: false,
+      is_actual_super_admin: false,
+    });
+    await expect(canCurrentActorMarkTimesheetPayrollReceived()).resolves.toBe(true);
+
+    vi.mocked(getEffectiveModuleAccessLevel).mockResolvedValue(2);
+    await expect(canCurrentActorMarkTimesheetPayrollReceived()).resolves.toBe(false);
   });
 });

@@ -20,7 +20,7 @@ import { PanelLoader } from '@/components/ui/panel-loader';
 import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, Moon, BedDouble } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
-import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import { calculateStandardTimesheetHours, formatHours, isDisplayedNightShift, resolvePersistedNightShiftFlag, roundTimeToNearestQuarterHour, syncManualNightShiftAfterTimesChange } from '@/lib/utils/time-calculations';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
@@ -104,6 +104,15 @@ type TimesheetEntryDraft = TimesheetEntryLike & {
   bank_holiday: boolean;
   bankHolidayWarningShown: boolean;
 };
+
+function displayedNightShift(entry: Pick<TimesheetEntryDraft, 'night_shift' | 'time_started' | 'time_finished' | 'did_not_work'>): boolean {
+  return isDisplayedNightShift({
+    nightShift: entry.night_shift,
+    timeStarted: entry.time_started,
+    timeFinished: entry.time_finished,
+    didNotWork: entry.did_not_work,
+  });
+}
 
 const createBlankEntry = (dayOfWeek: number): TimesheetEntryDraft => ({
   day_of_week: dayOfWeek,
@@ -974,10 +983,20 @@ export function CivilsTimesheet({
           job_number: getPrimaryJobNumber(nextJobNumbers) || '',
         };
       } else {
+        const previous = newEntries[dayIndex];
         newEntries[dayIndex] = {
-          ...newEntries[dayIndex],
+          ...previous,
           [field]: value,
         };
+        if (field === 'time_started' || field === 'time_finished') {
+          newEntries[dayIndex].night_shift = syncManualNightShiftAfterTimesChange({
+            nightShift: previous.night_shift,
+            previousStarted: previous.time_started,
+            previousFinished: previous.time_finished,
+            nextStarted: newEntries[dayIndex].time_started,
+            nextFinished: newEntries[dayIndex].time_finished,
+          });
+        }
       }
 
       if (field === 'working_in_yard' && value === true) {
@@ -1432,8 +1451,10 @@ export function CivilsTimesheet({
           const offDay = offDayByDay.get(entry.day_of_week);
           const persistedJobNumbers = getNormalizedJobNumbers(entry.job_numbers);
           
-          // Night Shift is employee/editor selected; bank holidays remain calendar derived.
-          const isNight = !entry.did_not_work && entry.night_shift;
+          const isNight = resolvePersistedNightShiftFlag({
+            nightShift: entry.night_shift,
+            didNotWork: entry.did_not_work,
+          });
           const isBankHol = !entry.did_not_work && isUKBankHoliday(entryDate);
           const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(offDay);
           const normalizedRemarks =
@@ -1911,15 +1932,15 @@ export function CivilsTimesheet({
                           type="button"
                           onClick={() => updateEntry(index, 'night_shift', !entry.night_shift)}
                           disabled={disableWorkingInputs}
-                          aria-pressed={entry.night_shift}
+                          aria-pressed={displayedNightShift(entry)}
                           className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
-                            entry.night_shift
+                            displayedNightShift(entry)
                               ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20'
                               : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                           } disabled:opacity-30 disabled:cursor-not-allowed`}
                         >
-                          <Moon className={`h-8 w-8 mb-2 ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`} />
-                          <span className={`text-lg font-medium ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`}>
+                          <Moon className={`h-8 w-8 mb-2 ${displayedNightShift(entry) ? 'text-indigo-400' : 'text-muted-foreground'}`} />
+                          <span className={`text-lg font-medium ${displayedNightShift(entry) ? 'text-indigo-400' : 'text-muted-foreground'}`}>
                             Night Shift
                           </span>
                         </button>
@@ -2146,15 +2167,15 @@ export function CivilsTimesheet({
                             type="button"
                             onClick={() => updateEntry(index, 'night_shift', !entry.night_shift)}
                             disabled={disableWorkingInputs}
-                            aria-pressed={entry.night_shift}
+                            aria-pressed={displayedNightShift(entry)}
                             className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
-                              entry.night_shift
+                              displayedNightShift(entry)
                                 ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20'
                                 : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                             } disabled:opacity-30 disabled:cursor-not-allowed`}
                             title="Night Shift"
                           >
-                            <Moon className={`h-5 w-5 ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`} />
+                            <Moon className={`h-5 w-5 ${displayedNightShift(entry) ? 'text-indigo-400' : 'text-muted-foreground'}`} />
                           </button>
 
                           {hasTrainingBooking && (

@@ -31,7 +31,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AlertCircle, ArrowLeft, BedDouble, Check, Home, Moon, Save, User, Wrench, XCircle } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
-import { formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import { formatHours, isDisplayedNightShift, resolvePersistedNightShiftFlag, roundTimeToNearestQuarterHour, syncManualNightShiftAfterTimesChange } from '@/lib/utils/time-calculations';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
@@ -105,6 +105,15 @@ import {
   type RecalculateEntryOptions,
 } from './plant-timesheet-v2-utils';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+
+function displayedNightShift(entry: Pick<PlantEntryDraft, 'night_shift' | 'time_started' | 'time_finished' | 'did_not_work'>): boolean {
+  return isDisplayedNightShift({
+    nightShift: entry.night_shift,
+    timeStarted: entry.time_started,
+    timeFinished: entry.time_finished,
+    didNotWork: entry.did_not_work,
+  });
+}
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 import { ConfirmationModal } from '../../components/ConfirmationModal';
 
@@ -864,11 +873,21 @@ export function PlantTimesheetV2({
         typeof normalizedValue === 'string' && (field === 'time_started' || field === 'time_finished')
           ? getMachineMirrorUpdates(currentEntry, field, normalizedValue)
           : {};
-      let updated = recalculateEntry({
+      const nextTimes = {
         ...currentEntry,
         [field]: normalizedValue,
         ...machineMirrorUpdates,
-      } as PlantEntryDraft, getRecalculateOptionsForOffDay(offDayState));
+      } as PlantEntryDraft;
+      if (field === 'time_started' || field === 'time_finished') {
+        nextTimes.night_shift = syncManualNightShiftAfterTimesChange({
+          nightShift: currentEntry.night_shift,
+          previousStarted: currentEntry.time_started,
+          previousFinished: currentEntry.time_finished,
+          nextStarted: nextTimes.time_started,
+          nextFinished: nextTimes.time_finished,
+        });
+      }
+      let updated = recalculateEntry(nextTimes, getRecalculateOptionsForOffDay(offDayState));
       if (
         (field === 'time_started' || field === 'time_finished') &&
         !hasWorkedTimesForSubsistence(updated)
@@ -1310,7 +1329,10 @@ export function PlantTimesheetV2({
           working_in_yard: recalculated.working_in_yard,
           subsistence_payment_required: requiresSubsistence,
           did_not_work: recalculated.did_not_work,
-          night_shift: !recalculated.did_not_work && recalculated.night_shift,
+          night_shift: resolvePersistedNightShiftFlag({
+            nightShift: recalculated.night_shift,
+            didNotWork: recalculated.did_not_work,
+          }),
           bank_holiday: !recalculated.did_not_work && bankHolidays.has(
             formatLocalIsoDate(
               getTimesheetEntryDateFromWeekEnding(weekEnding, recalculated.day_of_week)
@@ -1827,18 +1849,18 @@ export function PlantTimesheetV2({
                           <Label className="text-foreground text-sm leading-tight">Night</Label>
                           <button
                             type="button"
-                            aria-pressed={entry.night_shift}
+                            aria-pressed={displayedNightShift(entry)}
                             aria-label={`${DAY_NAMES[index]} Night Shift`}
                             title="Night Shift"
                             onClick={() => updateEntry(index, { night_shift: !entry.night_shift })}
                             disabled={disableInputs}
                             className={`flex h-16 w-16 items-center justify-center rounded-lg border-2 transition-all ${
-                              entry.night_shift
+                              displayedNightShift(entry)
                                 ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20'
                                 : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                             } disabled:opacity-30 disabled:cursor-not-allowed`}
                           >
-                            <Moon className={`h-7 w-7 ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`} />
+                            <Moon className={`h-7 w-7 ${displayedNightShift(entry) ? 'text-indigo-400' : 'text-muted-foreground'}`} />
                           </button>
                         </div>
                       </div>
@@ -2251,15 +2273,15 @@ export function PlantTimesheetV2({
                                 type="button"
                                 onClick={() => updateEntry(index, { night_shift: !entry.night_shift })}
                                 disabled={disableInputs}
-                                aria-pressed={entry.night_shift}
+                                aria-pressed={displayedNightShift(entry)}
                                 className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
-                                  entry.night_shift
+                                  displayedNightShift(entry)
                                     ? 'bg-indigo-500/20 border-indigo-500 shadow-lg shadow-indigo-500/20'
                                     : 'bg-slate-800/30 border-slate-700 hover:bg-slate-800/50'
                                 } disabled:opacity-30 disabled:cursor-not-allowed`}
                                 title="Night Shift"
                               >
-                                <Moon className={`h-5 w-5 ${entry.night_shift ? 'text-indigo-400' : 'text-muted-foreground'}`} />
+                                <Moon className={`h-5 w-5 ${displayedNightShift(entry) ? 'text-indigo-400' : 'text-muted-foreground'}`} />
                               </button>
 
                               {hasTrainingBooking && (

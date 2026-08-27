@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import {
+  isDisplayedNightShift,
+  resolvePersistedNightShiftFlag,
+  roundTimeToNearestQuarterHour,
+  syncManualNightShiftAfterTimesChange,
+} from '@/lib/utils/time-calculations';
 
 describe('roundTimeToNearestQuarterHour', () => {
   it('keeps quarter-hour values unchanged', () => {
@@ -30,5 +35,45 @@ describe('roundTimeToNearestQuarterHour', () => {
     expect(roundTimeToNearestQuarterHour('')).toBe('');
     expect(roundTimeToNearestQuarterHour('10')).toBe('10');
     expect(roundTimeToNearestQuarterHour('not-a-time')).toBe('not-a-time');
+  });
+});
+
+describe('night shift persist vs display', () => {
+  it('PAY-MONEY-002 and PAY-VERIFY-002 persist only the manual tick, not overnight wrap', () => {
+    expect(resolvePersistedNightShiftFlag({
+      nightShift: false,
+      didNotWork: false,
+    })).toBe(false);
+    expect(isDisplayedNightShift({
+      nightShift: false,
+      timeStarted: '16:00',
+      timeFinished: '04:00',
+    })).toBe(true);
+    expect(isDisplayedNightShift({
+      nightShift: false,
+      timeStarted: '08:00',
+      timeFinished: '16:00',
+    })).toBe(false);
+    expect(resolvePersistedNightShiftFlag({
+      nightShift: true,
+      didNotWork: true,
+    })).toBe(false);
+  });
+
+  it('PAY-VERIFY-002 clears a stored Night Shift tick when an overnight entry is edited back to daytime', () => {
+    expect(syncManualNightShiftAfterTimesChange({
+      nightShift: true,
+      previousStarted: '16:00',
+      previousFinished: '04:00',
+      nextStarted: '08:00',
+      nextFinished: '16:00',
+    })).toBe(false);
+    expect(syncManualNightShiftAfterTimesChange({
+      nightShift: true,
+      previousStarted: '18:00',
+      previousFinished: '23:00',
+      nextStarted: '19:00',
+      nextFinished: '23:00',
+    })).toBe(true);
   });
 });

@@ -38,6 +38,7 @@ import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
 import {
   canActorAuthoriseTimesheetTarget,
+  canActorMarkTimesheetPayrollReceived,
   hasAccountsTimesheetFullVisibilityOverride,
 } from '@/lib/utils/timesheet-visibility';
 import { toast } from 'sonner';
@@ -146,6 +147,11 @@ function ApprovalsContent() {
   );
   const isAdminTier = Boolean(isAdmin || isSuperAdmin);
   const isTimesheetAdminTier = Boolean(isAdminTier || hasAccountsVisibilityOverride);
+  const canMarkPayrollReceived = canActorMarkTimesheetPayrollReceived({
+    hasFullAdminAccess: isAdminTier,
+    roleName: absenceSecondarySnapshot?.role_name,
+    teamName: actorTeamName,
+  });
   const activeTab: ApprovalsTab = tabParam === 'absences' ? 'absences' : 'timesheets';
   const defaultStatusFilters = useMemo(
     () => getApprovalsDefaultStatusFilters(actorTeamName),
@@ -442,7 +448,7 @@ function ApprovalsContent() {
         actor: {
           actorProfileId,
           actorTeamId: absenceSecondarySnapshot.team_id,
-          approvalsAccessLevel: canViewApprovals ? 3 : 0,
+          approvalsAccessLevel: canAuthoriseTimesheets ? 3 : 0,
           // Admin tier keeps global visibility; Accounts Supervisor override remains explicit.
           // Self-approval is still blocked inside canActorAuthoriseTimesheetTarget.
           hasAccountsOverride: hasAccountsVisibilityOverride || isAdminTier,
@@ -1214,6 +1220,7 @@ function ApprovalsContent() {
                       columnVisibility={columnVisibility}
                       visibleCount={visibleTimesheetCount}
                       busyTimesheetIds={busyTimesheetIds}
+                      showPayrollReceived={canMarkPayrollReceived && canAuthoriseTimesheets}
                     />
                   </div>
                 )}
@@ -1259,6 +1266,7 @@ function ApprovalsContent() {
                                 <TimesheetSubmittedActions
                                   timesheetId={timesheet.id}
                                   busy={busyTimesheetIds.has(timesheet.id)}
+                                  showPayrollReceived={canMarkPayrollReceived && canAuthoriseTimesheets}
                                   onApprove={(id) => { void handleQuickApprove('timesheet', id); }}
                                   onReject={(id) => { void handleQuickReject('timesheet', id); }}
                                   className="flex gap-2"

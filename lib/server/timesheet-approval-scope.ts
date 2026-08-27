@@ -1,6 +1,7 @@
 import { getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
 import {
   canActorAuthoriseTimesheetTarget,
+  canActorMarkTimesheetPayrollReceived,
   hasAccountsTimesheetFullVisibilityOverride,
 } from '@/lib/utils/timesheet-visibility';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
@@ -64,5 +65,26 @@ export async function canCurrentActorAuthoriseTimesheetTarget(
       permissions: actorPermissions.effective,
     },
     target,
+  });
+}
+
+export async function canCurrentActorMarkTimesheetPayrollReceived(
+  options: TimesheetApprovalScopeOptions = {}
+): Promise<boolean> {
+  const [effectiveRole, approvalsAccessLevel] = await Promise.all([
+    options.effectiveRole ? Promise.resolve(options.effectiveRole) : getEffectiveRole(),
+    options.approvalsAccessLevel !== undefined
+      ? Promise.resolve(options.approvalsAccessLevel)
+      : getEffectiveModuleAccessLevel('approvals'),
+  ]);
+
+  if (!effectiveRole.user_id || approvalsAccessLevel < 3) {
+    return false;
+  }
+
+  return canActorMarkTimesheetPayrollReceived({
+    hasFullAdminAccess: hasEffectiveRoleFullAccess(effectiveRole),
+    roleName: effectiveRole.role_name,
+    teamName: effectiveRole.team_name,
   });
 }

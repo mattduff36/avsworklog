@@ -12,6 +12,7 @@ interface TimesheetSubmittedActionsProps {
   className?: string;
   rejectClassName: string;
   approveClassName: string;
+  showPayrollReceived?: boolean;
 }
 
 export function TimesheetSubmittedActions({
@@ -23,6 +24,7 @@ export function TimesheetSubmittedActions({
   className = 'flex items-center justify-end gap-1',
   rejectClassName,
   approveClassName,
+  showPayrollReceived = true,
 }: TimesheetSubmittedActionsProps) {
   return (
     <div className={className}>
@@ -40,20 +42,22 @@ export function TimesheetSubmittedActions({
         <XCircle className="h-3.5 w-3.5 mr-1" />
         Reject
       </Button>
-      <Button
-        variant="outline"
-        size={size}
-        disabled={busy}
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          onApprove(timesheetId);
-        }}
-        className={approveClassName}
-      >
-        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-        Payroll Received
-      </Button>
+      {showPayrollReceived ? (
+        <Button
+          variant="outline"
+          size={size}
+          disabled={busy}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onApprove(timesheetId);
+          }}
+          className={approveClassName}
+        >
+          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+          Payroll Received
+        </Button>
+      ) : null}
     </div>
   );
 }

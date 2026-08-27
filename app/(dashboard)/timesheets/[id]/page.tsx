@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useTimesheetJobCodeOptions } from '@/lib/client/timesheet-job-codes';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,7 +22,15 @@ import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTrian
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
-import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour, syncManualNightShiftAfterTimesChange } from '@/lib/utils/time-calculations';
+import {
+  canActorMarkTimesheetPayrollReceived,
+  canActorShowTimesheetPayrollReceived,
+} from '@/lib/utils/timesheet-visibility';
+import {
+  TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
+  isTimesheetProcessConflict,
+} from '@/lib/utils/timesheet-process';
 import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
@@ -66,7 +75,8 @@ import type { PayrollWeekBreakdown } from '@/lib/payroll/types';
 export default function ViewTimesheetPage() {
   const router = useRouter();
   const params = useParams();
-  const { user, isManager, isAdmin, isSuperAdmin, loading: authLoading } = useAuth();
+  const { user, isManager, isAdmin, isSuperAdmin, effectiveRole, loading: authLoading } = useAuth();
+  const { hasPermission: canViewApprovals } = usePermissionCheck('approvals', false);
   const { options: jobCodeOptions, isLoading: jobCodeOptionsLoading } = useTimesheetJobCodeOptions();
   const cataloguedJobNumbers = useMemo(
     () => new Set(jobCodeOptions.map((option) => option.value)),
@@ -426,6 +436,16 @@ export default function ViewTimesheetPage() {
             [field]: normalizedValue,
           };
 
+    if (field === 'time_started' || field === 'time_finished') {
+      nextEntry.night_shift = syncManualNightShiftAfterTimesChange({
+        nightShift: currentEntry.night_shift === true,
+        previousStarted: currentEntry.time_started,
+        previousFinished: currentEntry.time_finished,
+        nextStarted: nextEntry.time_started,
+        nextFinished: nextEntry.time_finished,
+      });
+    }
+
     if (field === 'working_in_yard' && value === true) {
       nextEntry.job_number = null;
       nextEntry.job_numbers = [];
@@ -741,7 +761,15 @@ export default function ViewTimesheetPage() {
   };
 
   const handleApprove = async () => {
-    if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin)) return;
+    if (!timesheet || !canViewApprovals || !canActorShowTimesheetPayrollReceived({
+      canMarkPayrollReceived: canActorMarkTimesheetPayrollReceived({
+        hasFullAdminAccess: Boolean(isAdmin || isSuperAdmin),
+        roleName: effectiveRole?.name,
+        teamName: effectiveRole?.team_name,
+      }),
+      actorProfileId: user?.id,
+      targetProfileId: timesheet.user_id,
+    })) return;
 
     setSaving(true);
     try {
@@ -822,17 +850,32 @@ export default function ViewTimesheetPage() {
     setSaving(true);
     setShowProcessedDialog(false);
     try {
-      const { error } = await supabase
-        .from('timesheets')
-        .update({
-          status: 'processed',
-          processed_at: new Date().toISOString(),
-        })
-        .eq('id', timesheet.id);
+      const response = await fetch(`/api/timesheets/${timesheet.id}/process`, {
+        method: 'POST',
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        code?: string;
+        alreadyProcessed?: boolean;
+      };
+      if (!response.ok) {
+        const conflict = new Error(payload.error || 'Failed to mark as Manager Approved');
+        if (
+          payload.code === TIMESHEET_PROCESS_STATUS_CONFLICT_CODE ||
+          isTimesheetProcessConflict(conflict)
+        ) {
+          toast.error(conflict.message, { id: 'timesheet-details-mark-manager-approved-error' });
+          await fetchTimesheet(timesheet.id);
+          return;
+        }
+        throw conflict;
+      }
 
-      if (error) throw error;
-      
-      toast.success('Timesheet marked as Manager Approved');
+      toast.success(
+        payload.alreadyProcessed
+          ? 'Timesheet already marked as Manager Approved'
+          : 'Timesheet marked as Manager Approved'
+      );
       await fetchTimesheet(timesheet.id);
     } catch (err) {
       const errorContextId = 'timesheet-details-mark-manager-approved-error';
@@ -983,9 +1026,18 @@ export default function ViewTimesheetPage() {
   if (!timesheet) return null;
 
   const hasElevatedAccess = isManager || isAdmin || isSuperAdmin;
+  const canMarkPayrollReceived = canActorMarkTimesheetPayrollReceived({
+    hasFullAdminAccess: Boolean(isAdmin || isSuperAdmin),
+    roleName: effectiveRole?.name,
+    teamName: effectiveRole?.team_name,
+  });
   const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected' || (hasElevatedAccess && timesheet.status === 'approved'));
   const canSubmit = timesheet.user_id === user?.id && (timesheet.status === 'draft' || timesheet.status === 'rejected');
-  const canApprove = hasElevatedAccess && ['submitted', 'adjusted'].includes(timesheet.status);
+  const canApprove = canViewApprovals && canActorShowTimesheetPayrollReceived({
+    canMarkPayrollReceived,
+    actorProfileId: user?.id,
+    targetProfileId: timesheet.user_id,
+  }) && ['submitted', 'adjusted'].includes(timesheet.status);
   const canMarkAsProcessed = hasElevatedAccess && timesheet.status === 'approved';
   const canEditApproved = hasElevatedAccess && timesheet.status === 'approved';
   const isEndState = timesheet.status === 'processed' || timesheet.status === 'adjusted';
@@ -1620,7 +1672,7 @@ export default function ViewTimesheetPage() {
                   className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
                 >
                   <CheckCircle2 className="h-4 w-4 mr-2" />
-                  {timesheet.status === 'adjusted' ? 'Reapprove' : 'Approve'}
+                  {timesheet.status === 'adjusted' ? 'Re-mark Payroll Received' : 'Payroll Received'}
                 </Button>
               </>
             )}

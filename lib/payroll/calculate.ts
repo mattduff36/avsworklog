@@ -1,4 +1,4 @@
-import { roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import { isOvernightShift, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
 import type {
   PayrollDayBand,
   PayrollDayBreakdown,
@@ -112,7 +112,11 @@ function calculateDay(input: PayrollDayInput, week: PayrollWeekInput): PayrollDa
   } else if (input.bankHoliday) {
     treatmentReason = 'bank_holiday';
     addTreatment(totals, week.rule.bankHolidayTreatment, payableMinutes);
-  } else if (input.nightShift && week.rule.nightShiftTreatment) {
+  } else if (
+    week.rule.key !== 'lorries' &&
+    week.rule.nightShiftTreatment &&
+    (input.nightShift || isOvernightShift(input.timeStarted, input.timeFinished))
+  ) {
     treatmentReason = 'night_shift';
     addTreatment(totals, week.rule.nightShiftTreatment, payableMinutes);
   } else {

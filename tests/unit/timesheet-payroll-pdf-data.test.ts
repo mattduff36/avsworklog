@@ -3,6 +3,10 @@ import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { payrollSnapshotPdfTitle } from '@/lib/pdf/payroll-snapshot-summary';
 import {
+  formatGenericPdfRemarks,
+  formatJobNumberOrYard,
+} from '@/lib/pdf/timesheet-pdf-cells';
+import {
   buildTimesheetPayrollPreviewDays,
   toPayrollSnapshotPdfData,
 } from '@/lib/pdf/timesheet-payroll-pdf-data';
@@ -97,5 +101,19 @@ describe('timesheet payroll PDF data', () => {
     expect(route).toContain('allowsSnapshotlessPayrollPreview');
     expect(route).toContain('shouldPrintLivePayrollPreview');
     expect(route).toContain("typedTimesheet.status === 'adjusted' ? 'reapproval' : 'provisional'");
+  });
+
+  it('PAY-PDF-JOB-YARD-001 renders job numbers or Yard in the generic Job number / Yard column', () => {
+    const generic = readProjectFile('lib/pdf/timesheet-pdf.tsx');
+    expect(generic).toContain("Job number{'\\n'}/ Yard");
+    expect(formatJobNumberOrYard({ job_number: '3485-LC' })).toBe('3485-LC');
+    expect(formatJobNumberOrYard({ working_in_yard: true })).toBe('Yard');
+    expect(formatJobNumberOrYard({ job_number: null, working_in_yard: false })).toBe('');
+  });
+
+  it('PAY-PDF-REMARKS-001 keeps generic remarks as comments, leave and subsistence only', () => {
+    expect(formatGenericPdfRemarks({ remarks: 'holiday (annual leave)' })).toBe('holiday (annual leave)');
+    expect(formatGenericPdfRemarks({ remarks: 'Site delay' })).not.toMatch(/Job number/);
+    expect(formatGenericPdfRemarks({ remarks: 'Site delay' })).toBe('Site delay');
   });
 });

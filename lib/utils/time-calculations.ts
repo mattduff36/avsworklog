@@ -137,6 +137,49 @@ export function roundTimeToNearestQuarterHour(time: string): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
+export function isDisplayedNightShift(input: {
+  nightShift: boolean;
+  timeStarted: string | null;
+  timeFinished: string | null;
+  didNotWork?: boolean;
+}): boolean {
+  if (input.didNotWork) return false;
+  return input.nightShift || isOvernightShift(input.timeStarted, input.timeFinished);
+}
+
+export function resolvePersistedNightShiftFlag(input: {
+  nightShift: boolean;
+  didNotWork?: boolean;
+}): boolean {
+  return !input.didNotWork && input.nightShift === true;
+}
+
+export function syncManualNightShiftAfterTimesChange(input: {
+  nightShift: boolean;
+  previousStarted: string | null;
+  previousFinished: string | null;
+  nextStarted: string | null;
+  nextFinished: string | null;
+}): boolean {
+  const wasOvernight = isOvernightShift(input.previousStarted, input.previousFinished);
+  const isOvernight = isOvernightShift(input.nextStarted, input.nextFinished);
+  if (wasOvernight && !isOvernight) return false;
+  return input.nightShift === true;
+}
+
+export function isOvernightShift(timeStarted: string | null, timeFinished: string | null): boolean {
+  if (!timeStarted || !timeFinished) return false;
+  const roundedStart = roundTimeToNearestQuarterHour(timeStarted);
+  const roundedFinish = roundTimeToNearestQuarterHour(timeFinished);
+  const startMatch = roundedStart.match(/^(\d{2}):(\d{2})$/);
+  const finishMatch = roundedFinish.match(/^(\d{2}):(\d{2})$/);
+  if (!startMatch || !finishMatch) return false;
+  const startMinutes = Number(startMatch[1]) * 60 + Number(startMatch[2]);
+  const finishMinutes = Number(finishMatch[1]) * 60 + Number(finishMatch[2]);
+  if (!Number.isFinite(startMinutes) || !Number.isFinite(finishMinutes)) return false;
+  return finishMinutes < startMinutes;
+}
+
 /**
  * Calculate total hours from an array of daily totals
  */

@@ -11,6 +11,11 @@ function readProjectFile(path: string): string {
 }
 
 describe('payroll rollout contract', () => {
+  it('TS-TYPECHECK-001 keeps the project typecheck script available', () => {
+    const pkg = JSON.parse(readProjectFile('package.json')) as { scripts?: { typecheck?: string } };
+    expect(pkg.scripts?.typecheck).toBe('tsc --noEmit');
+  });
+
   it('PAY-FAIL-CLOSED-001 rejects incomplete post-cutover configuration', () => {
     const rule = getSignedPayrollRule('civils');
     delete rule.dayBands[7];
@@ -50,10 +55,26 @@ describe('payroll rollout contract', () => {
     expect(report).toContain(': leaveAwareTotals.weekly.display');
   });
 
-  it('PAY-AUTH-APPROVAL-001 requires module permission and employee scope', () => {
+  it('PAY-AUTH-APPROVAL-001 requires module permission, employee scope and payroll-received authority', () => {
     const route = readProjectFile('app/api/timesheets/[id]/approve/route.ts');
     expect(route).toContain('canCurrentActorAuthoriseTimesheetTarget');
+    expect(route).toContain('canCurrentActorMarkTimesheetPayrollReceived');
     expect(route).not.toContain('filterTimesheetRowsForReportScope');
+  });
+
+  it('PAY-PROCESS-MANAGER-001 keeps process on authorise scope and routes the detail page through the API', () => {
+    const processRoute = readProjectFile('app/api/timesheets/[id]/process/route.ts');
+    const detail = readProjectFile('app/(dashboard)/timesheets/[id]/page.tsx');
+    expect(processRoute).toContain('canCurrentActorAuthoriseTimesheetTarget');
+    expect(processRoute).not.toContain('canCurrentActorMarkTimesheetPayrollReceived');
+    expect(detail).toContain('/api/timesheets/${timesheet.id}/process');
+    expect(detail).not.toContain('processed_at: new Date().toISOString()');
+  });
+
+  it('PAY-ENGINE-VERSION-002 records engine version 2 on new snapshots', () => {
+    const server = readProjectFile('lib/server/timesheet-payroll.ts');
+    expect(server).toContain('export const PAYROLL_ENGINE_VERSION = 2');
+    expect(server).toContain('const ENGINE_VERSION = PAYROLL_ENGINE_VERSION');
   });
 
   it('AUTH-PAYROLL-LEVEL5-01 requires delegated Admin Settings access', () => {
@@ -117,7 +138,7 @@ describe('payroll rollout contract', () => {
     expect(excel).toContain('snapshot.basic_minutes');
     expect(excel).toContain("'Basic Hours'");
     expect(excel).toContain("'Double Time Hours'");
-    expect(detail).toContain("'Reapprove' : 'Approve'");
+    expect(detail).toContain("'Re-mark Payroll Received' : 'Payroll Received'");
   });
 
   it('PAY-ASSIGNMENT-001 supports effective-dated profile override retirement', () => {
@@ -128,6 +149,10 @@ describe('payroll rollout contract', () => {
     expect(admin).toContain('VALUES ($1, NULL, false, $2, $3)');
     expect(ui).toContain("value={assignment?.ruleSetKey || 'none'}");
     expect(ui).toContain('<SelectItem value="none">Use team rule</SelectItem>');
+    expect(ui).toContain('Save employee overrides');
+    expect(readProjectFile('app/api/admin/settings/payroll-rules/route.ts')).toContain(
+      "action === 'save_profile_assignment'"
+    );
   });
 
   it('PAY-MIGRATION-001 is rerunnable after activation and protects snapshot pointers', () => {
@@ -188,5 +213,48 @@ describe('payroll rollout contract', () => {
     expect(states[1]).toMatchObject({ paidLeaveUnits: 0, unpaidLeaveUnits: 0.5 });
     expect(states[2]).toMatchObject({ paidLeaveUnits: 0, unpaidLeaveUnits: 0 });
     expect(states[5]).toMatchObject({ paidLeaveUnits: 1, unpaidLeaveUnits: 0 });
+  });
+
+  it('PAY-OVERRIDE-SAVE-001 and PAY-OVERRIDE-TXN-001 write one profile assignment per save and never touch versions, teams or rollout', () => {
+    const admin = readProjectFile('lib/server/payroll-admin.ts');
+    const saveFn = admin.slice(admin.indexOf('export async function savePayrollProfileAssignment'));
+    expect(saveFn).toContain('INSERT INTO public.payroll_profile_rule_assignments');
+    expect(saveFn).not.toContain('payroll_rule_versions');
+    expect(saveFn).not.toContain('payroll_team_rule_assignments');
+    expect(saveFn).not.toContain('payroll_rollout_activations');
+    expect(saveFn).toContain('PayrollAssignmentConflictError');
+    expect(saveFn).toContain('validatePayrollProfileAssignmentInput');
+    expect(saveFn).toContain('decidePayrollAssignmentWrite');
+    expect(readProjectFile('lib/payroll/calculate.ts')).toContain("week.rule.key !== 'lorries'");
+    expect(readProjectFile('app/(dashboard)/admin/settings/components/PayrollRulesSettingsCard.tsx')).toContain(
+      'Each employee is saved separately'
+    );
+    const civils = readProjectFile('app/(dashboard)/timesheets/types/civils/CivilsTimesheet.tsx');
+    const plant = readProjectFile('app/(dashboard)/timesheets/types/plant/PlantTimesheetV2Aligned.tsx');
+    expect(civils).toContain('resolvePersistedNightShiftFlag');
+    expect(plant).toContain('resolvePersistedNightShiftFlag');
+    expect(civils).not.toContain(
+      'entry.night_shift || isOvernightShift(entry.time_started, entry.time_finished)'
+    );
+  });
+
+  it('PAY-OVERRIDE-RESOLVE-001 keeps profile overrides ahead of team and Civils fallback', () => {
+    const server = readProjectFile('lib/server/timesheet-payroll.ts');
+    expect(server).toContain('FROM profile_assignment WHERE is_active');
+    expect(server).toContain("WHEN EXISTS (SELECT 1 FROM profile_assignment WHERE is_active) THEN 'profile'");
+    expect(server).toContain("rule_key = 'civils'");
+  });
+
+  it('PAY-PDF-JOB-YARD-001 and PAY-PDF-REMARKS-001 move generic PDF jobs out of remarks', () => {
+    const generic = readProjectFile('lib/pdf/timesheet-pdf.tsx');
+    const plant = readProjectFile('lib/pdf/plant-timesheet-v2-pdf.tsx');
+    expect(generic).toContain('Job number');
+    expect(generic).toContain('/ Yard');
+    expect(generic).toContain('formatJobNumberOrYard');
+    expect(readProjectFile('lib/pdf/timesheet-pdf-cells.ts')).toContain('export function formatJobNumberOrYard');
+    expect(generic).not.toContain('Working{\'\\n\'}in Yard');
+    expect(generic).not.toContain('Job number${formattedJobNumbers.includes(\',\') ? \'s\' : \'\'}');
+    expect(plant).toContain('Job numbers ${jobNumbers}');
+    expect(plant).not.toContain('Job number / Yard');
   });
 });

@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { approveTimesheetWithPayrollSnapshot } from '@/lib/server/timesheet-payroll';
-import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
+import {
+  canCurrentActorAuthoriseTimesheetTarget,
+  canCurrentActorMarkTimesheetPayrollReceived,
+} from '@/lib/server/timesheet-approval-scope';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
@@ -60,6 +63,16 @@ export async function POST(
     );
     if (!canAuthoriseTarget) {
       return NextResponse.json({ error: 'You cannot approve this employee’s timesheet' }, { status: 403 });
+    }
+
+    const canMarkPayrollReceived = await canCurrentActorMarkTimesheetPayrollReceived({
+      effectiveRole,
+    });
+    if (!canMarkPayrollReceived) {
+      return NextResponse.json(
+        { error: 'Only Accounts or Admin can mark a timesheet as Payroll Received' },
+        { status: 403 }
+      );
     }
 
     const result = await approveTimesheetWithPayrollSnapshot({

@@ -5,12 +5,11 @@ import { formatDate } from '@/lib/utils/date';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals } from '@/lib/utils/timesheet-leave-totals';
-import { formatEntryJobNumbers, getPrimaryJobNumber } from '@/lib/utils/timesheet-job-codes';
-import { addSubsistenceRemark } from '@/lib/utils/timesheet-subsistence';
 import {
   PayrollSnapshotSummary,
   type PayrollSnapshotPdfData,
 } from '@/lib/pdf/payroll-snapshot-summary';
+import { formatGenericPdfRemarks, formatJobNumberOrYard } from '@/lib/pdf/timesheet-pdf-cells';
 
 // Create styles for the PDF matching the scanned form
 const styles = StyleSheet.create({
@@ -207,29 +206,6 @@ export function TimesheetPDF({
     ? timesheet.id.slice(-5).toUpperCase() 
     : '00000';
 
-  // Helper to format remarks with job number (entry may be full TimesheetEntry or partial from allDays)
-  const formatRemarks = (entry: {
-    job_number?: string | null;
-    job_numbers?: string[];
-    remarks?: string | null;
-    subsistence_payment_required?: boolean | null;
-  }) => {
-    const jobNumber = getPrimaryJobNumber(entry);
-    const remarks = entry.subsistence_payment_required
-      ? addSubsistenceRemark(entry.remarks)
-      : entry.remarks;
-    const formattedJobNumbers = formatEntryJobNumbers(entry);
-    
-    if (jobNumber && remarks) {
-      return `Job number${formattedJobNumbers.includes(',') ? 's' : ''} ${formattedJobNumbers} - ${remarks}`;
-    } else if (jobNumber) {
-      return `Job number${formattedJobNumbers.includes(',') ? 's' : ''} ${formattedJobNumbers}`;
-    } else if (remarks) {
-      return remarks;
-    }
-    return '';
-  };
-
   // Create an array with all 7 days
   const allDays = [1, 2, 3, 4, 5, 6, 7].map(dayNum => {
     const entry = sortedEntries.find(e => e.day_of_week === dayNum);
@@ -299,7 +275,7 @@ export function TimesheetPDF({
               <Text style={styles.headerText}>Time{'\n'}Started</Text>
             </View>
             <View style={styles.colWorkingYard}>
-              <Text style={styles.headerText}>Working{'\n'}in Yard</Text>
+              <Text style={styles.headerText}>Job number{'\n'}/ Yard</Text>
             </View>
             <View style={styles.colTimeFinished}>
               <Text style={styles.headerText}>Time{'\n'}Finished</Text>
@@ -325,7 +301,7 @@ export function TimesheetPDF({
               </View>
               <View style={styles.colWorkingYard}>
                 <Text style={styles.cellText}>
-                  {entry.did_not_work ? '' : (entry.working_in_yard ? 'Yes' : '')}
+                  {entry.did_not_work ? '' : formatJobNumberOrYard(entry)}
                 </Text>
               </View>
               <View style={styles.colTimeFinished}>
@@ -345,7 +321,7 @@ export function TimesheetPDF({
                         entry.did_not_work,
                         entry.remarks?.trim() ? entry.remarks : 'Not on Shift'
                       ).combinedDisplay
-                    : formatRemarks(entry)}
+                    : formatGenericPdfRemarks(entry)}
                 </Text>
               </View>
             </View>

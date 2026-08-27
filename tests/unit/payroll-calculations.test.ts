@@ -72,6 +72,102 @@ describe('signed payroll rule engine', () => {
     expect(calculate('others', { dayOfWeek: 1, nightShift: true }).doubleTimeMinutes).toBe(600);
   });
 
+  it('PAY-NIGHT-OVERNIGHT-001 treats midnight-wrap shifts as Night Shift for Civils, Plant and Others', () => {
+    for (const ruleSetKey of ['civils', 'plant', 'others'] as PayrollRuleSetKey[]) {
+      const result = calculate(ruleSetKey, {
+        dayOfWeek: 1,
+        timeStarted: '22:00',
+        timeFinished: '06:00',
+      });
+      expect(result.days[0].treatmentReason).toBe('night_shift');
+      expect(result.doubleTimeMinutes).toBe(result.payableMinutes);
+      expect(result.overtimeMinutes).toBe(0);
+      expect(result.basicMinutes).toBe(0);
+    }
+  });
+
+  it('PAY-NIGHT-OVERNIGHT-SAT-001 pays a Saturday 16:00-04:00 shift as Double Time, not Saturday Overtime', () => {
+    const result = calculate('civils', {
+      dayOfWeek: 6,
+      timeStarted: '16:00',
+      timeFinished: '04:00',
+    });
+    expect(result.days[0].elapsedMinutes).toBe(720);
+    expect(result.payableMinutes).toBe(690);
+    expect(result.days[0].treatmentReason).toBe('night_shift');
+    expect(result.doubleTimeMinutes).toBe(690);
+    expect(result.overtimeMinutes).toBe(0);
+  });
+
+  it('PAY-NIGHT-OVERNIGHT-LORRIES-001, PAY-MONEY-001 and PAY-VERIFY-002 keep Lorries overnight on calendar bands even if a night premium is configured', () => {
+    const configured = getSignedPayrollRule('lorries');
+    configured.nightShiftTreatment = 'double_time';
+    const configuredOvernight = calculatePayrollWeek({
+      weekEnding: '2026-08-09',
+      rule: configured,
+      days: [{
+        dayOfWeek: 1,
+        timeStarted: '22:00',
+        timeFinished: '06:00',
+      }],
+    });
+    expect(configuredOvernight.days[0].treatmentReason).toBe('calendar');
+    expect(configuredOvernight.doubleTimeMinutes).toBe(0);
+    expect(configuredOvernight.basicMinutes).toBe(configuredOvernight.payableMinutes);
+
+    const weekday = calculate('lorries', {
+      dayOfWeek: 1,
+      timeStarted: '22:00',
+      timeFinished: '06:00',
+    });
+    expect(weekday.basicMinutes).toBe(weekday.payableMinutes);
+    expect(weekday.doubleTimeMinutes).toBe(0);
+    expect(weekday.days[0].treatmentReason).toBe('calendar');
+
+    const saturday = calculate('lorries', {
+      dayOfWeek: 6,
+      timeStarted: '16:00',
+      timeFinished: '04:00',
+    });
+    expect(saturday.overtimeMinutes).toBe(240);
+    expect(saturday.doubleTimeMinutes).toBe(saturday.payableMinutes - 240);
+    expect(saturday.days[0].treatmentReason).toBe('calendar');
+  });
+
+  it('PAY-NIGHT-MANUAL-001 still pays a same-day manual Night Shift as Double Time', () => {
+    const result = calculate('plant', {
+      dayOfWeek: 2,
+      timeStarted: '18:00',
+      timeFinished: '23:00',
+      nightShift: true,
+    });
+    expect(result.days[0].treatmentReason).toBe('night_shift');
+    expect(result.doubleTimeMinutes).toBe(result.payableMinutes);
+  });
+
+  it('PAY-VERIFY-002 treats a later daytime resave without a Night Shift tick as calendar pay', () => {
+    const daytimeResave = calculate('civils', {
+      dayOfWeek: 6,
+      timeStarted: '08:00',
+      timeFinished: '16:00',
+      nightShift: false,
+    });
+    expect(daytimeResave.days[0].treatmentReason).toBe('calendar');
+    expect(daytimeResave.overtimeMinutes).toBe(daytimeResave.payableMinutes);
+    expect(daytimeResave.doubleTimeMinutes).toBe(0);
+  });
+
+  it('PAY-PREC-BH-OVERNIGHT-001 keeps bank holiday above overnight Night Shift', () => {
+    const result = calculate('civils', {
+      dayOfWeek: 6,
+      timeStarted: '16:00',
+      timeFinished: '04:00',
+      bankHoliday: true,
+    });
+    expect(result.days[0].treatmentReason).toBe('bank_holiday');
+    expect(result.doubleTimeMinutes).toBe(result.payableMinutes);
+  });
+
   it('PAY-PRECEDENCE-001 makes bank holiday highest and ignores Lorries night premium', () => {
     for (const ruleSetKey of ['lorries', 'civils', 'plant', 'others'] as PayrollRuleSetKey[]) {
       const bankHoliday = calculate(ruleSetKey, {
@@ -179,5 +275,16 @@ describe('payroll assignment resolution', () => {
       profileId: 'profile',
       teamId: null,
     }).ruleSetKey).toBe('civils');
+  });
+
+  it('PAY-OVERRIDE-RESOLVE-001 lets a Plant profile override win over a Civils team', () => {
+    const assignment = resolvePayrollRuleAssignment({
+      profileId: 'profile',
+      teamId: 'civils-team',
+      profileRuleSetKey: 'plant',
+      teamRuleSetKey: 'civils',
+    });
+    expect(assignment.ruleSetKey).toBe('plant');
+    expect(assignment.source).toBe('profile');
   });
 });

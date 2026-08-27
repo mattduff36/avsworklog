@@ -36,4 +36,21 @@ describe('TimesheetSubmittedActions', () => {
     expect(screen.getByRole('button', { name: 'Reject' })).not.toBeDisabled();
     expect(screen.getByRole('button', { name: 'Payroll Received' })).not.toBeDisabled();
   });
+
+  it('PAY-UI-PAYROLL-BUTTON-001 hides Payroll Received for non-payroll actors', () => {
+    render(
+      <TimesheetSubmittedActions
+        timesheetId="timesheet-manager"
+        busy={false}
+        showPayrollReceived={false}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        rejectClassName="reject"
+        approveClassName="approve"
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Payroll Received' })).not.toBeInTheDocument();
+  });
 });

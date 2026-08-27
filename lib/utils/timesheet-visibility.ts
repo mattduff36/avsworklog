@@ -46,6 +46,31 @@ export function hasAccountsTimesheetFullVisibilityOverride(
   );
 }
 
+export function canActorShowTimesheetPayrollReceived(input: {
+  canMarkPayrollReceived: boolean;
+  actorProfileId?: string | null;
+  targetProfileId?: string | null;
+}): boolean {
+  if (!input.canMarkPayrollReceived) return false;
+  if (
+    input.actorProfileId &&
+    input.targetProfileId &&
+    input.actorProfileId === input.targetProfileId
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function canActorMarkTimesheetPayrollReceived(input: {
+  hasFullAdminAccess: boolean;
+  roleName: string | null | undefined;
+  teamName: string | null | undefined;
+}): boolean {
+  if (input.hasFullAdminAccess) return true;
+  return hasAccountsTimesheetFullVisibilityOverride(input.roleName, input.teamName);
+}
+
 export function canActorAuthoriseTimesheetTarget({
   actor,
   target,
