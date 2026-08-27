@@ -46,6 +46,30 @@ export function hasAccountsTimesheetFullVisibilityOverride(
   );
 }
 
+export function resolveClientApprovalsAccessLevel(input: {
+  isAdminTier: boolean;
+  permissionLevels?: { approvals?: number } | null;
+}): number {
+  if (input.isAdminTier) return 5;
+  return Number(input.permissionLevels?.approvals ?? 0);
+}
+
+export function canActorPerformTimesheetPayrollReceived(input: {
+  canMarkPayrollReceived: boolean;
+  canAuthoriseTarget: boolean;
+  actorProfileId?: string | null;
+  targetProfileId?: string | null;
+}): boolean {
+  return (
+    input.canAuthoriseTarget &&
+    canActorShowTimesheetPayrollReceived({
+      canMarkPayrollReceived: input.canMarkPayrollReceived,
+      actorProfileId: input.actorProfileId,
+      targetProfileId: input.targetProfileId,
+    })
+  );
+}
+
 export function canActorShowTimesheetPayrollReceived(input: {
   canMarkPayrollReceived: boolean;
   actorProfileId?: string | null;

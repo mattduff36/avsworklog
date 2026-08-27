@@ -58,6 +58,16 @@ describe('night shift persist vs display', () => {
       nightShift: true,
       didNotWork: true,
     })).toBe(false);
+    expect(resolvePersistedNightShiftFlag({
+      nightShift: true,
+      timeStarted: '16:00',
+      timeFinished: '04:00',
+    })).toBe(false);
+    expect(resolvePersistedNightShiftFlag({
+      nightShift: true,
+      timeStarted: '18:00',
+      timeFinished: '23:00',
+    })).toBe(true);
   });
 
   it('PAY-VERIFY-002 clears a stored Night Shift tick when an overnight entry is edited back to daytime', () => {

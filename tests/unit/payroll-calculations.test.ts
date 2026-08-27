@@ -3,6 +3,10 @@ import { calculatePayrollWeek } from '@/lib/payroll/calculate';
 import { resolvePayrollRuleAssignment } from '@/lib/payroll/assignment';
 import { getSignedPayrollRule } from '@/lib/payroll/schema';
 import type { PayrollDayInput, PayrollRuleSetKey } from '@/lib/payroll/types';
+import {
+  applyTimesheetFormTimeChange,
+  persistTimesheetNightShiftFromFormEntry,
+} from '@/lib/utils/timesheet-night-shift-form';
 
 function calculate(
   ruleSetKey: PayrollRuleSetKey,
@@ -146,12 +150,22 @@ describe('signed payroll rule engine', () => {
   });
 
   it('PAY-VERIFY-002 treats a later daytime resave without a Night Shift tick as calendar pay', () => {
+    const afterStartEdit = applyTimesheetFormTimeChange({
+      night_shift: true,
+      time_started: '16:00',
+      time_finished: '04:00',
+      did_not_work: false,
+    }, 'time_started', '08:00');
+    const afterFormEdit = applyTimesheetFormTimeChange(afterStartEdit, 'time_finished', '16:00');
+    const persistedNightShift = persistTimesheetNightShiftFromFormEntry(afterFormEdit);
     const daytimeResave = calculate('civils', {
       dayOfWeek: 6,
-      timeStarted: '08:00',
-      timeFinished: '16:00',
-      nightShift: false,
+      timeStarted: afterFormEdit.time_started,
+      timeFinished: afterFormEdit.time_finished,
+      nightShift: persistedNightShift,
     });
+    expect(afterFormEdit.night_shift).toBe(false);
+    expect(persistedNightShift).toBe(false);
     expect(daytimeResave.days[0].treatmentReason).toBe('calendar');
     expect(daytimeResave.overtimeMinutes).toBe(daytimeResave.payableMinutes);
     expect(daytimeResave.doubleTimeMinutes).toBe(0);

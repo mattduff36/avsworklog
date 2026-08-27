@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useQueryState } from 'nuqs';
@@ -40,6 +41,7 @@ import {
   canActorAuthoriseTimesheetTarget,
   canActorMarkTimesheetPayrollReceived,
   hasAccountsTimesheetFullVisibilityOverride,
+  resolveClientApprovalsAccessLevel,
 } from '@/lib/utils/timesheet-visibility';
 import { toast } from 'sonner';
 import { TimesheetsApprovalTable, COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_COLUMN_VISIBILITY } from './components/TimesheetsApprovalTable';
@@ -126,6 +128,11 @@ type ApprovalsTab = 'timesheets' | 'absences';
 function ApprovalsContent() {
   const { profile, isAdmin, isSuperAdmin } = useAuth();
   const { hasPermission: canViewApprovals, loading: permissionLoading } = usePermissionCheck('approvals', false);
+  const { permissionLevels } = usePermissionSnapshot();
+  const approvalsAccessLevel = resolveClientApprovalsAccessLevel({
+    isAdminTier: Boolean(isAdmin || isSuperAdmin),
+    permissionLevels,
+  });
   const { data: absenceSecondarySnapshot, isLoading: absenceSecondaryLoading } = useAbsenceSecondaryPermissions(
     canViewApprovals
   );
@@ -448,7 +455,7 @@ function ApprovalsContent() {
         actor: {
           actorProfileId,
           actorTeamId: absenceSecondarySnapshot.team_id,
-          approvalsAccessLevel: canAuthoriseTimesheets ? 3 : 0,
+          approvalsAccessLevel,
           // Admin tier keeps global visibility; Accounts Supervisor override remains explicit.
           // Self-approval is still blocked inside canActorAuthoriseTimesheetTarget.
           hasAccountsOverride: hasAccountsVisibilityOverride || isAdminTier,
@@ -468,6 +475,7 @@ function ApprovalsContent() {
     canViewApprovals,
     hasAccountsVisibilityOverride,
     isAdminTier,
+    approvalsAccessLevel,
   ]);
 
   const getCurrentFilteredTimesheets = useCallback((rows: TimesheetWithProfile[]) => {

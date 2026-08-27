@@ -31,7 +31,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PageLoader } from '@/components/ui/page-loader';
 import { AlertCircle, ArrowLeft, BedDouble, Check, Home, Moon, Save, User, Wrench, XCircle } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
-import { formatHours, isDisplayedNightShift, resolvePersistedNightShiftFlag, roundTimeToNearestQuarterHour, syncManualNightShiftAfterTimesChange } from '@/lib/utils/time-calculations';
+import { formatHours, isDisplayedNightShift, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import { applyTimesheetFormTimeChange, persistTimesheetNightShiftFromFormEntry } from '@/lib/utils/timesheet-night-shift-form';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
@@ -873,20 +874,15 @@ export function PlantTimesheetV2({
         typeof normalizedValue === 'string' && (field === 'time_started' || field === 'time_finished')
           ? getMachineMirrorUpdates(currentEntry, field, normalizedValue)
           : {};
-      const nextTimes = {
-        ...currentEntry,
-        [field]: normalizedValue,
-        ...machineMirrorUpdates,
-      } as PlantEntryDraft;
-      if (field === 'time_started' || field === 'time_finished') {
-        nextTimes.night_shift = syncManualNightShiftAfterTimesChange({
-          nightShift: currentEntry.night_shift,
-          previousStarted: currentEntry.time_started,
-          previousFinished: currentEntry.time_finished,
-          nextStarted: nextTimes.time_started,
-          nextFinished: nextTimes.time_finished,
-        });
-      }
+      const nextTimes = (
+        field === 'time_started' || field === 'time_finished'
+          ? applyTimesheetFormTimeChange(currentEntry, field, String(normalizedValue))
+          : {
+              ...currentEntry,
+              [field]: normalizedValue,
+            }
+      ) as PlantEntryDraft;
+      Object.assign(nextTimes, machineMirrorUpdates);
       let updated = recalculateEntry(nextTimes, getRecalculateOptionsForOffDay(offDayState));
       if (
         (field === 'time_started' || field === 'time_finished') &&
@@ -1329,10 +1325,7 @@ export function PlantTimesheetV2({
           working_in_yard: recalculated.working_in_yard,
           subsistence_payment_required: requiresSubsistence,
           did_not_work: recalculated.did_not_work,
-          night_shift: resolvePersistedNightShiftFlag({
-            nightShift: recalculated.night_shift,
-            didNotWork: recalculated.did_not_work,
-          }),
+          night_shift: persistTimesheetNightShiftFromFormEntry(recalculated),
           bank_holiday: !recalculated.did_not_work && bankHolidays.has(
             formatLocalIsoDate(
               getTimesheetEntryDateFromWeekEnding(weekEnding, recalculated.day_of_week)

@@ -72,6 +72,15 @@ function dynamicAdmin(): DynamicAdminClient {
   return createAdminClient() as unknown as DynamicAdminClient;
 }
 
+export interface PayrollAdminSqlClient {
+  connect(): Promise<void>;
+  query<T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[]
+  ): Promise<{ rows: T[] }>;
+  end(): Promise<void>;
+}
+
 function createPayrollAdminPgClient() {
   const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
   if (!connectionString) throw new Error('Missing database connection string');
@@ -826,10 +835,11 @@ export async function savePayrollProfileAssignment(input: {
   ruleSetKey: PayrollRuleSetKey | 'none';
   effectiveWeekEnding: string;
   actorId: string;
+  createClient?: () => PayrollAdminSqlClient;
 }): Promise<{ alreadyExists: boolean }> {
   const validated = validatePayrollProfileAssignmentInput(input);
 
-  const client = createPayrollAdminPgClient();
+  const client = input.createClient ? input.createClient() : createPayrollAdminPgClient();
   await client.connect();
   try {
     await client.query('BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE');

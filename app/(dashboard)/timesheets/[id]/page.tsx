@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { usePermissionSnapshot } from '@/lib/hooks/usePermissionSnapshot';
+import { useAbsenceSecondaryPermissions } from '@/lib/hooks/useAbsenceSecondaryPermissions';
 import { useTimesheetJobCodeOptions } from '@/lib/client/timesheet-job-codes';
 import { createClient } from '@/lib/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,10 +24,14 @@ import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTrian
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
-import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour, syncManualNightShiftAfterTimesChange } from '@/lib/utils/time-calculations';
+import { calculateStandardTimesheetHours, formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import { applyTimesheetFormTimeChange, persistTimesheetNightShiftFromFormEntry } from '@/lib/utils/timesheet-night-shift-form';
 import {
+  canActorAuthoriseTimesheetTarget,
   canActorMarkTimesheetPayrollReceived,
-  canActorShowTimesheetPayrollReceived,
+  canActorPerformTimesheetPayrollReceived,
+  hasAccountsTimesheetFullVisibilityOverride,
+  resolveClientApprovalsAccessLevel,
 } from '@/lib/utils/timesheet-visibility';
 import {
   TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
@@ -77,6 +83,8 @@ export default function ViewTimesheetPage() {
   const params = useParams();
   const { user, isManager, isAdmin, isSuperAdmin, effectiveRole, loading: authLoading } = useAuth();
   const { hasPermission: canViewApprovals } = usePermissionCheck('approvals', false);
+  const { permissionLevels } = usePermissionSnapshot();
+  const { data: absenceSecondarySnapshot } = useAbsenceSecondaryPermissions(canViewApprovals);
   const { options: jobCodeOptions, isLoading: jobCodeOptionsLoading } = useTimesheetJobCodeOptions();
   const cataloguedJobNumbers = useMemo(
     () => new Set(jobCodeOptions.map((option) => option.value)),
@@ -105,6 +113,7 @@ export default function ViewTimesheetPage() {
   const [payrollPreview, setPayrollPreview] = useState<PayrollWeekBreakdown | null>(null);
   const [trainingDeclineDayOfWeek, setTrainingDeclineDayOfWeek] = useState<number | null>(null);
   const [decliningTraining, setDecliningTraining] = useState(false);
+  const [employeeTeamId, setEmployeeTeamId] = useState<string | null>(null);
 
   const getActionErrorMessage = (err: unknown, fallback: string) => {
     return err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
@@ -144,6 +153,7 @@ export default function ViewTimesheetPage() {
           setPayrollSnapshot(null);
           setPayrollHistory([]);
           setSignature(null);
+          setEmployeeTeamId(null);
           setError('Timesheet not found. It may have been deleted.');
           setLoading(false);
           return;
@@ -159,10 +169,18 @@ export default function ViewTimesheetPage() {
         setPayrollSnapshot(null);
         setPayrollHistory([]);
         setSignature(null);
+        setEmployeeTeamId(null);
         setError('You do not have permission to view this timesheet');
         setLoading(false);
         return;
       }
+
+      const { data: employeeProfile } = await supabase
+        .from('profiles')
+        .select('team_id')
+        .eq('id', timesheetData.user_id)
+        .maybeSingle();
+      setEmployeeTeamId(employeeProfile?.team_id ?? null);
 
       setTimesheet({
         ...timesheetData,
@@ -186,6 +204,7 @@ export default function ViewTimesheetPage() {
             setPayrollSnapshot(null);
             setPayrollHistory([]);
             setSignature(null);
+            setEmployeeTeamId(null);
             setError(payrollPayload.error || 'You do not have permission to view this timesheet');
             setLoading(false);
             return;
@@ -437,13 +456,12 @@ export default function ViewTimesheetPage() {
           };
 
     if (field === 'time_started' || field === 'time_finished') {
-      nextEntry.night_shift = syncManualNightShiftAfterTimesChange({
-        nightShift: currentEntry.night_shift === true,
-        previousStarted: currentEntry.time_started,
-        previousFinished: currentEntry.time_finished,
-        nextStarted: nextEntry.time_started,
-        nextFinished: nextEntry.time_finished,
-      });
+      const nextTimes = applyTimesheetFormTimeChange({
+        night_shift: currentEntry.night_shift === true,
+        time_started: currentEntry.time_started,
+        time_finished: currentEntry.time_finished,
+      }, field, nextEntry[field] ?? null);
+      nextEntry.night_shift = nextTimes.night_shift;
     }
 
     if (field === 'working_in_yard' && value === true) {
@@ -659,7 +677,12 @@ export default function ViewTimesheetPage() {
           working_in_yard: entry.working_in_yard,
           subsistence_payment_required: requiresSubsistence,
           daily_total: entry.daily_total,
-          night_shift: entry.night_shift ?? false,
+          night_shift: persistTimesheetNightShiftFromFormEntry({
+            night_shift: entry.night_shift === true,
+            time_started: entry.time_started,
+            time_finished: entry.time_finished,
+            did_not_work: entry.did_not_work,
+          }),
           bank_holiday: entry.bank_holiday ?? false,
           remarks: persistedRemarks || null,
           };
@@ -760,16 +783,41 @@ export default function ViewTimesheetPage() {
     }
   };
 
+  const canMarkPayrollReceived = canActorMarkTimesheetPayrollReceived({
+    hasFullAdminAccess: Boolean(isAdmin || isSuperAdmin),
+    roleName: effectiveRole?.name,
+    teamName: effectiveRole?.team_name,
+  });
+  const canAuthoriseThisTimesheet = Boolean(
+    timesheet &&
+      canActorAuthoriseTimesheetTarget({
+        actor: {
+          actorProfileId: user?.id ?? '',
+          actorTeamId: absenceSecondarySnapshot?.team_id ?? effectiveRole?.team_id ?? null,
+          approvalsAccessLevel: resolveClientApprovalsAccessLevel({
+            isAdminTier: Boolean(isAdmin || isSuperAdmin),
+            permissionLevels,
+          }),
+          hasAccountsOverride:
+            Boolean(isAdmin || isSuperAdmin) ||
+            hasAccountsTimesheetFullVisibilityOverride(effectiveRole?.name, effectiveRole?.team_name),
+          permissions: absenceSecondarySnapshot?.permissions ?? null,
+        },
+        target: {
+          profileId: timesheet.user_id,
+          teamId: employeeTeamId,
+        },
+      })
+  );
+  const canPerformPayrollReceived = canActorPerformTimesheetPayrollReceived({
+    canMarkPayrollReceived,
+    canAuthoriseTarget: canAuthoriseThisTimesheet,
+    actorProfileId: user?.id,
+    targetProfileId: timesheet?.user_id,
+  });
+
   const handleApprove = async () => {
-    if (!timesheet || !canViewApprovals || !canActorShowTimesheetPayrollReceived({
-      canMarkPayrollReceived: canActorMarkTimesheetPayrollReceived({
-        hasFullAdminAccess: Boolean(isAdmin || isSuperAdmin),
-        roleName: effectiveRole?.name,
-        teamName: effectiveRole?.team_name,
-      }),
-      actorProfileId: user?.id,
-      targetProfileId: timesheet.user_id,
-    })) return;
+    if (!timesheet || !canPerformPayrollReceived) return;
 
     setSaving(true);
     try {
@@ -1026,18 +1074,9 @@ export default function ViewTimesheetPage() {
   if (!timesheet) return null;
 
   const hasElevatedAccess = isManager || isAdmin || isSuperAdmin;
-  const canMarkPayrollReceived = canActorMarkTimesheetPayrollReceived({
-    hasFullAdminAccess: Boolean(isAdmin || isSuperAdmin),
-    roleName: effectiveRole?.name,
-    teamName: effectiveRole?.team_name,
-  });
   const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected' || (hasElevatedAccess && timesheet.status === 'approved'));
   const canSubmit = timesheet.user_id === user?.id && (timesheet.status === 'draft' || timesheet.status === 'rejected');
-  const canApprove = canViewApprovals && canActorShowTimesheetPayrollReceived({
-    canMarkPayrollReceived,
-    actorProfileId: user?.id,
-    targetProfileId: timesheet.user_id,
-  }) && ['submitted', 'adjusted'].includes(timesheet.status);
+  const canApprove = canPerformPayrollReceived && ['submitted', 'adjusted'].includes(timesheet.status);
   const canMarkAsProcessed = hasElevatedAccess && timesheet.status === 'approved';
   const canEditApproved = hasElevatedAccess && timesheet.status === 'approved';
   const isEndState = timesheet.status === 'processed' || timesheet.status === 'adjusted';

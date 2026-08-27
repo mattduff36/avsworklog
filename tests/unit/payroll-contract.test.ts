@@ -231,11 +231,21 @@ describe('payroll rollout contract', () => {
     );
     const civils = readProjectFile('app/(dashboard)/timesheets/types/civils/CivilsTimesheet.tsx');
     const plant = readProjectFile('app/(dashboard)/timesheets/types/plant/PlantTimesheetV2Aligned.tsx');
-    expect(civils).toContain('resolvePersistedNightShiftFlag');
-    expect(plant).toContain('resolvePersistedNightShiftFlag');
+    expect(civils).toContain('applyTimesheetFormTimeChange');
+    expect(plant).toContain('applyTimesheetFormTimeChange');
+    expect(civils).toContain('persistTimesheetNightShiftFromFormEntry');
+    expect(plant).toContain('persistTimesheetNightShiftFromFormEntry');
     expect(civils).not.toContain(
       'entry.night_shift || isOvernightShift(entry.time_started, entry.time_finished)'
     );
+    const detail = readProjectFile('app/(dashboard)/timesheets/[id]/page.tsx');
+    expect(detail).toContain('canActorPerformTimesheetPayrollReceived');
+    expect(detail).toContain('canActorAuthoriseTimesheetTarget');
+    expect(detail).toContain('resolveClientApprovalsAccessLevel');
+    expect(detail).toContain('permissionLevels');
+    expect(detail).toContain('applyTimesheetFormTimeChange');
+    expect(detail).toContain('persistTimesheetNightShiftFromFormEntry');
+    expect(readProjectFile('app/(dashboard)/approvals/page.tsx')).toContain('resolveClientApprovalsAccessLevel');
   });
 
   it('PAY-OVERRIDE-RESOLVE-001 keeps profile overrides ahead of team and Civils fallback', () => {

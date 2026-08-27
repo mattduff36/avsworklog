@@ -3,9 +3,11 @@ import { getAbsenceSecondaryDefaultMap } from '@/types/absence-permissions';
 import {
   canActorAuthoriseTimesheetTarget,
   canActorMarkTimesheetPayrollReceived,
+  canActorPerformTimesheetPayrollReceived,
   canActorShowTimesheetPayrollReceived,
   canShowTimesheetInList,
   hasAccountsTimesheetFullVisibilityOverride,
+  resolveClientApprovalsAccessLevel,
 } from '@/lib/utils/timesheet-visibility';
 
 describe('canShowTimesheetInList', () => {
@@ -157,6 +159,65 @@ describe('canActorMarkTimesheetPayrollReceived', () => {
       canMarkPayrollReceived: false,
       actorProfileId: 'accounts-1',
       targetProfileId: 'employee-2',
+    })).toBe(false);
+  });
+
+  it('PAY-UI-AUTHZ-001 requires payroll actor, target authorise, and not-self together', () => {
+    expect(canActorPerformTimesheetPayrollReceived({
+      canMarkPayrollReceived: true,
+      canAuthoriseTarget: true,
+      actorProfileId: 'accounts-1',
+      targetProfileId: 'employee-2',
+    })).toBe(true);
+    expect(canActorPerformTimesheetPayrollReceived({
+      canMarkPayrollReceived: true,
+      canAuthoriseTarget: false,
+      actorProfileId: 'accounts-1',
+      targetProfileId: 'employee-2',
+    })).toBe(false);
+    expect(canActorPerformTimesheetPayrollReceived({
+      canMarkPayrollReceived: true,
+      canAuthoriseTarget: true,
+      actorProfileId: 'accounts-1',
+      targetProfileId: 'accounts-1',
+    })).toBe(false);
+    expect(canActorPerformTimesheetPayrollReceived({
+      canMarkPayrollReceived: false,
+      canAuthoriseTarget: true,
+      actorProfileId: 'manager-1',
+      targetProfileId: 'employee-2',
+    })).toBe(false);
+  });
+
+  it('PAY-UI-AUTHZ-001 uses the real Approvals access level instead of boolean module access', () => {
+    expect(resolveClientApprovalsAccessLevel({
+      isAdminTier: true,
+      permissionLevels: { approvals: 1 },
+    })).toBe(5);
+    expect(resolveClientApprovalsAccessLevel({
+      isAdminTier: false,
+      permissionLevels: { approvals: 2 },
+    })).toBe(2);
+    expect(resolveClientApprovalsAccessLevel({
+      isAdminTier: false,
+      permissionLevels: { approvals: 3 },
+    })).toBe(3);
+    expect(resolveClientApprovalsAccessLevel({
+      isAdminTier: false,
+      permissionLevels: null,
+    })).toBe(0);
+    expect(canActorAuthoriseTimesheetTarget({
+      actor: {
+        actorProfileId: 'viewer-1',
+        actorTeamId: 'team-a',
+        approvalsAccessLevel: resolveClientApprovalsAccessLevel({
+          isAdminTier: false,
+          permissionLevels: { approvals: 1 },
+        }),
+        hasAccountsOverride: true,
+        permissions: null,
+      },
+      target: { profileId: 'employee-2', teamId: 'team-a' },
     })).toBe(false);
   });
 });

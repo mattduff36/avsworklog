@@ -149,9 +149,13 @@ export function isDisplayedNightShift(input: {
 
 export function resolvePersistedNightShiftFlag(input: {
   nightShift: boolean;
+  timeStarted?: string | null;
+  timeFinished?: string | null;
   didNotWork?: boolean;
 }): boolean {
-  return !input.didNotWork && input.nightShift === true;
+  if (input.didNotWork) return false;
+  if (isOvernightShift(input.timeStarted ?? null, input.timeFinished ?? null)) return false;
+  return input.nightShift === true;
 }
 
 export function syncManualNightShiftAfterTimesChange(input: {

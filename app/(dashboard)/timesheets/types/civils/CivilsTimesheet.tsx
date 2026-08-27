@@ -20,7 +20,8 @@ import { PanelLoader } from '@/components/ui/panel-loader';
 import { ArrowLeft, Save, Check, AlertCircle, XCircle, Home, User, Moon, BedDouble } from 'lucide-react';
 import Link from 'next/link';
 // Removed: getWeekEnding, formatDateISO - no longer needed (week comes from props)
-import { calculateStandardTimesheetHours, formatHours, isDisplayedNightShift, resolvePersistedNightShiftFlag, roundTimeToNearestQuarterHour, syncManualNightShiftAfterTimesChange } from '@/lib/utils/time-calculations';
+import { calculateStandardTimesheetHours, formatHours, isDisplayedNightShift, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import { applyTimesheetFormTimeChange, persistTimesheetNightShiftFromFormEntry } from '@/lib/utils/timesheet-night-shift-form';
 import { DAY_NAMES } from '@/types/timesheet';
 import { Database } from '@/types/database';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
@@ -989,13 +990,11 @@ export function CivilsTimesheet({
           [field]: value,
         };
         if (field === 'time_started' || field === 'time_finished') {
-          newEntries[dayIndex].night_shift = syncManualNightShiftAfterTimesChange({
-            nightShift: previous.night_shift,
-            previousStarted: previous.time_started,
-            previousFinished: previous.time_finished,
-            nextStarted: newEntries[dayIndex].time_started,
-            nextFinished: newEntries[dayIndex].time_finished,
-          });
+          newEntries[dayIndex] = applyTimesheetFormTimeChange(
+            previous,
+            field,
+            newEntries[dayIndex][field]
+          );
         }
       }
 
@@ -1451,10 +1450,7 @@ export function CivilsTimesheet({
           const offDay = offDayByDay.get(entry.day_of_week);
           const persistedJobNumbers = getNormalizedJobNumbers(entry.job_numbers);
           
-          const isNight = resolvePersistedNightShiftFlag({
-            nightShift: entry.night_shift,
-            didNotWork: entry.did_not_work,
-          });
+          const isNight = persistTimesheetNightShiftFromFormEntry(entry);
           const isBankHol = !entry.did_not_work && isUKBankHoliday(entryDate);
           const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(offDay);
           const normalizedRemarks =
