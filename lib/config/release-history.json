@@ -1,5 +1,32 @@
 [
   {
+    "version": "0826.39.1",
+    "updateKind": "minor",
+    "title": "Timesheets improvements",
+    "description": "Payroll received scope, overnight DT, overrides, PDF document.",
+    "summary": "Payroll received scope, overnight DT, overrides, PDF document.",
+    "details": [
+      "Payroll received scope, overnight DT, overrides, PDF document, with changes to background routes, app screens, shared logic, automated tests, and documentation.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated approvals, with changes to app screens, shared logic, and automated tests.",
+      "Updated PDF document documents, with changes to shared logic and automated tests.",
+      "Updated admin settings, with changes to background routes and app screens.",
+      "Updated actions, with changes to app screens and automated tests.",
+      "Updated profile, with changes to automated tests."
+    ],
+    "areas": [
+      "Timesheets",
+      "Payroll received scope",
+      "Overnight DT",
+      "Overrides",
+      "PDF document"
+    ],
+    "areaKeys": [
+      "timesheets"
+    ],
+    "pushedAt": "2026-08-27T18:53:59.407Z"
+  },
+  {
     "version": "0826.39.0",
     "updateKind": "major",
     "title": "Daily Tasks update",

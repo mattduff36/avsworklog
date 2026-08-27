@@ -2,6 +2,29 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.39.1
+
+**GIT COMMIT MESSAGE**
+`fix(timesheets): payroll received scope, overnight DT, overrides, PDF`
+
+**PUSHED AT**
+2026-08-27T18:53:59.407Z
+
+**WHAT CHANGED**
+Payroll received scope, overnight DT, overrides, PDF.
+
+**VERSION HISTORY DETAILS**
+- Payroll received scope, overnight DT, overrides, PDF, with changes to background routes, app screens, shared logic, automated tests, and documentation.
+- Updated help and FAQ, with changes to documentation.
+- Updated approvals, with changes to app screens, shared logic, and automated tests.
+- Updated PDF documents, with changes to shared logic and automated tests.
+- Updated admin settings, with changes to background routes and app screens.
+- Updated actions, with changes to app screens and automated tests.
+- Updated profile, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(timesheets): payroll received scope, overnight DT, overrides, PDF`
+
 ## 0826.39.0
 
 **GIT COMMIT MESSAGE**
