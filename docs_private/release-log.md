@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.40.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): update Timesheets, Profile, and Approvals`
+
+**PUSHED AT**
+2026-08-27T19:26:08.417Z
+
+**WHAT CHANGED**
+Update Timesheets, Profile, and Approvals.
+
+**VERSION HISTORY DETAILS**
+- Updated Timesheets, Profile, and Approvals, with changes to app screens, shared logic, and automated tests.
+- Updated profile, with changes to automated tests.
+- Updated approvals, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(timesheets): update Timesheets, Profile, and Approvals`
+
 ## 0826.39.1
 
 **GIT COMMIT MESSAGE**

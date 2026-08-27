@@ -1,5 +1,28 @@
 [
   {
+    "version": "0826.40.0",
+    "updateKind": "major",
+    "title": "Timesheets update",
+    "description": "Updated Timesheets, Profile, and Approvals.",
+    "summary": "Updated Timesheets, Profile, and Approvals.",
+    "details": [
+      "Updated Timesheets, Profile, and Approvals, with changes to app screens, shared logic, and automated tests.",
+      "Updated profile, with changes to automated tests.",
+      "Updated approvals, with changes to app screens."
+    ],
+    "areas": [
+      "Timesheets",
+      "Profile",
+      "Approvals"
+    ],
+    "areaKeys": [
+      "timesheets",
+      "profile",
+      "approvals"
+    ],
+    "pushedAt": "2026-08-27T19:26:08.417Z"
+  },
+  {
     "version": "0826.39.1",
     "updateKind": "minor",
     "title": "Timesheets improvements",
