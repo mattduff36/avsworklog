@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0826.40.1
+
+**GIT COMMIT MESSAGE**
+`fix(hgv-inspections): persist checklist items through an authenticated RPC`
+
+**PUSHED AT**
+2026-08-28T14:34:40.051Z
+
+**WHAT CHANGED**
+Persist checklist items through an authenticated RPC.
+
+**VERSION HISTORY DETAILS**
+- Persist checklist items through an authenticated RPC, with changes to background routes, app screens, shared logic, automated tests, and data storage.
+- Updated data storage, with changes to data storage.
+
+**COMMITS IN THIS RELEASE**
+- `fix(hgv-inspections): persist checklist items through an authenticated RPC`
+
 ## 0826.40.0
 
 **GIT COMMIT MESSAGE**

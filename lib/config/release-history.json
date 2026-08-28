@@ -1,5 +1,23 @@
 [
   {
+    "version": "0826.40.1",
+    "updateKind": "minor",
+    "title": "Daily Tasks improvements",
+    "description": "Persist checklist items through an authenticated RPC.",
+    "summary": "Persist checklist items through an authenticated RPC.",
+    "details": [
+      "Persist checklist items through an authenticated RPC, with changes to background routes, app screens, shared logic, automated tests, and data storage.",
+      "Updated data storage, with changes to data storage."
+    ],
+    "areas": [
+      "Daily Tasks"
+    ],
+    "areaKeys": [
+      "daily-tasks"
+    ],
+    "pushedAt": "2026-08-28T14:34:40.051Z"
+  },
+  {
     "version": "0826.40.0",
     "updateKind": "major",
     "title": "Timesheets update",
