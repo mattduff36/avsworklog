@@ -49,6 +49,8 @@ import {
   mapSignalToExitCode,
   markLifecycleStateConsumed,
   parseCliCommand,
+  parseCliInvocation,
+  HGV_SAVE_TARGET_TEST_FILE,
   parseDockerResourceLines,
   parseLifecycleState,
   parseLockPid,
@@ -649,6 +651,13 @@ describe('local test postgres contracts', () => {
       }
       expect(() => parseCliCommand(['unknown'])).toThrow(LocalTestPostgresError);
       expect(() => parseCliCommand(['start', '--extra'])).toThrow(LocalTestPostgresError);
+      expect(parseCliInvocation(['one-shot', '--target', HGV_SAVE_TARGET_TEST_FILE])).toEqual({
+        command: 'one-shot',
+        targetFile: HGV_SAVE_TARGET_TEST_FILE,
+      });
+      expect(() => parseCliInvocation(['one-shot', '--target', 'tests/db/not-allowed.test.ts'])).toThrow(
+        LocalTestPostgresError
+      );
     });
   });
 

@@ -39,7 +39,6 @@ import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } fro
 import { getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { buildInspectionDefectSignature } from '@/lib/utils/inspectionDefectSignature';
 import { scrollAndHighlightValidationTarget } from '@/lib/utils/validation-scroll';
-import type { Database } from '@/types/database';
 import type { Employee } from '@/types/common';
 import type { InspectionStatus } from '@/types/inspection';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -47,9 +46,14 @@ import { InspectionPhotoTiles } from '@/components/inspections/InspectionPhotoTi
 import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
-import { createStatusError, getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
+import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { getInspectionErrorMessage, isMissingDraftError } from '@/lib/utils/inspection-error-handling';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
+import {
+  isHgvSubmittedConflictError,
+  requestHgvInspectionSave,
+} from '@/lib/client/hgv-inspection-save';
+import type { HgvInspectionSavedItem } from '@/lib/server/hgv-inspection-save';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
@@ -64,8 +68,6 @@ type HgvAsset = {
   hgv_categories?: { name: string } | null;
 };
 
-type InspectionItemInsert = Database['public']['Tables']['inspection_items']['Insert'];
-type InspectionInsert = Database['public']['Tables']['hgv_inspections']['Insert'];
 type PendingNavigation = { type: 'href'; href: string } | { type: 'back' };
 type ExistingInspectionConflict = { id: string; status: 'draft' | 'submitted' };
 
@@ -278,90 +280,89 @@ function NewHgvInspectionContent() {
     toast.info('A daily check has already been submitted for this employee, HGV and date.');
   }, []);
 
-  const buildCurrentInspectionItemsPayload = useCallback((inspectionId: string): InspectionItemInsert[] => {
+  const buildCurrentInspectionItemsPayload = useCallback(() => {
     if (!inspectionDate) return [];
 
     const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
-    const items: InspectionItemInsert[] = [];
-    TRUCK_CHECKLIST_ITEMS.forEach((itemDescription, idx) => {
+    return TRUCK_CHECKLIST_ITEMS.flatMap((itemDescription, idx) => {
       const itemNumber = idx + 1;
       const key = `${itemNumber}`;
-      if (checkboxStates[key]) {
-        items.push({
-          inspection_id: inspectionId,
-          item_number: itemNumber,
-          item_description: itemDescription,
-          day_of_week: dayOfWeek,
-          status: checkboxStates[key],
-          comments: comments[key] || null,
-        });
+      if (!checkboxStates[key]) {
+        return [];
       }
+      return [{
+        item_number: itemNumber,
+        item_description: itemDescription,
+        day_of_week: dayOfWeek,
+        status: checkboxStates[key],
+        comments: comments[key] || null,
+      }];
     });
-    return items;
   }, [checkboxStates, comments, inspectionDate]);
+
+  const persistHgvInspection = useCallback(async (options: {
+    status: 'draft' | 'submitted';
+    hintInspectionId?: string | null;
+    signatureData?: string;
+  }): Promise<{ id: string; items: HgvInspectionSavedItem[] }> => {
+    if (!hgvId || !inspectionDate || !selectedEmployeeId) {
+      throw new Error('Select an HGV, employee and date before saving');
+    }
+
+    const mileageValue = parseInt(currentMileage, 10);
+    if (options.status === 'submitted' && (Number.isNaN(mileageValue) || mileageValue < 0)) {
+      throw new Error('Please enter a valid current KM');
+    }
+
+    const saved = await requestHgvInspectionSave({
+      hintInspectionId: options.hintInspectionId ?? existingInspectionId,
+      hgvId,
+      userId: selectedEmployeeId,
+      inspectionDate,
+      currentMileage: Number.isNaN(mileageValue) ? null : mileageValue,
+      status: options.status,
+      inspectorComments: inspectorComments.trim() || null,
+      signatureData: options.signatureData ?? null,
+      items: buildCurrentInspectionItemsPayload(),
+    });
+
+    setExistingInspectionId(saved.id);
+    window.history.replaceState(null, '', `/hgv-inspections/new?id=${saved.id}`);
+    return saved;
+  }, [
+    buildCurrentInspectionItemsPayload,
+    currentMileage,
+    existingInspectionId,
+    hgvId,
+    inspectionDate,
+    inspectorComments,
+    selectedEmployeeId,
+  ]);
 
   const mergeIntoExistingDraft = useCallback(async (
     inspectionId: string,
     options: { showToast?: boolean } = {}
-  ): Promise<boolean> => {
+  ): Promise<string | null> => {
     const { showToast = true } = options;
     const errorContextId = 'hgv-inspections-new-merge-draft-error';
     if (!hgvId || !inspectionDate || !selectedEmployeeId) {
       toast.error('Select an HGV, employee and date before continuing', {
         id: 'hgv-inspections-new-validation-missing-core-fields',
       });
-      return false;
+      return null;
     }
 
-    const mileageValue = parseInt(currentMileage, 10);
-    const draftPayload: Database['public']['Tables']['hgv_inspections']['Update'] = {
-      hgv_id: hgvId,
-      user_id: selectedEmployeeId,
-      inspection_date: inspectionDate,
-      inspection_end_date: inspectionDate,
-      current_mileage: Number.isNaN(mileageValue) ? null : mileageValue,
-      status: 'draft',
-      submitted_at: null,
-      signature_data: null,
-      signed_at: null,
-      inspector_comments: inspectorComments.trim() || null,
-      updated_at: new Date().toISOString(),
-    };
-
     try {
-      const { data: updatedDraft, error: updateError } = await supabase
-        .from('hgv_inspections')
-        .update(draftPayload)
-        .eq('id', inspectionId)
-        .eq('status', 'draft')
-        .select('id')
-        .maybeSingle();
-
-      if (updateError || !updatedDraft) {
-        throw updateError ?? new Error('Draft not found');
-      }
-
-      const { error: deleteItemsError } = await supabase
-        .from('inspection_items')
-        .delete()
-        .eq('inspection_id', inspectionId);
-      if (deleteItemsError) throw deleteItemsError;
-
-      const items = buildCurrentInspectionItemsPayload(inspectionId);
-      if (items.length > 0) {
-        const { error: itemsError } = await supabase
-          .from('inspection_items')
-          .insert(items);
-        if (itemsError) throw itemsError;
-      }
-
-      setExistingInspectionId(inspectionId);
-      window.history.replaceState(null, '', `/hgv-inspections/new?id=${inspectionId}`);
+      const saved = await persistHgvInspection({ status: 'draft', hintInspectionId: inspectionId });
       if (showToast) {
         toast.info('Merged with existing draft for this HGV and date.');
       }
-      return true;
+      return saved.id;
     } catch (err) {
+      if (isHgvSubmittedConflictError(err)) {
+        handleInspectionConflict({ id: inspectionId, status: 'submitted' });
+        return null;
+      }
       const message = err instanceof Error ? err.message : 'Could not merge with existing draft';
       if (!isAuthErrorStatus(getErrorStatus(err))) {
         if (isNetworkFetchError(err)) {
@@ -373,16 +374,14 @@ function NewHgvInspectionContent() {
       if (showToast && !isAuthErrorStatus(getErrorStatus(err))) {
         toast.error(message, { id: errorContextId });
       }
-      return false;
+      return null;
     }
   }, [
-    buildCurrentInspectionItemsPayload,
-    currentMileage,
+    handleInspectionConflict,
     hgvId,
     inspectionDate,
-    inspectorComments,
+    persistHgvInspection,
     selectedEmployeeId,
-    supabase,
   ]);
 
   const discardDraftById = useCallback(async (inspectionId: string, showToast = true): Promise<boolean> => {
@@ -462,7 +461,7 @@ function NewHgvInspectionContent() {
           if (!merged && !silent) {
             toast.error('Could not auto-save draft. Please try again.', { id: 'hgv-inspections-new-autosave-draft-error' });
           }
-          return merged ? existingInspectionId : null;
+          return merged;
         } finally {
           saveInspectionInFlightRef.current = false;
         }
@@ -489,70 +488,14 @@ function NewHgvInspectionContent() {
         const inspectionConflict = await findExistingInspectionConflict();
         if (inspectionConflict) {
           if (inspectionConflict.status === 'draft') {
-            const merged = await mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
-            return merged ? inspectionConflict.id : null;
+            return mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
           }
           handleInspectionConflict(inspectionConflict);
           return null;
         }
 
-        const mileageValue = parseInt(currentMileage, 10);
-        const { data: draft, error: draftError } = await supabase
-          .from('hgv_inspections')
-          .insert({
-            hgv_id: hgvId,
-            user_id: selectedEmployeeId,
-            inspection_date: inspectionDate,
-            inspection_end_date: inspectionDate,
-            current_mileage: Number.isNaN(mileageValue) ? null : mileageValue,
-            status: 'draft' as const,
-            inspector_comments: inspectorComments.trim() || null,
-          })
-          .select('id')
-          .maybeSingle();
-
-        if (draftError || !draft) {
-          if (draftError?.code === '23505') {
-            const inspectionConflict = await findExistingInspectionConflict();
-            if (inspectionConflict) {
-              if (inspectionConflict.status === 'draft') {
-                const merged = await mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
-                return merged ? inspectionConflict.id : null;
-              }
-              handleInspectionConflict(inspectionConflict);
-              return null;
-            }
-          }
-          throw draftError || new Error('Draft not found');
-        }
-
-        const dayOfWeek = getDayOfWeek(new Date(inspectionDate + 'T00:00:00'));
-        const items: InspectionItemInsert[] = [];
-        TRUCK_CHECKLIST_ITEMS.forEach((itemDescription, idx) => {
-          const itemNumber = idx + 1;
-          const key = `${itemNumber}`;
-          if (checkboxStates[key]) {
-            items.push({
-              inspection_id: draft.id,
-              item_number: itemNumber,
-              item_description: itemDescription,
-              day_of_week: dayOfWeek,
-              status: checkboxStates[key],
-              comments: comments[key] || null,
-            });
-          }
-        });
-
-        if (items.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('inspection_items')
-            .insert(items);
-          if (itemsError) throw itemsError;
-        }
-
-        setExistingInspectionId(draft.id);
-        window.history.replaceState(null, '', `/hgv-inspections/new?id=${draft.id}`);
-        return draft.id;
+        const saved = await persistHgvInspection({ status: 'draft' });
+        return saved.id;
       } catch (err) {
         const errorContextId = 'hgv-inspections-new-silent-draft-save-error';
         if (isNetworkFetchError(err)) {
@@ -1107,164 +1050,18 @@ function NewHgvInspectionContent() {
         }
       }
 
-      if (!hgvId || !inspectionDate || !selectedEmployeeId) {
-        throw new Error('Select an HGV, employee and date before saving');
-      }
-
-      const mileageValue = parseInt(currentMileage, 10);
-      if (Number.isNaN(mileageValue) || mileageValue < 0) {
-        throw new Error('Please enter a valid current KM');
-      }
-
-      const inspectionPayload: InspectionInsert = {
-        hgv_id: hgvId,
-        user_id: selectedEmployeeId,
-        inspection_date: inspectionDate,
-        inspection_end_date: inspectionDate,
-        current_mileage: mileageValue,
+      const saved = await persistHgvInspection({
         status,
-        submitted_at: status === 'submitted' ? new Date().toISOString() : null,
-        signature_data: status === 'submitted' ? signatureData || null : null,
-        signed_at: status === 'submitted' && signatureData ? new Date().toISOString() : null,
-        inspector_comments: inspectorComments.trim() || null,
-      };
-
-      let inspectionId = existingInspectionId;
-
-      if (existingInspectionId) {
-        const { error: deleteItemsError } = await supabase
-          .from('inspection_items')
-          .delete()
-          .eq('inspection_id', existingInspectionId);
-        if (deleteItemsError) {
-          throw deleteItemsError;
-        }
-      } else {
-        const { data: newInspection, error: insertInspectionError } = await supabase
-          .from('hgv_inspections')
-          .insert(inspectionPayload)
-          .select('id')
-          .maybeSingle();
-
-        if (insertInspectionError || !newInspection) {
-          throw insertInspectionError || new Error('Failed to create inspection');
-        }
-        inspectionId = newInspection.id;
-        setExistingInspectionId(newInspection.id);
-        window.history.replaceState(null, '', `/hgv-inspections/new?id=${newInspection.id}`);
-      }
-
-      if (!inspectionId) {
-        throw new Error('Failed to resolve inspection id');
-      }
-
-      const resolvedInspectionId = inspectionId;
-      const dayOfWeek = getDayOfWeek(new Date(`${inspectionDate}T00:00:00`));
-      const itemsToInsert: InspectionItemInsert[] = [];
-      TRUCK_CHECKLIST_ITEMS.forEach((itemDescription, idx) => {
-        const itemNumber = idx + 1;
-        const key = `${itemNumber}`;
-        const itemStatus = checkboxStates[key];
-
-        if (!itemStatus) {
-          return;
-        }
-
-        itemsToInsert.push({
-          inspection_id: resolvedInspectionId,
-          item_number: itemNumber,
-          item_description: itemDescription,
-          day_of_week: dayOfWeek,
-          status: itemStatus,
-          comments: comments[key] || null,
-        });
+        hintInspectionId: existingInspectionId,
+        signatureData,
       });
+      const inspectionId = saved.id;
 
-      type InsertedItem = {
-        id: string;
-        item_number: number;
-        item_description: string;
-        day_of_week: number | null;
-        status: InspectionStatus;
-        comments: string | null;
-      };
-      let insertedItems: InsertedItem[] = [];
-
-      if (itemsToInsert.length > 0) {
-        const { data, error: insertItemsError } = await supabase
-          .from('inspection_items')
-          .insert(itemsToInsert)
-          .select('id, item_number, item_description, day_of_week, status, comments');
-
-        if (insertItemsError) {
-          throw insertItemsError;
-        }
-        insertedItems = (data || []) as InsertedItem[];
-      }
-
-      if (existingInspectionId) {
-        const { data: updatedInspection, error: updateError } = await supabase
-          .from('hgv_inspections')
-          .update(inspectionPayload)
-          .eq('id', existingInspectionId)
-          .eq('status', 'draft')
-          .select('id')
-          .maybeSingle();
-
-        if (updateError) {
-          throw updateError;
-        }
-
-        if (!updatedInspection) {
-          const { data: sessionData } = await supabase.auth.getSession();
-          if (!sessionData.session) {
-            throw createStatusError('Your session expired. Please sign in and try again.', 401);
-          }
-
-          const { data: current } = await supabase
-            .from('hgv_inspections')
-            .select('id, status')
-            .eq('id', existingInspectionId)
-            .maybeSingle();
-
-          if (current?.status === 'submitted' && status === 'submitted') {
-            toast.success('HGV inspection submitted successfully');
-            if (typeof window !== 'undefined') {
-              window.sessionStorage.removeItem(getInspectionTimerStorageKey(existingInspectionId));
-            }
-            allowNavigationRef.current = true;
-            router.push(`/hgv-inspections/${existingInspectionId}`);
-            return;
-          }
-
-          if (!current) {
-            throw new Error('Draft not found');
-          }
-
-          throw new Error(
-            'Failed to update inspection - no rows returned. You may not have permission to edit this inspection.'
-          );
-        }
-
-        inspectionId = updatedInspection.id;
-      }
-
-      if (status === 'submitted') {
-        const { error: updateHgvMileageError } = await supabase
-          .from('hgvs')
-          .update({ current_mileage: mileageValue })
-          .eq('id', hgvId);
-
-        if (updateHgvMileageError) {
-          throw updateHgvMileageError;
-        }
-      }
-
-      const failedItems = insertedItems.filter((item) => item.status === 'attention');
+      const failedItems = saved.items.filter((item) => item.status === 'attention');
       if (status === 'submitted' && failedItems.length > 0) {
-        const defects = failedItems.map((item: InsertedItem) => ({
+        const defects = failedItems.map((item) => ({
           item_number: item.item_number,
-          item_description: item.item_description,
+          item_description: item.item_description || '',
           dayOfWeek: item.day_of_week,
           comment: item.comments || '',
           primaryInspectionItemId: item.id,
@@ -1317,6 +1114,22 @@ function NewHgvInspectionContent() {
         toast.success('Draft saved');
       }
     } catch (err) {
+      if (isHgvSubmittedConflictError(err)) {
+        const conflict = await findExistingInspectionConflict();
+        if (status === 'submitted' && conflict?.id) {
+          toast.success('HGV inspection submitted successfully');
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.removeItem(getInspectionTimerStorageKey(conflict.id));
+          }
+          allowNavigationRef.current = true;
+          router.push(`/hgv-inspections/${conflict.id}`);
+          return;
+        }
+        if (conflict) {
+          handleInspectionConflict(conflict);
+        }
+        return;
+      }
       const errorContextId = 'hgv-inspections-new-save-inspection-error';
       const isNetworkError = isNetworkFetchError(err);
       const message = isNetworkError

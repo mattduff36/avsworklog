@@ -62,6 +62,7 @@ export function isMissingDraftError(error: unknown): boolean {
   return (
     isPostgrestNoRowError(error) ||
     message === 'draft not found' ||
-    message.includes('no rows returned')
+    message.includes('no rows returned') ||
+    message.includes('this draft could not be saved')
   );
 }

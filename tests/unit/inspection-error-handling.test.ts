@@ -42,6 +42,11 @@ describe('inspection-error-handling', () => {
 
   it('detects stale draft update misses', () => {
     expect(isMissingDraftError(new Error('Draft not found'))).toBe(true);
+    expect(
+      isMissingDraftError(
+        new Error('This draft could not be saved. It may have been submitted, removed, or your session may have expired. Refresh and try again.')
+      )
+    ).toBe(true);
   });
 
   it('does not treat unrelated missing data as a stale draft', () => {

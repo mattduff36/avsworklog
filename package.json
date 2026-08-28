@@ -57,6 +57,7 @@
     "test:db:local:run": "tsx scripts/local-test-postgres.ts run",
     "test:db:local:stop": "tsx scripts/local-test-postgres.ts stop",
     "test:db:local": "tsx scripts/local-test-postgres.ts one-shot",
+    "test:db:local:hgv-save": "tsx scripts/local-test-postgres.ts one-shot --target tests/db/hgv-inspection-save-rpc.test.ts",
     "test:db:local:verify-cleanup": "tsx scripts/local-test-postgres.ts verify-failure-cleanup",
     "setup:storage": "tsx scripts/setup-storage.ts",
     "setup:test-users": "tsx scripts/setup-test-users.ts",

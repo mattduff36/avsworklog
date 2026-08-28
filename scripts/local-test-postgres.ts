@@ -41,6 +41,8 @@ export const PROJECT_NAME_HASH_LENGTH = 12;
 export const STATE_VERSION = 1;
 export const DATABASE_COMMENT_PREFIX = 'avsworklog-ltdb';
 export const TARGET_TEST_FILE = 'tests/db/daily-allocation-v2-runtime.test.ts';
+export const HGV_SAVE_TARGET_TEST_FILE = 'tests/db/hgv-inspection-save-rpc.test.ts';
+export const ALLOWED_TARGET_TEST_FILES = [TARGET_TEST_FILE, HGV_SAVE_TARGET_TEST_FILE] as const;
 export const HOST_PORT_MIN = 20_000;
 export const HOST_PORT_COUNT = 10_000;
 export const COMPOSE_UP_WAIT_TIMEOUT_SECONDS = 90;
@@ -709,17 +711,28 @@ export function resolveVerifyFailureCleanupExitCode(input: {
 }
 
 export function parseCliCommand(argv: readonly string[]): CliCommand {
+  return parseCliInvocation(argv).command;
+}
+
+export function parseCliInvocation(argv: readonly string[]): { command: CliCommand; targetFile: string } {
   const command = argv[0];
   if (!command || !(CLI_COMMANDS as readonly string[]).includes(command)) {
     throw new LocalTestPostgresError(
-      `Unknown command. Usage: tsx scripts/local-test-postgres.ts <${CLI_COMMANDS.join('|')}>`,
+      `Unknown command. Usage: tsx scripts/local-test-postgres.ts <${CLI_COMMANDS.join('|')}> [--target <file>]`,
       2,
     );
   }
-  if (argv.length !== 1) {
-    throw new LocalTestPostgresError(`Command "${command}" takes no extra arguments.`, 2);
+  if (argv.length === 1) {
+    return { command: command as CliCommand, targetFile: TARGET_TEST_FILE };
   }
-  return command as CliCommand;
+  if (argv.length === 3 && argv[1] === '--target') {
+    const targetFile = argv[2];
+    if (!(ALLOWED_TARGET_TEST_FILES as readonly string[]).includes(targetFile)) {
+      throw new LocalTestPostgresError('Unknown --target test file.', 2);
+    }
+    return { command: command as CliCommand, targetFile };
+  }
+  throw new LocalTestPostgresError(`Command "${command}" takes no extra arguments.`, 2);
 }
 
 export function isPidAlive(pid: number): boolean {
@@ -880,8 +893,16 @@ export class LocalTestPostgresOrchestrator {
   private cleanupPromise: Promise<void> | null = null;
   private signalEntered = false;
   private identity: CheckoutIdentity | null = null;
+  private targetTestFile = TARGET_TEST_FILE;
 
   constructor(private readonly deps: LocalTestPostgresDependencies) {}
+
+  setTargetTestFile(targetFile: string): void {
+    if (!(ALLOWED_TARGET_TEST_FILES as readonly string[]).includes(targetFile)) {
+      throw new LocalTestPostgresError('Unknown --target test file.', 2);
+    }
+    this.targetTestFile = targetFile;
+  }
 
   async start(): Promise<number> {
     await this.withLock(async () => {
@@ -1198,7 +1219,7 @@ export class LocalTestPostgresOrchestrator {
     const vitestEntrypoint = this.deps.resolveVitestEntrypoint(identity.canonicalPath);
     const result = await this.runTracked({
       command: this.deps.execPath,
-      args: [vitestEntrypoint, 'run', TARGET_TEST_FILE, '--reporter=verbose'],
+      args: [vitestEntrypoint, 'run', this.targetTestFile, '--reporter=verbose'],
       cwd: identity.canonicalPath,
       env: childEnv,
       timeoutMs: 30 * 60 * 1000,
@@ -1475,8 +1496,9 @@ export async function runLocalTestPostgresCli(
   orchestrator: LocalTestPostgresOrchestrator = new LocalTestPostgresOrchestrator(deps),
 ): Promise<number> {
   try {
-    const command = parseCliCommand(argv);
-    switch (command) {
+    const invocation = parseCliInvocation(argv);
+    orchestrator.setTargetTestFile(invocation.targetFile);
+    switch (invocation.command) {
       case 'start':
         return await orchestrator.start();
       case 'run':
@@ -1488,7 +1510,7 @@ export async function runLocalTestPostgresCli(
       case 'verify-failure-cleanup':
         return await orchestrator.verifyFailureCleanup();
       default: {
-        const exhaustive: never = command;
+        const exhaustive: never = invocation.command;
         throw new LocalTestPostgresError(`Unhandled command ${String(exhaustive)}.`, 2);
       }
     }
