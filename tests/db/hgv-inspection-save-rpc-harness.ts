@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-export const HGV_SAVE_MIGRATION_PATH = 'supabase/migrations/20260828_hgv_inspection_save_rpc.sql';
+export const HGV_SAVE_MIGRATION_PATH = 'supabase/migrations/20260901_hgv_inspection_save_rpc_itemset.sql';
 
 export const HGV_SAVE_FIXTURE = {
   actor: '11111111-1111-4111-8111-111111111111',
@@ -71,6 +71,11 @@ export function hgvInspectionSaveSchemaSql(): string {
       comments text,
       created_at timestamptz DEFAULT now(),
       day_of_week integer NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS public.actions (
+      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+      inspection_item_id uuid REFERENCES public.inspection_items(id) ON DELETE SET NULL
     );
   `;
 }

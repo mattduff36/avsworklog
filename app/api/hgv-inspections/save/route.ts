@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 import {
+  HGV_INSPECTION_SAVE_FORBIDDEN,
   HgvInspectionSaveBodySchema,
   saveHgvInspectionForActor,
 } from '@/lib/server/hgv-inspection-save';
+
+const FORBIDDEN_BODY = { error: HGV_INSPECTION_SAVE_FORBIDDEN, code: 'FORBIDDEN' as const };
+
+function forbiddenResponse(): NextResponse {
+  return NextResponse.json(FORBIDDEN_BODY, { status: 403 });
+}
 
 export async function POST(request: NextRequest) {
   try {
     const { access, errorResponse } = await getInspectionRouteActorAccess('hgv-inspections');
     if (errorResponse || !access) {
+      if (errorResponse?.status === 403) {
+        return forbiddenResponse();
+      }
       return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -35,9 +45,13 @@ export async function POST(request: NextRequest) {
     const code = error && typeof error === 'object' && 'code' in error
       ? String((error as { code?: unknown }).code || 'SAVE_FAILED')
       : 'SAVE_FAILED';
-    const message = error instanceof Error ? error.message : 'Failed to save HGV inspection';
 
-    if (status === 403 || status === 409 || status === 400) {
+    if (status === 403) {
+      return forbiddenResponse();
+    }
+
+    const message = error instanceof Error ? error.message : 'Failed to save HGV inspection';
+    if (status === 409 || status === 400) {
       return NextResponse.json({ error: message, code }, { status });
     }
 

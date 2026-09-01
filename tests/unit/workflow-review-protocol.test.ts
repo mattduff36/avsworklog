@@ -342,6 +342,60 @@ describe('workflow review protocol', () => {
     expect(executed.manifest.baseHeadEvidence.headCommit).toBeTruthy();
   });
 
+  it('does not mark extra required IDs executed from the default vitest subset run', () => {
+    const repoRoot = makeTempRoot('manifest-vitest-subset');
+    mkdirSync(path.join(repoRoot, 'tests', 'unit'), { recursive: true });
+    writeFileSync(
+      path.join(repoRoot, 'tests', 'unit', 'sample.test.ts'),
+      `import { it } from 'vitest';
+it('WF-VITEST-001 behavioral', () => {});
+it('WF-EXTRA-001 behavioral', () => {});
+`,
+      'utf8'
+    );
+
+    const built = buildEvidenceManifest({
+      repoRoot,
+      workstreamId: 'ws_manifest_vitest_subset',
+      kind: 'preflight',
+      baseCommit: 'abc1234',
+      requiredTestIds: ['WF-VITEST-001', 'WF-EXTRA-001'],
+      vitestTestIds: ['WF-VITEST-001'],
+      runChecks: false,
+      runRequiredTests: false,
+      executedTestIds: ['WF-VITEST-001'],
+      commandResults: [
+        { name: 'required-test-WF-EXTRA-001', status: 'passed', exitCode: 0, durationMs: 1, summary: 'ok' },
+      ],
+    });
+    expect(built.manifest.requiredTests.find((test) => test.id === 'WF-VITEST-001')?.executed).toBe(
+      true
+    );
+    expect(built.manifest.requiredTests.find((test) => test.id === 'WF-EXTRA-001')?.executed).toBe(
+      false
+    );
+    expect(built.manifest.status).toBe('failed');
+
+    const withExtra = buildEvidenceManifest({
+      repoRoot,
+      workstreamId: 'ws_manifest_vitest_subset',
+      kind: 'preflight',
+      baseCommit: 'abc1234',
+      requiredTestIds: ['WF-VITEST-001', 'WF-EXTRA-001'],
+      vitestTestIds: ['WF-VITEST-001'],
+      runChecks: false,
+      runRequiredTests: false,
+      executedTestIds: ['WF-VITEST-001', 'WF-EXTRA-001'],
+      commandResults: [
+        { name: 'required-test-WF-EXTRA-001', status: 'passed', exitCode: 0, durationMs: 1, summary: 'ok' },
+      ],
+    });
+    expect(withExtra.manifest.requiredTests.find((test) => test.id === 'WF-EXTRA-001')?.executed).toBe(
+      true
+    );
+    expect(withExtra.manifest.status).toBe('passed');
+  });
+
   it('TEE-V2-PREFLIGHT-SCOPE-001 runs changed-file oxlint and ESLint with exact evidence', () => {
     const repoRoot = makeTempRoot('changed-scope');
     mkdirSync(path.join(repoRoot, 'src'), { recursive: true });

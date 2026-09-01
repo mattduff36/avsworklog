@@ -89,7 +89,7 @@ describeConcurrency('HGV inspection save RPC disposable PostgreSQL', () => {
     }
   });
 
-  it('concurrent draft and submit leave one complete submitted item set', async () => {
+  it('HGV-SAVE-CONC-01 concurrent draft and submit leave one complete submitted item set', async () => {
     await firstClient.query('BEGIN');
     const draft = await firstClient.query<{ save_hgv_inspection: unknown }>(
       hgvSaveCallSql('draft', draftItems, { expectedOwnerId: null })

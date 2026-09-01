@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import type { InspectionStatus } from '@/types/inspection';
 
 export const HGV_INSPECTION_SAVE_RPC = 'save_hgv_inspection';
+export const HGV_INSPECTION_SAVE_FORBIDDEN = 'Forbidden: cannot save this inspection';
 
 const InspectionItemSchema = z
   .object({
@@ -26,7 +27,22 @@ export const HgvInspectionSaveBodySchema = z
     signatureData: z.string().nullable().optional(),
     items: z.array(InspectionItemSchema),
   })
-  .strict();
+  .strict()
+  .superRefine((body, ctx) => {
+    const seen = new Set<string>();
+    for (const item of body.items) {
+      const key = `${item.item_number}:${item.day_of_week}`;
+      if (seen.has(key)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['items'],
+          message: 'Duplicate inspection item keys are not allowed',
+        });
+        return;
+      }
+      seen.add(key);
+    }
+  });
 
 export type HgvInspectionSaveBody = z.infer<typeof HgvInspectionSaveBodySchema>;
 
@@ -55,6 +71,11 @@ type HgvInspectionLookupRow = {
   status: 'draft' | 'submitted';
 };
 
+export type HgvInspectionSaveResolution = {
+  existing: HgvInspectionLookupRow | null;
+  sanitizedHintId: string | null;
+};
+
 type AdminRpc = {
   rpc(
     fn: typeof HGV_INSPECTION_SAVE_RPC,
@@ -75,6 +96,17 @@ type AdminRpc = {
   ): Promise<{ data: HgvInspectionSaveResult | null; error: { message: string } | null }>;
 };
 
+type LookupQuery = {
+  select(columns: string): LookupQuery;
+  eq(column: string, value: string): LookupQuery;
+  maybeSingle(): Promise<{ data: HgvInspectionLookupRow | null; error: { message: string } | null }>;
+};
+
+export type HgvInspectionSaveAdmin = {
+  from(table: string): unknown;
+  rpc: AdminRpc['rpc'];
+};
+
 export function actorCanWriteInspectionOwner(
   actorId: string,
   canManageOthers: boolean,
@@ -93,19 +125,26 @@ export function authorizeHgvInspectionWrite(input: {
     input.existingOwnerId &&
     !actorCanWriteInspectionOwner(input.actorId, input.canManageOthers, input.existingOwnerId)
   ) {
-    return { ok: false, status: 403, error: 'Forbidden: cannot edit another user draft' };
+    return { ok: false, status: 403, error: HGV_INSPECTION_SAVE_FORBIDDEN };
   }
 
   if (!actorCanWriteInspectionOwner(input.actorId, input.canManageOthers, input.subjectUserId)) {
-    return { ok: false, status: 403, error: 'Forbidden: cannot save for another user' };
+    return { ok: false, status: 403, error: HGV_INSPECTION_SAVE_FORBIDDEN };
   }
 
   return { ok: true };
 }
 
+export function forbiddenHgvInspectionSaveError(): Error & { status: number; code: string } {
+  const error = new Error(HGV_INSPECTION_SAVE_FORBIDDEN) as Error & { status: number; code: string };
+  error.status = 403;
+  error.code = 'FORBIDDEN';
+  return error;
+}
+
 export function mapHgvSaveRpcError(message: string): { status: number; error: string; code: string } {
   if (message.includes('HGV_SAVE:FORBIDDEN_OWNER') || message.includes('HGV_SAVE:FORBIDDEN_SUBJECT')) {
-    return { status: 403, error: 'Forbidden: cannot save this inspection', code: 'FORBIDDEN' };
+    return { status: 403, error: HGV_INSPECTION_SAVE_FORBIDDEN, code: 'FORBIDDEN' };
   }
   if (message.includes('HGV_SAVE:SUBMITTED_CONFLICT')) {
     return {
@@ -127,12 +166,16 @@ export function mapHgvSaveRpcError(message: string): { status: number; error: st
   return { status: 500, error: 'Failed to save HGV inspection', code: 'SAVE_FAILED' };
 }
 
-export async function lookupHgvInspectionForSave(
-  admin: ReturnType<typeof createAdminClient>,
-  input: Pick<HgvInspectionSaveBody, 'hgvId' | 'userId' | 'inspectionDate' | 'hintInspectionId'>
-): Promise<HgvInspectionLookupRow | null> {
-  const { data: byKey, error: keyError } = await admin
-    .from('hgv_inspections')
+function asLookupQuery(value: unknown): LookupQuery {
+  return value as LookupQuery;
+}
+
+export async function resolveHgvInspectionForSave(
+  admin: Pick<HgvInspectionSaveAdmin, 'from'>,
+  input: Pick<HgvInspectionSaveBody, 'hgvId' | 'userId' | 'inspectionDate' | 'hintInspectionId'>,
+  access: { actorId: string; canManageOthers: boolean }
+): Promise<HgvInspectionSaveResolution> {
+  const { data: byKey, error: keyError } = await asLookupQuery(admin.from('hgv_inspections'))
     .select('id, user_id, status')
     .eq('hgv_id', input.hgvId)
     .eq('user_id', input.userId)
@@ -143,58 +186,84 @@ export async function lookupHgvInspectionForSave(
     throw keyError;
   }
   if (byKey) {
-    return byKey;
+    return { existing: byKey, sanitizedHintId: null };
   }
 
   if (!input.hintInspectionId) {
-    return null;
+    return { existing: null, sanitizedHintId: null };
   }
 
-  const { data: byHint, error: hintError } = await admin
-    .from('hgv_inspections')
+  let hintQuery = asLookupQuery(admin.from('hgv_inspections'))
     .select('id, user_id, status')
-    .eq('id', input.hintInspectionId)
-    .maybeSingle();
+    .eq('id', input.hintInspectionId);
+  if (!access.canManageOthers) {
+    hintQuery = hintQuery.eq('user_id', access.actorId);
+  }
+  const { data: byHint, error: hintError } = await hintQuery.maybeSingle();
 
   if (hintError) {
     throw hintError;
   }
-  if (!byHint || byHint.status !== 'draft') {
-    return null;
+  if (
+    !byHint ||
+    byHint.status !== 'draft' ||
+    !actorCanWriteInspectionOwner(access.actorId, access.canManageOthers, byHint.user_id)
+  ) {
+    return { existing: null, sanitizedHintId: null };
   }
-  return byHint;
+
+  return { existing: byHint, sanitizedHintId: byHint.id };
+}
+
+export async function lookupHgvInspectionForSave(
+  admin: Pick<HgvInspectionSaveAdmin, 'from'>,
+  input: Pick<HgvInspectionSaveBody, 'hgvId' | 'userId' | 'inspectionDate' | 'hintInspectionId'>,
+  access: { actorId: string; canManageOthers: boolean }
+): Promise<HgvInspectionLookupRow | null> {
+  const resolved = await resolveHgvInspectionForSave(admin, input, access);
+  return resolved.existing;
 }
 
 export async function saveHgvInspectionForActor(input: {
   actorId: string;
   canManageOthers: boolean;
   body: HgvInspectionSaveBody;
-  admin?: ReturnType<typeof createAdminClient>;
+  admin?: HgvInspectionSaveAdmin;
 }): Promise<HgvInspectionSaveResult> {
-  const admin = input.admin ?? createAdminClient();
-  const existing = await lookupHgvInspectionForSave(admin, input.body);
-  const authorization = authorizeHgvInspectionWrite({
+  const subjectAuthorization = authorizeHgvInspectionWrite({
     actorId: input.actorId,
     canManageOthers: input.canManageOthers,
-    existingOwnerId: existing?.user_id ?? null,
+    existingOwnerId: null,
     subjectUserId: input.body.userId,
   });
-  if (!authorization.ok) {
-    const error = new Error(authorization.error) as Error & { status: number; code: string };
-    error.status = authorization.status;
-    error.code = 'FORBIDDEN';
-    throw error;
+  if (!subjectAuthorization.ok) {
+    throw forbiddenHgvInspectionSaveError();
   }
 
-  const rpcClient = admin as unknown as AdminRpc;
+  const admin = input.admin ?? (createAdminClient() as unknown as HgvInspectionSaveAdmin);
+  const resolved = await resolveHgvInspectionForSave(admin, input.body, {
+    actorId: input.actorId,
+    canManageOthers: input.canManageOthers,
+  });
+  const ownerAuthorization = authorizeHgvInspectionWrite({
+    actorId: input.actorId,
+    canManageOthers: input.canManageOthers,
+    existingOwnerId: resolved.existing?.user_id ?? null,
+    subjectUserId: input.body.userId,
+  });
+  if (!ownerAuthorization.ok) {
+    throw forbiddenHgvInspectionSaveError();
+  }
+
+  const rpcClient = admin;
   const { data, error } = await rpcClient.rpc(HGV_INSPECTION_SAVE_RPC, {
     p_actor_id: input.actorId,
     p_actor_can_manage_others: input.canManageOthers,
     p_subject_user_id: input.body.userId,
     p_hgv_id: input.body.hgvId,
     p_inspection_date: input.body.inspectionDate,
-    p_hint_inspection_id: input.body.hintInspectionId ?? null,
-    p_expected_owner_id: existing?.user_id ?? null,
+    p_hint_inspection_id: resolved.sanitizedHintId,
+    p_expected_owner_id: resolved.existing?.user_id ?? null,
     p_status: input.body.status,
     p_current_mileage: input.body.currentMileage,
     p_inspector_comments: input.body.inspectorComments,

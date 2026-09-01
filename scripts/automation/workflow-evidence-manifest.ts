@@ -182,7 +182,7 @@ function quoteWindowsArg(value: string): string {
   return `"${value.replace(/"/g, '\\"')}"`;
 }
 
-function runCommand(
+export function runCommand(
   repoRoot: string,
   name: string,
   command: string,
@@ -287,6 +287,8 @@ export function buildEvidenceManifest(params: {
   kind: EvidenceManifestKind;
   baseCommit: string;
   requiredTestIds?: string[];
+  /** When set, the default vitest -t run uses this subset instead of every requiredTestId. */
+  vitestTestIds?: string[];
   runChecks?: boolean;
   runRequiredTests?: boolean;
   liveVerification?: WorkflowEvidenceManifest['liveVerification'];
@@ -355,18 +357,20 @@ export function buildEvidenceManifest(params: {
     }
   }
   if (params.runRequiredTests && (params.requiredTestIds?.length ?? 0) > 0) {
-    const ids = params.requiredTestIds ?? [];
-    // Vitest uses -t/--testNamePattern, not --grep.
-    const testRun = execute(params.repoRoot, 'required-tests', 'npm', [
-      'run',
-      'test:run',
-      '--',
-      '-t',
-      ids.join('|'),
-    ]);
-    commands.push(testRun);
-    if (testRun.status === 'passed') {
-      for (const id of ids) executedIds.add(id);
+    const ids = params.vitestTestIds ?? params.requiredTestIds ?? [];
+    if (ids.length > 0) {
+      // Vitest uses -t/--testNamePattern, not --grep.
+      const testRun = execute(params.repoRoot, 'required-tests', 'npm', [
+        'run',
+        'test:run',
+        '--',
+        '-t',
+        ids.join('|'),
+      ]);
+      commands.push(testRun);
+      if (testRun.status === 'passed') {
+        for (const id of ids) executedIds.add(id);
+      }
     }
   }
 

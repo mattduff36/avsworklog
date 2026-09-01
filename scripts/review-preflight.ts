@@ -1,7 +1,11 @@
 #!/usr/bin/env tsx
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
-import { buildEvidenceManifest } from './automation/workflow-evidence-manifest';
+import {
+  buildEvidenceManifest,
+  runCommand,
+  type EvidenceCommandResult,
+} from './automation/workflow-evidence-manifest';
 import {
   applyProtocolTransition,
   readProtocolRecord,
@@ -29,10 +33,30 @@ function hasFlag(args: string[], name: string): boolean {
 function printUsage(): void {
   process.stdout.write(`Usage:
   npm run review:preflight -- --workstream <id> [--plan <path>] [--profile timesheets-pay] [--live-db] [--skip-checks]
+  npm run review:preflight -- --workstream <id> --kind fix-delta --closed-blocker-ids <csv> [--plan <path>]
 
-Creates a content-addressed preflight evidence manifest and records it on the protocol workstream.
+Creates a content-addressed evidence manifest and records it on the protocol workstream.
+
+Use --kind fix-delta after a failed first review. --closed-blocker-ids is required for that kind.
 `);
 }
+
+const EXTRA_REQUIRED_TEST_COMMANDS: Record<
+  string,
+  { name: string; command: string; args: string[] }
+> = {
+  'HGV-SAVE-CONC-01': {
+    name: 'required-test-HGV-SAVE-CONC-01',
+    command: 'npx',
+    args: [
+      'tsx',
+      'scripts/local-test-postgres.ts',
+      'one-shot',
+      '--target',
+      'tests/db/hgv-inspection-save-rpc.test.ts',
+    ],
+  },
+};
 
 async function maybeLiveInventory(liveDb: boolean) {
   if (!liveDb) {
@@ -90,10 +114,18 @@ async function main(): Promise<void> {
   const profile = readFlag(args, '--profile');
   const skipChecks = hasFlag(args, '--skip-checks');
   const liveDb = hasFlag(args, '--live-db');
+  const kind = readFlag(args, '--kind') === 'fix-delta' ? 'fix-delta' : 'preflight';
+  const closedBlockerIds = (readFlag(args, '--closed-blocker-ids') ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean);
 
   if (!workstreamId) {
     printUsage();
     process.exit(1);
+  }
+  if (kind === 'fix-delta' && closedBlockerIds.length === 0) {
+    throw new Error('--closed-blocker-ids is required for --kind fix-delta');
   }
 
   let requiredTestIds: string[] = [];
@@ -160,15 +192,44 @@ async function main(): Promise<void> {
     }
   }
 
+  const extraCommands: EvidenceCommandResult[] = [];
+  const extraExecutedIds: string[] = [];
+  const extraIds = requiredTestIds.filter((id) => EXTRA_REQUIRED_TEST_COMMANDS[id]);
+  const vitestTestIds = requiredTestIds.filter((id) => !EXTRA_REQUIRED_TEST_COMMANDS[id]);
+
+  if (!skipChecks) {
+    for (const id of extraIds) {
+      const spec = EXTRA_REQUIRED_TEST_COMMANDS[id];
+      if (!spec) continue;
+      const extraResult = runCommand(repoRoot, spec.name, spec.command, spec.args);
+      extraCommands.push(extraResult);
+      if (extraResult.status === 'passed') {
+        extraExecutedIds.push(id);
+      }
+    }
+  }
+
   const built = buildEvidenceManifest({
     repoRoot,
     workstreamId,
-    kind: 'preflight',
+    kind,
     baseCommit: protocol.baseCommit,
     requiredTestIds,
+    vitestTestIds,
     runChecks: !skipChecks,
-    runRequiredTests: !skipChecks && requiredTestIds.length > 0,
+    runRequiredTests: !skipChecks && vitestTestIds.length > 0,
+    executedTestIds: extraExecutedIds,
+    commandResults: extraCommands,
     liveVerification,
+    closedBlockerIds: kind === 'fix-delta' ? closedBlockerIds : undefined,
+    blockerEvidence:
+      kind === 'fix-delta'
+        ? closedBlockerIds.map((blockerId) => ({
+            blockerId,
+            evidenceLabel: `required test ${blockerId}`,
+            commandName: EXTRA_REQUIRED_TEST_COMMANDS[blockerId]?.name ?? 'required-tests',
+          }))
+        : undefined,
   });
 
   if (built.manifest.status !== 'passed') {
@@ -194,9 +255,10 @@ async function main(): Promise<void> {
 
   const recorded = applyProtocolTransition({
     repoRoot,
-    command: 'preflight-record',
+    command: kind === 'fix-delta' ? 'fix-record' : 'preflight-record',
     workstreamId,
     manifestPath: built.relativePath,
+    closedBlockerIds: kind === 'fix-delta' ? closedBlockerIds : undefined,
   });
 
   process.stdout.write(
