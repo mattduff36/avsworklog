@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.0.0
+
+**GIT COMMIT MESSAGE**
+`fix(hgv-inspections): close save auth leak and canonical item set`
+
+**PUSHED AT**
+2026-09-01T11:43:19.918Z
+
+**WHAT CHANGED**
+Close save auth leak and canonical item set.
+
+**VERSION HISTORY DETAILS**
+- Close save auth leak and canonical item set, with changes to background routes, shared logic, automated tests, and data storage.
+- Updated data storage, with changes to data storage.
+
+**COMMITS IN THIS RELEASE**
+- `fix(hgv-inspections): close save auth leak and canonical item set`
+
 ## 0826.40.1
 
 **GIT COMMIT MESSAGE**

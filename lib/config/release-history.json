@@ -1,5 +1,25 @@
 [
   {
+    "version": "0926.0.0",
+    "updateKind": "minor",
+    "title": "Daily Tasks improvements",
+    "description": "Close save auth leak and canonical item set.",
+    "summary": "Close save auth leak and canonical item set.",
+    "details": [
+      "Close save auth leak and canonical item set, with changes to background routes, shared logic, automated tests, and data storage.",
+      "Updated data storage, with changes to data storage."
+    ],
+    "areas": [
+      "Daily Tasks",
+      "Close save auth leak",
+      "Canonical item set"
+    ],
+    "areaKeys": [
+      "daily-tasks"
+    ],
+    "pushedAt": "2026-09-01T11:43:19.918Z"
+  },
+  {
     "version": "0826.40.1",
     "updateKind": "minor",
     "title": "Daily Tasks improvements",
