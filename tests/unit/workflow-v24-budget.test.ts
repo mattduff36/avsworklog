@@ -34,8 +34,9 @@ import {
   writePassingManifest,
 } from '@/tests/unit/workflow-v24-test-harness';
 
-afterEach(() => {
+afterEach(async () => {
   cleanupWorkflowV24Fixtures();
+  await new Promise<void>((resolve) => setImmediate(resolve));
 });
 
 describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {

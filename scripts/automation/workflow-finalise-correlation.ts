@@ -68,7 +68,6 @@ export function isGitAncestor(params: {
   if (!params.ancestorCommit || !params.descendantCommit) {
     throw new Error('git ancestry inspection requires commit identities');
   }
-  if (params.ancestorCommit === params.descendantCommit) return true;
   const inspection = inspectCommitAncestry(
     params.repoRoot,
     params.ancestorCommit,

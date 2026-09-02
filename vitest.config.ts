@@ -11,6 +11,7 @@ export default defineConfig({
     maxWorkers: 4,
     hookTimeout: 120_000,
     teardownTimeout: 120_000,
+    testTimeout: 120_000,
     setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',

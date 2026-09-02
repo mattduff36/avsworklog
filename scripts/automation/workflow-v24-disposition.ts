@@ -20,9 +20,11 @@ export const WORKFLOW_NON_RELEASE_PHASES = [
   'rehomed',
 ] as const;
 
-const SHA_RE = /^[0-9a-f]{7,64}$/i;
+const INPUT_COMMIT_ID_RE = /^[0-9a-f]{7,64}$/i;
+const FULL_COMMIT_SHA_RE = /^[0-9a-f]{40}$|^[0-9a-f]{64}$/i;
 const SHA256_RE = /^[0-9a-f]{64}$/i;
 const BRANCH_RE = /^[A-Za-z0-9._/-]{1,120}$/;
+const GIT_SAFETY_TIMEOUT_MS = 30_000;
 
 export function lineageFailedPremiumReviewCount(record: {
   failedPremiumReviewCount: number;
@@ -246,10 +248,6 @@ export function rejectUnreviewedHeadDrift(
       message: 'unable to read current HEAD for drift inspection',
     };
   }
-  if (!SHA_RE.test(currentHead) || !SHA_RE.test(candidateHead)) {
-    return { ok: false, kind: 'git-error', message: 'malformed commit identity for drift inspection' };
-  }
-  if (candidateHead === currentHead) return { ok: true };
   const ancestry = inspectCommitAncestry(repoRoot, candidateHead, currentHead, git);
   if (ancestry.status === 'error') {
     return { ok: false, kind: 'git-error', message: ancestry.message };
@@ -275,9 +273,16 @@ export interface GitCommandResult {
   stdout: string;
   stderr: string;
   error?: Error;
+  signal?: NodeJS.Signals | null;
+  timedOut?: boolean;
 }
 
 export type GitCommandRunner = (repoRoot: string, args: string[]) => GitCommandResult;
+
+function isTimeoutError(error?: Error): boolean {
+  if (!error) return false;
+  return (error as NodeJS.ErrnoException).code === 'ETIMEDOUT';
+}
 
 export function defaultGitCommandRunner(repoRoot: string, args: string[]): GitCommandResult {
   const result = spawnSync('git', args, {
@@ -285,12 +290,16 @@ export function defaultGitCommandRunner(repoRoot: string, args: string[]): GitCo
     encoding: 'utf8',
     shell: false,
     windowsHide: true,
+    timeout: GIT_SAFETY_TIMEOUT_MS,
   });
+  const timedOut = isTimeoutError(result.error);
   return {
     status: result.status,
     stdout: result.stdout ?? '',
     stderr: result.stderr ?? '',
     error: result.error,
+    signal: result.signal,
+    timedOut,
   };
 }
 
@@ -323,38 +332,148 @@ export type AncestryInspection =
   | { status: 'not_ancestor' }
   | { status: 'error'; message: string };
 
+export type CommitResolution = { ok: true; sha: string } | { ok: false; message: string };
+
+function normalizeGitStdout(stdout: string): string {
+  return stdout.replace(/(?:\r?\n)+\s*$/u, '');
+}
+
+function gitProcessDidNotComplete(result: GitCommandResult, label: string): string | null {
+  if (result.timedOut || isTimeoutError(result.error)) {
+    return `${label} timed out`;
+  }
+  if (result.error) {
+    return result.error.message || `${label} spawn failed`;
+  }
+  if (result.signal) {
+    return `${label} terminated by signal ${result.signal}`;
+  }
+  if (result.status === null) {
+    return `${label} returned no status`;
+  }
+  return null;
+}
+
+function diagnosticGitText(result: GitCommandResult, fallback: string): string {
+  const text = (result.stderr ?? '').trim() || (result.stdout ?? '').trim();
+  return text || fallback;
+}
+
+export function resolveExactCommitObject(
+  repoRoot: string,
+  value: string,
+  git: GitCommandRunner = defaultGitCommandRunner
+): CommitResolution {
+  const trimmed = value.trim();
+  if (!INPUT_COMMIT_ID_RE.test(trimmed)) {
+    return { ok: false, message: 'malformed commit identity' };
+  }
+  let result: GitCommandResult;
+  try {
+    result = git(repoRoot, ['rev-parse', '--verify', `${trimmed}^{commit}`]);
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'git commit resolution threw',
+    };
+  }
+  const incomplete = gitProcessDidNotComplete(result, 'git commit resolution');
+  if (incomplete) return { ok: false, message: incomplete };
+  if (result.status !== 0) {
+    return { ok: false, message: 'commit object is not uniquely resolvable' };
+  }
+  const sha = normalizeGitStdout(result.stdout ?? '').toLowerCase();
+  if (!FULL_COMMIT_SHA_RE.test(sha)) {
+    return { ok: false, message: 'git commit resolution did not return a full commit SHA' };
+  }
+  return { ok: true, sha };
+}
+
+const ISOLATION_FETCH_REF_PREFIX = 'refs/tee-v24/isolation/';
+
+export function importCommitObjectForIsolation(params: {
+  repoRoot: string;
+  sha: string;
+  sourceRepoRoot: string;
+  git?: GitCommandRunner;
+}): { ok: true; sha: string } | { ok: false; message: string } {
+  const git = params.git ?? defaultGitCommandRunner;
+  const source = resolveExactCommitObject(params.sourceRepoRoot, params.sha, git);
+  if (!source.ok) {
+    return { ok: false, message: 'source commit object is not uniquely resolvable' };
+  }
+  const local = resolveExactCommitObject(params.repoRoot, source.sha, git);
+  if (local.ok) return local;
+  const sourcePath = params.sourceRepoRoot.replace(/\\/g, '/');
+  const ref = `${ISOLATION_FETCH_REF_PREFIX}${source.sha}`;
+  let fetched: GitCommandResult;
+  try {
+    fetched = git(params.repoRoot, [
+      'fetch',
+      '--no-tags',
+      '--force',
+      sourcePath,
+      `${source.sha}:${ref}`,
+    ]);
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'git fetch of isolation commit threw',
+    };
+  }
+  const incomplete = gitProcessDidNotComplete(fetched, 'git fetch of isolation commit');
+  if (incomplete) return { ok: false, message: incomplete };
+  if (fetched.status !== 0) {
+    return { ok: false, message: 'unable to import commit object for isolation proof' };
+  }
+  const again = resolveExactCommitObject(params.repoRoot, source.sha, git);
+  if (!again.ok) {
+    return { ok: false, message: 'commit object missing after isolation import' };
+  }
+  return again;
+}
+
 export function inspectCommitAncestry(
   repoRoot: string,
   maybeAncestor: string,
   descendant: string,
   git: GitCommandRunner = defaultGitCommandRunner
 ): AncestryInspection {
-  if (!SHA_RE.test(maybeAncestor) || !SHA_RE.test(descendant)) {
-    return { status: 'error', message: 'malformed commit identity for ancestry inspection' };
+  const predecessor = resolveExactCommitObject(repoRoot, maybeAncestor, git);
+  const descendantResolved = resolveExactCommitObject(repoRoot, descendant, git);
+  if (!predecessor.ok || !descendantResolved.ok) {
+    const message = [
+      predecessor.ok ? null : predecessor.message,
+      descendantResolved.ok ? null : descendantResolved.message,
+    ]
+      .filter((entry): entry is string => Boolean(entry))
+      .join('; ');
+    return { status: 'error', message: message || 'commit object validation failed' };
   }
   let result: GitCommandResult;
   try {
-    result = git(repoRoot, ['merge-base', '--is-ancestor', maybeAncestor, descendant]);
+    result = git(repoRoot, [
+      'merge-base',
+      '--is-ancestor',
+      predecessor.sha,
+      descendantResolved.sha,
+    ]);
   } catch (error) {
     return {
       status: 'error',
       message: error instanceof Error ? error.message : 'git ancestry inspection threw',
     };
   }
-  if (result.error) {
-    return { status: 'error', message: result.error.message };
-  }
+  const incomplete = gitProcessDidNotComplete(result, 'git ancestry inspection');
+  if (incomplete) return { status: 'error', message: incomplete };
   if (result.status === 0) return { status: 'ancestor' };
-  const stderr = (result.stderr ?? '').trim();
-  if (result.status === 1 && !/fatal:/iu.test(stderr)) {
-    return { status: 'not_ancestor' };
-  }
-  if (result.status === null) {
-    return { status: 'error', message: 'git ancestry inspection returned no status' };
-  }
+  if (result.status === 1) return { status: 'not_ancestor' };
   return {
     status: 'error',
-    message: stderr || `git merge-base --is-ancestor failed (status ${String(result.status)})`,
+    message: diagnosticGitText(
+      result,
+      `git merge-base --is-ancestor failed (status ${String(result.status)})`
+    ),
   };
 }
 
@@ -381,17 +500,7 @@ export function requireCommitNotAncestor(
   const inspection = inspectCommitAncestry(repoRoot, maybeAncestor, descendant, git);
   if (inspection.status === 'not_ancestor') return { ok: true };
   if (inspection.status === 'ancestor') return { ok: false, message: failMessage };
-  if (inspection.status === 'error') {
-    const mentionsPredecessor =
-      inspection.message.includes(maybeAncestor) ||
-      (maybeAncestor.length >= 7 && inspection.message.includes(maybeAncestor.slice(0, 7)));
-    const missingObject = /not a valid (?:object|commit) name|bad object|unknown revision/iu.test(
-      inspection.message
-    );
-    if (mentionsPredecessor && missingObject) return { ok: true };
-    return { ok: false, message: inspection.message };
-  }
-  return { ok: false, message: failMessage };
+  return { ok: false, message: inspection.message };
 }
 
 export function filterAncestorCommits(
@@ -415,7 +524,7 @@ export function gitHeadCommit(
 ): string | null {
   const result = runGit(repoRoot, ['rev-parse', 'HEAD'], git);
   if (result.error || result.status !== 0) return null;
-  return SHA_RE.test(result.stdout) ? result.stdout : null;
+  return FULL_COMMIT_SHA_RE.test(result.stdout) ? result.stdout.toLowerCase() : null;
 }
 
 export function gitBranchName(
@@ -458,10 +567,17 @@ export function resolveCanonicalExistingPath(candidate: string): {
   return { ok: true, canonical: absolute.replace(/\\/g, '/') };
 }
 
-function requireSha(value: string | undefined, label: string): string | { error: string } {
+function requireResolvedCommit(
+  repoRoot: string,
+  value: string | undefined,
+  label: string,
+  git?: GitCommandRunner
+): string | { error: string } {
   const trimmed = value?.trim() ?? '';
-  if (!SHA_RE.test(trimmed)) return { error: `${label} must be a git commit hash` };
-  return trimmed;
+  if (!INPUT_COMMIT_ID_RE.test(trimmed)) return { error: `${label} must be a git commit hash` };
+  const resolved = resolveExactCommitObject(repoRoot, trimmed, git);
+  if (!resolved.ok) return { error: `${label}: ${resolved.message}` };
+  return resolved.sha;
 }
 
 export function parsePredecessorReleaseContext(value: string):
@@ -511,14 +627,21 @@ function hashLegacyEvidence(value: unknown): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
 
-export function resolveCommitObject(repoRoot: string, sha: string): string | null {
-  if (!SHA_RE.test(sha)) return null;
-  const result = runGit(repoRoot, ['rev-parse', '--verify', `${sha}^{commit}`]);
-  return result.status === 0 && SHA_RE.test(result.stdout) ? result.stdout : null;
+export function resolveCommitObject(
+  repoRoot: string,
+  sha: string,
+  git: GitCommandRunner = defaultGitCommandRunner
+): string | null {
+  const resolved = resolveExactCommitObject(repoRoot, sha, git);
+  return resolved.ok ? resolved.sha : null;
 }
 
-export function gitCommitExists(repoRoot: string, sha: string): boolean {
-  return resolveCommitObject(repoRoot, sha) !== null;
+export function gitCommitExists(
+  repoRoot: string,
+  sha: string,
+  git: GitCommandRunner = defaultGitCommandRunner
+): boolean {
+  return resolveCommitObject(repoRoot, sha, git) !== null;
 }
 
 export function resolveBranchCommit(
@@ -529,7 +652,7 @@ export function resolveBranchCommit(
     return { ok: false, message: `predecessor branch name is invalid: ${branchName}` };
   }
   const result = runGit(repoRoot, ['rev-parse', '--verify', `refs/heads/${branchName}`]);
-  if (result.status !== 0 || !SHA_RE.test(result.stdout)) {
+  if (result.status !== 0 || !FULL_COMMIT_SHA_RE.test(result.stdout)) {
     return { ok: false, message: `predecessor branch does not exist: ${branchName}` };
   }
   const sha = resolveCommitObject(repoRoot, result.stdout);
@@ -541,17 +664,18 @@ export function resolveBranchCommit(
 
 export function requireOrderedCommitObjects(
   repoRoot: string,
-  values: string[] | undefined
+  values: string[] | undefined,
+  git?: GitCommandRunner
 ): string[] | { error: string } {
   if (!values || values.length === 0) {
     return { error: 'disposition requires implementation commit evidence' };
   }
   const resolved: string[] = [];
   for (const value of values) {
-    if (typeof value !== 'string' || value !== value.trim() || !SHA_RE.test(value)) {
+    if (typeof value !== 'string' || value !== value.trim() || !INPUT_COMMIT_ID_RE.test(value)) {
       return { error: `implementation commit is not a canonical git commit hash: ${String(value)}` };
     }
-    const full = resolveCommitObject(repoRoot, value);
+    const full = resolveCommitObject(repoRoot, value, git);
     if (!full) {
       return { error: `implementation commit is not a git commit object: ${value}` };
     }
@@ -592,8 +716,8 @@ export function listOrderedImplementationCommits(
   headCommit: string,
   git?: GitCommandRunner
 ): string[] | { error: string } {
-  const baseline = resolveCommitObject(repoRoot, baselineCommit);
-  const head = resolveCommitObject(repoRoot, headCommit);
+  const baseline = resolveCommitObject(repoRoot, baselineCommit, git);
+  const head = resolveCommitObject(repoRoot, headCommit, git);
   if (!baseline) return { error: 'source baseline does not exist as a git commit object' };
   if (!head) return { error: 'source HEAD does not exist as a git commit object' };
   const result = runGit(repoRoot, ['rev-list', '--reverse', `${baseline}..${head}`], git);
@@ -602,7 +726,7 @@ export function listOrderedImplementationCommits(
   }
   const commits = result.stdout ? result.stdout.split(/\n/u).filter(Boolean) : [];
   if (commits.length === 0) return [];
-  return requireOrderedCommitObjects(repoRoot, commits);
+  return requireOrderedCommitObjects(repoRoot, commits, git);
 }
 
 const GIT_BINARY_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
@@ -1007,13 +1131,6 @@ export function buildBoundRehomeProvenance(params: {
     'successor baseline is not an ancestor of current HEAD'
   );
   if (!successorBaselineOk.ok) return successorBaselineOk;
-  const predecessorIsolated = requireCommitNotAncestor(
-    params.repoRoot,
-    params.predecessorHeadCommit,
-    currentHead,
-    'predecessor HEAD is an ancestor of the successor; independent Git context required'
-  );
-  if (!predecessorIsolated.ok) return predecessorIsolated;
   if (params.predecessorHeadCommit !== params.declared.predecessorHeadCommit) {
     return { ok: false, message: 'predecessor HEAD does not match declared provenance' };
   }
@@ -1078,6 +1195,19 @@ export function buildBoundRehomeProvenance(params: {
   if (!resolveCommitObject(predecessorRepo.canonical, params.predecessorHeadCommit)) {
     return { ok: false, message: 'predecessor HEAD does not exist as a git commit object' };
   }
+  const importedPredecessor = importCommitObjectForIsolation({
+    repoRoot: params.repoRoot,
+    sha: params.predecessorHeadCommit,
+    sourceRepoRoot: predecessorRepo.canonical,
+  });
+  if (!importedPredecessor.ok) return importedPredecessor;
+  const predecessorIsolated = requireCommitNotAncestor(
+    params.repoRoot,
+    importedPredecessor.sha,
+    currentHead,
+    'predecessor HEAD is an ancestor of the successor; independent Git context required'
+  );
+  if (!predecessorIsolated.ok) return predecessorIsolated;
 
   const sourceContext = parsePredecessorReleaseContext(params.sourceReleaseContext);
   if (!sourceContext.ok) {
@@ -1213,7 +1343,7 @@ export function buildBoundRehomeProvenance(params: {
     currentHead,
     currentBranch,
     successorBaseline: params.successorBaselineCommit,
-    predecessorHead: params.predecessorHeadCommit,
+    predecessorHead: importedPredecessor.sha,
     predecessorBranchResolvedSha: predecessorResolved.sha,
     sourceHeadCommit: candidate.headCommit,
     sourceBaselineCommit: params.sourceBaselineCommit,
@@ -1328,7 +1458,7 @@ export function buildRouteDisposition(params: {
       }),
     };
   } else if (params.target === 'reverted') {
-    const revertCommit = requireSha(params.revertCommit, 'revertCommit');
+    const revertCommit = requireResolvedCommit(params.repoRoot, params.revertCommit, 'revertCommit');
     if (typeof revertCommit === 'object') return { ok: false, message: revertCommit.error };
     const revertInHistory = requireCommitAncestor(
       params.repoRoot,
@@ -1363,7 +1493,11 @@ export function buildRouteDisposition(params: {
       }),
     };
   } else if (params.target === 'superseded') {
-    const supersedeCommit = requireSha(params.supersedeCommit, 'supersedeCommit');
+    const supersedeCommit = requireResolvedCommit(
+      params.repoRoot,
+      params.supersedeCommit,
+      'supersedeCommit'
+    );
     if (typeof supersedeCommit === 'object') return { ok: false, message: supersedeCommit.error };
     const supersedeInHistory = requireCommitAncestor(
       params.repoRoot,
@@ -1378,7 +1512,7 @@ export function buildRouteDisposition(params: {
     const stillIndependent = filterAncestorCommits(params.repoRoot, implementationCommits, releaseHead);
     if (!stillIndependent.ok) return stillIndependent;
     if (stillIndependent.ancestors.length > 0) {
-      const revertCommit = requireSha(params.revertCommit, 'revertCommit');
+      const revertCommit = requireResolvedCommit(params.repoRoot, params.revertCommit, 'revertCommit');
       if (typeof revertCommit === 'object') {
         return {
           ok: false,
@@ -1415,15 +1549,23 @@ export function buildRouteDisposition(params: {
       }),
     };
   } else {
-    const predecessorHead = requireSha(params.predecessorHead, 'predecessorHead');
-    const successorBaseline = requireSha(params.successorBaseline, 'successorBaseline');
-    if (typeof predecessorHead === 'object') return { ok: false, message: predecessorHead.error };
-    if (typeof successorBaseline === 'object') return { ok: false, message: successorBaseline.error };
     if (!params.successorRepo || !params.successorBranch) {
       return { ok: false, message: 'rehome route requires successor repo, branch, and baseline' };
     }
     const successorRepo = resolveCanonicalExistingPath(params.successorRepo);
     if (!successorRepo.ok) return successorRepo;
+    const predecessorHead = requireResolvedCommit(
+      params.repoRoot,
+      params.predecessorHead,
+      'predecessorHead'
+    );
+    const successorBaseline = requireResolvedCommit(
+      successorRepo.canonical,
+      params.successorBaseline,
+      'successorBaseline'
+    );
+    if (typeof predecessorHead === 'object') return { ok: false, message: predecessorHead.error };
+    if (typeof successorBaseline === 'object') return { ok: false, message: successorBaseline.error };
     if (!BRANCH_RE.test(params.successorBranch)) {
       return { ok: false, message: 'successor branch name is invalid' };
     }
@@ -1445,9 +1587,15 @@ export function buildRouteDisposition(params: {
       'successor baseline is not an ancestor of successor HEAD'
     );
     if (!successorOwned.ok) return successorOwned;
+    const importedPredecessor = importCommitObjectForIsolation({
+      repoRoot: successorRepo.canonical,
+      sha: predecessorHead,
+      sourceRepoRoot: params.repoRoot,
+    });
+    if (!importedPredecessor.ok) return importedPredecessor;
     const successorIsolated = requireCommitNotAncestor(
       successorRepo.canonical,
-      predecessorHead,
+      importedPredecessor.sha,
       successorHead,
       'successor ancestry contains the blocked predecessor HEAD'
     );
@@ -1460,7 +1608,7 @@ export function buildRouteDisposition(params: {
       successorBranch: params.successorBranch,
       successorBaseline,
       successorRepoCanonicalPath: successorRepo.canonical,
-      predecessorHead,
+      predecessorHead: importedPredecessor.sha,
       predecessorHeadIsAncestor: false,
       latestLegalReviewCandidateHead: candidate.headCommit,
       canonVersion: REHOME_EVIDENCE_CANON_VERSION,
@@ -1473,7 +1621,7 @@ export function buildRouteDisposition(params: {
         successorRepo: successorRepo.canonical,
         successorBranch: params.successorBranch,
         successorBaseline,
-        predecessorHead,
+        predecessorHead: importedPredecessor.sha,
       }),
     };
   }
@@ -1634,9 +1782,37 @@ export function revalidateBoundRehomeProvenance(params: {
   if (!resolveCommitObject(params.repoRoot, params.provenance.successorBaselineCommit)) {
     return { ok: false, message: 'successor baseline is not a git commit object' };
   }
+  const localPredecessor = resolveExactCommitObject(
+    params.repoRoot,
+    params.provenance.predecessorHeadCommit
+  );
+  let predecessorSha: string;
+  if (localPredecessor.ok) {
+    predecessorSha = localPredecessor.sha;
+  } else {
+    const predecessorContext = parsePredecessorReleaseContext(
+      params.provenance.predecessorReleaseContext
+    );
+    if (!predecessorContext.ok) return predecessorContext;
+    const predecessorRepo = resolveCanonicalExistingPath(predecessorContext.repoPath);
+    if (!predecessorRepo.ok) {
+      return {
+        ok: false,
+        message:
+          'predecessor commit object is missing from the successor repository; cannot prove isolation',
+      };
+    }
+    const importedPredecessor = importCommitObjectForIsolation({
+      repoRoot: params.repoRoot,
+      sha: params.provenance.predecessorHeadCommit,
+      sourceRepoRoot: predecessorRepo.canonical,
+    });
+    if (!importedPredecessor.ok) return importedPredecessor;
+    predecessorSha = importedPredecessor.sha;
+  }
   const predecessorStillIsolated = requireCommitNotAncestor(
     params.repoRoot,
-    params.provenance.predecessorHeadCommit,
+    predecessorSha,
     currentHead,
     'predecessor HEAD became an ancestor of the successor'
   );

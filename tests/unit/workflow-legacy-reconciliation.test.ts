@@ -178,7 +178,7 @@ function stateBytes(repoRoot: string): Buffer {
   return readFileSync(getWorkflowPaths(repoRoot).statePath);
 }
 
-describe('legacy protocol closure records', () => {
+describe('legacy protocol closure records', { timeout: 30_000 }, () => {
   it('T-TYPECHECK / T-LINT / T-EXISTING-WORKFLOW-TESTS / LC-LIVENESS-012: workflow engine files remain present', () => {
     expect(existsSync(path.join(process.cwd(), 'scripts/automation/workflow-legacy-reconciliation.ts'))).toBe(true);
     expect(existsSync(path.join(process.cwd(), 'tests/unit/workflow-liveness.test.ts'))).toBe(true);

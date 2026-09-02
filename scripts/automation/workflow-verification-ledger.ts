@@ -77,6 +77,23 @@ export const BLOCKER_REQUIRED_TEST_IDS: Readonly<Record<string, readonly string[
     'T-DRIFT-GIT-SUCCESS',
     'T-DRIFT-DESCENDANT-MISSING-NOT-ISOLATION',
     'T-DRIFT-PREDECESSOR-MISSING-ISOLATION',
+    'T-DRIFT-ANCESTOR-REJECTS-ISOLATION',
+    'T-DRIFT-NON-ANCESTOR-ISOLATION-OK',
+    'T-DRIFT-COLLIDING-PREFIX-MISSING-DESCENDANT',
+    'T-DRIFT-COLLIDING-PREFIX-MISSING-PREDECESSOR',
+    'T-DRIFT-BOTH-MISSING-SAME-PREFIX',
+    'T-DRIFT-MALFORMED-SAME-PREFIX',
+    'T-DRIFT-AMBIGUOUS-SHA',
+    'T-DRIFT-NON-COMMIT-OBJECT',
+    'T-DRIFT-MERGE-BASE-EXIT-2',
+    'T-DRIFT-SPAWN-FAILURE',
+    'T-DRIFT-TIMEOUT',
+    'T-DRIFT-UNEXPECTED-SIGNAL',
+    'T-DRIFT-STDERR-CONTAINS-SHA-STILL-ERROR',
+    'T-DRIFT-STDERR-EMPTY-STILL-ERROR',
+    'T-DRIFT-EXIT-1-BOTH-VERIFIED',
+    'T-DRIFT-FULL-SHA-IN-EVIDENCE',
+    'T-DRIFT-ABBREV-DISPLAY-DOES-NOT-DECIDE',
   ],
 };
 
@@ -819,6 +836,7 @@ export function runVitestJsonAndPersistLedger(params: {
     '--reporter=json',
     `--outputFile=${reporterTemp}`,
     '--passWithNoTests=false',
+    ...(params.commandType === 'vitest_suite' ? ['--maxWorkers=1'] : []),
     ...(params.extraArgs ?? []),
   ];
   const startedAt = new Date().toISOString();

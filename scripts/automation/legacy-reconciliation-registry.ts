@@ -16,6 +16,8 @@ export const CURRENT_HARDENING_WORKSTREAM_IDS = [
   'ws_7ecf361b08ebf3b5',
   'ws_160682e6d1d29306',
   'ws_35b2dd36862f74bf',
+  'ws_14384350646dfcfd',
+  'ws_7371a72f9d58f7ea',
 ] as const;
 
 export type LegacyIdentityProof =

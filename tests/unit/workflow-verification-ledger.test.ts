@@ -1,3 +1,4 @@
+import { spawnSync } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -5,8 +6,11 @@ import { buildEvidenceManifest } from '@/scripts/automation/workflow-evidence-ma
 import {
   inspectCommitAncestry,
   isCommitAncestor,
+  hashCanonicalEvidence,
   rejectUnreviewedHeadDrift,
   requireCommitNotAncestor,
+  resolveExactCommitObject,
+  type GitCommandResult,
   type GitCommandRunner,
 } from '@/scripts/automation/workflow-v24-disposition';
 import {
@@ -35,9 +39,50 @@ import {
 const INSTALL_ROOT = path.resolve(__dirname, '..', '..');
 const FAKE_A = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const FAKE_B = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+const COLLIDE_PREFIX = 'abcdef1';
+const PRED_COLLIDE = `${COLLIDE_PREFIX}${'a'.repeat(33)}`;
+const DESC_COLLIDE = `${COLLIDE_PREFIX}${'b'.repeat(33)}`;
+const MALFORMED_COLLIDE = `${COLLIDE_PREFIX}${'z'.repeat(33)}`;
 
-afterEach(() => {
+function verifySpec(args: string[]): string | null {
+  if (args[0] !== 'rev-parse' || !args.includes('--verify')) return null;
+  const spec = args[args.length - 1] ?? '';
+  return spec.replace(/\^\{commit\}$/u, '');
+}
+
+function fixtureGit(params: {
+  commits?: Record<string, string | GitCommandResult>;
+  mergeBase?: GitCommandResult | ((pred: string, desc: string) => GitCommandResult);
+  onMergeBase?: () => void;
+}): { git: GitCommandRunner; calls: string[][] } {
+  const calls: string[][] = [];
+  const git: GitCommandRunner = (_root, args) => {
+    calls.push([...args]);
+    const spec = verifySpec(args);
+    if (spec !== null) {
+      const mapped = params.commits?.[spec];
+      if (typeof mapped === 'string') return { status: 0, stdout: mapped, stderr: '' };
+      if (mapped) return mapped;
+      return {
+        status: 128,
+        stdout: '',
+        stderr: `fatal: Not a valid object name ${spec}`,
+      };
+    }
+    if (args[0] === 'merge-base' && args[1] === '--is-ancestor') {
+      params.onMergeBase?.();
+      if (typeof params.mergeBase === 'function') return params.mergeBase(args[2]!, args[3]!);
+      if (params.mergeBase) return params.mergeBase;
+      return { status: 2, stdout: '', stderr: 'unhandled merge-base' };
+    }
+    return { status: 128, stdout: '', stderr: `unhandled ${args.join(' ')}` };
+  };
+  return { git, calls };
+}
+
+afterEach(async () => {
   cleanupWorkflowV24Fixtures();
+  await new Promise<void>((resolve) => setImmediate(resolve));
 });
 
 function expectOk<T extends { ok: true } | { ok: false; message: string }>(
@@ -516,7 +561,7 @@ it('T-LEDGER-DUPLICATE-ID-FAIL-CLOSED second', () => {});
     expect(tampered.ok).toBe(false);
   });
 
-  it('T-DRIFT-GIT-THROW / T-DRIFT-GIT-NONZERO / T-DRIFT-GIT-MALFORMED / T-DRIFT-GIT-SUCCESS', () => {
+  it('T-DRIFT-GIT-THROW / T-DRIFT-SPAWN-FAILURE / T-DRIFT-GIT-NONZERO / T-DRIFT-GIT-MALFORMED / T-DRIFT-GIT-SUCCESS / T-DRIFT-ANCESTOR-REJECTS-ISOLATION / T-DRIFT-NON-ANCESTOR-ISOLATION-OK / T-DRIFT-EXIT-1-BOTH-VERIFIED', () => {
     const throwing: GitCommandRunner = () => {
       throw new Error('spawn failed');
     };
@@ -525,6 +570,7 @@ it('T-LEDGER-DUPLICATE-ID-FAIL-CLOSED second', () => {});
     const thrown = rejectUnreviewedHeadDrift('.', FAKE_A, FAKE_B, throwing);
     expect(thrown.ok).toBe(false);
     if (!thrown.ok) expect(thrown.kind).toBe('git-error');
+    expect(requireCommitNotAncestor('.', FAKE_A, FAKE_B, 'not isolated', throwing).ok).toBe(false);
 
     const nonzero: GitCommandRunner = () => ({
       status: 128,
@@ -543,10 +589,27 @@ it('T-LEDGER-DUPLICATE-ID-FAIL-CLOSED second', () => {});
     });
     expect(inspectCommitAncestry('.', FAKE_A, FAKE_B, malformed).status).toBe('error');
 
-    const ancestor: GitCommandRunner = () => ({ status: 0, stdout: '', stderr: '' });
-    expect(inspectCommitAncestry('.', FAKE_A, FAKE_B, ancestor).status).toBe('ancestor');
-    const notAncestor: GitCommandRunner = () => ({ status: 1, stdout: '', stderr: '' });
-    expect(inspectCommitAncestry('.', FAKE_A, FAKE_B, notAncestor).status).toBe('not_ancestor');
+    let mergeBaseCalls = 0;
+    const ancestor = fixtureGit({
+      commits: { [FAKE_A]: FAKE_A, [FAKE_B]: FAKE_B },
+      mergeBase: { status: 0, stdout: '', stderr: '' },
+      onMergeBase: () => {
+        mergeBaseCalls += 1;
+      },
+    });
+    expect(inspectCommitAncestry('.', FAKE_A, FAKE_B, ancestor.git).status).toBe('ancestor');
+    expect(requireCommitNotAncestor('.', FAKE_A, FAKE_B, 'not isolated', ancestor.git).ok).toBe(false);
+    expect(mergeBaseCalls).toBeGreaterThan(0);
+
+    const notAncestor = fixtureGit({
+      commits: { [FAKE_A]: FAKE_A, [FAKE_B]: FAKE_B },
+      mergeBase: { status: 1, stdout: '', stderr: '' },
+    });
+    expect(inspectCommitAncestry('.', FAKE_A, FAKE_B, notAncestor.git).status).toBe('not_ancestor');
+    expect(requireCommitNotAncestor('.', FAKE_A, FAKE_B, 'not isolated', notAncestor.git).ok).toBe(
+      true
+    );
+
     const missingHead = rejectUnreviewedHeadDrift('.', FAKE_A, null);
     expect(missingHead.ok).toBe(false);
     if (!missingHead.ok) expect(missingHead.kind).toBe('git-error');
@@ -556,6 +619,8 @@ it('T-LEDGER-DUPLICATE-ID-FAIL-CLOSED second', () => {});
     const second = commitFile(repoRoot, 'extra.ts', 'extra');
     expect(inspectCommitAncestry(repoRoot, first, second).status).toBe('ancestor');
     expect(inspectCommitAncestry(repoRoot, second, first).status).toBe('not_ancestor');
+    expect(requireCommitNotAncestor(repoRoot, first, second, 'not isolated').ok).toBe(false);
+    expect(requireCommitNotAncestor(repoRoot, second, first, 'not isolated').ok).toBe(true);
     const same = rejectUnreviewedHeadDrift(repoRoot, second, second);
     expect(same.ok).toBe(true);
     const extras = rejectUnreviewedHeadDrift(repoRoot, first, second);
@@ -644,22 +709,191 @@ it('T-LEDGER-DUPLICATE-ID-FAIL-CLOSED second', () => {});
     expect(built.manifest.status).toBe('failed');
   });
 
-  it('T-DRIFT-DESCENDANT-MISSING-NOT-ISOLATION / T-DRIFT-PREDECESSOR-MISSING-ISOLATION: missing descendant is not isolation', () => {
-    const descendantMissing: GitCommandRunner = () => ({
-      status: 128,
-      stdout: '',
-      stderr: `fatal: Not a valid commit name ${FAKE_B}`,
+  it('T-DRIFT-DESCENDANT-MISSING-NOT-ISOLATION / T-DRIFT-PREDECESSOR-MISSING-ISOLATION: missing objects fail closed, never isolation', () => {
+    const descendantMissing = fixtureGit({
+      commits: { [FAKE_A]: FAKE_A },
     });
-    const isolated = requireCommitNotAncestor('.', FAKE_A, FAKE_B, 'not isolated', descendantMissing);
+    const isolated = requireCommitNotAncestor(
+      '.',
+      FAKE_A,
+      FAKE_B,
+      'not isolated',
+      descendantMissing.git
+    );
     expect(isolated.ok).toBe(false);
+    expect(descendantMissing.calls.some((args) => args[0] === 'merge-base')).toBe(false);
 
-    const predecessorMissing: GitCommandRunner = () => ({
-      status: 128,
-      stdout: '',
-      stderr: `fatal: Not a valid commit name ${FAKE_A}`,
+    const predecessorMissing = fixtureGit({
+      commits: { [FAKE_B]: FAKE_B },
     });
-    const ok = requireCommitNotAncestor('.', FAKE_A, FAKE_B, 'not isolated', predecessorMissing);
-    expect(ok.ok).toBe(true);
+    const predecessor = requireCommitNotAncestor(
+      '.',
+      FAKE_A,
+      FAKE_B,
+      'not isolated',
+      predecessorMissing.git
+    );
+    expect(predecessor.ok).toBe(false);
+    expect(predecessorMissing.calls.some((args) => args[0] === 'merge-base')).toBe(false);
+
+    const repoRoot = makeTempRoot('drift-real-collide');
+    const pred = initGitRepo(repoRoot);
+    const prefix = pred.slice(0, 7).toLowerCase();
+    const missingDesc = `${prefix}${'c'.repeat(33)}`;
+    const missingPred = `${prefix}${'d'.repeat(33)}`;
+    expect(missingDesc).toHaveLength(40);
+    expect(missingPred).toHaveLength(40);
+    expect(resolveExactCommitObject(repoRoot, pred).ok).toBe(true);
+    expect(resolveExactCommitObject(repoRoot, missingDesc).ok).toBe(false);
+    expect(resolveExactCommitObject(repoRoot, missingPred).ok).toBe(false);
+    const gitMissing = spawnSync('git', ['rev-parse', '--verify', `${missingDesc}^{commit}`], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      shell: false,
+    });
+    expect(gitMissing.status).not.toBe(0);
+    const realMissingDesc = requireCommitNotAncestor(repoRoot, pred, missingDesc, 'not isolated');
+    expect(realMissingDesc.ok).toBe(false);
+    const realMissingPred = requireCommitNotAncestor(repoRoot, missingPred, pred, 'not isolated');
+    expect(realMissingPred.ok).toBe(false);
+  });
+
+  it('T-DRIFT-COLLIDING-PREFIX-MISSING-DESCENDANT / T-DRIFT-COLLIDING-PREFIX-MISSING-PREDECESSOR / T-DRIFT-BOTH-MISSING-SAME-PREFIX / T-DRIFT-MALFORMED-SAME-PREFIX', () => {
+    const missingDesc = fixtureGit({
+      commits: { [PRED_COLLIDE]: PRED_COLLIDE },
+    });
+    const descResult = requireCommitNotAncestor(
+      '.',
+      PRED_COLLIDE,
+      DESC_COLLIDE,
+      'not isolated',
+      missingDesc.git
+    );
+    expect(descResult.ok).toBe(false);
+    expect(missingDesc.calls.some((args) => args[0] === 'merge-base')).toBe(false);
+    const descVerify = missingDesc.calls.find((args) => verifySpec(args) === DESC_COLLIDE);
+    expect(descVerify).toBeTruthy();
+
+    const missingPred = fixtureGit({
+      commits: { [DESC_COLLIDE]: DESC_COLLIDE },
+    });
+    const predResult = requireCommitNotAncestor(
+      '.',
+      PRED_COLLIDE,
+      DESC_COLLIDE,
+      'not isolated',
+      missingPred.git
+    );
+    expect(predResult.ok).toBe(false);
+    expect(missingPred.calls.some((args) => args[0] === 'merge-base')).toBe(false);
+
+    const bothMissing = fixtureGit({ commits: {} });
+    const both = requireCommitNotAncestor(
+      '.',
+      PRED_COLLIDE,
+      DESC_COLLIDE,
+      'not isolated',
+      bothMissing.git
+    );
+    expect(both.ok).toBe(false);
+    expect(bothMissing.calls.some((args) => args[0] === 'merge-base')).toBe(false);
+
+    const malformed = requireCommitNotAncestor('.', MALFORMED_COLLIDE, DESC_COLLIDE, 'not isolated');
+    expect(malformed.ok).toBe(false);
+    expect(malformed.ok === false && malformed.message).toMatch(/malformed commit identity/i);
+  });
+
+  it('T-DRIFT-AMBIGUOUS-SHA / T-DRIFT-NON-COMMIT-OBJECT / T-DRIFT-MERGE-BASE-EXIT-2 / T-DRIFT-TIMEOUT / T-DRIFT-UNEXPECTED-SIGNAL', () => {
+    const ambiguous = fixtureGit({
+      commits: {
+        abcdef1: {
+          status: 128,
+          stdout: '',
+          stderr: 'error: short SHA1 abcdef1 is ambiguous',
+        },
+        [FAKE_B]: FAKE_B,
+      },
+    });
+    expect(requireCommitNotAncestor('.', 'abcdef1', FAKE_B, 'not isolated', ambiguous.git).ok).toBe(
+      false
+    );
+    expect(ambiguous.calls.some((args) => args[0] === 'merge-base')).toBe(false);
+
+    const repoRoot = makeTempRoot('non-commit');
+    initGitRepo(repoRoot);
+    writeFileSync(path.join(repoRoot, 'blob.txt'), 'payload');
+    const blob = git(repoRoot, ['hash-object', '-w', 'blob.txt']);
+    expect(blob).toMatch(/^[0-9a-f]{40}$/i);
+    expect(resolveExactCommitObject(repoRoot, blob).ok).toBe(false);
+    expect(requireCommitNotAncestor(repoRoot, blob, git(repoRoot, ['rev-parse', 'HEAD']), 'not isolated').ok).toBe(
+      false
+    );
+
+    const exitTwo = fixtureGit({
+      commits: { [FAKE_A]: FAKE_A, [FAKE_B]: FAKE_B },
+      mergeBase: { status: 2, stdout: '', stderr: 'fatal: Not a valid commit name abcdef1' },
+    });
+    expect(requireCommitNotAncestor('.', FAKE_A, FAKE_B, 'not isolated', exitTwo.git).ok).toBe(false);
+
+    const timeout = fixtureGit({
+      commits: {
+        [FAKE_A]: { status: null, stdout: '', stderr: '', timedOut: true, error: Object.assign(new Error('ETIMEDOUT'), { code: 'ETIMEDOUT' }) },
+        [FAKE_B]: FAKE_B,
+      },
+    });
+    expect(requireCommitNotAncestor('.', FAKE_A, FAKE_B, 'not isolated', timeout.git).ok).toBe(false);
+
+    const signaled = fixtureGit({
+      commits: {
+        [FAKE_A]: { status: null, stdout: '', stderr: '', signal: 'SIGTERM' },
+        [FAKE_B]: FAKE_B,
+      },
+    });
+    expect(requireCommitNotAncestor('.', FAKE_A, FAKE_B, 'not isolated', signaled.git).ok).toBe(false);
+  });
+
+  it('T-DRIFT-STDERR-CONTAINS-SHA-STILL-ERROR / T-DRIFT-STDERR-EMPTY-STILL-ERROR / T-DRIFT-FULL-SHA-IN-EVIDENCE / T-DRIFT-ABBREV-DISPLAY-DOES-NOT-DECIDE', () => {
+    const stderrSha = fixtureGit({
+      commits: { [PRED_COLLIDE]: PRED_COLLIDE, [FAKE_B]: FAKE_B },
+      mergeBase: {
+        status: 128,
+        stdout: '',
+        stderr: `fatal: Not a valid object name ${PRED_COLLIDE}`,
+      },
+    });
+    expect(requireCommitNotAncestor('.', PRED_COLLIDE, FAKE_B, 'not isolated', stderrSha.git).ok).toBe(
+      false
+    );
+
+    const emptyStderr = fixtureGit({
+      commits: { [FAKE_A]: FAKE_A, [FAKE_B]: FAKE_B },
+      mergeBase: { status: 128, stdout: '', stderr: '' },
+    });
+    expect(requireCommitNotAncestor('.', FAKE_A, FAKE_B, 'not isolated', emptyStderr.git).ok).toBe(
+      false
+    );
+
+    const abbrev = COLLIDE_PREFIX;
+    const recorded: string[][] = [];
+    const fullShaGit = fixtureGit({
+      commits: { [abbrev]: PRED_COLLIDE, [PRED_COLLIDE]: PRED_COLLIDE, [FAKE_B]: FAKE_B },
+      mergeBase: (pred, desc) => {
+        recorded.push([pred, desc]);
+        return { status: 1, stdout: '', stderr: abbrev };
+      },
+    });
+    const isolated = requireCommitNotAncestor('.', abbrev, FAKE_B, 'not isolated', fullShaGit.git);
+    expect(isolated.ok).toBe(true);
+    expect(recorded).toEqual([[PRED_COLLIDE, FAKE_B]]);
+    expect(resolveExactCommitObject('.', abbrev, fullShaGit.git)).toEqual({
+      ok: true,
+      sha: PRED_COLLIDE,
+    });
+    expect(hashCanonicalEvidence({ predecessorHead: PRED_COLLIDE })).not.toBe(
+      hashCanonicalEvidence({ predecessorHead: abbrev })
+    );
+    expect(PRED_COLLIDE).toHaveLength(40);
+    expect(abbrev).toHaveLength(7);
   });
 
   it('mapped blocker IDs require the registered ledger tests, not the blocker token', () => {

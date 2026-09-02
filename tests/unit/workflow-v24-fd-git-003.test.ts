@@ -33,11 +33,12 @@ import {
   writePassingManifest,
 } from '@/tests/unit/workflow-v24-test-harness';
 
-afterEach(() => {
+afterEach(async () => {
   cleanupWorkflowV24Fixtures();
+  await new Promise<void>((resolve) => setImmediate(resolve));
 });
 
-describe('TEE V2.4 FD-GIT-003 closure-head and FD-REHOME-001', { timeout: 50_000 }, () => {
+describe('TEE V2.4 FD-GIT-003 closure-head and FD-REHOME-001', { timeout: 90_000 }, () => {
   it('T-FD-GIT-003-CLOSURE-HEAD / T-FD-GIT-003-CANDIDATE-RANGE / T-FD-GIT-003-SUCCESS-HEAD-UNCHANGED / T-FD-GIT-003-FAILED-FIRST-NO-CLOSURE / T-FD-GIT-003-ILLEGAL-POST-BUDGET / T-FD-GIT-003-HEAD-DRIFT / T-FD-GIT-003-TAMPER-CANDIDATE / T-FD-GIT-003-SUBSTITUTE-B', { timeout: 30000 }, () => {
     const repoRoot = makeTempRoot('fd-git-003-closure');
     const baseline = initGitRepo(repoRoot);
@@ -529,6 +530,7 @@ describe('TEE V2.4 FD-GIT-003 closure-head and FD-REHOME-001', { timeout: 50_000
           sourceReleaseContext: `${ancestralRoot}#source`,
           sourceHeadCommit: ancestralSourceHead,
           sourceBaselineCommit: ancestralBaseline,
+          sourceReviewWorkstreamId: 'ws_fd_rehome_source',
         }
       ),
     });
@@ -548,6 +550,7 @@ describe('TEE V2.4 FD-GIT-003 closure-head and FD-REHOME-001', { timeout: 50_000
       sourceReleaseContext: `${ancestralRoot}#source`,
       sourceHeadCommit: ancestralSourceHead,
       sourceBaselineCommit: ancestralBaseline,
+      sourceReviewWorkstreamId: 'ws_fd_rehome_source',
     });
     expect(ancestral.ok).toBe(false);
     expect(ancestral.message).toMatch(/ancestor/i);

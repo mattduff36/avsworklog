@@ -37,7 +37,7 @@ import {
   withWorkflowLock,
 } from './workflow-events';
 import { assertProtocolGitBinding, readWorkflowGitBinding } from './workflow-git-binding';
-import { inspectCommitAncestry } from './workflow-v24-disposition';
+import { inspectCommitAncestry, resolveExactCommitObject } from './workflow-v24-disposition';
 
 const FORBIDDEN_RELEASE_REFS = new Set(['HEAD', '@', 'HEAD^{}', 'refs/heads/HEAD']);
 
@@ -139,7 +139,8 @@ function runGit(repoRoot: string, args: string[]): string | null {
 }
 
 function resolveCommit(repoRoot: string, value: string): string | null {
-  return runGit(repoRoot, ['rev-parse', '--verify', `${value}^{commit}`]);
+  const resolved = resolveExactCommitObject(repoRoot, value);
+  return resolved.ok ? resolved.sha : null;
 }
 
 function requireAncestor(
@@ -149,7 +150,6 @@ function requireAncestor(
   failMessage: string
 ): string | null {
   if (!ancestor || !descendant) return failMessage;
-  if (ancestor === descendant) return null;
   const inspection = inspectCommitAncestry(repoRoot, ancestor, descendant);
   if (inspection.status === 'error') return inspection.message;
   if (inspection.status === 'not_ancestor') return failMessage;
