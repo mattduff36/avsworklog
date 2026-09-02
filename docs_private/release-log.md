@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.1.0
+
+**GIT COMMIT MESSAGE**
+`feat(workflow): import TEE V2.4 runtime from exhausted isolated candidate`
+
+**PUSHED AT**
+2026-09-02T17:07:05.693Z
+
+**WHAT CHANGED**
+Fail-closed Git isolation without error-text inference. Import TEE V2.4 runtime from exhausted isolated candidate.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(workflow): fail-closed Git isolation without error-text inference`
+- `feat(workflow): import TEE V2.4 runtime from exhausted isolated candidate`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0926.0.0
 
 **GIT COMMIT MESSAGE**

@@ -1,5 +1,18 @@
 [
   {
+    "version": "0926.1.0",
+    "updateKind": "major",
+    "title": "Workflow update",
+    "description": "Fail-closed Git isolation without error-text inference. Import TEE V2.4 runtime from exhausted isolated candidate.",
+    "summary": "Fail-closed Git isolation without error-text inference. Import TEE V2.4 runtime from exhausted isolated candidate.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-09-02T17:07:05.693Z"
+  },
+  {
     "version": "0926.0.0",
     "updateKind": "minor",
     "title": "Daily Tasks improvements",
