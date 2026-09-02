@@ -1,6 +1,6 @@
 # Development (current)
 
-Working guide for Squires. Commands come from root `package.json`. TEE V2.2 owns lane selection, review gates, and completion markers — do not copy that procedure here.
+Working guide for Squires. Commands come from root `package.json`. TEE V2.4 owns lane selection, review gates, and completion markers — do not copy that procedure here.
 
 ## Working method
 
@@ -95,7 +95,17 @@ npm run fixerrors
 npm run review:preflight
 ```
 
-`/fap` and `/ffap` are the explicit push-authorising commands. `finalise` / `finalise-full` do not push.
+Local commit is not release-ready, and release-ready is not a push. `/fap` and `/ffap` do not authorize GitHub push; use `finalise and push`, `finalise full and push`, `finalise:push`, or `push to GitHub`. `finalise` / `finalise-full` stay local.
+
+CRITICAL protocol notes (runtime is in `scripts/automation`, not hand-edited JSON):
+
+- Split ancestors are parked history. The active descendant owns remaining work. After two failed premium rounds, remaining work is routing, isolation, or proven removal from release — not another normal final-diff pass.
+- Orphan, cyclic, or malformed split lineage blocks as protocol corruption.
+- Review evidence is bound to the reviewed Git HEAD and working-tree fingerprint. After drift, run `review-start --pass delta` and a fresh final-diff review; do not silently rebind metadata.
+- Unresolved CRITICAL implementation already on the release branch still owns mutating finalise. An independent unstarted sibling does not deadlock a different matching `finalise_ready` lineage.
+- `npm run finalise -- --dry-run` is non-mutating. Run `npm run workflow-protocol -- status --blocking` before mutating finalise.
+- Do not launch a third premium review for the same CRITICAL continuation. Routing or split does not reset this budget.
+- Historical leftover records may be closed only through `workflow-protocol reconcile-legacy`, which writes a separate evidence-backed `legacy-closure.json` and does not rewrite protocol lifecycle fields. It cannot authorise finalise or skip review for current work.
 
 Do not run `npm run build` unless the user authorises a test build.
 

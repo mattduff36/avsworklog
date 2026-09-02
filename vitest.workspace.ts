@@ -9,6 +9,7 @@ export default defineWorkspace([
     test: {
       name: 'integration',
       environment: 'node',
+      hookTimeout: 120_000,
       include: [
         'tests/integration/**/*.test.ts',
         'tests/unit/**/*.test.ts',

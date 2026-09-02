@@ -14,7 +14,7 @@ This file routes agents. It is not a second engineering workflow.
 | How to work, test, and commit | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
 | Auth, permissions, RLS, secrets, production data | [`docs/SECURITY.md`](docs/SECURITY.md) |
 
-Token-Efficient Engineering V2.2 is the active engineering workflow (global Skill). Do not duplicate TEE lanes, markers, or finalise procedure here. Project rules override TEE when they are stricter.
+Token-Efficient Engineering V2.4 is the active engineering workflow (global Skill). Do not duplicate TEE lanes, markers, or finalise procedure here. Project rules override TEE when they are stricter.
 
 ## Documentation precedence
 
@@ -30,7 +30,7 @@ Token-Efficient Engineering V2.2 is the active engineering workflow (global Skil
 ## Hard project rules
 
 - Never expose environment values, tokens, cookies, or secrets.
-- Never push unless the user writes `push to GitHub`, invokes `/fap` or `/ffap`, or explicitly requests `finalise and push` / `finalise full and push` / `finalise:push`.
+- Never push unless the user writes `push to GitHub`, or explicitly requests `finalise and push` / `finalise full and push` / `finalise:push`. `/fap` and `/ffap` do not authorize a push.
 - Stay on the current branch unless the user says otherwise.
 - Do not change production data or schema without explicit permission. Persistence, auth, permissions/RLS, money, and concurrency are CRITICAL under TEE.
 - For database/persistence intent, load `.cursor/rules/database-migrations.mdc` and the migration guides before acting.

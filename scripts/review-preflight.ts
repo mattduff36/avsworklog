@@ -152,16 +152,22 @@ async function main(): Promise<void> {
       throw new Error(`invalid plan path: ${resolved.errors.join('; ')}`);
     }
     const contract = extractPlanContractMarker(readFileSync(resolved.absolutePath, 'utf8'));
-    if (contract.status === 'present' && contract.contract) {
-      requiredTestIds = contract.contract.requiredTests.map((test) => test.id);
-      const reasons = contract.contract.independentReviewReasons ?? [];
-      if (
-        reasons.includes('permissions') ||
-        reasons.includes('money') ||
-        reasons.includes('auth')
-      ) {
-        needsTimesheetsPay = true;
-      }
+    if (contract.status !== 'present' || !contract.contract) {
+      throw new Error(
+        `plan contract is ${contract.status}: ${(contract.errors ?? []).join('; ')}`
+      );
+    }
+    requiredTestIds = contract.contract.requiredTests.map((test) => test.id);
+    if (contract.contract.risk === 'high' && requiredTestIds.length === 0) {
+      throw new Error('high-risk plan requiredTests are empty');
+    }
+    const reasons = contract.contract.independentReviewReasons ?? [];
+    if (
+      reasons.includes('permissions') ||
+      reasons.includes('money') ||
+      reasons.includes('auth')
+    ) {
+      needsTimesheetsPay = true;
     }
   }
 
@@ -193,19 +199,13 @@ async function main(): Promise<void> {
   }
 
   const extraCommands: EvidenceCommandResult[] = [];
-  const extraExecutedIds: string[] = [];
   const extraIds = requiredTestIds.filter((id) => EXTRA_REQUIRED_TEST_COMMANDS[id]);
-  const vitestTestIds = requiredTestIds.filter((id) => !EXTRA_REQUIRED_TEST_COMMANDS[id]);
 
   if (!skipChecks) {
     for (const id of extraIds) {
       const spec = EXTRA_REQUIRED_TEST_COMMANDS[id];
       if (!spec) continue;
-      const extraResult = runCommand(repoRoot, spec.name, spec.command, spec.args);
-      extraCommands.push(extraResult);
-      if (extraResult.status === 'passed') {
-        extraExecutedIds.push(id);
-      }
+      extraCommands.push(runCommand(repoRoot, spec.name, spec.command, spec.args));
     }
   }
 
@@ -215,21 +215,11 @@ async function main(): Promise<void> {
     kind,
     baseCommit: protocol.baseCommit,
     requiredTestIds,
-    vitestTestIds,
     runChecks: !skipChecks,
-    runRequiredTests: !skipChecks && vitestTestIds.length > 0,
-    executedTestIds: extraExecutedIds,
+    runRequiredTests: !skipChecks,
     commandResults: extraCommands,
     liveVerification,
     closedBlockerIds: kind === 'fix-delta' ? closedBlockerIds : undefined,
-    blockerEvidence:
-      kind === 'fix-delta'
-        ? closedBlockerIds.map((blockerId) => ({
-            blockerId,
-            evidenceLabel: `required test ${blockerId}`,
-            commandName: EXTRA_REQUIRED_TEST_COMMANDS[blockerId]?.name ?? 'required-tests',
-          }))
-        : undefined,
   });
 
   if (built.manifest.status !== 'passed') {

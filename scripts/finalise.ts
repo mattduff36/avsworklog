@@ -12,6 +12,15 @@ import {
   resolveActiveProtocolFinaliseContext,
 } from './automation/finalise-checkpoint';
 import {
+  assertFinaliseAllowedForProtocol,
+  formatFinaliseProtocolReadinessReport,
+  getFinaliseProtocolReadiness,
+} from './automation/workflow-finalise-correlation';
+import {
+  assertFinaliseProductCommitAllowed,
+  recordFinaliseOwnedCommit,
+} from './automation/workflow-review-protocol';
+import {
   clearFinaliseFailureArtifact,
   writeFinaliseFailureArtifact,
 } from './automation/finalise-failure';
@@ -635,7 +644,7 @@ async function createDbClient(): Promise<pg.Client> {
   return client;
 }
 
-async function inspectPendingMigrations(
+export async function inspectPendingMigrations(
   migrationFiles: FinaliseMigrationFile[],
   deferred: string[]
 ): Promise<MigrationRunSummary> {
@@ -935,6 +944,7 @@ function commitAllChanges(commitMessage: string): boolean {
     return false;
   }
 
+  assertFinaliseProductCommitAllowed(REPO_ROOT);
   runCommand('git', ['add', '-A']);
   runCommand('git', ['commit', '-m', commitMessage]);
   return true;
@@ -998,6 +1008,7 @@ async function main(): Promise<void> {
     scriptName: 'finalise',
     mode: getPushModeDescription(options),
     args: process.argv.slice(2),
+    persist: !options.dryRun,
   });
   automationRun = run;
   let timingEntries: FinaliseTimingEntry[] = [];
@@ -1009,11 +1020,25 @@ async function main(): Promise<void> {
       return;
     }
 
-    await run.step('Check for blocking Cursor activity', () => assertNoBlockingCursorActivity());
+    if (!options.dryRun) {
+      await run.step('Check for blocking Cursor activity', () => assertNoBlockingCursorActivity());
+    }
 
     const unmergedFiles = getUnmergedFiles();
     if (unmergedFiles.length > 0) {
       throw new Error(`Resolve merge conflicts before finalising: ${unmergedFiles.join(', ')}`);
+    }
+
+    const protocolReadiness = getFinaliseProtocolReadiness(REPO_ROOT);
+    if (!options.dryRun) {
+      await run.step('Validate protocol finalise gate', () => {
+        assertFinaliseAllowedForProtocol(REPO_ROOT);
+      });
+    } else {
+      await run.step('Inspect protocol finalise readiness', () => {
+        console.log('\n==> Protocol readiness');
+        console.log(formatFinaliseProtocolReadinessReport(protocolReadiness));
+      });
     }
 
     const changedFileStats = getChangedFileStats();
@@ -1063,13 +1088,6 @@ async function main(): Promise<void> {
     };
 
     if (options.dryRun) {
-      migrationSummary = await inspectPendingMigrations(
-        predeployMigrations,
-        deferredMigrationPaths
-      );
-      const dryRunNeedsDbValidate = getValidatedMigrationEvidencePaths(
-        migrationSummary
-      ).some((relativePath) => migrationNeedsDbValidate(relativePath));
       console.log(`Mode: ${getPushModeDescription(options)}`);
       console.log(`Branch: ${branch || '(detached HEAD)'}`);
       console.log(
@@ -1078,18 +1096,14 @@ async function main(): Promise<void> {
         }`
       );
       console.log(`Dev server: ${devServerProcesses.length > 0 ? `would stop ${devServerProcesses.length} process(es)` : 'none running'}`);
-      console.log(`Migrations applied (would apply): ${formatMigrationFiles(migrationSummary.applied)}`);
-      console.log(`Migrations reused: ${formatMigrationFiles(migrationSummary.reused)}`);
-      console.log(`Migrations deferred (postdeploy): ${formatMigrationFiles(migrationSummary.deferred)}`);
       console.log(
-        `DB validate: ${
-          dryRunNeedsDbValidate && recentDbValidateRun
-            ? `would skip; recent run found: ${formatRecentTask(recentDbValidateRun)}`
-            : dryRunNeedsDbValidate
-            ? 'would run'
-            : 'not needed'
+        `Migrations: ${
+          predeployMigrationPaths.length > 0
+            ? `would inspect ${predeployMigrationPaths.join(', ')}`
+            : 'none pending'
         }`
       );
+      console.log(`Migrations deferred (postdeploy): ${formatMigrationFiles(deferredMigrationPaths)}`);
       console.log(
         `Build: ${
           recentBuildRun
@@ -1329,6 +1343,12 @@ async function main(): Promise<void> {
     const committed = await timeFinaliseStep(timingEntries, 'Commit workspace changes', () =>
       commitAllChanges(changeSummary.commitMessage)
     );
+    if (committed) {
+      const owned = recordFinaliseOwnedCommit(REPO_ROOT);
+      if (!owned.ok) {
+        throw new Error(owned.message);
+      }
+    }
     await run.step(
       'Record commit outcome',
       () => undefined,
@@ -1350,6 +1370,12 @@ async function main(): Promise<void> {
       runCommand('npm', ['run', 'version:bump', '--', releaseBeforeSha, releaseAfterSha]);
       return commitReleaseVersionChanges(releasePrimaryCommitMessage);
     });
+    if (releaseVersion) {
+      const owned = recordFinaliseOwnedCommit(REPO_ROOT);
+      if (!owned.ok) {
+        throw new Error(owned.message);
+      }
+    }
     printProgress(
       releaseVersion
         ? `Created release version commit: ${formatReleaseVersionCommitMessage(releasePrimaryCommitMessage, releaseVersion).split(/\r?\n/u)[0]}`

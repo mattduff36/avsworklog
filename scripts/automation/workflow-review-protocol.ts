@@ -1,16 +1,28 @@
 import { createHash, randomBytes } from 'crypto';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync, readFileSync, readdirSync, unlinkSync } from 'fs';
 import path from 'path';
 import type {
   WorkflowActiveFinaliseContext,
   WorkflowProtocolPhase,
   WorkflowProtocolRecord,
   WorkflowProtocolReviewAttempt,
+  WorkflowProtocolReviewPass,
+  WorkflowRehomeProvenance,
   WorkflowReviewState,
+  WorkflowRouteDispositionTarget,
 } from './types';
+import { getCurrentTreeFingerprint, recomputeManifestProvenIds } from './workflow-evidence-manifest';
+import { requiredTestIdsForBlocker } from './workflow-verification-ledger';
+import {
+  appendOwnedCommit,
+  assertNamedBranchForInit,
+  assertProtocolGitBinding,
+  lastOwnedCommit,
+  readWorkflowGitBinding,
+} from './workflow-git-binding';
 import {
   getWorkflowPaths,
-  loadWorkflowReviewState,
+  loadWorkflowReviewStateStrict,
   saveWorkflowReviewState,
   upsertWorkstreamRecord,
   withWorkflowLock,
@@ -20,7 +32,20 @@ import {
   extractPlanContractMarker,
   resolvePlanPath,
 } from './workflow-plan-contract';
-import { getCurrentTreeFingerprint } from './workflow-evidence-manifest';
+import {
+  buildBoundRehomeProvenance,
+  buildRouteDisposition,
+  isApprovalValidReviewEvidence,
+  lineageBudgetExhausted,
+  lineageFailedPremiumReviewCount,
+  lineageFirstConsumed,
+  planRequiresBoundRehome,
+  revalidateBoundRehomeProvenance,
+} from './workflow-v24-disposition';
+
+export function resolveProtocolPlanAbsolutePath(repoRoot: string, planPath: string): string {
+  return path.isAbsolute(planPath) ? planPath : path.resolve(repoRoot, planPath);
+}
 
 export const WORKFLOW_PROTOCOL_VERSION = '1' as const;
 export const WORKFLOW_ROUTING_REQUIRED_EXIT_CODE = 2;
@@ -32,7 +57,10 @@ export type WorkflowProtocolCommand =
   | 'review-record'
   | 'fix-record'
   | 'split'
+  | 'route'
+  | 'rehome-bind'
   | 'finalise-start'
+  | 'reconcile-legacy'
   | 'status';
 
 export interface WorkflowProtocolTransitionResult {
@@ -43,6 +71,7 @@ export interface WorkflowProtocolTransitionResult {
   reviewToken?: string;
   checkpointId?: string;
   splitWorkstreamId?: string;
+  childRecord?: WorkflowProtocolRecord;
 }
 
 function nowIso(now?: () => Date): string {
@@ -79,6 +108,36 @@ export function getProtocolRecordPath(repoRoot: string, workstreamId: string): s
   return path.join(getProtocolDirectory(repoRoot, workstreamId), 'protocol.json');
 }
 
+function expectedPlanRequiredTestIds(
+  record: WorkflowProtocolRecord
+): { ok: true; ids?: string[] } | { ok: false; message: string } {
+  if (!record.planPath) return { ok: true };
+  if (!existsSync(record.planPath)) {
+    return { ok: false, message: `plan path is missing: ${record.planPath}` };
+  }
+  try {
+    const parsed = extractPlanContractMarker(readFileSync(record.planPath, 'utf8'));
+    if (parsed.status !== 'present' || !parsed.contract) {
+      return {
+        ok: false,
+        message: `plan contract is ${parsed.status}: ${(parsed.errors ?? []).join('; ')}`,
+      };
+    }
+    const ids = parsed.contract.requiredTests
+      .map((test) => test.id)
+      .filter((id) => !id.startsWith('WF-PAY-'));
+    if (parsed.contract.risk === 'high' && ids.length === 0) {
+      return { ok: false, message: 'high-risk plan requiredTests are empty' };
+    }
+    return { ok: true, ids };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error instanceof Error ? error.message : 'plan contract could not be read',
+    };
+  }
+}
+
 export function createEmptyProtocolRecord(params: {
   workstreamId: string;
   baseCommit: string;
@@ -87,6 +146,7 @@ export function createEmptyProtocolRecord(params: {
   planPath?: string | null;
   sourceWorkstreamIds?: string[];
   inheritedFailedReviewCount?: number;
+  rehomeProvenance?: WorkflowRehomeProvenance | null;
   now?: () => Date;
 }): WorkflowProtocolRecord {
   return {
@@ -109,8 +169,11 @@ export function createEmptyProtocolRecord(params: {
     evidenceManifestPath: null,
     fixDeltaManifestPath: null,
     activeCheckpointId: null,
+    reviewedTreeFingerprint: null,
     planPath: params.planPath ?? null,
     updatedAt: nowIso(params.now),
+    rehomeProvenance: params.rehomeProvenance ?? null,
+    routeDisposition: null,
   };
 }
 
@@ -148,6 +211,31 @@ export function writeProtocolRecord(repoRoot: string, record: WorkflowProtocolRe
   return filePath;
 }
 
+export function lastReviewAttempt(
+  record: WorkflowProtocolRecord
+): WorkflowProtocolRecord['reviewAttempts'][number] | null {
+  return record.reviewAttempts[record.reviewAttempts.length - 1] ?? null;
+}
+
+export function reviewAllowsFinaliseStart(record: WorkflowProtocolRecord): boolean {
+  if (record.phase === 'reconciled' || record.phase === 'finalised') return false;
+  if (
+    record.phase === 'routing_required' ||
+    record.phase === 'removed_from_release' ||
+    record.phase === 'reverted' ||
+    record.phase === 'superseded' ||
+    record.phase === 'rehomed'
+  ) {
+    return false;
+  }
+  if (record.openBlockerIds.length > 0) return false;
+  const last = lastReviewAttempt(record);
+  if (!last) {
+    return record.phase === 'review_closed' || record.phase === 'finalise_ready';
+  }
+  return isApprovalValidReviewEvidence(last, record);
+}
+
 function upsertProtocolInState(
   state: WorkflowReviewState,
   record: WorkflowProtocolRecord
@@ -177,6 +265,99 @@ export function getActiveFinaliseContext(
   state: WorkflowReviewState
 ): WorkflowActiveFinaliseContext | null {
   return state.activeFinaliseContext ?? null;
+}
+
+export function assertFinaliseProductCommitAllowed(repoRoot: string): void {
+  const paths = getWorkflowPaths(repoRoot);
+  const loaded = loadWorkflowReviewStateStrict(paths.statePath);
+  if (!loaded.ok) {
+    throw new Error(`workflow review state is ${loaded.reason}; refuse product commit`);
+  }
+  const git = readWorkflowGitBinding(repoRoot);
+  if (git.detached || !git.branchName) {
+    throw new Error('finalise product commit requires a named branch');
+  }
+  const active = getActiveFinaliseContext(loaded.state);
+  if (!active) {
+    // Ordinary FAST/STANDARD finalise has no C9 activation chain.
+    return;
+  }
+  if (!active.activatedHeadCommit) {
+    throw new Error(
+      'active finalise context is missing activatedHeadCommit; refuse product commit'
+    );
+  }
+  const expected = lastOwnedCommit(active.ownedCommits, active.activatedHeadCommit);
+  const protocol = readProtocolRecord(repoRoot, active.workstreamId);
+  if (protocol?.branchName && protocol.branchName !== git.branchName) {
+    throw new Error(
+      `current branch ${git.branchName} does not match protocol branch ${protocol.branchName}; refuse to authorise a product commit on the wrong branch`
+    );
+  }
+  if (!git.headCommit || !expected || git.headCommit !== expected) {
+    throw new Error(
+      `HEAD ${git.headCommit ?? 'unknown'} is not the activated/owned finalise SHA ${expected ?? 'missing'}; refuse to authorise a newer Git state`
+    );
+  }
+}
+
+export function recordFinaliseOwnedCommit(repoRoot: string): {
+  ok: true;
+  ownedCommits: string[];
+} | { ok: false; message: string } {
+  const paths = getWorkflowPaths(repoRoot);
+  return withWorkflowLock(paths.lockPath, () => {
+    const loaded = loadWorkflowReviewStateStrict(paths.statePath);
+    if (!loaded.ok) {
+      return { ok: false as const, message: `workflow review state is ${loaded.reason}` };
+    }
+    const state = loaded.state;
+    const active = getActiveFinaliseContext(state);
+    if (!active?.activatedHeadCommit) {
+      return { ok: false as const, message: 'no active finalise context with activatedHeadCommit' };
+    }
+    const appended = appendOwnedCommit({
+      repoRoot,
+      ownedCommits: active.ownedCommits ?? [active.activatedHeadCommit],
+      activatedHeadCommit: active.activatedHeadCommit,
+    });
+    if (!appended.ok) return appended;
+    const next: WorkflowReviewState = {
+      ...state,
+      activeFinaliseContext: {
+        ...active,
+        ownedCommits: appended.ownedCommits,
+      },
+    };
+    saveWorkflowReviewState(paths.statePath, next);
+    const checkpointPath = path.join(
+      repoRoot,
+      'docs_private',
+      'automation',
+      'workstreams',
+      active.workstreamId,
+      'checkpoints',
+      `${active.checkpointId}.json`
+    );
+    if (existsSync(checkpointPath)) {
+      try {
+        const parsed = JSON.parse(readFileSync(checkpointPath, 'utf8')) as Record<string, unknown>;
+        writeJsonAtomic(checkpointPath, {
+          ...parsed,
+          ownedCommits: appended.ownedCommits,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (error) {
+        return {
+          ok: false as const,
+          message: `unable to sync owned commits onto checkpoint ${active.checkpointId}: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        };
+      }
+    }
+    return { ok: true as const, ownedCommits: appended.ownedCommits };
+  });
 }
 
 function validateEvidenceManifest(params: {
@@ -257,33 +438,35 @@ function validateEvidenceManifest(params: {
         return { ok: false, message: 'preflight manifest requires executed commands', absolutePath };
       }
       const requiredTests = Array.isArray(parsed.requiredTests) ? parsed.requiredTests : [];
+      const proven = recomputeManifestProvenIds({
+        repoRoot: params.repoRoot,
+        workstreamId: params.workstreamId,
+        parsed,
+      });
+      if (!proven.ok) {
+        return { ok: false, message: proven.message, absolutePath };
+      }
       const incomplete = requiredTests.filter((entry) => {
         if (!entry || typeof entry !== 'object') return true;
         const row = entry as Record<string, unknown>;
-        return row.status !== 'completed' || row.behavioral !== true || row.executed !== true;
+        if (typeof row.id !== 'string') return true;
+        return !proven.executedIds.has(row.id);
       });
       if (requiredTests.length > 0 && incomplete.length > 0) {
         return {
           ok: false,
-          message: 'preflight requiredTests must be behavioral and executed',
+          message: 'preflight requiredTests must be proven by verification ledger or exact command',
           absolutePath,
         };
       }
       if (params.expectedRequiredTestIds && params.expectedRequiredTestIds.length > 0) {
-        const presentIds = new Set(
-          requiredTests
-            .map((entry) =>
-              entry && typeof entry === 'object'
-                ? (entry as Record<string, unknown>).id
-                : null
-            )
-            .filter((id): id is string => typeof id === 'string')
+        const missingPlanIds = params.expectedRequiredTestIds.filter(
+          (id) => !proven.executedIds.has(id)
         );
-        const missingPlanIds = params.expectedRequiredTestIds.filter((id) => !presentIds.has(id));
         if (missingPlanIds.length > 0) {
           return {
             ok: false,
-            message: `preflight missing plan requiredTests: ${missingPlanIds.join(', ')}`,
+            message: `preflight missing proven plan requiredTests: ${missingPlanIds.join(', ')}`,
             absolutePath,
           };
         }
@@ -293,49 +476,27 @@ function validateEvidenceManifest(params: {
       const closed = Array.isArray(parsed.closedBlockerIds)
         ? parsed.closedBlockerIds.filter((id): id is string => typeof id === 'string')
         : [];
-      const evidence = Array.isArray(parsed.blockerEvidence) ? parsed.blockerEvidence : [];
-      const commands = Array.isArray(parsed.commands) ? parsed.commands : [];
       if (closed.length === 0) {
         return { ok: false, message: 'fix-delta requires closedBlockerIds', absolutePath };
       }
-      if (evidence.length === 0) {
-        return { ok: false, message: 'fix-delta requires blockerEvidence mappings', absolutePath };
+      if (new Set(closed).size !== closed.length) {
+        return { ok: false, message: 'fix-delta closedBlockerIds contains duplicates', absolutePath };
+      }
+      const proven = recomputeManifestProvenIds({
+        repoRoot: params.repoRoot,
+        workstreamId: params.workstreamId,
+        parsed,
+      });
+      if (!proven.ok) {
+        return { ok: false, message: proven.message, absolutePath };
       }
       for (const blockerId of closed) {
-        const matched = evidence.find((entry) => {
-          if (!entry || typeof entry !== 'object') return false;
-          return (entry as Record<string, unknown>).blockerId === blockerId;
-        }) as Record<string, unknown> | undefined;
-        if (!matched) {
+        const expectedIds = requiredTestIdsForBlocker(blockerId);
+        const missing = expectedIds.filter((id) => !proven.executedIds.has(id));
+        if (missing.length > 0) {
           return {
             ok: false,
-            message: `fix-delta missing blockerEvidence for ${blockerId}`,
-            absolutePath,
-          };
-        }
-        if (typeof matched.evidenceLabel !== 'string' || !matched.evidenceLabel.trim()) {
-          return {
-            ok: false,
-            message: `fix-delta blockerEvidence for ${blockerId} lacks evidenceLabel`,
-            absolutePath,
-          };
-        }
-        if (typeof matched.commandName !== 'string' || !matched.commandName.trim()) {
-          return {
-            ok: false,
-            message: `fix-delta blockerEvidence for ${blockerId} lacks commandName`,
-            absolutePath,
-          };
-        }
-        const commandPassed = commands.some((entry) => {
-          if (!entry || typeof entry !== 'object') return false;
-          const row = entry as Record<string, unknown>;
-          return row.name === matched.commandName && row.status === 'passed';
-        });
-        if (!commandPassed) {
-          return {
-            ok: false,
-            message: `fix-delta blockerEvidence for ${blockerId} commandName was not a passed command`,
+            message: `fix-delta blocker ${blockerId} lacks proven ledger tests: ${missing.join(', ')}`,
             absolutePath,
           };
         }
@@ -390,6 +551,7 @@ export function reduceProtocolInit(params: {
   let sourceWorkstreamIds = params.sourceWorkstreamIds;
   let planPath = params.planPath ?? null;
   let inheritedFailedReviewCount = 0;
+  let rehomeProvenance: WorkflowRehomeProvenance | null = null;
 
   if (params.planPath) {
     const resolved = resolvePlanPath({
@@ -416,6 +578,14 @@ export function reduceProtocolInit(params: {
     }
     workstreamId = workstreamId || parsed.contract.workstreamId;
     sourceWorkstreamIds = sourceWorkstreamIds ?? parsed.contract.sourceWorkstreamIds;
+    if (parsed.contract.rehomeProvenance) {
+      rehomeProvenance = {
+        ...parsed.contract.rehomeProvenance,
+        status: 'declared',
+        predecessorPassedReview: false,
+        predecessorHeadIsAncestor: false,
+      };
+    }
     if (
       parsed.contract.risk === 'high' &&
       parsed.contract.reviewClosureProtocol &&
@@ -437,12 +607,15 @@ export function reduceProtocolInit(params: {
   if (sourceWorkstreamIds?.length) {
     for (const sourceId of sourceWorkstreamIds) {
       const source = readProtocolRecord(params.repoRoot, sourceId);
-      if (source) {
-        inheritedFailedReviewCount = Math.max(
-          inheritedFailedReviewCount,
-          source.failedPremiumReviewCount
+      if (!source) {
+        return fail(
+          `source workstream ${sourceId} is missing; a new ID cannot mint a fresh review budget`
         );
       }
+      inheritedFailedReviewCount = Math.max(
+        inheritedFailedReviewCount,
+        lineageFailedPremiumReviewCount(source)
+      );
     }
   }
 
@@ -454,14 +627,18 @@ export function reduceProtocolInit(params: {
     return fail('baseCommit must be an explicit git commit hash');
   }
 
+  const git = assertNamedBranchForInit(params.repoRoot);
+  if (!git.ok) return fail(git.message);
+
   const record = createEmptyProtocolRecord({
     workstreamId,
     baseCommit,
-    branchName: runGit(params.repoRoot, ['branch', '--show-current']),
-    headCommit: runGit(params.repoRoot, ['rev-parse', 'HEAD']),
+    branchName: git.binding.branchName,
+    headCommit: git.binding.headCommit,
     planPath,
     sourceWorkstreamIds,
     inheritedFailedReviewCount,
+    rehomeProvenance,
     now: params.now,
   });
 
@@ -476,23 +653,29 @@ export function reducePreflightRecord(params: {
 }): WorkflowProtocolTransitionResult {
   const current = readProtocolRecord(params.repoRoot, params.workstreamId);
   if (!current) return fail('protocol record missing; run init first');
+  if (lineageBudgetExhausted(current) || lineageFirstConsumed(current) || current.phase === 'routing_required') {
+    return fail(
+      'preflight cannot reopen an exhausted or first-consumed CRITICAL lineage',
+      current,
+      WORKFLOW_ROUTING_REQUIRED_EXIT_CODE
+    );
+  }
   if (current.phase !== 'initialized' && current.phase !== 'preflight_ready') {
     return fail(`preflight-record not allowed in phase ${current.phase}`, current);
   }
-  let expectedRequiredTestIds: string[] | undefined;
-  if (current.planPath && existsSync(current.planPath)) {
-    try {
-      const parsedPlan = extractPlanContractMarker(readFileSync(current.planPath, 'utf8'));
-      if (parsedPlan.status === 'present' && parsedPlan.contract) {
-        expectedRequiredTestIds = parsedPlan.contract.requiredTests
-          .map((test) => test.id)
-          // Deferred pay behavioral IDs are inventory obligations until live-db mode.
-          .filter((id) => !id.startsWith('WF-PAY-'));
-      }
-    } catch {
-      // plan unreadable → treated as no expected IDs
-    }
+  if (planRequiresBoundRehome(current) && current.rehomeProvenance?.status !== 'bound') {
+    return fail('rehome-bind required before preflight for a re-homed successor', current);
   }
+  if (current.rehomeProvenance?.status === 'bound') {
+    const rehome = revalidateBoundRehomeProvenance({
+      repoRoot: params.repoRoot,
+      provenance: current.rehomeProvenance,
+    });
+    if (!rehome.ok) return fail(rehome.message, current);
+  }
+  const planTests = expectedPlanRequiredTestIds(current);
+  if (!planTests.ok) return fail(planTests.message, current);
+  const expectedRequiredTestIds = planTests.ids;
 
   const validation = validateEvidenceManifest({
     repoRoot: params.repoRoot,
@@ -519,33 +702,80 @@ export function reducePreflightRecord(params: {
 export function reduceReviewStart(params: {
   repoRoot: string;
   workstreamId: string;
-  pass: 'first' | 'closure';
+  pass: WorkflowProtocolReviewPass;
   now?: () => Date;
 }): WorkflowProtocolTransitionResult {
   const current = readProtocolRecord(params.repoRoot, params.workstreamId);
   if (!current) return fail('protocol record missing; run init first');
 
-  if (current.phase === 'routing_required') {
+  const git = assertProtocolGitBinding({
+    repoRoot: params.repoRoot,
+    protocol: current,
+  });
+  if (!git.ok) return fail(git.message, current);
+
+  if (current.phase === 'routing_required' || lineageBudgetExhausted(current)) {
     return fail(
-      'routing_required: launch premium-fix-routing or split; review-start rejected',
+      'routing_required: lineage premium review budget exhausted; route, isolate, remove, revert, or evidence-backed supersede. review-start rejected',
       current,
       WORKFLOW_ROUTING_REQUIRED_EXIT_CODE
     );
   }
 
+  const tree = getCurrentTreeFingerprint(params.repoRoot);
+
+  if (params.pass === 'delta') {
+    if (
+      current.phase !== 'review_closed' &&
+      current.phase !== 'finalise_ready' &&
+      current.phase !== 'delta_review'
+    ) {
+      return fail(`delta review-start requires review_closed (have ${current.phase})`, current);
+    }
+    const token = createToken('rev_delta');
+    const attempt: WorkflowProtocolReviewAttempt = {
+      pass: 'delta',
+      token,
+      startedAt: nowIso(params.now),
+      headCommit: git.binding.headCommit,
+      treeFingerprint: tree.inputFingerprint,
+    };
+    const next: WorkflowProtocolRecord = {
+      ...current,
+      phase: 'delta_review',
+      nextAction: 'review_record',
+      activeReviewToken: token,
+      activeReviewPass: 'delta',
+      activeCheckpointId: null,
+      reviewAttempts: [...current.reviewAttempts, attempt],
+      updatedAt: nowIso(params.now),
+    };
+    return succeed('delta review token issued', next, { reviewToken: token });
+  }
+
   if (params.pass === 'first') {
+    if (lineageFirstConsumed(current)) {
+      return fail(
+        'first review already consumed in this CRITICAL lineage; split does not mint a new first',
+        current,
+        WORKFLOW_ROUTING_REQUIRED_EXIT_CODE
+      );
+    }
     if (current.phase !== 'preflight_ready') {
       return fail(`first review-start requires preflight_ready (have ${current.phase})`, current);
     }
     if (!current.evidenceManifestPath) {
       return fail('first review requires a recorded preflight manifest', current);
     }
+    const planTests = expectedPlanRequiredTestIds(current);
+    if (!planTests.ok) return fail(planTests.message, current);
     const validation = validateEvidenceManifest({
       repoRoot: params.repoRoot,
       workstreamId: params.workstreamId,
       manifestPath: current.evidenceManifestPath,
       requireKind: 'preflight',
       expectedBaseCommit: current.baseCommit,
+      expectedRequiredTestIds: planTests.ids,
     });
     if (!validation.ok) {
       return fail(`first review evidence is stale or invalid: ${validation.message}`, current);
@@ -557,7 +787,7 @@ export function reduceReviewStart(params: {
     if (!current.fixDeltaManifestPath) {
       return fail('closure review requires a recorded fix-delta manifest', current);
     }
-    if (current.failedPremiumReviewCount >= 2) {
+    if (lineageBudgetExhausted(current)) {
       return fail(
         'review budget exhausted; routing_required',
         current,
@@ -581,6 +811,8 @@ export function reduceReviewStart(params: {
     pass: params.pass,
     token,
     startedAt: nowIso(params.now),
+    headCommit: git.binding.headCommit,
+    treeFingerprint: tree.inputFingerprint,
   };
   const next: WorkflowProtocolRecord = {
     ...current,
@@ -606,14 +838,40 @@ export function reduceReviewRecord(params: {
 }): WorkflowProtocolTransitionResult {
   const current = readProtocolRecord(params.repoRoot, params.workstreamId);
   if (!current) return fail('protocol record missing; run init first');
-  if (current.phase !== 'first_review' && current.phase !== 'closure_review') {
+  if (
+    current.phase !== 'first_review' &&
+    current.phase !== 'closure_review' &&
+    current.phase !== 'delta_review'
+  ) {
     return fail(`review-record not allowed in phase ${current.phase}`, current);
   }
+  const git = assertProtocolGitBinding({
+    repoRoot: params.repoRoot,
+    protocol: current,
+  });
+  if (!git.ok) return fail(git.message, current);
   if (!current.activeReviewToken || current.activeReviewToken !== params.token) {
     return fail('invalid or consumed review token', current);
   }
   if (!current.activeReviewPass) {
     return fail('active review pass missing', current);
+  }
+  const startedAttempt = current.reviewAttempts.find((attempt) => attempt.token === params.token);
+  const startedHead = startedAttempt?.headCommit ?? null;
+  const recordHead = git.binding.headCommit;
+  if (startedHead && recordHead && startedHead !== recordHead) {
+    return fail(
+      `HEAD moved during review (started ${startedHead}, now ${recordHead}); re-run review-start. Do not rewrite review metadata to the current HEAD.`,
+      current
+    );
+  }
+  const currentTree = getCurrentTreeFingerprint(params.repoRoot).inputFingerprint;
+  const startedTree = startedAttempt?.treeFingerprint ?? null;
+  if (startedTree && startedTree !== currentTree) {
+    return fail(
+      'working tree fingerprint moved during review; re-run review-start. Do not rewrite review metadata to the current tree.',
+      current
+    );
   }
 
   const families = [...new Set((params.blockerFamilies ?? []).map((v) => v.trim()).filter(Boolean))];
@@ -655,17 +913,24 @@ export function reduceReviewRecord(params: {
         current
       );
     }
-    if (current.activeReviewPass === 'closure' && blockers.length > 0) {
+    if (
+      (current.activeReviewPass === 'closure' || current.activeReviewPass === 'delta') &&
+      blockers.length > 0
+    ) {
       return fail('closure pass=passed must not introduce open blockerIds', current);
     }
     phase = 'review_closed';
     nextAction = 'finalise_start';
     message = 'review closed';
+  } else if (current.activeReviewPass === 'delta') {
+    phase = 'review_closed';
+    nextAction = 'review_start_delta';
+    message = 'delta review failed; retry review-start --pass delta after addressing blockers';
   } else {
     failedCount += 1;
     if (failedCount >= 2) {
       phase = 'routing_required';
-      nextAction = 'premium_fix_routing_or_split';
+      nextAction = 'route_or_isolate';
       exitCode = WORKFLOW_ROUTING_REQUIRED_EXIT_CODE;
       message = 'second failed premium review; routing_required';
     } else {
@@ -675,6 +940,8 @@ export function reduceReviewRecord(params: {
     }
   }
 
+  const reviewedHead =
+    params.result === 'passed' ? recordHead ?? runGit(params.repoRoot, ['rev-parse', 'HEAD']) : null;
   const next: WorkflowProtocolRecord = {
     ...current,
     phase,
@@ -685,6 +952,9 @@ export function reduceReviewRecord(params: {
     reviewAttempts: attempts,
     blockerFamilies: [...new Set([...current.blockerFamilies, ...families])],
     openBlockerIds: params.result === 'passed' ? [] : blockers,
+    headCommit: reviewedHead ?? current.headCommit,
+    reviewedTreeFingerprint:
+      params.result === 'passed' ? currentTree : current.reviewedTreeFingerprint,
     updatedAt: nowIso(params.now),
   };
 
@@ -783,17 +1053,26 @@ export function reduceSplit(params: {
   if (!params.newWorkstreamId.trim()) {
     return fail('newWorkstreamId required', current);
   }
-  if (readProtocolRecord(params.repoRoot, params.newWorkstreamId)) {
+  const childId = params.newWorkstreamId.trim();
+  if (childId === current.workstreamId) {
+    return fail('split child cannot be the parent', current);
+  }
+  if ((current.sourceWorkstreamIds ?? []).includes(childId)) {
+    return fail('split would create a lineage cycle', current);
+  }
+  if (readProtocolRecord(params.repoRoot, childId)) {
     return fail('newWorkstreamId already exists', current);
   }
+  if (listImmediateChildWorkstreamIds(params.repoRoot, current.workstreamId).length > 0) {
+    return fail('split already has a continuation child', current);
+  }
 
-  const inheritBudget =
-    params.narrowerPartition || params.hasFixDelta
-      ? current.failedPremiumReviewCount
-      : Math.max(current.failedPremiumReviewCount, 2);
+  const inheritBudget = lineageFailedPremiumReviewCount(current);
+  void params.narrowerPartition;
+  void params.hasFixDelta;
 
   const child = createEmptyProtocolRecord({
-    workstreamId: params.newWorkstreamId.trim(),
+    workstreamId: childId,
     baseCommit: current.baseCommit,
     branchName: current.branchName,
     headCommit: current.headCommit,
@@ -802,10 +1081,20 @@ export function reduceSplit(params: {
     inheritedFailedReviewCount: inheritBudget,
     now: params.now,
   });
-
-  if (!params.narrowerPartition && !params.hasFixDelta) {
+  child.failedPremiumReviewCount = inheritBudget;
+  child.blockerFamilies = [...current.blockerFamilies];
+  child.openBlockerIds = [...current.openBlockerIds];
+  child.fixDeltaManifestPath = current.fixDeltaManifestPath;
+  if (inheritBudget >= 2) {
     child.phase = 'routing_required';
-    child.nextAction = 'premium_fix_routing_or_split';
+    child.nextAction = 'route_or_isolate';
+  } else {
+    // Split is only legal from fix_sweep_required | routing_required. After one
+    // failed premium round the child keeps closure-only ownership; it does not
+    // regain first. After two failed rounds every child is routing_required.
+    child.phase = current.phase;
+    child.nextAction =
+      current.phase === 'routing_required' ? 'route_or_isolate' : 'consolidated_fix_record';
   }
 
   const parent: WorkflowProtocolRecord = {
@@ -821,8 +1110,111 @@ export function reduceSplit(params: {
     record: parent,
     message: 'workstream split recorded',
     splitWorkstreamId: child.workstreamId,
-    // Attach child via message channel; persistProtocolTransition writes both.
+    childRecord: child,
   };
+}
+
+export function reduceRoute(params: {
+  repoRoot: string;
+  workstreamId: string;
+  disposition: WorkflowRouteDispositionTarget;
+  reason: string;
+  implementationCommits?: string[];
+  revertCommit?: string;
+  supersedeCommit?: string;
+  successorRepo?: string;
+  successorBranch?: string;
+  successorBaseline?: string;
+  predecessorHead?: string;
+  now?: () => Date;
+}): WorkflowProtocolTransitionResult {
+  const current = readProtocolRecord(params.repoRoot, params.workstreamId);
+  if (!current) return fail('protocol record missing; run init first');
+  const built = buildRouteDisposition({
+    repoRoot: params.repoRoot,
+    record: current,
+    target: params.disposition,
+    reason: params.reason,
+    implementationCommits: params.implementationCommits,
+    revertCommit: params.revertCommit,
+    supersedeCommit: params.supersedeCommit,
+    successorRepo: params.successorRepo,
+    successorBranch: params.successorBranch,
+    successorBaseline: params.successorBaseline,
+    predecessorHead: params.predecessorHead,
+    nowIso: nowIso(params.now),
+  });
+  if (!built.ok) return fail(built.message, current);
+  const next: WorkflowProtocolRecord = {
+    ...current,
+    phase: params.disposition,
+    nextAction: 'non_release_disposition',
+    activeReviewToken: null,
+    activeReviewPass: null,
+    activeCheckpointId: null,
+    routeDisposition: built.disposition,
+    failedPremiumReviewCount: current.failedPremiumReviewCount,
+    inheritedFailedReviewCount: current.inheritedFailedReviewCount,
+    reviewAttempts: current.reviewAttempts,
+    headCommit: current.headCommit,
+    reviewedTreeFingerprint: current.reviewedTreeFingerprint,
+    updatedAt: nowIso(params.now),
+  };
+  return succeed(`route recorded as ${params.disposition}; not approval and not finalised`, next);
+}
+
+export function reduceRehomeBind(params: {
+  repoRoot: string;
+  workstreamId: string;
+  predecessorRootWorkstreamId: string;
+  predecessorDescendantWorkstreamId: string;
+  predecessorHeadCommit: string;
+  predecessorReleaseContext: string;
+  successorBaselineCommit: string;
+  successorBranchName: string;
+  sourcePatchSha256: string;
+  sourceProductTreeFingerprint: string;
+  sourceReleaseContext: string;
+  sourceHeadCommit: string;
+  sourceBaselineCommit: string;
+  sourceReviewWorkstreamId?: string;
+  now?: () => Date;
+}): WorkflowProtocolTransitionResult {
+  const current = readProtocolRecord(params.repoRoot, params.workstreamId);
+  if (!current) return fail('protocol record missing; run init first');
+  if (current.phase !== 'initialized') {
+    return fail(`rehome-bind requires initialized (have ${current.phase})`, current);
+  }
+  if (!current.rehomeProvenance) {
+    return fail('rehome-bind requires declared plan/protocol rehomeProvenance', current);
+  }
+  const bound = buildBoundRehomeProvenance({
+    repoRoot: params.repoRoot,
+    record: current,
+    declared: current.rehomeProvenance,
+    predecessorRootWorkstreamId: params.predecessorRootWorkstreamId,
+    predecessorDescendantWorkstreamId: params.predecessorDescendantWorkstreamId,
+    predecessorHeadCommit: params.predecessorHeadCommit,
+    predecessorReleaseContext: params.predecessorReleaseContext,
+    successorBaselineCommit: params.successorBaselineCommit,
+    successorBranchName: params.successorBranchName,
+    sourcePatchSha256: params.sourcePatchSha256,
+    sourceProductTreeFingerprint: params.sourceProductTreeFingerprint,
+    sourceReleaseContext: params.sourceReleaseContext,
+    sourceHeadCommit: params.sourceHeadCommit,
+    sourceBaselineCommit: params.sourceBaselineCommit,
+    sourceReviewWorkstreamId: params.sourceReviewWorkstreamId,
+    nowIso: nowIso(params.now),
+  });
+  if (!bound.ok) return fail(bound.message, current);
+  const next: WorkflowProtocolRecord = {
+    ...current,
+    rehomeProvenance: bound.provenance,
+    failedPremiumReviewCount: 0,
+    inheritedFailedReviewCount: 0,
+    updatedAt: nowIso(params.now),
+  };
+  return succeed('rehome provenance bound; predecessor is not claimed as passed', next);
 }
 
 export function reduceFinaliseStart(params: {
@@ -832,10 +1224,50 @@ export function reduceFinaliseStart(params: {
 }): WorkflowProtocolTransitionResult {
   const current = readProtocolRecord(params.repoRoot, params.workstreamId);
   if (!current) return fail('protocol record missing; run init first');
+  const closurePath = path.join(
+    params.repoRoot,
+    'docs_private',
+    'automation',
+    'workstreams',
+    current.workstreamId,
+    'legacy-closure.json'
+  );
+  if (existsSync(closurePath)) {
+    return fail('historically closed workstream cannot finalise-start', current);
+  }
   if (current.phase !== 'review_closed' && current.phase !== 'finalise_ready') {
     return fail(`finalise-start requires review_closed (have ${current.phase})`, current);
   }
-  const checkpointId = createCheckpointId(current.workstreamId);
+  if (!reviewAllowsFinaliseStart(current)) {
+    return fail(
+      'finalise-start requires a successful review with no open blockers; if HEAD or the tree drifted, run review-start --pass delta and record a passing delta review first',
+      current
+    );
+  }
+  const tree = getCurrentTreeFingerprint(params.repoRoot);
+  const git = assertProtocolGitBinding({
+    repoRoot: params.repoRoot,
+    protocol: current,
+    expectedHeadCommit: current.headCommit,
+    expectedTreeFingerprint: current.reviewedTreeFingerprint,
+    currentTreeFingerprint: tree.inputFingerprint,
+  });
+  if (!git.ok) {
+    if (/HEAD has moved/i.test(git.message) || /fingerprint moved/i.test(git.message)) {
+      return fail(
+        `${git.message} Run npx tsx scripts/workflow-protocol.ts review-start --workstream ${current.workstreamId} --pass delta to refresh the final-diff review. Do not rewrite review metadata to the current HEAD.`,
+        current
+      );
+    }
+    return fail(git.message, current);
+  }
+  if (!current.headCommit) {
+    return fail('finalise-start requires a reviewed headCommit bound by a successful review', current);
+  }
+  const checkpointId =
+    current.phase === 'finalise_ready' && current.activeCheckpointId
+      ? current.activeCheckpointId
+      : createCheckpointId(current.workstreamId);
   const next: WorkflowProtocolRecord = {
     ...current,
     phase: 'finalise_ready',
@@ -846,6 +1278,112 @@ export function reduceFinaliseStart(params: {
   return succeed('finalise context activated', next, { checkpointId });
 }
 
+function listImmediateChildWorkstreamIds(repoRoot: string, parentId: string): string[] {
+  const root = path.join(repoRoot, 'docs_private', 'automation', 'workstreams');
+  if (!existsSync(root)) return [];
+  const ids: string[] = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const child = readProtocolRecord(repoRoot, entry.name);
+    if (child?.sourceWorkstreamIds?.[0] === parentId) {
+      ids.push(child.workstreamId);
+    }
+  }
+  return ids;
+}
+
+/**
+ * Safe finalise completion/failure transition. Does not invent review tokens.
+ * Passed: phase -> finalised in memory. Disk persistence of `finalised` is deferred
+ * until shared workflow state is saved.
+ */
+export function applyFinaliseProtocolOutcome(params: {
+  repoRoot: string;
+  state: WorkflowReviewState;
+  workstreamId: string;
+  outcome: 'passed' | 'failed' | 'unknown';
+  now?: () => Date;
+}): {
+  state: WorkflowReviewState;
+  record: WorkflowProtocolRecord | null;
+} {
+  const current = readProtocolRecord(params.repoRoot, params.workstreamId);
+  if (!current || !isWorkflowProtocolRecord(current)) {
+    return { state: params.state, record: null };
+  }
+  if (current.phase !== 'finalise_ready' && current.phase !== 'finalised') {
+    return { state: params.state, record: current };
+  }
+
+  const updatedAt = nowIso(params.now);
+  if (params.outcome !== 'passed') {
+    const failedRecord: WorkflowProtocolRecord = {
+      ...current,
+      nextAction: 'rerun_or_repair_finalise',
+      updatedAt,
+    };
+    return {
+      state: upsertProtocolInState(params.state, failedRecord),
+      record: failedRecord,
+    };
+  }
+
+  const finalized: WorkflowProtocolRecord = {
+    ...current,
+    phase: 'finalised',
+    nextAction: 'done',
+    activeCheckpointId: null,
+    updatedAt,
+  };
+  let nextState = upsertProtocolInState(params.state, finalized);
+  if (nextState.activeFinaliseContext?.workstreamId === params.workstreamId) {
+    nextState = setActiveFinaliseContext(nextState, null);
+  }
+  return { state: nextState, record: finalized };
+}
+
+/**
+ * Persist shared workflow state first, then mark matched protocols finalised on disk.
+ */
+export function commitFinaliseCorrelationStateAndProtocols(params: {
+  repoRoot: string;
+  statePath: string;
+  previousState: WorkflowReviewState;
+  nextState: WorkflowReviewState;
+  workstreamIds: string[];
+}): void {
+  const protocolBackups = new Map<string, WorkflowProtocolRecord | null>();
+  for (const workstreamId of params.workstreamIds) {
+    protocolBackups.set(workstreamId, readProtocolRecord(params.repoRoot, workstreamId));
+  }
+
+  const restore = (): void => {
+    for (const [, previous] of protocolBackups) {
+      if (previous) {
+        writeProtocolRecord(params.repoRoot, previous);
+      }
+    }
+    try {
+      saveWorkflowReviewState(params.statePath, params.previousState);
+    } catch {
+      // Best-effort restore; original error is rethrown by caller.
+    }
+  };
+
+  try {
+    saveWorkflowReviewState(params.statePath, params.nextState);
+    for (const workstreamId of params.workstreamIds) {
+      const record = params.nextState.protocolRecords?.[workstreamId];
+      if (record && isWorkflowProtocolRecord(record)) {
+        writeProtocolRecord(params.repoRoot, record);
+      }
+    }
+  } catch (error) {
+    restore();
+    throw error;
+  }
+}
+
 function persistParentAndOptionalChildUnlocked(params: {
   repoRoot: string;
   parent: WorkflowProtocolRecord;
@@ -853,45 +1391,89 @@ function persistParentAndOptionalChildUnlocked(params: {
   activateFinalise?: boolean;
 }): void {
   const paths = getWorkflowPaths(params.repoRoot);
-  writeProtocolRecord(params.repoRoot, params.parent);
-  if (params.child) {
-    writeProtocolRecord(params.repoRoot, params.child);
+  const previousParent = readProtocolRecord(params.repoRoot, params.parent.workstreamId);
+  const previousChild = params.child
+    ? readProtocolRecord(params.repoRoot, params.child.workstreamId)
+    : null;
+  const loadedState = loadWorkflowReviewStateStrict(paths.statePath);
+  if (!loadedState.ok) {
+    throw new Error(`workflow review state is ${loadedState.reason}; refuse protocol persist`);
   }
-  let state = loadWorkflowReviewState(paths.statePath);
-  state = upsertProtocolInState(state, params.parent);
-  if (params.child) {
-    state = upsertProtocolInState(state, params.child);
-  }
-  state = upsertWorkstreamRecord(state, {
-    workstreamId: params.parent.workstreamId,
-    branchName: params.parent.branchName,
-    headCommit: params.parent.headCommit,
-    taskIds: [],
-    eventIds: [],
-    status: params.parent.phase === 'finalised' ? 'finalised' : 'open',
-    sourceWorkstreamIds: params.parent.sourceWorkstreamIds,
-    updatedAt: params.parent.updatedAt,
-  });
-  if (params.child) {
+  const previousState = loadedState.state;
+  const childWasNew = Boolean(params.child && !previousChild);
+  try {
+    writeProtocolRecord(params.repoRoot, params.parent);
+    if (params.child) {
+      writeProtocolRecord(params.repoRoot, params.child);
+    }
+    let state = previousState;
+    state = upsertProtocolInState(state, params.parent);
+    if (params.child) {
+      state = upsertProtocolInState(state, params.child);
+    }
+    if (
+      state.activeFinaliseContext?.workstreamId === params.parent.workstreamId &&
+      params.parent.phase !== 'finalise_ready'
+    ) {
+      state = setActiveFinaliseContext(state, null);
+    }
     state = upsertWorkstreamRecord(state, {
-      workstreamId: params.child.workstreamId,
-      branchName: params.child.branchName,
-      headCommit: params.child.headCommit,
+      workstreamId: params.parent.workstreamId,
+      branchName: params.parent.branchName,
+      headCommit: params.parent.headCommit,
       taskIds: [],
       eventIds: [],
-      status: 'open',
-      sourceWorkstreamIds: params.child.sourceWorkstreamIds,
-      updatedAt: params.child.updatedAt,
+      status: params.parent.phase === 'finalised' ? 'finalised' : 'open',
+      sourceWorkstreamIds: params.parent.sourceWorkstreamIds,
+      updatedAt: params.parent.updatedAt,
     });
+    if (params.child) {
+      const existingChild = previousState.workstreams?.[params.child.workstreamId];
+      state = upsertWorkstreamRecord(state, {
+        workstreamId: params.child.workstreamId,
+        branchName: params.child.branchName,
+        headCommit: params.child.headCommit,
+        taskIds: [],
+        eventIds: [],
+        status:
+          existingChild?.status ??
+          (params.child.phase === 'finalised' ? 'finalised' : 'open'),
+        sourceWorkstreamIds: params.child.sourceWorkstreamIds,
+        updatedAt: params.child.updatedAt,
+      });
+    }
+    if (params.activateFinalise && params.parent.activeCheckpointId) {
+      const tree = getCurrentTreeFingerprint(params.repoRoot);
+      const activatedHead = params.parent.headCommit;
+      state = setActiveFinaliseContext(state, {
+        workstreamId: params.parent.workstreamId,
+        checkpointId: params.parent.activeCheckpointId,
+        activatedAt: params.parent.updatedAt,
+        activatedHeadCommit: activatedHead,
+        activatedTreeFingerprint: params.parent.reviewedTreeFingerprint ?? tree.inputFingerprint,
+        ownedCommits: activatedHead ? [activatedHead] : [],
+      });
+    }
+    saveWorkflowReviewState(paths.statePath, state);
+  } catch (error) {
+    if (previousParent) {
+      writeProtocolRecord(params.repoRoot, previousParent);
+    }
+    if (previousChild) {
+      writeProtocolRecord(params.repoRoot, previousChild);
+    } else if (params.child && childWasNew) {
+      const childPath = getProtocolRecordPath(params.repoRoot, params.child.workstreamId);
+      if (existsSync(childPath)) {
+        unlinkSync(childPath);
+      }
+    }
+    try {
+      saveWorkflowReviewState(paths.statePath, previousState);
+    } catch {
+      // Best-effort restore; original error is rethrown.
+    }
+    throw error;
   }
-  if (params.activateFinalise && params.parent.activeCheckpointId) {
-    state = setActiveFinaliseContext(state, {
-      workstreamId: params.parent.workstreamId,
-      checkpointId: params.parent.activeCheckpointId,
-      activatedAt: params.parent.updatedAt,
-    });
-  }
-  saveWorkflowReviewState(paths.statePath, state);
 }
 
 function applyProtocolTransitionUnlocked(params: {
@@ -901,7 +1483,7 @@ function applyProtocolTransitionUnlocked(params: {
   planPath?: string;
   baseCommit?: string;
   manifestPath?: string;
-  pass?: 'first' | 'closure';
+  pass?: WorkflowProtocolReviewPass;
   token?: string;
   result?: 'passed' | 'failed';
   blockerFamilies?: string[];
@@ -912,6 +1494,26 @@ function applyProtocolTransitionUnlocked(params: {
   narrowerPartition?: boolean;
   hasFixDelta?: boolean;
   sourceWorkstreamIds?: string[];
+  disposition?: WorkflowRouteDispositionTarget;
+  reason?: string;
+  implementationCommits?: string[];
+  revertCommit?: string;
+  supersedeCommit?: string;
+  successorRepo?: string;
+  successorBranch?: string;
+  successorBaseline?: string;
+  predecessorRootWorkstreamId?: string;
+  predecessorDescendantWorkstreamId?: string;
+  predecessorHeadCommit?: string;
+  predecessorReleaseContext?: string;
+  successorBaselineCommit?: string;
+  successorBranchName?: string;
+  sourcePatchSha256?: string;
+  sourceProductTreeFingerprint?: string;
+  sourceReleaseContext?: string;
+  sourceHeadCommit?: string;
+  sourceBaselineCommit?: string;
+  sourceReviewWorkstreamId?: string;
   now?: () => Date;
 }): WorkflowProtocolTransitionResult {
   if (params.command === 'status') {
@@ -955,8 +1557,8 @@ function applyProtocolTransitionUnlocked(params: {
   }
 
   if (params.command === 'review-start') {
-    if (params.pass !== 'first' && params.pass !== 'closure') {
-      return fail('pass must be first|closure');
+    if (params.pass !== 'first' && params.pass !== 'closure' && params.pass !== 'delta') {
+      return fail('pass must be first|closure|delta');
     }
     const result = reduceReviewStart({
       repoRoot: params.repoRoot,
@@ -1014,7 +1616,6 @@ function applyProtocolTransitionUnlocked(params: {
 
   if (params.command === 'split') {
     if (!params.newWorkstreamId) return fail('newWorkstreamId required');
-    const parentBefore = readProtocolRecord(params.repoRoot, params.workstreamId);
     const result = reduceSplit({
       repoRoot: params.repoRoot,
       workstreamId: params.workstreamId,
@@ -1023,32 +1624,58 @@ function applyProtocolTransitionUnlocked(params: {
       hasFixDelta: Boolean(params.hasFixDelta),
       now: params.now,
     });
-    if (result.ok && result.record && result.splitWorkstreamId) {
-      const child = createEmptyProtocolRecord({
-        workstreamId: result.splitWorkstreamId,
-        baseCommit: result.record.baseCommit,
-        branchName: result.record.branchName,
-        headCommit: result.record.headCommit,
-        planPath: result.record.planPath,
-        sourceWorkstreamIds: [
-          result.record.workstreamId,
-          ...(result.record.sourceWorkstreamIds ?? []),
-        ],
-        inheritedFailedReviewCount:
-          params.narrowerPartition || params.hasFixDelta
-            ? parentBefore?.failedPremiumReviewCount ?? 0
-            : Math.max(parentBefore?.failedPremiumReviewCount ?? 0, 2),
-        now: params.now,
-      });
-      if (!params.narrowerPartition && !params.hasFixDelta) {
-        child.phase = 'routing_required';
-        child.nextAction = 'premium_fix_routing_or_split';
-      }
+    if (result.ok && result.record && result.childRecord) {
       persistParentAndOptionalChildUnlocked({
         repoRoot: params.repoRoot,
         parent: result.record,
-        child,
+        child: result.childRecord,
       });
+    }
+    return result;
+  }
+
+  if (params.command === 'route') {
+    if (!params.disposition) return fail('disposition required');
+    const result = reduceRoute({
+      repoRoot: params.repoRoot,
+      workstreamId: params.workstreamId,
+      disposition: params.disposition,
+      reason: params.reason ?? '',
+      implementationCommits: params.implementationCommits,
+      revertCommit: params.revertCommit,
+      supersedeCommit: params.supersedeCommit,
+      successorRepo: params.successorRepo,
+      successorBranch: params.successorBranch,
+      successorBaseline: params.successorBaseline,
+      predecessorHead: params.predecessorHeadCommit,
+      now: params.now,
+    });
+    if (result.ok && result.record) {
+      persistParentAndOptionalChildUnlocked({ repoRoot: params.repoRoot, parent: result.record });
+    }
+    return result;
+  }
+
+  if (params.command === 'rehome-bind') {
+    const result = reduceRehomeBind({
+      repoRoot: params.repoRoot,
+      workstreamId: params.workstreamId,
+      predecessorRootWorkstreamId: params.predecessorRootWorkstreamId ?? '',
+      predecessorDescendantWorkstreamId: params.predecessorDescendantWorkstreamId ?? '',
+      predecessorHeadCommit: params.predecessorHeadCommit ?? '',
+      predecessorReleaseContext: params.predecessorReleaseContext ?? '',
+      successorBaselineCommit: params.successorBaselineCommit ?? '',
+      successorBranchName: params.successorBranchName ?? '',
+      sourcePatchSha256: params.sourcePatchSha256 ?? '',
+      sourceProductTreeFingerprint: params.sourceProductTreeFingerprint ?? '',
+      sourceReleaseContext: params.sourceReleaseContext ?? '',
+      sourceHeadCommit: params.sourceHeadCommit ?? '',
+      sourceBaselineCommit: params.sourceBaselineCommit ?? '',
+      sourceReviewWorkstreamId: params.sourceReviewWorkstreamId,
+      now: params.now,
+    });
+    if (result.ok && result.record) {
+      persistParentAndOptionalChildUnlocked({ repoRoot: params.repoRoot, parent: result.record });
     }
     return result;
   }
@@ -1079,7 +1706,7 @@ export function applyProtocolTransition(params: {
   planPath?: string;
   baseCommit?: string;
   manifestPath?: string;
-  pass?: 'first' | 'closure';
+  pass?: WorkflowProtocolReviewPass;
   token?: string;
   result?: 'passed' | 'failed';
   blockerFamilies?: string[];
@@ -1090,6 +1717,26 @@ export function applyProtocolTransition(params: {
   narrowerPartition?: boolean;
   hasFixDelta?: boolean;
   sourceWorkstreamIds?: string[];
+  disposition?: WorkflowRouteDispositionTarget;
+  reason?: string;
+  implementationCommits?: string[];
+  revertCommit?: string;
+  supersedeCommit?: string;
+  successorRepo?: string;
+  successorBranch?: string;
+  successorBaseline?: string;
+  predecessorRootWorkstreamId?: string;
+  predecessorDescendantWorkstreamId?: string;
+  predecessorHeadCommit?: string;
+  predecessorReleaseContext?: string;
+  successorBaselineCommit?: string;
+  successorBranchName?: string;
+  sourcePatchSha256?: string;
+  sourceProductTreeFingerprint?: string;
+  sourceReleaseContext?: string;
+  sourceHeadCommit?: string;
+  sourceBaselineCommit?: string;
+  sourceReviewWorkstreamId?: string;
   now?: () => Date;
 }): WorkflowProtocolTransitionResult {
   // Status is read-only and does not need the mutation lock.

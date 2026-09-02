@@ -17,6 +17,8 @@
 
 A first failure must list the full family set so the consolidated fix sweep can close siblings together.
 
+Do not launch a third premium review for the same CRITICAL continuation. Routing or split does not reset this budget.
+
 ## Recording
 
 ```bash

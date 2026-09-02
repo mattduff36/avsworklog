@@ -34,6 +34,8 @@ export interface FinaliseCheckpointRecord {
   /** Live schema fingerprint from read-only catalog query, or 'unavailable'. */
   liveSchemaFingerprint: string;
   environmentFingerprint: string;
+  activatedHeadCommit?: string;
+  ownedCommits?: string[];
   steps: Partial<Record<FinaliseTaskKey, FinaliseCheckpointStep>>;
 }
 
@@ -638,21 +640,33 @@ export function createOrLoadFinaliseCheckpoint(params: {
     params.workstreamId,
     params.checkpointId
   );
-  if (existing) return existing;
+  if (existing) {
+    const currentHead = runGit(params.repoRoot, ['rev-parse', 'HEAD']) || 'unknown';
+    const owned = existing.ownedCommits ?? [existing.headCommit];
+    if (existing.headCommit !== currentHead && !owned.includes(currentHead)) {
+      throw new Error(
+        `finalise checkpoint ${params.checkpointId} is bound to ${existing.headCommit}; current HEAD is ${currentHead}. Do not reuse an old active finalise context for a newer Git state.`
+      );
+    }
+    return existing;
+  }
 
   const now = new Date().toISOString();
+  const headCommit = runGit(params.repoRoot, ['rev-parse', 'HEAD']) || 'unknown';
   const record: FinaliseCheckpointRecord = {
     schemaVersion: '1',
     checkpointId: params.checkpointId,
     workstreamId: params.workstreamId,
     branchName: runGit(params.repoRoot, ['branch', '--show-current']) || 'unknown',
-    headCommit: runGit(params.repoRoot, ['rev-parse', 'HEAD']) || 'unknown',
+    headCommit,
     createdAt: now,
     updatedAt: now,
     inputFingerprint: inputFingerprint(params.repoRoot),
     migrationFingerprint: migrationFingerprint(params.repoRoot),
     liveSchemaFingerprint: liveSchemaFingerprint(),
     environmentFingerprint: environmentFingerprint(params.repoRoot),
+    activatedHeadCommit: headCommit,
+    ownedCommits: [headCommit],
     steps: {},
   };
   mkdirSync(getCheckpointDirectory(params.repoRoot, params.workstreamId), { recursive: true });
@@ -702,7 +716,6 @@ export function markFinaliseCheckpointStep(params: {
     migrationFingerprint: migrationFingerprint(params.repoRoot),
     liveSchemaFingerprint: liveSchemaFingerprint(),
     environmentFingerprint: environmentFingerprint(params.repoRoot),
-    headCommit: runGit(params.repoRoot, ['rev-parse', 'HEAD']) || current.headCommit,
     steps: {
       ...current.steps,
       [params.task]: step,
@@ -785,6 +798,16 @@ export function resolveActiveProtocolFinaliseContext(repoRoot: string): {
   }
   if (protocol.phase !== 'finalise_ready' && protocol.phase !== 'finalised') {
     return null;
+  }
+  const currentHead = runGit(repoRoot, ['rev-parse', 'HEAD']);
+  const expectedHead =
+    (active.ownedCommits && active.ownedCommits.length > 0
+      ? active.ownedCommits[active.ownedCommits.length - 1]
+      : active.activatedHeadCommit) ?? protocol.headCommit;
+  if (expectedHead && currentHead && expectedHead !== currentHead) {
+    throw new Error(
+      `active finalise context is bound to ${expectedHead}; current HEAD is ${currentHead}. Run review-start --pass delta. Do not authorise a newer Git state.`
+    );
   }
   return {
     workstreamId: active.workstreamId,

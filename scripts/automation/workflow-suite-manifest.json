@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1",
+  "id": "avs-workflow-regression-suite",
+  "files": [
+    "tests/unit/tee-v2-context.test.ts",
+    "tests/unit/workflow-execution-mode.test.ts",
+    "tests/unit/workflow-finalise-correlation.test.ts",
+    "tests/unit/workflow-legacy-reconciliation.test.ts",
+    "tests/unit/workflow-liveness.test.ts",
+    "tests/unit/workflow-plan-contract.test.ts",
+    "tests/unit/workflow-review-protocol.test.ts",
+    "tests/unit/workflow-review.test.ts",
+    "tests/unit/workflow-v24-budget.test.ts",
+    "tests/unit/workflow-v24-fd-git-003.test.ts",
+    "tests/unit/workflow-verification-ledger.test.ts"
+  ]
+}

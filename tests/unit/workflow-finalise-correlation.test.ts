@@ -4,6 +4,7 @@ import {
   applyFinaliseCorrelationToState,
   correlateFinaliseRun,
   resolveFinaliseWorkstreamMatches,
+  shouldApplyFinaliseCorrelation,
 } from '@/scripts/automation/workflow-finalise-correlation';
 import {
   createEmptyWorkflowReviewState,
@@ -168,5 +169,16 @@ describe('workflow finalise correlation and registry', () => {
     expect(state.workstreams?.['ws-1']?.eventIds.sort()).toEqual(['event-2', 'event-ws-1']);
     expect(state.workstreams?.['ws-1']?.sourceWorkstreamIds).toEqual(['ws-source']);
     expect(state.schemaVersion).toBe('2');
+  });
+
+  it('skips correlation on dry-run', () => {
+    expect(
+      shouldApplyFinaliseCorrelation({
+        scriptName: 'finalise',
+        mode: 'dry-run',
+        args: ['--dry-run'],
+      })
+    ).toBe(false);
+    expect(shouldApplyFinaliseCorrelation({ scriptName: 'finalise' })).toBe(true);
   });
 });

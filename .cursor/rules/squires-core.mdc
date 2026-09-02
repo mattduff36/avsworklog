@@ -7,7 +7,7 @@ alwaysApply: true
 
 - Stay on the current branch unless the user explicitly instructs otherwise.
 - Commit completed coding tasks locally unless the task is planning/review-only or the user says not to commit. Use `type(scope): summary`.
-- Never push unless the user writes `push to GitHub`, invokes `/fap` or `/ffap`, or explicitly requests `finalise and push`, `finalise full and push`, or `finalise:push`. State the branch and summary before pushing.
+- Never push unless the user writes `push to GitHub`, or explicitly requests `finalise and push`, `finalise full and push`, or `finalise:push`. Short aliases such as `fap` / `ffap` / `/fap` / `/ffap` do **not** authorize a push. State the branch and summary before pushing.
 - Never destructively change production data without explicit permission.
 - Treat database, schema, persistence, migration, auth, permissions/RLS, security, money, concurrency, irreversible operations, and production-data risk as CRITICAL.
 - For database/persistence intent, load `.cursor/rules/database-migrations.mdc` and the migration guide before acting.
@@ -15,3 +15,5 @@ alwaysApply: true
 - Keep functions typed and focused; update targeted tests when behavior changes.
 - Do not expose environment values or secrets.
 - Run application builds only when the user authorizes a test build. Project-specific rules override generic TEE when stricter.
+- Local commit is not release-ready, and release-ready is not a push. Do not hand-edit workflow protocol JSON. Split ancestors are parked history. The active descendant owns remaining work. After two failed premium rounds, remaining work is routing, isolation, or proven removal from release — not another normal final-diff pass. Review is bound to the reviewed HEAD and tree fingerprint; drift requires `review-start --pass delta`. Dry-run is non-mutating.
+- Once unresolved CRITICAL implementation is committed to the current release branch, do not start unrelated implementation on that branch. Finish CRITICAL first or use a separate explicitly-authorised branch/worktree.

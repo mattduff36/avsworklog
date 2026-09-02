@@ -20,7 +20,6 @@ describe('TEE V2 project context', () => {
     for (const removed of [
       '.cursorrules',
       '.cursor/rules/token-efficient-engineering.mdc',
-      '.cursor/rules/finalise-commands.mdc',
       '.cursor/rules/createinvoice.mdc',
       '.cursor/rules/fixerrors.mdc',
       '.cursor/rules/workflow-review.mdc',
@@ -31,9 +30,12 @@ describe('TEE V2 project context', () => {
     }
 
     const fap = readFileSync(path.join(commandDirectory, 'fap.md'), 'utf8');
+    const ffap = readFileSync(path.join(commandDirectory, 'ffap.md'), 'utf8');
     const finalise = readFileSync(path.join(commandDirectory, 'finalise.md'), 'utf8');
-    expect(fap).toMatch(/authorizes.+pushing/iu);
+    expect(fap).toMatch(/does \*\*not\*\* authorize pushing/);
+    expect(ffap).toMatch(/does \*\*not\*\* authorize pushing/);
     expect(finalise).toMatch(/not push/iu);
+    expect(existsSync(path.join(root, '.cursor', 'rules', 'finalise-commands.mdc'))).toBe(true);
   });
 
   it('TEE-V2-LARGE-FILE-001 has no forced line-count refactor policy', () => {

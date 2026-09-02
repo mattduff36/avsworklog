@@ -14,6 +14,7 @@ import type {
   WorkflowRoutingDecision,
   WorkflowSwitchTiming,
   WorkflowTaskType,
+  WorkflowRehomeProvenance,
   WorkflowUnresolvedRisk,
 } from './types';
 import {
@@ -122,6 +123,10 @@ function parseOptionalStringArray(
 
 export function createWorkflowWorkstreamId(prefix = 'ws'): string {
   return `${prefix}_${randomBytes(8).toString('hex')}`;
+}
+
+export function isCriticalPlanContract(contract: WorkflowPlanContract): boolean {
+  return contract.risk === 'high';
 }
 
 function parseRequiredTests(value: unknown): { tests: WorkflowRequiredTest[]; errors: string[] } {
@@ -388,6 +393,9 @@ export function validatePlanContractObject(value: unknown): ParsedPlanContract {
     }
   }
 
+  const rehome = parsePlanRehomeProvenance(value.rehomeProvenance);
+  errors.push(...rehome.errors);
+
   if (errors.length > 0 || !recommended.model) {
     return { status: 'malformed', contract: null, errors };
   }
@@ -418,6 +426,110 @@ export function validatePlanContractObject(value: unknown): ParsedPlanContract {
       implementationContract,
       reviewClosureProtocol:
         asString(value.reviewClosureProtocol) === 'two-pass-v1' ? 'two-pass-v1' : undefined,
+      rehomeProvenance: rehome.provenance,
+    },
+    errors: [],
+  };
+}
+
+function parsePlanRehomeProvenance(value: unknown): {
+  provenance?: WorkflowRehomeProvenance;
+  errors: string[];
+} {
+  if (value === undefined) return { errors: [] };
+  if (!value || typeof value !== 'object') {
+    return { errors: ['rehomeProvenance must be an object'] };
+  }
+  const raw = value as Record<string, unknown>;
+  const errors: string[] = [];
+  if (raw.schemaVersion !== '1') errors.push('rehomeProvenance.schemaVersion must be 1');
+  if (raw.status !== 'declared' && raw.status !== 'bound') {
+    errors.push('rehomeProvenance.status must be declared|bound');
+  }
+  if (raw.predecessorPassedReview !== false) {
+    errors.push('rehomeProvenance.predecessorPassedReview must be false');
+  }
+  if (raw.predecessorHeadIsAncestor !== false) {
+    errors.push('rehomeProvenance.predecessorHeadIsAncestor must be false');
+  }
+  const sha = (label: string, input: unknown): string => {
+    const text = asString(input) ?? '';
+    if (!/^[0-9a-f]{7,64}$/i.test(text)) {
+      errors.push(`${label} must be a git commit hash`);
+      return '';
+    }
+    return text;
+  };
+  const sha256 = (label: string, input: unknown): string => {
+    const text = (asString(input) ?? '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/i.test(text)) {
+      errors.push(`${label} must be a 64-char sha256`);
+      return '';
+    }
+    return text;
+  };
+  const workstreamId = (label: string, input: unknown): string => {
+    const text = asString(input) ?? '';
+    if (!/^[A-Za-z0-9_]{3,80}$/.test(text)) {
+      errors.push(`${label} is not a valid workstream id`);
+      return '';
+    }
+    return text;
+  };
+  const predecessorRootWorkstreamId = workstreamId(
+    'predecessorRootWorkstreamId',
+    raw.predecessorRootWorkstreamId
+  );
+  const predecessorDescendantWorkstreamId = workstreamId(
+    'predecessorDescendantWorkstreamId',
+    raw.predecessorDescendantWorkstreamId
+  );
+  const predecessorHeadCommit = sha('predecessorHeadCommit', raw.predecessorHeadCommit);
+  const successorBaselineCommit = sha('successorBaselineCommit', raw.successorBaselineCommit);
+  const sourcePatchSha256 = sha256('sourcePatchSha256', raw.sourcePatchSha256);
+  const sourceProductTreeFingerprint = sha256(
+    'sourceProductTreeFingerprint',
+    raw.sourceProductTreeFingerprint
+  );
+  const predecessorReleaseContext = asString(raw.predecessorReleaseContext) ?? '';
+  const successorBranchName = asString(raw.successorBranchName) ?? '';
+  const sourceReleaseContext = asString(raw.sourceReleaseContext) ?? undefined;
+  const sourceHeadCommit = raw.sourceHeadCommit
+    ? sha('sourceHeadCommit', raw.sourceHeadCommit)
+    : undefined;
+  const sourceBaselineCommit = raw.sourceBaselineCommit
+    ? sha('sourceBaselineCommit', raw.sourceBaselineCommit)
+    : undefined;
+  if (!raw.sourceReviewWorkstreamId) {
+    errors.push('sourceReviewWorkstreamId required');
+  }
+  const sourceReviewWorkstreamId = workstreamId(
+    'sourceReviewWorkstreamId',
+    raw.sourceReviewWorkstreamId
+  );
+  if (!predecessorReleaseContext) errors.push('predecessorReleaseContext required');
+  if (!/^[A-Za-z0-9._/-]{1,120}$/.test(successorBranchName)) {
+    errors.push('successorBranchName is invalid');
+  }
+  if (errors.length > 0) return { errors };
+  return {
+    provenance: {
+      schemaVersion: '1',
+      status: raw.status === 'bound' ? 'bound' : 'declared',
+      predecessorRootWorkstreamId,
+      predecessorDescendantWorkstreamId,
+      predecessorHeadCommit,
+      predecessorReleaseContext,
+      successorBranchName,
+      successorBaselineCommit,
+      sourcePatchSha256,
+      sourceProductTreeFingerprint,
+      sourceReleaseContext,
+      sourceHeadCommit,
+      sourceBaselineCommit,
+      sourceReviewWorkstreamId,
+      predecessorHeadIsAncestor: false,
+      predecessorPassedReview: false,
     },
     errors: [],
   };
@@ -551,6 +663,8 @@ export function pathHasSymlinkComponent(absolutePath: string): boolean {
     try {
       if (lstatSync(current).isSymbolicLink()) return true;
     } catch {
+      // A missing leaf is not a symlink. Unreadable existing components fail closed.
+      if (!existsSync(current)) continue;
       return true;
     }
   }
@@ -855,12 +969,12 @@ export function createDefaultPlanContract(params: {
           invariants: [
             'Preserve fail-open stop-hook topology and mixed-version readers.',
             'Persist hashes, opaque IDs, and derived evidence only.',
-            'Bound premium final review to two-pass-v1 with consolidated fix routing after two failures.',
+            'Bound premium final review to two-pass-v1. After two failed premium rounds remaining work is routing, isolation, or proven removal from release — not another normal final-diff pass.',
           ],
           boundaries: [
             'Do not rewrite immutable workflow events.',
             'Do not change user-facing finalise command phrases.',
-            'Do not launch a third premium review without routing or split.',
+            'Do not launch a third premium review for the same CRITICAL continuation. Routing or split does not reset this budget.',
           ],
           rollback:
             'Revert new writers/rules or switch plan validation to observation-only; keep mixed-version readers accepting already-written records.',

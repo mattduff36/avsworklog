@@ -122,6 +122,26 @@ export function loadWorkflowReviewState(statePath: string): WorkflowReviewState 
   return createEmptyWorkflowReviewState();
 }
 
+export type WorkflowReviewStateLoad =
+  | { ok: true; state: WorkflowReviewState; source: 'missing' | 'ok' }
+  | { ok: false; reason: 'unreadable' | 'malformed' };
+
+/** Safety-path loader. Missing state is empty; corrupted state is a hard failure. */
+export function loadWorkflowReviewStateStrict(statePath: string): WorkflowReviewStateLoad {
+  if (!existsSync(statePath)) {
+    return { ok: true, state: createEmptyWorkflowReviewState(), source: 'missing' };
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(statePath, 'utf8')) as unknown;
+    if (!isWorkflowReviewState(parsed)) {
+      return { ok: false, reason: 'malformed' };
+    }
+    return { ok: true, state: loadWorkflowReviewState(statePath), source: 'ok' };
+  } catch {
+    return { ok: false, reason: 'unreadable' };
+  }
+}
+
 export function upsertWorkstreamRecord(
   state: WorkflowReviewState,
   record: WorkflowWorkstreamRecord

@@ -15,11 +15,14 @@ import type {
 } from './types';
 import {
   getWorkflowPaths,
-  loadWorkflowReviewState,
-  saveWorkflowReviewState,
+  loadWorkflowReviewStateStrict,
   withWorkflowLock,
 } from './workflow-events';
-import { correlateFinaliseRun } from './workflow-finalise-correlation';
+import {
+  correlateFinaliseRun,
+  shouldApplyFinaliseCorrelation,
+} from './workflow-finalise-correlation';
+import { commitFinaliseCorrelationStateAndProtocols } from './workflow-review-protocol';
 
 const REPO_ROOT = process.cwd();
 const AUTOMATION_ROOT = path.join(REPO_ROOT, 'docs_private', 'automation');
@@ -30,6 +33,7 @@ interface AutomationRunOptions {
   mode: string;
   args?: string[];
   expectedArtifacts?: AutomationExpectedArtifact[];
+  persist?: boolean;
 }
 
 interface LoggedCommandOptions {
@@ -102,8 +106,18 @@ export function correlateFinaliseAutomationRun(params: {
   runId: string;
   repoRoot?: string;
   state?: WorkflowReviewState;
+  mode?: string;
+  args?: string[];
 }): WorkflowFinaliseCorrelation | undefined {
-  if (params.scriptName !== 'finalise') return undefined;
+  if (
+    !shouldApplyFinaliseCorrelation({
+      scriptName: params.scriptName,
+      mode: params.mode,
+      args: params.args,
+    })
+  ) {
+    return undefined;
+  }
   const repoRoot = params.repoRoot ?? REPO_ROOT;
   const identity = readPostRunGitIdentity();
   const correlate = (state: WorkflowReviewState) =>
@@ -112,37 +126,39 @@ export function correlateFinaliseAutomationRun(params: {
       repoRoot,
       finaliseRunId: params.runId,
       finaliseOutcome: params.status === 'passed' ? 'passed' : 'failed',
-      // Intentionally omit resultingCommit: correlation must read finish-time HEAD.
     });
 
-  try {
-    if (params.state) {
-      const result = correlate(params.state);
-      return {
-        ...result.correlation,
-        resultingCommit: result.correlation.resultingCommit ?? identity.headCommit,
-        branchName: result.correlation.branchName || identity.branchName,
-      };
-    }
-    const paths = getWorkflowPaths(repoRoot);
-    return withWorkflowLock(paths.lockPath, () => {
-      const result = correlate(loadWorkflowReviewState(paths.statePath));
-      saveWorkflowReviewState(paths.statePath, result.state);
-      return {
-        ...result.correlation,
-        resultingCommit: result.correlation.resultingCommit ?? identity.headCommit,
-        branchName: result.correlation.branchName || identity.branchName,
-      };
-    });
-  } catch {
+  if (params.state) {
+    const result = correlate(params.state);
     return {
-      workstreamIds: [],
-      matchedBy: 'none',
-      branchName: identity.branchName,
-      headCommit: identity.headCommit,
-      resultingCommit: identity.headCommit,
+      ...result.correlation,
+      resultingCommit: result.correlation.resultingCommit ?? identity.headCommit,
+      branchName: result.correlation.branchName || identity.branchName,
     };
   }
+  const paths = getWorkflowPaths(repoRoot);
+  return withWorkflowLock(paths.lockPath, () => {
+    const loaded = loadWorkflowReviewStateStrict(paths.statePath);
+    if (!loaded.ok) {
+      throw new Error(
+        `workflow review state is ${loaded.reason}; refuse finalise correlation so malformed state is not overwritten`
+      );
+    }
+    const previousState = loaded.state;
+    const result = correlate(previousState);
+    commitFinaliseCorrelationStateAndProtocols({
+      repoRoot,
+      statePath: paths.statePath,
+      previousState,
+      nextState: result.state,
+      workstreamIds: result.correlation.workstreamIds,
+    });
+    return {
+      ...result.correlation,
+      resultingCommit: result.correlation.resultingCommit ?? identity.headCommit,
+      branchName: result.correlation.branchName || identity.branchName,
+    };
+  });
 }
 
 export function redactSensitiveText(value: string): string {
@@ -255,6 +271,7 @@ function renderMarkdown(log: AutomationRunLog): string {
 }
 
 export class AutomationRun {
+  private readonly persist: boolean;
   private readonly runDirectory: string;
   private readonly reviewsDirectory: string;
   private readonly logPath: string;
@@ -264,9 +281,12 @@ export class AutomationRun {
   constructor(options: AutomationRunOptions) {
     const startedAt = new Date();
     const safeScriptName = options.scriptName.replace(/[^a-z0-9-]/giu, '-').toLowerCase();
+    this.persist = options.persist !== false;
     this.runDirectory = path.join(AUTOMATION_ROOT, 'runs', safeScriptName);
     this.reviewsDirectory = path.join(AUTOMATION_ROOT, 'reviews');
-    mkdirSync(this.runDirectory, { recursive: true });
+    if (this.persist) {
+      mkdirSync(this.runDirectory, { recursive: true });
+    }
 
     const id = `${startedAt.toISOString().replace(/[:.]/gu, '-')}-${process.pid}`;
     this.logPath = path.join(this.runDirectory, `${id}.json`);
@@ -359,11 +379,14 @@ export class AutomationRun {
   private correlateWorkflowIfFinalise(
     status: AutomationRunStatus
   ): WorkflowFinaliseCorrelation | undefined {
+    if (!this.persist) return undefined;
     return correlateFinaliseAutomationRun({
       scriptName: this.log.scriptName,
       status,
       runId: this.log.id,
       repoRoot: REPO_ROOT,
+      mode: this.log.mode,
+      args: this.log.args,
     });
   }
 
@@ -384,6 +407,11 @@ export class AutomationRun {
       error: error ? redactSensitiveText(error instanceof Error ? error.message : String(error)) : undefined,
       workflowCorrelation,
     };
+
+    if (!this.persist) {
+      console.log(`Dry-run complete for ${this.log.scriptName}; no automation files were written.`);
+      return;
+    }
 
     writeFileSync(this.logPath, JSON.stringify(finalLog, null, 2), 'utf8');
     const review = reviewAutomationRun({

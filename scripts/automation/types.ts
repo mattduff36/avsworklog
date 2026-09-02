@@ -247,11 +247,169 @@ export type WorkflowProtocolPhase =
   | 'fix_sweep_required'
   | 'fix_recorded'
   | 'closure_review'
+  | 'delta_review'
   | 'review_closed'
   | 'routing_required'
   | 'split'
   | 'finalise_ready'
-  | 'finalised';
+  | 'finalised'
+  | 'reconciled'
+  | 'removed_from_release'
+  | 'reverted'
+  | 'superseded'
+  | 'rehomed';
+
+export type WorkflowRouteDispositionTarget =
+  | 'removed_from_release'
+  | 'reverted'
+  | 'superseded'
+  | 'rehomed';
+
+export type WorkflowRouteGitEvidenceKind =
+  | 'absent_from_release_range'
+  | 'full_revert'
+  | 'safe_supersede'
+  | 'isolated_successor';
+
+export interface WorkflowRouteGitEvidence {
+  kind: WorkflowRouteGitEvidenceKind;
+  baselineCommit: string;
+  releaseHeadCommit: string;
+  implementationCommits: string[];
+  revertCommit?: string;
+  supersedeCommit?: string;
+  successorBranch?: string;
+  successorBaseline?: string;
+  successorRepoCanonicalPath?: string;
+  predecessorHead?: string;
+  predecessorHeadIsAncestor?: boolean;
+  latestLegalReviewCandidateHead?: string;
+  canonVersion?: 'tee-v24-rehome-evidence-v2';
+  evidenceHash: string;
+}
+
+export interface WorkflowRouteDisposition {
+  schemaVersion: '1';
+  command: 'route';
+  recordedAt: string;
+  target: WorkflowRouteDispositionTarget;
+  reason: string;
+  gitEvidence: WorkflowRouteGitEvidence;
+}
+
+export type WorkflowRehomeProvenanceStatus = 'declared' | 'bound';
+
+export interface WorkflowRehomeProvenance {
+  schemaVersion: '1';
+  status: WorkflowRehomeProvenanceStatus;
+  predecessorRootWorkstreamId: string;
+  predecessorDescendantWorkstreamId: string;
+  predecessorHeadCommit: string;
+  predecessorReleaseContext: string;
+  successorBranchName: string;
+  successorBaselineCommit: string;
+  successorWorktreeCanonicalPath?: string;
+  sourcePatchSha256: string;
+  sourceProductTreeFingerprint: string;
+  sourceReleaseContext?: string;
+  sourceHeadCommit?: string;
+  sourceBaselineCommit?: string;
+  sourceReviewWorkstreamId?: string;
+  sourceImplementationCommits?: string[];
+  predecessorBranchResolvedSha?: string;
+  predecessorHeadIsAncestor: false;
+  predecessorPassedReview: false;
+  boundAt?: string;
+  evidence?: {
+    canonVersion: 'tee-v24-rehome-evidence-v2';
+    currentHead: string;
+    currentBranch: string;
+    successorBaseline: string;
+    predecessorHead: string;
+    predecessorBranchResolvedSha: string;
+    sourceHeadCommit: string;
+    sourceBaselineCommit: string;
+    sourceReviewWorkstreamId?: string;
+    sourcePatchSha256: string;
+    sourceProductTreeFingerprint: string;
+    implementationCommits: string[];
+    latestLegalReviewCandidateHead?: string;
+    mergeBaseCheck: 'predecessor_head_not_ancestor';
+    predecessorExhausted: true;
+    evidenceHash: string;
+  };
+}
+
+export type WorkflowProtocolReviewPass = 'first' | 'closure' | 'delta';
+
+export type WorkflowLegacyReconciliationKind =
+  | 'released'
+  | 'reconstruct-lineage'
+  | 'superseded';
+
+export type WorkflowLegacyClosureDisposition =
+  | 'released'
+  | 'superseded'
+  | 'lineage-reconstructed';
+
+export type WorkflowLegacyIdentityProofKind = 'plan-in-commit' | 'manifest-to-commit';
+
+export interface WorkflowLegacyClosureObservedSnapshot {
+  phase: WorkflowProtocolPhase;
+  nextAction: string;
+  checkpointId: string | null;
+  sourceWorkstreamIds: string[] | null;
+  baseCommit: string;
+  headCommit: string | null;
+  protocolPreimageSha256: string;
+}
+
+export interface WorkflowLegacyClosureIdentityAnchor {
+  implementationCommit: string;
+  proofKind: WorkflowLegacyIdentityProofKind;
+  proofPath: string;
+  proofWorkstreamId: string;
+  manifestSha256?: string;
+  identityFiles?: string[];
+}
+
+export interface WorkflowLegacyClosureRecord {
+  schemaVersion: '1';
+  workstreamId: string;
+  disposition: WorkflowLegacyClosureDisposition;
+  kind: WorkflowLegacyReconciliationKind;
+  registryId: string;
+  registryFingerprint: string;
+  observedSnapshot: WorkflowLegacyClosureObservedSnapshot;
+  identityAnchor: WorkflowLegacyClosureIdentityAnchor;
+  childWorkstreamId?: string;
+  releasedRef: string;
+  releasedRefCommit: string;
+  evidenceCommits: string[];
+  reason: string;
+  command: 'reconcile-legacy';
+  protocolVersion: string;
+  createdAt: string;
+}
+
+export interface WorkflowLegacyReconciliationAudit {
+  previousPhase: WorkflowProtocolPhase;
+  previousNextAction?: string | null;
+  previousCheckpointId?: string | null;
+  previousSourceWorkstreamIds?: string[] | null;
+  kind: WorkflowLegacyReconciliationKind;
+  reason: string;
+  evidenceCommits: string[];
+  releasedRef: string;
+  releasedRefCommit: string;
+  command: 'reconcile-legacy';
+  protocolVersion: string;
+  reconstructedChildWorkstreamId?: string;
+  reconstructedParentWorkstreamId?: string;
+  registryId: string;
+  preimageSha256: string;
+  reconciledAt: string;
+}
 
 export type WorkflowIdentityStatus = 'present' | 'missing' | 'unknown';
 export type WorkflowTranscriptStatus = 'parsed' | 'null' | 'missing' | 'malformed';
@@ -342,6 +500,8 @@ export interface WorkflowPlanContract {
   };
   /** Additive; high-risk plans should set two-pass-v1. */
   reviewClosureProtocol?: WorkflowReviewClosureProtocol;
+  /** Additive V2.4 re-home declaration. Not a split-parent pointer. */
+  rehomeProvenance?: WorkflowRehomeProvenance;
 }
 
 export interface WorkflowFinding {
@@ -444,9 +604,11 @@ export interface WorkflowWorkstreamRecord {
 }
 
 export interface WorkflowProtocolReviewAttempt {
-  pass: 'first' | 'closure';
+  pass: WorkflowProtocolReviewPass;
   token: string;
   startedAt: string;
+  headCommit?: string | null;
+  treeFingerprint?: string | null;
   result?: 'passed' | 'failed';
   blockerFamilies?: string[];
   blockerIds?: string[];
@@ -467,8 +629,9 @@ export interface WorkflowProtocolRecord {
   nextAction: string;
   failedPremiumReviewCount: number;
   activeReviewToken: string | null;
-  activeReviewPass: 'first' | 'closure' | null;
+  activeReviewPass: WorkflowProtocolReviewPass | null;
   reviewAttempts: WorkflowProtocolReviewAttempt[];
+  reviewedTreeFingerprint?: string | null;
   blockerFamilies: string[];
   openBlockerIds: string[];
   evidenceManifestPath: string | null;
@@ -476,12 +639,18 @@ export interface WorkflowProtocolRecord {
   activeCheckpointId: string | null;
   planPath: string | null;
   updatedAt: string;
+  legacyReconciliation?: WorkflowLegacyReconciliationAudit | null;
+  rehomeProvenance?: WorkflowRehomeProvenance | null;
+  routeDisposition?: WorkflowRouteDisposition | null;
 }
 
 export interface WorkflowActiveFinaliseContext {
   workstreamId: string;
   checkpointId: string;
   activatedAt: string;
+  activatedHeadCommit?: string | null;
+  activatedTreeFingerprint?: string | null;
+  ownedCommits?: string[];
 }
 
 export interface WorkflowReviewState {

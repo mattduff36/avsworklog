@@ -9,6 +9,8 @@ export default defineConfig({
     globals: true,
     // Avoid high-core machines starving individual tests under full-suite load.
     maxWorkers: 4,
+    hookTimeout: 120_000,
+    teardownTimeout: 120_000,
     setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',

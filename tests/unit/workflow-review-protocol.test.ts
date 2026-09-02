@@ -4,6 +4,7 @@ import path from 'path';
 import { spawnSync } from 'child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildEvidenceManifest } from '@/scripts/automation/workflow-evidence-manifest';
+import { persistFixtureLedger, writePassingManifest } from '@/tests/unit/workflow-v24-test-harness';
 import {
   canResumeFinaliseCheckpointStep,
   createOrLoadFinaliseCheckpoint,
@@ -14,6 +15,7 @@ import {
   WORKFLOW_ROUTING_REQUIRED_EXIT_CODE,
   applyProtocolTransition,
   readProtocolRecord,
+  writeProtocolRecord,
 } from '@/scripts/automation/workflow-review-protocol';
 import {
   buildFixtureTimesheetsPayInventory,
@@ -44,6 +46,22 @@ function makeTempRoot(label: string): string {
   return root;
 }
 
+function initGitRepo(repoRoot: string): string {
+  writeFileSync(path.join(repoRoot, 'README.md'), 'fixture\n', 'utf8');
+  spawnSync('git', ['init', '-b', 'main'], { cwd: repoRoot });
+  spawnSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'add', '.'], {
+    cwd: repoRoot,
+  });
+  spawnSync(
+    'git',
+    ['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'init'],
+    { cwd: repoRoot }
+  );
+  return (
+    spawnSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).stdout ?? ''
+  ).trim();
+}
+
 afterEach(() => {
   while (tempRoots.length > 0) {
     const root = tempRoots.pop();
@@ -52,39 +70,6 @@ afterEach(() => {
     }
   }
 });
-
-function writePassingManifest(
-  repoRoot: string,
-  workstreamId: string,
-  kind: 'preflight' | 'fix-delta',
-  closedBlockerIds?: string[]
-): string {
-  const built = buildEvidenceManifest({
-    repoRoot,
-    workstreamId,
-    kind,
-    baseCommit: 'abc1234deadbeef',
-    requiredTestIds: [],
-    runChecks: false,
-    closedBlockerIds,
-    blockerEvidence: closedBlockerIds?.map((blockerId) => ({
-      blockerId,
-      evidenceLabel: `targeted:${blockerId}`,
-      commandName: 'fixture',
-    })),
-    commandResults: [
-      {
-        name: 'fixture',
-        status: 'passed',
-        exitCode: 0,
-        durationMs: 1,
-        summary: 'ok',
-      },
-    ],
-  });
-  expect(built.manifest.status).toBe('passed');
-  return built.relativePath;
-}
 
 describe('workflow review protocol', () => {
   it('rejects a review token when the recorded evidence no longer matches the tree', () => {
@@ -107,11 +92,15 @@ describe('workflow review protocol', () => {
       ],
       { cwd: repoRoot }
     );
+    const headCommit = spawnSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }).stdout.trim();
     applyProtocolTransition({
       repoRoot,
       command: 'init',
       workstreamId,
-      baseCommit: 'abc1234deadbeef',
+      baseCommit: headCommit,
     });
     const manifestPath = writePassingManifest(repoRoot, workstreamId, 'preflight');
     expect(
@@ -136,13 +125,14 @@ describe('workflow review protocol', () => {
 
   it('WF-IDENTITY-001 / WF-REVIEW-001 / WF-REVIEW-002 / WF-ROUTE-001 / WF-ROUTE-002: two-pass budget and routing', () => {
     const repoRoot = makeTempRoot('route');
+    const baseCommit = initGitRepo(repoRoot);
     const workstreamId = 'ws_protocol_route_1';
 
     const init = applyProtocolTransition({
       repoRoot,
       command: 'init',
       workstreamId,
-      baseCommit: 'abc1234deadbeef',
+      baseCommit,
     });
     expect(init.ok).toBe(true);
     expect(init.record?.phase).toBe('initialized');
@@ -224,12 +214,13 @@ describe('workflow review protocol', () => {
 
   it('WF-LINEAGE-001: cosmetic split cannot reset exhausted budget', () => {
     const repoRoot = makeTempRoot('lineage');
+    const baseCommit = initGitRepo(repoRoot);
     const workstreamId = 'ws_protocol_lineage_1';
     applyProtocolTransition({
       repoRoot,
       command: 'init',
       workstreamId,
-      baseCommit: 'abc1234deadbeef',
+      baseCommit,
     });
     const manifestPath = writePassingManifest(repoRoot, workstreamId, 'preflight');
     applyProtocolTransition({
@@ -295,6 +286,7 @@ describe('workflow review protocol', () => {
 
   it('WF-PREFLIGHT-001 / WF-MANIFEST-001 / WF-MANIFEST-002: behavioral evidence required', () => {
     const repoRoot = makeTempRoot('manifest');
+    const head = initGitRepo(repoRoot);
     mkdirSync(path.join(repoRoot, 'tests', 'unit'), { recursive: true });
     writeFileSync(
       path.join(repoRoot, 'tests', 'unit', 'sample.test.ts'),
@@ -306,7 +298,7 @@ describe('workflow review protocol', () => {
       repoRoot,
       workstreamId: 'ws_manifest_1',
       kind: 'preflight',
-      baseCommit: 'abc1234',
+      baseCommit: head,
       requiredTestIds: ['WF-PREFLIGHT-001', 'WF-MISSING-999'],
       runChecks: false,
       commandResults: [
@@ -324,14 +316,15 @@ describe('workflow review protocol', () => {
     );
     expect(unexecuted.manifest.status).toBe('failed');
 
+    const ledger = persistFixtureLedger(repoRoot, 'ws_manifest_1', ['WF-PREFLIGHT-001']);
     const executed = buildEvidenceManifest({
       repoRoot,
       workstreamId: 'ws_manifest_1',
       kind: 'preflight',
-      baseCommit: 'abc1234',
+      baseCommit: head,
       requiredTestIds: ['WF-PREFLIGHT-001'],
       runChecks: false,
-      executedTestIds: ['WF-PREFLIGHT-001'],
+      verificationLedgerRefs: [ledger],
       commandResults: [
         { name: 'fixture', status: 'passed', exitCode: 0, durationMs: 1, summary: 'ok' },
       ],
@@ -342,8 +335,9 @@ describe('workflow review protocol', () => {
     expect(executed.manifest.baseHeadEvidence.headCommit).toBeTruthy();
   });
 
-  it('does not mark extra required IDs executed from the default vitest subset run', () => {
+  it('does not mark extra required IDs executed from an unrelated passing command', () => {
     const repoRoot = makeTempRoot('manifest-vitest-subset');
+    const head = initGitRepo(repoRoot);
     mkdirSync(path.join(repoRoot, 'tests', 'unit'), { recursive: true });
     writeFileSync(
       path.join(repoRoot, 'tests', 'unit', 'sample.test.ts'),
@@ -354,16 +348,16 @@ it('WF-EXTRA-001 behavioral', () => {});
       'utf8'
     );
 
+    const partial = persistFixtureLedger(repoRoot, 'ws_manifest_vitest_subset', ['WF-VITEST-001']);
     const built = buildEvidenceManifest({
       repoRoot,
       workstreamId: 'ws_manifest_vitest_subset',
       kind: 'preflight',
-      baseCommit: 'abc1234',
+      baseCommit: head,
       requiredTestIds: ['WF-VITEST-001', 'WF-EXTRA-001'],
-      vitestTestIds: ['WF-VITEST-001'],
       runChecks: false,
       runRequiredTests: false,
-      executedTestIds: ['WF-VITEST-001'],
+      verificationLedgerRefs: [partial],
       commandResults: [
         { name: 'required-test-WF-EXTRA-001', status: 'passed', exitCode: 0, durationMs: 1, summary: 'ok' },
       ],
@@ -376,16 +370,19 @@ it('WF-EXTRA-001 behavioral', () => {});
     );
     expect(built.manifest.status).toBe('failed');
 
+    const both = persistFixtureLedger(repoRoot, 'ws_manifest_vitest_subset', [
+      'WF-VITEST-001',
+      'WF-EXTRA-001',
+    ]);
     const withExtra = buildEvidenceManifest({
       repoRoot,
       workstreamId: 'ws_manifest_vitest_subset',
       kind: 'preflight',
-      baseCommit: 'abc1234',
+      baseCommit: head,
       requiredTestIds: ['WF-VITEST-001', 'WF-EXTRA-001'],
-      vitestTestIds: ['WF-VITEST-001'],
       runChecks: false,
       runRequiredTests: false,
-      executedTestIds: ['WF-VITEST-001', 'WF-EXTRA-001'],
+      verificationLedgerRefs: [both],
       commandResults: [
         { name: 'required-test-WF-EXTRA-001', status: 'passed', exitCode: 0, durationMs: 1, summary: 'ok' },
       ],
@@ -535,13 +532,14 @@ it('WF-EXTRA-001 behavioral', () => {});
 
   it('WF-TELEMETRY-001: explicit finalise context preferred over ancestry', () => {
     const repoRoot = makeTempRoot('corr');
+    const head = initGitRepo(repoRoot);
     const paths = getWorkflowPaths(repoRoot);
     mkdirSync(path.dirname(paths.statePath), { recursive: true });
     let state = createEmptyWorkflowReviewState();
     state = upsertWorkstreamRecord(state, {
       workstreamId: 'ws_explicit_1',
       branchName: 'main',
-      headCommit: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      headCommit: head,
       taskIds: [],
       eventIds: [],
       status: 'open',
@@ -556,8 +554,8 @@ it('WF-EXTRA-001 behavioral', () => {});
           identityStatus: 'present',
           inheritedFailedReviewCount: 0,
           branchName: 'main',
-          baseCommit: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-          headCommit: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          baseCommit: head,
+          headCommit: head,
           phase: 'finalise_ready',
           nextAction: 'run_finalise',
           failedPremiumReviewCount: 0,
@@ -577,15 +575,18 @@ it('WF-EXTRA-001 behavioral', () => {});
         workstreamId: 'ws_explicit_1',
         checkpointId: 'ckpt_explicit',
         activatedAt: new Date().toISOString(),
+        activatedHeadCommit: head,
+        ownedCommits: [head],
       },
     };
     saveWorkflowReviewState(paths.statePath, state);
+    writeProtocolRecord(repoRoot, state.protocolRecords.ws_explicit_1);
 
     const matched = resolveFinaliseWorkstreamMatches({
       state,
       repoRoot,
       branchName: 'main',
-      headCommit: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      headCommit: head,
     });
     expect(matched.correlation.matchedBy).toBe('explicit_context');
     expect(matched.correlation.workstreamIds).toEqual(['ws_explicit_1']);
@@ -638,11 +639,12 @@ it('WF-EXTRA-001 behavioral', () => {});
 
   it('WF-PRIVACY-001: evidence manifests mark redaction and omit secrets', () => {
     const repoRoot = makeTempRoot('privacy');
+    const head = initGitRepo(repoRoot);
     const built = buildEvidenceManifest({
       repoRoot,
       workstreamId: 'ws_privacy_1',
       kind: 'preflight',
-      baseCommit: 'abc1234',
+      baseCommit: head,
       runChecks: false,
       commandResults: [
         { name: 'fixture', status: 'passed', exitCode: 0, durationMs: 1, summary: 'ok' },
