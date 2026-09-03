@@ -127,19 +127,24 @@ describe('Permission Alignment Phase 4', () => {
   });
 
   it('ROUTE-AUTH-001 keeps mutation routes independent from Reports scope', () => {
-    const routePaths = [
+    const authorisingRoutePaths = [
       'app/api/timesheets/[id]/approve/route.ts',
       'app/api/timesheets/[id]/reject/route.ts',
-      'app/api/timesheets/[id]/adjust/route.ts',
       'app/api/timesheets/[id]/process/route.ts',
+      'app/api/timesheets/[id]/payroll-edit/route.ts',
       'app/api/timesheets/payroll-preview/route.ts',
     ];
 
-    for (const path of routePaths) {
+    for (const path of authorisingRoutePaths) {
       const route = readProjectFile(path);
       expect(route).toContain('canCurrentActorAuthoriseTimesheetTarget');
       expect(route).not.toContain('filterTimesheetRowsForReportScope');
     }
+
+    const retiredAdjust = readProjectFile('app/api/timesheets/[id]/adjust/route.ts');
+    expect(retiredAdjust).toContain('TIMESHEET_ADJUST_RETIRED_CODE');
+    expect(retiredAdjust).not.toContain('filterTimesheetRowsForReportScope');
+    expect(retiredAdjust).not.toContain('applyTimesheetAdjustmentMutation');
   });
 
   it('APPROVAL-CONSUMER-001 applies the no-self decision in UI and dashboard metrics', () => {

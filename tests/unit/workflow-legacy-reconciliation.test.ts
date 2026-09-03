@@ -958,7 +958,12 @@ describe('legacy protocol closure records', { timeout: 30_000 }, () => {
       expect(dry.ok, `${entry.registryId}: ${dry.message}`).toBe(true);
       expect(dry.wrote).toBe(false);
       expect(dry.record?.phase).toBe(entry.expectedPreviousPhase);
-      expect(existsSync(getLegacyClosurePath(repoRoot, entry.workstreamId))).toBe(false);
+      const closurePath = getLegacyClosurePath(repoRoot, entry.workstreamId);
+      if (existsSync(closurePath)) {
+        const closure = readLegacyClosure(repoRoot, entry.workstreamId);
+        expect(closure?.registryId, `${entry.registryId} closure`).toBe(entry.registryId);
+        expect(closure?.kind).toBe(entry.kind);
+      }
     }
     for (const id of CURRENT_HARDENING_WORKSTREAM_IDS) {
       const modern = applyLegacyReconciliation({

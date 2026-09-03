@@ -99,20 +99,40 @@ describe('payroll approval guard live DB', () => {
       await client.query(
         `
           UPDATE public.timesheets
-          SET status = 'approved', current_payroll_snapshot_id = $2, reviewed_by = $3, reviewed_at = NOW()
+          SET
+            status = 'approved',
+            current_payroll_snapshot_id = $2,
+            reviewed_by = $3,
+            reviewed_at = NOW(),
+            payroll_received_at = NOW(),
+            payroll_received_by = $3
           WHERE id = $1
         `,
         [timesheetId, snapshotId, actorId]
       );
       await client.query(
-        `UPDATE public.timesheets SET status = 'adjusted' WHERE id = $1`,
+        `
+          UPDATE public.timesheets
+          SET
+            status = 'adjusted',
+            payroll_received_at = NULL,
+            payroll_received_by = NULL
+          WHERE id = $1
+        `,
         [timesheetId]
       );
 
       await expect(
         client.query(
-          `UPDATE public.timesheets SET status = 'approved' WHERE id = $1`,
-          [timesheetId]
+          `
+            UPDATE public.timesheets
+            SET
+              status = 'approved',
+              payroll_received_at = NOW(),
+              payroll_received_by = $2
+            WHERE id = $1
+          `,
+          [timesheetId, actorId]
         )
       ).rejects.toThrow(/Reapproval must append a snapshot revision/);
     } finally {
@@ -208,22 +228,33 @@ describe('payroll approval guard live DB', () => {
         await client.query(
           `
             UPDATE public.timesheets
-            SET status = 'approved', current_payroll_snapshot_id = $2
+            SET
+              status = 'approved',
+              current_payroll_snapshot_id = $2,
+              payroll_received_at = NOW(),
+              payroll_received_by = $3
             WHERE id = $1
           `,
-          [approvedId, snapshot.rows[0]?.id]
+          [approvedId, snapshot.rows[0]?.id, actorId]
         );
       } else {
         await client.query(
-          `UPDATE public.timesheets SET status = 'approved' WHERE id = $1`,
-          [approvedId]
+          `
+            UPDATE public.timesheets
+            SET
+              status = 'approved',
+              payroll_received_at = NOW(),
+              payroll_received_by = $2
+            WHERE id = $1
+          `,
+          [approvedId, actorId]
         );
       }
 
       await client.query('SAVEPOINT before_delete_guard');
       await expect(
         client.query(`DELETE FROM public.timesheet_entries WHERE id = $1`, [entryId])
-      ).rejects.toThrow(/Approved timesheet entries are immutable/);
+      ).rejects.toThrow(/Timesheet entries are locked after submission/);
       await client.query('ROLLBACK TO SAVEPOINT before_delete_guard');
 
       const draft = await client.query<{ id: string }>(
@@ -245,7 +276,7 @@ describe('payroll approval guard live DB', () => {
           `UPDATE public.timesheet_entries SET timesheet_id = $2 WHERE id = $1`,
           [entryId, draftId]
         )
-      ).rejects.toThrow(/Approved timesheet entries are immutable/);
+      ).rejects.toThrow(/Timesheet entries are locked after submission/);
       await client.query('ROLLBACK TO SAVEPOINT before_reparent_guard');
 
       const draftEntry = await client.query<{ id: string }>(
@@ -267,7 +298,7 @@ describe('payroll approval guard live DB', () => {
           `UPDATE public.timesheet_entries SET timesheet_id = $2 WHERE id = $1`,
           [draftEntryId, approvedId]
         )
-      ).rejects.toThrow(/Approved timesheet entries are immutable/);
+      ).rejects.toThrow(/Timesheet entries are locked after submission/);
       await client.query('ROLLBACK TO SAVEPOINT before_new_parent_guard');
 
       await client.query('SAVEPOINT before_entry_insert_guard');
@@ -281,7 +312,7 @@ describe('payroll approval guard live DB', () => {
           `,
           [approvedId]
         )
-      ).rejects.toThrow(/Approved timesheet entries are immutable/);
+      ).rejects.toThrow(/Timesheet entries are locked after submission/);
       await client.query('ROLLBACK TO SAVEPOINT before_entry_insert_guard');
 
       await client.query('SAVEPOINT before_entry_update_guard');
@@ -290,7 +321,7 @@ describe('payroll approval guard live DB', () => {
           `UPDATE public.timesheet_entries SET remarks = 'changed' WHERE id = $1`,
           [entryId]
         )
-      ).rejects.toThrow(/Approved timesheet entries are immutable/);
+      ).rejects.toThrow(/Timesheet entries are locked after submission/);
       await client.query('ROLLBACK TO SAVEPOINT before_entry_update_guard');
 
       await client.query('SAVEPOINT before_job_code_insert_guard');
@@ -304,7 +335,7 @@ describe('payroll approval guard live DB', () => {
           `,
           [entryId]
         )
-      ).rejects.toThrow(/Approved timesheet entry job codes are immutable/);
+      ).rejects.toThrow(/Timesheet entry job codes are locked after submission/);
       await client.query('ROLLBACK TO SAVEPOINT before_job_code_insert_guard');
 
       await client.query('SAVEPOINT before_job_code_update_guard');
@@ -313,13 +344,13 @@ describe('payroll approval guard live DB', () => {
           `UPDATE public.timesheet_entry_job_codes SET job_number = 'JOB-NEW' WHERE id = $1`,
           [jobCodeId]
         )
-      ).rejects.toThrow(/Approved timesheet entry job codes are immutable/);
+      ).rejects.toThrow(/Timesheet entry job codes are locked after submission/);
       await client.query('ROLLBACK TO SAVEPOINT before_job_code_update_guard');
 
       await client.query('SAVEPOINT before_job_code_delete_guard');
       await expect(
         client.query(`DELETE FROM public.timesheet_entry_job_codes WHERE id = $1`, [jobCodeId])
-      ).rejects.toThrow(/Approved timesheet entry job codes are immutable/);
+      ).rejects.toThrow(/Timesheet entry job codes are locked after submission/);
       await client.query('ROLLBACK TO SAVEPOINT before_job_code_delete_guard');
 
       await client.query('SAVEPOINT before_job_code_reparent_guard');
@@ -328,7 +359,7 @@ describe('payroll approval guard live DB', () => {
           `UPDATE public.timesheet_entry_job_codes SET timesheet_entry_id = $2 WHERE id = $1`,
           [jobCodeId, draftEntryId]
         )
-      ).rejects.toThrow(/Approved timesheet entry job codes are immutable/);
+      ).rejects.toThrow(/Timesheet entry job codes are locked after submission/);
       await client.query('ROLLBACK TO SAVEPOINT before_job_code_reparent_guard');
     } finally {
       await client.query('ROLLBACK');
