@@ -189,13 +189,15 @@ function chunkValues<T>(values: readonly T[], size = OVERVIEW_IN_FILTER_CHUNK_SI
 
 async function selectInChunks<TRow>(
   values: readonly string[],
-  runChunk: (chunk: string[]) => PromiseLike<{ data: TRow[] | null; error: unknown }>,
+  runChunk: (chunk: string[]) => PromiseLike<{ data: unknown; error: unknown }>,
 ): Promise<TRow[]> {
   const rows: TRow[] = [];
   for (const chunk of chunkValues(values)) {
     const { data, error } = await runChunk(chunk);
     if (error) throw error;
-    if (data?.length) rows.push(...data);
+    if (Array.isArray(data) && data.length > 0) {
+      rows.push(...(data as TRow[]));
+    }
   }
   return rows;
 }
