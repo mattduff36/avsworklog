@@ -3,13 +3,21 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowUpDown } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import { collectUniqueJobNumbers } from '@/lib/utils/timesheet-job-codes';
 import { TimesheetSubmittedActions } from './TimesheetSubmittedActions';
+import { TimesheetApprovalPreview } from './TimesheetApprovalPreview';
 import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
+import {
+  type ApprovalsActorKind,
+  getTimesheetApprovalActionVisibility,
+  resolveTimesheetPrimaryGate,
+} from '@/lib/utils/approvals-action-visibility';
+import type { TimesheetStatusFilter } from '@/types/common';
 
 interface TimesheetEntry {
   day_of_week: number;
@@ -52,14 +60,17 @@ export const DEFAULT_COLUMN_VISIBILITY: ColumnVisibility = {
 
 interface TimesheetsApprovalTableProps {
   timesheets: TimesheetWithProfile[];
-  onApprove: (id: string) => Promise<void>;
-  onReject: (id: string) => Promise<void>;
+  onApprove: (id: string) => Promise<void> | void;
+  onReject: (id: string) => Promise<void> | void;
   onProcess: (id: string) => void;
   columnVisibility: ColumnVisibility;
   visibleCount?: number;
   busyTimesheetIds?: ReadonlySet<string>;
-  showPayrollReceived?: boolean;
-  showPayrollEdit?: boolean;
+  actorKind?: ApprovalsActorKind;
+  selectedIds?: ReadonlySet<string>;
+  onToggleSelected?: (id: string, selected: boolean) => void;
+  onToggleVisibleSelected?: (ids: string[], selected: boolean) => void;
+  statusFilter?: TimesheetStatusFilter;
 }
 
 type SortField = 'name' | 'date' | 'totalHours' | 'status' | 'submittedAt';
@@ -87,12 +98,16 @@ export function TimesheetsApprovalTable({
   columnVisibility,
   visibleCount,
   busyTimesheetIds,
-  showPayrollReceived = true,
-  showPayrollEdit = false,
+  actorKind = 'admin',
+  selectedIds,
+  onToggleSelected,
+  onToggleVisibleSelected,
+  statusFilter,
 }: TimesheetsApprovalTableProps) {
   const router = useRouter();
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const selectionEnabled = Boolean(onToggleSelected && selectedIds);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -127,8 +142,11 @@ export function TimesheetsApprovalTable({
     () => sortedTimesheets.slice(0, visibleCount ?? sortedTimesheets.length),
     [sortedTimesheets, visibleCount]
   );
-
-  const getStatusBadge = (status: string) => <TimesheetStatusChips status={status} />;
+  const visibleIds = visibleTimesheets.map((row) => row.id);
+  const allVisibleSelected =
+    selectionEnabled &&
+    visibleIds.length > 0 &&
+    visibleIds.every((id) => selectedIds?.has(id));
 
   if (timesheets.length === 0) {
     return (
@@ -140,11 +158,21 @@ export function TimesheetsApprovalTable({
 
   return (
     <div className="space-y-3">
-      {/* Table */}
       <div className="border border-slate-700 rounded-lg overflow-hidden">
         <Table className="min-w-full">
           <TableHeader>
             <TableRow className="border-border">
+              {selectionEnabled ? (
+                <TableHead className="bg-slate-900 w-10 border-b-2 border-border">
+                  <Checkbox
+                    checked={allVisibleSelected}
+                    aria-label="Select visible timesheets"
+                    onCheckedChange={(checked) => {
+                      onToggleVisibleSelected?.(visibleIds, checked === true);
+                    }}
+                  />
+                </TableHead>
+              ) : null}
               <TableHead
                 className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
                 onClick={() => handleSort('name')}
@@ -213,7 +241,7 @@ export function TimesheetsApprovalTable({
                 </TableHead>
               )}
 
-              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right">
+              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right min-w-[14rem]">
                 Actions
               </TableHead>
             </TableRow>
@@ -225,6 +253,11 @@ export function TimesheetsApprovalTable({
                 ? formatLeaveAwareWeeklyDisplayMultiline(totalHours, ts.leave_days)
                 : (ts.leave_total_display || (totalHours > 0 ? `${totalHours.toFixed(1)}h` : '-'));
               const jobNumbers = computeJobNumbers(ts.timesheet_entries);
+              const visibility = getTimesheetApprovalActionVisibility({
+                actorKind,
+                status: ts.status,
+              });
+              const rowBusy = Boolean(busyTimesheetIds?.has(ts.id));
 
               return (
                 <TableRow
@@ -232,8 +265,36 @@ export function TimesheetsApprovalTable({
                   className="border-slate-700 hover:bg-slate-800/50 cursor-pointer"
                   onClick={() => router.push(`/timesheets/${ts.id}`)}
                 >
-                  <TableCell className="font-medium text-white">
-                    {ts.user?.full_name || 'Unknown'}
+                  {selectionEnabled ? (
+                    <TableCell
+                      onClick={(event) => event.stopPropagation()}
+                      className="w-10"
+                    >
+                      <Checkbox
+                        checked={selectedIds?.has(ts.id) ?? false}
+                        disabled={rowBusy}
+                        aria-label={`Select ${ts.user?.full_name || 'timesheet'}`}
+                        onCheckedChange={(checked) => {
+                          onToggleSelected?.(ts.id, checked === true);
+                        }}
+                      />
+                    </TableCell>
+                  ) : null}
+                  <TableCell
+                    className="font-medium text-white"
+                    onClick={(event) => {
+                      if ((event.target as HTMLElement).closest('button, a, [role="dialog"]')) {
+                        event.stopPropagation();
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>{ts.user?.full_name || 'Unknown'}</span>
+                      <TimesheetApprovalPreview
+                        timesheetId={ts.id}
+                        entries={ts.timesheet_entries}
+                      />
+                    </div>
                   </TableCell>
 
                   {columnVisibility.employeeId && (
@@ -260,7 +321,7 @@ export function TimesheetsApprovalTable({
 
                   {columnVisibility.status && (
                     <TableCell>
-                      {getStatusBadge(ts.status)}
+                      <TimesheetStatusChips status={ts.status} density="compact" />
                     </TableCell>
                   )}
 
@@ -271,21 +332,25 @@ export function TimesheetsApprovalTable({
                   )}
 
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <TimesheetSubmittedActions
-                        timesheetId={ts.id}
-                        status={ts.status}
-                        busy={Boolean(busyTimesheetIds?.has(ts.id))}
-                        showPayrollReceived={showPayrollReceived}
-                        showPayrollEdit={showPayrollEdit}
-                        onApprove={onApprove}
-                        onReject={onReject}
-                        onProcess={onProcess}
-                        onEdit={() => router.push(`/timesheets/${ts.id}`)}
-                        rejectClassName="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all h-8 px-2"
-                        approveClassName="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all h-8 px-2"
-                      />
-                    </div>
+                    <TimesheetSubmittedActions
+                      timesheetId={ts.id}
+                      status={ts.status}
+                      busy={rowBusy}
+                      compactLabels
+                      showPayrollReceived={visibility.showPayrollReceived}
+                      showManagerApproved={visibility.showManagerApproved}
+                      showReject={visibility.showReject}
+                      showPayrollEdit={visibility.showEdit}
+                      primaryGate={resolveTimesheetPrimaryGate({
+                        showPayrollReceived: visibility.showPayrollReceived,
+                        showManagerApproved: visibility.showManagerApproved,
+                        filter: statusFilter,
+                      })}
+                      onApprove={onApprove}
+                      onReject={onReject}
+                      onProcess={onProcess}
+                      onEdit={() => router.push(`/timesheets/${ts.id}`)}
+                    />
                   </TableCell>
                 </TableRow>
               );

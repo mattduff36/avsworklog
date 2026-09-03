@@ -16,6 +16,24 @@ export interface ApprovalInFlightGuard {
   has: (id: string) => boolean;
 }
 
+export async function runWithConcurrency<T>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<void>
+): Promise<void> {
+  const queue = [...items];
+  const workerCount = Math.max(1, Math.min(limit, queue.length || 1));
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (queue.length > 0) {
+        const item = queue.shift();
+        if (item === undefined) return;
+        await worker(item);
+      }
+    })
+  );
+}
+
 export function createApprovalInFlightGuard(
   store: Set<string> = new Set()
 ): ApprovalInFlightGuard {

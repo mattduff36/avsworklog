@@ -42,6 +42,11 @@ import { Database } from '@/types/database';
 import { TimesheetPayrollEditModal } from '@/components/timesheets/TimesheetPayrollEditModal';
 import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
 import {
+  getTimesheetApprovalActionVisibility,
+  resolveApprovalsActorKind,
+  resolveTimesheetPrimaryGate,
+} from '@/lib/utils/approvals-action-visibility';
+import {
   canRejectTimesheetStatus,
   hasPayrollReceivedGate,
   isTimesheetComplete,
@@ -1184,9 +1189,25 @@ export default function ViewTimesheetPage() {
   const canPayrollEdit = canPerformPayrollReceived && timesheet.status !== 'draft';
   const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected' || canPayrollEdit);
   const canSubmit = timesheet.user_id === user?.id && (timesheet.status === 'draft' || timesheet.status === 'rejected');
-  const canApprove = canPerformPayrollReceived && !hasPayrollReceivedGate(timesheet.status) && timesheet.status !== 'draft' && timesheet.status !== 'rejected';
-  const canReject = canAuthoriseThisTimesheet && canRejectTimesheetStatus(timesheet.status);
-  const canMarkAsProcessed = canAuthoriseThisTimesheet && timesheet.status !== 'draft' && timesheet.status !== 'rejected' && timesheet.status !== 'adjusted' && !isTimesheetComplete(timesheet.status) && timesheet.status !== 'manager_approved';
+  const isAdminTier = Boolean(isAdmin || isSuperAdmin);
+  const isAccountsActor =
+    !isAdminTier &&
+    hasAccountsTimesheetFullVisibilityOverride(effectiveRole?.name, effectiveRole?.team_name);
+  const detailActorKind = resolveApprovalsActorKind({
+    isAdminTier,
+    isAccountsActor,
+  });
+  const detailActionVisibility = getTimesheetApprovalActionVisibility({
+    actorKind: detailActorKind,
+    status: timesheet.status,
+  });
+  const canApprove = detailActionVisibility.showPayrollReceived && canPerformPayrollReceived;
+  const canReject = detailActionVisibility.showReject && canAuthoriseThisTimesheet && canRejectTimesheetStatus(timesheet.status);
+  const canMarkAsProcessed = detailActionVisibility.showManagerApproved && canAuthoriseThisTimesheet;
+  const detailPrimaryGate = resolveTimesheetPrimaryGate({
+    showPayrollReceived: canApprove,
+    showManagerApproved: canMarkAsProcessed,
+  });
   const canStartPayrollEdit = canPayrollEdit && !editing;
   const payrollGateLocked = hasPayrollReceivedGate(timesheet.status);
   const canDeclineTrainingFromDetails = !payrollGateLocked && timesheet.status !== 'adjusted' && (hasElevatedAccess || timesheet.user_id === user?.id);
@@ -1818,7 +1839,12 @@ export default function ViewTimesheetPage() {
               <Button
                 onClick={handleApprove}
                 disabled={saving}
-                className="h-11 bg-emerald-600 text-white hover:bg-emerald-700 md:h-9"
+                variant={detailPrimaryGate === 'payroll' ? 'default' : 'outline'}
+                className={
+                  detailPrimaryGate === 'payroll'
+                    ? 'h-11 bg-emerald-600 text-white hover:bg-emerald-700 md:h-9'
+                    : 'h-11 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 md:h-9'
+                }
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 {timesheet.status === 'adjusted' ? 'Re-mark Payroll Received' : 'Payroll Received'}
@@ -1829,7 +1855,12 @@ export default function ViewTimesheetPage() {
               <Button
                 onClick={() => setShowProcessedDialog(true)}
                 disabled={saving}
-                className="h-11 bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover md:h-9"
+                variant={detailPrimaryGate === 'manager' ? 'default' : 'outline'}
+                className={
+                  detailPrimaryGate === 'manager'
+                    ? 'h-11 bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover md:h-9'
+                    : 'h-11 border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/10 md:h-9'
+                }
               >
                 <UserCheck className="h-4 w-4 mr-2" />
                 Mark as Manager Approved

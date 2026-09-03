@@ -7,9 +7,19 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useQueryState } from 'nuqs';
 import { createClient } from '@/lib/supabase/client';
-import { AppPageShell } from '@/components/layout/AppPageShell';
+import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -39,7 +49,6 @@ import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
 import {
   canActorAuthoriseTimesheetTarget,
-  canActorMarkTimesheetPayrollReceived,
   hasAccountsTimesheetFullVisibilityOverride,
   resolveClientApprovalsAccessLevel,
 } from '@/lib/utils/timesheet-visibility';
@@ -49,6 +58,9 @@ import type { ColumnVisibility } from './components/TimesheetsApprovalTable';
 import { AbsencesApprovalTable, ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_ABSENCE_COLUMN_VISIBILITY } from './components/AbsencesApprovalTable';
 import type { AbsenceColumnVisibility } from './components/AbsencesApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
+import { ApprovalsRejectDialog } from './components/ApprovalsRejectDialog';
+import { AbsenceApprovalActions } from './components/AbsenceApprovalActions';
+import { TimesheetApprovalPreview } from './components/TimesheetApprovalPreview';
 import { TimesheetSubmittedActions } from './components/TimesheetSubmittedActions';
 import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
 import { SectionLoader } from '@/components/ui/section-loader';
@@ -75,7 +87,18 @@ import { timesheetMatchesStatusFilter } from '@/lib/utils/timesheet-status-displ
 import {
   createApprovalInFlightGuard,
   isAlreadyApprovedConflict,
+  runWithConcurrency,
 } from './approvals-quick-approve';
+import {
+  getAbsenceApprovalActionVisibility,
+  getApprovalsAbsenceFilterOptions,
+  getApprovalsTimesheetFilterOptions,
+  getTimesheetApprovalActionVisibility,
+  getTimesheetBulkToolbarVisibility,
+  resolveTimesheetPrimaryGate,
+  partitionTimesheetBulkSelection,
+  resolveApprovalsActorKind,
+} from '@/lib/utils/approvals-action-visibility';
 import {
   TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
   isTimesheetProcessConflict,
@@ -156,10 +179,10 @@ function ApprovalsContent() {
   );
   const isAdminTier = Boolean(isAdmin || isSuperAdmin);
   const isTimesheetAdminTier = Boolean(isAdminTier || hasAccountsVisibilityOverride);
-  const canMarkPayrollReceived = canActorMarkTimesheetPayrollReceived({
-    hasFullAdminAccess: isAdminTier,
-    roleName: absenceSecondarySnapshot?.role_name,
-    teamName: actorTeamName,
+  const isAccountsActor = hasAccountsVisibilityOverride && !isAdminTier;
+  const actorKind = resolveApprovalsActorKind({
+    isAdminTier,
+    isAccountsActor,
   });
   const activeTab: ApprovalsTab = tabParam === 'absences' ? 'absences' : 'timesheets';
   const defaultStatusFilters = useMemo(
@@ -187,10 +210,16 @@ function ApprovalsContent() {
   // View mode (cards vs table) - persisted to localStorage per tab
   const [timesheetViewMode, setTimesheetViewMode] = useState<'cards' | 'table'>(() => {
     if (typeof window !== 'undefined') {
-      return (localStorage.getItem('approvals-ts-view-mode') as 'cards' | 'table') || 'cards';
+      return (localStorage.getItem('approvals-ts-view-mode') as 'cards' | 'table') || 'table';
     }
-    return 'cards';
+    return 'table';
   });
+  const [selectedTimesheetIds, setSelectedTimesheetIds] = useState<Set<string>>(() => new Set());
+  const [rejectTarget, setRejectTarget] = useState<{ type: 'timesheet' | 'absence'; id: string } | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+  const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  const [bulkDialog, setBulkDialog] = useState<{ action: 'payroll' | 'manager' } | null>(null);
+  const [bulkRunning, setBulkRunning] = useState(false);
   const [absenceViewMode, setAbsenceViewMode] = useState<'cards' | 'table'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('approvals-abs-view-mode') as 'cards' | 'table') || 'table';
@@ -287,6 +316,17 @@ function ApprovalsContent() {
 
     setAbsenceStatusFilter(defaultStatusFilters.absences);
   }, [activeTab, defaultStatusFilters.absences, defaultStatusFilters.timesheets]);
+
+  useEffect(() => {
+    const timesheetOptions = getApprovalsTimesheetFilterOptions(actorKind);
+    if (!timesheetOptions.includes(timesheetFilter)) {
+      setTimesheetFilter(defaultStatusFilters.timesheets);
+    }
+    const absenceOptions = getApprovalsAbsenceFilterOptions(actorKind);
+    if (!absenceOptions.includes(absenceStatusFilter)) {
+      setAbsenceStatusFilter(defaultStatusFilters.absences);
+    }
+  }, [actorKind, timesheetFilter, absenceStatusFilter, defaultStatusFilters]);
 
   useEffect(() => {
     if (!scopeTeamOnly) {
@@ -528,6 +568,7 @@ function ApprovalsContent() {
 
   useEffect(() => {
     setVisibleTimesheetCount(APPROVALS_PAGE_SIZE);
+    setSelectedTimesheetIds(new Set());
   }, [selectedEmployeeId, effectiveTeamFilter, timesheetFilter, dateFrom, dateTo]);
 
   useEffect(() => {
@@ -539,7 +580,7 @@ function ApprovalsContent() {
       setLoading(true);
       const timesheetStatuses = getApprovalsTimesheetStatuses(timesheetFilter);
       
-      // Build a lightweight list first; entry details are fetched only for rows currently visible.
+      // Headers first; entry details cover the filtered set so table sort cannot orphan previews.
       let timesheetQuery = supabase
         .from('timesheets')
         .select(`
@@ -586,7 +627,7 @@ function ApprovalsContent() {
         leave_days: undefined,
       }));
 
-      const visibleTimesheets = getCurrentFilteredTimesheets(timesheetsWithLeaveTotals).slice(0, visibleTimesheetCount);
+      const visibleTimesheets = getCurrentFilteredTimesheets(timesheetsWithLeaveTotals);
       const visibleTimesheetIds = visibleTimesheets.map((timesheet) => timesheet.id);
       const userIds = [...new Set(visibleTimesheets.map((timesheet) => timesheet.user_id).filter(Boolean))];
       if (visibleTimesheetIds.length === 0 || userIds.length === 0) {
@@ -710,9 +751,13 @@ function ApprovalsContent() {
     }
   }, [canViewApprovals, permissionLoading, router, fetchApprovals]);
 
-  const handleQuickApprove = async (_type: 'timesheet', id: string) => {
+  const handleQuickApprove = async (
+    _type: 'timesheet',
+    id: string,
+    options?: { skipRefresh?: boolean }
+  ): Promise<boolean> => {
     if (!approveInFlightRef.current.tryBegin(id)) {
-      return;
+      return false;
     }
     setBusyTimesheetIds((previous) => {
       const next = new Set(previous);
@@ -734,25 +779,33 @@ function ApprovalsContent() {
       if (!response.ok) {
         if (response.status === 409) {
           toast.error(payload.error || 'Timesheet status changed. Reloading.');
-          await fetchApprovals();
-          return;
+          if (!options?.skipRefresh) {
+            await fetchApprovals();
+          }
+          return false;
         }
         throw new Error(payload.error || 'Failed to approve timesheet');
       }
 
       toast.success('Timesheet marked as Payroll Received');
-      await fetchApprovals();
+      if (!options?.skipRefresh) {
+        await fetchApprovals();
+      }
+      return true;
     } catch (error) {
       if (isAlreadyApprovedConflict(error)) {
         toast.success('Timesheet already marked as Payroll Received');
-        await fetchApprovals();
-        return;
+        if (!options?.skipRefresh) {
+          await fetchApprovals();
+        }
+        return true;
       }
       const errorContextId = 'approvals-quick-approve-error';
       console.error('Error approving:', error, { errorContextId });
       toast.error(error instanceof Error ? error.message : 'Failed to approve timesheet', {
         id: errorContextId,
       });
+      return false;
     } finally {
       approveInFlightRef.current.end(id);
       setBusyTimesheetIds((previous) => {
@@ -763,32 +816,67 @@ function ApprovalsContent() {
     }
   };
 
-  const handleQuickReject = async (_type: 'timesheet', id: string) => {
-    const comments = prompt('Enter rejection reason:');
-    if (!comments) return;
+  const requestTimesheetReject = (id: string) => {
+    setRejectTarget({ type: 'timesheet', id });
+    setRejectionReason('');
+  };
 
-    try {
-      const response = await fetch(`/api/timesheets/${id}/reject`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comments }),
+  const requestAbsenceReject = (id: string) => {
+    setRejectTarget({ type: 'absence', id });
+    setRejectionReason('');
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectTarget || !rejectionReason.trim()) {
+      toast.error('Rejection reason required', {
+        id: 'approvals-rejection-reason-required',
+        description: 'Please provide a reason for rejecting this request.',
       });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) {
-        if (response.status === 409) {
-          toast.error(payload.error || 'Timesheet status changed. Reloading.');
-          await fetchApprovals();
-          return;
-        }
-        throw new Error(payload.error || 'Failed to reject timesheet');
-      }
+      return;
+    }
 
-      // Refresh data
-      await fetchApprovals();
+    setRejectSubmitting(true);
+    try {
+      if (rejectTarget.type === 'timesheet') {
+        const response = await fetch(`/api/timesheets/${rejectTarget.id}/reject`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comments: rejectionReason.trim() }),
+        });
+        const payload = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          if (response.status === 409) {
+            toast.error(payload.error || 'Timesheet status changed. Reloading.');
+            await fetchApprovals();
+            setRejectTarget(null);
+            return;
+          }
+          throw new Error(payload.error || 'Failed to reject timesheet');
+        }
+        await fetchApprovals();
+      } else {
+        await rejectAbsence.mutateAsync({
+          id: rejectTarget.id,
+          reason: rejectionReason.trim(),
+        });
+      }
+      setRejectTarget(null);
+      setRejectionReason('');
     } catch (error) {
+      if (rejectTarget.type === 'absence') {
+        reportAbsenceActionError(
+          'Error rejecting absence',
+          error,
+          'approvals-absence-reject-error',
+          'Failed to reject absence'
+        );
+        return;
+      }
       const errorContextId = 'approvals-quick-reject-error';
       console.error('Error rejecting:', error, { errorContextId });
       toast.error('Failed to reject timesheet', { id: errorContextId });
+    } finally {
+      setRejectSubmitting(false);
     }
   };
 
@@ -858,6 +946,84 @@ function ApprovalsContent() {
     }
   };
 
+  const selectedTimesheetRows = filteredTimesheets.filter((row) => selectedTimesheetIds.has(row.id));
+  const selectedBulkActions = getTimesheetBulkToolbarVisibility({
+    actorKind,
+    selectedStatuses: selectedTimesheetRows.map((row) => row.status),
+    filter: timesheetFilter,
+  });
+
+  const handleBulkAction = async (action: 'payroll' | 'manager') => {
+    const { eligibleIds, skippedCount } = partitionTimesheetBulkSelection({
+      actorKind,
+      action,
+      rows: selectedTimesheetRows,
+    });
+    if (eligibleIds.length === 0) {
+      toast.error(
+        skippedCount > 0
+          ? 'None of the selected timesheets can take this action'
+          : 'Select at least one timesheet'
+      );
+      return;
+    }
+
+    setBulkRunning(true);
+    let succeeded = 0;
+    let failed = 0;
+    try {
+      await runWithConcurrency(eligibleIds, 3, async (id) => {
+        if (action === 'payroll') {
+          const ok = await handleQuickApprove('timesheet', id, { skipRefresh: true });
+          if (ok) succeeded += 1;
+          else failed += 1;
+          return;
+        }
+        const expectedStatus = timesheets.find((row) => row.id === id)?.status;
+        if (!processInFlightRef.current.tryBegin(id)) {
+          failed += 1;
+          return;
+        }
+        setBusyTimesheetIds((previous) => {
+          const next = new Set(previous);
+          next.add(id);
+          return next;
+        });
+        try {
+          const response = await fetch(`/api/timesheets/${id}/process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ expected_status: expectedStatus }),
+          });
+          const payload = (await response.json()) as { error?: string };
+          if (!response.ok) {
+            throw new Error(payload.error || 'Failed to process timesheet');
+          }
+          succeeded += 1;
+        } catch {
+          failed += 1;
+        } finally {
+          processInFlightRef.current.end(id);
+          setBusyTimesheetIds((previous) => {
+            const next = new Set(previous);
+            next.delete(id);
+            return next;
+          });
+        }
+      });
+      await fetchApprovals();
+      setSelectedTimesheetIds(new Set());
+      setBulkDialog(null);
+      toast.success(
+        `${succeeded} updated${failed > 0 ? `, ${failed} failed` : ''}${
+          skippedCount > 0 ? `, ${skippedCount} skipped` : ''
+        }`
+      );
+    } finally {
+      setBulkRunning(false);
+    }
+  };
+
   if (permissionLoading || absenceSecondaryLoading || employeesLoading) {
     return (
       <AppPageLoadingShell
@@ -910,18 +1076,8 @@ function ApprovalsContent() {
 
   const getFilterOptions = (): StatusFilter[] =>
     activeTab === 'timesheets'
-      ? [
-          'awaiting_payroll',
-          'awaiting_manager',
-          'pending',
-          'approved',
-          'manager_approved',
-          'rejected',
-          'processed',
-          'adjusted',
-          'all',
-        ]
-      : ['pending', 'approved', 'processed', 'rejected', 'all'];
+      ? getApprovalsTimesheetFilterOptions(actorKind)
+      : getApprovalsAbsenceFilterOptions(actorKind);
 
   const handleFilterChange = (filter: StatusFilter) => {
     if (activeTab === 'timesheets') {
@@ -949,25 +1105,12 @@ function ApprovalsContent() {
     setDateTo('');
   };
 
-  const approvalsStatusHelperText = (() => {
-    if (
-      (activeTab === 'timesheets' &&
-        (timesheetFilter === 'awaiting_payroll' || timesheetFilter === 'pending')) ||
-      (activeTab === 'absences' && absenceStatusFilter === 'approved')
-    ) {
-      return 'These approvals are designed to be processed by Payroll';
-    }
-
-    if (
-      (activeTab === 'timesheets' &&
-        (timesheetFilter === 'awaiting_manager' || timesheetFilter === 'approved')) ||
-      (activeTab === 'absences' && absenceStatusFilter === 'pending')
-    ) {
-      return 'These approvals are designed to be processed by Team Managers';
-    }
-
-    return null;
-  })();
+  const approvalsStatusHelperText =
+    actorKind === 'accounts'
+      ? 'Showing the Accounts queue. Payroll Received and edits stay on this list.'
+      : actorKind === 'manager'
+        ? 'Showing the manager queue. Mark Manager Approved or reject a week from here.'
+        : null;
 
   const handleTabChange = (tab: string) => {
     if (tab !== 'timesheets' && tab !== 'absences') return;
@@ -977,17 +1120,13 @@ function ApprovalsContent() {
   const getStatusBadge = (status: string) => <TimesheetStatusChips status={status} />;
 
   return (
-    <AppPageShell>
-      {/* Header */}
-      <div className="bg-white dark:bg-slate-900 rounded-lg p-6 border border-border">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Approvals</h1>
-            <p className="text-muted-foreground">
-              Review and manage submissions
-            </p>
-          </div>
-          <Badge 
+    <AppPageShell width="wide">
+      <AppPageHeader
+        title="Approvals"
+        description="Review and manage submissions"
+        icon={<FileText className="h-5 w-5" />}
+        actions={
+          <Badge
             variant={
               statusFilter === 'pending' ? 'warning' :
               statusFilter === 'approved' ? 'success' :
@@ -1003,16 +1142,21 @@ function ApprovalsContent() {
           >
             {totalCount} {getFilterLabel(statusFilter)}
           </Badge>
-        </div>
-      </div>
+        }
+      />
 
       <Card className="bg-white dark:bg-slate-900 border-border">
         <CardHeader className="pb-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <CardTitle className="text-foreground flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              Filters
-            </CardTitle>
+            <div className="space-y-1">
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Filter className="h-4 w-4" />
+                Filters
+              </CardTitle>
+              {approvalsStatusHelperText ? (
+                <CardDescription>{approvalsStatusHelperText}</CardDescription>
+              ) : null}
+            </div>
             {hasActiveFilters ? (
               <Button variant="outline" size="sm" onClick={clearFilters} className="border-border text-muted-foreground">
                 Clear Filters
@@ -1109,13 +1253,6 @@ function ApprovalsContent() {
               />
             </div>
           </div>
-          {approvalsStatusHelperText ? (
-            <div className="mt-4 flex justify-center">
-              <p className="inline-flex items-center rounded-full border border-border/70 bg-slate-100/80 px-4 py-1.5 text-center text-sm text-muted-foreground shadow-sm dark:bg-slate-800/60 dark:text-slate-300">
-                {approvalsStatusHelperText}
-              </p>
-            </div>
-          ) : null}
         </CardContent>
       </Card>
 
@@ -1185,41 +1322,99 @@ function ApprovalsContent() {
             ) : (
               <>
                 {/* Toolbar: Columns + View Toggle - Desktop Only */}
-                <div className="hidden md:flex items-center justify-end gap-2">
-                  {timesheetViewMode === 'table' ? (
-                    <ColumnVisibilityMenu
-                      options={[
-                        { id: 'employeeId', label: 'Employee ID', checked: columnVisibility.employeeId },
-                        { id: 'totalHours', label: 'Total Hours', checked: columnVisibility.totalHours },
-                        { id: 'jobNumber', label: 'Job Number', checked: columnVisibility.jobNumber },
-                        { id: 'status', label: 'Status', checked: columnVisibility.status },
-                        { id: 'submittedAt', label: 'Submitted', checked: columnVisibility.submittedAt },
-                      ]}
-                      onToggle={toggleColumn}
+                <div className="hidden md:flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedTimesheetIds.size > 0 ? (
+                      <>
+                        <p className="text-sm text-muted-foreground">
+                          {selectedTimesheetIds.size} selected
+                        </p>
+                        {filteredTimesheets.length > visibleTimesheetCount ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedTimesheetIds(new Set(filteredTimesheets.map((row) => row.id)));
+                            }}
+                          >
+                            Select all {filteredTimesheets.length} matching
+                          </Button>
+                        ) : null}
+                        {selectedBulkActions.showPayrollReceived ? (
+                          <Button
+                            size="sm"
+                            className="bg-emerald-600 text-white hover:bg-emerald-700"
+                            onClick={() => setBulkDialog({ action: 'payroll' })}
+                          >
+                            Mark {selectedTimesheetIds.size} as Payroll Received
+                          </Button>
+                        ) : null}
+                        {selectedBulkActions.showManagerApproved ? (
+                          <Button
+                            size="sm"
+                            className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover"
+                            onClick={() => setBulkDialog({ action: 'manager' })}
+                          >
+                            Mark {selectedTimesheetIds.size} as Manager Approved
+                          </Button>
+                        ) : null}
+                      </>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {timesheetViewMode === 'table' ? (
+                      <ColumnVisibilityMenu
+                        options={[
+                          { id: 'employeeId', label: 'Employee ID', checked: columnVisibility.employeeId },
+                          { id: 'totalHours', label: 'Total Hours', checked: columnVisibility.totalHours },
+                          { id: 'jobNumber', label: 'Job Number', checked: columnVisibility.jobNumber },
+                          { id: 'status', label: 'Status', checked: columnVisibility.status },
+                          { id: 'submittedAt', label: 'Submitted', checked: columnVisibility.submittedAt },
+                        ]}
+                        onToggle={toggleColumn}
+                      />
+                    ) : null}
+                    <DataViewToggle
+                      value={timesheetViewMode}
+                      onValueChange={(nextViewMode) => {
+                        setTimesheetViewMode(nextViewMode);
+                        localStorage.setItem('approvals-ts-view-mode', nextViewMode);
+                      }}
                     />
-                  ) : null}
-                  <DataViewToggle
-                    value={timesheetViewMode}
-                    onValueChange={(nextViewMode) => {
-                      setTimesheetViewMode(nextViewMode);
-                      localStorage.setItem('approvals-ts-view-mode', nextViewMode);
-                    }}
-                  />
+                  </div>
                 </div>
 
-                {/* Table View - Desktop Only */}
                 {timesheetViewMode === 'table' && (
                   <div className="hidden md:block">
                     <TimesheetsApprovalTable
                       timesheets={filteredTimesheets}
+                      actorKind={actorKind}
                       onApprove={async (id) => { await handleQuickApprove('timesheet', id); }}
-                      onReject={async (id) => { await handleQuickReject('timesheet', id); }}
+                      onReject={requestTimesheetReject}
                       onProcess={handleOpenProcessModal}
                       columnVisibility={columnVisibility}
                       visibleCount={visibleTimesheetCount}
+                      statusFilter={timesheetFilter}
                       busyTimesheetIds={busyTimesheetIds}
-                      showPayrollReceived={canMarkPayrollReceived && canAuthoriseTimesheets}
-                      showPayrollEdit={canMarkPayrollReceived && canAuthoriseTimesheets}
+                      selectedIds={selectedTimesheetIds}
+                      onToggleSelected={(id, selected) => {
+                        setSelectedTimesheetIds((current) => {
+                          const next = new Set(current);
+                          if (selected) next.add(id);
+                          else next.delete(id);
+                          return next;
+                        });
+                      }}
+                      onToggleVisibleSelected={(ids, selected) => {
+                        setSelectedTimesheetIds((current) => {
+                          const next = new Set(current);
+                          ids.forEach((id) => {
+                            if (selected) next.add(id);
+                            else next.delete(id);
+                          });
+                          return next;
+                        });
+                      }}
                     />
                   </div>
                 )}
@@ -1230,13 +1425,17 @@ function ApprovalsContent() {
                     const cardTotalDisplay = typeof timesheet.leave_worked_hours === 'number' && typeof timesheet.leave_days === 'number'
                       ? formatLeaveAwareWeeklyDisplayMultiline(timesheet.leave_worked_hours, timesheet.leave_days)
                       : timesheet.leave_total_display;
+                    const cardVisibility = getTimesheetApprovalActionVisibility({
+                      actorKind,
+                      status: timesheet.status,
+                    });
                     return (
                     <Link key={timesheet.id} href={`/timesheets/${timesheet.id}`} className="block">
-                      <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-timesheet/50 transition-all duration-200 cursor-pointer">
+                      <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-avs-yellow/40 transition-all duration-200 cursor-pointer">
                         <CardHeader>
                           <div className="flex items-start justify-between">
                             <div className="flex items-center space-x-3">
-                              <FileText className="h-5 w-5 text-amber-600" />
+                              <FileText className="h-5 w-5 text-avs-yellow" />
                               <div>
                                 <CardTitle className="text-lg">
                                   Week Ending {formatDate(timesheet.week_ending)}
@@ -1252,7 +1451,7 @@ function ApprovalsContent() {
                           </div>
                         </CardHeader>
                         <CardContent>
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between gap-3">
                             <div className="text-sm text-muted-foreground">
                               {timesheet.submitted_at ? `Submitted ${formatDate(timesheet.submitted_at)}` : 'Not submitted'}
                               {timesheet.reg_number && ` • Reg: ${timesheet.reg_number}`}
@@ -1260,20 +1459,34 @@ function ApprovalsContent() {
                                 <p className="mt-1 whitespace-pre-line">{`Total: ${cardTotalDisplay}`}</p>
                               )}
                             </div>
-                            <div onClick={(e) => e.preventDefault()}>
+                            <div
+                              className="flex items-center gap-1"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                              }}
+                            >
+                              <TimesheetApprovalPreview
+                                timesheetId={timesheet.id}
+                                entries={timesheet.timesheet_entries}
+                              />
                               <TimesheetSubmittedActions
                                 timesheetId={timesheet.id}
                                 status={timesheet.status}
                                 busy={busyTimesheetIds.has(timesheet.id)}
-                                showPayrollReceived={canMarkPayrollReceived && canAuthoriseTimesheets}
-                                showPayrollEdit={canMarkPayrollReceived && canAuthoriseTimesheets}
+                                showPayrollReceived={cardVisibility.showPayrollReceived}
+                                showManagerApproved={cardVisibility.showManagerApproved}
+                                showReject={cardVisibility.showReject}
+                                showPayrollEdit={cardVisibility.showEdit}
+                                primaryGate={resolveTimesheetPrimaryGate({
+                                  ...cardVisibility,
+                                  filter: timesheetFilter,
+                                })}
                                 onApprove={(id) => { void handleQuickApprove('timesheet', id); }}
-                                onReject={(id) => { void handleQuickReject('timesheet', id); }}
+                                onReject={requestTimesheetReject}
                                 onProcess={handleOpenProcessModal}
                                 onEdit={(id) => router.push(`/timesheets/${id}`)}
-                                className="flex gap-2"
-                                rejectClassName="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                                approveClassName="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
+                                className="flex min-w-0 flex-wrap justify-end gap-1"
                               />
                             </div>
                           </div>
@@ -1306,11 +1519,23 @@ function ApprovalsContent() {
           <TabsContent value="absences" className="mt-4 space-y-4">
             {absencesLoading ? (
               <SectionLoader message="Loading absence approvals..." />
-            ) : !canAuthoriseAbsences || filteredAbsences.length === 0 ? (
+            ) : !canAuthoriseAbsences ? (
+              <Card className="border-border">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <Calendar className="h-12 w-12 text-muted-foreground mb-3" />
+                  <h3 className="text-lg font-semibold text-foreground mb-1">
+                    Absence approvals are not available
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    You do not have permission to authorise absence bookings.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : filteredAbsences.length === 0 ? (
               <Card className="border-border">
                 <CardContent className="flex flex-col items-center justify-center py-12">
                   <CheckCircle2 className="h-12 w-12 text-green-400 mb-3" />
-                  <h3 className="text-lg font-semibold text-white mb-1">
+                  <h3 className="text-lg font-semibold text-foreground mb-1">
                     {statusFilter === 'pending' ? 'All caught up!' : `No ${getFilterLabel(statusFilter).toLowerCase()} absences`}
                   </h3>
                   <p className="text-sm text-muted-foreground">
@@ -1351,6 +1576,7 @@ function ApprovalsContent() {
                   <div className="hidden md:block">
                     <AbsencesApprovalTable
                       absences={filteredAbsences}
+                      actorKind={actorKind}
                       onApprove={async (id) => {
                         try { await approveAbsence.mutateAsync(id); }
                         catch (e) {
@@ -1358,15 +1584,7 @@ function ApprovalsContent() {
                           reportAbsenceActionError('Error approving absence', e, errorContextId, 'Failed to approve absence');
                         }
                       }}
-                      onReject={async (id) => {
-                        const reason = prompt('Enter rejection reason:');
-                        if (!reason) return;
-                        try { await rejectAbsence.mutateAsync({ id, reason }); }
-                        catch (e) {
-                          const errorContextId = 'approvals-table-absence-reject-error';
-                          reportAbsenceActionError('Error rejecting absence', e, errorContextId, 'Failed to reject absence');
-                        }
-                      }}
+                      onReject={requestAbsenceReject}
                       onProcess={async (id) => {
                         try { await processAbsence.mutateAsync(id); }
                         catch (e) {
@@ -1386,9 +1604,10 @@ function ApprovalsContent() {
                     <AbsenceApprovalCard
                       key={absence.id}
                       absence={absence}
+                      actorKind={actorKind}
                       onApprove={approveAbsence}
                       onProcess={processAbsence}
-                      onReject={rejectAbsence}
+                      onReject={requestAbsenceReject}
                       reportAbsenceActionError={reportAbsenceActionError}
                     />
                   ))}
@@ -1425,6 +1644,72 @@ function ApprovalsContent() {
         onConfirm={handleConfirmProcess}
         processing={processingInProgress}
       />
+      <ApprovalsRejectDialog
+        open={Boolean(rejectTarget)}
+        title={rejectTarget?.type === 'absence' ? 'Reject absence' : 'Reject timesheet'}
+        description={
+          rejectTarget?.type === 'absence'
+            ? 'Provide a reason for rejecting this absence request.'
+            : 'Provide a reason for rejecting this timesheet. The employee will be notified.'
+        }
+        reason={rejectionReason}
+        submitting={rejectSubmitting}
+        onReasonChange={setRejectionReason}
+        onOpenChange={(open) => {
+          if (!open && !rejectSubmitting) {
+            setRejectTarget(null);
+            setRejectionReason('');
+          }
+        }}
+        onConfirm={() => {
+          void handleConfirmReject();
+        }}
+      />
+      <AlertDialog open={Boolean(bulkDialog)} onOpenChange={(open) => !open && !bulkRunning && setBulkDialog(null)}>
+        <AlertDialogContent className="bg-white dark:bg-slate-900 border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">
+              {bulkDialog?.action === 'payroll'
+                ? 'Mark selected as Payroll Received'
+                : 'Mark selected as Manager Approved'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {(() => {
+                if (!bulkDialog) return '';
+                const { eligibleIds, skippedCount } = partitionTimesheetBulkSelection({
+                  actorKind,
+                  action: bulkDialog.action,
+                  rows: selectedTimesheetRows,
+                });
+                return `${eligibleIds.length} timesheet${eligibleIds.length === 1 ? '' : 's'} will be updated${
+                  skippedCount > 0 ? `. ${skippedCount} will be skipped.` : '.'
+                }`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkRunning} className="border-border text-foreground">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={bulkRunning}
+              onClick={(event) => {
+                event.preventDefault();
+                if (bulkDialog) {
+                  void handleBulkAction(bulkDialog.action);
+                }
+              }}
+              className={
+                bulkDialog?.action === 'payroll'
+                  ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  : 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover'
+              }
+            >
+              {bulkRunning ? 'Updating...' : 'Confirm'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppPageShell>
   );
 }
@@ -1432,22 +1717,26 @@ function ApprovalsContent() {
 // Absence Approval Card Component
 function AbsenceApprovalCard({ 
   absence, 
+  actorKind,
   onApprove, 
   onProcess,
   onReject,
   reportAbsenceActionError,
 }: { 
   absence: AbsenceWithRelations;
+  actorKind: ReturnType<typeof resolveApprovalsActorKind>;
   onApprove: ReturnType<typeof useApproveAbsence>;
   onProcess: ReturnType<typeof useProcessAbsence>;
-  onReject: ReturnType<typeof useRejectAbsence>;
+  onReject: (id: string) => void;
   reportAbsenceActionError: (actionLabel: string, error: unknown, errorContextId: string, fallbackMessage: string) => void;
 }) {
-  const [rejecting, setRejecting] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState('');
   const { data: summary } = useAbsenceSummaryForEmployee(absence.profile_id);
-  const canApproveOrReject = absence.status === 'pending';
-  const canProcessAbsence = absence.status === 'approved';
+  const visibility = getAbsenceApprovalActionVisibility({
+    actorKind,
+    status: absence.status,
+  });
+  const canApproveOrReject = visibility.showApprove || visibility.showReject;
+  const canProcessAbsence = visibility.showProcess;
   
   async function handleApprove() {
     if (!canApproveOrReject) return;
@@ -1486,27 +1775,6 @@ function AbsenceApprovalCard({
     } catch (error) {
       const errorContextId = 'approvals-absence-process-error';
       reportAbsenceActionError('Error processing absence', error, errorContextId, 'Failed to process absence');
-    }
-  }
-  
-  async function handleReject() {
-    if (!canApproveOrReject) return;
-
-    if (!rejectionReason.trim()) {
-      toast.error('Rejection reason required', {
-        id: 'approvals-rejection-reason-required',
-        description: 'Please provide a reason for rejecting this absence request.',
-      });
-      return;
-    }
-    
-    try {
-      await onReject.mutateAsync({ id: absence.id, reason: rejectionReason });
-      setRejecting(false);
-      setRejectionReason('');
-    } catch (error) {
-      const errorContextId = 'approvals-absence-reject-error';
-      reportAbsenceActionError('Error rejecting absence', error, errorContextId, 'Failed to reject absence');
     }
   }
   
@@ -1551,11 +1819,11 @@ function AbsenceApprovalCard({
   };
   
   return (
-    <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-purple-500/50 transition-all duration-200">
+    <Card className="bg-white dark:bg-slate-900 border-border hover:shadow-lg hover:border-avs-yellow/40 transition-all duration-200">
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
-            <Calendar className="h-5 w-5 text-purple-600" />
+            <Calendar className="h-5 w-5 text-avs-yellow" />
             <div>
               <CardTitle className="text-lg">
                 {absence.profiles.full_name}
@@ -1631,93 +1899,21 @@ function AbsenceApprovalCard({
             </div>
           )}
 
-          {canApproveOrReject && rejecting ? (
-            <div className="space-y-3">
-              <div>
-                <Label htmlFor="rejectionReason">Rejection Reason *</Label>
-                <Input
-                  id="rejectionReason"
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Provide a reason for rejection..."
-                  className="bg-background border-border text-foreground"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setRejecting(false);
-                    setRejectionReason('');
-                  }}
-                  className="border-border text-muted-foreground"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleReject}
-                  disabled={!rejectionReason.trim()}
-                  className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500"
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  Confirm Rejection
-                </Button>
-              </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm text-muted-foreground">
+              Submitted {formatDate(absence.created_at)}
             </div>
-          ) : canApproveOrReject ? (
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Submitted {formatDate(absence.created_at)}
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setRejecting(true)}
-                  className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                >
-                  <XCircle className="h-4 w-4 mr-1" />
-                  Reject
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleApprove}
-                  className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-1" />
-                  Approve
-                </Button>
-              </div>
-            </div>
-          ) : canProcessAbsence ? (
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Submitted {formatDate(absence.created_at)}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleProcess}
-                className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/20 hover:text-avs-yellow hover:border-avs-yellow active:bg-avs-yellow/30 active:text-avs-yellow active:scale-95 transition-all"
-              >
-                <Package className="h-4 w-4 mr-1" />
-                Process
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Submitted {formatDate(absence.created_at)}
-              </div>
-              <Badge variant="outline" className="border-border text-muted-foreground capitalize">
-                {absence.status}
-              </Badge>
-            </div>
-          )}
+            <AbsenceApprovalActions
+              visibility={visibility}
+              onApprove={() => {
+                void handleApprove();
+              }}
+              onReject={() => onReject(absence.id)}
+              onProcess={() => {
+                void handleProcess();
+              }}
+            />
+          </div>
         </div>
       </CardContent>
     </Card>

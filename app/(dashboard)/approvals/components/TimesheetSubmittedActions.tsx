@@ -1,13 +1,16 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { CheckCircle2, Edit2, Package, XCircle } from 'lucide-react';
+import { CheckCircle2, Edit2, UserCheck, XCircle } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
 import {
-  canRejectTimesheetStatus,
-  hasManagerApprovedGate,
-  hasPayrollReceivedGate,
-  isTimesheetComplete,
-} from '@/lib/utils/timesheet-gates';
+  canShowTimesheetEditAction,
+  canShowTimesheetManagerAction,
+  canShowTimesheetPayrollAction,
+} from '@/lib/utils/approvals-action-visibility';
+import { canRejectTimesheetStatus } from '@/lib/utils/timesheet-gates';
+
+const ACTION_BUTTON_SIZE = 'h-11 px-2 md:h-8';
 
 interface TimesheetSubmittedActionsProps {
   timesheetId: string;
@@ -16,15 +19,19 @@ interface TimesheetSubmittedActionsProps {
   onReject: (id: string) => void;
   size?: 'default' | 'sm';
   className?: string;
-  rejectClassName: string;
-  approveClassName: string;
+  rejectClassName?: string;
+  approveClassName?: string;
   showPayrollReceived?: boolean;
+  showManagerApproved?: boolean;
+  showReject?: boolean;
   status?: string;
   showPayrollEdit?: boolean;
   onProcess?: (id: string) => void;
   onEdit?: (id: string) => void;
   processClassName?: string;
   editClassName?: string;
+  compactLabels?: boolean;
+  primaryGate?: 'payroll' | 'manager' | null;
 }
 
 export function TimesheetSubmittedActions({
@@ -33,25 +40,44 @@ export function TimesheetSubmittedActions({
   onApprove,
   onReject,
   size = 'sm',
-  className = 'flex items-center justify-end gap-1',
+  className = 'flex min-w-[12.5rem] items-center justify-end gap-1',
   rejectClassName,
   approveClassName,
   showPayrollReceived = true,
+  showManagerApproved = false,
+  showReject = true,
   status = 'submitted',
   showPayrollEdit = false,
   onProcess,
   onEdit,
-  processClassName = 'border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/20 hover:text-avs-yellow hover:border-avs-yellow active:bg-avs-yellow/30 active:text-avs-yellow active:scale-95 transition-all h-8 px-2',
-  editClassName = 'border-blue-300 text-blue-500 hover:bg-blue-500 hover:text-white hover:border-blue-500 active:bg-blue-600 active:scale-95 transition-all h-8 px-2',
+  processClassName,
+  editClassName,
+  compactLabels = false,
+  primaryGate,
 }: TimesheetSubmittedActionsProps) {
-  const canReject = canRejectTimesheetStatus(status);
-  const showPayroll = showPayrollReceived && !hasPayrollReceivedGate(status);
-  const showManager = Boolean(onProcess) && !hasManagerApprovedGate(status) && status !== 'draft' && status !== 'rejected' && status !== 'adjusted';
-  const showEdit = showPayrollEdit && status !== 'draft' && Boolean(onEdit);
+  const canReject = showReject && canRejectTimesheetStatus(status);
+  const showPayroll = showPayrollReceived && canShowTimesheetPayrollAction(status);
+  const showManager =
+    showManagerApproved && Boolean(onProcess) && canShowTimesheetManagerAction(status);
+  const showEdit = showPayrollEdit && canShowTimesheetEditAction(status) && Boolean(onEdit);
+  const resolvedPrimaryGate =
+    primaryGate ??
+    (showPayroll && !showManager
+      ? 'payroll'
+      : !showPayroll && showManager
+        ? 'manager'
+        : showPayroll
+          ? 'payroll'
+          : null);
+  const payrollIsPrimary = showPayroll && resolvedPrimaryGate !== 'manager';
+  const managerIsPrimary = showManager && resolvedPrimaryGate !== 'payroll';
 
   if (!canReject && !showPayroll && !showManager && !showEdit) {
     return <span className="text-xs text-muted-foreground">-</span>;
   }
+
+  const payrollLabel = compactLabels ? 'Received' : 'Payroll Received';
+  const managerLabel = compactLabels ? 'Approved' : 'Manager Approved';
 
   return (
     <div className={className}>
@@ -65,47 +91,67 @@ export function TimesheetSubmittedActions({
             event.stopPropagation();
             onReject(timesheetId);
           }}
-          className={rejectClassName}
+          className={cn(
+            ACTION_BUTTON_SIZE,
+            'border-red-400/70 text-red-400 hover:bg-red-500/10 hover:text-red-300',
+            rejectClassName
+          )}
         >
-          <XCircle className="mr-1 h-3.5 w-3.5" />
+          <XCircle className="h-3.5 w-3.5" />
           Reject
         </Button>
       ) : null}
       {showPayroll ? (
         <Button
-          variant="outline"
           size={size}
           disabled={busy}
+          variant={payrollIsPrimary ? 'default' : 'outline'}
+          aria-label="Payroll Received"
+          title="Payroll Received"
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
             onApprove(timesheetId);
           }}
-          className={approveClassName}
+          className={cn(
+            ACTION_BUTTON_SIZE,
+            payrollIsPrimary
+              ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+              : 'border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10',
+            approveClassName
+          )}
         >
-          <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-          Payroll Received
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          {payrollLabel}
         </Button>
       ) : null}
       {showManager && onProcess ? (
         <Button
-          variant="outline"
           size={size}
           disabled={busy}
+          variant={managerIsPrimary ? 'default' : 'outline'}
+          aria-label="Manager Approved"
+          title="Manager Approved"
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
             onProcess(timesheetId);
           }}
-          className={processClassName}
+          className={cn(
+            ACTION_BUTTON_SIZE,
+            managerIsPrimary
+              ? 'bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover'
+              : 'border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/10',
+            processClassName
+          )}
         >
-          <Package className="mr-1 h-3.5 w-3.5" />
-          Manager Approved
+          <UserCheck className="h-3.5 w-3.5" />
+          {managerLabel}
         </Button>
       ) : null}
-      {showEdit && onEdit && (hasPayrollReceivedGate(status) || hasManagerApprovedGate(status) || isTimesheetComplete(status) || status === 'submitted' || status === 'rejected' || status === 'adjusted') ? (
+      {showEdit && onEdit ? (
         <Button
-          variant="outline"
+          variant="ghost"
           size={size}
           disabled={busy}
           onClick={(event) => {
@@ -113,9 +159,9 @@ export function TimesheetSubmittedActions({
             event.stopPropagation();
             onEdit(timesheetId);
           }}
-          className={editClassName}
+          className={cn(ACTION_BUTTON_SIZE, 'text-muted-foreground hover:text-foreground', editClassName)}
         >
-          <Edit2 className="mr-1 h-3.5 w-3.5" />
+          <Edit2 className="h-3.5 w-3.5" />
           Edit
         </Button>
       ) : null}

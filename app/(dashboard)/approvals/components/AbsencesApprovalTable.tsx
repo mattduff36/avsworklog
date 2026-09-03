@@ -2,12 +2,16 @@
 
 import { useState, useMemo } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpDown, CheckCircle2, XCircle, Clock, Package } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { AbsenceWithRelations } from '@/types/absence';
 import { useAbsenceSummaryForEmployee } from '@/lib/hooks/useAbsence';
+import { AbsenceApprovalActions } from './AbsenceApprovalActions';
+import {
+  type ApprovalsActorKind,
+  getAbsenceApprovalActionVisibility,
+} from '@/lib/utils/approvals-action-visibility';
 
 export interface AbsenceColumnVisibility {
   employeeId: boolean;
@@ -36,6 +40,7 @@ interface AbsencesApprovalTableProps {
   onProcess: (id: string) => void;
   columnVisibility: AbsenceColumnVisibility;
   visibleCount?: number;
+  actorKind?: ApprovalsActorKind;
 }
 
 type SortField = 'name' | 'reason' | 'date' | 'duration' | 'submittedAt';
@@ -48,6 +53,7 @@ export function AbsencesApprovalTable({
   onProcess,
   columnVisibility,
   visibleCount,
+  actorKind = 'admin',
 }: AbsencesApprovalTableProps) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -221,7 +227,7 @@ export function AbsencesApprovalTable({
                 </TableHead>
               )}
 
-              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right">
+              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right min-w-[10rem]">
                 Actions
               </TableHead>
             </TableRow>
@@ -291,42 +297,15 @@ export function AbsencesApprovalTable({
                 )}
 
                 <TableCell className="text-right">
-                  {absence.status === 'pending' ? (
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onReject(absence.id)}
-                        className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all h-8 px-2"
-                      >
-                        <XCircle className="h-3.5 w-3.5 mr-1" />
-                        Reject
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onApprove(absence.id)}
-                        className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all h-8 px-2"
-                      >
-                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                        Approve
-                      </Button>
-                    </div>
-                  ) : absence.status === 'approved' ? (
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onProcess(absence.id)}
-                        className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/20 hover:text-avs-yellow hover:border-avs-yellow active:bg-avs-yellow/30 active:text-avs-yellow active:scale-95 transition-all h-8 px-2"
-                      >
-                        <Package className="h-3.5 w-3.5 mr-1" />
-                        Process
-                      </Button>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">No actions</span>
-                  )}
+                  <AbsenceApprovalActions
+                    visibility={getAbsenceApprovalActionVisibility({
+                      actorKind,
+                      status: absence.status,
+                    })}
+                    onApprove={() => onApprove(absence.id)}
+                    onReject={() => onReject(absence.id)}
+                    onProcess={() => onProcess(absence.id)}
+                  />
                 </TableCell>
               </TableRow>
             ))}

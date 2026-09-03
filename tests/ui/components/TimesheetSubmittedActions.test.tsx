@@ -37,6 +37,24 @@ describe('TimesheetSubmittedActions', () => {
     expect(screen.getByRole('button', { name: 'Payroll Received' })).not.toBeDisabled();
   });
 
+  it('renders only one filled primary when both gates are visible', () => {
+    render(
+      <TimesheetSubmittedActions
+        timesheetId="timesheet-admin"
+        busy={false}
+        showPayrollReceived
+        showManagerApproved
+        primaryGate="payroll"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onProcess={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Payroll Received' })).toHaveClass('bg-emerald-600');
+    expect(screen.getByRole('button', { name: 'Manager Approved' })).toHaveClass('border-avs-yellow/50');
+  });
+
   it('PAY-UI-PAYROLL-BUTTON-001 hides Payroll Received for non-payroll actors', () => {
     render(
       <TimesheetSubmittedActions

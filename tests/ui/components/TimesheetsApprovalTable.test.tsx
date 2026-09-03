@@ -1,6 +1,6 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 import {
   DEFAULT_COLUMN_VISIBILITY,
@@ -41,6 +41,14 @@ function buildTimesheet(status: string) {
 describe('TimesheetsApprovalTable', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    const proto = Element.prototype as unknown as {
+      hasPointerCapture?: (pointerId: number) => boolean;
+      setPointerCapture?: (pointerId: number) => void;
+      releasePointerCapture?: (pointerId: number) => void;
+    };
+    proto.hasPointerCapture ??= () => false;
+    proto.setPointerCapture ??= () => undefined;
+    proto.releasePointerCapture ??= () => undefined;
   });
 
   it('shows Edit and Manager Approved actions for payroll received timesheets', () => {
@@ -49,17 +57,18 @@ describe('TimesheetsApprovalTable', () => {
     render(
       <TimesheetsApprovalTable
         timesheets={[buildTimesheet('approved')]}
+        actorKind="admin"
         onApprove={vi.fn()}
         onReject={vi.fn()}
         onProcess={onProcess}
         columnVisibility={DEFAULT_COLUMN_VISIBILITY}
-        showPayrollEdit
       />
     );
 
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Adjust' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Manager Approved' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Manager Approved' })).toHaveTextContent('Approved');
 
     fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
@@ -71,28 +80,48 @@ describe('TimesheetsApprovalTable', () => {
     render(
       <TimesheetsApprovalTable
         timesheets={[buildTimesheet('submitted')]}
+        actorKind="manager"
         onApprove={vi.fn()}
         onReject={vi.fn()}
         onProcess={vi.fn()}
         columnVisibility={DEFAULT_COLUMN_VISIBILITY}
-        showPayrollReceived={false}
       />
     );
 
     expect(screen.getByRole('button', { name: 'Manager Approved' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Payroll Received' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+  });
+
+  it('hides Manager Approved for Accounts on pending sheets', () => {
+    render(
+      <TimesheetsApprovalTable
+        timesheets={[buildTimesheet('submitted')]}
+        actorKind="accounts"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onProcess={vi.fn()}
+        columnVisibility={DEFAULT_COLUMN_VISIBILITY}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Payroll Received' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Payroll Received' })).toHaveTextContent('Received');
+    expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Manager Approved' })).not.toBeInTheDocument();
   });
 
   it('TS-UI-002 keeps Accounts Edit on Complete and hides Reject', () => {
     render(
       <TimesheetsApprovalTable
         timesheets={[buildTimesheet('processed')]}
+        actorKind="accounts"
         onApprove={vi.fn()}
         onReject={vi.fn()}
         onProcess={vi.fn()}
         columnVisibility={DEFAULT_COLUMN_VISIBILITY}
-        showPayrollEdit
       />
     );
 
@@ -106,6 +135,7 @@ describe('TimesheetsApprovalTable', () => {
     render(
       <TimesheetsApprovalTable
         timesheets={[buildTimesheet('approved')]}
+        actorKind="manager"
         onApprove={vi.fn()}
         onReject={vi.fn()}
         onProcess={onProcess}
@@ -116,6 +146,53 @@ describe('TimesheetsApprovalTable', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Manager Approved' }));
 
     expect(onProcess).toHaveBeenCalledWith('timesheet-approved');
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('opens a preview without navigating', async () => {
+    render(
+      <TimesheetsApprovalTable
+        timesheets={[buildTimesheet('submitted')]}
+        actorKind="manager"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onProcess={vi.fn()}
+        columnVisibility={DEFAULT_COLUMN_VISIBILITY}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview timesheet' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Week preview')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('link', { name: 'Open timesheet' })).toHaveAttribute(
+      'href',
+      '/timesheets/timesheet-submitted'
+    );
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('selects visible rows without navigating', () => {
+    const onToggleSelected = vi.fn();
+
+    render(
+      <TimesheetsApprovalTable
+        timesheets={[buildTimesheet('submitted')]}
+        actorKind="manager"
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onProcess={vi.fn()}
+        columnVisibility={DEFAULT_COLUMN_VISIBILITY}
+        selectedIds={new Set()}
+        onToggleSelected={onToggleSelected}
+        onToggleVisibleSelected={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Zak Edlin' }));
+
+    expect(onToggleSelected).toHaveBeenCalledWith('timesheet-submitted', true);
     expect(pushMock).not.toHaveBeenCalled();
   });
 
@@ -136,6 +213,7 @@ describe('TimesheetsApprovalTable', () => {
     render(
       <TimesheetsApprovalTable
         timesheets={[busy, idle]}
+        actorKind="accounts"
         onApprove={vi.fn()}
         onReject={vi.fn()}
         onProcess={vi.fn()}
@@ -148,11 +226,9 @@ describe('TimesheetsApprovalTable', () => {
     const idleRow = screen.getByText('Idle User').closest('tr');
     expect(busyRow).not.toBeNull();
     expect(idleRow).not.toBeNull();
-    const busyButtons = Array.from(busyRow!.querySelectorAll('button'));
-    const idleButtons = Array.from(idleRow!.querySelectorAll('button'));
-    expect(busyButtons.find((button) => button.textContent?.includes('Reject'))).toBeDisabled();
-    expect(busyButtons.find((button) => button.textContent?.includes('Payroll Received'))).toBeDisabled();
-    expect(idleButtons.find((button) => button.textContent?.includes('Reject'))).not.toBeDisabled();
-    expect(idleButtons.find((button) => button.textContent?.includes('Payroll Received'))).not.toBeDisabled();
+    expect(busyRow!.querySelector('[aria-label="Payroll Received"]')).toBeDisabled();
+    expect(idleRow!.querySelector('[aria-label="Payroll Received"]')).not.toBeDisabled();
+    expect(busyRow!.querySelector('button') && Array.from(busyRow!.querySelectorAll('button')).find((button) => button.textContent === 'Reject')).toBeDisabled();
+    expect(Array.from(idleRow!.querySelectorAll('button')).find((button) => button.textContent === 'Reject')).not.toBeDisabled();
   });
 });
