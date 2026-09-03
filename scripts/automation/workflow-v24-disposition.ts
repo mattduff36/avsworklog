@@ -1598,23 +1598,21 @@ export function buildRouteDisposition(params: {
 
   const releaseHead = gitHeadCommit(params.repoRoot);
   if (!releaseHead) return { ok: false, message: 'unable to read release HEAD for route evidence' };
-  const candidate = resolveLatestLegalReviewCandidateHead(params.repoRoot, params.record);
-  if (!candidate.ok) return candidate;
-  const drift = rejectUnreviewedHeadDrift(params.repoRoot, candidate.headCommit, releaseHead);
-  // Extra commits after the candidate are expected for revert/supersede/remove.
-  // Git-list failures still fail closed for every target.
-  if (!drift.ok && (drift.kind === 'git-error' || params.target === 'rehomed')) {
-    return drift;
-  }
   const baseline = params.record.baseCommit;
   if (params.target === 'already_in_release') {
+    const candidate = resolveLatestLegalReviewCandidateHead(params.repoRoot, params.record);
+    const latestLegalReviewCandidateHead = candidate.ok
+      ? candidate.headCommit
+      : resolveCommitObject(params.repoRoot, params.record.headCommit ?? '') ??
+        resolveCommitObject(params.repoRoot, TRUSTED_LEGACY_RELEASE_SHA) ??
+        TRUSTED_LEGACY_RELEASE_SHA;
     const leftover = buildAlreadyInReleaseEvidence({
       repoRoot: params.repoRoot,
       record: params.record,
       releaseHead,
       baseline,
       implementationCommits: [],
-      latestLegalReviewCandidateHead: candidate.headCommit,
+      latestLegalReviewCandidateHead,
       claimedOriginMain: params.originMainCommit,
     });
     if (!leftover.ok) return leftover;
@@ -1629,6 +1627,14 @@ export function buildRouteDisposition(params: {
         gitEvidence: leftover.gitEvidence,
       },
     };
+  }
+  const candidate = resolveLatestLegalReviewCandidateHead(params.repoRoot, params.record);
+  if (!candidate.ok) return candidate;
+  const drift = rejectUnreviewedHeadDrift(params.repoRoot, candidate.headCommit, releaseHead);
+  // Extra commits after the candidate are expected for revert/supersede/remove.
+  // Git-list failures still fail closed for every target.
+  if (!drift.ok && (drift.kind === 'git-error' || params.target === 'rehomed')) {
+    return drift;
   }
   const implementationCommits = requireGitDerivedImplementationCommits({
     repoRoot: params.repoRoot,

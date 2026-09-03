@@ -328,6 +328,23 @@ describe('leftover already_in_release', { timeout: 40_000 }, () => {
     expect(readiness.lineages.find((row) => row.workstreamId === workstreamId)?.phase).toBe(
       'already_in_release'
     );
+
+    const chainId = `ws_test_leftover_chain_${Date.now()}`;
+    leftoverRoutingRecord(chainId, {
+      sourceWorkstreamIds: ['ws_missing_parent', 'ws_missing_root'],
+      reviewAttempts: [],
+    });
+    const chained = reduceRoute({
+      repoRoot: REAL_REPO,
+      workstreamId: chainId,
+      disposition: 'already_in_release',
+      reason: 'exhausted leftover with ancestor-id chain and no local review attempts',
+    });
+    expect(chained.ok, chained.message).toBe(true);
+    expect(chained.record?.phase).toBe('already_in_release');
+    expect(chained.record?.routeDisposition?.gitEvidence.latestLegalReviewCandidateHead).toBe(
+      TRUSTED_LEGACY_RELEASE_SHA
+    );
   });
 
   it('T-LEFTOVER-FALSE-ABSENT-004', () => {
