@@ -57,7 +57,7 @@ export type WorkflowProtocolCommand =
   | 'review-record'
   | 'fix-record'
   | 'fix-delta-refresh'
-  | 'exhaustion-acknowledge'
+  | 'exhaustion-acknowledge' // exhausted initialized -> routing_required; no review minted
   | 'split'
   | 'route'
   | 'rehome-bind'

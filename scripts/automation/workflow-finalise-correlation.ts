@@ -897,6 +897,7 @@ export function getFinaliseProtocolReadiness(
             protocolCommand(protocol.workstreamId, 'route', ' --disposition reverted'),
             protocolCommand(protocol.workstreamId, 'route', ' --disposition superseded'),
             protocolCommand(protocol.workstreamId, 'route', ' --disposition already_in_release'),
+            // already_in_release is a leftover/non-release disposition, not finalise-start.
           ],
         })
       );

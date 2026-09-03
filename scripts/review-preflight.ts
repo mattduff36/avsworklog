@@ -38,6 +38,7 @@ function printUsage(): void {
 Creates a content-addressed evidence manifest and records it on the protocol workstream.
 
 Use --kind fix-delta after a failed first review. --closed-blocker-ids is required for that kind.
+On phase fix_recorded, this records a fix-delta-refresh bound to the current HEAD/tree.
 `);
 }
 

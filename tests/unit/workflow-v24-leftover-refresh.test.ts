@@ -1,7 +1,9 @@
 import { mkdirSync, readFileSync, rmSync } from 'fs';
 import path from 'path';
+import { spawnSync } from 'child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import { extractPlanContractMarker } from '@/scripts/automation/workflow-plan-contract';
+import { SUCCESSOR_ENGINE_PATHS } from '@/scripts/automation/types';
 import {
   WORKFLOW_ROUTING_REQUIRED_EXIT_CODE,
   applyProtocolTransition,
@@ -34,6 +36,7 @@ import {
 } from '@/tests/unit/workflow-v24-test-harness';
 
 const REAL_REPO = process.cwd();
+const ISOLATE_PARENT = 'b4a5aa09992c23c8358876421996606e7d7701fc';
 const LEGAL_FIRST_HEAD = 'f223f06dd52d2f005b4ea4c6f1a66a87712a5274';
 const LEGAL_CLOSURE_HEAD = 'a331d0c88c98aee014d4ec624a796407359cf7a2';
 const throwawayIds: string[] = [];
@@ -400,6 +403,46 @@ describe('leftover already_in_release', { timeout: 40_000 }, () => {
       nowIso: new Date().toISOString(),
     });
     expect(noOrigin.ok).toBe(false);
+  });
+});
+
+describe('first-review binding repairs', () => {
+  it('FD-GIT intended engine range is bound on HEAD', () => {
+    const diff = spawnSync(
+      'git',
+      ['diff', '--name-only', `${ISOLATE_PARENT}..HEAD`],
+      { cwd: REAL_REPO, encoding: 'utf8', shell: false }
+    );
+    expect(diff.status).toBe(0);
+    const files = new Set(
+      diff.stdout
+        .split('\n')
+        .map((line) => line.trim().replace(/\\/g, '/'))
+        .filter(Boolean)
+    );
+    for (const relative of SUCCESSOR_ENGINE_PATHS) {
+      expect(files.has(relative), relative).toBe(true);
+    }
+    expect([...files].some((file) => file.includes('app/(dashboard)/approvals'))).toBe(false);
+    expect([...files].some((file) => file.includes('timesheet-submit'))).toBe(false);
+  });
+
+  it('FD-VERIFY successor verification covers the bound engine files', () => {
+    const suite = JSON.parse(
+      readFileSync(
+        path.join(REAL_REPO, 'scripts/automation/workflow-suite-manifest.json'),
+        'utf8'
+      )
+    ) as { files?: string[] };
+    expect(suite.files).toContain('tests/unit/workflow-v24-leftover-refresh.test.ts');
+    const source = readFileSync(
+      path.join(REAL_REPO, 'tests/unit/workflow-v24-leftover-refresh.test.ts'),
+      'utf8'
+    );
+    expect(source).toContain('T-EXH-INIT-TO-ROUTING-001');
+    expect(source).toContain('T-FIXDELTA-REFRESH-001');
+    expect(source).toContain('T-LEFTOVER-DISPOSITION-001');
+    expect(source).toContain('already_in_release');
   });
 });
 

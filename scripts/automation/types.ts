@@ -260,6 +260,17 @@ export type WorkflowProtocolPhase =
   | 'rehomed'
   | 'already_in_release';
 
+export const SUCCESSOR_ENGINE_PATHS = [
+  'scripts/automation/types.ts',
+  'scripts/automation/workflow-finalise-correlation.ts',
+  'scripts/automation/workflow-review-protocol.ts',
+  'scripts/automation/workflow-suite-manifest.json',
+  'scripts/automation/workflow-v24-disposition.ts',
+  'scripts/review-preflight.ts',
+  'scripts/workflow-protocol.ts',
+  'tests/unit/workflow-v24-leftover-refresh.test.ts',
+] as const;
+
 export type WorkflowRouteDispositionTarget =
   | 'removed_from_release'
   | 'reverted'

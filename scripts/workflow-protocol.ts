@@ -27,6 +27,7 @@ Commands:
   fix-record --workstream <id> --manifest <path> [--closed-blocker-ids a,b]
   fix-delta-refresh --workstream <id> --manifest <path> --closed-blocker-ids a,b
   exhaustion-acknowledge --workstream <id>
+  # leftover route uses --disposition already_in_release; it is not approval or finalise
   split --workstream <id> --new-workstream <id> [--narrower-partition] [--has-fix-delta]
   route --workstream <id> --disposition removed_from_release|reverted|superseded|rehomed|already_in_release \\
     --reason <text> [--implementation-commits a,b] [--revert-commit <sha>] \\
