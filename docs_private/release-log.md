@@ -2,6 +2,38 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.3.0
+
+**GIT COMMIT MESSAGE**
+`feat(approvals): hide off-role actions and quiet dual-gate chrome`
+
+**PUSHED AT**
+2026-09-03T23:54:32.249Z
+
+**WHAT CHANGED**
+Require identity proof and reject opaque git errors. Reject claimed or unresolved removal evidence. Fail closed when removal evidence is uncertain. Map FD-GIT and FD-VERIFY to unique successor tests. Give FD-GIT and FD-VERIFY unique ledger assertions. Include suite manifest in successor owned range. Bind successor verification to the full engine range. Allow leftover route without a resolvable review candidate. Dispose exhausted leftover and refresh fix-delta. Hide off-role actions and quiet dual-gate chrome. Submit header and entries atomically.
+
+**VERSION HISTORY DETAILS**
+- Submit header and entries atomically, with changes to background routes, app screens, interface components, shared logic, automated tests, and data storage.
+- Hide off-role actions and quiet dual-gate chrome, with changes to app screens, shared logic, and automated tests.
+- Updated actions, with changes to app screens, shared logic, and automated tests.
+- Updated absence and leave, with changes to app screens and automated tests.
+- Updated sign in, with changes to automated tests.
+- Updated data storage, with changes to data storage.
+
+**COMMITS IN THIS RELEASE**
+- `fix(workflow): require identity proof and reject opaque git errors`
+- `fix(workflow): reject claimed or unresolved removal evidence`
+- `fix(workflow): fail closed when removal evidence is uncertain`
+- `fix(workflow): map FD-GIT and FD-VERIFY to unique successor tests`
+- `fix(workflow): give FD-GIT and FD-VERIFY unique ledger assertions`
+- `fix(workflow): include suite manifest in successor owned range`
+- `fix(workflow): bind successor verification to the full engine range`
+- `fix(workflow): allow leftover route without a resolvable review candidate`
+- `fix(workflow): dispose exhausted leftover and refresh fix-delta`
+- `feat(approvals): hide off-role actions and quiet dual-gate chrome`
+- `fix(timesheets): submit header and entries atomically`
+
 ## 0926.2.1
 
 **GIT COMMIT MESSAGE**
