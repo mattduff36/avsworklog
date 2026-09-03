@@ -19,7 +19,7 @@ import {
 } from '@/components/timesheets/PayrollSnapshotCard';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTriangle, ArrowLeft, BedDouble } from 'lucide-react';
+import { Save, Send, Edit2, CheckCircle2, XCircle, Download, UserCheck, AlertTriangle, ArrowLeft, BedDouble } from 'lucide-react';
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
@@ -55,6 +55,7 @@ import { TrainingDeclineDialog } from '@/app/(dashboard)/timesheets/components/T
 import { declineTrainingBookingsClient } from '@/lib/client/training-bookings';
 import { toast } from 'sonner';
 import { isNetworkFetchError } from '@/lib/utils/http-error';
+import { submitTimesheet } from '@/lib/client/timesheet-submit';
 import {
   type ApprovedAbsenceForTimesheet,
   type TimesheetOffDayState,
@@ -772,28 +773,103 @@ export default function ViewTimesheetPage() {
       return;
     }
 
-    try {
-      // Save entries first
-      const saveResult = await handleSave();
-      if (!saveResult.success) {
-        return;
-      }
+    if (timesheet.status !== 'draft' && timesheet.status !== 'rejected') {
+      const errorMessage = 'Only draft or rejected timesheets can be submitted.';
+      setError(errorMessage);
+      toast.error(errorMessage);
+      return;
+    }
 
+    try {
       setSaving(true);
       setError('');
 
-      // Update timesheet status
-      const { error: updateError } = await supabase
-        .from('timesheets')
-        .update({
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-          signature_data: signature,
-          signed_at: new Date().toISOString(),
-        })
-        .eq('id', timesheet.id);
+      const entriesToPersist = normalizeTimesheetEntriesForDisplay(timesheet, entries, offDayStates);
+      if (jobCodeOptionsLoading) {
+        const errorMessage = 'Job codes are still loading. Please wait a moment, then try again.';
+        setError(errorMessage);
+        toast.error(errorMessage);
+        return;
+      }
 
-      if (updateError) throw updateError;
+      const invalidJobEntry = entriesToPersist.find((entry) => {
+        const hasHours = Boolean(entry.time_started && entry.time_finished);
+        if (!hasHours || entry.did_not_work || entry.working_in_yard) return false;
+        return !areCataloguedJobNumbers(entry.job_numbers, cataloguedJobNumbers);
+      });
+      if (invalidJobEntry) {
+        const errorMessage = `${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: select at least one valid Job Number from the job-code list and do not repeat the same code on a single day.`;
+        setError(errorMessage);
+        toast.error(errorMessage);
+        return;
+      }
+
+      const persistableEntries = entriesToPersist.map((entry) => {
+        const persistedJobNumbers = getNormalizedJobNumbers(entry.job_numbers);
+        const normalizedRemarks =
+          entry.remarks?.trim() ||
+          (entry.did_not_work ? 'Did Not Work' : '');
+        const requiresSubsistence =
+          Boolean(entry.subsistence_payment_required) && hasWorkedTimesForSubsistence(entry);
+        const persistedRemarks = syncSubsistenceRemark(normalizedRemarks, requiresSubsistence);
+
+        return {
+          day_of_week: entry.day_of_week,
+          time_started: entry.time_started || null,
+          time_finished: entry.time_finished || null,
+          operator_travel_hours: entry.operator_travel_hours ?? null,
+          operator_yard_hours: entry.operator_yard_hours ?? null,
+          operator_working_hours: entry.operator_working_hours ?? null,
+          machine_travel_hours: entry.machine_travel_hours ?? null,
+          machine_start_time: entry.machine_start_time || null,
+          machine_finish_time: entry.machine_finish_time || null,
+          machine_working_hours: entry.machine_working_hours ?? null,
+          machine_standing_hours: entry.machine_standing_hours ?? null,
+          machine_operator_hours: entry.machine_operator_hours ?? null,
+          maintenance_breakdown_hours: entry.maintenance_breakdown_hours ?? null,
+          job_number: persistedJobNumbers[0] || null,
+          job_numbers: persistedJobNumbers,
+          did_not_work: entry.did_not_work,
+          working_in_yard: entry.working_in_yard,
+          subsistence_payment_required: requiresSubsistence,
+          daily_total: entry.daily_total,
+          night_shift: persistTimesheetNightShiftFromFormEntry({
+            night_shift: entry.night_shift === true,
+            time_started: entry.time_started,
+            time_finished: entry.time_finished,
+            did_not_work: entry.did_not_work,
+          }),
+          bank_holiday: entry.bank_holiday ?? false,
+          remarks: persistedRemarks || null,
+        };
+      });
+
+      const incompleteDay = persistableEntries.find(
+        (entry) => !entry.did_not_work && !(entry.time_started && entry.time_finished)
+      );
+      if (incompleteDay) {
+        const errorMessage = 'Please enter hours or mark Did Not Work for all 7 days before submitting.';
+        setError(errorMessage);
+        toast.error(errorMessage);
+        return;
+      }
+
+      await submitTimesheet({
+        timesheetId: timesheet.id,
+        userId: timesheet.user_id,
+        weekEnding: timesheet.week_ending,
+        timesheetType: timesheet.timesheet_type === 'plant' ? 'plant' : 'civils',
+        templateVersion: timesheet.template_version === 2 ? 2 : 1,
+        regNumber: timesheet.reg_number,
+        siteAddress: timesheet.site_address ?? null,
+        hirerName: timesheet.hirer_name ?? null,
+        isHiredPlant: timesheet.is_hired_plant ?? false,
+        hiredPlantIdSerial: timesheet.hired_plant_id_serial ?? null,
+        hiredPlantDescription: timesheet.hired_plant_description ?? null,
+        hiredPlantHiringCompany: timesheet.hired_plant_hiring_company ?? null,
+        signatureData: signature,
+        entries: persistableEntries,
+      });
 
       router.push('/timesheets');
     } catch (err) {
@@ -1732,7 +1808,7 @@ export default function ViewTimesheetPage() {
                 variant="outline"
                 onClick={() => setShowRejectDialog(true)}
                 disabled={saving}
-                className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
+                className="h-11 border-red-400/70 text-red-400 hover:bg-red-500/10 hover:text-red-300 md:h-9"
               >
                 <XCircle className="h-4 w-4 mr-2" />
                 Reject
@@ -1740,25 +1816,22 @@ export default function ViewTimesheetPage() {
             )}
             {canApprove && !editing && (
               <Button
-                variant="outline"
                 onClick={handleApprove}
                 disabled={saving}
-                className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
+                className="h-11 bg-emerald-600 text-white hover:bg-emerald-700 md:h-9"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 {timesheet.status === 'adjusted' ? 'Re-mark Payroll Received' : 'Payroll Received'}
               </Button>
             )}
 
-            {/* Mark as Manager Approved button (only if NOT editing) */}
             {canMarkAsProcessed && !editing && (
               <Button
-                variant="outline"
                 onClick={() => setShowProcessedDialog(true)}
                 disabled={saving}
-                className="border-timesheet/50 text-timesheet hover:bg-timesheet hover:text-white hover:border-timesheet active:bg-timesheet-dark active:scale-95 transition-all"
+                className="h-11 bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover md:h-9"
               >
-                <Package className="h-4 w-4 mr-2" />
+                <UserCheck className="h-4 w-4 mr-2" />
                 Mark as Manager Approved
               </Button>
             )}
@@ -1781,7 +1854,7 @@ export default function ViewTimesheetPage() {
             <AlertDialogAction
               onClick={handleMarkAsProcessed}
               disabled={saving}
-              className="bg-timesheet hover:bg-timesheet-dark focus:ring-timesheet"
+              className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover"
             >
               {saving ? 'Updating...' : 'Mark as Manager Approved'}
             </AlertDialogAction>

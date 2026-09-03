@@ -93,6 +93,7 @@ import {
   type PendingDidNotWorkBookingMap,
 } from '@/lib/utils/timesheet-did-not-work-bookings';
 import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-not-work-bookings';
+import { submitTimesheet } from '@/lib/client/timesheet-submit';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   buildValidationErrors,
@@ -1210,10 +1211,83 @@ export function PlantTimesheetV2({
       ? hiredPlantIdSerial.trim()
       : (selectedPlant?.plant_id || '');
 
+    const persistableEntries = entries.map((entry) => {
+      const offDayState = offDayMap.get(entry.day_of_week);
+      const recalculated = recalculateEntry(entry, getRecalculateOptionsForOffDay(offDayState));
+      const persistedJobNumbers = getNormalizedJobNumbers(recalculated.job_numbers);
+      const operatorTravel = parseHoursInput(recalculated.operator_travel_hours);
+      const operatorYard = parseHoursInput(recalculated.operator_yard_hours);
+      const machineTravel = parseHoursInput(recalculated.machine_travel_hours);
+      const machineStanding = parseHoursInput(recalculated.machine_standing_hours);
+      const machineOperator = parseHoursInput(recalculated.machine_operator_hours);
+      const maintenanceBreakdown = parseHoursInput(recalculated.maintenance_breakdown_hours);
+      const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(offDayState);
+      const normalizedRemarks =
+        recalculated.remarks?.trim() ||
+        halfDayTrainingRemark ||
+        (recalculated.did_not_work
+          ? (offDayState && !offDayState.isExpectedShiftDay ? 'Not on Shift' : 'Did Not Work')
+          : '');
+      const requiresSubsistence =
+        Boolean(recalculated.subsistence_payment_required) && hasWorkedTimesForSubsistence(recalculated);
+      const persistedRemarks = syncSubsistenceRemark(normalizedRemarks, requiresSubsistence);
+
+      return {
+        day_of_week: recalculated.day_of_week,
+        time_started: recalculated.time_started || null,
+        time_finished: recalculated.time_finished || null,
+        operator_travel_hours: operatorTravel,
+        operator_yard_hours: operatorYard,
+        operator_working_hours: recalculated.operator_working_hours,
+        machine_travel_hours: machineTravel,
+        machine_start_time: recalculated.machine_start_time || null,
+        machine_finish_time: recalculated.machine_finish_time || null,
+        machine_working_hours: recalculated.machine_working_hours,
+        machine_standing_hours: machineStanding,
+        machine_operator_hours: machineOperator,
+        maintenance_breakdown_hours: maintenanceBreakdown,
+        daily_total: recalculated.daily_total,
+        job_number: persistedJobNumbers[0] || null,
+        job_numbers: persistedJobNumbers,
+        working_in_yard: recalculated.working_in_yard,
+        subsistence_payment_required: requiresSubsistence,
+        did_not_work: recalculated.did_not_work,
+        night_shift: persistTimesheetNightShiftFromFormEntry(recalculated),
+        bank_holiday: !recalculated.did_not_work && bankHolidays.has(
+          formatLocalIsoDate(
+            getTimesheetEntryDateFromWeekEnding(weekEnding, recalculated.day_of_week)
+          )
+        ),
+        remarks: persistedRemarks || null,
+      };
+    });
+
     try {
       let timesheetId = existingTimesheetId;
 
-      if (timesheetId) {
+      if (status === 'submitted') {
+        if (!signatureData) {
+          throw new Error('Signature is required to submit a timesheet');
+        }
+        const submitted = await submitTimesheet({
+          timesheetId: existingTimesheetId,
+          userId: selectedEmployeeId,
+          weekEnding,
+          timesheetType: 'plant',
+          templateVersion: 2,
+          regNumber: machineIdentifier || null,
+          siteAddress: siteAddress.trim() || null,
+          hirerName: hirerName.trim() || null,
+          isHiredPlant,
+          hiredPlantIdSerial: isHiredPlant ? hiredPlantIdSerial.trim() || null : null,
+          hiredPlantDescription: isHiredPlant ? hiredPlantDescription.trim() || null : null,
+          hiredPlantHiringCompany: isHiredPlant ? hiredPlantHiringCompany.trim() || null : null,
+          signatureData,
+          entries: persistableEntries,
+        });
+        timesheetId = submitted.id;
+        setExistingTimesheetId(submitted.id);
+      } else if (timesheetId) {
         type TimesheetUpdate = Database['public']['Tables']['timesheets']['Update'];
         const timesheetData: TimesheetUpdate = {
           timesheet_type: 'plant',
@@ -1226,10 +1300,10 @@ export function PlantTimesheetV2({
           hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() || null : null,
           hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() || null : null,
           week_ending: weekEnding,
-          status,
-          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
-          signature_data: signatureData || null,
-          signed_at: signatureData ? new Date().toISOString() : null,
+          status: 'draft',
+          submitted_at: null,
+          signature_data: null,
+          signed_at: null,
           updated_at: new Date().toISOString(),
         };
 
@@ -1256,10 +1330,7 @@ export function PlantTimesheetV2({
           hired_plant_description: isHiredPlant ? hiredPlantDescription.trim() || null : null,
           hired_plant_hiring_company: isHiredPlant ? hiredPlantHiringCompany.trim() || null : null,
           week_ending: weekEnding,
-          status,
-          submitted_at: status === 'submitted' ? new Date().toISOString() : null,
-          signature_data: signatureData || null,
-          signed_at: signatureData ? new Date().toISOString() : null,
+          status: 'draft',
         };
 
         const { data: createdTimesheet, error: createError } = await supabase
@@ -1276,98 +1347,83 @@ export function PlantTimesheetV2({
 
       if (!timesheetId) throw new Error('Timesheet id missing');
 
-      const { error: deleteError } = await supabase
-        .from('timesheet_entries')
-        .delete()
-        .eq('timesheet_id', timesheetId);
+      if (status !== 'submitted') {
+        const { error: deleteError } = await supabase
+          .from('timesheet_entries')
+          .delete()
+          .eq('timesheet_id', timesheetId);
 
-      if (deleteError) throw deleteError;
+        if (deleteError) throw deleteError;
 
-      type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
-      const entriesToInsert: TimesheetEntryInsert[] = entries.map((entry) => {
-        const offDayState = offDayMap.get(entry.day_of_week);
-        const recalculated = recalculateEntry(entry, getRecalculateOptionsForOffDay(offDayState));
-        const persistedJobNumbers = getNormalizedJobNumbers(recalculated.job_numbers);
-        const operatorTravel = parseHoursInput(recalculated.operator_travel_hours);
-        const operatorYard = parseHoursInput(recalculated.operator_yard_hours);
-        const machineTravel = parseHoursInput(recalculated.machine_travel_hours);
-        const machineStanding = parseHoursInput(recalculated.machine_standing_hours);
-        const machineOperator = parseHoursInput(recalculated.machine_operator_hours);
-        const maintenanceBreakdown = parseHoursInput(recalculated.maintenance_breakdown_hours);
-        const halfDayTrainingRemark = getHalfDayTrainingRemarkForOffDayState(offDayState);
-        const normalizedRemarks =
-          recalculated.remarks?.trim() ||
-          halfDayTrainingRemark ||
-          (recalculated.did_not_work
-            ? (offDayState && !offDayState.isExpectedShiftDay ? 'Not on Shift' : 'Did Not Work')
-            : '');
-        const requiresSubsistence =
-          Boolean(recalculated.subsistence_payment_required) && hasWorkedTimesForSubsistence(recalculated);
-        const persistedRemarks = syncSubsistenceRemark(normalizedRemarks, requiresSubsistence);
-
-        return {
+        type TimesheetEntryInsert = Database['public']['Tables']['timesheet_entries']['Insert'];
+        const entriesToInsert: TimesheetEntryInsert[] = persistableEntries.map((entry) => ({
           timesheet_id: timesheetId,
-          day_of_week: recalculated.day_of_week,
-          time_started: recalculated.time_started || null,
-          time_finished: recalculated.time_finished || null,
-          operator_travel_hours: operatorTravel,
-          operator_yard_hours: operatorYard,
-          operator_working_hours: recalculated.operator_working_hours,
-          machine_travel_hours: machineTravel,
-          machine_start_time: recalculated.machine_start_time || null,
-          machine_finish_time: recalculated.machine_finish_time || null,
-          machine_working_hours: recalculated.machine_working_hours,
-          machine_standing_hours: machineStanding,
-          machine_operator_hours: machineOperator,
-          maintenance_breakdown_hours: maintenanceBreakdown,
-          daily_total: recalculated.daily_total,
-          job_number: persistedJobNumbers[0] || null,
-          working_in_yard: recalculated.working_in_yard,
-          subsistence_payment_required: requiresSubsistence,
-          did_not_work: recalculated.did_not_work,
-          night_shift: persistTimesheetNightShiftFromFormEntry(recalculated),
-          bank_holiday: !recalculated.did_not_work && bankHolidays.has(
-            formatLocalIsoDate(
-              getTimesheetEntryDateFromWeekEnding(weekEnding, recalculated.day_of_week)
-            )
-          ),
-          remarks: persistedRemarks || null,
-        };
-      });
-
-      const { data: insertedEntries, error: entriesError } = await supabase
-        .from('timesheet_entries')
-        .insert(entriesToInsert)
-        .select('id, day_of_week');
-
-      if (entriesError) throw entriesError;
-
-      type TimesheetEntryJobCodeInsert = Database['public']['Tables']['timesheet_entry_job_codes']['Insert'];
-      const entryIdByDay = new Map(
-        (insertedEntries || []).map((entry) => [entry.day_of_week, entry.id] as const)
-      );
-      const jobCodesToInsert: TimesheetEntryJobCodeInsert[] = entries.flatMap((entry) => {
-        const entryId = entryIdByDay.get(entry.day_of_week);
-        if (!entryId) return [];
-
-        return getNormalizedJobNumbers(entry.job_numbers).map((jobNumber, displayOrder) => ({
-          timesheet_entry_id: entryId,
-          job_number: jobNumber,
-          display_order: displayOrder,
+          day_of_week: entry.day_of_week,
+          time_started: entry.time_started,
+          time_finished: entry.time_finished,
+          operator_travel_hours: entry.operator_travel_hours,
+          operator_yard_hours: entry.operator_yard_hours,
+          operator_working_hours: entry.operator_working_hours,
+          machine_travel_hours: entry.machine_travel_hours,
+          machine_start_time: entry.machine_start_time,
+          machine_finish_time: entry.machine_finish_time,
+          machine_working_hours: entry.machine_working_hours,
+          machine_standing_hours: entry.machine_standing_hours,
+          machine_operator_hours: entry.machine_operator_hours,
+          maintenance_breakdown_hours: entry.maintenance_breakdown_hours,
+          daily_total: entry.daily_total,
+          job_number: entry.job_number,
+          working_in_yard: entry.working_in_yard,
+          subsistence_payment_required: entry.subsistence_payment_required,
+          did_not_work: entry.did_not_work,
+          night_shift: entry.night_shift,
+          bank_holiday: entry.bank_holiday,
+          remarks: entry.remarks,
         }));
-      });
 
-      if (jobCodesToInsert.length > 0) {
-        const { error: jobCodesError } = await supabase
-          .from('timesheet_entry_job_codes')
-          .insert(jobCodesToInsert);
+        const { data: insertedEntries, error: entriesError } = await supabase
+          .from('timesheet_entries')
+          .insert(entriesToInsert)
+          .select('id, day_of_week');
 
-        if (jobCodesError) throw jobCodesError;
+        if (entriesError) throw entriesError;
+
+        type TimesheetEntryJobCodeInsert = Database['public']['Tables']['timesheet_entry_job_codes']['Insert'];
+        const entryIdByDay = new Map(
+          (insertedEntries || []).map((entry) => [entry.day_of_week, entry.id] as const)
+        );
+        const jobCodesToInsert: TimesheetEntryJobCodeInsert[] = persistableEntries.flatMap((entry) => {
+          const entryId = entryIdByDay.get(entry.day_of_week);
+          if (!entryId) return [];
+
+          return (entry.job_numbers || []).map((jobNumber, displayOrder) => ({
+            timesheet_entry_id: entryId,
+            job_number: jobNumber,
+            display_order: displayOrder,
+          }));
+        });
+
+        if (jobCodesToInsert.length > 0) {
+          const { error: jobCodesError } = await supabase
+            .from('timesheet_entry_job_codes')
+            .insert(jobCodesToInsert);
+
+          if (jobCodesError) throw jobCodesError;
+        }
       }
 
       const didNotWorkBookings = getPendingDidNotWorkBookingsPayload(pendingDidNotWorkBookings);
       if (didNotWorkBookings.length > 0) {
-        await commitTimesheetDidNotWorkBookings(timesheetId, didNotWorkBookings);
+        try {
+          await commitTimesheetDidNotWorkBookings(timesheetId, didNotWorkBookings);
+        } catch (bookingError) {
+          console.warn('Did Not Work bookings were not created:', bookingError);
+          if (status === 'submitted') {
+            toast.warning('Timesheet submitted, but Did Not Work bookings could not be created.');
+          } else {
+            throw bookingError;
+          }
+        }
       }
 
       try {
