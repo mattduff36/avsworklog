@@ -283,11 +283,11 @@ describe('GET /api/dashboard/summary', () => {
     expect(payload.kiosk_launch_available).toBe(true);
     expect(payload.metrics).toEqual({
       approvals: {
-        timesheets: 1,
+        timesheets: 2,
         absences: 1,
       },
       badges: {
-        approvals: 2,
+        approvals: 3,
         workshop_pending: 3,
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
@@ -385,6 +385,7 @@ describe('GET /api/dashboard/summary', () => {
                 { id: 'ts-2', status: 'submitted', user_id: 'employee-2', employee: { team_id: 'team-accounts' } },
                 { id: 'ts-3', status: 'submitted', user_id: 'employee-3', employee: { team_id: 'team-ops' } },
                 { id: 'ts-4', status: 'approved', user_id: 'employee-4', employee: { team_id: 'team-accounts' } },
+                { id: 'ts-5', status: 'manager_approved', user_id: 'employee-5', employee: { team_id: 'team-accounts' } },
               ]),
           };
         }
@@ -414,11 +415,11 @@ describe('GET /api/dashboard/summary', () => {
     expect(payload.kiosk_launch_available).toBe(false);
     expect(payload.metrics).toEqual({
       approvals: {
-        timesheets: 2,
+        timesheets: 3,
         absences: 2,
       },
       badges: {
-        approvals: 4,
+        approvals: 5,
         workshop_pending: 0,
         maintenance_due_soon: 0,
         maintenance_overdue: 0,
