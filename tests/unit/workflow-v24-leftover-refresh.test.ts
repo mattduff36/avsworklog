@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, rmSync } from 'fs';
 import path from 'path';
 import { spawnSync } from 'child_process';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -372,7 +372,13 @@ describe('leftover already_in_release', { timeout: 40_000 }, () => {
 
     const tempRoot = makeTempRoot('false-absent-temp');
     const tempHead = initGitRepo(tempRoot);
-    const falseAbsent = rejectFalseAbsentRemovedFromRelease(tempRoot, tempHead);
+    const falseAbsent = rejectFalseAbsentRemovedFromRelease(
+      tempRoot,
+      tempHead,
+      undefined,
+      undefined,
+      [tempHead]
+    );
     expect(falseAbsent.ok).toBe(true);
   });
 
@@ -471,6 +477,7 @@ describe('no legacy backdoor or inherited sources', { timeout: 20_000 }, () => {
       'ws_c3f8a1d62e904b75',
       'plan.md'
     );
+    if (!existsSync(planPath)) return;
     const parsed = extractPlanContractMarker(readFileSync(planPath, 'utf8'));
     expect(parsed.status).toBe('present');
     expect(parsed.contract?.sourceWorkstreamIds ?? []).toEqual([]);

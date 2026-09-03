@@ -12,6 +12,7 @@
     "tests/unit/workflow-review-protocol.test.ts",
     "tests/unit/workflow-review.test.ts",
     "tests/unit/workflow-v24-budget.test.ts",
+    "tests/unit/workflow-v24-false-absent.test.ts",
     "tests/unit/workflow-v24-fd-git-003.test.ts",
     "tests/unit/workflow-v24-leftover-refresh.test.ts",
     "tests/unit/workflow-verification-ledger.test.ts"
