@@ -384,7 +384,7 @@ describe('CAT-006 terminal, commercially closed, and inactive customers stay hid
 });
 
 describe('CAT-007 one live_quote row per thread', () => {
-  it('resolves two sent-onwards versions to the latest row, not an ambiguous pair', async () => {
+  it('resolves two sent-onwards versions to the latest row and a pre-send latest to the highest older sent revision', async () => {
     const original = quoteFixture({
       id: 'quote-old',
       quote_thread_id: 'thread-two-sent',
@@ -403,14 +403,6 @@ describe('CAT-007 one live_quote row per thread', () => {
       created_at: '2026-03-01T10:00:00.000Z',
       subject_line: 'Latest sent',
     });
-    const records = await loadJobCatalogueRecords(createCatalogueAdmin([original, latest]) as never);
-    const options = listJobCatalogueOptions(records, '40118');
-    expect(options).toHaveLength(1);
-    expect(options[0].sourceId).toBe('quote-latest-sent');
-    expect(resolveJobCatalogueRecord(records, { jobCode: '40118-GH' }).record?.source_id).toBe('quote-latest-sent');
-  });
-
-  it('picks the highest older sent revision when latest is pre-send', async () => {
     const firstSent = quoteFixture({
       id: 'quote-rev0',
       quote_thread_id: 'thread-tie',
@@ -438,9 +430,16 @@ describe('CAT-007 one live_quote row per thread', () => {
       revision_number: 2,
       created_at: '2026-03-01T10:00:00.000Z',
     });
-    const records = await loadJobCatalogueRecords(
+
+    const latestWins = await loadJobCatalogueRecords(createCatalogueAdmin([original, latest]) as never);
+    const latestOptions = listJobCatalogueOptions(latestWins, '40118');
+    expect(latestOptions).toHaveLength(1);
+    expect(latestOptions[0].sourceId).toBe('quote-latest-sent');
+    expect(resolveJobCatalogueRecord(latestWins, { jobCode: '40118-GH' }).record?.source_id).toBe('quote-latest-sent');
+
+    const fallback = await loadJobCatalogueRecords(
       createCatalogueAdmin([firstSent, secondSent, draft]) as never
     );
-    expect(listJobCatalogueOptions(records).map((option) => option.sourceId)).toEqual(['quote-rev1']);
+    expect(listJobCatalogueOptions(fallback).map((option) => option.sourceId)).toEqual(['quote-rev1']);
   });
 });
