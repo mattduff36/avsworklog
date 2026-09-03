@@ -896,6 +896,7 @@ export function getFinaliseProtocolReadiness(
             protocolCommand(protocol.workstreamId, 'route', ' --disposition removed_from_release'),
             protocolCommand(protocol.workstreamId, 'route', ' --disposition reverted'),
             protocolCommand(protocol.workstreamId, 'route', ' --disposition superseded'),
+            protocolCommand(protocol.workstreamId, 'route', ' --disposition already_in_release'),
           ],
         })
       );

@@ -56,6 +56,8 @@ export type WorkflowProtocolCommand =
   | 'review-start'
   | 'review-record'
   | 'fix-record'
+  | 'fix-delta-refresh'
+  | 'exhaustion-acknowledge'
   | 'split'
   | 'route'
   | 'rehome-bind'
@@ -224,7 +226,8 @@ export function reviewAllowsFinaliseStart(record: WorkflowProtocolRecord): boole
     record.phase === 'removed_from_release' ||
     record.phase === 'reverted' ||
     record.phase === 'superseded' ||
-    record.phase === 'rehomed'
+    record.phase === 'rehomed' ||
+    record.phase === 'already_in_release'
   ) {
     return false;
   }
@@ -1037,6 +1040,219 @@ export function reduceFixRecord(params: {
   return succeed('fix delta recorded', next);
 }
 
+function sameSortedIdSet(left: string[], right: string[]): boolean {
+  if (left.length !== right.length) return false;
+  const a = [...left].sort();
+  const b = [...right].sort();
+  return a.every((id, index) => id === b[index]);
+}
+
+function lastFailedPremiumBlockerIds(record: WorkflowProtocolRecord): string[] | null {
+  for (let index = record.reviewAttempts.length - 1; index >= 0; index -= 1) {
+    const attempt = record.reviewAttempts[index];
+    if ((attempt.pass === 'first' || attempt.pass === 'closure') && attempt.result === 'failed') {
+      return [...(attempt.blockerIds ?? [])];
+    }
+  }
+  return null;
+}
+
+function readRecordedFixDeltaBinding(
+  repoRoot: string,
+  relativeOrAbsolute: string
+):
+  | {
+      ok: true;
+      absolutePath: string;
+      headCommit: string;
+      inputFingerprint: string;
+      closedBlockerIds: string[];
+    }
+  | { ok: false; message: string } {
+  const absolutePath = path.isAbsolute(relativeOrAbsolute)
+    ? relativeOrAbsolute
+    : path.join(repoRoot, relativeOrAbsolute);
+  if (!existsSync(absolutePath)) {
+    return { ok: false, message: `recorded fix-delta missing: ${relativeOrAbsolute}` };
+  }
+  try {
+    const parsed = JSON.parse(readFileSync(absolutePath, 'utf8')) as {
+      kind?: unknown;
+      headCommit?: unknown;
+      inputFingerprint?: unknown;
+      closedBlockerIds?: unknown;
+    };
+    if (parsed.kind !== 'fix-delta') {
+      return { ok: false, message: 'recorded manifest is not a fix-delta' };
+    }
+    if (typeof parsed.headCommit !== 'string' || !parsed.headCommit) {
+      return { ok: false, message: 'recorded fix-delta is missing headCommit' };
+    }
+    if (typeof parsed.inputFingerprint !== 'string' || !parsed.inputFingerprint) {
+      return { ok: false, message: 'recorded fix-delta is missing inputFingerprint' };
+    }
+    const closedBlockerIds = Array.isArray(parsed.closedBlockerIds)
+      ? parsed.closedBlockerIds.filter((id): id is string => typeof id === 'string' && id.trim() !== '')
+      : [];
+    if (closedBlockerIds.length === 0) {
+      return { ok: false, message: 'recorded fix-delta is missing closedBlockerIds' };
+    }
+    return {
+      ok: true,
+      absolutePath,
+      headCommit: parsed.headCommit,
+      inputFingerprint: parsed.inputFingerprint,
+      closedBlockerIds,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: `recorded fix-delta unreadable: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+export function reduceExhaustionAcknowledge(params: {
+  repoRoot: string;
+  workstreamId: string;
+  now?: () => Date;
+}): WorkflowProtocolTransitionResult {
+  const current = readProtocolRecord(params.repoRoot, params.workstreamId);
+  if (!current) return fail('protocol record missing; run init first');
+  const git = assertProtocolGitBinding({
+    repoRoot: params.repoRoot,
+    protocol: current,
+  });
+  if (!git.ok) return fail(git.message, current);
+  if (current.phase !== 'initialized') {
+    return fail(
+      `exhaustion-acknowledge requires initialized (have ${current.phase})`,
+      current
+    );
+  }
+  if (!lineageBudgetExhausted(current)) {
+    return fail('exhaustion-acknowledge requires an exhausted lineage budget', current);
+  }
+  if (current.activeReviewToken || current.activeReviewPass || current.activeCheckpointId) {
+    return fail(
+      'exhaustion-acknowledge requires no active review token, pass, or checkpoint',
+      current
+    );
+  }
+  const next: WorkflowProtocolRecord = {
+    ...current,
+    phase: 'routing_required',
+    nextAction: 'route_or_isolate',
+    failedPremiumReviewCount: current.failedPremiumReviewCount,
+    inheritedFailedReviewCount: current.inheritedFailedReviewCount,
+    reviewAttempts: current.reviewAttempts,
+    headCommit: current.headCommit,
+    reviewedTreeFingerprint: current.reviewedTreeFingerprint,
+    updatedAt: nowIso(params.now),
+  };
+  return succeed(
+    'exhausted initialized lineage moved to routing_required; no review minted',
+    next
+  );
+}
+
+export function reduceFixDeltaRefresh(params: {
+  repoRoot: string;
+  workstreamId: string;
+  manifestPath: string;
+  closedBlockerIds?: string[];
+  now?: () => Date;
+}): WorkflowProtocolTransitionResult {
+  const current = readProtocolRecord(params.repoRoot, params.workstreamId);
+  if (!current) return fail('protocol record missing; run init first');
+  if (current.phase === 'review_closed' || current.phase === 'finalise_ready') {
+    return fail(
+      'fix-delta-refresh is illegal after review_closed; use review-start --pass delta',
+      current
+    );
+  }
+  if (current.phase !== 'fix_recorded') {
+    return fail(`fix-delta-refresh requires fix_recorded (have ${current.phase})`, current);
+  }
+  if (current.activeReviewToken || current.activeReviewPass || current.activeCheckpointId) {
+    return fail('fix-delta-refresh requires no active review token, pass, or checkpoint', current);
+  }
+  if (!current.fixDeltaManifestPath) {
+    return fail('fix-delta-refresh requires a recorded fix-delta manifest', current);
+  }
+  if (!params.closedBlockerIds || params.closedBlockerIds.length === 0) {
+    return fail('fix-delta-refresh requires explicit --closed-blocker-ids', current);
+  }
+  const git = assertProtocolGitBinding({
+    repoRoot: params.repoRoot,
+    protocol: current,
+  });
+  if (!git.ok) return fail(git.message, current);
+
+  const recorded = readRecordedFixDeltaBinding(params.repoRoot, current.fixDeltaManifestPath);
+  if (!recorded.ok) return fail(recorded.message, current);
+  const currentTree = getCurrentTreeFingerprint(params.repoRoot);
+  if (
+    recorded.headCommit === currentTree.headCommit &&
+    recorded.inputFingerprint === currentTree.inputFingerprint
+  ) {
+    return fail(
+      'fix-delta-refresh requires HEAD or tree drift from the recorded fix-delta',
+      current
+    );
+  }
+
+  const failedReviewIds = lastFailedPremiumBlockerIds(current);
+  if (!failedReviewIds || failedReviewIds.length === 0) {
+    return fail('fix-delta-refresh requires failed-review closed blocker IDs', current);
+  }
+  const requested = params.closedBlockerIds.map((id) => id.trim()).filter(Boolean);
+  if (!sameSortedIdSet(requested, recorded.closedBlockerIds)) {
+    return fail(
+      'fix-delta-refresh closed blocker IDs must match the recorded fix-delta exactly',
+      current
+    );
+  }
+  if (!sameSortedIdSet(requested, failedReviewIds)) {
+    return fail(
+      'fix-delta-refresh closed blocker IDs must match the failed review exactly',
+      current
+    );
+  }
+
+  const validation = validateEvidenceManifest({
+    repoRoot: params.repoRoot,
+    workstreamId: params.workstreamId,
+    manifestPath: params.manifestPath,
+    requireKind: 'fix-delta',
+    expectedBaseCommit: current.baseCommit,
+  });
+  if (!validation.ok || !validation.absolutePath) {
+    return fail(validation.message, current);
+  }
+  const refreshed = readRecordedFixDeltaBinding(params.repoRoot, validation.absolutePath);
+  if (!refreshed.ok) return fail(refreshed.message, current);
+  if (!sameSortedIdSet(requested, refreshed.closedBlockerIds)) {
+    return fail(
+      'fix-delta-refresh closed blocker IDs must match the new manifest exactly',
+      current
+    );
+  }
+
+  const next: WorkflowProtocolRecord = {
+    ...current,
+    phase: 'fix_recorded',
+    nextAction: 'review_start_closure',
+    fixDeltaManifestPath: path.relative(params.repoRoot, validation.absolutePath).replace(/\\/g, '/'),
+    openBlockerIds: [],
+    failedPremiumReviewCount: current.failedPremiumReviewCount,
+    inheritedFailedReviewCount: current.inheritedFailedReviewCount,
+    reviewAttempts: current.reviewAttempts,
+    updatedAt: nowIso(params.now),
+  };
+  return succeed('fix-delta refreshed on current HEAD/tree; review budget unchanged', next);
+}
+
 export function reduceSplit(params: {
   repoRoot: string;
   workstreamId: string;
@@ -1126,6 +1342,7 @@ export function reduceRoute(params: {
   successorBranch?: string;
   successorBaseline?: string;
   predecessorHead?: string;
+  originMainCommit?: string;
   now?: () => Date;
 }): WorkflowProtocolTransitionResult {
   const current = readProtocolRecord(params.repoRoot, params.workstreamId);
@@ -1142,6 +1359,7 @@ export function reduceRoute(params: {
     successorBranch: params.successorBranch,
     successorBaseline: params.successorBaseline,
     predecessorHead: params.predecessorHead,
+    originMainCommit: params.originMainCommit,
     nowIso: nowIso(params.now),
   });
   if (!built.ok) return fail(built.message, current);
@@ -1502,6 +1720,7 @@ function applyProtocolTransitionUnlocked(params: {
   successorRepo?: string;
   successorBranch?: string;
   successorBaseline?: string;
+  originMainCommit?: string;
   predecessorRootWorkstreamId?: string;
   predecessorDescendantWorkstreamId?: string;
   predecessorHeadCommit?: string;
@@ -1614,6 +1833,33 @@ function applyProtocolTransitionUnlocked(params: {
     return result;
   }
 
+  if (params.command === 'fix-delta-refresh') {
+    if (!params.manifestPath) return fail('manifestPath required');
+    const result = reduceFixDeltaRefresh({
+      repoRoot: params.repoRoot,
+      workstreamId: params.workstreamId,
+      manifestPath: params.manifestPath,
+      closedBlockerIds: params.closedBlockerIds,
+      now: params.now,
+    });
+    if (result.ok && result.record) {
+      persistParentAndOptionalChildUnlocked({ repoRoot: params.repoRoot, parent: result.record });
+    }
+    return result;
+  }
+
+  if (params.command === 'exhaustion-acknowledge') {
+    const result = reduceExhaustionAcknowledge({
+      repoRoot: params.repoRoot,
+      workstreamId: params.workstreamId,
+      now: params.now,
+    });
+    if (result.ok && result.record) {
+      persistParentAndOptionalChildUnlocked({ repoRoot: params.repoRoot, parent: result.record });
+    }
+    return result;
+  }
+
   if (params.command === 'split') {
     if (!params.newWorkstreamId) return fail('newWorkstreamId required');
     const result = reduceSplit({
@@ -1648,6 +1894,7 @@ function applyProtocolTransitionUnlocked(params: {
       successorBranch: params.successorBranch,
       successorBaseline: params.successorBaseline,
       predecessorHead: params.predecessorHeadCommit,
+      originMainCommit: params.originMainCommit,
       now: params.now,
     });
     if (result.ok && result.record) {
@@ -1725,6 +1972,7 @@ export function applyProtocolTransition(params: {
   successorRepo?: string;
   successorBranch?: string;
   successorBaseline?: string;
+  originMainCommit?: string;
   predecessorRootWorkstreamId?: string;
   predecessorDescendantWorkstreamId?: string;
   predecessorHeadCommit?: string;

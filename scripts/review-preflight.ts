@@ -245,7 +245,12 @@ async function main(): Promise<void> {
 
   const recorded = applyProtocolTransition({
     repoRoot,
-    command: kind === 'fix-delta' ? 'fix-record' : 'preflight-record',
+    command:
+      kind === 'fix-delta'
+        ? protocol.phase === 'fix_recorded'
+          ? 'fix-delta-refresh'
+          : 'fix-record'
+        : 'preflight-record',
     workstreamId,
     manifestPath: built.relativePath,
     closedBlockerIds: kind === 'fix-delta' ? closedBlockerIds : undefined,

@@ -25,8 +25,10 @@ Commands:
   review-record --workstream <id> --token <token> --result passed|failed \\
     [--blocker-families a,b] [--blocker-ids a,b] [--sibling-surfaces a,b]
   fix-record --workstream <id> --manifest <path> [--closed-blocker-ids a,b]
+  fix-delta-refresh --workstream <id> --manifest <path> --closed-blocker-ids a,b
+  exhaustion-acknowledge --workstream <id>
   split --workstream <id> --new-workstream <id> [--narrower-partition] [--has-fix-delta]
-  route --workstream <id> --disposition removed_from_release|reverted|superseded|rehomed \\
+  route --workstream <id> --disposition removed_from_release|reverted|superseded|rehomed|already_in_release \\
     --reason <text> [--implementation-commits a,b] [--revert-commit <sha>] \\
     [--supersede-commit <sha>] [--successor-repo <path>] [--successor-branch <name>] \\
     [--successor-baseline <sha>] [--predecessor-head <sha>]

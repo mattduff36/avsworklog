@@ -257,19 +257,22 @@ export type WorkflowProtocolPhase =
   | 'removed_from_release'
   | 'reverted'
   | 'superseded'
-  | 'rehomed';
+  | 'rehomed'
+  | 'already_in_release';
 
 export type WorkflowRouteDispositionTarget =
   | 'removed_from_release'
   | 'reverted'
   | 'superseded'
-  | 'rehomed';
+  | 'rehomed'
+  | 'already_in_release';
 
 export type WorkflowRouteGitEvidenceKind =
   | 'absent_from_release_range'
   | 'full_revert'
   | 'safe_supersede'
-  | 'isolated_successor';
+  | 'isolated_successor'
+  | 'trusted_release_content_identity';
 
 export interface WorkflowRouteGitEvidence {
   kind: WorkflowRouteGitEvidenceKind;
@@ -284,6 +287,9 @@ export interface WorkflowRouteGitEvidence {
   predecessorHead?: string;
   predecessorHeadIsAncestor?: boolean;
   latestLegalReviewCandidateHead?: string;
+  trustedReleaseSha?: string;
+  originMainCommit?: string;
+  identityPaths?: string[];
   canonVersion?: 'tee-v24-rehome-evidence-v2';
   evidenceHash: string;
 }

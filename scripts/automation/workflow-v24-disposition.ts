@@ -12,12 +12,21 @@ import type {
   WorkflowRouteGitEvidence,
 } from './types';
 import { pathHasSymlinkComponent } from './workflow-plan-contract';
+import { TRUSTED_LEGACY_RELEASE_SHA } from './legacy-reconciliation-registry';
 
 export const WORKFLOW_NON_RELEASE_PHASES = [
   'removed_from_release',
   'reverted',
   'superseded',
   'rehomed',
+  'already_in_release',
+] as const;
+
+export const TRUSTED_RELEASE_ENGINE_IDENTITY_PATHS = [
+  'scripts/automation/workflow-review-protocol.ts',
+  'scripts/automation/workflow-v24-disposition.ts',
+  'scripts/automation/workflow-finalise-correlation.ts',
+  'scripts/workflow-protocol.ts',
 ] as const;
 
 const INPUT_COMMIT_ID_RE = /^[0-9a-f]{7,64}$/i;
@@ -536,6 +545,165 @@ export function gitBranchName(
   return result.stdout ? result.stdout : null;
 }
 
+export function gitOriginMainCommit(
+  repoRoot: string,
+  git: GitCommandRunner = defaultGitCommandRunner
+): string | null {
+  const result = runGit(repoRoot, ['rev-parse', '--verify', 'refs/remotes/origin/main'], git);
+  if (result.error || result.status !== 0 || !FULL_COMMIT_SHA_RE.test(result.stdout)) {
+    return null;
+  }
+  return result.stdout.toLowerCase();
+}
+
+export function commitHasIdentityPaths(
+  repoRoot: string,
+  commitSha: string,
+  paths: readonly string[] = TRUSTED_RELEASE_ENGINE_IDENTITY_PATHS,
+  git: GitCommandRunner = defaultGitCommandRunner
+): boolean {
+  for (const relative of paths) {
+    const listed = runGit(repoRoot, ['ls-tree', '-r', '--name-only', commitSha, '--', relative], git);
+    if (listed.error || listed.status !== 0) return false;
+    const names = listed.stdout
+      .split('\n')
+      .map((line) => line.trim().replace(/\\/g, '/'))
+      .filter(Boolean);
+    if (!names.includes(relative.replace(/\\/g, '/'))) return false;
+  }
+  return true;
+}
+
+export function rejectFalseAbsentRemovedFromRelease(
+  repoRoot: string,
+  releaseHead: string,
+  originMainCommit?: string | null,
+  git?: GitCommandRunner
+): { ok: true } | { ok: false; message: string } {
+  if (!gitCommitExists(repoRoot, TRUSTED_LEGACY_RELEASE_SHA, git)) {
+    return { ok: true };
+  }
+  const originMain = originMainCommit ?? gitOriginMainCommit(repoRoot, git);
+  if (!originMain) return { ok: true };
+  const trustedOnOrigin = inspectCommitAncestry(
+    repoRoot,
+    TRUSTED_LEGACY_RELEASE_SHA,
+    originMain,
+    git
+  );
+  if (trustedOnOrigin.status === 'error') {
+    return { ok: false, message: trustedOnOrigin.message };
+  }
+  if (trustedOnOrigin.status !== 'ancestor') return { ok: true };
+  if (!commitHasIdentityPaths(repoRoot, originMain, TRUSTED_RELEASE_ENGINE_IDENTITY_PATHS, git)) {
+    return { ok: true };
+  }
+  const trustedOnHead = inspectCommitAncestry(
+    repoRoot,
+    TRUSTED_LEGACY_RELEASE_SHA,
+    releaseHead,
+    git
+  );
+  if (trustedOnHead.status === 'error') {
+    return { ok: false, message: trustedOnHead.message };
+  }
+  if (trustedOnHead.status !== 'ancestor') return { ok: true };
+  return {
+    ok: false,
+    message:
+      'removed_from_release is a false-absent: trusted release ancestry and live workflow engine remain on origin/main',
+  };
+}
+
+function buildAlreadyInReleaseEvidence(params: {
+  repoRoot: string;
+  record: WorkflowProtocolRecord;
+  releaseHead: string;
+  baseline: string;
+  implementationCommits: string[];
+  latestLegalReviewCandidateHead: string;
+  claimedOriginMain?: string;
+}): { ok: true; gitEvidence: WorkflowRouteGitEvidence } | { ok: false; message: string } {
+  if (!gitCommitExists(params.repoRoot, TRUSTED_LEGACY_RELEASE_SHA)) {
+    return { ok: false, message: 'trusted release SHA is not a git object in this repository' };
+  }
+  const originMain = gitOriginMainCommit(params.repoRoot);
+  if (!originMain) {
+    return { ok: false, message: 'refs/remotes/origin/main is missing or unreadable' };
+  }
+  if (params.claimedOriginMain && params.claimedOriginMain.toLowerCase() !== originMain) {
+    return {
+      ok: false,
+      message: `origin/main is ${originMain}, not the supplied ${params.claimedOriginMain}`,
+    };
+  }
+  const trustedOnOrigin = inspectCommitAncestry(
+    params.repoRoot,
+    TRUSTED_LEGACY_RELEASE_SHA,
+    originMain
+  );
+  if (trustedOnOrigin.status !== 'ancestor') {
+    return {
+      ok: false,
+      message: trustedOnOrigin.status === 'error'
+        ? trustedOnOrigin.message
+        : 'trusted release SHA is not an ancestor of origin/main',
+    };
+  }
+  const trustedOnHead = inspectCommitAncestry(
+    params.repoRoot,
+    TRUSTED_LEGACY_RELEASE_SHA,
+    params.releaseHead
+  );
+  if (trustedOnHead.status !== 'ancestor') {
+    return {
+      ok: false,
+      message: trustedOnHead.status === 'error'
+        ? trustedOnHead.message
+        : 'trusted release SHA is not an ancestor of the current HEAD',
+    };
+  }
+  if (
+    params.record.baseCommit.toLowerCase() !== TRUSTED_LEGACY_RELEASE_SHA ||
+    (params.record.headCommit ?? '').toLowerCase() !== TRUSTED_LEGACY_RELEASE_SHA
+  ) {
+    return {
+      ok: false,
+      message: 'already_in_release requires protocol base and head to be the trusted release SHA',
+    };
+  }
+  if (!commitHasIdentityPaths(params.repoRoot, originMain)) {
+    return {
+      ok: false,
+      message: 'live workflow engine identity paths are missing from origin/main',
+    };
+  }
+  const identityPaths = [...TRUSTED_RELEASE_ENGINE_IDENTITY_PATHS];
+  return {
+    ok: true,
+    gitEvidence: {
+      kind: 'trusted_release_content_identity',
+      baselineCommit: params.baseline,
+      releaseHeadCommit: params.releaseHead,
+      implementationCommits: params.implementationCommits,
+      latestLegalReviewCandidateHead: params.latestLegalReviewCandidateHead,
+      trustedReleaseSha: TRUSTED_LEGACY_RELEASE_SHA,
+      originMainCommit: originMain,
+      identityPaths,
+      evidenceHash: computeRouteEvidenceHash({
+        target: 'already_in_release',
+        baseline: params.baseline,
+        releaseHead: params.releaseHead,
+        implementationCommits: params.implementationCommits,
+        latestLegalReviewCandidateHead: params.latestLegalReviewCandidateHead,
+        trustedReleaseSha: TRUSTED_LEGACY_RELEASE_SHA,
+        originMainCommit: originMain,
+        identityPaths,
+      }),
+    },
+  };
+}
+
 export function isCommitAncestor(
   repoRoot: string,
   maybeAncestor: string,
@@ -971,6 +1139,9 @@ function routeEvidenceHashPayload(params: {
   successorBranch?: string;
   successorBaseline?: string;
   predecessorHead?: string;
+  trustedReleaseSha?: string;
+  originMainCommit?: string;
+  identityPaths?: string[];
 }): unknown {
   if (params.target === 'removed_from_release') {
     return {
@@ -1000,6 +1171,18 @@ function routeEvidenceHashPayload(params: {
       latestLegalReviewCandidateHead: params.latestLegalReviewCandidateHead,
       supersedeCommit: params.supersedeCommit,
       revertCommit: params.revertCommit ?? null,
+    };
+  }
+  if (params.target === 'already_in_release') {
+    return {
+      target: params.target,
+      baseline: params.baseline,
+      releaseHead: params.releaseHead,
+      implementationCommits: params.implementationCommits,
+      latestLegalReviewCandidateHead: params.latestLegalReviewCandidateHead,
+      trustedReleaseSha: params.trustedReleaseSha,
+      originMainCommit: params.originMainCommit,
+      identityPaths: params.identityPaths,
     };
   }
   return {
@@ -1401,6 +1584,7 @@ export function buildRouteDisposition(params: {
   successorBranch?: string;
   successorBaseline?: string;
   predecessorHead?: string;
+  originMainCommit?: string;
   nowIso: string;
 }): { ok: true; disposition: WorkflowRouteDisposition } | { ok: false; message: string } {
   if (params.record.phase !== 'routing_required') {
@@ -1422,6 +1606,30 @@ export function buildRouteDisposition(params: {
   if (!drift.ok && (drift.kind === 'git-error' || params.target === 'rehomed')) {
     return drift;
   }
+  const baseline = params.record.baseCommit;
+  if (params.target === 'already_in_release') {
+    const leftover = buildAlreadyInReleaseEvidence({
+      repoRoot: params.repoRoot,
+      record: params.record,
+      releaseHead,
+      baseline,
+      implementationCommits: [],
+      latestLegalReviewCandidateHead: candidate.headCommit,
+      claimedOriginMain: params.originMainCommit,
+    });
+    if (!leftover.ok) return leftover;
+    return {
+      ok: true,
+      disposition: {
+        schemaVersion: '1',
+        command: 'route',
+        recordedAt: params.nowIso,
+        target: params.target,
+        reason,
+        gitEvidence: leftover.gitEvidence,
+      },
+    };
+  }
   const implementationCommits = requireGitDerivedImplementationCommits({
     repoRoot: params.repoRoot,
     baselineCommit: params.record.baseCommit,
@@ -1431,7 +1639,6 @@ export function buildRouteDisposition(params: {
   if (typeof implementationCommits === 'object' && 'error' in implementationCommits) {
     return { ok: false, message: implementationCommits.error };
   }
-  const baseline = params.record.baseCommit;
 
   let gitEvidence: WorkflowRouteGitEvidence;
   if (params.target === 'removed_from_release') {
@@ -1443,6 +1650,8 @@ export function buildRouteDisposition(params: {
         message: `implementation still present in release history: ${stillPresent.ancestors.join(', ')}`,
       };
     }
+    const falseAbsent = rejectFalseAbsentRemovedFromRelease(params.repoRoot, releaseHead);
+    if (!falseAbsent.ok) return falseAbsent;
     gitEvidence = {
       kind: 'absent_from_release_range',
       baselineCommit: baseline,
@@ -1639,6 +1848,61 @@ export function buildRouteDisposition(params: {
   };
 }
 
+function sameSortedStringSet(left: readonly string[] | undefined, right: readonly string[]): boolean {
+  const a = [...(left ?? [])].sort();
+  const b = [...right].sort();
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
+function revalidateAlreadyInReleaseDisposition(params: {
+  repoRoot: string;
+  record: WorkflowProtocolRecord;
+  disposition: WorkflowRouteDisposition;
+}): { ok: true } | { ok: false; message: string } {
+  const evidence = params.disposition.gitEvidence;
+  if (evidence.kind !== 'trusted_release_content_identity') {
+    return { ok: false, message: 'already_in_release evidence kind is not trusted_release_content_identity' };
+  }
+  if ((evidence.trustedReleaseSha ?? '').toLowerCase() !== TRUSTED_LEGACY_RELEASE_SHA) {
+    return { ok: false, message: 'already_in_release evidence is not bound to the trusted release SHA' };
+  }
+  if (
+    params.record.baseCommit.toLowerCase() !== TRUSTED_LEGACY_RELEASE_SHA ||
+    (params.record.headCommit ?? '').toLowerCase() !== TRUSTED_LEGACY_RELEASE_SHA
+  ) {
+    return {
+      ok: false,
+      message: 'already_in_release requires protocol base and head to remain the trusted release SHA',
+    };
+  }
+  if (!sameSortedStringSet(evidence.identityPaths, TRUSTED_RELEASE_ENGINE_IDENTITY_PATHS)) {
+    return { ok: false, message: 'already_in_release identity paths no longer match the live engine set' };
+  }
+  const releaseHead = gitHeadCommit(params.repoRoot);
+  if (!releaseHead) return { ok: false, message: 'unable to revalidate leftover HEAD' };
+  if (!gitCommitExists(params.repoRoot, TRUSTED_LEGACY_RELEASE_SHA)) {
+    return { ok: false, message: 'trusted release SHA is no longer a git object' };
+  }
+  const trustedOnHead = inspectCommitAncestry(
+    params.repoRoot,
+    TRUSTED_LEGACY_RELEASE_SHA,
+    releaseHead
+  );
+  if (trustedOnHead.status !== 'ancestor') {
+    return {
+      ok: false,
+      message:
+        trustedOnHead.status === 'error'
+          ? trustedOnHead.message
+          : 'trusted release SHA is no longer an ancestor of the current HEAD',
+    };
+  }
+  if (!commitHasIdentityPaths(params.repoRoot, releaseHead)) {
+    return { ok: false, message: 'live workflow engine identity paths are missing from the current HEAD' };
+  }
+  return { ok: true };
+}
+
 export function revalidateRouteDisposition(params: {
   repoRoot: string;
   record: WorkflowProtocolRecord;
@@ -1675,9 +1939,19 @@ export function revalidateRouteDisposition(params: {
     successorBranch: disposition.gitEvidence.successorBranch,
     successorBaseline: disposition.gitEvidence.successorBaseline,
     predecessorHead: disposition.gitEvidence.predecessorHead,
+    trustedReleaseSha: disposition.gitEvidence.trustedReleaseSha,
+    originMainCommit: disposition.gitEvidence.originMainCommit,
+    identityPaths: disposition.gitEvidence.identityPaths,
   });
   if (expectedHash !== disposition.gitEvidence.evidenceHash) {
     return { ok: false, message: 'disposition evidence hash does not match recorded Git evidence' };
+  }
+  if (disposition.target === 'already_in_release') {
+    return revalidateAlreadyInReleaseDisposition({
+      repoRoot: params.repoRoot,
+      record: params.record,
+      disposition,
+    });
   }
   const rebuilt = buildRouteDisposition({
     repoRoot: params.repoRoot,
