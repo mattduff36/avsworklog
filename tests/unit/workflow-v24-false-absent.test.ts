@@ -79,6 +79,9 @@ describe('fail-closed removed_from_release', { timeout: 40_000 }, () => {
       'T-FA-LIVE-ENGINE-008',
       'T-FA-TEMP-PROVEN-ABSENT',
       'T-FA-REVALIDATION',
+      'T-FA-ANCESTRY-NOT-PROOF',
+      'T-FA-TRUSTED-NONZERO-ERROR',
+      'T-FA-MALFORMED-LSTREE',
     ];
     expect(ids.every((id) => source.includes(`it('${id}'`))).toBe(true);
   });
@@ -218,6 +221,56 @@ describe('fail-closed removed_from_release', { timeout: 40_000 }, () => {
       [TRUSTED_LEGACY_RELEASE_SHA]
     );
     expect(result.ok === false && /false-absent/.test(result.message)).toBe(true);
+  });
+
+  it('T-FA-ANCESTRY-NOT-PROOF', () => {
+    const result = rejectFalseAbsentRemovedFromRelease(
+      REAL_REPO,
+      currentHead(),
+      undefined,
+      gitWithOverrides([
+        {
+          match: (args) => args[0] === 'merge-base' && args[1] === '--is-ancestor',
+          result: gitResult({ status: 1, stderr: 'not an ancestor' }),
+        },
+      ]),
+      [TRUSTED_LEGACY_RELEASE_SHA]
+    );
+    expect(result.ok === false && /false-absent|live workflow engine/.test(result.message)).toBe(
+      true
+    );
+  });
+
+  it('T-FA-TRUSTED-NONZERO-ERROR', () => {
+    const result = rejectFalseAbsentRemovedFromRelease(
+      REAL_REPO,
+      currentHead(),
+      undefined,
+      gitWithOverrides([
+        {
+          match: (args) => args.includes(`${TRUSTED_LEGACY_RELEASE_SHA}^{commit}`),
+          result: gitResult({ status: 1, stderr: 'fatal: packed-refs I/O error' }),
+        },
+      ]),
+      [TRUSTED_LEGACY_RELEASE_SHA]
+    );
+    expect(result.ok === false && /unreadable|I\/O error|failed/.test(result.message)).toBe(true);
+  });
+
+  it('T-FA-MALFORMED-LSTREE', () => {
+    const result = rejectFalseAbsentRemovedFromRelease(
+      REAL_REPO,
+      currentHead(),
+      undefined,
+      gitWithOverrides([
+        {
+          match: (args) => args[0] === 'ls-tree',
+          result: gitResult({ status: 0, stdout: 'not-the-engine-path\n' }),
+        },
+      ]),
+      [TRUSTED_LEGACY_RELEASE_SHA]
+    );
+    expect(result.ok === false && /ambiguous|malformed/.test(result.message)).toBe(true);
   });
 
   it('does not treat an unresolved trusted SHA as proof while origin still has the engine', () => {

@@ -368,6 +368,16 @@ function diagnosticGitText(result: GitCommandResult, fallback: string): string {
   return text || fallback;
 }
 
+function gitLooksLikeMissingRef(result: GitCommandResult): boolean {
+  const text = `${result.stderr ?? ''}\n${result.stdout ?? ''}`.toLowerCase();
+  return (
+    /needed a single revision/.test(text) ||
+    /unknown revision/.test(text) ||
+    /bad object/.test(text) ||
+    /not a valid object name/.test(text)
+  );
+}
+
 export function resolveExactCommitObject(
   repoRoot: string,
   value: string,
@@ -389,7 +399,13 @@ export function resolveExactCommitObject(
   const incomplete = gitProcessDidNotComplete(result, 'git commit resolution');
   if (incomplete) return { ok: false, message: incomplete };
   if (result.status !== 0) {
-    return { ok: false, message: 'commit object is not uniquely resolvable' };
+    if (gitLooksLikeMissingRef(result)) {
+      return { ok: false, message: 'commit object is not uniquely resolvable' };
+    }
+    return {
+      ok: false,
+      message: diagnosticGitText(result, 'git commit resolution failed'),
+    };
   }
   const sha = normalizeGitStdout(result.stdout ?? '').toLowerCase();
   if (!FULL_COMMIT_SHA_RE.test(sha)) {
@@ -593,7 +609,13 @@ export function inspectOriginMainCommit(
   }
   const incomplete = gitProcessDidNotComplete(result, 'origin/main resolution');
   if (incomplete) return { status: 'error', message: incomplete };
-  if (result.status !== 0) return { status: 'absent' };
+  if (result.status !== 0) {
+    if (gitLooksLikeMissingRef(result)) return { status: 'absent' };
+    return {
+      status: 'error',
+      message: diagnosticGitText(result, 'origin/main resolution failed'),
+    };
+  }
   const sha = normalizeGitStdout(result.stdout ?? '').toLowerCase();
   if (!FULL_COMMIT_SHA_RE.test(sha)) {
     return { status: 'ambiguous', message: 'origin/main did not resolve to a full commit SHA' };
@@ -632,12 +654,23 @@ export function inspectEngineIdentityPaths(
     if (listed.status !== 0) {
       return { status: 'error', message: 'engine identity ls-tree failed' };
     }
+    const expected = relative.replace(/\\/g, '/');
     const names = normalizeGitStdout(listed.stdout ?? '')
       .split('\n')
       .map((line) => line.trim().replace(/\\/g, '/'))
       .filter(Boolean);
-    if (names.includes(relative.replace(/\\/g, '/'))) present += 1;
-    else absent += 1;
+    if (names.length === 0) {
+      absent += 1;
+      continue;
+    }
+    if (names.length === 1 && names[0] === expected) {
+      present += 1;
+      continue;
+    }
+    return {
+      status: 'ambiguous',
+      message: 'engine identity ls-tree listing is malformed',
+    };
   }
   if (present === paths.length) return { status: 'present' };
   if (absent === paths.length) return { status: 'absent' };
@@ -708,6 +741,10 @@ export function rejectFalseAbsentRemovedFromRelease(
   implementationCommits?: string[]
 ): { ok: true } | { ok: false; message: string } {
   const runner = git ?? defaultGitCommandRunner;
+  const releaseHeadResolved = resolveExactCommitObject(repoRoot, releaseHead, runner);
+  if (!releaseHeadResolved.ok) {
+    return { ok: false, message: `release HEAD is unreadable: ${releaseHeadResolved.message}` };
+  }
   const trusted = inspectTrustedReleaseObject(repoRoot, runner);
   if (trusted.status === 'error') {
     return { ok: false, message: `trusted release SHA is unreadable: ${trusted.message}` };
@@ -762,17 +799,6 @@ export function rejectFalseAbsentRemovedFromRelease(
     return { ok: false, message: originUncertaintyMessage(origin) };
   }
 
-  const trustedOnOrigin = inspectCommitAncestry(
-    repoRoot,
-    TRUSTED_LEGACY_RELEASE_SHA,
-    origin.sha,
-    runner
-  );
-  if (trustedOnOrigin.status === 'error') {
-    return { ok: false, message: trustedOnOrigin.message };
-  }
-  if (trustedOnOrigin.status !== 'ancestor') return { ok: true };
-
   const identity = inspectEngineIdentityPaths(
     repoRoot,
     origin.sha,
@@ -785,23 +811,14 @@ export function rejectFalseAbsentRemovedFromRelease(
   if (identity.status === 'ambiguous') {
     return { ok: false, message: `engine identity is ambiguous: ${identity.message}` };
   }
-  if (identity.status === 'absent') return { ok: true };
-
-  const trustedOnHead = inspectCommitAncestry(
-    repoRoot,
-    TRUSTED_LEGACY_RELEASE_SHA,
-    releaseHead,
-    runner
-  );
-  if (trustedOnHead.status === 'error') {
-    return { ok: false, message: trustedOnHead.message };
+  if (identity.status === 'present') {
+    return {
+      ok: false,
+      message:
+        'removed_from_release is a false-absent: live workflow engine remains on origin/main',
+    };
   }
-  if (trustedOnHead.status !== 'ancestor') return { ok: true };
-  return {
-    ok: false,
-    message:
-      'removed_from_release is a false-absent: trusted release ancestry and live workflow engine remain on origin/main',
-  };
+  return { ok: true };
 }
 
 function buildAlreadyInReleaseEvidence(params: {
