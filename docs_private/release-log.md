@@ -2,6 +2,35 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.2.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): dual-gate approval and payroll edit`
+
+**PUSHED AT**
+2026-09-03T16:06:04.530Z
+
+**WHAT CHANGED**
+Align finalise suite with dual-gate live schema. Dual-gate approval and payroll edit.
+
+**VERSION HISTORY DETAILS**
+- Align finalise suite with dual-gate live schema, with changes to background routes, app screens, interface components, shared logic, shared typing, automated tests, and data storage.
+- Updated approvals, with changes to app screens, shared logic, automated tests, and data storage.
+- Updated data storage, with changes to shared typing, automated tests, and data storage.
+- Updated absence and leave, with changes to background routes, shared logic, and automated tests.
+- Updated PDF documents, with changes to background routes, shared logic, and automated tests.
+- Updated training, with changes to shared logic and automated tests.
+- Updated actions, with changes to app screens.
+- Updated sign in, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `test(timesheets): align finalise suite with dual-gate live schema`
+- `feat(timesheets): dual-gate approval and payroll edit`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0926.1.1
 
 **GIT COMMIT MESSAGE**

@@ -1,5 +1,31 @@
 [
   {
+    "version": "0926.2.0",
+    "updateKind": "major",
+    "title": "Timesheets update",
+    "description": "Align finalise suite with dual-gate live schema. Dual-gate approval and payroll edit.",
+    "summary": "Align finalise suite with dual-gate live schema. Dual-gate approval and payroll edit.",
+    "details": [
+      "Align finalise suite with dual-gate live schema, with changes to background routes, app screens, interface components, shared logic, shared typing, automated tests, and data storage.",
+      "Updated approvals, with changes to app screens, shared logic, automated tests, and data storage.",
+      "Updated data storage, with changes to shared typing, automated tests, and data storage.",
+      "Updated absence and leave, with changes to background routes, shared logic, and automated tests.",
+      "Updated PDF document documents, with changes to background routes, shared logic, and automated tests.",
+      "Updated training, with changes to shared logic and automated tests.",
+      "Updated actions, with changes to app screens.",
+      "Updated sign in, with changes to automated tests."
+    ],
+    "areas": [
+      "Timesheets",
+      "Align finalise suite with dual-gate live schema. Dual-gate approval",
+      "Payroll edit"
+    ],
+    "areaKeys": [
+      "timesheets"
+    ],
+    "pushedAt": "2026-09-03T16:06:04.530Z"
+  },
+  {
     "version": "0926.1.1",
     "updateKind": "minor",
     "title": "Quotes improvements",
