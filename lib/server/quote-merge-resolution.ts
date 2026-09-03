@@ -14,17 +14,39 @@ export interface QuoteMergeContext {
   snapshots: SnapshotRow[];
 }
 
+const MERGE_IN_FILTER_CHUNK_SIZE = 100;
+
+async function loadMergeMembersByThreadIds(
+  admin: AdminClient,
+  threadIds: string[],
+): Promise<MergeMemberRow[]> {
+  const uniqueIds = Array.from(new Set(threadIds));
+  const rows: MergeMemberRow[] = [];
+  for (let index = 0; index < uniqueIds.length; index += MERGE_IN_FILTER_CHUNK_SIZE) {
+    const chunk = uniqueIds.slice(index, index + MERGE_IN_FILTER_CHUNK_SIZE);
+    const { data, error } = await admin
+      .from('quote_merge_members')
+      .select('*')
+      .in('quote_thread_id', chunk);
+    if (error) throw error;
+    if (data?.length) rows.push(...data);
+  }
+  return rows;
+}
+
 export async function loadQuoteMergeContexts(
   admin: AdminClient,
   threadIds?: string[],
 ): Promise<QuoteMergeContext[]> {
-  let memberQuery = admin.from('quote_merge_members').select('*');
+  let seedMembers: MergeMemberRow[];
   if (threadIds?.length) {
-    memberQuery = memberQuery.in('quote_thread_id', Array.from(new Set(threadIds)));
+    seedMembers = await loadMergeMembersByThreadIds(admin, threadIds);
+  } else {
+    const { data, error } = await admin.from('quote_merge_members').select('*');
+    if (error) throw error;
+    seedMembers = data || [];
   }
-  const { data: seedMembers, error: seedError } = await memberQuery;
-  if (seedError) throw seedError;
-  if (!seedMembers?.length) return [];
+  if (!seedMembers.length) return [];
 
   const groupIds = Array.from(new Set(seedMembers.map(member => member.merge_group_id)));
   const [{ data: groups, error: groupError }, { data: members, error: memberError }, { data: aliases, error: aliasError }, { data: snapshots, error: snapshotError }] = await Promise.all([

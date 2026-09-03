@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -278,6 +279,8 @@ export function QuotesOverviewTab() {
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const [payload, setPayload] = useState<QuoteOverviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
   const [search, setSearch] = useState('');
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState(getDefaultDateFrom);
@@ -291,6 +294,7 @@ export function QuotesOverviewTab() {
     const timeoutId = window.setTimeout(async () => {
       try {
         setLoading(true);
+        setLoadError(null);
         const params = new URLSearchParams();
         if (search.trim()) params.set('search', search.trim());
         if (dateFrom) params.set('date_from', dateFrom);
@@ -303,9 +307,12 @@ export function QuotesOverviewTab() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Unable to load quotes overview.');
         setPayload(data);
+        setLoadError(null);
       } catch (error) {
         if (controller.signal.aborted) return;
-        toast.error(error instanceof Error ? error.message : 'Unable to load quotes overview.');
+        const message = error instanceof Error ? error.message : 'Unable to load quotes overview.';
+        setLoadError(message);
+        toast.error(message);
       } finally {
         if (!controller.signal.aborted) setLoading(false);
       }
@@ -315,7 +322,7 @@ export function QuotesOverviewTab() {
       controller.abort();
       window.clearTimeout(timeoutId);
     };
-  }, [dateFrom, dateTo, search]);
+  }, [dateFrom, dateTo, search, reloadNonce]);
 
   useEffect(() => {
     if (!searchDropdownOpen) return;
@@ -426,7 +433,7 @@ export function QuotesOverviewTab() {
             <PanelLoader message="Loading quotes overview..." className="py-10" />
           ) : dateRangeSummary ? (
             <DateRangeSummary summary={dateRangeSummary} estimatedRate={estimatedRate} />
-          ) : (
+          ) : loadError ? null : (
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {[0, 1, 2, 3].map(index => (
                 <div key={index} className="h-20 animate-pulse rounded-lg border border-slate-800 bg-slate-900/60" />
@@ -445,10 +452,30 @@ export function QuotesOverviewTab() {
             </CardTitle>
             <p className="text-sm text-slate-400">Latest quote and job-number activity.</p>
           </CardHeader>
-          <CardContent className="grid gap-2 p-4 pt-0 md:grid-cols-2 lg:grid-cols-4">
-            {recentItems.length > 0 ? recentItems.map(item => (
-              <RecentItemCard key={`${item.kind}-${item.reference}`} item={item} estimatedRate={estimatedRate} />
-            )) : (
+          <CardContent className="space-y-3 p-4 pt-0">
+            {loadError ? (
+              <div
+                role="alert"
+                className="flex flex-col gap-3 rounded-lg border border-red-500/30 bg-red-500/10 p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <p className="text-sm text-red-100">{loadError}</p>
+                <Button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setReloadNonce(nonce => nonce + 1)}
+                  className="shrink-0 bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90"
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : null}
+            {recentItems.length > 0 ? (
+              <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+                {recentItems.map(item => (
+                  <RecentItemCard key={`${item.kind}-${item.reference}`} item={item} estimatedRate={estimatedRate} />
+                ))}
+              </div>
+            ) : loadError ? null : (
               <p className="rounded-lg border border-dashed border-slate-700 p-4 text-sm text-slate-400">
                 No recent quote or job activity found.
               </p>
