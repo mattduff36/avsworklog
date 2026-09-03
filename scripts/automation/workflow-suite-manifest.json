@@ -1,6 +1,7 @@
 {
   "schemaVersion": "1",
   "id": "avs-workflow-regression-suite",
+  "purpose": "canonical workflow regression suite",
   "files": [
     "tests/unit/tee-v2-context.test.ts",
     "tests/unit/workflow-execution-mode.test.ts",
