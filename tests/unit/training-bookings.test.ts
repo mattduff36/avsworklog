@@ -333,7 +333,7 @@ describe('training booking decline helper', () => {
     vi.mocked(createAdminClient).mockReturnValue(adminClient as never);
 
     await expect(declineTrainingBookings('employee-1', ['absence-1'])).rejects.toThrow(
-      'Training bookings linked to processed or adjusted timesheets cannot be removed from the timesheet flow'
+      'Training bookings linked to payroll-received timesheets cannot be removed from the timesheet flow'
     );
   });
 });

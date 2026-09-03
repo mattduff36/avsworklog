@@ -5,17 +5,14 @@ import {
 } from '@/lib/utils/timesheet-process';
 
 describe('resolveTimesheetProcessAction', () => {
-  it('PAY-PROCESS-DECISION-001 processes approved timesheets and is idempotent for processed', () => {
+  it('TS-GATE-001 processes submitted and approved timesheets and is idempotent for processed', () => {
+    expect(resolveTimesheetProcessAction('submitted')).toEqual({ type: 'process' });
     expect(resolveTimesheetProcessAction('approved')).toEqual({ type: 'process' });
     expect(resolveTimesheetProcessAction('processed')).toEqual({ type: 'already_processed' });
+    expect(resolveTimesheetProcessAction('manager_approved')).toEqual({ type: 'already_processed' });
   });
 
-  it('PAY-PROCESS-DECISION-002 rejects every other status with a user-facing conflict', () => {
-    expect(resolveTimesheetProcessAction('submitted')).toEqual({
-      type: 'conflict',
-      message:
-        'This timesheet is still pending Payroll Received, so it cannot be marked Manager Approved yet.',
-    });
+  it('PAY-PROCESS-DECISION-002 rejects terminal statuses with a user-facing conflict', () => {
     expect(resolveTimesheetProcessAction('rejected').type).toBe('conflict');
     expect(resolveTimesheetProcessAction('adjusted').type).toBe('conflict');
     expect(resolveTimesheetProcessAction('draft')).toEqual({

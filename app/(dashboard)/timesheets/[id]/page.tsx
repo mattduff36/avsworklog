@@ -18,7 +18,6 @@ import {
   type PayrollSnapshotView,
 } from '@/components/timesheets/PayrollSnapshotCard';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Save, Send, Edit2, CheckCircle2, XCircle, Download, Package, AlertTriangle, ArrowLeft, BedDouble } from 'lucide-react';
 import Link from 'next/link';
@@ -40,7 +39,18 @@ import {
 import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
-import { TimesheetAdjustmentModal } from '@/components/timesheets/TimesheetAdjustmentModal';
+import { TimesheetPayrollEditModal } from '@/components/timesheets/TimesheetPayrollEditModal';
+import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
+import {
+  canRejectTimesheetStatus,
+  hasPayrollReceivedGate,
+  isTimesheetComplete,
+} from '@/lib/utils/timesheet-gates';
+import {
+  canonicalPayWeekFromEntries,
+  classifyTimesheetPayImpact,
+} from '@/lib/utils/timesheet-pay-impact';
+import { minutesToHours } from '@/lib/payroll/calculate';
 import { TrainingDeclineDialog } from '@/app/(dashboard)/timesheets/components/TrainingDeclineDialog';
 import { declineTrainingBookingsClient } from '@/lib/client/training-bookings';
 import { toast } from 'sonner';
@@ -101,7 +111,7 @@ export default function ViewTimesheetPage() {
   const [signature, setSignature] = useState<string | null>(null);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [showProcessedDialog, setShowProcessedDialog] = useState(false);
-  const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [showPayrollEditModal, setShowPayrollEditModal] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectionComments, setRejectionComments] = useState('');
   const [originalData, setOriginalData] = useState<{entries: TimesheetEntry[], regNumber: string | null} | null>(null);
@@ -111,6 +121,11 @@ export default function ViewTimesheetPage() {
   const [payrollSnapshot, setPayrollSnapshot] = useState<PayrollSnapshotView | null>(null);
   const [payrollHistory, setPayrollHistory] = useState<PayrollSnapshotView[]>([]);
   const [payrollPreview, setPayrollPreview] = useState<PayrollWeekBreakdown | null>(null);
+  const [latestPayrollEdit, setLatestPayrollEdit] = useState<{
+    reason: string;
+    created_at: string;
+    pay_impact: boolean;
+  } | null>(null);
   const [trainingDeclineDayOfWeek, setTrainingDeclineDayOfWeek] = useState<number | null>(null);
   const [decliningTraining, setDecliningTraining] = useState(false);
   const [employeeTeamId, setEmployeeTeamId] = useState<string | null>(null);
@@ -123,8 +138,8 @@ export default function ViewTimesheetPage() {
     const normalized = message.trim().toLowerCase();
     return (
       normalized.includes('timesheet not found') ||
-      normalized.includes('only submitted timesheets can be rejected') ||
-      normalized.includes('only approved timesheets can be marked as adjusted')
+      normalized.includes('cannot be rejected') ||
+      normalized.includes('complete')
     );
   };
 
@@ -260,6 +275,24 @@ export default function ViewTimesheetPage() {
 
       setEntries(normalizedWeek);
 
+      const { data: payrollEditRows } = await supabase
+        .from('timesheet_payroll_edits')
+        .select('reason, created_at, pay_impact')
+        .eq('timesheet_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const latestEdit = (payrollEditRows || [])[0] as
+        | { reason: string; created_at: string; pay_impact: boolean }
+        | undefined;
+      setLatestPayrollEdit(latestEdit || null);
+
+      if (timesheetData.status && timesheetData.status !== 'draft') {
+        setOriginalData({
+          entries: JSON.parse(JSON.stringify(normalizedWeek)),
+          regNumber: timesheetData.reg_number
+        });
+      }
+
       try {
         const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheetData.week_ending);
         const { data: absenceData, error: absenceError } = await supabase
@@ -280,14 +313,6 @@ export default function ViewTimesheetPage() {
       } catch (absenceLookupError) {
         console.warn('Failed to resolve leave state for timesheet details view:', absenceLookupError);
         setOffDayStates(resolveTimesheetOffDayStates(timesheetData.week_ending, [], null));
-      }
-      
-      // Store original data if this is an approved timesheet (for change tracking)
-      if (timesheetData.status === 'approved') {
-        setOriginalData({
-          entries: JSON.parse(JSON.stringify(normalizedWeek)),
-          regNumber: timesheetData.reg_number
-        });
       }
       
       // Enable editing for draft or rejected timesheets
@@ -322,8 +347,8 @@ export default function ViewTimesheetPage() {
   useEffect(() => {
     if (
       !timesheet
-      || !['submitted', 'adjusted'].includes(timesheet.status)
-      || (payrollSnapshot && timesheet.status !== 'adjusted')
+      || !['submitted', 'adjusted', 'approved', 'manager_approved', 'processed'].includes(timesheet.status)
+      || (payrollSnapshot && timesheet.status !== 'adjusted' && !editing)
     ) {
       setPayrollPreview(null);
       return;
@@ -367,7 +392,7 @@ export default function ViewTimesheetPage() {
         if ((previewError as Error).name !== 'AbortError') setPayrollPreview(null);
       });
     return () => controller.abort();
-  }, [displayEntries, offDayStates, payrollSnapshot, timesheet]);
+  }, [displayEntries, offDayStates, payrollSnapshot, timesheet, editing]);
 
   const trimTrailingEmptyJobNumbers = (values: string[]): string[] => {
     const next = [...values];
@@ -596,16 +621,14 @@ export default function ViewTimesheetPage() {
         };
       }
 
-      // Approved dirty edits must use the scoped /adjust API so auth, employee
-      // scope, demotion, entry rewrite, and notifications happen server-side.
-      if (timesheet.status === 'approved' && dataChanged) {
-        const errorMessage =
-          'Approved timesheets with changes must be marked as Adjusted with a comment before saving.';
-        setError(errorMessage);
-        return {
-          success: false,
-          errorMessage,
-        };
+      if (timesheet.status !== 'draft' && timesheet.status !== 'rejected') {
+        if (!canPerformPayrollReceived) {
+          const errorMessage = 'Only Accounts or Admin can edit a submitted timesheet.';
+          setError(errorMessage);
+          return { success: false, errorMessage };
+        }
+        setShowPayrollEditModal(true);
+        return { success: true };
       }
 
       const timesheetUpdate: Database['public']['Tables']['timesheets']['Update'] = {
@@ -824,10 +847,20 @@ export default function ViewTimesheetPage() {
       const response = await fetch(`/api/timesheets/${timesheet.id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
+        body: JSON.stringify({
+          idempotency_key: crypto.randomUUID(),
+          expected_status: timesheet.status,
+        }),
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'Failed to approve');
+      if (!response.ok) {
+        if (response.status === 409) {
+          toast.error(payload.error || 'Timesheet status changed. Reloading.');
+          await fetchTimesheet(timesheet.id);
+          return;
+        }
+        throw new Error(payload.error || 'Failed to approve');
+      }
       
       await fetchTimesheet(timesheet.id);
     } catch (err) {
@@ -838,7 +871,7 @@ export default function ViewTimesheetPage() {
   };
 
   const handleReject = async () => {
-    if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin)) return;
+    if (!timesheet || !canAuthoriseThisTimesheet) return;
     if (rejectionComments.trim().length === 0) {
       toast.error('Please provide a reason for rejection', { id: 'timesheet-details-reject-validation-missing-reason' });
       return;
@@ -893,13 +926,15 @@ export default function ViewTimesheetPage() {
   };
 
   const handleMarkAsProcessed = async () => {
-    if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin)) return;
+    if (!timesheet || !canAuthoriseThisTimesheet) return;
 
     setSaving(true);
     setShowProcessedDialog(false);
     try {
       const response = await fetch(`/api/timesheets/${timesheet.id}/process`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expected_status: timesheet.status }),
       });
       const payload = (await response.json()) as {
         error?: string;
@@ -935,8 +970,8 @@ export default function ViewTimesheetPage() {
     }
   };
 
-  const handleAdjust = async (selectedManagerIds: string[], comments: string) => {
-    if (!timesheet || (!isManager && !isAdmin && !isSuperAdmin) || !user) return;
+  const handlePayrollEdit = async (reason: string) => {
+    if (!timesheet || !canPerformPayrollReceived || !user) return;
 
     try {
       setSaving(true);
@@ -946,7 +981,7 @@ export default function ViewTimesheetPage() {
       if (jobCodeOptionsLoading) {
         const errorMessage = 'Job codes are still loading. Please wait a moment, then try again.';
         setError(errorMessage);
-        toast.error(errorMessage, { id: 'timesheet-details-adjust-save-validation' });
+        toast.error(errorMessage, { id: 'timesheet-details-payroll-edit-validation' });
         return;
       }
 
@@ -958,39 +993,51 @@ export default function ViewTimesheetPage() {
       if (invalidJobEntry) {
         const errorMessage = `${DAY_NAMES[invalidJobEntry.day_of_week - 1]}: select at least one valid Job Number from the job-code list and do not repeat the same code on a single day.`;
         setError(errorMessage);
-        toast.error(errorMessage, { id: 'timesheet-details-adjust-save-validation' });
+        toast.error(errorMessage, { id: 'timesheet-details-payroll-edit-validation' });
         return;
       }
 
-      // Auth, employee scope, demotion, entry rewrite, and notifications all run
-      // on the server. Do not mutate approved rows from the browser first.
-      const response = await fetch(`/api/timesheets/${timesheet.id}/adjust`, {
+      const originalDays = canonicalPayWeekFromEntries(originalData?.entries || entries);
+      const proposedDays = canonicalPayWeekFromEntries(entriesToPersist);
+      const classification = classifyTimesheetPayImpact({
+        currentDays: originalDays,
+        proposedDays,
+        proposedEntries: entriesToPersist,
+      });
+
+      const response = await fetch(`/api/timesheets/${timesheet.id}/payroll-edit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          comments,
-          notifyManagerIds: selectedManagerIds,
+          reason,
+          idempotency_key: crypto.randomUUID(),
+          expected_status: timesheet.status,
+          expected_updated_at: timesheet.updated_at,
+          expected_snapshot_id: timesheet.current_payroll_snapshot_id ?? null,
+          client_pay_impact: classification.payImpact,
           entries: entriesToPersist,
         }),
       });
-
+      const data = (await response.json()) as { error?: string };
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to mark as adjusted');
+        if (response.status === 409) {
+          toast.error(data.error || 'Timesheet changed. Reloading.');
+          await fetchTimesheet(timesheet.id);
+          return;
+        }
+        throw new Error(data.error || 'Failed to save payroll edit');
       }
 
-      toast.success('Timesheet marked as adjusted and notifications sent');
-      setShowAdjustmentModal(false);
+      toast.success(classification.payImpact ? 'Pay figures updated and Manager Approved cleared' : 'Costing changes saved');
+      setShowPayrollEditModal(false);
       setEditing(false);
       setDataChanged(false);
       await fetchTimesheet(timesheet.id);
     } catch (err) {
-      const errorContextId = 'timesheet-details-adjust-error';
-      console.error('Adjustment error:', err, { errorContextId });
-      toast.error(err instanceof Error ? err.message : 'Failed to mark as adjusted', { id: errorContextId });
-      throw err; // Re-throw to let modal handle it
+      const errorContextId = 'timesheet-details-payroll-edit-error';
+      console.error('Payroll edit error:', err, { errorContextId });
+      toast.error(err instanceof Error ? err.message : 'Failed to save payroll edit', { id: errorContextId });
+      throw err;
     } finally {
       setSaving(false);
     }
@@ -1031,23 +1078,7 @@ export default function ViewTimesheetPage() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      draft: { variant: 'secondary' as const, label: 'Draft' },
-      submitted: { variant: 'warning' as const, label: 'Pending Approval' },
-      approved: { variant: 'success' as const, label: 'Payroll Received' },
-      rejected: { variant: 'destructive' as const, label: 'Rejected' },
-      processed: { variant: 'default' as const, label: 'Manager Approved' },
-      adjusted: { variant: 'default' as const, label: 'Adjusted' },
-    };
-    const config = variants[status as keyof typeof variants] || variants.draft;
-    
-    // Apply blue styling for final states (processed and adjusted)
-    const isFinalState = status === 'processed' || status === 'adjusted';
-    const blueClasses = isFinalState ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : '';
-    
-    return <Badge variant={config.variant} className={blueClasses}>{config.label}</Badge>;
-  };
+  const getStatusBadge = (status: string) => <TimesheetStatusChips status={status} />;
 
   if (authLoading || loading) {
     return <PageLoader message="Loading timesheet..." />;
@@ -1074,19 +1105,26 @@ export default function ViewTimesheetPage() {
   if (!timesheet) return null;
 
   const hasElevatedAccess = isManager || isAdmin || isSuperAdmin;
-  const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected' || (hasElevatedAccess && timesheet.status === 'approved'));
+  const canPayrollEdit = canPerformPayrollReceived && timesheet.status !== 'draft';
+  const canEdit = editing && (timesheet.status === 'draft' || timesheet.status === 'rejected' || canPayrollEdit);
   const canSubmit = timesheet.user_id === user?.id && (timesheet.status === 'draft' || timesheet.status === 'rejected');
-  const canApprove = canPerformPayrollReceived && ['submitted', 'adjusted'].includes(timesheet.status);
-  const canMarkAsProcessed = hasElevatedAccess && timesheet.status === 'approved';
-  const canEditApproved = hasElevatedAccess && timesheet.status === 'approved';
-  const isEndState = timesheet.status === 'processed' || timesheet.status === 'adjusted';
+  const canApprove = canPerformPayrollReceived && !hasPayrollReceivedGate(timesheet.status) && timesheet.status !== 'draft' && timesheet.status !== 'rejected';
+  const canReject = canAuthoriseThisTimesheet && canRejectTimesheetStatus(timesheet.status);
+  const canMarkAsProcessed = canAuthoriseThisTimesheet && timesheet.status !== 'draft' && timesheet.status !== 'rejected' && timesheet.status !== 'adjusted' && !isTimesheetComplete(timesheet.status) && timesheet.status !== 'manager_approved';
+  const canStartPayrollEdit = canPayrollEdit && !editing;
+  const payrollGateLocked = hasPayrollReceivedGate(timesheet.status);
+  const canDeclineTrainingFromDetails = !payrollGateLocked && timesheet.status !== 'adjusted' && (hasElevatedAccess || timesheet.user_id === user?.id);
   const trainingOffDayStates = offDayStates.filter(
     (state) => state.hasTrainingBooking || state.hasPendingTrainingBooking
   );
   const selectedTrainingDeclineState = trainingDeclineDayOfWeek === null
     ? undefined
     : offDayStates.find((state) => state.day_of_week === trainingDeclineDayOfWeek);
-  const canDeclineTrainingFromDetails = !isEndState && (hasElevatedAccess || timesheet.user_id === user?.id);
+  const payrollEditClassification = classifyTimesheetPayImpact({
+    currentDays: canonicalPayWeekFromEntries(originalData?.entries || entries),
+    proposedDays: canonicalPayWeekFromEntries(displayEntries),
+    proposedEntries: displayEntries,
+  });
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -1140,6 +1178,20 @@ export default function ViewTimesheetPage() {
         </div>
       )}
 
+      {latestPayrollEdit ? (
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/20">
+          <CardHeader>
+            <CardTitle className="text-amber-900 dark:text-amber-400">Payroll amendment</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-amber-800 dark:text-amber-300">
+              Amended by payroll on {formatDate(latestPayrollEdit.created_at)}: {latestPayrollEdit.reason}
+              {latestPayrollEdit.pay_impact ? ' Pay figures were rebuilt.' : ' Costing only — pay figures were not changed.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {timesheet.manager_comments && (
         <Card className="bg-white dark:bg-slate-900 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
           <CardHeader>
@@ -1173,7 +1225,7 @@ export default function ViewTimesheetPage() {
                   {state.hasPendingTrainingBooking && (
                     <p className="text-sm text-sky-700 dark:text-sky-300">{getPendingTrainingLabel(state)}</p>
                   )}
-                  {isEndState && state.hasTrainingBooking && (
+                  {payrollGateLocked && state.hasTrainingBooking && (
                     <p className="mt-1 text-xs text-muted-foreground">
                       This timesheet is locked, so Training is informational only.
                     </p>
@@ -1212,12 +1264,12 @@ export default function ViewTimesheetPage() {
                   : (timesheet.reg_number ? `Registration: ${timesheet.reg_number}` : '')}
               </CardDescription>
             </div>
-            {!editing && ((timesheet.status === 'draft' || timesheet.status === 'rejected') || canEditApproved) && !isEndState && (
+            {canStartPayrollEdit || (!editing && (timesheet.status === 'draft' || timesheet.status === 'rejected')) ? (
               <Button variant="outline" onClick={() => setEditing(true)} className="w-full sm:w-auto">
                 <Edit2 className="h-4 w-4 mr-2" />
                 Edit
               </Button>
-            )}
+            ) : null}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1633,27 +1685,24 @@ export default function ViewTimesheetPage() {
             </p>
           </div>
 
-          {/* Warning for payroll-received timesheet editing */}
-          {editing && timesheet.status === 'approved' && dataChanged && (
+          {editing && canPayrollEdit && dataChanged && (
             <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
                 <div>
                   <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
-                    Editing Payroll Received Timesheet
+                    Payroll edit
                   </p>
                   <p className="text-sm text-amber-800 dark:text-amber-200 mt-1">
-                    You are editing a payroll received timesheet. When you finish, you must add a comment and mark it as &ldquo;Adjusted&rdquo; to notify the employee and selected managers.
+                    Save with a reason. Job-number-only changes keep both gates. Hour or pay changes keep Payroll Received and clear Manager Approved.
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 justify-end">
-            {/* Save button for draft/rejected editing. Approved dirty edits must use Mark as Adjusted. */}
-            {canEdit && !(timesheet.status === 'approved' && dataChanged) && (
+            {canEdit && (
               <Button
                 variant="outline"
                 onClick={() => {
@@ -1663,19 +1712,6 @@ export default function ViewTimesheetPage() {
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            )}
-
-            {/* Mark as Adjusted button (for managers editing approved timesheets) */}
-            {editing && timesheet.status === 'approved' && dataChanged && hasElevatedAccess && (
-              <Button
-                variant="outline"
-                onClick={() => setShowAdjustmentModal(true)}
-                disabled={saving}
-                className="border-amber-500 text-amber-600 hover:bg-amber-500 hover:text-white active:scale-95 transition-all"
-              >
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                Mark as Adjusted
               </Button>
             )}
             
@@ -1691,29 +1727,27 @@ export default function ViewTimesheetPage() {
             )}
 
             {/* Approve/Reject buttons for pending timesheets */}
-            {canApprove && (
-              <>
-                {timesheet.status === 'submitted' && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowRejectDialog(true)}
-                    disabled={saving}
-                    className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                  >
-                    <XCircle className="h-4 w-4 mr-2" />
-                    Reject
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  onClick={handleApprove}
-                  disabled={saving}
-                  className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
-                >
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                  {timesheet.status === 'adjusted' ? 'Re-mark Payroll Received' : 'Payroll Received'}
-                </Button>
-              </>
+            {canReject && !editing && (
+              <Button
+                variant="outline"
+                onClick={() => setShowRejectDialog(true)}
+                disabled={saving}
+                className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
+              >
+                <XCircle className="h-4 w-4 mr-2" />
+                Reject
+              </Button>
+            )}
+            {canApprove && !editing && (
+              <Button
+                variant="outline"
+                onClick={handleApprove}
+                disabled={saving}
+                className="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                {timesheet.status === 'adjusted' ? 'Re-mark Payroll Received' : 'Payroll Received'}
+              </Button>
             )}
 
             {/* Mark as Manager Approved button (only if NOT editing) */}
@@ -1739,9 +1773,7 @@ export default function ViewTimesheetPage() {
             <AlertDialogTitle>Mark Timesheet as Manager Approved</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to mark this timesheet as Manager Approved?
-              <br />
-              <br />
-              <strong>Warning:</strong> Once marked as Manager Approved, this action cannot be undone. This indicates that the timesheet has been sent to payroll for payment.
+              Payroll Received can still happen afterwards. Reject stays available until both gates are complete.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1798,12 +1830,26 @@ export default function ViewTimesheetPage() {
 
       {/* Adjustment Modal */}
       {timesheet && (
-        <TimesheetAdjustmentModal
-          open={showAdjustmentModal}
-          onClose={() => setShowAdjustmentModal(false)}
-          onConfirm={handleAdjust}
+        <TimesheetPayrollEditModal
+          open={showPayrollEditModal}
+          onClose={() => setShowPayrollEditModal(false)}
+          onConfirm={handlePayrollEdit}
           employeeName={(timesheet as Timesheet & { profile?: { full_name?: string | null } }).profile?.full_name || 'Employee'}
           weekEnding={formatDate(timesheet.week_ending)}
+          payImpact={payrollEditClassification.payImpact}
+          isComplete={isTimesheetComplete(timesheet.status)}
+          beforeTotals={payrollSnapshot ? {
+            basicHours: minutesToHours(payrollSnapshot.basic_minutes),
+            overtimeHours: minutesToHours(payrollSnapshot.overtime_minutes),
+            doubleTimeHours: minutesToHours(payrollSnapshot.double_time_minutes),
+            subsistenceDays: payrollSnapshot.subsistence_days,
+          } : null}
+          afterTotals={payrollPreview ? {
+            basicHours: minutesToHours(payrollPreview.basicMinutes),
+            overtimeHours: minutesToHours(payrollPreview.overtimeMinutes),
+            doubleTimeHours: minutesToHours(payrollPreview.doubleTimeMinutes),
+            subsistenceDays: payrollPreview.subsistenceDays,
+          } : null}
         />
       )}
 

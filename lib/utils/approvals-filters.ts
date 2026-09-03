@@ -1,6 +1,7 @@
 import type { AbsenceStatusFilter, TimesheetStatusFilter } from '@/types/common';
-import type { Timesheet } from '@/types/timesheet';
+import type { TimesheetStatus } from '@/types/timesheet';
 import type { AbsenceSecondaryRoleTier } from '@/types/absence-permissions';
+import { getApprovalsTimesheetStatuses as mapApprovalsTimesheetStatuses } from '@/lib/utils/timesheet-status-display';
 
 export interface ApprovalsDefaultStatusFilters {
   timesheets: TimesheetStatusFilter;
@@ -16,13 +17,13 @@ export function getApprovalsDefaultStatusFilters(
 ): ApprovalsDefaultStatusFilters {
   if (isAccountsTeam(teamName)) {
     return {
-      timesheets: 'pending',
+      timesheets: 'awaiting_payroll',
       absences: 'approved',
     };
   }
 
   return {
-    timesheets: 'approved',
+    timesheets: 'awaiting_manager',
     absences: 'pending',
   };
 }
@@ -42,16 +43,8 @@ export function canLoadApprovalsFilterDirectory(
   );
 }
 
-const APPROVALS_TIMESHEET_STATUS_MAP: Record<TimesheetStatusFilter, readonly Timesheet['status'][]> = {
-  all: ['submitted', 'approved', 'rejected', 'processed', 'adjusted'],
-  draft: ['draft'],
-  pending: ['submitted'],
-  approved: ['approved'],
-  rejected: ['rejected'],
-  processed: ['processed'],
-  adjusted: ['adjusted'],
-};
-
-export function getApprovalsTimesheetStatuses(filter: TimesheetStatusFilter): readonly Timesheet['status'][] {
-  return APPROVALS_TIMESHEET_STATUS_MAP[filter];
+export function getApprovalsTimesheetStatuses(
+  filter: TimesheetStatusFilter
+): readonly TimesheetStatus[] {
+  return mapApprovalsTimesheetStatuses(filter);
 }

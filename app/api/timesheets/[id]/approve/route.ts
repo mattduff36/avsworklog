@@ -29,9 +29,11 @@ export async function POST(
     }
 
     let idempotencyKey = '';
+    let expectedStatus: string | undefined;
     try {
-      const body = (await request.json()) as { idempotency_key?: string };
+      const body = (await request.json()) as { idempotency_key?: string; expected_status?: string };
       idempotencyKey = (body.idempotency_key || '').trim();
+      expectedStatus = body.expected_status?.trim() || undefined;
     } catch {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
@@ -79,11 +81,12 @@ export async function POST(
       timesheetId,
       actorId: effectiveRole.user_id,
       idempotencyKey,
+      expectedStatus,
     });
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Failed to approve timesheet';
-    const expected = /not found|cannot be approved|configuration|idempotency/i.test(message);
+    const expected = /not found|cannot be approved|cannot be marked Payroll Received|configuration|idempotency|status changed/i.test(message);
     if (!expected) {
       await logServerError({
         error: error as Error,

@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
-import { logServerError } from '@/lib/utils/server-error-logger';
 import {
-  TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
-  resolveTimesheetProcessAction,
-} from '@/lib/utils/timesheet-process';
+  TimesheetGateConflictError,
+  applyTimesheetManagerApproved,
+} from '@/lib/server/timesheet-gate-mutations';
+import { getEffectiveRole } from '@/lib/utils/view-as';
+import { logServerError } from '@/lib/utils/server-error-logger';
+import { TIMESHEET_PROCESS_STATUS_CONFLICT_CODE } from '@/lib/utils/timesheet-process';
 
 export async function POST(
   request: NextRequest,
@@ -18,6 +20,11 @@ export async function POST(
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const effectiveRole = await getEffectiveRole();
+    if (!effectiveRole.user_id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -38,10 +45,13 @@ export async function POST(
       return NextResponse.json({ error: 'Timesheet not found' }, { status: 404 });
     }
 
-    const canAuthoriseTarget = await canCurrentActorAuthoriseTimesheetTarget({
-      profileId: typedTarget.user_id,
-      teamId: typedTarget.employee?.team_id || null,
-    });
+    const canAuthoriseTarget = await canCurrentActorAuthoriseTimesheetTarget(
+      {
+        profileId: typedTarget.user_id,
+        teamId: typedTarget.employee?.team_id || null,
+      },
+      { effectiveRole }
+    );
     if (!canAuthoriseTarget) {
       return NextResponse.json(
         { error: 'You cannot process this employee’s timesheet' },
@@ -49,55 +59,33 @@ export async function POST(
       );
     }
 
-    const processDecision = resolveTimesheetProcessAction(typedTarget.status);
-    if (processDecision.type === 'already_processed') {
-      return NextResponse.json({ success: true, alreadyProcessed: true });
-    }
-    if (processDecision.type === 'conflict') {
-      return NextResponse.json(
-        {
-          error: processDecision.message,
-          code: TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
-          currentStatus: typedTarget.status,
-        },
-        { status: 409 }
-      );
-    }
-
-    const { data: updated, error: updateError } = await admin
-      .from('timesheets')
-      .update({
-        status: 'processed',
-        processed_at: new Date().toISOString(),
-      })
-      .eq('id', timesheetId)
-      .eq('status', 'approved')
-      .select('id')
-      .maybeSingle();
-
-    if (updateError) {
-      throw updateError;
-    }
-    if (!updated) {
-      const { data: latest } = await admin
-        .from('timesheets')
-        .select('status')
-        .eq('id', timesheetId)
-        .maybeSingle();
-      if (latest?.status === 'processed') {
-        return NextResponse.json({ success: true, alreadyProcessed: true });
+    let expectedStatus = typedTarget.status;
+    try {
+      const body = (await request.json()) as { expected_status?: string };
+      if (typeof body.expected_status === 'string' && body.expected_status.trim()) {
+        expectedStatus = body.expected_status.trim();
       }
+    } catch {
+      // optional body
+    }
+
+    const result = await applyTimesheetManagerApproved({
+      timesheetId,
+      actorId: effectiveRole.user_id,
+      expectedStatus,
+    });
+    return NextResponse.json({ success: true, alreadyProcessed: result.alreadyProcessed, status: result.status });
+  } catch (error) {
+    if (error instanceof TimesheetGateConflictError) {
       return NextResponse.json(
         {
-          error: 'Timesheet status changed before it could be processed',
+          error: error.message,
           code: TIMESHEET_PROCESS_STATUS_CONFLICT_CODE,
+          currentStatus: error.currentStatus,
         },
         { status: 409 }
       );
     }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
     await logServerError({
       error: error as Error,
       request,

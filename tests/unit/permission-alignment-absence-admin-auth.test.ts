@@ -30,16 +30,20 @@ describe('Permission alignment absence and admin auth hardening', () => {
     );
   });
 
-  it('APPROVAL-NOTIFY-001 uses admin client for reject/adjust notifications', () => {
+  it('TS-FD-001 writes reject notifications in the gate transaction and does not mutate via Adjust', () => {
     const reject = readProjectFile('app/api/timesheets/[id]/reject/route.ts');
     const adjust = readProjectFile('app/api/timesheets/[id]/adjust/route.ts');
+    const gates = readProjectFile('lib/server/timesheet-gate-mutations.ts');
 
-    expect(reject).toMatch(/await adminClient\s*\n\s*\.from\('messages'\)/);
-    expect(reject).toMatch(/await adminClient\s*\n\s*\.from\('message_recipients'\)/);
+    expect(reject).toContain('applyTimesheetReject');
+    expect(reject).not.toMatch(/\.from\('messages'\)/);
     expect(reject).not.toMatch(/const db = supabase/);
-    expect(adjust).toMatch(/await admin\s*\n\s*\.from\('messages'\)/);
-    expect(adjust).toMatch(/await admin\s*\n\s*\.from\('message_recipients'\)/);
-    expect(adjust).toContain('blocked by Toolbox Talks Level 4');
+    expect(adjust).toContain('TIMESHEET_ADJUST_RETIRED_CODE');
+    expect(adjust).not.toMatch(/\.from\('messages'\)/);
+    expect(adjust).not.toContain('applyTimesheetAdjustmentMutation');
+    expect(gates).toContain('INSERT INTO public.messages');
+    expect(gates).toContain('INSERT INTO public.message_recipients');
+    expect(gates).toContain("'timesheet_gate'");
   });
 
   it('APPROVAL-ADMIN-GLOBAL-001 keeps admin-tier override in SQL and server scope', () => {

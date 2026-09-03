@@ -24,28 +24,28 @@ describe('canLoadApprovalsFilterDirectory', () => {
 describe('getApprovalsDefaultStatusFilters', () => {
   it('uses the Accounts defaults for Accounts team members', () => {
     expect(getApprovalsDefaultStatusFilters('Accounts')).toEqual({
-      timesheets: 'pending',
+      timesheets: 'awaiting_payroll',
       absences: 'approved',
     });
   });
 
   it('treats team names case-insensitively', () => {
     expect(getApprovalsDefaultStatusFilters('aCCoUnts')).toEqual({
-      timesheets: 'pending',
+      timesheets: 'awaiting_payroll',
       absences: 'approved',
     });
   });
 
   it('uses the non-Accounts defaults for every other team', () => {
     expect(getApprovalsDefaultStatusFilters('Operations')).toEqual({
-      timesheets: 'approved',
+      timesheets: 'awaiting_manager',
       absences: 'pending',
     });
   });
 
   it('falls back to the non-Accounts defaults when no team is present', () => {
     expect(getApprovalsDefaultStatusFilters(null)).toEqual({
-      timesheets: 'approved',
+      timesheets: 'awaiting_manager',
       absences: 'pending',
     });
   });
@@ -69,6 +69,7 @@ describe('shouldIncludeTimesheetInAllSubmittedFilter', () => {
   it('includes submitted timesheet statuses', () => {
     expect(shouldIncludeTimesheetInAllSubmittedFilter('submitted')).toBe(true);
     expect(shouldIncludeTimesheetInAllSubmittedFilter('approved')).toBe(true);
+    expect(shouldIncludeTimesheetInAllSubmittedFilter('manager_approved')).toBe(true);
     expect(shouldIncludeTimesheetInAllSubmittedFilter('processed')).toBe(true);
   });
 });
@@ -85,6 +86,9 @@ describe('getApprovalsTimesheetStatuses', () => {
       'rejected',
       'processed',
       'adjusted',
+      'manager_approved',
     ]);
+    expect(getApprovalsTimesheetStatuses('awaiting_payroll')).toEqual(['submitted', 'manager_approved']);
+    expect(getApprovalsTimesheetStatuses('awaiting_manager')).toEqual(['submitted', 'approved']);
   });
 });

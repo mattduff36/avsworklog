@@ -27,6 +27,22 @@ vi.mock('@/lib/utils/email', () => ({
 vi.mock('@/lib/utils/server-error-logger', () => ({
   logServerError: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock('@/lib/server/timesheet-gate-mutations', () => ({
+  applyTimesheetReject: vi.fn().mockResolvedValue({
+    userId: 'employee-id',
+    weekEnding: '2026-08-30',
+    previousStatus: 'submitted',
+    payrollReceivedBy: null,
+  }),
+  TimesheetGateConflictError: class TimesheetGateConflictError extends Error {
+    currentStatus: string | null;
+    constructor(message: string, currentStatus: string | null = null) {
+      super(message);
+      this.name = 'TimesheetGateConflictError';
+      this.currentStatus = currentStatus;
+    }
+  },
+}));
 
 function mockAuthenticatedClients(userId: string, adminClient: Record<string, unknown>) {
   vi.mocked(createClient).mockResolvedValue({
@@ -271,7 +287,7 @@ describe('POST /api/timesheets/[id]/reject', () => {
   });
 
   describe('Status validation', () => {
-    it('should return 400 if timesheet is not in submitted status', async () => {
+    it('TS-GATE-003 allows reject from Payroll Received', async () => {
       const manager = createMockManager();
       const timesheet = createMockTimesheet({ status: 'approved' });
       
@@ -317,8 +333,9 @@ describe('POST /api/timesheets/[id]/reject', () => {
       const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
       const data = await response.json();
 
-      expect(response.status).toBe(400);
-      expect(data.error).toContain('submitted');
+      expect(response.status).toBe(200);
+      const { applyTimesheetReject } = await import('@/lib/server/timesheet-gate-mutations');
+      expect(applyTimesheetReject).toHaveBeenCalled();
     });
   });
 
@@ -386,16 +403,11 @@ describe('POST /api/timesheets/[id]/reject', () => {
 
       await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
 
-      expect(updateMock).toHaveBeenCalledWith(
+      const { applyTimesheetReject } = await import('@/lib/server/timesheet-gate-mutations');
+      expect(applyTimesheetReject).toHaveBeenCalledWith(
         expect.objectContaining({
-          status: 'rejected',
-          reviewed_by: manager.id,
-          manager_comments: 'Please fix the hours',
-        })
-      );
-      expect(updateMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          reviewed_at: expect.any(String),
+          timesheetId: 'test-id',
+          comments: 'Please fix the hours',
         })
       );
     });
@@ -466,19 +478,11 @@ describe('POST /api/timesheets/[id]/reject', () => {
 
       await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
 
-      expect(messageInsertMock).toHaveBeenCalledWith(
+      const { applyTimesheetReject } = await import('@/lib/server/timesheet-gate-mutations');
+      expect(applyTimesheetReject).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: 'NOTIFICATION',
-          subject: expect.stringContaining('Rejected'),
-          created_via: 'timesheet_rejection',
-          module_key: 'timesheets',
-        })
-      );
-      expect(recipientInsertMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message_id: 'message-id',
-          user_id: 'employee-id',
-          status: 'PENDING',
+          timesheetId: 'test-id',
+          comments: 'Please fix the hours',
         })
       );
     });

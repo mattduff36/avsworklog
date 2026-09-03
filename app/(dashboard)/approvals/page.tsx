@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package, Edit2 } from 'lucide-react';
+import { FileText, Clock, CheckCircle2, XCircle, User, Filter, Calendar, Package } from 'lucide-react';
 import { ColumnVisibilityMenu, DataViewToggle } from '@/components/ui/data-view-controls';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils/date';
@@ -50,6 +50,7 @@ import { AbsencesApprovalTable, ABSENCE_COLUMN_VISIBILITY_STORAGE_KEY, DEFAULT_A
 import type { AbsenceColumnVisibility } from './components/AbsencesApprovalTable';
 import { ProcessTimesheetModal } from './components/ProcessTimesheetModal';
 import { TimesheetSubmittedActions } from './components/TimesheetSubmittedActions';
+import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
 import { SectionLoader } from '@/components/ui/section-loader';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
 import {
@@ -70,6 +71,7 @@ import {
   getApprovalsDefaultStatusFilters,
   shouldIncludeTimesheetInAllSubmittedFilter,
 } from '@/lib/utils/approvals-filters';
+import { timesheetMatchesStatusFilter } from '@/lib/utils/timesheet-status-display';
 import {
   createApprovalInFlightGuard,
   isAlreadyApprovedConflict,
@@ -493,9 +495,7 @@ function ApprovalsContent() {
 
       if (timesheetFilter === 'all') {
         if (!shouldIncludeTimesheetInAllSubmittedFilter(timesheet.status)) return false;
-      } else if (timesheetFilter === 'pending') {
-        if (timesheet.status !== 'submitted') return false;
-      } else if (timesheet.status !== timesheetFilter) {
+      } else if (!timesheetMatchesStatusFilter(timesheet.status, timesheetFilter)) {
         return false;
       }
       if (dateFrom && timesheet.week_ending < dateFrom) return false;
@@ -721,13 +721,24 @@ function ApprovalsContent() {
     });
 
     try {
+      const expectedStatus = timesheets.find((row) => row.id === id)?.status;
       const response = await fetch(`/api/timesheets/${id}/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idempotency_key: crypto.randomUUID() }),
+        body: JSON.stringify({
+          idempotency_key: crypto.randomUUID(),
+          expected_status: expectedStatus,
+        }),
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'Failed to approve timesheet');
+      if (!response.ok) {
+        if (response.status === 409) {
+          toast.error(payload.error || 'Timesheet status changed. Reloading.');
+          await fetchApprovals();
+          return;
+        }
+        throw new Error(payload.error || 'Failed to approve timesheet');
+      }
 
       toast.success('Timesheet marked as Payroll Received');
       await fetchApprovals();
@@ -763,7 +774,14 @@ function ApprovalsContent() {
         body: JSON.stringify({ comments }),
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || 'Failed to reject timesheet');
+      if (!response.ok) {
+        if (response.status === 409) {
+          toast.error(payload.error || 'Timesheet status changed. Reloading.');
+          await fetchApprovals();
+          return;
+        }
+        throw new Error(payload.error || 'Failed to reject timesheet');
+      }
 
       // Refresh data
       await fetchApprovals();
@@ -787,8 +805,11 @@ function ApprovalsContent() {
 
     try {
       setProcessingInProgress(true);
+      const expectedStatus = timesheets.find((row) => row.id === timesheetId)?.status;
       const response = await fetch(`/api/timesheets/${timesheetId}/process`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expected_status: expectedStatus }),
       });
       const payload = (await response.json()) as {
         error?: string;
@@ -868,10 +889,16 @@ function ApprovalsContent() {
         return 'Pending';
       case 'approved':
         return 'Payroll Received';
+      case 'manager_approved':
+        return 'Manager Approved';
+      case 'awaiting_payroll':
+        return 'Awaiting Payroll';
+      case 'awaiting_manager':
+        return 'Awaiting Manager';
       case 'rejected':
         return 'Rejected';
       case 'processed':
-        return 'Manager Approved';
+        return 'Complete';
       case 'adjusted':
         return 'Adjusted';
       case 'all':
@@ -883,7 +910,17 @@ function ApprovalsContent() {
 
   const getFilterOptions = (): StatusFilter[] =>
     activeTab === 'timesheets'
-      ? ['pending', 'approved', 'rejected', 'processed', 'adjusted', 'all']
+      ? [
+          'awaiting_payroll',
+          'awaiting_manager',
+          'pending',
+          'approved',
+          'manager_approved',
+          'rejected',
+          'processed',
+          'adjusted',
+          'all',
+        ]
       : ['pending', 'approved', 'processed', 'rejected', 'all'];
 
   const handleFilterChange = (filter: StatusFilter) => {
@@ -914,14 +951,16 @@ function ApprovalsContent() {
 
   const approvalsStatusHelperText = (() => {
     if (
-      (activeTab === 'timesheets' && timesheetFilter === 'pending') ||
+      (activeTab === 'timesheets' &&
+        (timesheetFilter === 'awaiting_payroll' || timesheetFilter === 'pending')) ||
       (activeTab === 'absences' && absenceStatusFilter === 'approved')
     ) {
       return 'These approvals are designed to be processed by Payroll';
     }
 
     if (
-      (activeTab === 'timesheets' && timesheetFilter === 'approved') ||
+      (activeTab === 'timesheets' &&
+        (timesheetFilter === 'awaiting_manager' || timesheetFilter === 'approved')) ||
       (activeTab === 'absences' && absenceStatusFilter === 'pending')
     ) {
       return 'These approvals are designed to be processed by Team Managers';
@@ -935,56 +974,7 @@ function ApprovalsContent() {
     void setTabParam(tab);
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'submitted':
-        return (
-          <Badge variant="warning">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
-        );
-      case 'approved':
-        return (
-          <Badge variant="success" className="bg-green-500/10 text-green-600 border-green-500/20">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
-            Payroll Received
-          </Badge>
-        );
-      case 'rejected':
-        return (
-          <Badge variant="destructive">
-            <XCircle className="h-3 w-3 mr-1" />
-            Rejected
-          </Badge>
-        );
-      case 'processed':
-        return (
-          <Badge variant="default" className="bg-blue-500/10 text-blue-300 border-blue-500/20 hover:bg-blue-500/20">
-            Manager Approved
-          </Badge>
-        );
-      case 'adjusted':
-        return (
-          <Badge variant="default" className="bg-purple-500/10 text-purple-600 border-purple-500/20">
-            Adjusted
-          </Badge>
-        );
-      case 'draft':
-        return (
-          <Badge variant="secondary">
-            <FileText className="h-3 w-3 mr-1" />
-            Draft
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="secondary">
-            {status}
-          </Badge>
-        );
-    }
-  };
+  const getStatusBadge = (status: string) => <TimesheetStatusChips status={status} />;
 
   return (
     <AppPageShell>
@@ -1229,6 +1219,7 @@ function ApprovalsContent() {
                       visibleCount={visibleTimesheetCount}
                       busyTimesheetIds={busyTimesheetIds}
                       showPayrollReceived={canMarkPayrollReceived && canAuthoriseTimesheets}
+                      showPayrollEdit={canMarkPayrollReceived && canAuthoriseTimesheets}
                     />
                   </div>
                 )}
@@ -1269,50 +1260,22 @@ function ApprovalsContent() {
                                 <p className="mt-1 whitespace-pre-line">{`Total: ${cardTotalDisplay}`}</p>
                               )}
                             </div>
-                            {timesheet.status === 'submitted' && (
-                              <div onClick={(e) => e.preventDefault()}>
-                                <TimesheetSubmittedActions
-                                  timesheetId={timesheet.id}
-                                  busy={busyTimesheetIds.has(timesheet.id)}
-                                  showPayrollReceived={canMarkPayrollReceived && canAuthoriseTimesheets}
-                                  onApprove={(id) => { void handleQuickApprove('timesheet', id); }}
-                                  onReject={(id) => { void handleQuickReject('timesheet', id); }}
-                                  className="flex gap-2"
-                                  rejectClassName="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
-                                  approveClassName="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
-                                />
-                              </div>
-                            )}
-                            {timesheet.status === 'approved' && (
-                              <div className="flex gap-2" onClick={(e) => e.preventDefault()}>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    router.push(`/timesheets/${timesheet.id}`);
-                                  }}
-                                  className="border-blue-300 text-blue-500 hover:bg-blue-500 hover:text-white hover:border-blue-500 active:bg-blue-600 active:scale-95 transition-all"
-                                >
-                                  <Edit2 className="h-4 w-4 mr-1" />
-                                  Adjust
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    handleOpenProcessModal(timesheet.id);
-                                  }}
-                                  className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/20 hover:text-avs-yellow hover:border-avs-yellow active:bg-avs-yellow/30 active:text-avs-yellow active:scale-95 transition-all"
-                                >
-                                  <Package className="h-4 w-4 mr-1" />
-                                  Manager Approved
-                                </Button>
-                              </div>
-                            )}
+                            <div onClick={(e) => e.preventDefault()}>
+                              <TimesheetSubmittedActions
+                                timesheetId={timesheet.id}
+                                status={timesheet.status}
+                                busy={busyTimesheetIds.has(timesheet.id)}
+                                showPayrollReceived={canMarkPayrollReceived && canAuthoriseTimesheets}
+                                showPayrollEdit={canMarkPayrollReceived && canAuthoriseTimesheets}
+                                onApprove={(id) => { void handleQuickApprove('timesheet', id); }}
+                                onReject={(id) => { void handleQuickReject('timesheet', id); }}
+                                onProcess={handleOpenProcessModal}
+                                onEdit={(id) => router.push(`/timesheets/${id}`)}
+                                className="flex gap-2"
+                                rejectClassName="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all"
+                                approveClassName="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all"
+                              />
+                            </div>
                           </div>
                         </CardContent>
                       </Card>

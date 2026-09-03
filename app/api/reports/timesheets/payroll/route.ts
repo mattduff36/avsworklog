@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
           bank_holiday
         )
       `)
-      .eq('status', 'approved')
+      .in('status', ['approved', 'processed'])
       .order('week_ending', { ascending: false });
 
     // Apply filters
@@ -283,7 +283,7 @@ export async function GET(request: NextRequest) {
         )
       `)
       .in('id', scopedIds)
-      .eq('status', 'approved')
+      .in('status', ['approved', 'processed'])
       .order('week_ending', { ascending: false });
     if (hydrateError) {
       console.error('Error hydrating scoped payroll snapshots:', hydrateError);

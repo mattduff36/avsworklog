@@ -19,6 +19,7 @@ import {
 } from '@/lib/utils/timesheet-off-days';
 import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
 import type { WorkShiftPattern } from '@/types/work-shifts';
+import { hasPayrollReceivedGate, resolveTimesheetPayrollReceivedAction } from '@/lib/utils/timesheet-gates';
 
 const { Client } = pg;
 export const PAYROLL_ENGINE_VERSION = 2;
@@ -40,13 +41,14 @@ export interface PayrollPgClient {
 
 export type PayrollPgClientFactory = () => PayrollPgClient;
 
-interface TimesheetRow {
+export interface TimesheetPayrollLockRow {
   id: string;
   user_id: string;
   week_ending: string;
   status: string;
   team_id: string | null;
   current_payroll_snapshot_id: string | null;
+  updated_at: string | null;
 }
 
 interface EntryRow {
@@ -88,11 +90,12 @@ export interface ApproveTimesheetPayrollInput {
   timesheetId: string;
   actorId: string;
   idempotencyKey: string;
+  expectedStatus?: string;
 }
 
 export interface ApproveTimesheetPayrollResult {
   timesheetId: string;
-  status: 'approved';
+  status: 'approved' | 'processed';
   legacy: boolean;
   snapshotId: string | null;
   revision: number | null;
@@ -136,7 +139,7 @@ function toNumber(value: string | number | null): number {
 
 async function resolveRule(
   client: PayrollPgClient,
-  timesheet: TimesheetRow
+  timesheet: TimesheetPayrollLockRow
 ): Promise<{ row: RuleResolutionRow; rule: PayrollRuleConfiguration }> {
   const resolution = await client.query<RuleResolutionRow>(
     `
@@ -309,125 +312,15 @@ async function loadCanonicalLeaveByDay(
   );
 }
 
-async function approveInTransaction(
+export async function insertPayrollSnapshotForLockedTimesheet(
   client: PayrollPgClient,
-  input: ApproveTimesheetPayrollInput
-): Promise<ApproveTimesheetPayrollResult> {
-  const existing = await client.query<{
-    id: string;
-    timesheet_id: string;
-    revision: number;
-    source_evidence: { breakdown?: PayrollWeekBreakdown };
-  }>(
-    `
-      SELECT id, timesheet_id, revision, source_evidence
-      FROM public.timesheet_payroll_snapshots
-      WHERE idempotency_key = $1
-    `,
-    [input.idempotencyKey]
-  );
-  if (existing.rows[0]) {
-    const snapshot = existing.rows[0];
-    if (snapshot.timesheet_id !== input.timesheetId) {
-      throw new Error('Idempotency key already belongs to another timesheet.');
-    }
-    return {
-      timesheetId: input.timesheetId,
-      status: 'approved',
-      legacy: false,
-      snapshotId: snapshot.id,
-      revision: snapshot.revision,
-      breakdown: snapshot.source_evidence.breakdown ?? null,
-    };
+  input: {
+    timesheet: TimesheetPayrollLockRow;
+    actorId: string;
+    idempotencyKey: string;
   }
-
-  const timesheetResult = await client.query<TimesheetRow>(
-    `
-      SELECT
-        timesheet.id,
-        timesheet.user_id,
-        timesheet.week_ending::text,
-        timesheet.status,
-        profile.team_id,
-        timesheet.current_payroll_snapshot_id
-      FROM public.timesheets timesheet
-      JOIN public.profiles profile ON profile.id = timesheet.user_id
-      WHERE timesheet.id = $1
-      FOR UPDATE OF timesheet
-    `,
-    [input.timesheetId]
-  );
-  const timesheet = timesheetResult.rows[0];
-  if (!timesheet) throw new Error('Timesheet not found.');
-  // Concurrent/double-click approve: already approved is an idempotent success (no writes).
-  if (timesheet.status === 'approved') {
-    if (!timesheet.current_payroll_snapshot_id) {
-      return {
-        timesheetId: timesheet.id,
-        status: 'approved',
-        legacy: true,
-        snapshotId: null,
-        revision: null,
-        breakdown: null,
-      };
-    }
-
-    const snapshotResult = await client.query<{ id: string; revision: number }>(
-      `
-        SELECT id, revision
-        FROM public.timesheet_payroll_snapshots
-        WHERE id = $1
-          AND timesheet_id = $2
-      `,
-      [timesheet.current_payroll_snapshot_id, timesheet.id]
-    );
-    const snapshot = snapshotResult.rows[0];
-    if (!snapshot) {
-      throw new Error('Approved timesheet snapshot pointer is invalid.');
-    }
-
-    return {
-      timesheetId: timesheet.id,
-      status: 'approved',
-      legacy: false,
-      snapshotId: snapshot.id,
-      revision: snapshot.revision,
-      breakdown: null,
-    };
-  }
-  if (!['submitted', 'adjusted'].includes(timesheet.status)) {
-    throw new Error(`Timesheet cannot be approved from status "${timesheet.status}".`);
-  }
-
-  const rollout = await client.query<{ applies: boolean }>(
-    `
-      SELECT EXISTS (
-        SELECT 1
-        FROM public.payroll_rollout_activations
-        WHERE effective_week_ending <= $1
-      ) AS applies
-    `,
-    [timesheet.week_ending]
-  );
-  if (!rollout.rows[0]?.applies) {
-    await client.query(
-      `
-        UPDATE public.timesheets
-        SET status = 'approved', reviewed_by = $2, reviewed_at = NOW()
-        WHERE id = $1
-      `,
-      [timesheet.id, input.actorId]
-    );
-    return {
-      timesheetId: timesheet.id,
-      status: 'approved',
-      legacy: true,
-      snapshotId: null,
-      revision: null,
-      breakdown: null,
-    };
-  }
-
+): Promise<{ snapshotId: string; revision: number; breakdown: PayrollWeekBreakdown }> {
+  const timesheet = input.timesheet;
   const [{ row: resolution, rule }, entriesResult, leaveByDay, bankHolidays] = await Promise.all([
     resolveRule(client, timesheet),
     client.query<EntryRow>(
@@ -611,22 +504,174 @@ async function approveInTransaction(
     );
   }
 
+  return { snapshotId, revision, breakdown };
+}
+
+async function approveInTransaction(
+  client: PayrollPgClient,
+  input: ApproveTimesheetPayrollInput
+): Promise<ApproveTimesheetPayrollResult> {
+  const existing = await client.query<{
+    id: string;
+    timesheet_id: string;
+    revision: number;
+    source_evidence: { breakdown?: PayrollWeekBreakdown };
+  }>(
+    `
+      SELECT id, timesheet_id, revision, source_evidence
+      FROM public.timesheet_payroll_snapshots
+      WHERE idempotency_key = $1
+    `,
+    [input.idempotencyKey]
+  );
+    if (existing.rows[0]) {
+    const snapshot = existing.rows[0];
+    if (snapshot.timesheet_id !== input.timesheetId) {
+      throw new Error('Idempotency key already belongs to another timesheet.');
+    }
+    const statusResult = await client.query<{ status: string }>(
+      `SELECT status FROM public.timesheets WHERE id = $1`,
+      [input.timesheetId]
+    );
+    const resultStatus = statusResult.rows[0]?.status === 'processed' ? 'processed' : 'approved';
+    return {
+      timesheetId: input.timesheetId,
+      status: resultStatus,
+      legacy: false,
+      snapshotId: snapshot.id,
+      revision: snapshot.revision,
+      breakdown: snapshot.source_evidence.breakdown ?? null,
+    };
+  }
+
+  const timesheetResult = await client.query<TimesheetPayrollLockRow>(
+    `
+      SELECT
+        timesheet.id,
+        timesheet.user_id,
+        timesheet.week_ending::text,
+        timesheet.status,
+        profile.team_id,
+        timesheet.current_payroll_snapshot_id,
+        timesheet.updated_at::text
+      FROM public.timesheets timesheet
+      JOIN public.profiles profile ON profile.id = timesheet.user_id
+      WHERE timesheet.id = $1
+      FOR UPDATE OF timesheet
+    `,
+    [input.timesheetId]
+  );
+  const timesheet = timesheetResult.rows[0];
+  if (!timesheet) throw new Error('Timesheet not found.');
+  if (input.expectedStatus && timesheet.status !== input.expectedStatus) {
+    throw new Error('Timesheet status changed before it could be marked Payroll Received.');
+  }
+
+  const payrollDecision = resolveTimesheetPayrollReceivedAction(timesheet.status);
+  if (payrollDecision.type === 'already_done' || hasPayrollReceivedGate(timesheet.status)) {
+    const resultStatus = timesheet.status === 'processed' ? 'processed' : 'approved';
+    if (!timesheet.current_payroll_snapshot_id) {
+      return {
+        timesheetId: timesheet.id,
+        status: resultStatus,
+        legacy: true,
+        snapshotId: null,
+        revision: null,
+        breakdown: null,
+      };
+    }
+
+    const snapshotResult = await client.query<{ id: string; revision: number }>(
+      `
+        SELECT id, revision
+        FROM public.timesheet_payroll_snapshots
+        WHERE id = $1
+          AND timesheet_id = $2
+      `,
+      [timesheet.current_payroll_snapshot_id, timesheet.id]
+    );
+    const snapshot = snapshotResult.rows[0];
+    if (!snapshot) {
+      throw new Error('Approved timesheet snapshot pointer is invalid.');
+    }
+
+    return {
+      timesheetId: timesheet.id,
+      status: resultStatus,
+      legacy: false,
+      snapshotId: snapshot.id,
+      revision: snapshot.revision,
+      breakdown: null,
+    };
+  }
+  if (payrollDecision.type === 'conflict') {
+    throw new Error(payrollDecision.message);
+  }
+  const nextStatus = payrollDecision.nextStatus;
+
+  const rollout = await client.query<{ applies: boolean }>(
+    `
+      SELECT EXISTS (
+        SELECT 1
+        FROM public.payroll_rollout_activations
+        WHERE effective_week_ending <= $1
+      ) AS applies
+    `,
+    [timesheet.week_ending]
+  );
+  if (!rollout.rows[0]?.applies) {
+    await client.query(
+      `
+        UPDATE public.timesheets
+        SET
+          status = $3,
+          payroll_received_at = COALESCE(payroll_received_at, NOW()),
+          payroll_received_by = COALESCE(payroll_received_by, $2),
+          reviewed_by = $2,
+          reviewed_at = NOW(),
+          processed_at = CASE WHEN $3 = 'processed' THEN COALESCE(processed_at, NOW()) ELSE processed_at END,
+          updated_at = NOW()
+        WHERE id = $1
+      `,
+      [timesheet.id, input.actorId, nextStatus]
+    );
+    return {
+      timesheetId: timesheet.id,
+      status: nextStatus === 'processed' ? 'processed' : 'approved',
+      legacy: true,
+      snapshotId: null,
+      revision: null,
+      breakdown: null,
+    };
+  }
+
+  const { snapshotId, revision, breakdown } = await insertPayrollSnapshotForLockedTimesheet(client, {
+    timesheet,
+    actorId: input.actorId,
+    idempotencyKey: input.idempotencyKey,
+  });
+
+
   await client.query(
     `
       UPDATE public.timesheets
-      SET
-        status = 'approved',
-        reviewed_by = $2,
-        reviewed_at = NOW(),
-        current_payroll_snapshot_id = $3
-      WHERE id = $1
+        SET
+          status = $4,
+          payroll_received_at = COALESCE(payroll_received_at, NOW()),
+          payroll_received_by = COALESCE(payroll_received_by, $2),
+          reviewed_by = $2,
+          reviewed_at = NOW(),
+          processed_at = CASE WHEN $4 = 'processed' THEN COALESCE(processed_at, NOW()) ELSE processed_at END,
+          current_payroll_snapshot_id = $3,
+          updated_at = NOW()
+        WHERE id = $1
     `,
-    [timesheet.id, input.actorId, snapshotId]
+    [timesheet.id, input.actorId, snapshotId, nextStatus]
   );
 
   return {
     timesheetId: timesheet.id,
-    status: 'approved',
+    status: nextStatus === 'processed' ? 'processed' : 'approved',
     legacy: false,
     snapshotId,
     revision,
@@ -681,13 +726,14 @@ export async function previewTimesheetPayroll(
       [input.weekEnding]
     );
     if (!rollout.rows[0]?.applies) return { legacy: true, breakdown: null };
-    const timesheet: TimesheetRow = {
+    const timesheet: TimesheetPayrollLockRow = {
       id: 'preview',
       user_id: input.userId,
       week_ending: input.weekEnding,
       status: 'draft',
       team_id: profileResult.rows[0].team_id,
       current_payroll_snapshot_id: null,
+      updated_at: null,
     };
     const { rule } = await resolveRule(client, timesheet);
     const leaveByDay = await loadCanonicalLeaveByDay(client, input.userId, input.weekEnding);

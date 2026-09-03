@@ -130,6 +130,17 @@ function setupRoute(fixture: RouteFixture = {}) {
         }),
       };
     }
+    if (table === 'timesheet_payroll_edits') {
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            order: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue({ data: [], error: null }),
+            }),
+          }),
+        }),
+      };
+    }
     throw new Error(`Unexpected admin table: ${table}`);
   });
 

@@ -22,7 +22,7 @@ import {
   toPayrollSnapshotPdfData,
 } from '@/lib/pdf/timesheet-payroll-pdf-data';
 
-const SNAPSHOTLESS_PDF_PREVIEW_STATUSES = ['submitted', 'adjusted'] as const;
+const SNAPSHOTLESS_PDF_PREVIEW_STATUSES = ['submitted', 'adjusted', 'manager_approved'] as const;
 
 function allowsSnapshotlessPayrollPreview(status: string): boolean {
   return (SNAPSHOTLESS_PDF_PREVIEW_STATUSES as readonly string[]).includes(status);
@@ -30,7 +30,7 @@ function allowsSnapshotlessPayrollPreview(status: string): boolean {
 
 function shouldPrintLivePayrollPreview(status: string, hasFrozenSnapshot: boolean): boolean {
   if (status === 'adjusted') return true;
-  return status === 'submitted' && !hasFrozenSnapshot;
+  return status === 'submitted' && !hasFrozenSnapshot || status === 'manager_approved';
 }
 
 export async function GET(
@@ -163,6 +163,19 @@ export async function GET(
 
     const employeeName = employee?.full_name || null;
 
+    const { data: payrollEditRows } = await admin
+      .from('timesheet_payroll_edits')
+      .select('reason, created_at, pay_impact')
+      .eq('timesheet_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const latestEdit = (payrollEditRows || [])[0] as
+      | { reason: string; created_at: string; pay_impact: boolean }
+      | undefined;
+    const amendmentBanner = latestEdit
+      ? `Amended by payroll on ${new Date(latestEdit.created_at).toLocaleDateString('en-GB')}: ${latestEdit.reason}${latestEdit.pay_impact ? ' Pay figures were rebuilt.' : ' Costing only — pay figures were not changed.'}`
+      : null;
+
     console.log('PDF Generation Debug:', {
       timesheetId: id,
       userId: typedTimesheet.user_id,
@@ -230,12 +243,14 @@ export async function GET(
             employeeName: employeeName,
             offDayStates,
             payrollSnapshot,
+            amendmentBanner,
           })
         : TimesheetPDF({
             timesheet: typedTimesheetData,
             employeeName: employeeName,
             offDayStates,
             payrollSnapshot,
+            amendmentBanner,
           })
     );
 

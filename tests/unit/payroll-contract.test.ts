@@ -102,16 +102,22 @@ describe('payroll rollout contract', () => {
     const excel = readProjectFile('app/api/reports/timesheets/payroll/route.ts');
     const snapshotRls = readProjectFile('supabase/migrations/20260805_squires_payroll_snapshot_rls_scope.sql');
     const civils = readProjectFile('app/(dashboard)/timesheets/types/civils/CivilsTimesheet.tsx');
+    const payrollEditApi = readProjectFile('app/api/timesheets/[id]/payroll-edit/route.ts');
     const adjustApi = readProjectFile('app/api/timesheets/[id]/adjust/route.ts');
     const entryGuard = readProjectFile('supabase/migrations/20260805_squires_payroll_approved_entry_guard.sql');
     expect(detail).toContain('/api/timesheets/${id}/payroll');
+    expect(detail).toContain('/api/timesheets/${timesheet.id}/payroll-edit');
     expect(detail).toContain('entries: entriesToPersist');
     expect(detail).not.toContain('allowApprovedAdjustment');
-    expect(detail).toContain("!(timesheet.status === 'approved' && dataChanged)");
-    expect(adjustApi).toContain('canCurrentActorAuthoriseTimesheetTarget');
+    expect(detail).toContain('canPayrollEdit && dataChanged');
+    expect(payrollEditApi).toContain('canCurrentActorMarkTimesheetPayrollReceived');
+    expect(payrollEditApi).toContain('applyTimesheetPayrollEdit');
+    expect(adjustApi).toContain('TIMESHEET_ADJUST_RETIRED_CODE');
     expect(adjustApi).not.toContain('filterTimesheetRowsForReportScope');
-    expect(adjustApi).toContain('applyTimesheetAdjustmentMutation');
-    expect(adjustApi).toContain("typedTimesheet.status === 'approved' && entries === null");
+    expect(adjustApi).not.toContain('applyTimesheetAdjustmentMutation');
+    expect(readProjectFile('lib/server/timesheet-payroll-edit.ts')).toContain(
+      'BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE'
+    );
     expect(readProjectFile('lib/server/timesheet-adjust.ts')).toContain("await client.query('BEGIN')");
     expect(readProjectFile('lib/server/timesheet-adjust.ts')).toContain("await client.query('COMMIT')");
     expect(readProjectFile('lib/server/timesheet-adjust.ts')).toContain("await client.query('ROLLBACK')");
@@ -124,7 +130,7 @@ describe('payroll rollout contract', () => {
     expect(excel.indexOf('const admin = createAdminClient()')).toBeLessThan(
       excel.indexOf('current_payroll_snapshot:timesheet_payroll_snapshots')
     );
-    expect(adjustApi).toContain("typedTimesheet.status !== 'adjusted'");
+    expect(adjustApi).toContain('TIMESHEET_ADJUST_RETIRED_CODE');
     expect(entryGuard).toContain('reject_approved_timesheet_entry_mutation');
     expect(snapshotRls).toContain('payroll_is_full_admin()');
     expect(snapshotRls).not.toContain('effective_is_manager_admin()');

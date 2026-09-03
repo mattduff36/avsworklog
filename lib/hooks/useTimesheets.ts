@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { Timesheet } from '@/types/timesheet';
 import { TimesheetStatusFilter } from '@/types/common';
+import { getApprovalsTimesheetStatuses } from '@/lib/utils/timesheet-status-display';
 
 interface TimesheetWithProfile extends Timesheet {
   profile?: {
@@ -42,10 +43,11 @@ export function useTimesheets({ userId, isManager, selectedEmployeeId, statusFil
 
       // Apply status filter
       if (statusFilter && statusFilter !== 'all') {
-        if (statusFilter === 'pending') {
-          query = query.eq('status', 'submitted');
-        } else {
-          query = query.eq('status', statusFilter);
+        const statuses = [...getApprovalsTimesheetStatuses(statusFilter)];
+        if (statuses.length === 1) {
+          query = query.eq('status', statuses[0]);
+        } else if (statuses.length > 1) {
+          query = query.in('status', statuses);
         }
       }
 

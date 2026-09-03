@@ -106,7 +106,7 @@ function shouldPersistEntry(entry: AdjustableTimesheetEntryInput): boolean {
   );
 }
 
-function toPersistableEntries(entries: AdjustableTimesheetEntryInput[]): PersistableEntry[] {
+export function toPersistableEntries(entries: AdjustableTimesheetEntryInput[]): PersistableEntry[] {
   return entries.filter(shouldPersistEntry).map((entry) => {
     const jobNumbers = getNormalizedJobNumbers(
       entry.job_numbers ?? (entry.job_number ? [entry.job_number] : [])
@@ -147,6 +147,78 @@ function toPersistableEntries(entries: AdjustableTimesheetEntryInput[]): Persist
       remarks: persistedRemarks || null,
     };
   });
+}
+
+export async function persistTimesheetEntries(
+  client: AdjustPgClient,
+  timesheetId: string,
+  entries: AdjustableTimesheetEntryInput[]
+): Promise<void> {
+  await client.query(`DELETE FROM public.timesheet_entries WHERE timesheet_id = $1`, [timesheetId]);
+
+  const persistable = toPersistableEntries(entries);
+  for (const entry of persistable) {
+    const inserted = await client.query<{ id: string }>(
+      `
+        INSERT INTO public.timesheet_entries (
+          timesheet_id, day_of_week, time_started, time_finished,
+          operator_travel_hours, operator_yard_hours, operator_working_hours,
+          machine_travel_hours, machine_start_time, machine_finish_time,
+          machine_working_hours, machine_standing_hours, machine_operator_hours,
+          maintenance_breakdown_hours, job_number, did_not_work, working_in_yard,
+          subsistence_payment_required, daily_total, night_shift, bank_holiday, remarks
+        )
+        VALUES (
+          $1, $2, $3, $4,
+          $5, $6, $7,
+          $8, $9, $10,
+          $11, $12, $13,
+          $14, $15, $16, $17,
+          $18, $19, $20, $21, $22
+        )
+        RETURNING id::text
+      `,
+      [
+        timesheetId,
+        entry.day_of_week,
+        entry.time_started,
+        entry.time_finished,
+        entry.operator_travel_hours,
+        entry.operator_yard_hours,
+        entry.operator_working_hours,
+        entry.machine_travel_hours,
+        entry.machine_start_time,
+        entry.machine_finish_time,
+        entry.machine_working_hours,
+        entry.machine_standing_hours,
+        entry.machine_operator_hours,
+        entry.maintenance_breakdown_hours,
+        entry.job_number,
+        entry.did_not_work,
+        entry.working_in_yard,
+        entry.subsistence_payment_required,
+        entry.daily_total,
+        entry.night_shift,
+        entry.bank_holiday,
+        entry.remarks,
+      ]
+    );
+    const entryId = inserted.rows[0]?.id;
+    if (!entryId) {
+      throw new Error('Failed to insert timesheet entry');
+    }
+    for (const [displayOrder, jobNumber] of entry.job_numbers.entries()) {
+      await client.query(
+        `
+          INSERT INTO public.timesheet_entry_job_codes (
+            timesheet_entry_id, job_number, display_order
+          )
+          VALUES ($1, $2, $3)
+        `,
+        [entryId, jobNumber, displayOrder]
+      );
+    }
+  }
 }
 
 export async function applyTimesheetAdjustmentMutation(options: {
@@ -207,74 +279,7 @@ export async function applyTimesheetAdjustmentMutation(options: {
     }
 
     if (options.entries) {
-      await client.query(
-        `DELETE FROM public.timesheet_entries WHERE timesheet_id = $1`,
-        [options.timesheetId]
-      );
-
-      const persistable = toPersistableEntries(options.entries);
-      for (const entry of persistable) {
-        const inserted = await client.query<{ id: string }>(
-          `
-            INSERT INTO public.timesheet_entries (
-              timesheet_id, day_of_week, time_started, time_finished,
-              operator_travel_hours, operator_yard_hours, operator_working_hours,
-              machine_travel_hours, machine_start_time, machine_finish_time,
-              machine_working_hours, machine_standing_hours, machine_operator_hours,
-              maintenance_breakdown_hours, job_number, did_not_work, working_in_yard,
-              subsistence_payment_required, daily_total, night_shift, bank_holiday, remarks
-            )
-            VALUES (
-              $1, $2, $3, $4,
-              $5, $6, $7,
-              $8, $9, $10,
-              $11, $12, $13,
-              $14, $15, $16, $17,
-              $18, $19, $20, $21, $22
-            )
-            RETURNING id::text
-          `,
-          [
-            options.timesheetId,
-            entry.day_of_week,
-            entry.time_started,
-            entry.time_finished,
-            entry.operator_travel_hours,
-            entry.operator_yard_hours,
-            entry.operator_working_hours,
-            entry.machine_travel_hours,
-            entry.machine_start_time,
-            entry.machine_finish_time,
-            entry.machine_working_hours,
-            entry.machine_standing_hours,
-            entry.machine_operator_hours,
-            entry.maintenance_breakdown_hours,
-            entry.job_number,
-            entry.did_not_work,
-            entry.working_in_yard,
-            entry.subsistence_payment_required,
-            entry.daily_total,
-            entry.night_shift,
-            entry.bank_holiday,
-            entry.remarks,
-          ]
-        );
-        const entryId = inserted.rows[0]?.id;
-        if (!entryId) {
-          throw new Error('Failed to insert adjusted timesheet entry');
-        }
-        for (const [displayOrder, jobNumber] of entry.job_numbers.entries()) {
-          await client.query(
-            `
-              INSERT INTO public.timesheet_entry_job_codes (
-                timesheet_entry_id, job_number, display_order
-              )
-              VALUES ($1, $2, $3)
-            `,
-            [entryId, jobNumber, displayOrder]
-          );
-        }
-      }
+      await persistTimesheetEntries(client, options.timesheetId, options.entries);
     }
 
     await client.query('COMMIT');

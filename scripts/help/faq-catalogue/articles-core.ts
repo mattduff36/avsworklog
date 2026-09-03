@@ -230,11 +230,13 @@ Submitted timesheets may be locked until a manager returns them. Approved timesh
 Common statuses include:
 
 - **Draft** - saved but not submitted
-- **Submitted** - waiting for manager review
-- **Approved** - accepted for payroll/processing
-- **Rejected** or returned statuses - needs correction and resubmission
+- **Pending** - submitted, waiting for Payroll Received and/or Manager Approved
+- **Payroll Received** - Accounts have received the week. Only Accounts/Admin can mark this.
+- **Manager Approved** - a manager has signed the week. This can happen before or after Payroll Received.
+- **Complete** - both gates are done. Reject is then closed.
+- **Rejected** - returned to the employee to amend and resubmit
 
-Check Approvals if you are a manager reviewing submitted timesheets.`,
+Accounts can edit job numbers after Payroll Received without clearing gates. Hour or pay changes keep Payroll Received, rebuild the payroll snapshot, and clear Manager Approved. Team managers never see Payroll Received.`,
     4
   ),
   article(

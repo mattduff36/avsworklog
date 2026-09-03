@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils/date';
 import type { Timesheet } from '@/types/timesheet';
+import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
 
 export interface TimesheetsListColumnVisibility {
   employeeId: boolean;
@@ -45,19 +46,7 @@ type SortField = 'name' | 'weekEnding' | 'status' | 'submittedAt';
 type SortDirection = 'asc' | 'desc';
 
 function getStatusBadge(status: string) {
-  const variants = {
-    draft: { variant: 'secondary' as const, label: 'Draft' },
-    submitted: { variant: 'warning' as const, label: 'Pending' },
-    approved: { variant: 'success' as const, label: 'Payroll Received' },
-    rejected: { variant: 'destructive' as const, label: 'Rejected' },
-    processed: { variant: 'default' as const, label: 'Manager Approved' },
-    adjusted: { variant: 'default' as const, label: 'Adjusted' },
-  };
-
-  const config = variants[status as keyof typeof variants] || variants.draft;
-  const blueClasses = status === 'processed' || status === 'adjusted' ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : '';
-
-  return <Badge variant={config.variant} className={blueClasses}>{config.label}</Badge>;
+  return <TimesheetStatusChips status={status} />;
 }
 
 export function TimesheetsListTable({
@@ -175,7 +164,7 @@ export function TimesheetsListTable({
         </TableHeader>
         <TableBody>
           {sortedRows.map((timesheet) => {
-            const canDownload = ['submitted', 'approved', 'processed', 'adjusted'].includes(timesheet.status);
+            const canDownload = ['submitted', 'approved', 'processed', 'adjusted', 'manager_approved'].includes(timesheet.status);
             return (
               <TableRow
                 key={timesheet.id}

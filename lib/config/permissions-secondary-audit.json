@@ -11,8 +11,8 @@
       "byRole": {
         "Contractor": "No module access by rank. Legacy direct RLS has own-user policies, but normal app module gates should block access.",
         "Employee": "Own timesheets only: create, view, update own rows, entries, and job codes. No employee/team filters.",
-        "Supervisor": "Own timesheets plus scoped team visibility when Approvals Level 3+ and absence secondary authorise_bookings_team is effective. Self-approval and out-of-team approval are denied.",
-        "Manager": "Own timesheets plus Approvals-scoped team/all visibility from absence secondary permissions. Timesheet approval mutations run through scoped server APIs rather than broad manager UPDATE RLS.",
+        "Supervisor": "Own timesheets plus scoped team visibility when Approvals Level 3+ and absence secondary authorise_bookings_team is effective. Self-approval and out-of-team approval are denied. Manager Approved and Reject are available until Complete. Payroll Received is Accounts/Admin only.",
+        "Manager": "Own timesheets plus Approvals-scoped team/all visibility from absence secondary permissions. Timesheet approval mutations run through scoped server APIs rather than broad manager UPDATE RLS. Manager Approved can happen before Payroll Received. Payroll Received and payroll edit stay Accounts/Admin only.",
         "Admin": "Full access and unscoped report/admin behavior."
       }
     },
@@ -141,8 +141,8 @@
       "byRole": {
         "Contractor": "No module access by rank.",
         "Employee": "No module access by rank.",
-        "Supervisor": "Approvals Level 3 access. Timesheet and absence authorisation follows effective absence secondary scope, normally TEAM; self-approval and out-of-team approval are denied.",
-        "Manager": "Approvals page for timesheets and absences. Authorisation follows effective absence secondary permissions; TEAM and ALL are enforced consistently in APIs and timesheet RLS.",
+        "Supervisor": "Approvals Level 3 access. Timesheet and absence authorisation follows effective absence secondary scope, normally TEAM; self-approval and out-of-team approval are denied. Payroll Received is hidden unless the actor is Accounts or Admin.",
+        "Manager": "Approvals page for timesheets and absences. Authorisation follows effective absence secondary permissions; TEAM and ALL are enforced consistently in APIs and timesheet RLS. Manager Approved and Reject are available until Complete.",
         "Admin": "All non-self approval scopes through Level 5 plus effective ALL secondary permission."
       }
     },

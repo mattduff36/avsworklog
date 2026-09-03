@@ -7,12 +7,16 @@ import { isTrainingReasonName } from '@/lib/utils/timesheet-off-days';
 type DbClient = SupabaseClient<Database>;
 type TimesheetStatus = Timesheet['status'];
 
-const LOCKED_TIMESHEET_STATUSES: ReadonlySet<TimesheetStatus> = new Set(['processed', 'adjusted']);
+const LOCKED_TIMESHEET_STATUSES: ReadonlySet<TimesheetStatus> = new Set([
+  'approved',
+  'processed',
+  'adjusted',
+]);
 const RECONCILABLE_TIMESHEET_STATUSES: ReadonlySet<TimesheetStatus> = new Set([
   'draft',
   'rejected',
   'submitted',
-  'approved',
+  'manager_approved',
 ]);
 
 interface TimesheetEntryImpactRow {
@@ -777,6 +781,7 @@ export async function applyApprovedAbsenceTimesheetEffects(
   input: ApplyAbsenceTimesheetEffectsInput
 ): Promise<string[]> {
   const impacts = input.impacts || await resolveAbsenceTimesheetImpacts(supabase, input);
+  assertNoLockedAbsenceTimesheetImpacts(impacts);
 
   await applyAbsenceToTimesheetRows(supabase, {
     ...input,

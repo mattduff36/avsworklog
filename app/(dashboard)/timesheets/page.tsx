@@ -8,7 +8,6 @@ import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
@@ -20,6 +19,8 @@ import { Plus, FileText, Clock, CheckCircle2, XCircle, Download, Trash2, Filter,
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { TimesheetStatusFilter } from '@/types/common';
+import { getApprovalsTimesheetStatuses, getTimesheetStatusLabel } from '@/lib/utils/timesheet-status-display';
+import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
 import {
   useAbsenceSecondaryPermissions,
 } from '@/lib/hooks/useAbsenceSecondaryPermissions';
@@ -293,10 +294,15 @@ export default function TimesheetsPage() {
         }
 
         // Apply status filter
-        if (statusFilter === 'pending') {
-          query = query.eq('status', 'submitted');
-        } else if (statusFilter !== 'all') {
-          query = query.eq('status', statusFilter);
+        if (statusFilter === 'all') {
+          // no status filter
+        } else {
+          const statuses = [...getApprovalsTimesheetStatuses(statusFilter)];
+          if (statuses.length === 1) {
+            query = query.eq('status', statuses[0]);
+          } else if (statuses.length > 1) {
+            query = query.in('status', statuses);
+          }
         }
 
         return query;
@@ -422,24 +428,7 @@ export default function TimesheetsPage() {
     }
   });
 
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      draft: { variant: 'secondary' as const, label: 'Draft' },
-      submitted: { variant: 'warning' as const, label: 'Pending' },
-      approved: { variant: 'success' as const, label: 'Payroll Received' },
-      rejected: { variant: 'destructive' as const, label: 'Rejected' },
-      processed: { variant: 'default' as const, label: 'Manager Approved' },
-      adjusted: { variant: 'default' as const, label: 'Adjusted' },
-    };
-
-    const config = variants[status as keyof typeof variants] || variants.draft;
-    
-    // Apply blue styling for final states (processed and adjusted)
-    const isFinalState = status === 'processed' || status === 'adjusted';
-    const blueClasses = isFinalState ? 'bg-blue-500/10 text-blue-600 border-blue-500/20' : '';
-
-    return <Badge variant={config.variant} className={blueClasses}>{config.label}</Badge>;
-  };
+  const getStatusBadge = (status: string) => <TimesheetStatusChips status={status} />;
 
   const getFilterLabel = (filter: TimesheetStatusFilter) => {
     switch (filter) {
@@ -447,9 +436,13 @@ export default function TimesheetsPage() {
       case 'draft': return 'Draft';
       case 'pending': return 'Pending';
       case 'approved': return 'Payroll Received';
+      case 'manager_approved': return 'Manager Approved';
+      case 'awaiting_payroll': return 'Awaiting Payroll';
+      case 'awaiting_manager': return 'Awaiting Manager';
       case 'rejected': return 'Rejected';
-      case 'processed': return 'Manager Approved';
+      case 'processed': return 'Complete';
       case 'adjusted': return 'Adjusted';
+      default: return getTimesheetStatusLabel(filter);
     }
   };
 
@@ -770,7 +763,7 @@ export default function TimesheetsPage() {
                       <SelectValue placeholder="All statuses" />
                     </SelectTrigger>
                     <SelectContent>
-                      {(['all', 'draft', 'pending', 'approved', 'rejected', 'processed', 'adjusted'] as TimesheetStatusFilter[]).map((filter) => (
+                      {(['all', 'draft', 'pending', 'awaiting_payroll', 'awaiting_manager', 'approved', 'manager_approved', 'rejected', 'processed', 'adjusted'] as TimesheetStatusFilter[]).map((filter) => (
                         <SelectItem key={filter} value={filter}>
                           {getFilterLabel(filter)}
                         </SelectItem>

@@ -3,22 +3,13 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  ArrowUpDown,
-  CheckCircle2,
-  XCircle,
-  Clock,
-  Edit2,
-  FileText,
-  Package,
-} from 'lucide-react';
+import { ArrowUpDown } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { Timesheet } from '@/types/timesheet';
 import { formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import { collectUniqueJobNumbers } from '@/lib/utils/timesheet-job-codes';
 import { TimesheetSubmittedActions } from './TimesheetSubmittedActions';
+import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
 
 interface TimesheetEntry {
   day_of_week: number;
@@ -68,6 +59,7 @@ interface TimesheetsApprovalTableProps {
   visibleCount?: number;
   busyTimesheetIds?: ReadonlySet<string>;
   showPayrollReceived?: boolean;
+  showPayrollEdit?: boolean;
 }
 
 type SortField = 'name' | 'date' | 'totalHours' | 'status' | 'submittedAt';
@@ -96,6 +88,7 @@ export function TimesheetsApprovalTable({
   visibleCount,
   busyTimesheetIds,
   showPayrollReceived = true,
+  showPayrollEdit = false,
 }: TimesheetsApprovalTableProps) {
   const router = useRouter();
   const [sortField, setSortField] = useState<SortField>('date');
@@ -135,52 +128,7 @@ export function TimesheetsApprovalTable({
     [sortedTimesheets, visibleCount]
   );
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'submitted':
-        return (
-          <Badge variant="warning">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
-        );
-      case 'approved':
-        return (
-          <Badge variant="success" className="bg-green-500/10 text-green-600 border-green-500/20">
-            <CheckCircle2 className="h-3 w-3 mr-1" />
-            Payroll Received
-          </Badge>
-        );
-      case 'rejected':
-        return (
-          <Badge variant="destructive">
-            <XCircle className="h-3 w-3 mr-1" />
-            Rejected
-          </Badge>
-        );
-      case 'processed':
-        return (
-          <Badge variant="default" className="bg-blue-500/10 text-blue-300 border-blue-500/20 hover:bg-blue-500/20">
-            Manager Approved
-          </Badge>
-        );
-      case 'adjusted':
-        return (
-          <Badge variant="default" className="bg-purple-500/10 text-purple-600 border-purple-500/20">
-            Adjusted
-          </Badge>
-        );
-      case 'draft':
-        return (
-          <Badge variant="secondary">
-            <FileText className="h-3 w-3 mr-1" />
-            Draft
-          </Badge>
-        );
-      default:
-        return <Badge variant="secondary">{status}</Badge>;
-    }
-  };
+  const getStatusBadge = (status: string) => <TimesheetStatusChips status={status} />;
 
   if (timesheets.length === 0) {
     return (
@@ -324,42 +272,19 @@ export function TimesheetsApprovalTable({
 
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {ts.status === 'submitted' && (
-                        <TimesheetSubmittedActions
-                          timesheetId={ts.id}
-                          busy={Boolean(busyTimesheetIds?.has(ts.id))}
-                          showPayrollReceived={showPayrollReceived}
-                          onApprove={onApprove}
-                          onReject={onReject}
-                          rejectClassName="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all h-8 px-2"
-                          approveClassName="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all h-8 px-2"
-                        />
-                      )}
-                      {ts.status === 'approved' && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => { e.stopPropagation(); router.push(`/timesheets/${ts.id}`); }}
-                            className="border-blue-300 text-blue-500 hover:bg-blue-500 hover:text-white hover:border-blue-500 active:bg-blue-600 active:scale-95 transition-all h-8 px-2"
-                          >
-                            <Edit2 className="h-3.5 w-3.5 mr-1" />
-                            Adjust
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={(e) => { e.stopPropagation(); onProcess(ts.id); }}
-                            className="border-avs-yellow/50 text-avs-yellow hover:bg-avs-yellow/20 hover:text-avs-yellow hover:border-avs-yellow active:bg-avs-yellow/30 active:text-avs-yellow active:scale-95 transition-all h-8 px-2"
-                          >
-                            <Package className="h-3.5 w-3.5 mr-1" />
-                            Manager Approved
-                          </Button>
-                        </>
-                      )}
-                      {ts.status !== 'submitted' && ts.status !== 'approved' && (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )}
+                      <TimesheetSubmittedActions
+                        timesheetId={ts.id}
+                        status={ts.status}
+                        busy={Boolean(busyTimesheetIds?.has(ts.id))}
+                        showPayrollReceived={showPayrollReceived}
+                        showPayrollEdit={showPayrollEdit}
+                        onApprove={onApprove}
+                        onReject={onReject}
+                        onProcess={onProcess}
+                        onEdit={() => router.push(`/timesheets/${ts.id}`)}
+                        rejectClassName="border-red-300 text-red-600 hover:bg-red-500 hover:text-white hover:border-red-500 active:bg-red-600 active:scale-95 transition-all h-8 px-2"
+                        approveClassName="border-green-300 text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 active:bg-green-600 active:scale-95 transition-all h-8 px-2"
+                      />
                     </div>
                   </TableCell>
                 </TableRow>

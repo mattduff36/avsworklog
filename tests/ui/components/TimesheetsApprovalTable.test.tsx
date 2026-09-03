@@ -43,7 +43,7 @@ describe('TimesheetsApprovalTable', () => {
     vi.clearAllMocks();
   });
 
-  it('shows Adjust and Manager Approved actions for payroll received timesheets', () => {
+  it('shows Edit and Manager Approved actions for payroll received timesheets', () => {
     const onProcess = vi.fn();
 
     render(
@@ -53,16 +53,51 @@ describe('TimesheetsApprovalTable', () => {
         onReject={vi.fn()}
         onProcess={onProcess}
         columnVisibility={DEFAULT_COLUMN_VISIBILITY}
+        showPayrollEdit
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Adjust' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Adjust' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Manager Approved' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Adjust' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
 
     expect(pushMock).toHaveBeenCalledWith('/timesheets/timesheet-approved');
     expect(onProcess).not.toHaveBeenCalled();
+  });
+
+  it('TS-UI-001 shows Manager Approved on pending and hides Payroll Received for non-Accounts', () => {
+    render(
+      <TimesheetsApprovalTable
+        timesheets={[buildTimesheet('submitted')]}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onProcess={vi.fn()}
+        columnVisibility={DEFAULT_COLUMN_VISIBILITY}
+        showPayrollReceived={false}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Manager Approved' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reject' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Payroll Received' })).not.toBeInTheDocument();
+  });
+
+  it('TS-UI-002 keeps Accounts Edit on Complete and hides Reject', () => {
+    render(
+      <TimesheetsApprovalTable
+        timesheets={[buildTimesheet('processed')]}
+        onApprove={vi.fn()}
+        onReject={vi.fn()}
+        onProcess={vi.fn()}
+        columnVisibility={DEFAULT_COLUMN_VISIBILITY}
+        showPayrollEdit
+      />
+    );
+
+    expect(screen.queryByRole('button', { name: 'Reject' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
 
   it('keeps Manager Approved wired to the process action', () => {

@@ -121,29 +121,29 @@ describe('Timesheet Workflow Regression Tests', () => {
     });
   });
 
-  describe('New adjusted workflow', () => {
-    it('should support Approved → Adjusted transition', () => {
-      const timesheet = createMockTimesheet({ 
-        status: 'approved',
-        reviewed_by: 'manager-id',
-        reviewed_at: '2024-12-01T11:00:00Z',
+  describe('Dual-gate workflow', () => {
+    it('should support Pending → Manager Approved without Payroll Received', () => {
+      const timesheet = createMockTimesheet({
+        status: 'submitted',
+        submitted_at: '2024-12-01T10:00:00Z',
       });
-      
-      // Simulate adjustment
-      const adjusted = {
+
+      const managerApproved = {
         ...timesheet,
-        status: 'adjusted' as const,
-        adjusted_by: 'manager-id',
-        adjusted_at: new Date().toISOString(),
-        adjustment_recipients: ['manager2-id', 'manager3-id'],
-        manager_comments: 'Corrected hours for Thursday',
+        status: 'manager_approved' as const,
       };
 
-      expect(adjusted.status).toBe('adjusted');
-      expect(adjusted.adjusted_by).toBeDefined();
-      expect(adjusted.adjusted_at).toBeDefined();
-      expect(adjusted.adjustment_recipients).toHaveLength(2);
-      expect(adjusted.manager_comments).toBeDefined();
+      expect(managerApproved.status).toBe('manager_approved');
+    });
+
+    it('should treat historical adjusted rows as visible history, not a new wage path', () => {
+      const timesheet = createMockTimesheet({
+        status: 'adjusted',
+        adjusted_by: 'manager-id',
+        adjusted_at: '2024-12-01T12:00:00Z',
+      });
+
+      expect(timesheet.status).toBe('adjusted');
     });
 
     it('should treat adjusted as terminal status', () => {

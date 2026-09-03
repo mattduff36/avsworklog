@@ -17,7 +17,17 @@ export interface Employee {
 /**
  * Status filters for different modules
  */
-export type TimesheetStatusFilter = 'all' | 'draft' | 'pending' | 'approved' | 'rejected' | 'processed' | 'adjusted';
+export type TimesheetStatusFilter =
+  | 'all'
+  | 'draft'
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'processed'
+  | 'adjusted'
+  | 'manager_approved'
+  | 'awaiting_payroll'
+  | 'awaiting_manager';
 export type InspectionStatusFilter = 'all' | 'draft' | 'submitted';
 export type AbsenceStatusFilter = 'all' | 'pending' | 'approved' | 'processed' | 'rejected';
 export type StatusFilter = TimesheetStatusFilter | InspectionStatusFilter | AbsenceStatusFilter;

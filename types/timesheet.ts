@@ -37,6 +37,18 @@ export interface TimesheetEntry {
   updated_at?: string;
 }
 
+export const TIMESHEET_STATUSES = [
+  'draft',
+  'submitted',
+  'approved',
+  'rejected',
+  'processed',
+  'adjusted',
+  'manager_approved',
+] as const;
+
+export type TimesheetStatus = (typeof TIMESHEET_STATUSES)[number];
+
 export interface Timesheet {
   id: string;
   user_id: string;
@@ -50,7 +62,7 @@ export interface Timesheet {
   hired_plant_description?: string | null;
   hired_plant_hiring_company?: string | null;
   week_ending: string; // Date string (Sunday of the week)
-  status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted';
+  status: TimesheetStatus;
   signature_data: string | null;
   signed_at: string | null;
   submitted_at: string | null;
@@ -61,6 +73,10 @@ export interface Timesheet {
   adjusted_at: string | null;
   adjustment_recipients: string[] | null;
   processed_at: string | null;
+  payroll_received_at?: string | null;
+  payroll_received_by?: string | null;
+  manager_approved_at?: string | null;
+  manager_approved_by?: string | null;
   current_payroll_snapshot_id?: string | null;
   created_at: string;
   updated_at: string;

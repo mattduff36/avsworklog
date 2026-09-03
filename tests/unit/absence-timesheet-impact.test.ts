@@ -63,11 +63,11 @@ describe('absence timesheet impact workflow', () => {
     expect(getAbsenceImpactDayOfWeek('2026-04-19')).toBe(7);
   });
 
-  it('blocks processed and adjusted timesheets', () => {
-    const impact = { ...baseImpact, status: 'processed' as const };
-
-    expect(() => assertNoLockedAbsenceTimesheetImpacts([impact])).toThrow(/locked timesheets/);
-    expect(buildAbsenceTimesheetImpactMessage('Sickness', [impact])).toContain('payroll history');
+  it('TS-ABS-001 blocks payroll-received timesheets and allows manager-only weeks', () => {
+    expect(() => assertNoLockedAbsenceTimesheetImpacts([{ ...baseImpact, status: 'approved' }])).toThrow(/locked timesheets/);
+    expect(() => assertNoLockedAbsenceTimesheetImpacts([{ ...baseImpact, status: 'processed' }])).toThrow(/locked timesheets/);
+    expect(() => assertNoLockedAbsenceTimesheetImpacts([{ ...baseImpact, status: 'adjusted' }])).toThrow(/locked timesheets/);
+    expect(() => assertNoLockedAbsenceTimesheetImpacts([{ ...baseImpact, status: 'manager_approved' }])).not.toThrow();
   });
 
   it('returns submitted timesheets with leave-specific amendment comments', async () => {

@@ -55,6 +55,9 @@ class ApprovalClient implements PayrollPgClient {
         }] : []) as Row[],
       };
     }
+    if (sql.includes('SELECT status FROM public.timesheets WHERE id = $1')) {
+      return { rows: [{ status: this.options.status || 'submitted' }] as Row[] };
+    }
     if (sql.includes('FOR UPDATE OF timesheet')) {
       return {
         rows: [{
@@ -246,8 +249,22 @@ describe('transactional payroll approval', () => {
     expect(client.statements.some((item) => item.sql.includes('UPDATE public.'))).toBe(false);
   });
 
-  it('PAY-APPROVAL-STATE-GUARD-002 rejects processed, rejected, and draft without writes', async () => {
-    for (const status of ['processed', 'rejected', 'draft'] as const) {
+  it('TS-GATE-004 rejects expected_status mismatch without writes', async () => {
+    const client = new ApprovalClient({ status: 'submitted' });
+    await expect(
+      approveTimesheetWithPayrollSnapshot({
+        timesheetId: TIMESHEET_ID,
+        actorId: ACTOR_ID,
+        idempotencyKey: IDEMPOTENCY_ID,
+        expectedStatus: 'approved',
+      }, () => client)
+    ).rejects.toThrow('Timesheet status changed before it could be marked Payroll Received.');
+    expect(client.statements.some((item) => item.sql.includes('INSERT INTO'))).toBe(false);
+    expect(client.statements.some((item) => item.sql.includes('UPDATE public.'))).toBe(false);
+  });
+
+  it('PAY-APPROVAL-STATE-GUARD-002 rejects rejected and draft without writes, and is idempotent for processed', async () => {
+    for (const status of ['rejected', 'draft'] as const) {
       const client = new ApprovalClient({ status });
       await expect(
         approveTimesheetWithPayrollSnapshot({
@@ -255,10 +272,23 @@ describe('transactional payroll approval', () => {
           actorId: ACTOR_ID,
           idempotencyKey: IDEMPOTENCY_ID,
         }, () => client)
-      ).rejects.toThrow(`Timesheet cannot be approved from status "${status}".`);
+      ).rejects.toThrow(`Timesheet cannot be marked Payroll Received from status "${status}".`);
       expect(client.statements.some((item) => item.sql.includes('INSERT INTO'))).toBe(false);
       expect(client.statements.some((item) => item.sql.includes('UPDATE public.'))).toBe(false);
     }
+
+    const processedClient = new ApprovalClient({
+      status: 'processed',
+      currentSnapshotId: SNAPSHOT_ID,
+      revision: 1,
+    });
+    const result = await approveTimesheetWithPayrollSnapshot({
+      timesheetId: TIMESHEET_ID,
+      actorId: ACTOR_ID,
+      idempotencyKey: IDEMPOTENCY_ID,
+    }, () => processedClient);
+    expect(result.status).toBe('processed');
+    expect(processedClient.statements.some((item) => item.sql.includes('INSERT INTO'))).toBe(false);
   });
 
   it('PAY-APPROVAL-GUARD-001 and PAY-RLS-IMMUTABLE-001 are enforced by migration guards', () => {

@@ -14,6 +14,7 @@ describe('Timesheet Type Tests', () => {
         'draft',
         'submitted',
         'approved',
+        'manager_approved',
         'rejected',
         'processed',
         'adjusted',

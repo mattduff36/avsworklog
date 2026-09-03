@@ -5,7 +5,11 @@ import { sendTimesheetRejectionEmail } from '@/lib/utils/email';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
 import { getEffectiveRole } from '@/lib/utils/view-as';
-import type { Database } from '@/types/database';
+import {
+  TimesheetGateConflictError,
+  applyTimesheetReject,
+} from '@/lib/server/timesheet-gate-mutations';
+import { TIMESHEET_GATE_STATUS_CONFLICT_CODE } from '@/lib/utils/timesheet-gates';
 
 export async function POST(
   request: NextRequest,
@@ -70,13 +74,6 @@ export async function POST(
       );
     }
 
-    if (typedTimesheet.status !== 'submitted') {
-      return NextResponse.json(
-        { error: 'Only submitted timesheets can be rejected' },
-        { status: 400 }
-      );
-    }
-
     const canAuthoriseTarget = await canCurrentActorAuthoriseTimesheetTarget(
       {
         profileId: typedTimesheet.user_id,
@@ -91,20 +88,25 @@ export async function POST(
       );
     }
 
-    // Update timesheet status
-    const { error: updateError } = await adminClient
-      .from('timesheets')
-      .update({
-        status: 'rejected',
-        reviewed_by: effectiveRole.user_id,
-        reviewed_at: new Date().toISOString(),
-        manager_comments: comments.trim(),
-      } as never)
-      .eq('id', timesheetId);
-
-    if (updateError) {
-      console.error('Error updating timesheet:', updateError);
-      throw updateError;
+    try {
+      await applyTimesheetReject({
+        timesheetId,
+        actorId: effectiveRole.user_id,
+        comments: comments.trim(),
+        expectedStatus: typedTimesheet.status,
+      });
+    } catch (error) {
+      if (error instanceof TimesheetGateConflictError) {
+        return NextResponse.json(
+          {
+            error: error.message,
+            code: TIMESHEET_GATE_STATUS_CONFLICT_CODE,
+            currentStatus: error.currentStatus,
+          },
+          { status: 409 }
+        );
+      }
+      throw error;
     }
 
     // Email addresses live in auth.users, not public.profiles.
@@ -118,7 +120,6 @@ export async function POST(
     const employeeProfile = typedTimesheet.profiles as unknown as { full_name: string } | null;
     const employeeEmail = employeeUserResult.user?.email ?? null;
 
-    // Send email notification
     if (employeeEmail) {
       const emailResult = await sendTimesheetRejectionEmail({
         to: employeeEmail,
@@ -135,42 +136,6 @@ export async function POST(
       if (!emailResult.success) {
         console.error('Failed to send rejection email:', emailResult.error);
       }
-    }
-
-    // Create in-app notification via admin client so Approvals L3 authors
-    // are not blocked by Toolbox Talks Level 4 message INSERT RLS.
-    const { data: message, error: messageInsertError } = await adminClient
-      .from('messages')
-      .insert({
-        type: 'NOTIFICATION',
-        subject: 'Timesheet Rejected',
-        body: `Your timesheet for week ending ${new Date(typedTimesheet.week_ending).toLocaleDateString('en-GB', {
-          day: 'numeric',
-          month: 'short',
-          year: 'numeric',
-        })} has been rejected.\n\nManager's Comments: ${comments.trim()}`,
-        priority: 'HIGH',
-        sender_id: user.id,
-        created_via: 'timesheet_rejection',
-        module_key: 'timesheets',
-      } satisfies Database['public']['Tables']['messages']['Insert'])
-      .select('id')
-      .single();
-    let messageError = messageInsertError;
-    const typedMessage = message as { id: string } | null;
-    if (!messageError && typedMessage) {
-      const { error: recipientError } = await adminClient
-        .from('message_recipients')
-        .insert({
-          message_id: typedMessage.id,
-          user_id: typedTimesheet.user_id,
-          status: 'PENDING' as const,
-        });
-      messageError = recipientError;
-    }
-
-    if (messageError) {
-      console.error('Failed to create in-app notification:', messageError);
     }
 
     return NextResponse.json({

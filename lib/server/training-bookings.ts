@@ -292,8 +292,8 @@ export async function declineTrainingBookings(
     endDate: firstRow.end_date,
     isHalfDay: firstRow.is_half_day,
   });
-  if (timesheetImpacts.some((impact) => impact.status === 'processed' || impact.status === 'adjusted')) {
-    throw new Error('Training bookings linked to processed or adjusted timesheets cannot be removed from the timesheet flow');
+  if (timesheetImpacts.some((impact) => impact.status === 'approved' || impact.status === 'processed' || impact.status === 'adjusted')) {
+    throw new Error('Training bookings linked to payroll-received timesheets cannot be removed from the timesheet flow');
   }
 
   // Cancel instead of hard-delete so service-role paths do not bypass historic delete guards

@@ -25,11 +25,8 @@ import {
 } from '@/lib/utils/absence-self-service-deadline';
 import { isAdminRole } from '@/lib/utils/role-access';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { isTrainingReasonName } from '@/lib/utils/timesheet-off-days';
 import {
-  applyApprovedAbsenceTimesheetEffects,
   assertNoLockedAbsenceTimesheetImpacts,
-  removeAbsenceFromTimesheetRows,
   resolveAbsenceTimesheetImpacts,
 } from '@/lib/utils/absence-timesheet-impact';
 
@@ -360,25 +357,6 @@ async function getAnnualLeaveReasonIdByReason(
   return reason?.name?.trim().toLowerCase() === ANNUAL_LEAVE_REASON_NAME ? reason.id : null;
 }
 
-async function getAbsenceReasonDetailsByReason(
-  supabase: ReturnType<typeof createClient>,
-  reasonId: string
-): Promise<{ reasonName: string; isPaid: boolean; isTraining: boolean }> {
-  const { data: reason, error: reasonError } = await supabase
-    .from('absence_reasons')
-    .select('name, is_paid')
-    .eq('id', reasonId)
-    .single();
-
-  if (reasonError) throw reasonError;
-  const reasonName = reason?.name || 'Approved Leave';
-  return {
-    reasonName,
-    isPaid: Boolean(reason?.is_paid),
-    isTraining: isTrainingReasonName(reasonName),
-  };
-}
-
 async function resolveActiveAbsenceTimesheetImpacts(
   supabase: ReturnType<typeof createClient>,
   absence: AbsenceValidationShape
@@ -394,26 +372,21 @@ async function resolveActiveAbsenceTimesheetImpacts(
 }
 
 async function applyApprovedLeaveTimesheetEffects(
-  supabase: ReturnType<typeof createClient>,
+  _supabase: ReturnType<typeof createClient>,
   absence: AbsenceValidationShape & { id?: string; allow_timesheet_work_on_leave?: boolean | null },
-  actorUserId: string,
-  action = 'Approved'
+  _actorUserId: string,
+  _action = 'Approved'
 ): Promise<void> {
   if (absence.status !== 'approved' || !absence.id) return;
-
-  const reason = await getAbsenceReasonDetailsByReason(supabase, absence.reason_id);
-  await applyApprovedAbsenceTimesheetEffects(supabase, {
-    absenceId: absence.id,
-    actorUserId,
-    profileId: absence.profile_id,
-    startDate: absence.date,
-    endDate: absence.end_date,
-    isHalfDay: absence.is_half_day,
-    halfDaySession: absence.half_day_session,
-    allowTimesheetWorkOnLeave: absence.allow_timesheet_work_on_leave,
-    returnReason: action,
-    ...reason,
+  const response = await fetch(`/api/absence/${absence.id}/timesheet-effects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'apply' }),
   });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error || 'Failed to update timesheet hours for this leave booking');
+  }
 }
 
 async function assertAbsenceTimesheetChangesUnlocked(
@@ -425,26 +398,19 @@ async function assertAbsenceTimesheetChangesUnlocked(
 }
 
 async function removeLeaveTimesheetEffects(
-  supabase: ReturnType<typeof createClient>,
+  _supabase: ReturnType<typeof createClient>,
   absence: AbsenceValidationShape & { id: string; allow_timesheet_work_on_leave?: boolean | null },
-  actorUserId: string
+  _actorUserId: string
 ): Promise<void> {
-  const reason = await getAbsenceReasonDetailsByReason(supabase, absence.reason_id);
-  const impacts = await resolveActiveAbsenceTimesheetImpacts(supabase, absence);
-  assertNoLockedAbsenceTimesheetImpacts(impacts);
-
-  await removeAbsenceFromTimesheetRows(supabase, {
-    absenceId: absence.id,
-    actorUserId,
-    profileId: absence.profile_id,
-    startDate: absence.date,
-    endDate: absence.end_date,
-    isHalfDay: absence.is_half_day,
-    halfDaySession: absence.half_day_session,
-    allowTimesheetWorkOnLeave: absence.allow_timesheet_work_on_leave,
-    impacts,
-    ...reason,
+  const response = await fetch(`/api/absence/${absence.id}/timesheet-effects`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'remove' }),
   });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { error?: string };
+    throw new Error(payload.error || 'Failed to restore timesheet hours for this leave booking');
+  }
 }
 
 async function assertAnnualLeaveAllowanceAvailable(
@@ -1373,24 +1339,15 @@ export function useApproveAbsence() {
       
       if (error) throw error;
       if (!data) return { id, status: 'approved' } as const;
-      await applyApprovedLeaveTimesheetEffects(
-        supabase,
-        {
-          profile_id: data.profile_id,
-          date: data.date,
-          end_date: data.end_date,
-          reason_id: data.reason_id,
-          duration_days: data.duration_days,
-          is_half_day: Boolean(data.is_half_day),
-          half_day_session: data.half_day_session,
-          status: data.status,
-          notes: data.notes,
-          id: data.id,
-          allow_timesheet_work_on_leave: data.allow_timesheet_work_on_leave,
-        },
-        user.id,
-        'Approved'
-      );
+      const effectsResponse = await fetch(`/api/absence/${data.id}/timesheet-effects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'apply' }),
+      });
+      if (!effectsResponse.ok) {
+        const payload = (await effectsResponse.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error || 'Failed to update timesheet hours for this leave booking');
+      }
       return data;
     },
     onSuccess: () => {

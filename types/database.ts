@@ -8753,13 +8753,105 @@ export type Database = {
           },
         ]
       }
+      timesheet_payroll_edits: {
+        Row: {
+          id: string
+          timesheet_id: string
+          actor_id: string
+          reason: string
+          pay_impact: boolean
+          client_pay_impact: boolean | null
+          idempotency_key: string
+          request_fingerprint: string
+          before_hash: string | null
+          after_hash: string | null
+          before_status: string
+          after_status: string
+          before_snapshot_id: string | null
+          after_snapshot_id: string | null
+          before_totals: Json | null
+          after_totals: Json | null
+          notification_user_ids: string[]
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          timesheet_id: string
+          actor_id: string
+          reason: string
+          pay_impact: boolean
+          client_pay_impact?: boolean | null
+          idempotency_key: string
+          request_fingerprint: string
+          before_hash?: string | null
+          after_hash?: string | null
+          before_status: string
+          after_status: string
+          before_snapshot_id?: string | null
+          after_snapshot_id?: string | null
+          before_totals?: Json | null
+          after_totals?: Json | null
+          notification_user_ids?: string[]
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          timesheet_id?: string
+          actor_id?: string
+          reason?: string
+          pay_impact?: boolean
+          client_pay_impact?: boolean | null
+          idempotency_key?: string
+          request_fingerprint?: string
+          before_hash?: string | null
+          after_hash?: string | null
+          before_status?: string
+          after_status?: string
+          before_snapshot_id?: string | null
+          after_snapshot_id?: string | null
+          before_totals?: Json | null
+          after_totals?: Json | null
+          notification_user_ids?: string[]
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'timesheet_payroll_edits_actor_id_fkey'
+            columns: ['actor_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_payroll_edits_after_snapshot_id_fkey'
+            columns: ['after_snapshot_id']
+            isOneToOne: false
+            referencedRelation: 'timesheet_payroll_snapshots'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_payroll_edits_before_snapshot_id_fkey'
+            columns: ['before_snapshot_id']
+            isOneToOne: false
+            referencedRelation: 'timesheet_payroll_snapshots'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_payroll_edits_timesheet_id_fkey'
+            columns: ['timesheet_id']
+            isOneToOne: false
+            referencedRelation: 'timesheets'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       timesheets: {
         Row: {
           id: string
           user_id: string
           reg_number: string | null
           week_ending: string
-          status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted' | null
+          status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted' | 'manager_approved' | null
           signature_data: string | null
           signed_at: string | null
           submitted_at: string | null
@@ -8781,13 +8873,17 @@ export type Database = {
           hired_plant_description: string | null
           hired_plant_hiring_company: string | null
           current_payroll_snapshot_id: string | null
+          payroll_received_at: string | null
+          payroll_received_by: string | null
+          manager_approved_at: string | null
+          manager_approved_by: string | null
         }
         Insert: {
           id?: string
           user_id: string
           reg_number?: string | null
           week_ending: string
-          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted' | null
+          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted' | 'manager_approved' | null
           signature_data?: string | null
           signed_at?: string | null
           submitted_at?: string | null
@@ -8809,13 +8905,17 @@ export type Database = {
           hired_plant_description?: string | null
           hired_plant_hiring_company?: string | null
           current_payroll_snapshot_id?: string | null
+          payroll_received_at?: string | null
+          payroll_received_by?: string | null
+          manager_approved_at?: string | null
+          manager_approved_by?: string | null
         }
         Update: {
           id?: string
           user_id?: string
           reg_number?: string | null
           week_ending?: string
-          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted' | null
+          status?: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted' | 'manager_approved' | null
           signature_data?: string | null
           signed_at?: string | null
           submitted_at?: string | null
@@ -8837,6 +8937,10 @@ export type Database = {
           hired_plant_description?: string | null
           hired_plant_hiring_company?: string | null
           current_payroll_snapshot_id?: string | null
+          payroll_received_at?: string | null
+          payroll_received_by?: string | null
+          manager_approved_at?: string | null
+          manager_approved_by?: string | null
         }
         Relationships: [
           {
@@ -8851,6 +8955,20 @@ export type Database = {
             columns: ['current_payroll_snapshot_id']
             isOneToOne: false
             referencedRelation: 'timesheet_payroll_snapshots'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheets_manager_approved_by_fkey'
+            columns: ['manager_approved_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheets_payroll_received_by_fkey'
+            columns: ['payroll_received_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
             referencedColumns: ['id']
           },
           {
@@ -11400,7 +11518,7 @@ export type Database = {
       check__sensitive_pin_verification_tokens__purpose: 'setup' | 'change' | 'reset'
       check__service_health_events__status: 'active' | 'recovered'
       check__suggestions__status: 'new' | 'under_review' | 'planned' | 'completed' | 'declined'
-      check__timesheets__status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted'
+      check__timesheets__status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'processed' | 'adjusted' | 'manager_approved'
       check__timesheets__template_version: 1 | 2
       check__timesheets__timesheet_type: 'civils' | 'plant'
       check__training_people__profile_match_status: 'matched' | 'ambiguous' | 'unmatched' | 'not_attempted'

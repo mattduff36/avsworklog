@@ -190,6 +190,7 @@ interface TimesheetPDFProps {
   employeeName?: string;
   offDayStates?: TimesheetOffDayState[];
   payrollSnapshot?: PayrollSnapshotPdfData | null;
+  amendmentBanner?: string | null;
 }
 
 export function TimesheetPDF({
@@ -197,6 +198,7 @@ export function TimesheetPDF({
   employeeName,
   offDayStates = [],
   payrollSnapshot = null,
+  amendmentBanner = null,
 }: TimesheetPDFProps) {
   // Sort entries by day of week
   const sortedEntries = (timesheet.entries || []).sort((a, b) => a.day_of_week - b.day_of_week);
@@ -350,6 +352,9 @@ export function TimesheetPDF({
           </View>
         </View>
 
+        {amendmentBanner ? (
+          <Text style={{ fontSize: 8, marginBottom: 8, color: '#7c2d12' }}>{amendmentBanner}</Text>
+        ) : null}
         {payrollSnapshot ? <PayrollSnapshotSummary snapshot={payrollSnapshot} /> : null}
 
         {/* Footer */}

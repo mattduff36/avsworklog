@@ -34,8 +34,7 @@ export function ProcessTimesheetModal({
               Are you sure you want to mark this timesheet as Manager Approved?
             </span>
             <span className="block text-sm">
-              <strong>Warning:</strong> Once marked as Manager Approved, this action cannot be undone.
-              This indicates that the timesheet has been sent to payroll for payment.
+              Payroll Received can still happen afterwards. Reject stays available until both gates are complete.
             </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
