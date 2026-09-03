@@ -191,7 +191,7 @@ export async function loadPayrollAdminMatrix(): Promise<PayrollAdminMatrix> {
       .from('timesheets')
       .select('id', { count: 'exact', head: true })
       .gte('week_ending', rolloutWeekEnding)
-      .in('status', ['draft', 'submitted', 'rejected', 'adjusted']);
+      .in('status', ['draft', 'submitted', 'rejected', 'adjusted', 'manager_approved']);
     if (result.error) throw new Error(result.error.message);
     impactedUnapprovedTimesheets = result.count || 0;
   }

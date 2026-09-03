@@ -31,6 +31,19 @@ describe('timesheet dual-gate contracts', () => {
     expect(route).not.toContain('applyTimesheetAdjustmentMutation');
   });
 
+  it('dashboard tiles follow the dual-gate default queues', () => {
+    const dashboard = read('lib/server/dashboard-approvals.ts');
+    expect(dashboard).toContain('getApprovalsTimesheetStatuses');
+    expect(dashboard).toContain('getApprovalsDefaultStatusFilters');
+    expect(dashboard).not.toContain("defaultFilters.timesheets === 'approved' ? 'approved' : 'submitted'");
+    expect(dashboard).not.toContain("['submitted', 'approved']");
+  });
+
+  it('payroll-admin unapproved impact includes manager-first sheets', () => {
+    const admin = read('lib/server/payroll-admin.ts');
+    expect(admin).toContain("['draft', 'submitted', 'rejected', 'adjusted', 'manager_approved']");
+  });
+
   it('TS-ABS-001 blocks absence hour rewrites after Payroll Received', () => {
     const impact = read('lib/utils/absence-timesheet-impact.ts');
     expect(impact).toContain("'approved'");

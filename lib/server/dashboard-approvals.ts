@@ -1,6 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { canActorUseScopedAbsencePermission, getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
 import { getApprovalsDefaultStatusFilters } from '@/lib/utils/approvals-filters';
+import { getApprovalsTimesheetStatuses } from '@/lib/utils/timesheet-status-display';
+import type { TimesheetStatus } from '@/types/timesheet';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import {
   canActorAuthoriseTimesheetTarget,
@@ -45,14 +47,21 @@ function countRowsWithStatus<T extends { status: string | null }>(rows: T[], sta
   return rows.reduce((total, row) => total + (row.status === status ? 1 : 0), 0);
 }
 
-function getApprovalTileStatuses(teamName: string | null | undefined): {
-  timesheetStatus: 'submitted' | 'approved';
+function countRowsWithStatuses<T extends { status: string | null }>(
+  rows: T[],
+  statuses: readonly string[]
+): number {
+  return rows.reduce((total, row) => total + (row.status && statuses.includes(row.status) ? 1 : 0), 0);
+}
+
+function getApprovalTileConfig(teamName: string | null | undefined): {
+  timesheetStatuses: readonly TimesheetStatus[];
   absenceStatus: 'pending' | 'approved';
 } {
   const defaultFilters = getApprovalsDefaultStatusFilters(teamName);
 
   return {
-    timesheetStatus: defaultFilters.timesheets === 'approved' ? 'approved' : 'submitted',
+    timesheetStatuses: getApprovalsTimesheetStatuses(defaultFilters.timesheets),
     absenceStatus: defaultFilters.absences === 'approved' ? 'approved' : 'pending',
   };
 }
@@ -106,11 +115,10 @@ export async function getDashboardApprovalsMetrics(params: {
     };
   }
 
-  const tileStatuses = getApprovalTileStatuses(effectiveRole.team_name);
-  const timesheetStatusesToLoad: ReadonlyArray<'submitted' | 'approved'> =
-    tileStatuses.timesheetStatus === 'approved' ? ['submitted', 'approved'] : ['submitted'];
+  const tileConfig = getApprovalTileConfig(effectiveRole.team_name);
+  const timesheetStatusesToLoad = tileConfig.timesheetStatuses;
   const absenceStatusesToLoad: ReadonlyArray<'pending' | 'approved'> =
-    tileStatuses.absenceStatus === 'approved' ? ['pending', 'approved'] : ['pending'];
+    tileConfig.absenceStatus === 'approved' ? ['pending', 'approved'] : ['pending'];
 
   const [timesheetsResult, absencesResult] = await Promise.all([
     supabase
@@ -159,11 +167,12 @@ export async function getDashboardApprovalsMetrics(params: {
     });
   });
 
+  const summaryTimesheets = countRowsWithStatuses(scopedTimesheets, timesheetStatusesToLoad);
+  const summaryAbsences = countRowsWithStatus(scopedAbsences, tileConfig.absenceStatus);
+
   return {
-    summaryTimesheets: countRowsWithStatus(scopedTimesheets, tileStatuses.timesheetStatus),
-    summaryAbsences: countRowsWithStatus(scopedAbsences, tileStatuses.absenceStatus),
-    tileTotal:
-      countRowsWithStatus(scopedTimesheets, tileStatuses.timesheetStatus) +
-      countRowsWithStatus(scopedAbsences, tileStatuses.absenceStatus),
+    summaryTimesheets,
+    summaryAbsences,
+    tileTotal: summaryTimesheets + summaryAbsences,
   };
 }
