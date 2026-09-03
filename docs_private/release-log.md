@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.2.1
+
+**GIT COMMIT MESSAGE**
+`fix(timesheets): count manager-first sheets in dashboard and payroll impact`
+
+**PUSHED AT**
+2026-09-03T18:56:46.050Z
+
+**WHAT CHANGED**
+Expect dual-gate queues in summary metrics. Prove leftover dual-gate queue and PDF contracts. Give leftover queue contracts stable IDs. Count manager-first sheets in dashboard and payroll impact.
+
+**VERSION HISTORY DETAILS**
+- Prove leftover dual-gate queue and PDF contracts, with changes to app screens and automated tests.
+- Updated approvals, with changes to shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `test(dashboard): expect dual-gate queues in summary metrics`
+- `test(timesheets): prove leftover dual-gate queue and PDF contracts`
+- `test(timesheets): give leftover queue contracts stable IDs`
+- `fix(timesheets): count manager-first sheets in dashboard and payroll impact`
+
 ## 0926.2.0
 
 **GIT COMMIT MESSAGE**

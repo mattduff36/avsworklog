@@ -1,5 +1,27 @@
 [
   {
+    "version": "0926.2.1",
+    "updateKind": "minor",
+    "title": "Timesheets improvements",
+    "description": "Expect dual-gate queues in summary metrics. Prove leftover dual-gate queue and PDF document contracts. Give leftover queue contracts stable IDs. Count manager-first sheets in dashboard and payroll impact.",
+    "summary": "Expect dual-gate queues in summary metrics. Prove leftover dual-gate queue and PDF document contracts. Give leftover queue contracts stable IDs. Count manager-first sheets in dashboard and payroll impact.",
+    "details": [
+      "Prove leftover dual-gate queue and PDF document contracts, with changes to app screens and automated tests.",
+      "Updated approvals, with changes to shared logic."
+    ],
+    "areas": [
+      "Dashboard",
+      "Timesheets",
+      "Expect dual-gate queues in summary metrics. Prove leftover dual-gate queue",
+      "Payroll impact"
+    ],
+    "areaKeys": [
+      "dashboard",
+      "timesheets"
+    ],
+    "pushedAt": "2026-09-03T18:56:46.050Z"
+  },
+  {
     "version": "0926.2.0",
     "updateKind": "major",
     "title": "Timesheets update",
