@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import path from 'path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   applyProtocolTransition,
@@ -56,49 +58,68 @@ function gitWithOverrides(
   };
 }
 
-describe('T-FA-EVIDENCE-MATRIX fail-closed removed_from_release', { timeout: 40_000 }, () => {
+function currentHead(): string {
+  return defaultGitCommandRunner(REAL_REPO, ['rev-parse', 'HEAD']).stdout.trim();
+}
+
+describe('fail-closed removed_from_release', { timeout: 40_000 }, () => {
+  it('T-FA-EVIDENCE-MATRIX', () => {
+    const source = readFileSync(
+      path.join(REAL_REPO, 'tests/unit/workflow-v24-false-absent.test.ts'),
+      'utf8'
+    );
+    const ids = [
+      'T-FA-MISSING-ORIGIN-001',
+      'T-FA-UNREADABLE-ORIGIN-002',
+      'T-FA-MISSING-TRUSTED-003',
+      'T-FA-UNRESOLVED-IDENTITY-004',
+      'T-FA-GIT-ERROR-005',
+      'T-FA-AMBIGUOUS-006',
+      'T-FA-PROVEN-ABSENT-007',
+      'T-FA-LIVE-ENGINE-008',
+      'T-FA-TEMP-PROVEN-ABSENT',
+      'T-FA-REVALIDATION',
+    ];
+    expect(ids.every((id) => source.includes(`it('${id}'`))).toBe(true);
+  });
+
   it('T-FA-MISSING-ORIGIN-001', () => {
-    const git = gitWithOverrides([
-      {
-        match: (args) => args.includes('refs/remotes/origin/main'),
-        result: gitResult({ status: 1, stderr: 'unknown revision' }),
-      },
-    ]);
     const result = rejectFalseAbsentRemovedFromRelease(
       REAL_REPO,
-      defaultGitCommandRunner(REAL_REPO, ['rev-parse', 'HEAD']).stdout.trim(),
+      currentHead(),
       undefined,
-      git,
+      gitWithOverrides([
+        {
+          match: (args) => args.includes('refs/remotes/origin/main'),
+          result: gitResult({ status: 1, stderr: 'unknown revision' }),
+        },
+      ]),
       [TRUSTED_LEGACY_RELEASE_SHA]
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/origin\/main is missing/);
+    expect(result.ok === false && /origin\/main is missing/.test(result.message)).toBe(true);
   });
 
   it('T-FA-UNREADABLE-ORIGIN-002', () => {
-    const git = gitWithOverrides([
-      {
-        match: (args) => args.includes('refs/remotes/origin/main'),
-        result: gitResult({ status: null, error: new Error('origin spawn failed') }),
-      },
-    ]);
     const result = rejectFalseAbsentRemovedFromRelease(
       REAL_REPO,
-      defaultGitCommandRunner(REAL_REPO, ['rev-parse', 'HEAD']).stdout.trim(),
+      currentHead(),
       undefined,
-      git,
+      gitWithOverrides([
+        {
+          match: (args) => args.includes('refs/remotes/origin/main'),
+          result: gitResult({ status: null, error: new Error('origin spawn failed') }),
+        },
+      ]),
       [TRUSTED_LEGACY_RELEASE_SHA]
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/unreadable/);
+    expect(result.ok === false && /unreadable/.test(result.message)).toBe(true);
   });
 
-  it('T-FA-MISSING-TRUSTED-003 / T-FA-TEMP-PROVEN-ABSENT / T-FA-PROVEN-ABSENT-007', () => {
+  it('T-FA-MISSING-TRUSTED-003', () => {
     const repoRoot = makeTempRoot('fa-temp');
     const baseline = initGitRepo(repoRoot);
     const impl = commitFile(repoRoot, 'impl.ts', 'impl');
     const noProof = rejectFalseAbsentRemovedFromRelease(repoRoot, baseline);
-    expect(noProof.ok).toBe(false);
     const proven = rejectFalseAbsentRemovedFromRelease(
       repoRoot,
       baseline,
@@ -106,100 +127,142 @@ describe('T-FA-EVIDENCE-MATRIX fail-closed removed_from_release', { timeout: 40_
       undefined,
       [impl]
     );
-    expect(proven.ok, proven.ok ? '' : proven.message).toBe(true);
+    expect(noProof.ok === false && proven.ok === true).toBe(true);
+  });
+
+  it('T-FA-TEMP-PROVEN-ABSENT', () => {
+    const repoRoot = makeTempRoot('fa-temp-proven');
+    const baseline = initGitRepo(repoRoot);
+    const impl = commitFile(repoRoot, 'impl.ts', 'impl');
+    const proven = rejectFalseAbsentRemovedFromRelease(
+      repoRoot,
+      baseline,
+      undefined,
+      undefined,
+      [impl]
+    );
+    expect(proven.ok).toBe(true);
   });
 
   it('T-FA-UNRESOLVED-IDENTITY-004', () => {
-    const git = gitWithOverrides([
-      {
-        match: (args) => args[0] === 'ls-tree',
-        result: gitResult({ status: null, error: new Error('ls-tree spawn failed') }),
-      },
-    ]);
-    const head = defaultGitCommandRunner(REAL_REPO, ['rev-parse', 'HEAD']).stdout.trim();
     const result = rejectFalseAbsentRemovedFromRelease(
       REAL_REPO,
-      head,
+      currentHead(),
       undefined,
-      git,
+      gitWithOverrides([
+        {
+          match: (args) => args[0] === 'ls-tree',
+          result: gitResult({ status: null, error: new Error('ls-tree spawn failed') }),
+        },
+      ]),
       [TRUSTED_LEGACY_RELEASE_SHA]
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/engine identity is unreadable/);
+    expect(result.ok === false && /engine identity is unreadable/.test(result.message)).toBe(true);
   });
 
   it('T-FA-GIT-ERROR-005', () => {
-    const git = gitWithOverrides([
-      {
-        match: (args) => args.includes(`${TRUSTED_LEGACY_RELEASE_SHA}^{commit}`),
-        throwError: new Error('trusted sha resolution threw'),
-      },
-    ]);
     const result = rejectFalseAbsentRemovedFromRelease(
       REAL_REPO,
-      defaultGitCommandRunner(REAL_REPO, ['rev-parse', 'HEAD']).stdout.trim(),
+      currentHead(),
       undefined,
-      git,
+      gitWithOverrides([
+        {
+          match: (args) => args.includes(`${TRUSTED_LEGACY_RELEASE_SHA}^{commit}`),
+          throwError: new Error('trusted sha resolution threw'),
+        },
+      ]),
       [TRUSTED_LEGACY_RELEASE_SHA]
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/unreadable|threw/);
+    expect(result.ok === false && /unreadable|threw/.test(result.message)).toBe(true);
   });
 
   it('T-FA-AMBIGUOUS-006', () => {
-    const originAmbiguous = rejectFalseAbsentRemovedFromRelease(
+    const supplied = rejectFalseAbsentRemovedFromRelease(
       REAL_REPO,
-      defaultGitCommandRunner(REAL_REPO, ['rev-parse', 'HEAD']).stdout.trim(),
+      currentHead(),
       'not-a-sha',
       undefined,
       [TRUSTED_LEGACY_RELEASE_SHA]
     );
-    expect(originAmbiguous.ok).toBe(false);
-    if (!originAmbiguous.ok) expect(originAmbiguous.message).toMatch(/ambiguous/);
-
     const firstPath = TRUSTED_RELEASE_ENGINE_IDENTITY_PATHS[0];
-    const git = gitWithOverrides([
-      {
-        match: (args) => args[0] === 'ls-tree' && args.includes(firstPath),
-        result: gitResult({ status: 0, stdout: `${firstPath}\n` }),
-      },
-      {
-        match: (args) => args[0] === 'ls-tree',
-        result: gitResult({ status: 0, stdout: '' }),
-      },
-    ]);
     const partial = rejectFalseAbsentRemovedFromRelease(
       REAL_REPO,
-      defaultGitCommandRunner(REAL_REPO, ['rev-parse', 'HEAD']).stdout.trim(),
+      currentHead(),
       undefined,
-      git,
+      gitWithOverrides([
+        {
+          match: (args) => args[0] === 'ls-tree' && args.includes(firstPath),
+          result: gitResult({ status: 0, stdout: `${firstPath}\n` }),
+        },
+        {
+          match: (args) => args[0] === 'ls-tree',
+          result: gitResult({ status: 0, stdout: '' }),
+        },
+      ]),
       [TRUSTED_LEGACY_RELEASE_SHA]
     );
-    expect(partial.ok).toBe(false);
-    if (!partial.ok) expect(partial.message).toMatch(/ambiguous/);
+    expect(
+      supplied.ok === false &&
+        /ambiguous|not a full commit SHA/.test(supplied.message) &&
+        partial.ok === false &&
+        /ambiguous/.test(partial.message)
+    ).toBe(true);
   });
 
   it('T-FA-LIVE-ENGINE-008', () => {
-    const head = defaultGitCommandRunner(REAL_REPO, ['rev-parse', 'HEAD']).stdout.trim();
     const result = rejectFalseAbsentRemovedFromRelease(
       REAL_REPO,
-      head,
+      currentHead(),
       undefined,
       undefined,
       [TRUSTED_LEGACY_RELEASE_SHA]
     );
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.message).toMatch(/false-absent/);
+    expect(result.ok === false && /false-absent/.test(result.message)).toBe(true);
   });
 
-  it('T-FA-REVALIDATION / T-FA-PROVEN-ABSENT-007', () => {
+  it('does not treat an unresolved trusted SHA as proof while origin still has the engine', () => {
+    const result = rejectFalseAbsentRemovedFromRelease(
+      REAL_REPO,
+      currentHead(),
+      undefined,
+      gitWithOverrides([
+        {
+          match: (args) => args.includes(`${TRUSTED_LEGACY_RELEASE_SHA}^{commit}`),
+          result: gitResult({ status: 1, stderr: 'fatal: Needed a single revision' }),
+        },
+      ]),
+      [TRUSTED_LEGACY_RELEASE_SHA]
+    );
+    expect(result.ok === false && /false-absent|live workflow engine/.test(result.message)).toBe(
+      true
+    );
+  });
+
+  it('T-FA-PROVEN-ABSENT-007', () => {
+    const repoRoot = makeTempRoot('fa-proven-route');
+    const baseline = initGitRepo(repoRoot);
+    const impl = commitFile(repoRoot, 'impl.ts', 'impl');
+    initWorkstream(repoRoot, 'ws_fa_proven', baseline);
+    failFirstThenClosure(repoRoot, 'ws_fa_proven');
+    const reset = defaultGitCommandRunner(repoRoot, ['reset', '--hard', baseline]);
+    const removed = applyProtocolTransition({
+      repoRoot,
+      command: 'route',
+      workstreamId: 'ws_fa_proven',
+      disposition: 'removed_from_release',
+      reason: 'implementation no longer in HEAD ancestry',
+      implementationCommits: [impl],
+    });
+    expect(reset.status === 0 && removed.ok === true).toBe(true);
+  });
+
+  it('T-FA-REVALIDATION', () => {
     const repoRoot = makeTempRoot('fa-revalidate');
     const baseline = initGitRepo(repoRoot);
     const impl = commitFile(repoRoot, 'impl.ts', 'impl');
     initWorkstream(repoRoot, 'ws_fa_route', baseline);
     failFirstThenClosure(repoRoot, 'ws_fa_route');
-    const reset = defaultGitCommandRunner(repoRoot, ['reset', '--hard', baseline]);
-    expect(reset.status).toBe(0);
+    defaultGitCommandRunner(repoRoot, ['reset', '--hard', baseline]);
     const removed = applyProtocolTransition({
       repoRoot,
       command: 'route',
@@ -208,15 +271,18 @@ describe('T-FA-EVIDENCE-MATRIX fail-closed removed_from_release', { timeout: 40_
       reason: 'implementation no longer in HEAD ancestry',
       implementationCommits: [impl],
     });
-    expect(removed.ok, removed.message).toBe(true);
     const record = readProtocolRecord(repoRoot, 'ws_fa_route')!;
-    expect(revalidateRouteDisposition({ repoRoot, record }).ok).toBe(true);
+    const valid = revalidateRouteDisposition({ repoRoot, record });
     const unavailable = revalidateRouteDisposition({
       repoRoot,
       record,
       git: () => gitResult({ status: null, error: new Error('git unavailable') }),
     });
-    expect(unavailable.ok).toBe(false);
-    if (!unavailable.ok) expect(unavailable.message).toMatch(/no longer holds|unreadable|unable/);
+    expect(
+      removed.ok === true &&
+        valid.ok === true &&
+        unavailable.ok === false &&
+        /no longer holds|unreadable|unable/.test(unavailable.ok ? '' : unavailable.message)
+    ).toBe(true);
   });
 });

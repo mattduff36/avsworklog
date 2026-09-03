@@ -570,10 +570,9 @@ export function inspectTrustedReleaseObject(
 ): TrustedReleaseInspection {
   const resolved = resolveExactCommitObject(repoRoot, TRUSTED_LEGACY_RELEASE_SHA, git);
   if (resolved.ok) return { status: 'present', sha: resolved.sha };
-  if (
-    resolved.message === 'commit object is not uniquely resolvable' ||
-    resolved.message === 'malformed commit identity'
-  ) {
+  // Only a missing object is absence. Malformed, incomplete, or otherwise
+  // unreadable resolution must fail closed — never become a temp-repo pass.
+  if (resolved.message === 'commit object is not uniquely resolvable') {
     return { status: 'absent' };
   }
   return { status: 'error', message: resolved.message };
@@ -657,6 +656,50 @@ export function commitHasIdentityPaths(
   return inspectEngineIdentityPaths(repoRoot, commitSha, paths, git).status === 'present';
 }
 
+function bindOriginMainInspection(
+  repoRoot: string,
+  runner: GitCommandRunner,
+  originMainCommit?: string | null
+): { ok: true; origin: OriginMainInspection } | { ok: false; message: string } {
+  const inspectedOrigin = inspectOriginMainCommit(repoRoot, runner);
+  if (originMainCommit) {
+    if (inspectedOrigin.status === 'error') {
+      return { ok: false, message: `origin/main is unreadable: ${inspectedOrigin.message}` };
+    }
+    if (inspectedOrigin.status === 'absent') {
+      return { ok: false, message: 'origin/main is missing; cannot prove live engine absence' };
+    }
+    if (inspectedOrigin.status === 'ambiguous') {
+      return { ok: false, message: `origin/main is ambiguous: ${inspectedOrigin.message}` };
+    }
+    if (!FULL_COMMIT_SHA_RE.test(originMainCommit)) {
+      return { ok: false, message: 'supplied origin/main is not a full commit SHA' };
+    }
+    if (inspectedOrigin.sha !== originMainCommit.toLowerCase()) {
+      return {
+        ok: false,
+        message: `origin/main is ${inspectedOrigin.sha}, not the supplied ${originMainCommit}`,
+      };
+    }
+  }
+  return { ok: true, origin: inspectedOrigin };
+}
+
+function rejectUncertainOrigin(
+  origin: OriginMainInspection
+): origin is { status: 'present'; sha: string } {
+  return origin.status === 'present';
+}
+
+function originUncertaintyMessage(origin: OriginMainInspection): string {
+  if (origin.status === 'error') return `origin/main is unreadable: ${origin.message}`;
+  if (origin.status === 'absent') {
+    return 'origin/main is missing; cannot prove live engine absence';
+  }
+  if (origin.status === 'ambiguous') return `origin/main is ambiguous: ${origin.message}`;
+  return 'origin/main is not a resolved commit';
+}
+
 export function rejectFalseAbsentRemovedFromRelease(
   repoRoot: string,
   releaseHead: string,
@@ -669,6 +712,10 @@ export function rejectFalseAbsentRemovedFromRelease(
   if (trusted.status === 'error') {
     return { ok: false, message: `trusted release SHA is unreadable: ${trusted.message}` };
   }
+
+  const boundOrigin = bindOriginMainInspection(repoRoot, runner, originMainCommit);
+  if (!boundOrigin.ok) return boundOrigin;
+
   if (trusted.status === 'absent') {
     if (!implementationCommits || implementationCommits.length === 0) {
       return {
@@ -677,22 +724,42 @@ export function rejectFalseAbsentRemovedFromRelease(
           'removed_from_release requires affirmative implementation-commit absence evidence',
       };
     }
+    // No origin/main: temp or isolated repo. Impl-commit absence is the proof.
+    if (boundOrigin.origin.status === 'absent') return { ok: true };
+    if (!rejectUncertainOrigin(boundOrigin.origin)) {
+      return { ok: false, message: originUncertaintyMessage(boundOrigin.origin) };
+    }
+    const identityWithoutTrusted = inspectEngineIdentityPaths(
+      repoRoot,
+      boundOrigin.origin.sha,
+      TRUSTED_RELEASE_ENGINE_IDENTITY_PATHS,
+      runner
+    );
+    if (identityWithoutTrusted.status === 'error') {
+      return {
+        ok: false,
+        message: `engine identity is unreadable: ${identityWithoutTrusted.message}`,
+      };
+    }
+    if (identityWithoutTrusted.status === 'ambiguous') {
+      return {
+        ok: false,
+        message: `engine identity is ambiguous: ${identityWithoutTrusted.message}`,
+      };
+    }
+    if (identityWithoutTrusted.status === 'present') {
+      return {
+        ok: false,
+        message:
+          'removed_from_release is a false-absent: live workflow engine remains on origin/main',
+      };
+    }
     return { ok: true };
   }
 
-  const origin = originMainCommit
-    ? FULL_COMMIT_SHA_RE.test(originMainCommit)
-      ? ({ status: 'present', sha: originMainCommit.toLowerCase() } as const)
-      : ({ status: 'ambiguous', message: 'supplied origin/main is not a full commit SHA' } as const)
-    : inspectOriginMainCommit(repoRoot, runner);
-  if (origin.status === 'error') {
-    return { ok: false, message: `origin/main is unreadable: ${origin.message}` };
-  }
-  if (origin.status === 'absent') {
-    return { ok: false, message: 'origin/main is missing; cannot prove live engine absence' };
-  }
-  if (origin.status === 'ambiguous') {
-    return { ok: false, message: `origin/main is ambiguous: ${origin.message}` };
+  const origin = boundOrigin.origin;
+  if (!rejectUncertainOrigin(origin)) {
+    return { ok: false, message: originUncertaintyMessage(origin) };
   }
 
   const trustedOnOrigin = inspectCommitAncestry(
