@@ -407,42 +407,45 @@ describe('leftover already_in_release', { timeout: 40_000 }, () => {
 });
 
 describe('first-review binding repairs', () => {
-  it('FD-GIT intended engine range is bound on HEAD', () => {
+  it('FD-GIT', () => {
     const diff = spawnSync(
       'git',
       ['diff', '--name-only', `${ISOLATE_PARENT}..HEAD`],
       { cwd: REAL_REPO, encoding: 'utf8', shell: false }
     );
-    expect(diff.status).toBe(0);
     const files = new Set(
-      diff.stdout
+      (diff.stdout ?? '')
         .split('\n')
         .map((line) => line.trim().replace(/\\/g, '/'))
         .filter(Boolean)
     );
-    for (const relative of SUCCESSOR_ENGINE_PATHS) {
-      expect(files.has(relative), relative).toBe(true);
-    }
-    expect([...files].some((file) => file.includes('app/(dashboard)/approvals'))).toBe(false);
-    expect([...files].some((file) => file.includes('timesheet-submit'))).toBe(false);
+    expect(
+      diff.status === 0 &&
+        SUCCESSOR_ENGINE_PATHS.every((relative) => files.has(relative)) &&
+        ![...files].some(
+          (file) => file.includes('app/(dashboard)/approvals') || file.includes('timesheet-submit')
+        )
+    ).toBe(true);
   });
 
-  it('FD-VERIFY successor verification covers the bound engine files', () => {
+  it('FD-VERIFY', () => {
     const suite = JSON.parse(
       readFileSync(
         path.join(REAL_REPO, 'scripts/automation/workflow-suite-manifest.json'),
         'utf8'
       )
     ) as { files?: string[] };
-    expect(suite.files).toContain('tests/unit/workflow-v24-leftover-refresh.test.ts');
     const source = readFileSync(
       path.join(REAL_REPO, 'tests/unit/workflow-v24-leftover-refresh.test.ts'),
       'utf8'
     );
-    expect(source).toContain('T-EXH-INIT-TO-ROUTING-001');
-    expect(source).toContain('T-FIXDELTA-REFRESH-001');
-    expect(source).toContain('T-LEFTOVER-DISPOSITION-001');
-    expect(source).toContain('already_in_release');
+    expect(
+      suite.files?.includes('tests/unit/workflow-v24-leftover-refresh.test.ts') === true &&
+        source.includes('T-EXH-INIT-TO-ROUTING-001') &&
+        source.includes('T-FIXDELTA-REFRESH-001') &&
+        source.includes('T-LEFTOVER-DISPOSITION-001') &&
+        source.includes('already_in_release')
+    ).toBe(true);
   });
 });
 
