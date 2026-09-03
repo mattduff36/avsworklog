@@ -39,6 +39,9 @@ interface QuoteJobCodeTestRow {
   site_address: string | null;
   status?: string | null;
   commercial_status?: string | null;
+  revision_number?: number;
+  created_at?: string;
+  is_latest_version?: boolean;
   customer: {
     status: string | null;
     company_name: string | null;
@@ -92,16 +95,54 @@ function createAliasQuery(
   };
 }
 
-function createQuoteQuery(rowsOrPages: QuoteJobCodeTestRow[] | QuoteJobCodeTestRow[][]) {
-  const range = createRangeMock(rowsOrPages);
-  const order = vi.fn().mockReturnValue({ range });
-  const query = {
-    eq: vi.fn().mockReturnThis(),
-    in: vi.fn().mockReturnThis(),
-    order,
+function createQuoteQuery(allRows: QuoteJobCodeTestRow[]) {
+  const eqCalls: Array<[string, unknown]> = [];
+  const inCalls: Array<[string, unknown[]]> = [];
+
+  const create = () => {
+    const eqs: Record<string, unknown> = {};
+    const ins: Record<string, unknown[]> = {};
+    const query = {
+      eq: vi.fn((column: string, value: unknown) => {
+        eqs[column] = value;
+        eqCalls.push([column, value]);
+        return query;
+      }),
+      in: vi.fn((column: string, values: unknown[]) => {
+        ins[column] = values;
+        inCalls.push([column, values]);
+        return query;
+      }),
+      order: vi.fn(() => ({
+        range: async (from: number, to: number) => {
+          const rows = allRows.filter((row) => {
+            for (const [column, value] of Object.entries(eqs)) {
+              if (column === 'customer.status') {
+                if (row.customer?.status !== value) return false;
+                continue;
+              }
+              if ((row as Record<string, unknown>)[column] !== value) return false;
+            }
+            for (const [column, values] of Object.entries(ins)) {
+              if (!values.includes((row as Record<string, unknown>)[column] as never)) return false;
+            }
+            return true;
+          });
+          return { data: rows.slice(from, to + 1), error: null };
+        },
+      })),
+    };
+    return query;
   };
 
-  return { query, order, range };
+  return {
+    create,
+    get query() {
+      return create();
+    },
+    eqCalls,
+    inCalls,
+  };
 }
 
 function createLegacyQuoteQuery(rowsOrPages: LegacyQuoteJobCodeTestRow[] | LegacyQuoteJobCodeTestRow[][]) {
@@ -165,6 +206,9 @@ describe('GET /api/timesheets/job-codes', () => {
         site_address: null,
         status: 'sent',
         commercial_status: 'open',
+        is_latest_version: true,
+        revision_number: 0,
+        created_at: '2026-01-01T10:00:00.000Z',
         customer: { status: 'active', company_name: 'Omexom' },
       },
       {
@@ -177,6 +221,9 @@ describe('GET /api/timesheets/job-codes', () => {
         site_address: null,
         status: 'sent',
         commercial_status: 'open',
+        is_latest_version: false,
+        revision_number: 2,
+        created_at: '2026-03-01T10:00:00.000Z',
         customer: { status: 'active', company_name: 'Omexom' },
       },
       {
@@ -189,6 +236,9 @@ describe('GET /api/timesheets/job-codes', () => {
         site_address: null,
         status: 'sent',
         commercial_status: 'open',
+        is_latest_version: true,
+        revision_number: 0,
+        created_at: '2026-01-01T10:00:00.000Z',
         customer: { status: 'active', company_name: 'Legacy Customer' },
       },
       {
@@ -201,6 +251,9 @@ describe('GET /api/timesheets/job-codes', () => {
         site_address: null,
         status: 'sent',
         commercial_status: 'open',
+        is_latest_version: true,
+        revision_number: 0,
+        created_at: '2026-01-01T10:00:00.000Z',
         customer: { status: 'active', company_name: 'Saint Gobain' },
       },
     ]);
@@ -286,10 +339,10 @@ describe('GET /api/timesheets/job-codes', () => {
         source: 'legacy_quote',
       },
     ]);
-    expect(quoteQuery.query.eq).toHaveBeenCalledWith('is_latest_version', true);
-    expect(quoteQuery.query.eq).toHaveBeenCalledWith('commercial_status', 'open');
-    expect(quoteQuery.query.eq).toHaveBeenCalledWith('customer.status', 'active');
-    expect(quoteQuery.query.in).toHaveBeenCalledWith('status', [
+    expect(quoteQuery.eqCalls).toContainEqual(['is_latest_version', true]);
+    expect(quoteQuery.eqCalls).toContainEqual(['commercial_status', 'open']);
+    expect(quoteQuery.eqCalls).toContainEqual(['customer.status', 'active']);
+    expect(quoteQuery.inCalls).toContainEqual(['status', [
       'sent',
       'won',
       'ready_to_invoice',
@@ -299,7 +352,13 @@ describe('GET /api/timesheets/job-codes', () => {
       'completed_full',
       'partially_invoiced',
       'invoiced',
-    ]);
+    ]]);
+    expect(quoteQuery.inCalls).toContainEqual(['status', [
+      'draft',
+      'pending_internal_approval',
+      'approved',
+      'changes_requested',
+    ]]);
     expect(legacyQuoteQuery.query.not).toHaveBeenCalledWith('quote_reference', 'is', null);
     expect(projectNumberQuery.query.in).toHaveBeenCalledWith('status', ['open', 'merged', 'converted']);
   });
@@ -405,6 +464,74 @@ describe('GET /api/timesheets/job-codes', () => {
     ]);
     expect(legacyQuoteQuery.range).toHaveBeenNthCalledWith(1, 0, 999);
     expect(legacyQuoteQuery.range).toHaveBeenNthCalledWith(2, 1000, 1999);
+  });
+
+  it('TS-JOB-001 returns the fallback job code when latest is still a draft revision', async () => {
+    const quoteQuery = createQuoteQuery([
+      {
+        id: 'quote-40118-original',
+        quote_thread_id: 'thread-40118',
+        base_quote_reference: '40118-GH',
+        quote_reference: '40118-GH',
+        subject_line: 'Original PO received',
+        project_description: null,
+        site_address: '12 High Street, Southwell',
+        status: 'po_received',
+        commercial_status: 'open',
+        is_latest_version: false,
+        revision_number: 0,
+        created_at: '2026-01-01T10:00:00.000Z',
+        customer: { status: 'active', company_name: 'Omexom' },
+      },
+      {
+        id: 'quote-40118-draft',
+        quote_thread_id: 'thread-40118',
+        base_quote_reference: '40118-GH',
+        quote_reference: '40118-GH-REV1',
+        subject_line: 'Draft revision',
+        project_description: null,
+        site_address: '12 High Street, Southwell',
+        status: 'draft',
+        commercial_status: 'open',
+        is_latest_version: true,
+        revision_number: 1,
+        created_at: '2026-03-01T10:00:00.000Z',
+        customer: { status: 'active', company_name: 'Omexom' },
+      },
+    ]);
+    const legacyQuoteQuery = createLegacyQuoteQuery([]);
+    const projectNumberQuery = createProjectNumberQuery([]);
+    const aliasQuery = createAliasQuery();
+    const from = vi.fn((table: string) => {
+      if (table === 'quote_reference_aliases') return aliasQuery;
+      return {
+        select: vi.fn(() => {
+          if (table === 'quotes') return quoteQuery.query;
+          if (table === 'legacy_quotes') return legacyQuoteQuery.query;
+          if (table === 'quote_project_numbers') return projectNumberQuery.query;
+          throw new Error(`Unexpected table ${table}`);
+        }),
+      };
+    });
+    mockCreateAdminClient.mockReturnValue({ from });
+
+    const { GET } = await import('@/app/api/timesheets/job-codes/route');
+    const response = await GET(new NextRequest('http://localhost/api/timesheets/job-codes?q=40118'));
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.job_codes).toEqual([
+      {
+        value: '40118-GH',
+        label: '40118-GH',
+        customerName: 'Omexom',
+        quoteTitle: 'Original PO received',
+        source: 'live_quote',
+      },
+    ]);
+    expect(quoteQuery.eqCalls).toContainEqual(['is_latest_version', true]);
+    expect(quoteQuery.eqCalls).toContainEqual(['is_latest_version', false]);
+    expect(quoteQuery.inCalls).toContainEqual(['quote_thread_id', ['thread-40118']]);
   });
 
   it('requires timesheets access', async () => {

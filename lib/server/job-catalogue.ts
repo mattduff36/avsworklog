@@ -30,7 +30,31 @@ const SENT_ONWARDS_QUOTE_STATUSES = [
   'invoiced',
 ] as const;
 
+const PRE_SEND_QUOTE_STATUSES = [
+  'draft',
+  'pending_internal_approval',
+  'approved',
+  'changes_requested',
+] as const;
+
 const JOB_CODE_FETCH_PAGE_SIZE = 1_000;
+const JOB_CATALOGUE_IN_FILTER_CHUNK_SIZE = 100;
+
+const QUOTE_CATALOGUE_SELECT = `
+  id,
+  quote_thread_id,
+  base_quote_reference,
+  quote_reference,
+  subject_line,
+  project_description,
+  site_address,
+  status,
+  commercial_status,
+  revision_number,
+  created_at,
+  is_latest_version,
+  customer:customers!inner(status, company_name)
+`;
 
 interface QuoteJobCodeCustomer {
   status: string | null;
@@ -47,6 +71,9 @@ interface QuoteJobCodeRow {
   site_address: string | null;
   status: string | null;
   commercial_status: string | null;
+  revision_number: number | null;
+  created_at: string | null;
+  is_latest_version: boolean | null;
   customer: QuoteJobCodeCustomer | QuoteJobCodeCustomer[] | null;
 }
 
@@ -106,33 +133,78 @@ async function fetchAllPages<T>(
   return rows;
 }
 
+function chunkValues<T>(values: readonly T[], size: number): T[][] {
+  if (values.length === 0) return [];
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
+function quoteVersionTimestamp(value: string | null | undefined): number {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function compareQuoteVersionDesc(left: QuoteJobCodeRow, right: QuoteJobCodeRow): number {
+  const revisionDelta = Number(left.revision_number || 0) - Number(right.revision_number || 0);
+  if (revisionDelta !== 0) return revisionDelta;
+  const createdDelta = quoteVersionTimestamp(left.created_at) - quoteVersionTimestamp(right.created_at);
+  if (createdDelta !== 0) return createdDelta;
+  if (left.id === right.id) return 0;
+  return left.id > right.id ? 1 : -1;
+}
+
+function selectPreferredQuoteRow(
+  current: QuoteJobCodeRow | undefined,
+  candidate: QuoteJobCodeRow
+): QuoteJobCodeRow {
+  if (!current || compareQuoteVersionDesc(candidate, current) > 0) return candidate;
+  return current;
+}
+
+async function fetchFilteredQuotePages(
+  loadPage: (
+    from: number,
+    to: number
+  ) => Promise<{ data: QuoteJobCodeRow[] | null; error: { message?: string } | null }>
+): Promise<QuoteJobCodeRow[]> {
+  return fetchAllPages(async (from, to) => {
+    const result = await loadPage(from, to);
+    if (result.error) throw result.error;
+    return result.data || [];
+  });
+}
+
 export async function loadJobCatalogueRecords(
   admin: ReturnType<typeof createAdminClient> = createAdminClient()
 ): Promise<JobCatalogueRecord[]> {
-  const [quoteRows, legacyRows, projectRows, aliasResult] = await Promise.all([
-    fetchAllPages(async (from, to) => {
+  const [latestSentRows, latestPreSendRows, legacyRows, projectRows, aliasResult] = await Promise.all([
+    fetchFilteredQuotePages(async (from, to) => {
       const result = await admin
         .from('quotes')
-        .select(`
-          id,
-          quote_thread_id,
-          base_quote_reference,
-          quote_reference,
-          subject_line,
-          project_description,
-          site_address,
-          status,
-          commercial_status,
-          customer:customers!inner(status, company_name)
-        `)
+        .select(QUOTE_CATALOGUE_SELECT)
         .eq('is_latest_version', true)
         .eq('commercial_status', 'open')
         .in('status', SENT_ONWARDS_QUOTE_STATUSES)
         .eq('customer.status', 'active')
         .order('base_quote_reference', { ascending: true })
         .range(from, to);
-      if (result.error) throw result.error;
-      return (result.data || []) as QuoteJobCodeRow[];
+      return { data: (result.data || null) as QuoteJobCodeRow[] | null, error: result.error };
+    }),
+    fetchFilteredQuotePages(async (from, to) => {
+      const result = await admin
+        .from('quotes')
+        .select(QUOTE_CATALOGUE_SELECT)
+        .eq('is_latest_version', true)
+        .eq('commercial_status', 'open')
+        .in('status', PRE_SEND_QUOTE_STATUSES)
+        .eq('customer.status', 'active')
+        .order('base_quote_reference', { ascending: true })
+        .range(from, to);
+      return { data: (result.data || null) as QuoteJobCodeRow[] | null, error: result.error };
     }),
     fetchAllPages(async (from, to) => {
       const result = await admin
@@ -180,8 +252,8 @@ export async function loadJobCatalogueRecords(
     ]);
   }
 
-  const quotesById = new Map(quoteRows.map((row) => [row.id, row]));
-  const quotesByThread = new Map(quoteRows.map((row) => [row.quote_thread_id, row]));
+  const quotesById = new Map(latestSentRows.map((row) => [row.id, row]));
+  const quotesByThread = new Map(latestSentRows.map((row) => [row.quote_thread_id, row]));
   const projectsById = new Map(projectRows.map((row) => [row.id, row]));
   const extraAliases = new Map<string, string[]>();
 
@@ -203,8 +275,55 @@ export async function loadJobCatalogueRecords(
     return current;
   };
 
+  const latestSentByThread = new Map<string, QuoteJobCodeRow>();
+  for (const row of latestSentRows) {
+    if (retiredThreadIds.has(row.quote_thread_id)) continue;
+    latestSentByThread.set(
+      row.quote_thread_id,
+      selectPreferredQuoteRow(latestSentByThread.get(row.quote_thread_id), row)
+    );
+  }
+
+  const fallbackThreadIds = Array.from(new Set(
+    latestPreSendRows
+      .filter((row) => (
+        !retiredThreadIds.has(row.quote_thread_id)
+        && !latestSentByThread.has(row.quote_thread_id)
+      ))
+      .map((row) => row.quote_thread_id)
+  ));
+
+  const fallbackSentRows: QuoteJobCodeRow[] = [];
+  for (const threadIds of chunkValues(fallbackThreadIds, JOB_CATALOGUE_IN_FILTER_CHUNK_SIZE)) {
+    const pageRows = await fetchFilteredQuotePages(async (from, to) => {
+      const result = await admin
+        .from('quotes')
+        .select(QUOTE_CATALOGUE_SELECT)
+        .eq('is_latest_version', false)
+        .eq('commercial_status', 'open')
+        .in('status', SENT_ONWARDS_QUOTE_STATUSES)
+        .in('quote_thread_id', threadIds)
+        .eq('customer.status', 'active')
+        .order('base_quote_reference', { ascending: true })
+        .range(from, to);
+      return { data: (result.data || null) as QuoteJobCodeRow[] | null, error: result.error };
+    });
+    fallbackSentRows.push(...pageRows);
+  }
+
+  const liveQuoteByThread = new Map(latestSentByThread);
+  for (const row of fallbackSentRows) {
+    if (retiredThreadIds.has(row.quote_thread_id)) continue;
+    if (latestSentByThread.has(row.quote_thread_id)) continue;
+    liveQuoteByThread.set(
+      row.quote_thread_id,
+      selectPreferredQuoteRow(liveQuoteByThread.get(row.quote_thread_id), row)
+    );
+  }
+
   const records: JobCatalogueRecord[] = [];
   const seenIdentities = new Set<string>();
+  const seenLiveQuoteThreads = new Set<string>();
 
   const pushRecord = (record: JobCatalogueRecord) => {
     const key = identityKey(record);
@@ -213,8 +332,9 @@ export async function loadJobCatalogueRecords(
     records.push(record);
   };
 
-  for (const row of quoteRows) {
-    if (retiredThreadIds.has(row.quote_thread_id)) continue;
+  for (const row of liveQuoteByThread.values()) {
+    if (seenLiveQuoteThreads.has(row.quote_thread_id)) continue;
+    seenLiveQuoteThreads.add(row.quote_thread_id);
     const jobCode = normalizeJobNumberInput(row.base_quote_reference || row.quote_reference || '');
     if (!QUOTE_JOB_NUMBER_REGEX.test(jobCode)) continue;
     const customer = getQuoteCustomer(row);

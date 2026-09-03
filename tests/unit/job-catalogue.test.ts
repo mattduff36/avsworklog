@@ -4,7 +4,11 @@ import {
   isPlantDailyCheckCatalogueOptionSelectable,
   isReliableSiteAddress,
 } from '@/lib/utils/job-catalogue';
-import { listJobCatalogueOptions, resolveJobCatalogueRecord } from '@/lib/server/job-catalogue';
+import {
+  listJobCatalogueOptions,
+  loadJobCatalogueRecords,
+  resolveJobCatalogueRecord,
+} from '@/lib/server/job-catalogue';
 import type { JobCatalogueRecord } from '@/types/job-catalogue';
 
 function record(partial: Partial<JobCatalogueRecord> & Pick<JobCatalogueRecord, 'source_type' | 'source_id' | 'job_code'>): JobCatalogueRecord {
@@ -140,5 +144,303 @@ describe('PLC plant daily-check catalogue selection', () => {
       source: 'live_quote',
       blockReason: null,
     })).toBe(true);
+  });
+});
+
+interface CatalogueQuoteFixture {
+  id: string;
+  quote_thread_id: string;
+  base_quote_reference: string | null;
+  quote_reference: string | null;
+  subject_line: string | null;
+  project_description?: string | null;
+  site_address: string | null;
+  status: string | null;
+  commercial_status: string | null;
+  revision_number: number;
+  created_at: string;
+  is_latest_version: boolean;
+  customer: { status: string | null; company_name: string | null };
+}
+
+function createCatalogueAdmin(quotes: CatalogueQuoteFixture[]) {
+  const matchQuote = (
+    row: CatalogueQuoteFixture,
+    eqs: Record<string, unknown>,
+    ins: Record<string, unknown[]>
+  ) => {
+    for (const [column, value] of Object.entries(eqs)) {
+      if (column === 'customer.status') {
+        if (row.customer.status !== value) return false;
+        continue;
+      }
+      if ((row as Record<string, unknown>)[column] !== value) return false;
+    }
+    for (const [column, values] of Object.entries(ins)) {
+      const actual = (row as Record<string, unknown>)[column];
+      if (!values.includes(actual as never)) return false;
+    }
+    return true;
+  };
+
+  return {
+    from(table: string) {
+      if (table === 'quote_reference_aliases') {
+        return {
+          select: () => Promise.resolve({ data: [], error: null }),
+        };
+      }
+      if (table === 'legacy_quotes') {
+        const query = {
+          not: () => query,
+          order: () => ({
+            range: async () => ({ data: [], error: null }),
+          }),
+        };
+        return { select: () => query };
+      }
+      if (table === 'quote_project_numbers') {
+        const query = {
+          in: () => query,
+          order: () => ({
+            range: async () => ({ data: [], error: null }),
+          }),
+        };
+        return { select: () => query };
+      }
+      if (table === 'quotes') {
+        return {
+          select() {
+            const eqs: Record<string, unknown> = {};
+            const ins: Record<string, unknown[]> = {};
+            const query = {
+              eq(column: string, value: unknown) {
+                eqs[column] = value;
+                return query;
+              },
+              in(column: string, values: unknown[]) {
+                ins[column] = values;
+                return query;
+              },
+              order() {
+                return {
+                  async range(from: number, to: number) {
+                    const rows = quotes.filter((row) => matchQuote(row, eqs, ins));
+                    return { data: rows.slice(from, to + 1), error: null };
+                  },
+                };
+              },
+            };
+            return query;
+          },
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    },
+  };
+}
+
+function quoteFixture(
+  partial: Partial<CatalogueQuoteFixture> & Pick<CatalogueQuoteFixture, 'id' | 'quote_thread_id' | 'status' | 'is_latest_version'>
+): CatalogueQuoteFixture {
+  return {
+    base_quote_reference: '40118-GH',
+    quote_reference: '40118-GH',
+    subject_line: 'Works',
+    project_description: null,
+    site_address: '12 High Street, Southwell',
+    commercial_status: 'open',
+    revision_number: 0,
+    created_at: '2026-01-01T10:00:00.000Z',
+    customer: { status: 'active', company_name: 'Omexom' },
+    ...partial,
+  };
+}
+
+describe('CAT-004 / TS-JOB-001 draft revision fallback', () => {
+  it('lists po_received original plus latest draft as 40118-GH from the older sent UUID', async () => {
+    const original = quoteFixture({
+      id: 'quote-original',
+      quote_thread_id: 'thread-gh',
+      quote_reference: '40118-GH',
+      subject_line: 'Original works',
+      status: 'po_received',
+      is_latest_version: false,
+      revision_number: 0,
+    });
+    const draft = quoteFixture({
+      id: 'quote-draft',
+      quote_thread_id: 'thread-gh',
+      quote_reference: '40118-GH-REV1',
+      subject_line: 'Draft revision',
+      status: 'draft',
+      is_latest_version: true,
+      revision_number: 1,
+      created_at: '2026-03-01T10:00:00.000Z',
+    });
+    const records = await loadJobCatalogueRecords(createCatalogueAdmin([original, draft]) as never);
+    const options = listJobCatalogueOptions(records, '40118');
+
+    expect(options).toHaveLength(1);
+    expect(options[0].value).toBe('40118-GH');
+    expect(options[0].sourceId).toBe('quote-original');
+    expect(options[0].quoteTitle).toBe('Original works');
+    expect(resolveJobCatalogueRecord(records, { jobCode: '40118-GH' }).record?.source_id).toBe('quote-original');
+  });
+});
+
+describe('CAT-005 never-sent drafts stay hidden', () => {
+  it('excludes a draft-only thread', async () => {
+    const draft = quoteFixture({
+      id: 'quote-never',
+      quote_thread_id: 'thread-never',
+      status: 'draft',
+      is_latest_version: true,
+    });
+    const records = await loadJobCatalogueRecords(createCatalogueAdmin([draft]) as never);
+    expect(listJobCatalogueOptions(records, '40118')).toEqual([]);
+    expect(resolveJobCatalogueRecord(records, { jobCode: '40118-GH' }).ok).toBe(false);
+  });
+});
+
+describe('CAT-006 terminal, commercially closed, and inactive customers stay hidden', () => {
+  it('omits latest lost, closed, commercial closed, and inactive-customer threads even with older sent versions', async () => {
+    const records = await loadJobCatalogueRecords(createCatalogueAdmin([
+      quoteFixture({
+        id: 'lost-original',
+        quote_thread_id: 'thread-lost',
+        base_quote_reference: '40120-GH',
+        quote_reference: '40120-GH',
+        status: 'sent',
+        is_latest_version: false,
+      }),
+      quoteFixture({
+        id: 'lost-latest',
+        quote_thread_id: 'thread-lost',
+        base_quote_reference: '40120-GH',
+        quote_reference: '40120-GH-REV1',
+        status: 'lost',
+        is_latest_version: true,
+        revision_number: 1,
+      }),
+      quoteFixture({
+        id: 'closed-original',
+        quote_thread_id: 'thread-closed',
+        base_quote_reference: '40121-GH',
+        quote_reference: '40121-GH',
+        status: 'sent',
+        is_latest_version: false,
+      }),
+      quoteFixture({
+        id: 'closed-latest',
+        quote_thread_id: 'thread-closed',
+        base_quote_reference: '40121-GH',
+        quote_reference: '40121-GH-REV1',
+        status: 'closed',
+        is_latest_version: true,
+        revision_number: 1,
+      }),
+      quoteFixture({
+        id: 'commercial-original',
+        quote_thread_id: 'thread-commercial',
+        base_quote_reference: '40122-GH',
+        quote_reference: '40122-GH',
+        status: 'sent',
+        is_latest_version: false,
+      }),
+      quoteFixture({
+        id: 'commercial-latest',
+        quote_thread_id: 'thread-commercial',
+        base_quote_reference: '40122-GH',
+        quote_reference: '40122-GH-REV1',
+        status: 'draft',
+        commercial_status: 'closed',
+        is_latest_version: true,
+        revision_number: 1,
+      }),
+      quoteFixture({
+        id: 'inactive-original',
+        quote_thread_id: 'thread-inactive',
+        base_quote_reference: '40123-GH',
+        quote_reference: '40123-GH',
+        status: 'sent',
+        is_latest_version: false,
+        customer: { status: 'inactive', company_name: 'Inactive Ltd' },
+      }),
+      quoteFixture({
+        id: 'inactive-latest',
+        quote_thread_id: 'thread-inactive',
+        base_quote_reference: '40123-GH',
+        quote_reference: '40123-GH-REV1',
+        status: 'draft',
+        is_latest_version: true,
+        revision_number: 1,
+        customer: { status: 'inactive', company_name: 'Inactive Ltd' },
+      }),
+    ]) as never);
+
+    expect(listJobCatalogueOptions(records).map((option) => option.value)).toEqual([]);
+  });
+});
+
+describe('CAT-007 one live_quote row per thread', () => {
+  it('resolves two sent-onwards versions to the latest row, not an ambiguous pair', async () => {
+    const original = quoteFixture({
+      id: 'quote-old',
+      quote_thread_id: 'thread-two-sent',
+      status: 'po_received',
+      is_latest_version: false,
+      revision_number: 0,
+      subject_line: 'Older sent',
+    });
+    const latest = quoteFixture({
+      id: 'quote-latest-sent',
+      quote_thread_id: 'thread-two-sent',
+      quote_reference: '40118-GH-REV1',
+      status: 'sent',
+      is_latest_version: true,
+      revision_number: 1,
+      created_at: '2026-03-01T10:00:00.000Z',
+      subject_line: 'Latest sent',
+    });
+    const records = await loadJobCatalogueRecords(createCatalogueAdmin([original, latest]) as never);
+    const options = listJobCatalogueOptions(records, '40118');
+    expect(options).toHaveLength(1);
+    expect(options[0].sourceId).toBe('quote-latest-sent');
+    expect(resolveJobCatalogueRecord(records, { jobCode: '40118-GH' }).record?.source_id).toBe('quote-latest-sent');
+  });
+
+  it('picks the highest older sent revision when latest is pre-send', async () => {
+    const firstSent = quoteFixture({
+      id: 'quote-rev0',
+      quote_thread_id: 'thread-tie',
+      status: 'po_received',
+      is_latest_version: false,
+      revision_number: 0,
+      created_at: '2026-01-01T10:00:00.000Z',
+    });
+    const secondSent = quoteFixture({
+      id: 'quote-rev1',
+      quote_thread_id: 'thread-tie',
+      quote_reference: '40118-GH-REV1',
+      status: 'sent',
+      is_latest_version: false,
+      revision_number: 1,
+      created_at: '2026-02-01T10:00:00.000Z',
+      subject_line: 'Higher sent',
+    });
+    const draft = quoteFixture({
+      id: 'quote-rev2-draft',
+      quote_thread_id: 'thread-tie',
+      quote_reference: '40118-GH-REV2',
+      status: 'pending_internal_approval',
+      is_latest_version: true,
+      revision_number: 2,
+      created_at: '2026-03-01T10:00:00.000Z',
+    });
+    const records = await loadJobCatalogueRecords(
+      createCatalogueAdmin([firstSent, secondSent, draft]) as never
+    );
+    expect(listJobCatalogueOptions(records).map((option) => option.sourceId)).toEqual(['quote-rev1']);
   });
 });
