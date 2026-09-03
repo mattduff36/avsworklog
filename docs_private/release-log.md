@@ -2,6 +2,33 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.1.1
+
+**GIT COMMIT MESSAGE**
+`fix(quotes): chunk overview PostgREST filters so the tab can load`
+
+**PUSHED AT**
+2026-09-03T12:02:15.327Z
+
+**WHAT CHANGED**
+Type overview chunk helper for PostgREST builders. Close first-pass identity and verification blockers. Keep CAT-007 as a single required assertion. Keep job codes selectable during draft revisions. Chunk overview PostgREST filters so the tab can load.
+
+**VERSION HISTORY DETAILS**
+- Type overview chunk helper for PostgREST builders, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated data storage, with changes to automated tests and data storage.
+- Updated timesheets, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(quotes): type overview chunk helper for PostgREST builders`
+- `fix(job-catalogue): close first-pass identity and verification blockers`
+- `test(job-catalogue): keep CAT-007 as a single required assertion`
+- `fix(job-catalogue): keep job codes selectable during draft revisions`
+- `fix(quotes): chunk overview PostgREST filters so the tab can load`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0926.1.0
 
 **GIT COMMIT MESSAGE**

@@ -1,5 +1,25 @@
 [
   {
+    "version": "0926.1.1",
+    "updateKind": "minor",
+    "title": "Quotes improvements",
+    "description": "Type overview chunk helper for PostgREST builders. Close first-pass identity and verification blockers. Keep CAT-007 as a single required assertion. Keep job codes selectable during draft revisions. Chunk overview PostgREST filters so the tab can load.",
+    "summary": "Type overview chunk helper for PostgREST builders. Close first-pass identity and verification blockers. Keep CAT-007 as a single required assertion. Keep job codes selectable during draft revisions. Chunk overview PostgREST filters so the tab can load.",
+    "details": [
+      "Type overview chunk helper for PostgREST builders, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated data storage, with changes to automated tests and data storage.",
+      "Updated timesheets, with changes to automated tests."
+    ],
+    "areas": [
+      "Quotes",
+      "Type overview chunk helper for PostgREST builders. Close first-pass identity"
+    ],
+    "areaKeys": [
+      "quotes"
+    ],
+    "pushedAt": "2026-09-03T12:02:15.327Z"
+  },
+  {
     "version": "0926.1.0",
     "updateKind": "major",
     "title": "Workflow update",
