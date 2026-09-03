@@ -340,25 +340,6 @@ describe('GET /api/timesheets/job-codes', () => {
       },
     ]);
     expect(quoteQuery.eqCalls).toContainEqual(['is_latest_version', true]);
-    expect(quoteQuery.eqCalls).toContainEqual(['commercial_status', 'open']);
-    expect(quoteQuery.eqCalls).toContainEqual(['customer.status', 'active']);
-    expect(quoteQuery.inCalls).toContainEqual(['status', [
-      'sent',
-      'won',
-      'ready_to_invoice',
-      'po_received',
-      'in_progress',
-      'completed_part',
-      'completed_full',
-      'partially_invoiced',
-      'invoiced',
-    ]]);
-    expect(quoteQuery.inCalls).toContainEqual(['status', [
-      'draft',
-      'pending_internal_approval',
-      'approved',
-      'changes_requested',
-    ]]);
     expect(legacyQuoteQuery.query.not).toHaveBeenCalledWith('quote_reference', 'is', null);
     expect(projectNumberQuery.query.in).toHaveBeenCalledWith('status', ['open', 'merged', 'converted']);
   });
@@ -466,7 +447,7 @@ describe('GET /api/timesheets/job-codes', () => {
     expect(legacyQuoteQuery.range).toHaveBeenNthCalledWith(2, 1000, 1999);
   });
 
-  it('TS-JOB-001 returns the fallback job code when latest is still a draft revision', async () => {
+  it('returns the fallback job code when latest is still a draft revision', async () => {
     const quoteQuery = createQuoteQuery([
       {
         id: 'quote-40118-original',

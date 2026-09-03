@@ -5,7 +5,7 @@ import {
   applyJobCatalogueFallbackRollback,
   createJobCatalogueFallbackPglite,
   resolveAllocationJob,
-} from './job-catalogue-revision-fallback-pglite-harness';
+} from '../db/job-catalogue-revision-fallback-pglite-harness';
 
 const SITE = '12 High Street, Southwell';
 
@@ -112,7 +112,7 @@ describe('job catalogue revision fallback PGlite runtime', () => {
     await pg?.close();
   });
 
-  it('SQL-RUNTIME-001: by-id and by-code return the same representative and any version UUID canonicalizes', async () => {
+  it('SQL-RUNTIME-001 / FD-VERIFY-001: by-id and by-code return the same representative and any version UUID canonicalizes', async () => {
     const byOriginal = await resolveAllocationJob(pg, 'live_quote', IDS.originalGh, null);
     const byMid = await resolveAllocationJob(pg, 'live_quote', IDS.midSentGh, null);
     const byDraft = await resolveAllocationJob(pg, 'live_quote', IDS.draftGh, null);
@@ -129,6 +129,7 @@ describe('job catalogue revision fallback PGlite runtime', () => {
       title: 'Mid sent',
     });
     expect(byOriginal[0].job_code).not.toContain('REV');
+    expect(await resolveAllocationJob(pg, null, null, '40118-GH-REV2')).toEqual([]);
   });
 
   it('SQL-RUNTIME-002: never-sent and terminal or closed threads return zero rows', async () => {

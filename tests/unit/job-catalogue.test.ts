@@ -257,7 +257,7 @@ function quoteFixture(
   };
 }
 
-describe('CAT-004 / TS-JOB-001 draft revision fallback', () => {
+describe('CAT-004 draft revision fallback', () => {
   it('lists po_received original plus latest draft as 40118-GH from the older sent UUID', async () => {
     const original = quoteFixture({
       id: 'quote-original',
@@ -304,7 +304,7 @@ describe('CAT-005 never-sent drafts stay hidden', () => {
 });
 
 describe('CAT-006 terminal, commercially closed, and inactive customers stay hidden', () => {
-  it('omits latest lost, closed, commercial closed, and inactive-customer threads even with older sent versions', async () => {
+  it('omits latest lost, closed, commercial closed, inactive-customer, and FD-LATEST-001 duplicate-latest terminal threads even with older sent versions', async () => {
     const records = await loadJobCatalogueRecords(createCatalogueAdmin([
       quoteFixture({
         id: 'lost-original',
@@ -376,6 +376,25 @@ describe('CAT-006 terminal, commercially closed, and inactive customers stay hid
         is_latest_version: true,
         revision_number: 1,
         customer: { status: 'inactive', company_name: 'Inactive Ltd' },
+      }),
+      quoteFixture({
+        id: 'dup-sent',
+        quote_thread_id: 'thread-dup-latest',
+        base_quote_reference: '40124-GH',
+        quote_reference: '40124-GH',
+        status: 'sent',
+        is_latest_version: true,
+        revision_number: 0,
+      }),
+      quoteFixture({
+        id: 'dup-lost',
+        quote_thread_id: 'thread-dup-latest',
+        base_quote_reference: '40124-GH',
+        quote_reference: '40124-GH-REV1',
+        status: 'lost',
+        is_latest_version: true,
+        revision_number: 2,
+        created_at: '2026-04-01T10:00:00.000Z',
       }),
     ]) as never);
 

@@ -165,6 +165,18 @@ function selectPreferredQuoteRow(
   return current;
 }
 
+function isSentOnwardsQuoteStatus(status: string | null): boolean {
+  return (SENT_ONWARDS_QUOTE_STATUSES as readonly string[]).includes(status || '');
+}
+
+function isPreSendQuoteStatus(status: string | null): boolean {
+  return (PRE_SEND_QUOTE_STATUSES as readonly string[]).includes(status || '');
+}
+
+function isOpenActiveQuote(row: QuoteJobCodeRow): boolean {
+  return row.commercial_status === 'open' && getQuoteCustomer(row)?.status === 'active';
+}
+
 async function fetchFilteredQuotePages(
   loadPage: (
     from: number,
@@ -181,27 +193,12 @@ async function fetchFilteredQuotePages(
 export async function loadJobCatalogueRecords(
   admin: ReturnType<typeof createAdminClient> = createAdminClient()
 ): Promise<JobCatalogueRecord[]> {
-  const [latestSentRows, latestPreSendRows, legacyRows, projectRows, aliasResult] = await Promise.all([
+  const [latestRows, legacyRows, projectRows, aliasResult] = await Promise.all([
     fetchFilteredQuotePages(async (from, to) => {
       const result = await admin
         .from('quotes')
         .select(QUOTE_CATALOGUE_SELECT)
         .eq('is_latest_version', true)
-        .eq('commercial_status', 'open')
-        .in('status', SENT_ONWARDS_QUOTE_STATUSES)
-        .eq('customer.status', 'active')
-        .order('base_quote_reference', { ascending: true })
-        .range(from, to);
-      return { data: (result.data || null) as QuoteJobCodeRow[] | null, error: result.error };
-    }),
-    fetchFilteredQuotePages(async (from, to) => {
-      const result = await admin
-        .from('quotes')
-        .select(QUOTE_CATALOGUE_SELECT)
-        .eq('is_latest_version', true)
-        .eq('commercial_status', 'open')
-        .in('status', PRE_SEND_QUOTE_STATUSES)
-        .eq('customer.status', 'active')
         .order('base_quote_reference', { ascending: true })
         .range(from, to);
       return { data: (result.data || null) as QuoteJobCodeRow[] | null, error: result.error };
@@ -252,6 +249,18 @@ export async function loadJobCatalogueRecords(
     ]);
   }
 
+  const latestByThread = new Map<string, QuoteJobCodeRow>();
+  for (const row of latestRows) {
+    if (retiredThreadIds.has(row.quote_thread_id)) continue;
+    latestByThread.set(
+      row.quote_thread_id,
+      selectPreferredQuoteRow(latestByThread.get(row.quote_thread_id), row)
+    );
+  }
+
+  const latestSentRows = [...latestByThread.values()].filter(
+    (row) => isOpenActiveQuote(row) && isSentOnwardsQuoteStatus(row.status)
+  );
   const quotesById = new Map(latestSentRows.map((row) => [row.id, row]));
   const quotesByThread = new Map(latestSentRows.map((row) => [row.quote_thread_id, row]));
   const projectsById = new Map(projectRows.map((row) => [row.id, row]));
@@ -275,23 +284,18 @@ export async function loadJobCatalogueRecords(
     return current;
   };
 
-  const latestSentByThread = new Map<string, QuoteJobCodeRow>();
-  for (const row of latestSentRows) {
-    if (retiredThreadIds.has(row.quote_thread_id)) continue;
-    latestSentByThread.set(
-      row.quote_thread_id,
-      selectPreferredQuoteRow(latestSentByThread.get(row.quote_thread_id), row)
-    );
+  const liveQuoteByThread = new Map<string, QuoteJobCodeRow>();
+  const fallbackThreadIds: string[] = [];
+  for (const [threadId, latest] of latestByThread) {
+    if (!isOpenActiveQuote(latest)) continue;
+    if (isSentOnwardsQuoteStatus(latest.status)) {
+      liveQuoteByThread.set(threadId, latest);
+      continue;
+    }
+    if (isPreSendQuoteStatus(latest.status)) {
+      fallbackThreadIds.push(threadId);
+    }
   }
-
-  const fallbackThreadIds = Array.from(new Set(
-    latestPreSendRows
-      .filter((row) => (
-        !retiredThreadIds.has(row.quote_thread_id)
-        && !latestSentByThread.has(row.quote_thread_id)
-      ))
-      .map((row) => row.quote_thread_id)
-  ));
 
   const fallbackSentRows: QuoteJobCodeRow[] = [];
   for (const threadIds of chunkValues(fallbackThreadIds, JOB_CATALOGUE_IN_FILTER_CHUNK_SIZE)) {
@@ -311,10 +315,7 @@ export async function loadJobCatalogueRecords(
     fallbackSentRows.push(...pageRows);
   }
 
-  const liveQuoteByThread = new Map(latestSentByThread);
   for (const row of fallbackSentRows) {
-    if (retiredThreadIds.has(row.quote_thread_id)) continue;
-    if (latestSentByThread.has(row.quote_thread_id)) continue;
     liveQuoteByThread.set(
       row.quote_thread_id,
       selectPreferredQuoteRow(liveQuoteByThread.get(row.quote_thread_id), row)

@@ -19,12 +19,15 @@ function readSql(relativePath: string): string {
 }
 
 describe('job catalogue revision fallback migration contract', () => {
-  it('SQL-001: new migration encodes pre-send fallback without changing 20260813', () => {
+  it('SQL-001 / FD-CODE-001: new migration encodes pre-send fallback without changing 20260813', () => {
     const sql = readSql(MIGRATION_RELATIVE);
     const historic = readSql(HISTORIC_RELATIVE);
 
     expect(sql).toContain('-- finalise-phase: predeploy');
     expect(sql).toContain('CREATE OR REPLACE FUNCTION private.allocation_live_quote_thread_representative');
+    expect(sql).toContain(
+      "UPPER(COALESCE(NULLIF(BTRIM(quotes.base_quote_reference), ''), NULLIF(BTRIM(quotes.quote_reference), ''), '')) = v_code"
+    );
     expect(sql).toContain("'draft'");
     expect(sql).toContain("'pending_internal_approval'");
     expect(sql).toContain("'approved'");

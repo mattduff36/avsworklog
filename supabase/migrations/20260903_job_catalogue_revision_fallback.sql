@@ -225,7 +225,7 @@ BEGIN
     WITH candidate_threads AS (
       SELECT DISTINCT quotes.quote_thread_id AS thread_id
       FROM public.quotes
-      WHERE UPPER(COALESCE(quotes.base_quote_reference, quotes.quote_reference, '')) = v_code
+      WHERE UPPER(COALESCE(NULLIF(BTRIM(quotes.base_quote_reference), ''), NULLIF(BTRIM(quotes.quote_reference), ''), '')) = v_code
         AND NOT EXISTS (
           SELECT 1
           FROM public.quote_reference_aliases aliases
