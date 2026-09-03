@@ -407,7 +407,7 @@ describe('leftover already_in_release', { timeout: 40_000 }, () => {
 });
 
 describe('first-review binding repairs', () => {
-  it('FD-GIT', () => {
+  it('T-SUCCESSOR-RANGE-001', () => {
     const diff = spawnSync(
       'git',
       ['diff', '--name-only', `${ISOLATE_PARENT}..HEAD`],
@@ -428,7 +428,7 @@ describe('first-review binding repairs', () => {
     ).toBe(true);
   });
 
-  it('FD-VERIFY', () => {
+  it('T-SUCCESSOR-VERIFY-001', () => {
     const suite = JSON.parse(
       readFileSync(
         path.join(REAL_REPO, 'scripts/automation/workflow-suite-manifest.json'),
