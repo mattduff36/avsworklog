@@ -177,6 +177,29 @@ function uniqueIdentifiers(values: Array<string | null | undefined>): string[] {
   return Array.from(new Set(values.map(value => (value || '').trim()).filter(Boolean)));
 }
 
+export const OVERVIEW_IN_FILTER_CHUNK_SIZE = 100;
+
+function chunkValues<T>(values: readonly T[], size = OVERVIEW_IN_FILTER_CHUNK_SIZE): T[][] {
+  const chunks: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+  return chunks;
+}
+
+async function selectInChunks<TRow>(
+  values: readonly string[],
+  runChunk: (chunk: string[]) => PromiseLike<{ data: TRow[] | null; error: unknown }>,
+): Promise<TRow[]> {
+  const rows: TRow[] = [];
+  for (const chunk of chunkValues(values)) {
+    const { data, error } = await runChunk(chunk);
+    if (error) throw error;
+    if (data?.length) rows.push(...data);
+  }
+  return rows;
+}
+
 function roundHours(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -605,8 +628,8 @@ async function loadProjects(admin: SupabaseAdminClient): Promise<ProjectSourceRo
   return (data || []) as ProjectSourceRow[];
 }
 
-async function loadInvoices(
-  admin: SupabaseAdminClient,
+export async function loadInvoices(
+  admin: Pick<SupabaseAdminClient, 'from'>,
   quoteIds: string[],
   quotes: QuoteLevelInvoiceSource[]
 ): Promise<Map<string, QuoteOverviewInvoice[]>> {
@@ -614,14 +637,14 @@ async function loadInvoices(
   quoteIds.forEach(quoteId => invoicesByQuoteId.set(quoteId, []));
   if (quoteIds.length === 0) return invoicesByQuoteId;
 
-  const { data, error } = await admin
-    .from('quote_invoices')
-    .select('id, quote_id, invoice_number, invoice_date, amount, invoice_scope, comments, created_by, created_at, updated_at, invoice_request_id')
-    .in('quote_id', quoteIds);
+  const data = await selectInChunks<QuoteInvoiceRow>(quoteIds, (chunk) =>
+    admin
+      .from('quote_invoices')
+      .select('id, quote_id, invoice_number, invoice_date, amount, invoice_scope, comments, created_by, created_at, updated_at, invoice_request_id')
+      .in('quote_id', chunk)
+  );
 
-  if (error) throw error;
-
-  (data || []).forEach((row) => {
+  data.forEach((row) => {
     const invoice = toInvoice(row as QuoteInvoiceRow);
     const invoices = invoicesByQuoteId.get(invoice.quote_id) || [];
     invoices.push(invoice);
@@ -642,8 +665,8 @@ async function loadInvoices(
   return invoicesByQuoteId;
 }
 
-async function loadLabourRowsByReference(
-  admin: SupabaseAdminClient,
+export async function loadLabourRowsByReference(
+  admin: Pick<SupabaseAdminClient, 'from'>,
   references: string[]
 ): Promise<Map<string, QuoteOverviewLabourRow[]>> {
   const normalizedReferences = uniqueValues(references);
@@ -651,66 +674,69 @@ async function loadLabourRowsByReference(
   normalizedReferences.forEach(reference => emptyMap.set(reference, []));
   if (normalizedReferences.length === 0) return emptyMap;
 
-  const { data: matchingJobCodes, error: matchingJobCodesError } = await admin
-    .from('timesheet_entry_job_codes')
-    .select('timesheet_entry_id, job_number, display_order')
-    .in('job_number', normalizedReferences);
+  const matchingJobCodes = await selectInChunks<LabourJobCodeSourceRow>(
+    normalizedReferences,
+    (chunk) =>
+      admin
+        .from('timesheet_entry_job_codes')
+        .select('timesheet_entry_id, job_number, display_order')
+        .in('job_number', chunk),
+  );
 
-  if (matchingJobCodesError) throw matchingJobCodesError;
-
-  const entryIds = Array.from(new Set((matchingJobCodes || []).map(row => row.timesheet_entry_id).filter(Boolean)));
+  const entryIds = Array.from(new Set(matchingJobCodes.map(row => row.timesheet_entry_id).filter(Boolean)));
   if (entryIds.length === 0) return emptyMap;
 
-  const [{ data: allJobCodes, error: allJobCodesError }, { data: entries, error: entriesError }] = await Promise.all([
-    admin
-      .from('timesheet_entry_job_codes')
-      .select('timesheet_entry_id, job_number, display_order')
-      .in('timesheet_entry_id', entryIds),
-    admin
-      .from('timesheet_entries')
-      .select(`
-        id,
-        daily_total,
-        day_of_week,
-        time_started,
-        time_finished,
-        remarks,
-        job_number,
-        operator_travel_hours,
-        operator_yard_hours,
-        operator_working_hours,
-        machine_travel_hours,
-        machine_start_time,
-        machine_finish_time,
-        machine_working_hours,
-        machine_standing_hours,
-        machine_operator_hours,
-        maintenance_breakdown_hours,
-        timesheet:timesheets(
+  const [allJobCodes, entries] = await Promise.all([
+    selectInChunks<LabourJobCodeSourceRow>(entryIds, (chunk) =>
+      admin
+        .from('timesheet_entry_job_codes')
+        .select('timesheet_entry_id, job_number, display_order')
+        .in('timesheet_entry_id', chunk)
+    ),
+    selectInChunks<LabourEntrySourceRow>(entryIds, (chunk) =>
+      admin
+        .from('timesheet_entries')
+        .select(`
           id,
-          week_ending,
-          status,
-          timesheet_type,
-          reg_number,
-          site_address,
-          hirer_name,
-          is_hired_plant,
-          hired_plant_id_serial,
-          hired_plant_description,
-          hired_plant_hiring_company,
-          user_id,
-          profile:profiles!timesheets_user_id_fkey(id, full_name, employee_id)
-        )
-      `)
-      .in('id', entryIds),
+          daily_total,
+          day_of_week,
+          time_started,
+          time_finished,
+          remarks,
+          job_number,
+          operator_travel_hours,
+          operator_yard_hours,
+          operator_working_hours,
+          machine_travel_hours,
+          machine_start_time,
+          machine_finish_time,
+          machine_working_hours,
+          machine_standing_hours,
+          machine_operator_hours,
+          maintenance_breakdown_hours,
+          timesheet:timesheets(
+            id,
+            week_ending,
+            status,
+            timesheet_type,
+            reg_number,
+            site_address,
+            hirer_name,
+            is_hired_plant,
+            hired_plant_id_serial,
+            hired_plant_description,
+            hired_plant_hiring_company,
+            user_id,
+            profile:profiles!timesheets_user_id_fkey(id, full_name, employee_id)
+          )
+        `)
+        .in('id', chunk)
+    ),
   ]);
 
-  if (allJobCodesError) throw allJobCodesError;
-  if (entriesError) throw entriesError;
-
   return buildAllocatedLabourRows(
-    (entries || []) as LabourEntrySourceRow[],
-    (allJobCodes || []) as LabourJobCodeSourceRow[],
+    entries,
+    allJobCodes,
     normalizedReferences
   );
 }
@@ -896,24 +922,35 @@ async function loadOverviewSources(admin: SupabaseAdminClient): Promise<Overview
   );
 
   if (threadIds.length > 0) {
-    const { data: versions, error: versionError } = await admin
-      .from('quotes')
-      .select('id, quote_thread_id, total, revision_type, revision_number, created_at')
-      .in('quote_thread_id', threadIds);
-    if (versionError) throw versionError;
+    const versions = await selectInChunks<{
+      id: string;
+      quote_thread_id: string;
+      total: number | null;
+      revision_type: QuoteRow['revision_type'];
+      revision_number: number | null;
+      created_at: string;
+    }>(threadIds, (chunk) =>
+      admin
+        .from('quotes')
+        .select('id, quote_thread_id, total, revision_type, revision_number, created_at')
+        .in('quote_thread_id', chunk)
+    );
 
-    const versionIds = (versions || []).map(version => version.id);
-    const [invoiceResult, requestResult, adjustmentResult] = await Promise.all([
-      admin.from('quote_invoices').select('*').in('quote_id', versionIds),
-      admin.from('quote_invoice_requests').select('*').in('quote_id', versionIds),
-      admin.from('quote_financial_adjustments').select('*').in('quote_thread_id', threadIds),
+    const versionIds = versions.map(version => version.id);
+    const [invoiceRows, requestRows, adjustmentRows] = await Promise.all([
+      selectInChunks<QuoteInvoice>(versionIds, (chunk) =>
+        admin.from('quote_invoices').select('*').in('quote_id', chunk)
+      ),
+      selectInChunks<QuoteInvoiceRequest>(versionIds, (chunk) =>
+        admin.from('quote_invoice_requests').select('*').in('quote_id', chunk)
+      ),
+      selectInChunks<QuoteFinancialAdjustment>(threadIds, (chunk) =>
+        admin.from('quote_financial_adjustments').select('*').in('quote_thread_id', chunk)
+      ),
     ]);
-    if (invoiceResult.error) throw invoiceResult.error;
-    if (requestResult.error) throw requestResult.error;
-    if (adjustmentResult.error) throw adjustmentResult.error;
 
     for (const quote of quotes) {
-      const threadVersions = (versions || []).filter(
+      const threadVersions = versions.filter(
         version => version.quote_thread_id === quote.quote_thread_id,
       );
       const threadVersionIds = new Set(threadVersions.map(version => version.id));
@@ -926,16 +963,16 @@ async function loadOverviewSources(admin: SupabaseAdminClient): Promise<Overview
           revision_number: Number(version.revision_number || 0),
           created_at: version.created_at,
         })),
-        invoices: (invoiceResult.data || [])
+        invoices: invoiceRows
           .filter(invoice => threadVersionIds.has(invoice.quote_id))
           .map(invoice => ({ ...invoice, amount: Number(invoice.amount || 0) } as QuoteInvoice)),
-        requests: (requestResult.data || [])
+        requests: requestRows
           .filter(request => threadVersionIds.has(request.quote_id))
           .map(request => ({
             ...request,
             requested_amount: Number(request.requested_amount || 0),
           } as QuoteInvoiceRequest)),
-        adjustments: (adjustmentResult.data || [])
+        adjustments: adjustmentRows
           .filter(adjustment => adjustment.quote_thread_id === quote.quote_thread_id)
           .map(adjustment => ({
             ...adjustment,

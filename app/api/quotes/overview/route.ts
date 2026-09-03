@@ -9,6 +9,35 @@ function normalizeDateParam(value: string | null): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
+function getPostgrestLogFields(error: unknown): {
+  message: unknown;
+  details: unknown;
+  hint: unknown;
+  code: unknown;
+} {
+  if (error && typeof error === 'object') {
+    const record = error as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+    return {
+      message: record.message ?? (error instanceof Error ? error.message : 'Unknown error'),
+      details: record.details ?? null,
+      hint: record.hint ?? null,
+      code: record.code ?? null,
+    };
+  }
+
+  return {
+    message: error instanceof Error ? error.message : String(error),
+    details: null,
+    hint: null,
+    code: null,
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -30,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(payload);
   } catch (error) {
-    console.error('Error fetching quotes overview:', error);
+    console.error('Error fetching quotes overview:', getPostgrestLogFields(error));
     return NextResponse.json({ error: 'Unable to load quotes overview right now.' }, { status: 500 });
   }
 }

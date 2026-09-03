@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  OVERVIEW_IN_FILTER_CHUNK_SIZE,
   buildAllocatedLabourRows,
   buildOverviewRecords,
   buildOverviewSummary,
   buildOverviewQuoteIds,
   buildQuoteLevelInvoiceFallback,
   getLatestLabourActivityDate,
+  loadInvoices,
+  loadLabourRowsByReference,
   type LabourEntrySourceRow,
   type LabourJobCodeSourceRow,
   type LabourTimesheetSource,
@@ -338,5 +341,169 @@ describe('quotes overview summary', () => {
 
     expect(summary.invoice_count).toBe(1);
     expect(summary.invoice_total).toBe(100);
+  });
+});
+
+describe('quotes overview PostgREST .in() chunking', () => {
+  interface InCall {
+    table: string;
+    column: string;
+    ids: string[];
+  }
+
+  function createInTrackingAdmin() {
+    const inCalls: InCall[] = [];
+    const admin = {
+      from(table: string) {
+        return {
+          select() {
+            return {
+              async in(column: string, ids: string[]) {
+                inCalls.push({ table, column, ids: [...ids] });
+                if (table === 'timesheet_entry_job_codes' && column === 'job_number') {
+                  return {
+                    data: ids.map((jobNumber) => ({
+                      timesheet_entry_id: `entry-${jobNumber}`,
+                      job_number: jobNumber,
+                      display_order: 0,
+                    })),
+                    error: null,
+                  };
+                }
+                return { data: [], error: null };
+              },
+            };
+          },
+        };
+      },
+    };
+
+    return { admin, inCalls };
+  }
+
+  it('OV-001: chunks labour and invoice .in() filters when ID lists exceed the chunk size', async () => {
+    const oversizedCount = 651;
+    const quoteIds = Array.from({ length: oversizedCount }, (_, index) => `quote-${index}`);
+    const jobNumbers = Array.from({ length: oversizedCount }, (_, index) => (
+      `J${String(index).padStart(5, '0')}-MD`
+    ));
+    const { admin, inCalls } = createInTrackingAdmin();
+
+    await loadInvoices(admin, quoteIds, []);
+    await loadLabourRowsByReference(admin, jobNumbers);
+
+    expect(inCalls.length).toBeGreaterThan(0);
+    expect(inCalls.every(call => call.ids.length > 0 && call.ids.length <= OVERVIEW_IN_FILTER_CHUNK_SIZE)).toBe(true);
+
+    const invoiceQuoteIds = inCalls
+      .filter(call => call.table === 'quote_invoices' && call.column === 'quote_id')
+      .flatMap(call => call.ids);
+    expect(invoiceQuoteIds).toEqual(quoteIds);
+    expect(invoiceQuoteIds).toHaveLength(oversizedCount);
+
+    const jobNumberIds = inCalls
+      .filter(call => call.table === 'timesheet_entry_job_codes' && call.column === 'job_number')
+      .flatMap(call => call.ids);
+    expect(jobNumberIds).toEqual(jobNumbers);
+    expect(jobNumberIds).toHaveLength(oversizedCount);
+
+    const expectedEntryIds = jobNumbers.map(jobNumber => `entry-${jobNumber}`);
+    const timesheetEntryIds = inCalls
+      .filter(call => call.table === 'timesheet_entry_job_codes' && call.column === 'timesheet_entry_id')
+      .flatMap(call => call.ids);
+    const timesheetIds = inCalls
+      .filter(call => call.table === 'timesheet_entries' && call.column === 'id')
+      .flatMap(call => call.ids);
+
+    expect(timesheetEntryIds).toEqual(expectedEntryIds);
+    expect(timesheetIds).toEqual(expectedEntryIds);
+    expect(Math.ceil(oversizedCount / OVERVIEW_IN_FILTER_CHUNK_SIZE)).toBe(7);
+  });
+
+  it('OV-002: labour and invoice totals match when the same rows arrive in two chunks vs one array', () => {
+    const entries = [
+      createEntry('entry-1', 'approved', 8),
+      createEntry('entry-2', 'approved', 6),
+      createEntry('entry-3', 'processed', 4),
+    ];
+    const jobCodes = entries.flatMap(entry => createJobCodes(entry.id, ['01234-MD']));
+
+    const unchunkedRows = buildAllocatedLabourRows(entries, jobCodes, ['01234-MD']);
+    const chunkedRows = buildAllocatedLabourRows(
+      [...entries.slice(0, 2), ...entries.slice(2)],
+      [...jobCodes.slice(0, 2), ...jobCodes.slice(2)],
+      ['01234-MD'],
+    );
+
+    expect(chunkedRows.get('01234-MD')).toEqual(unchunkedRows.get('01234-MD'));
+    expect((chunkedRows.get('01234-MD') || []).reduce((sum, row) => sum + row.allocated_hours, 0)).toBe(18);
+
+    const invoices: QuoteOverviewInvoice[] = [
+      {
+        id: 'inv-1',
+        quote_id: 'quote-1',
+        invoice_number: '1',
+        invoice_date: '2026-05-20',
+        amount: 100,
+        invoice_scope: 'partial',
+        comments: null,
+        created_at: '2026-05-21T00:00:00.000Z',
+      },
+      {
+        id: 'inv-2',
+        quote_id: 'quote-1',
+        invoice_number: '2',
+        invoice_date: '2026-05-25',
+        amount: 250,
+        invoice_scope: 'partial',
+        comments: null,
+        created_at: '2026-05-26T00:00:00.000Z',
+      },
+      {
+        id: 'inv-3',
+        quote_id: 'quote-1',
+        invoice_number: '3',
+        invoice_date: '2026-06-02',
+        amount: 50,
+        invoice_scope: 'partial',
+        comments: null,
+        created_at: '2026-06-03T00:00:00.000Z',
+      },
+    ];
+    const unchunkedInvoices = new Map<string, QuoteOverviewInvoice[]>([['quote-1', invoices]]);
+    const chunkedInvoices = new Map<string, QuoteOverviewInvoice[]>([[
+      'quote-1',
+      [...invoices.slice(0, 2), ...invoices.slice(2)],
+    ]]);
+
+    const records: OverviewSummaryRecord[] = [{
+      item: {
+        ...createItem('01234-MD'),
+        quote_id: 'quote-1',
+        invoice_total: 400,
+        worked_hours: 18,
+      },
+      sourceReferences: ['01234-MD'],
+      quoteIds: ['quote-1'],
+    }];
+    const dateRange = { from: '2026-05-15', to: '2026-06-21' };
+
+    const unchunkedSummary = buildOverviewSummary({
+      records,
+      invoicesByQuoteId: unchunkedInvoices,
+      labourRowsByReference: unchunkedRows,
+      dateRange,
+    });
+    const chunkedSummary = buildOverviewSummary({
+      records,
+      invoicesByQuoteId: chunkedInvoices,
+      labourRowsByReference: chunkedRows,
+      dateRange,
+    });
+
+    expect(chunkedSummary).toEqual(unchunkedSummary);
+    expect(chunkedSummary.invoice_total).toBe(400);
+    expect(chunkedSummary.invoice_count).toBe(3);
+    expect(chunkedSummary.worked_hours).toBe(18);
   });
 });
