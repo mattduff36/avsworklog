@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { getApprovalsDefaultStatusFilters } from '@/lib/utils/approvals-filters';
+import { getApprovalsTimesheetStatuses } from '@/lib/utils/timesheet-status-display';
 
 function read(relativePath: string): string {
   return fs.readFileSync(path.join(process.cwd(), relativePath), 'utf-8');
@@ -32,16 +34,38 @@ describe('timesheet dual-gate contracts', () => {
   });
 
   it('TS-DG-QUEUE-001 dashboard tiles follow the dual-gate default queues', () => {
+    expect(getApprovalsTimesheetStatuses(getApprovalsDefaultStatusFilters('Accounts').timesheets)).toEqual([
+      'submitted',
+      'manager_approved',
+    ]);
+    expect(getApprovalsTimesheetStatuses(getApprovalsDefaultStatusFilters('Operations').timesheets)).toEqual([
+      'submitted',
+      'approved',
+    ]);
     const dashboard = read('lib/server/dashboard-approvals.ts');
     expect(dashboard).toContain('getApprovalsTimesheetStatuses');
     expect(dashboard).toContain('getApprovalsDefaultStatusFilters');
+    expect(dashboard).toContain('timesheetStatuses: getApprovalsTimesheetStatuses(defaultFilters.timesheets)');
     expect(dashboard).not.toContain("defaultFilters.timesheets === 'approved' ? 'approved' : 'submitted'");
-    expect(dashboard).not.toContain("['submitted', 'approved']");
   });
 
   it('TS-DG-ADMIN-001 payroll-admin unapproved impact includes manager-first sheets', () => {
     const admin = read('lib/server/payroll-admin.ts');
     expect(admin).toContain("['draft', 'submitted', 'rejected', 'adjusted', 'manager_approved']");
+    expect(admin).not.toContain(".in('status', ['draft', 'submitted', 'rejected', 'adjusted'])");
+  });
+
+  it('TS-DG-PDF-001 list PDF download includes manager-approved sheets', () => {
+    const page = read('app/(dashboard)/timesheets/page.tsx');
+    const table = read('app/(dashboard)/timesheets/components/TimesheetsListTable.tsx');
+    expect(page).toContain("timesheet.status === 'manager_approved'");
+    expect(table).toContain("'manager_approved'");
+  });
+
+  it('TS-DG-HISTORY-001 keeps snapshotless unsafe-history on payroll-received statuses', () => {
+    const admin = read('lib/server/payroll-admin.ts');
+    expect(admin).toContain("status IN ('approved', 'processed', 'adjusted')");
+    expect(admin).not.toContain("status IN ('approved', 'processed', 'adjusted', 'manager_approved')");
   });
 
   it('TS-ABS-001 blocks absence hour rewrites after Payroll Received', () => {
