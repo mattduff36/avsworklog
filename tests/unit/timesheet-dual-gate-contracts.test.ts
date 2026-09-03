@@ -31,7 +31,7 @@ describe('timesheet dual-gate contracts', () => {
     expect(route).not.toContain('applyTimesheetAdjustmentMutation');
   });
 
-  it('dashboard tiles follow the dual-gate default queues', () => {
+  it('TS-DG-QUEUE-001 dashboard tiles follow the dual-gate default queues', () => {
     const dashboard = read('lib/server/dashboard-approvals.ts');
     expect(dashboard).toContain('getApprovalsTimesheetStatuses');
     expect(dashboard).toContain('getApprovalsDefaultStatusFilters');
@@ -39,7 +39,7 @@ describe('timesheet dual-gate contracts', () => {
     expect(dashboard).not.toContain("['submitted', 'approved']");
   });
 
-  it('payroll-admin unapproved impact includes manager-first sheets', () => {
+  it('TS-DG-ADMIN-001 payroll-admin unapproved impact includes manager-first sheets', () => {
     const admin = read('lib/server/payroll-admin.ts');
     expect(admin).toContain("['draft', 'submitted', 'rejected', 'adjusted', 'manager_approved']");
   });
