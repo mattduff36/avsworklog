@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.5.2
+
+**GIT COMMIT MESSAGE**
+`fix(maintenance): drop duplicate save-failure console error`
+
+**PUSHED AT**
+2026-09-04T19:14:07.538Z
+
+**WHAT CHANGED**
+Drop duplicate save-failure console error.
+
+**VERSION HISTORY DETAILS**
+- Drop duplicate save-failure console error, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(maintenance): drop duplicate save-failure console error`
+
 ## 0926.5.1
 
 **GIT COMMIT MESSAGE**

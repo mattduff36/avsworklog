@@ -1,5 +1,22 @@
 [
   {
+    "version": "0926.5.2",
+    "updateKind": "minor",
+    "title": "Maintenance improvements",
+    "description": "Drop duplicate save-failure console error.",
+    "summary": "Drop duplicate save-failure console error.",
+    "details": [
+      "Drop duplicate save-failure console error, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Maintenance"
+    ],
+    "areaKeys": [
+      "maintenance"
+    ],
+    "pushedAt": "2026-09-04T19:14:07.538Z"
+  },
+  {
     "version": "0926.5.1",
     "updateKind": "minor",
     "title": "Projects improvements",
