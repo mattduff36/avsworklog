@@ -1,5 +1,8 @@
+/** @vitest-environment happy-dom */
+
 import { render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import '@testing-library/jest-dom/vitest';
 import { useScreenWakeLock } from '@/lib/hooks/useScreenWakeLock';
 
 class MockWakeLockSentinel extends EventTarget {
@@ -68,7 +71,7 @@ describe('useScreenWakeLock', () => {
 
     await waitFor(() => expect(screen.getByTestId('wake-lock-status')).toHaveTextContent('active'));
     await firstSentinel.release();
-    expect(screen.getByTestId('wake-lock-status')).toHaveTextContent('interrupted');
+    await waitFor(() => expect(screen.getByTestId('wake-lock-status')).toHaveTextContent('interrupted'));
 
     setVisibilityState('visible');
     document.dispatchEvent(new Event('visibilitychange'));

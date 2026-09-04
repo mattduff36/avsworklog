@@ -5,22 +5,13 @@ import { PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY } from '@/lib/config/reminder-wo
 import { getReminderActionDueState } from '@/lib/utils/reminder-action-due';
 import { canIgnoreReminderAction } from '@/lib/utils/reminder-action-permissions';
 
-const migration = readFileSync(
-  resolve(process.cwd(), 'supabase/migrations/20260817_plant_legacy_missing_site_actions.sql'),
-  'utf8'
-);
-const rollback = readFileSync(
-  resolve(process.cwd(), 'supabase/rollback/20260817_plant_legacy_missing_site_actions.sql'),
-  'utf8'
-);
-const enforcement = readFileSync(
-  resolve(process.cwd(), 'supabase/migrations/20260813_zz_daily_allocation_enforcement.sql'),
-  'utf8'
-);
-const allocationModule = readFileSync(
-  resolve(process.cwd(), 'supabase/migrations/20260813_daily_allocation_module.sql'),
-  'utf8'
-);
+const readSql = (relativePath: string) =>
+  readFileSync(resolve(process.cwd(), relativePath), 'utf8').replace(/\r\n/g, '\n');
+
+const migration = readSql('supabase/migrations/20260817_plant_legacy_missing_site_actions.sql');
+const rollback = readSql('supabase/rollback/20260817_plant_legacy_missing_site_actions.sql');
+const enforcement = readSql('supabase/migrations/20260813_zz_daily_allocation_enforcement.sql');
+const allocationModule = readSql('supabase/migrations/20260813_daily_allocation_module.sql');
 
 describe('plant legacy missing-site actions', () => {
   it('MIG-001 keeps the shared allocation function signature and adds a plant-only helper', () => {
