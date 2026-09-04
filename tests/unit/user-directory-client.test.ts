@@ -92,7 +92,7 @@ describe('fetchUserDirectory', () => {
     );
   });
 
-  it('DIR-RAMS-ASSIGN-004: passes rams-assignment context through to the directory endpoint', async () => {
+  it('passes rams-assignment context through to the directory endpoint', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({

@@ -62,7 +62,7 @@ describe('Projects / Toolbox Talks permission gates (Phase 2)', () => {
     expect(modal).toContain("module: 'rams'");
   });
 
-  it('ASSIGN-SIGNED-001: unassign delete excludes signed rows in the mutation predicate', () => {
+  it('unassign delete excludes signed rows in the mutation predicate', () => {
     const assign = read('app/api/rams/[id]/assign/route.ts');
     expect(assign).toContain(".eq('status', 'signed')");
     expect(assign).toContain(".neq('status', 'signed')");

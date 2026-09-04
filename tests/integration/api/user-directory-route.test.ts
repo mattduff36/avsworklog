@@ -192,7 +192,7 @@ describe('GET /api/users/directory', () => {
     ]);
   });
 
-  it('allows toolbox talks assignment directory requests to include every team', async () => {
+  it('T-EXISTING-DIR-GATES: allows toolbox talks assignment directory requests to include every team', async () => {
     const { createClient } = await import('@/lib/supabase/server');
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const { canEffectiveRoleAccessModule } = await import('@/lib/utils/rbac');
