@@ -1,5 +1,27 @@
 [
   {
+    "version": "0926.5.1",
+    "updateKind": "minor",
+    "title": "Projects improvements",
+    "description": "Ignore leftover test workstreams in dry-run liveness. Treat fap and ffap as authorized complete-and-release aliases. Provide auth admin when resolving module access. Keep the eligibility blocker ID on one case. Fail closed when assignment eligibility lookups error. Give each assignment review ID a unique case. Allow managers to assign and unassign across teams.",
+    "summary": "Ignore leftover test workstreams in dry-run liveness. Treat fap and ffap as authorized complete-and-release aliases. Provide auth admin when resolving module access. Keep the eligibility blocker ID on one case. Fail closed when assignment eligibility lookups error. Give each assignment review ID a unique case. Allow managers to assign and unassign across teams.",
+    "details": [
+      "Keep the eligibility blocker ID on one case, with changes to background routes, interface components, shared logic, automated tests, and data storage.",
+      "Updated data storage, with changes to automated tests and data storage.",
+      "Updated user management, with changes to background routes.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Projects",
+      "Ignore leftover test workstreams in dry-run liveness. Treat fap",
+      "Unassign across teams"
+    ],
+    "areaKeys": [
+      "projects"
+    ],
+    "pushedAt": "2026-09-04T18:49:58.549Z"
+  },
+  {
     "version": "0926.5.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",

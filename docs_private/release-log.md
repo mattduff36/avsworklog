@@ -2,6 +2,36 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.5.1
+
+**GIT COMMIT MESSAGE**
+`fix(projects): allow managers to assign and unassign across teams`
+
+**PUSHED AT**
+2026-09-04T18:49:58.549Z
+
+**WHAT CHANGED**
+Ignore leftover test workstreams in dry-run liveness. Treat fap and ffap as authorized complete-and-release aliases. Provide auth admin when resolving module access. Keep the eligibility blocker ID on one case. Fail closed when assignment eligibility lookups error. Give each assignment review ID a unique case. Allow managers to assign and unassign across teams.
+
+**VERSION HISTORY DETAILS**
+- Keep the eligibility blocker ID on one case, with changes to background routes, interface components, shared logic, automated tests, and data storage.
+- Updated data storage, with changes to automated tests and data storage.
+- Updated user management, with changes to background routes.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `test(workflow): ignore leftover test workstreams in dry-run liveness`
+- `fix(workflow): treat fap and ffap as authorized complete-and-release aliases`
+- `test(permissions): provide auth admin when resolving module access`
+- `test(projects): keep the eligibility blocker ID on one case`
+- `fix(projects): fail closed when assignment eligibility lookups error`
+- `test(projects): give each assignment review ID a unique case`
+- `fix(projects): allow managers to assign and unassign across teams`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0926.5.0
 
 **GIT COMMIT MESSAGE**
