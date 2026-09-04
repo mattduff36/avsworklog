@@ -224,7 +224,7 @@ describe('canCurrentActorMarkTimesheetManagerApproved', () => {
     await expect(canCurrentActorMarkTimesheetManagerApproved(target)).resolves.toBe(false);
   });
 
-  it('TS-PROC-ACCOUNTS-EMPLOYEE-001 allows a scoped Accounts employee and denies one without authorise', async () => {
+  it('allows a scoped Accounts employee and denies one without authorise', async () => {
     const accountsEmployee: EffectiveRoleInfo = {
       ...supervisorRole,
       role_id: 'employee-role',

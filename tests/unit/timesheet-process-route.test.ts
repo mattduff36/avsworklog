@@ -148,7 +148,7 @@ describe('POST /api/timesheets/[id]/process', () => {
     });
   });
 
-  it('TS-PROC-MANAGER-ALLOW-001 TS-PROC-MUTATE-MANAGER-GATE-001 TS-PROC-AUDIT-001 TS-PROC-REGRESSION-001 allows a scoped manager', async () => {
+  it('TS-PROC-MANAGER-ALLOW-001 TS-PROC-MUTATE-MANAGER-GATE-001 TS-PROC-AUDIT-001 allows a scoped manager', async () => {
     mockAuth(ACTOR_ID);
     mockTimesheet();
     mockPermissions(role());
@@ -347,7 +347,7 @@ describe('POST /api/timesheets/[id]/process', () => {
     expect(applyTimesheetManagerApproved).not.toHaveBeenCalled();
   });
 
-  it('TS-PROC-PAYROLL-INDEPENDENT-001 PAY-PROCESS-MANAGER-001 keeps Payroll Received on /approve', () => {
+  it('TS-PROC-PAYROLL-INDEPENDENT-001 keeps Payroll Received on /approve', () => {
     const processRoute = readFileSync(
       resolve(process.cwd(), 'app/api/timesheets/[id]/process/route.ts'),
       'utf8'
