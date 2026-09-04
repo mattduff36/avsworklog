@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
-import { spawnSync } from 'child_process';
+import { spawn, spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { writeJsonAtomic } from './workflow-events';
 import { pathHasSymlinkComponent } from './workflow-plan-contract';
@@ -11,6 +11,12 @@ import {
   gitHeadCommit,
   type GitCommandRunner,
 } from './workflow-v24-disposition';
+import { notifyDisplayProgress } from './tee-progress';
+import {
+  readTeeVitestProgressFile,
+  teeVitestProgressReporterPath,
+  type TeeVitestProgressSnapshot,
+} from './tee-vitest-progress-reporter';
 
 export const VERIFICATION_LEDGER_SCHEMA_VERSION = '1' as const;
 export const VERIFICATION_LEDGER_COMMAND_TYPES = [
@@ -796,27 +802,46 @@ export function captureVerificationIdentity(
   return captureCandidateIdentity(repoRoot, git);
 }
 
-export function runVitestJsonAndPersistLedger(params: {
-  repoRoot: string;
-  workstreamId: string;
-  commandId: string;
-  commandType: VerificationLedgerCommandType;
-  files: string[];
-  extraArgs?: string[];
-  requiredIds?: string[];
-  expectedSuiteManifestHash?: string;
-  persist?: boolean;
-  git?: GitCommandRunner;
-  spawn?: typeof spawnSync;
-  vitestInstallRoot?: string;
-}):
+export type VitestLedgerRunResult =
   | {
       ok: true;
       record: VerificationLedgerRecord;
       reference: VerificationLedgerReference;
       reporterSuccess: boolean;
     }
-  | { ok: false; message: string } {
+  | { ok: false; message: string };
+
+interface VitestLedgerSpawnPlan {
+  args: string[];
+  reporterTemp: string;
+  before: { headCommit: string; productTreeFingerprint: string };
+  runnerVersion: string;
+  childEnv: NodeJS.ProcessEnv;
+  startedAt: string;
+}
+
+function sanitizeProcessEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const clean: Record<string, string> = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (typeof value === 'string') clean[key] = value;
+  }
+  return clean as NodeJS.ProcessEnv;
+}
+
+function isSpawnEinval(error: unknown): boolean {
+  return error instanceof Error && /EINVAL/i.test(error.message);
+}
+
+function prepareVitestLedgerSpawn(params: {
+  repoRoot: string;
+  workstreamId: string;
+  commandType: VerificationLedgerCommandType;
+  files: string[];
+  extraArgs?: string[];
+  persist?: boolean;
+  git?: GitCommandRunner;
+  vitestInstallRoot?: string;
+}): { ok: true; plan: VitestLedgerSpawnPlan } | { ok: false; message: string } {
   const before = captureCandidateIdentity(params.repoRoot, params.git);
   if (!before.ok) return before;
   const installRoot = params.vitestInstallRoot ?? params.repoRoot;
@@ -833,62 +858,82 @@ export function runVitestJsonAndPersistLedger(params: {
     mkdirSync(outputDir, { recursive: true });
   }
   const reporterTemp = path.join(outputDir, `verification-reporter-temp-${runToken}.json`);
-  const args = [
-    vitestPath,
-    'run',
-    ...params.files,
-    '--reporter=json',
-    `--outputFile=${reporterTemp}`,
-    '--passWithNoTests=false',
-    ...(params.commandType === 'vitest_suite' ? ['--maxWorkers=1'] : []),
-    ...(params.extraArgs ?? []),
-  ];
-  const startedAt = new Date().toISOString();
-  const spawn = params.spawn ?? spawnSync;
   const childEnv = { ...process.env };
   for (const key of Object.keys(childEnv)) {
     if (key === 'VITEST' || key.startsWith('VITEST_') || key.startsWith('VITE_TEST')) {
       delete childEnv[key];
     }
   }
-  const result = spawn(process.execPath, args, {
-    cwd: params.repoRoot,
-    encoding: 'utf8',
-    shell: false,
-    env: childEnv,
-    windowsHide: true,
-  });
-  const completedAt = new Date().toISOString();
+  return {
+    ok: true,
+    plan: {
+      args: [
+        vitestPath,
+        'run',
+        ...params.files,
+        '--reporter=json',
+        `--outputFile=${reporterTemp}`,
+        '--passWithNoTests=false',
+        ...(params.commandType === 'vitest_suite' ? ['--maxWorkers=1'] : []),
+        ...(params.extraArgs ?? []),
+      ],
+      reporterTemp,
+      before,
+      runnerVersion,
+      childEnv,
+      startedAt: new Date().toISOString(),
+    },
+  };
+}
+
+function finishVitestLedgerPersist(params: {
+  repoRoot: string;
+  workstreamId: string;
+  commandId: string;
+  commandType: VerificationLedgerCommandType;
+  args: string[];
+  reporterTemp: string;
+  before: { headCommit: string; productTreeFingerprint: string };
+  runnerVersion: string;
+  startedAt: string;
+  completedAt: string;
+  exitCode: number;
+  spawnError?: string;
+  requiredIds?: string[];
+  expectedSuiteManifestHash?: string;
+  persist?: boolean;
+  git?: GitCommandRunner;
+}): VitestLedgerRunResult {
+  if (params.spawnError) {
+    return { ok: false, message: `vitest spawn failed: ${params.spawnError}` };
+  }
   const after = captureCandidateIdentity(params.repoRoot, params.git);
   if (!after.ok) return after;
-  if (result.error) {
-    return { ok: false, message: `vitest spawn failed: ${result.error.message}` };
-  }
   const persisted = persistVerificationLedgerFromReporterFile({
     repoRoot: params.repoRoot,
     workstreamId: params.workstreamId,
     commandId: params.commandId,
     commandType: params.commandType,
     command: process.execPath,
-    args,
+    args: params.args,
     cwd: params.repoRoot,
-    startedAt,
-    completedAt,
-    exitCode: typeof result.status === 'number' ? result.status : 1,
+    startedAt: params.startedAt,
+    completedAt: params.completedAt,
+    exitCode: params.exitCode,
     runnerName: 'vitest',
-    runnerVersion,
-    reporterAbsolutePath: reporterTemp,
+    runnerVersion: params.runnerVersion,
+    reporterAbsolutePath: params.reporterTemp,
     requiredIds: params.requiredIds,
     expectedSuiteManifestHash: params.expectedSuiteManifestHash,
     persist: params.persist,
     git: params.git,
-    beforeIdentity: before,
+    beforeIdentity: params.before,
     afterIdentity: after,
   });
-  const reporterRaw = existsSync(reporterTemp) ? readFileSync(reporterTemp) : null;
-  if (existsSync(reporterTemp)) {
+  const reporterRaw = existsSync(params.reporterTemp) ? readFileSync(params.reporterTemp) : null;
+  if (existsSync(params.reporterTemp)) {
     try {
-      unlinkSync(reporterTemp);
+      unlinkSync(params.reporterTemp);
     } catch {
       /* the hashed reporter copy is the durable artifact */
     }
@@ -903,4 +948,177 @@ export function runVitestJsonAndPersistLedger(params: {
     ...persisted,
     reporterSuccess: parsed.ok ? parsed.success : false,
   };
+}
+
+export function runVitestJsonAndPersistLedger(params: {
+  repoRoot: string;
+  workstreamId: string;
+  commandId: string;
+  commandType: VerificationLedgerCommandType;
+  files: string[];
+  extraArgs?: string[];
+  requiredIds?: string[];
+  expectedSuiteManifestHash?: string;
+  persist?: boolean;
+  git?: GitCommandRunner;
+  spawn?: typeof spawnSync;
+  vitestInstallRoot?: string;
+}): VitestLedgerRunResult {
+  const prepared = prepareVitestLedgerSpawn(params);
+  if (!prepared.ok) return prepared;
+  const spawnFn = params.spawn ?? spawnSync;
+  const spawnOptions = {
+    cwd: params.repoRoot,
+    encoding: 'utf8' as const,
+    shell: false,
+    env: sanitizeProcessEnv(prepared.plan.childEnv),
+  };
+  let result = spawnFn(process.execPath, prepared.plan.args, {
+    ...spawnOptions,
+    windowsHide: process.platform !== 'win32',
+  });
+  if (result.error instanceof Error && process.platform === 'win32' && isSpawnEinval(result.error)) {
+    result = spawnFn(process.execPath, prepared.plan.args, {
+      ...spawnOptions,
+      windowsHide: false,
+    });
+  }
+  return finishVitestLedgerPersist({
+    repoRoot: params.repoRoot,
+    workstreamId: params.workstreamId,
+    commandId: params.commandId,
+    commandType: params.commandType,
+    args: prepared.plan.args,
+    reporterTemp: prepared.plan.reporterTemp,
+    before: prepared.plan.before,
+    runnerVersion: prepared.plan.runnerVersion,
+    startedAt: prepared.plan.startedAt,
+    completedAt: new Date().toISOString(),
+    exitCode: typeof result.status === 'number' ? result.status : 1,
+    spawnError: result.error instanceof Error ? result.error.message : undefined,
+    requiredIds: params.requiredIds,
+    expectedSuiteManifestHash: params.expectedSuiteManifestHash,
+    persist: params.persist,
+    git: params.git,
+  });
+}
+
+export function runVitestJsonAndPersistLedgerAsync(params: {
+  repoRoot: string;
+  workstreamId: string;
+  commandId: string;
+  commandType: VerificationLedgerCommandType;
+  files: string[];
+  extraArgs?: string[];
+  requiredIds?: string[];
+  expectedSuiteManifestHash?: string;
+  persist?: boolean;
+  git?: GitCommandRunner;
+  vitestInstallRoot?: string;
+  onProgress?: (snapshot: TeeVitestProgressSnapshot) => void;
+}): Promise<VitestLedgerRunResult> {
+  const prepared = prepareVitestLedgerSpawn(params);
+  if (!prepared.ok) return Promise.resolve(prepared);
+  const progressFile = params.onProgress
+    ? path.join(tmpdir(), `tee-vitest-progress-${randomBytes(8).toString('hex')}.json`)
+    : undefined;
+  const spawnArgs = progressFile
+    ? [...prepared.plan.args, `--reporter=${teeVitestProgressReporterPath(params.repoRoot)}`]
+    : prepared.plan.args;
+  const childEnv = sanitizeProcessEnv({
+    ...prepared.plan.childEnv,
+    ...(progressFile ? { TEE_VITEST_PROGRESS_FILE: progressFile } : {}),
+  });
+  return new Promise((resolve) => {
+    let settled = false;
+    let retried = false;
+    let progressTimer: ReturnType<typeof setInterval> | undefined;
+    const emitProgress = () => {
+      if (!progressFile || !params.onProgress) return;
+      notifyDisplayProgress(() => {
+        const snapshot = readTeeVitestProgressFile(progressFile);
+        if (snapshot) params.onProgress?.(snapshot);
+      });
+    };
+    const persist = (extra: { exitCode: number; spawnError?: string }) => {
+      if (settled) return;
+      settled = true;
+      if (progressTimer) clearInterval(progressTimer);
+      emitProgress();
+      if (progressFile) {
+        try {
+          unlinkSync(progressFile);
+        } catch {
+          /* display-only temp file */
+        }
+      }
+      try {
+        resolve(
+          finishVitestLedgerPersist({
+            repoRoot: params.repoRoot,
+            workstreamId: params.workstreamId,
+            commandId: params.commandId,
+            commandType: params.commandType,
+            args: prepared.plan.args,
+            reporterTemp: prepared.plan.reporterTemp,
+            before: prepared.plan.before,
+            runnerVersion: prepared.plan.runnerVersion,
+            startedAt: prepared.plan.startedAt,
+            completedAt: new Date().toISOString(),
+            requiredIds: params.requiredIds,
+            expectedSuiteManifestHash: params.expectedSuiteManifestHash,
+            persist: params.persist,
+            git: params.git,
+            ...extra,
+          })
+        );
+      } catch (error) {
+        resolve({
+          ok: false,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    };
+    const start = (windowsHide: boolean) => {
+      let child: ReturnType<typeof spawn>;
+      try {
+        child = spawn(process.execPath, spawnArgs, {
+          cwd: params.repoRoot,
+          env: childEnv,
+          shell: false,
+          windowsHide,
+        });
+      } catch (error) {
+        if (!retried && windowsHide && process.platform === 'win32' && isSpawnEinval(error)) {
+          retried = true;
+          start(false);
+          return;
+        }
+        persist({
+          exitCode: 1,
+          spawnError: error instanceof Error ? error.message : String(error),
+        });
+        return;
+      }
+      if (progressFile && !progressTimer) {
+        progressTimer = setInterval(emitProgress, 250);
+        progressTimer.unref?.();
+      }
+      let retrying = false;
+      child.on('error', (error) => {
+        if (!retried && windowsHide && process.platform === 'win32' && isSpawnEinval(error)) {
+          retried = true;
+          retrying = true;
+          start(false);
+          return;
+        }
+        persist({ exitCode: 1, spawnError: error.message });
+      });
+      child.on('close', (code) => {
+        if (retrying) return;
+        persist({ exitCode: typeof code === 'number' ? code : 1 });
+      });
+    };
+    start(process.platform !== 'win32');
+  });
 }

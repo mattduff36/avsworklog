@@ -16,9 +16,20 @@ import {
   requiredTestIdsForBlocker,
   requiredTestProofKind,
   runVitestJsonAndPersistLedger,
+  runVitestJsonAndPersistLedgerAsync,
   type VerificationLedgerRecord,
   type VerificationLedgerReference,
 } from './workflow-verification-ledger';
+import {
+  captureFrozenVerifyCandidate,
+  formatVerifyBatchFailures,
+  resolveTeeVerifyJobs,
+  runProcessJob,
+  runVerifyBatch,
+  type FrozenVerifyCandidate,
+  type TeeVerifyJob,
+} from './tee-parallel-verify';
+import { notifyDisplayProgress, type TeeProgressReporter } from './tee-progress';
 
 export type EvidenceManifestKind = 'preflight' | 'fix-delta';
 export type EvidenceCommandStatus = 'passed' | 'failed' | 'skipped' | 'unknown';
@@ -85,13 +96,17 @@ export interface WorkflowEvidenceManifest {
 
 const HEAD_SHA_RE = /^[0-9a-f]{7,64}$/i;
 
-function runGitOrThrow(repoRoot: string, args: string[]): string {
-  const result = spawnSync('git', args, {
+function spawnGitSync(repoRoot: string, args: string[]) {
+  return spawnSync(process.platform === 'win32' ? 'git.exe' : 'git', args, {
     cwd: repoRoot,
     encoding: 'utf8',
     shell: false,
-    windowsHide: true,
+    windowsHide: process.platform !== 'win32',
   });
+}
+
+function runGitOrThrow(repoRoot: string, args: string[]): string {
+  const result = spawnGitSync(repoRoot, args);
   if (result.error) {
     throw new Error(result.error.message);
   }
@@ -173,11 +188,7 @@ export function listBaseToHeadChangedFiles(
   if (!baseCommit || !headCommit || baseCommit === 'unknown' || headCommit === 'unknown') {
     throw new Error('unable to list base..HEAD changed files without valid commits');
   }
-  const result = spawnSync(
-    'git',
-    ['diff', '--name-only', `${baseCommit}...${headCommit}`],
-    { cwd: repoRoot, encoding: 'utf8', shell: false, windowsHide: true }
-  );
+  const result = spawnGitSync(repoRoot, ['diff', '--name-only', `${baseCommit}...${headCommit}`]);
   if (result.error) throw new Error(result.error.message);
   if (result.status !== 0) {
     const detail = (result.stderr ?? '').trim();
@@ -273,6 +284,132 @@ export function runCommand(
 }
 
 export type EvidenceCommandRunner = typeof runCommand;
+
+export async function runCommandAsync(
+  repoRoot: string,
+  name: string,
+  command: string,
+  args: string[]
+): Promise<EvidenceCommandResult> {
+  const executable = resolveCommandExecutable(command);
+  const result = await runProcessJob({
+    cwd: repoRoot,
+    command: executable,
+    args,
+    env: process.env,
+    windowsHide: process.platform !== 'win32',
+  });
+  return {
+    name,
+    status: result.status,
+    exitCode: result.exitCode,
+    durationMs: result.durationMs,
+    summary: result.summary,
+    command: [command, ...args].join(' '),
+  };
+}
+
+export interface PlannedStaticCheck {
+  name: string;
+  command: string;
+  args: string[];
+  files?: string[];
+  skipped?: EvidenceCommandResult;
+}
+
+export function planCanonicalStaticChecks(params: {
+  repoRoot: string;
+  changedFiles: string[];
+}): PlannedStaticCheck[] {
+  const lintableFiles = params.changedFiles.filter(
+    (relativePath) =>
+      isLintableFile(relativePath) && existsSync(path.join(params.repoRoot, relativePath))
+  );
+  const planned: PlannedStaticCheck[] = [
+    {
+      name: 'typecheck',
+      command: 'npm',
+      args: ['run', 'typecheck'],
+    },
+  ];
+  if (lintableFiles.length === 0) {
+    planned.push(
+      {
+        name: 'oxlint-changed',
+        command: 'npx',
+        args: ['oxlint', '--'],
+        files: [],
+        skipped: {
+          name: 'oxlint-changed',
+          status: 'skipped',
+          exitCode: null,
+          durationMs: 0,
+          summary: 'no changed lintable files',
+          command: 'npx oxlint --',
+          files: [],
+        },
+      },
+      {
+        name: 'eslint-changed',
+        command: 'npx',
+        args: ['eslint', '--'],
+        files: [],
+        skipped: {
+          name: 'eslint-changed',
+          status: 'skipped',
+          exitCode: null,
+          durationMs: 0,
+          summary: 'no changed lintable files',
+          command: 'npx eslint --',
+          files: [],
+        },
+      }
+    );
+    return planned;
+  }
+  planned.push(
+    {
+      name: 'oxlint-changed',
+      command: 'npx',
+      args: ['oxlint', '--', ...lintableFiles],
+      files: lintableFiles,
+    },
+    {
+      name: 'eslint-changed',
+      command: 'npx',
+      args: ['eslint', '--', ...lintableFiles],
+      files: lintableFiles,
+    }
+  );
+  return planned;
+}
+
+function staticCheckResultsMatchPlan(
+  planned: PlannedStaticCheck[],
+  results: EvidenceCommandResult[]
+): { ok: true } | { ok: false; message: string } {
+  if (planned.length !== results.length) {
+    return { ok: false, message: 'static check result count does not match the canonical plan' };
+  }
+  for (let index = 0; index < planned.length; index += 1) {
+    const plan = planned[index]!;
+    const result = results[index]!;
+    if (result.name !== plan.name) {
+      return { ok: false, message: `static check result order drifted at ${plan.name}` };
+    }
+    if (plan.skipped) {
+      if (result.command !== plan.skipped.command || result.summary !== plan.skipped.summary) {
+        return { ok: false, message: `skipped ${plan.name} evidence is not the canonical skip record` };
+      }
+      continue;
+    }
+    const expectedCommand = [plan.command, ...plan.args].join(' ');
+    if (result.command !== expectedCommand) {
+      return { ok: false, message: `static check ${plan.name} used a non-canonical command` };
+    }
+  }
+  return { ok: true };
+}
 
 function isLintableFile(relativePath: string): boolean {
   return /\.(?:cjs|mjs|js|jsx|ts|tsx)$/u.test(relativePath);
@@ -406,6 +543,7 @@ export function buildEvidenceManifest(params: {
   commandResults?: EvidenceCommandResult[];
   verificationLedgerRefs?: VerificationLedgerReference[];
   commandRunner?: EvidenceCommandRunner;
+  staticCheckResults?: EvidenceCommandResult[];
 }): { manifest: WorkflowEvidenceManifest; relativePath: string; absolutePath: string } {
   const tree = getCurrentTreeFingerprint(params.repoRoot);
   const headCommit = tree.headCommit;
@@ -428,47 +566,26 @@ export function buildEvidenceManifest(params: {
   const ledgerRefs: VerificationLedgerReference[] = [...(params.verificationLedgerRefs ?? [])];
   const execute = params.commandRunner ?? runCommand;
   if (params.runChecks) {
-    commands.push(execute(params.repoRoot, 'typecheck', 'npm', ['run', 'typecheck']));
-    const lintableFiles = changedFiles.filter(
-      (relativePath) =>
-        isLintableFile(relativePath) && existsSync(path.join(params.repoRoot, relativePath))
-    );
-    if (lintableFiles.length === 0) {
-      commands.push(
-        {
-          name: 'oxlint-changed',
-          status: 'skipped',
-          exitCode: null,
-          durationMs: 0,
-          summary: 'no changed lintable files',
-          command: 'npx oxlint --',
-          files: [],
-        },
-        {
-          name: 'eslint-changed',
-          status: 'skipped',
-          exitCode: null,
-          durationMs: 0,
-          summary: 'no changed lintable files',
-          command: 'npx eslint --',
-          files: [],
-        }
-      );
+    const plannedStatic = planCanonicalStaticChecks({
+      repoRoot: params.repoRoot,
+      changedFiles,
+    });
+    if (params.staticCheckResults) {
+      const matched = staticCheckResultsMatchPlan(plannedStatic, params.staticCheckResults);
+      if (!matched.ok) {
+        throw new Error(matched.message);
+      }
+      commands.push(...params.staticCheckResults);
     } else {
-      const oxlint = execute(params.repoRoot, 'oxlint-changed', 'npx', [
-        'oxlint',
-        '--',
-        ...lintableFiles,
-      ]);
-      oxlint.files = lintableFiles;
-      commands.push(oxlint);
-      const eslint = execute(params.repoRoot, 'eslint-changed', 'npx', [
-        'eslint',
-        '--',
-        ...lintableFiles,
-      ]);
-      eslint.files = lintableFiles;
-      commands.push(eslint);
+      for (const planned of plannedStatic) {
+        if (planned.skipped) {
+          commands.push(planned.skipped);
+          continue;
+        }
+        const result = execute(params.repoRoot, planned.name, planned.command, planned.args);
+        if (planned.files) result.files = planned.files;
+        commands.push(result);
+      }
     }
   }
 
@@ -840,4 +957,288 @@ export function readEvidenceManifest(filePath: string): WorkflowEvidenceManifest
   } catch {
     return null;
   }
+}
+
+function vitestCommandFromLedger(params: {
+  name: string;
+  files: string[];
+  run: Awaited<ReturnType<typeof runVitestJsonAndPersistLedgerAsync>>;
+}): {
+  command: EvidenceCommandResult;
+  ledgerError: string | null;
+  reference?: VerificationLedgerReference;
+} {
+  if (!params.run.ok) {
+    return {
+      ledgerError: params.run.message,
+      command: {
+        name: params.name,
+        status: 'failed',
+        exitCode: 1,
+        durationMs: 0,
+        summary: params.run.message,
+        files: params.files,
+      },
+    };
+  }
+  return {
+    ledgerError: null,
+    reference: params.run.reference,
+    command: {
+      name: params.name,
+      status: params.run.record.exitCode === 0 && params.run.reporterSuccess ? 'passed' : 'failed',
+      exitCode: params.run.record.exitCode,
+      durationMs: 0,
+      summary:
+        params.name === 'changed-test-files'
+          ? 'changed-files vitest ledger; does not prove canonical suite'
+          : 'vitest json reporter ledger',
+      command: [params.run.record.command, ...params.run.record.args].join(' '),
+      files: params.files,
+    },
+  };
+}
+
+export async function buildEvidenceManifestAsync(params: {
+  repoRoot: string;
+  workstreamId: string;
+  kind: EvidenceManifestKind;
+  baseCommit: string;
+  requiredTestIds?: string[];
+  runChecks?: boolean;
+  runRequiredTests?: boolean;
+  persistLedgers?: boolean;
+  vitestInstallRoot?: string;
+  liveVerification?: WorkflowEvidenceManifest['liveVerification'];
+  closedBlockerIds?: string[];
+  blockerEvidence?: WorkflowEvidenceManifest['blockerEvidence'];
+  commandResults?: EvidenceCommandResult[];
+  verificationLedgerRefs?: VerificationLedgerReference[];
+  extraJobs?: Array<TeeVerifyJob<EvidenceCommandResult>>;
+  candidate?: FrozenVerifyCandidate;
+  progress?: TeeProgressReporter;
+  maxJobs?: number;
+}): Promise<{ manifest: WorkflowEvidenceManifest; relativePath: string; absolutePath: string }> {
+  const captured =
+    params.candidate ??
+    (() => {
+      const current = captureFrozenVerifyCandidate({
+        repoRoot: params.repoRoot,
+        workstreamId: params.workstreamId,
+      });
+      if (!current.ok) throw new Error(current.message);
+      return current.candidate;
+    })();
+  const tree = getCurrentTreeFingerprint(params.repoRoot);
+  const dirtyFiles = tree.changedFiles;
+  const baseHeadFiles = listBaseToHeadChangedFiles(
+    params.repoRoot,
+    params.baseCommit,
+    tree.headCommit
+  );
+  const changedFiles = [...new Set([...baseHeadFiles, ...dirtyFiles])].sort();
+  const requiredIds = params.requiredTestIds ?? [];
+  const jobs: Array<TeeVerifyJob<EvidenceCommandResult | { kind: 'vitest'; name: string; files: string[]; run: Awaited<ReturnType<typeof runVitestJsonAndPersistLedgerAsync>> }>> = [];
+
+  if (params.runChecks) {
+    for (const planned of planCanonicalStaticChecks({
+      repoRoot: params.repoRoot,
+      changedFiles,
+    })) {
+      jobs.push({
+        id: planned.name,
+        label: planned.name === 'typecheck' ? 'Typecheck' : planned.name === 'oxlint-changed' ? 'Oxlint' : 'ESLint',
+        kind: 'read_only',
+        weight: planned.name === 'typecheck' ? 4 : planned.name === 'eslint-changed' ? 3 : 1,
+        run: async () => {
+          if (planned.skipped) return planned.skipped;
+          const result = await runCommandAsync(
+            params.repoRoot,
+            planned.name,
+            planned.command,
+            planned.args
+          );
+          if (planned.files) result.files = planned.files;
+          return result;
+        },
+      });
+    }
+  }
+
+  const extraJobs = params.extraJobs ?? [];
+  jobs.push(...extraJobs);
+
+  const persistLedgers = params.persistLedgers !== false;
+  const needsVitestProof = requiredIds.some((id) => {
+    const kind = requiredTestProofKind(id);
+    return kind === 'vitest_case' || kind === 'vitest_suite';
+  });
+  const changedUnitTestFiles = [
+    ...new Set(changedFiles.filter((relative) => isRepoUnitTestFile(relative))),
+  ]
+    .filter((relative) => existsSync(path.join(params.repoRoot, relative)))
+    .sort();
+
+  if (params.runRequiredTests && needsVitestProof) {
+    const suiteManifest = loadCanonicalWorkflowSuiteManifest();
+    jobs.push({
+      id: 'canonical-workflow-suite',
+      label: 'Workflow tests',
+      kind: 'read_only',
+      isolationGroup: 'vitest',
+      weight: 8,
+      run: async () => ({
+        kind: 'vitest' as const,
+        name: 'canonical-workflow-suite',
+        files: suiteManifest.files,
+        run: await runVitestJsonAndPersistLedgerAsync({
+          repoRoot: params.repoRoot,
+          workstreamId: params.workstreamId,
+          commandId: 'canonical-workflow-suite',
+          commandType: 'vitest_suite',
+          files: suiteManifest.files,
+          requiredIds,
+          expectedSuiteManifestHash: hashCanonicalWorkflowSuiteManifest(suiteManifest),
+          persist: persistLedgers,
+          vitestInstallRoot: params.vitestInstallRoot,
+          onProgress: (snapshot) => {
+            notifyDisplayProgress(() => {
+              params.progress?.workerUpdate('canonical-workflow-suite', 'running', {
+                completed: snapshot.completed,
+                total: snapshot.total,
+                current: snapshot.current ?? undefined,
+                failures: snapshot.failures,
+              });
+            });
+          },
+        }),
+      }),
+    });
+  }
+  // Changed-file vitest is an independent ledger (commandType changed_files)
+  // and must not be treated as canonical suite proof. The isolation group
+  // only prevents two Vitest processes overlapping; both remain required.
+  if (params.runRequiredTests && changedUnitTestFiles.length > 0) {
+    jobs.push({
+      id: 'changed-test-files',
+      label: 'Changed tests',
+      kind: 'read_only',
+      isolationGroup: 'vitest',
+      weight: 4,
+      run: async () => ({
+        kind: 'vitest' as const,
+        name: 'changed-test-files',
+        files: changedUnitTestFiles,
+        run: await runVitestJsonAndPersistLedgerAsync({
+          repoRoot: params.repoRoot,
+          workstreamId: params.workstreamId,
+          commandId: 'changed-test-files',
+          commandType: 'changed_files',
+          files: changedUnitTestFiles,
+          requiredIds,
+          persist: persistLedgers,
+          vitestInstallRoot: params.vitestInstallRoot,
+          onProgress: (snapshot) => {
+            notifyDisplayProgress(() => {
+              params.progress?.workerUpdate('changed-test-files', 'running', {
+                completed: snapshot.completed,
+                total: snapshot.total,
+                current: snapshot.current ?? undefined,
+                failures: snapshot.failures,
+              });
+            });
+          },
+        }),
+      }),
+    });
+  }
+
+  const staticCheckResults: EvidenceCommandResult[] = [];
+  const extraCommandResults: EvidenceCommandResult[] = [...(params.commandResults ?? [])];
+  const ledgerRefs: VerificationLedgerReference[] = [...(params.verificationLedgerRefs ?? [])];
+  let ledgerError: string | null = null;
+
+  if (jobs.length > 0) {
+    notifyDisplayProgress(() => {
+      params.progress?.stageStart(
+        'verify-batch',
+        `(${jobs.length} job${jobs.length === 1 ? '' : 's'}, ${params.maxJobs ?? resolveTeeVerifyJobs()} workers)`
+      );
+    });
+    const batch = await runVerifyBatch({
+      jobs,
+      maxJobs: params.maxJobs ?? resolveTeeVerifyJobs(),
+      candidate: captured,
+      readCandidate: () => {
+        const current = captureFrozenVerifyCandidate({
+          repoRoot: params.repoRoot,
+          workstreamId: params.workstreamId,
+        });
+        return current.ok ? current.candidate : { error: current.message };
+      },
+      progress: params.progress,
+    });
+    if (batch.foundational) {
+      throw new Error(batch.foundationalMessage ?? 'verification candidate drifted');
+    }
+    const plannedStaticNames = new Set(
+      planCanonicalStaticChecks({ repoRoot: params.repoRoot, changedFiles }).map((row) => row.name)
+    );
+    for (const result of batch.results) {
+      if (result.status === 'skipped' || result.value === undefined) {
+        if (result.required) {
+          throw new Error(
+            `required verification job failed: ${result.id}${
+              result.error ? `: ${result.error}` : ''
+            }${result.command ? ` command=${result.command}` : ''}`
+          );
+        }
+        continue;
+      }
+      const value = result.value;
+      if (value && typeof value === 'object' && 'kind' in value && value.kind === 'vitest') {
+        const mapped = vitestCommandFromLedger(value);
+        extraCommandResults.push(mapped.command);
+        if (mapped.ledgerError) ledgerError = ledgerError ?? mapped.ledgerError;
+        if (mapped.reference) ledgerRefs.push(mapped.reference);
+        continue;
+      }
+      const command = value as EvidenceCommandResult;
+      if (plannedStaticNames.has(command.name)) {
+        staticCheckResults.push(command);
+      } else {
+        extraCommandResults.push(command);
+      }
+    }
+    notifyDisplayProgress(() => {
+      params.progress?.stageFinish('verify-batch', batch.ok && !ledgerError ? 'passed' : 'failed');
+    });
+    if (!batch.ok) {
+      const failedCommands = [...staticCheckResults, ...extraCommandResults].filter(
+        (command) => command.status === 'failed'
+      );
+      if (failedCommands.length === 0) {
+        throw new Error(formatVerifyBatchFailures(batch));
+      }
+    }
+  }
+
+  notifyDisplayProgress(() => {
+    params.progress?.stageStart('manifest');
+  });
+  const built = buildEvidenceManifest({
+    ...params,
+    runChecks: Boolean(params.runChecks),
+    runRequiredTests: false,
+    commandResults: extraCommandResults,
+    verificationLedgerRefs: ledgerRefs,
+    staticCheckResults: params.runChecks ? staticCheckResults : undefined,
+  });
+  notifyDisplayProgress(() => {
+    params.progress?.stageFinish(
+      'manifest',
+      built.manifest.status === 'passed' ? 'passed' : 'failed'
+    );
+  });
+  return built;
 }

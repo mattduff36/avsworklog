@@ -56,6 +56,16 @@ import {
   applyMigrationWithLedger,
   readMigrationLedgerRows,
 } from './migration-executor';
+import { planFinaliseReadOnlyPrechecks } from './automation/tee-finalise-prechecks';
+import {
+  captureFrozenVerifyCandidate,
+  createFinaliseProgressReporter,
+  requireProcessSuccess,
+  runProcessJob,
+  runVerifyBatch,
+  type TeeProgressReporter,
+} from './automation/tee-parallel-verify';
+import { formatDurationMs, notifyDisplayProgress } from './automation/tee-progress';
 
 config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -65,6 +75,8 @@ const NEXT_BUILD_DIR = path.join(REPO_ROOT, '.next');
 const NEXT_BUILD_ARTIFACT_PATH = path.join(NEXT_BUILD_DIR, 'BUILD_ID');
 const RELEASE_VERSION_JSON_PATH = path.join(REPO_ROOT, 'lib/config/release-version.json');
 const FINALISE_HIGH_DURATION_MS = 15 * 60 * 1000;
+let activeFinaliseProgress: TeeProgressReporter | null = null;
+let activeFinaliseProgressTTY = false;
 
 function recordFinaliseCheckpointStep(params: {
   mode: FinaliseModeKey;
@@ -250,51 +262,10 @@ function getTrimmedLines(output: string): string[] {
     .filter(Boolean);
 }
 
-function getChangedFileStats(): FinaliseChangedFile[] {
-  const tracked = runCommand('git', ['diff', '--numstat', 'HEAD', '--'], {
-    captureOutput: true,
-  });
-  const untracked = runCommand('git', ['ls-files', '--others', '--exclude-standard'], {
-    captureOutput: true,
-  });
-  const statsByPath = new Map<string, FinaliseChangedFile>();
-
-  getTrimmedLines(tracked.stdout).forEach((line) => {
-    const [rawAdditions, rawDeletions, rawPath] = line.split(/\t/u);
-    const filePath = rawPath || '';
-    if (!filePath) return;
-
-    const additions = Number.parseInt(rawAdditions || '0', 10);
-    const deletions = Number.parseInt(rawDeletions || '0', 10);
-    statsByPath.set(filePath, {
-      path: filePath,
-      additions: Number.isFinite(additions) ? additions : 0,
-      deletions: Number.isFinite(deletions) ? deletions : 0,
-    });
-  });
-
-  getTrimmedLines(untracked.stdout).forEach((filePath) => {
-    if (!statsByPath.has(filePath)) {
-      statsByPath.set(filePath, { path: filePath, additions: 0, deletions: 0 });
-    }
-  });
-
-  return Array.from(statsByPath.values());
-}
-
 function getGitStatusPorcelain(): string {
   return runCommand('git', ['status', '--porcelain'], {
     captureOutput: true,
   }).stdout.trim();
-}
-
-function getUnmergedFiles(): string[] {
-  return getTrimmedLines(
-    runCommand('git', ['diff', '--name-only', '--diff-filter=U'], {
-      captureOutput: true,
-      allowFailure: true,
-    }).stdout
-  );
 }
 
 function hasUncommittedChanges(): boolean {
@@ -311,6 +282,192 @@ function getHeadSha(): string {
   return runCommand('git', ['rev-parse', 'HEAD'], {
     captureOutput: true,
   }).stdout.trim();
+}
+
+function parseChangedFileStats(trackedStdout: string, untrackedStdout: string): FinaliseChangedFile[] {
+  const statsByPath = new Map<string, FinaliseChangedFile>();
+
+  getTrimmedLines(trackedStdout).forEach((line) => {
+    const [rawAdditions, rawDeletions, rawPath] = line.split(/\t/u);
+    const filePath = rawPath || '';
+    if (!filePath) return;
+
+    const additions = Number.parseInt(rawAdditions || '0', 10);
+    const deletions = Number.parseInt(rawDeletions || '0', 10);
+    statsByPath.set(filePath, {
+      path: filePath,
+      additions: Number.isFinite(additions) ? additions : 0,
+      deletions: Number.isFinite(deletions) ? deletions : 0,
+    });
+  });
+
+  getTrimmedLines(untrackedStdout).forEach((filePath) => {
+    if (!statsByPath.has(filePath)) {
+      statsByPath.set(filePath, { path: filePath, additions: 0, deletions: 0 });
+    }
+  });
+
+  return Array.from(statsByPath.values());
+}
+
+async function collectFinaliseReadOnlyPrechecks(
+  progress?: TeeProgressReporter
+): Promise<{
+  unmergedFiles: string[];
+  changedFileStats: FinaliseChangedFile[];
+  branch: string;
+  headSha: string;
+  protocolReadiness: ReturnType<typeof getFinaliseProtocolReadiness>;
+  migrationDiscoveryPaths: string[];
+  devServerProcesses: ProcessInfo[];
+}> {
+  const captured = captureFrozenVerifyCandidate({ repoRoot: REPO_ROOT });
+  if (!captured.ok) {
+    throw new Error(captured.message);
+  }
+  const batch = await runVerifyBatch<unknown>({
+    candidate: captured.candidate,
+    readCandidate: () => {
+      const current = captureFrozenVerifyCandidate({ repoRoot: REPO_ROOT });
+      return current.ok ? current.candidate : { error: current.message };
+    },
+    jobs: planFinaliseReadOnlyPrechecks({
+      unmergedFiles: async () => {
+        const result = await runProcessJob({
+          cwd: REPO_ROOT,
+          command: 'git',
+          args: ['diff', '--name-only', '--diff-filter=U'],
+        });
+        return getTrimmedLines(requireProcessSuccess(result, 'git merge-conflict listing'));
+      },
+      changedFiles: async () => {
+        const tracked = await runProcessJob({
+          cwd: REPO_ROOT,
+          command: 'git',
+          args: ['diff', '--numstat', 'HEAD', '--'],
+        });
+        const untracked = await runProcessJob({
+          cwd: REPO_ROOT,
+          command: 'git',
+          args: ['ls-files', '--others', '--exclude-standard'],
+        });
+        return parseChangedFileStats(
+          requireProcessSuccess(tracked, 'git changed-file listing'),
+          requireProcessSuccess(untracked, 'git untracked-file listing')
+        );
+      },
+      branchAndHead: async () => {
+        const branch = await runProcessJob({
+          cwd: REPO_ROOT,
+          command: 'git',
+          args: ['branch', '--show-current'],
+        });
+        const head = await runProcessJob({
+          cwd: REPO_ROOT,
+          command: 'git',
+          args: ['rev-parse', 'HEAD'],
+        });
+        return {
+          branch: requireProcessSuccess(branch, 'git branch').trim(),
+          headSha: requireProcessSuccess(head, 'git HEAD').trim(),
+        };
+      },
+      protocolReadiness: () => getFinaliseProtocolReadiness(REPO_ROOT),
+      migrationInventory: () =>
+        getFinaliseMigrationDiscoveryPaths(REPO_ROOT, (args) =>
+          runCommand('git', args, { captureOutput: true, allowFailure: true })
+        ),
+      devServerInventory: () => getRepoDevServerProcesses(),
+    }).map((job) => ({
+      ...job,
+      run: async () => {
+        notifyDisplayProgress(() => progress?.stageStart(job.id));
+        try {
+          const value = await job.run();
+          notifyDisplayProgress(() => progress?.stageFinish(job.id, 'passed'));
+          return value;
+        } catch (error) {
+          notifyDisplayProgress(() => progress?.stageFinish(job.id, 'failed'));
+          throw error;
+        }
+      },
+    })),
+    progress,
+  });
+  if (batch.foundational) {
+    throw new Error(batch.foundationalMessage ?? 'finalise read-only prechecks failed');
+  }
+  const byId = new Map(batch.results.map((result) => [result.id, result]));
+  const requireValue = <T>(id: string): T => {
+    const row = byId.get(id);
+    if (!row || row.status !== 'passed' || row.value === undefined) {
+      throw new Error(row?.error ?? `finalise precheck failed: ${id}`);
+    }
+    return row.value as T;
+  };
+  const branchAndHead = requireValue<{ branch: string; headSha: string }>('git-branch-head');
+  return {
+    unmergedFiles: requireValue<string[]>('git-unmerged'),
+    changedFileStats: requireValue<FinaliseChangedFile[]>('git-changed-files'),
+    branch: branchAndHead.branch,
+    headSha: branchAndHead.headSha,
+    protocolReadiness: requireValue<ReturnType<typeof getFinaliseProtocolReadiness>>(
+      'protocol-readiness'
+    ),
+    migrationDiscoveryPaths: requireValue<string[]>('migration-inventory'),
+    devServerProcesses: requireValue<ProcessInfo[]>('dev-server-inventory'),
+  };
+}
+
+async function runCommandAsyncWithHeartbeat(
+  command: string,
+  args: string[],
+  options: RunCommandOptions & { label: string; percent: number }
+): Promise<CommandResult> {
+  const started = Date.now();
+  const timer = setInterval(() => {
+    printProgress(
+      `${options.label} still running (${formatDurationMs(Date.now() - started)} elapsed)`,
+      options.percent
+    );
+  }, 15_000);
+  timer.unref?.();
+  try {
+    const result = await runProcessJob({
+      cwd: REPO_ROOT,
+      command: getExecutable(command),
+      args,
+      env: options.env ?? process.env,
+      onStdout: options.captureOutput ? undefined : (text) => process.stdout.write(text),
+      onStderr: options.captureOutput ? undefined : (text) => process.stderr.write(text),
+    });
+    if (automationRun) {
+      automationRun.recordStep({
+        name: [command, ...args.map(quoteArg)].join(' '),
+        status: result.status === 'passed' || options.allowFailure ? 'passed' : 'failed',
+        startedAt: new Date(started).toISOString(),
+        endedAt: new Date().toISOString(),
+        durationMs: result.durationMs,
+        command: result.command,
+        exitCode: result.exitCode,
+        output: `${result.stdout}${result.stderr}`.slice(0, 500_000),
+      });
+    }
+    if (!options.allowFailure && result.status !== 'passed') {
+      throw new Error(
+        `Command failed (${[command, ...args.map(quoteArg)].join(' ')})${
+          result.exitCode !== null ? ` with exit code ${result.exitCode}` : ''
+        }`
+      );
+    }
+    return {
+      status: result.exitCode,
+      stdout: result.stdout,
+      stderr: result.stderr,
+    };
+  } finally {
+    clearInterval(timer);
+  }
 }
 
 function readReleaseVersionState(): ReleaseVersionState {
@@ -420,6 +577,10 @@ async function runDeterministicFinaliseStep<T>(params: {
 }
 
 function printProgress(message: string, percent: number): void {
+  notifyDisplayProgress(() => {
+    activeFinaliseProgress?.setSubtitle(message);
+  });
+  if (activeFinaliseProgressTTY) return;
   console.log(`- ${message} [${percent}% complete]`);
 }
 
@@ -534,6 +695,12 @@ function handleBuildProgressLine(line: string, printedMilestones: Set<number>): 
     if (!milestone.patterns.some((pattern) => pattern.test(line))) return;
 
     printedMilestones.add(index);
+    notifyDisplayProgress(() => {
+      activeFinaliseProgress?.stageUpdate('production-build', {
+        ratio: printedMilestones.size / BUILD_PROGRESS_MILESTONES.length,
+        detail: milestone.message,
+      });
+    });
     printProgress(milestone.message, milestone.percent);
   });
 }
@@ -1024,16 +1191,29 @@ async function main(): Promise<void> {
       await run.step('Check for blocking Cursor activity', () => assertNoBlockingCursorActivity());
     }
 
-    const unmergedFiles = getUnmergedFiles();
+    const progress = createFinaliseProgressReporter({
+      stream: process.stderr,
+      isTTY: Boolean(process.stderr.isTTY),
+    });
+    activeFinaliseProgress = progress;
+    activeFinaliseProgressTTY = Boolean(process.stderr.isTTY);
+
+    printProgress('Running read-only finalise prechecks...', 1);
+    const prechecks = await run.step('Read-only finalise prechecks', () =>
+      collectFinaliseReadOnlyPrechecks(progress)
+    );
+    const unmergedFiles = prechecks.unmergedFiles;
     if (unmergedFiles.length > 0) {
       throw new Error(`Resolve merge conflicts before finalising: ${unmergedFiles.join(', ')}`);
     }
 
-    const protocolReadiness = getFinaliseProtocolReadiness(REPO_ROOT);
+    const protocolReadiness = prechecks.protocolReadiness;
     if (!options.dryRun) {
+      notifyDisplayProgress(() => progress.stageStart('finalise-start'));
       await run.step('Validate protocol finalise gate', () => {
         assertFinaliseAllowedForProtocol(REPO_ROOT);
       });
+      notifyDisplayProgress(() => progress.stageFinish('finalise-start', 'passed'));
     } else {
       await run.step('Inspect protocol finalise readiness', () => {
         console.log('\n==> Protocol readiness');
@@ -1041,12 +1221,9 @@ async function main(): Promise<void> {
       });
     }
 
-    const changedFileStats = getChangedFileStats();
+    const changedFileStats = prechecks.changedFileStats;
     const changedFiles = changedFileStats.map((entry) => entry.path);
-    const migrationDiscoveryPaths = getFinaliseMigrationDiscoveryPaths(
-      REPO_ROOT,
-      (args) => runCommand('git', args, { captureOutput: true, allowFailure: true })
-    );
+    const migrationDiscoveryPaths = prechecks.migrationDiscoveryPaths;
     const pendingMigrationPaths = getFinaliseMigrationFilesFromPaths(
       REPO_ROOT,
       migrationDiscoveryPaths
@@ -1063,8 +1240,8 @@ async function main(): Promise<void> {
     );
     const configuredConnectionString = process.env.POSTGRES_URL_NON_POOLING;
     const databaseTargetIdentity = getSafeDatabaseTargetIdentity(configuredConnectionString);
-    const devServerProcesses = getRepoDevServerProcesses();
-    const branch = getCurrentBranch();
+    const devServerProcesses = prechecks.devServerProcesses;
+    const branch = prechecks.branch;
     const initialChangeSummary = summarizeFinaliseChanges(changedFileStats);
     const skippableTasks = getSkippableFinaliseTasks({
       repoRoot: REPO_ROOT,
@@ -1145,6 +1322,7 @@ async function main(): Promise<void> {
           pushedBranch: null,
         })
       );
+      notifyDisplayProgress(() => progress.complete('passed'));
       await run.finish('passed');
       return;
     }
@@ -1233,9 +1411,11 @@ async function main(): Promise<void> {
     }
 
     console.log('\n==> Run clean production build');
+    notifyDisplayProgress(() => progress.stageStart('production-build'));
     if (recentBuildRun) {
       await run.step('Reuse recent production build', () => undefined, getRecentTaskMetadata(recentBuildRun));
       printProgress(`Reused recent production build: ${formatRecentTask(recentBuildRun)}.`, 50);
+      notifyDisplayProgress(() => progress.stageFinish('production-build', 'passed'));
     } else {
       console.log('\n==> Remove clean build output');
       printProgress('Removing previous clean build output...', 28);
@@ -1252,6 +1432,7 @@ async function main(): Promise<void> {
             run.step('Run clean production build', () => runCleanProductionBuildWithProgress())
           ),
       });
+      notifyDisplayProgress(() => progress.stageFinish('production-build', 'passed'));
     }
 
     if (options.full) {
@@ -1267,7 +1448,9 @@ async function main(): Promise<void> {
           testsuite: recentTestsuiteRun ? getRecentTaskMetadata(recentTestsuiteRun) : null,
         });
         printProgress('Reused recent full automated test suite.', 84);
+        notifyDisplayProgress(() => progress.stageFinish('application-tests', 'passed'));
       } else {
+        notifyDisplayProgress(() => progress.stageStart('application-tests'));
         printProgress(`Starting local production server on ${localProductionBaseUrl}...`, 52);
         const testServer = startManagedProcess(
           'npm',
@@ -1293,7 +1476,11 @@ async function main(): Promise<void> {
               command: 'npm run test:run',
               action: () =>
                 timeFinaliseStep(timingEntries, 'Run Vitest test run', () =>
-                  runCommand('npm', ['run', 'test:run'], { env: localTestEnv })
+                  runCommandAsyncWithHeartbeat('npm', ['run', 'test:run'], {
+                    env: localTestEnv,
+                    label: 'Vitest test run',
+                    percent: 60,
+                  })
                 ),
             });
             printProgress('Vitest test run passed.', 72);
@@ -1309,7 +1496,11 @@ async function main(): Promise<void> {
               command: 'npm run testsuite',
               action: () =>
                 timeFinaliseStep(timingEntries, 'Run API and Playwright testsuite', () =>
-                  runCommand('npm', ['run', 'testsuite'], { env: localTestEnv })
+                  runCommandAsyncWithHeartbeat('npm', ['run', 'testsuite'], {
+                    env: localTestEnv,
+                    label: 'API and Playwright testsuite',
+                    percent: 75,
+                  })
                 ),
             });
             printProgress('Full automated test suite passed.', 84);
@@ -1321,12 +1512,14 @@ async function main(): Promise<void> {
           );
           printProgress('Local production server stopped.', 86);
         }
+        notifyDisplayProgress(() => progress.stageFinish('application-tests', 'passed'));
       }
     } else {
       console.log('\n==> Run full automated test suite');
       printProgress('Skipped for non-full finalise.', 84);
     }
 
+    notifyDisplayProgress(() => progress.stageStart('release-finish'));
     console.log('\n==> Summarise workspace changes');
     printProgress('Summarising workspace changes...', 87);
     const changeSummary = summarizeFinaliseChanges(changedFileStats);
@@ -1433,6 +1626,8 @@ async function main(): Promise<void> {
     recordFinaliseDurationAnomaly(finaliseMode, timingEntries);
     clearFinaliseFailureArtifact(REPO_ROOT);
     printProgress('Finalise workflow complete.', 100);
+    notifyDisplayProgress(() => progress.stageFinish('release-finish', 'passed'));
+    notifyDisplayProgress(() => progress.complete('passed'));
     await run.finish('passed');
   } catch (error) {
     if (timingEntries.length > 0) {
@@ -1445,10 +1640,13 @@ async function main(): Promise<void> {
         // Keep the original failure as the primary exit reason.
       }
     }
+    notifyDisplayProgress(() => activeFinaliseProgress?.complete('failed'));
     await run.finish('failed', error);
     throw error;
   } finally {
     automationRun = null;
+    activeFinaliseProgress = null;
+    activeFinaliseProgressTTY = false;
   }
 }
 

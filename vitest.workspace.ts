@@ -13,6 +13,7 @@ export default defineWorkspace([
       include: [
         'tests/integration/**/*.test.ts',
         'tests/unit/**/*.test.ts',
+        'tests/unit/**/*.test.tsx',
         'tests/regression/**/*.test.ts',
         'tests/db/**/*.test.ts',
       ],

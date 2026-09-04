@@ -3,6 +3,7 @@
   "id": "avs-workflow-regression-suite",
   "purpose": "canonical workflow regression suite",
   "files": [
+    "tests/unit/tee-parallel-verify.test.ts",
     "tests/unit/tee-v2-context.test.ts",
     "tests/unit/workflow-execution-mode.test.ts",
     "tests/unit/workflow-finalise-correlation.test.ts",

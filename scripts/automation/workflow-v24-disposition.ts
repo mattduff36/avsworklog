@@ -294,11 +294,11 @@ function isTimeoutError(error?: Error): boolean {
 }
 
 export function defaultGitCommandRunner(repoRoot: string, args: string[]): GitCommandResult {
-  const result = spawnSync('git', args, {
+  const result = spawnSync(process.platform === 'win32' ? 'git.exe' : 'git', args, {
     cwd: repoRoot,
     encoding: 'utf8',
     shell: false,
-    windowsHide: true,
+    windowsHide: process.platform !== 'win32',
     timeout: GIT_SAFETY_TIMEOUT_MS,
   });
   const timedOut = isTimeoutError(result.error);
@@ -1106,12 +1106,12 @@ export function listOrderedImplementationCommits(
 const GIT_BINARY_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
 
 function gitSpawnBuffer(repoRoot: string, args: string[]): { status: number; stdout: Buffer; error?: string } {
-  const result = spawnSync('git', args, {
+  const result = spawnSync(process.platform === 'win32' ? 'git.exe' : 'git', args, {
     cwd: repoRoot,
     encoding: 'buffer',
     maxBuffer: GIT_BINARY_MAX_BUFFER_BYTES,
     shell: false,
-    windowsHide: true,
+    windowsHide: process.platform !== 'win32',
   });
   return {
     status: result.status ?? 1,
@@ -1180,12 +1180,12 @@ function gitCatFileBatch(repoRoot: string, shas: string[]): Buffer[] | { error: 
   let fd: number | undefined;
   try {
     fd = openSync(listPath, 'r');
-    const result = spawnSync('git', ['cat-file', '--batch'], {
+    const result = spawnSync(process.platform === 'win32' ? 'git.exe' : 'git', ['cat-file', '--batch'], {
       cwd: repoRoot,
       encoding: 'buffer',
       maxBuffer: GIT_BINARY_MAX_BUFFER_BYTES,
       shell: false,
-      windowsHide: true,
+      windowsHide: process.platform !== 'win32',
       stdio: [fd, 'pipe', 'pipe'],
     });
     if ((result.status ?? 1) !== 0) {
@@ -1274,7 +1274,7 @@ export function computeGitPatchSha256(
   if (!from) return { error: 'source baseline does not exist as a git commit object' };
   if (!to) return { error: 'source HEAD does not exist as a git commit object' };
   const result = spawnSync(
-    'git',
+    process.platform === 'win32' ? 'git.exe' : 'git',
     [
       'diff',
       '--binary',
@@ -1291,7 +1291,7 @@ export function computeGitPatchSha256(
       encoding: 'buffer',
       maxBuffer: GIT_BINARY_MAX_BUFFER_BYTES,
       shell: false,
-      windowsHide: true,
+      windowsHide: process.platform !== 'win32',
     }
   );
   if ((result.status ?? 1) !== 0 && result.status !== 1) {
