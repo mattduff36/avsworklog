@@ -68,6 +68,40 @@ export async function canCurrentActorAuthoriseTimesheetTarget(
   });
 }
 
+/**
+ * Authoritative Manager Approved allow-set.
+ * Equivalent to shipped UI `(admin OR manager-kind) AND scoped authorise`:
+ * C AND (A OR NOT X), one effective-role snapshot.
+ */
+export async function canCurrentActorMarkTimesheetManagerApproved(
+  target: TimesheetApprovalTarget,
+  options: TimesheetApprovalScopeOptions = {}
+): Promise<boolean> {
+  const [effectiveRole, approvalsAccessLevel] = await Promise.all([
+    options.effectiveRole ? Promise.resolve(options.effectiveRole) : getEffectiveRole(),
+    options.approvalsAccessLevel !== undefined
+      ? Promise.resolve(options.approvalsAccessLevel)
+      : getEffectiveModuleAccessLevel('approvals'),
+  ]);
+
+  const canAuthorise = await canCurrentActorAuthoriseTimesheetTarget(target, {
+    effectiveRole,
+    approvalsAccessLevel,
+  });
+  if (!canAuthorise) {
+    return false;
+  }
+
+  if (hasEffectiveRoleFullAccess(effectiveRole)) {
+    return true;
+  }
+
+  return !hasAccountsTimesheetFullVisibilityOverride(
+    effectiveRole.role_name,
+    effectiveRole.team_name
+  );
+}
+
 export async function canCurrentActorMarkTimesheetPayrollReceived(
   options: TimesheetApprovalScopeOptions = {}
 ): Promise<boolean> {

@@ -17,6 +17,7 @@ vi.mock('@/lib/utils/view-as', () => ({
 import { getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
 import {
   canCurrentActorAuthoriseTimesheetTarget,
+  canCurrentActorMarkTimesheetManagerApproved,
   canCurrentActorMarkTimesheetPayrollReceived,
 } from '@/lib/server/timesheet-approval-scope';
 import { getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
@@ -157,5 +158,130 @@ describe('canCurrentActorAuthoriseTimesheetTarget', () => {
 
     vi.mocked(getEffectiveModuleAccessLevel).mockResolvedValue(2);
     await expect(canCurrentActorMarkTimesheetPayrollReceived()).resolves.toBe(false);
+  });
+});
+
+describe('canCurrentActorMarkTimesheetManagerApproved', () => {
+  const target = { profileId: 'employee-1', teamId: 'team-a' };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(getEffectiveModuleAccessLevel).mockResolvedValue(3);
+  });
+
+  function mockPermissions(
+    role: EffectiveRoleInfo,
+    effective = getAbsenceSecondaryDefaultMap(
+      role.role_name === 'admin' ? 'admin' : role.role_name === 'manager' ? 'manager' : 'supervisor'
+    )
+  ) {
+    vi.mocked(getEffectiveRole).mockResolvedValue(role);
+    vi.mocked(getActorAbsenceSecondaryPermissions).mockResolvedValue({
+      user_id: role.user_id!,
+      team_id: role.team_id,
+      team_name: role.team_name,
+      role_name: role.role_name,
+      role_display_name: role.display_name,
+      role_tier:
+        role.role_name === 'admin'
+          ? 'admin'
+          : role.role_name === 'manager'
+            ? 'manager'
+            : role.role_name === 'supervisor'
+              ? 'supervisor'
+              : 'employee',
+      defaults: getAbsenceSecondaryDefaultMap('employee'),
+      effective,
+      overrides: createNullAbsenceSecondaryOverrideRecord(),
+      has_exception_row: false,
+    });
+  }
+
+  it('allows a scoped non-Accounts manager and denies Accounts manager/supervisor', async () => {
+    mockPermissions({
+      ...supervisorRole,
+      role_name: 'manager',
+      display_name: 'Manager',
+      role_class: 'manager',
+      is_viewing_as: false,
+      is_actual_super_admin: false,
+      user_id: 'ops-manager',
+      team_name: 'Operations',
+    });
+    await expect(canCurrentActorMarkTimesheetManagerApproved(target)).resolves.toBe(true);
+
+    mockPermissions({
+      ...supervisorRole,
+      role_name: 'manager',
+      display_name: 'Manager',
+      role_class: 'manager',
+      is_viewing_as: false,
+      is_actual_super_admin: false,
+      user_id: 'accounts-manager',
+      team_id: 'team-accounts',
+      team_name: 'Accounts',
+    });
+    await expect(canCurrentActorMarkTimesheetManagerApproved(target)).resolves.toBe(false);
+  });
+
+  it('TS-PROC-ACCOUNTS-EMPLOYEE-001 allows a scoped Accounts employee and denies one without authorise', async () => {
+    const accountsEmployee: EffectiveRoleInfo = {
+      ...supervisorRole,
+      role_id: 'employee-role',
+      role_name: 'employee',
+      display_name: 'Employee',
+      role_class: 'employee',
+      is_viewing_as: false,
+      is_actual_super_admin: false,
+      user_id: 'accounts-clerk',
+      team_id: 'team-accounts',
+      team_name: 'Accounts',
+    };
+    const employeeDefaults = getAbsenceSecondaryDefaultMap('employee');
+    mockPermissions(accountsEmployee, {
+      ...employeeDefaults,
+      authorise_bookings_team: true,
+    });
+    await expect(
+      canCurrentActorMarkTimesheetManagerApproved({
+        profileId: 'employee-1',
+        teamId: 'team-accounts',
+      })
+    ).resolves.toBe(true);
+
+    mockPermissions(accountsEmployee, employeeDefaults);
+    await expect(
+      canCurrentActorMarkTimesheetManagerApproved({
+        profileId: 'employee-1',
+        teamId: 'team-accounts',
+      })
+    ).resolves.toBe(false);
+  });
+
+  it('denies View As Accounts manager and allows View As admin', async () => {
+    mockPermissions({
+      ...supervisorRole,
+      role_name: 'manager',
+      display_name: 'Manager',
+      role_class: 'manager',
+      is_viewing_as: true,
+      is_actual_super_admin: true,
+      is_super_admin: false,
+      team_id: 'team-accounts',
+      team_name: 'Accounts',
+    });
+    await expect(canCurrentActorMarkTimesheetManagerApproved(target)).resolves.toBe(false);
+
+    mockPermissions({
+      ...supervisorRole,
+      role_name: 'admin',
+      display_name: 'Admin',
+      role_class: 'admin',
+      is_viewing_as: true,
+      is_actual_super_admin: true,
+      is_super_admin: true,
+      team_name: 'Operations',
+    });
+    await expect(canCurrentActorMarkTimesheetManagerApproved(target)).resolves.toBe(true);
   });
 });

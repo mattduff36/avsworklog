@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
+import { canCurrentActorMarkTimesheetManagerApproved } from '@/lib/server/timesheet-approval-scope';
 import {
   TimesheetGateConflictError,
   applyTimesheetManagerApproved,
@@ -45,14 +45,14 @@ export async function POST(
       return NextResponse.json({ error: 'Timesheet not found' }, { status: 404 });
     }
 
-    const canAuthoriseTarget = await canCurrentActorAuthoriseTimesheetTarget(
+    const canMarkManagerApproved = await canCurrentActorMarkTimesheetManagerApproved(
       {
         profileId: typedTarget.user_id,
         teamId: typedTarget.employee?.team_id || null,
       },
       { effectiveRole }
     );
-    if (!canAuthoriseTarget) {
+    if (!canMarkManagerApproved) {
       return NextResponse.json(
         { error: 'You cannot process this employee’s timesheet' },
         { status: 403 }

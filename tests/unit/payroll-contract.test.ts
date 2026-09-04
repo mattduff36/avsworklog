@@ -62,10 +62,10 @@ describe('payroll rollout contract', () => {
     expect(route).not.toContain('filterTimesheetRowsForReportScope');
   });
 
-  it('PAY-PROCESS-MANAGER-001 keeps process on authorise scope and routes the detail page through the API', () => {
+  it('PAY-PROCESS-MANAGER-001 locks process to the Manager Approved helper and routes the detail page through the API', () => {
     const processRoute = readProjectFile('app/api/timesheets/[id]/process/route.ts');
     const detail = readProjectFile('app/(dashboard)/timesheets/[id]/page.tsx');
-    expect(processRoute).toContain('canCurrentActorAuthoriseTimesheetTarget');
+    expect(processRoute).toContain('canCurrentActorMarkTimesheetManagerApproved');
     expect(processRoute).not.toContain('canCurrentActorMarkTimesheetPayrollReceived');
     expect(detail).toContain('/api/timesheets/${timesheet.id}/process');
     expect(detail).not.toContain('processed_at: new Date().toISOString()');

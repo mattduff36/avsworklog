@@ -137,7 +137,11 @@ describe('Permission Alignment Phase 4', () => {
 
     for (const path of authorisingRoutePaths) {
       const route = readProjectFile(path);
-      expect(route).toContain('canCurrentActorAuthoriseTimesheetTarget');
+      if (path.endsWith('process/route.ts')) {
+        expect(route).toContain('canCurrentActorMarkTimesheetManagerApproved');
+      } else {
+        expect(route).toContain('canCurrentActorAuthoriseTimesheetTarget');
+      }
       expect(route).not.toContain('filterTimesheetRowsForReportScope');
     }
 
