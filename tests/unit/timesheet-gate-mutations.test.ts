@@ -47,6 +47,7 @@ class GateClient implements TimesheetGatePgClient {
   }
 }
 
+// Candidate-bound supporting evidence for ws_303cb13a69947b08 Manager Approved lock.
 describe('timesheet gate mutations', () => {
   it('TS-GATE-004 returns conflict and writes nothing on expected_status mismatch', async () => {
     const processClient = new GateClient('approved');

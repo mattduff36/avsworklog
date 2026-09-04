@@ -187,8 +187,8 @@ Stable IDs. Exercise the real `POST` handler in `app/api/timesheets/[id]/process
 15. `TS-PROC-REGRESSION-001` — valid manager workflow still works (`submitted` → `manager_approved`, `approved` → `processed` when payroll is already set).
 16. `PAY-PROCESS-MANAGER-001` — source-scan rewritten: `/process` uses the canonical Manager Approved helper; it still must not treat payroll-received as the allow rule.
 17. `TS-PROC-ACCOUNTS-EMPLOYEE-001` — Accounts role=`employee` (not manager/supervisor override) matches the shipped UI residual: allow only when they are a scoped authoriser (manager-kind); deny without authorise scope. Do not silently broaden or narrow.
-
-Also keep existing mutation tests `TS-GATE-001` and `TS-GATE-004` green. They are supporting, not a reason to skip the route IDs.
+18. `TS-GATE-001` — existing Manager Approved status-machine cases stay green.
+19. `TS-GATE-004` — existing stale `expected_status` fail-closed mutation case stays green.
 
 ## Implementation sequence
 
@@ -300,7 +300,9 @@ Happy path to aim for: plan approval → architecture gate → implementation �
     { "id": "TS-PROC-AUDIT-001", "status": "unresolved" },
     { "id": "TS-PROC-REGRESSION-001", "status": "unresolved" },
     { "id": "PAY-PROCESS-MANAGER-001", "status": "unresolved" },
-    { "id": "TS-PROC-ACCOUNTS-EMPLOYEE-001", "status": "unresolved" }
+    { "id": "TS-PROC-ACCOUNTS-EMPLOYEE-001", "status": "unresolved" },
+    { "id": "TS-GATE-001", "status": "unresolved" },
+    { "id": "TS-GATE-004", "status": "unresolved" }
   ],
   "unresolvedRisks": [
     {

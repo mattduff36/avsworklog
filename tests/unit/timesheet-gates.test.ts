@@ -10,6 +10,7 @@ import {
   statusAfterClearingManagerGate,
 } from '@/lib/utils/timesheet-gates';
 
+// Candidate-bound supporting evidence for ws_303cb13a69947b08 Manager Approved lock.
 describe('timesheet dual gates', () => {
   it('TS-GATE-001 allows Manager Approved from submitted and approved, and is idempotent afterwards', () => {
     expect(resolveTimesheetManagerApprovedAction('submitted')).toEqual({
