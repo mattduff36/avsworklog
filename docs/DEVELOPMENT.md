@@ -95,6 +95,8 @@ npm run fixerrors
 npm run review:preflight
 ```
 
+Launch `review:preflight`, full tests, health, build, and `finalise` in a dedicated Cursor integrated Terminal (`block_until_ms: 0` or the current equivalent). Do not attach those long commands to the chat command card when a real Terminal is available.
+
 Local commit is not release-ready, and release-ready is not a push. `fap` / `/fap` and `ffap` / `/ffap` implement the global COMPLETE_AND_RELEASE contract and authorize `npm run finalise:push` / `npm run finalise:full:push`. The long phrases `finalise and push`, `finalise full and push`, `finalise:push`, and `push to GitHub` also authorize those scripts. `finalise` / `finalise-full` stay local.
 
 CRITICAL protocol notes (runtime is in `scripts/automation`, not hand-edited JSON):
