@@ -1,5 +1,18 @@
 [
   {
+    "version": "0926.4.1",
+    "updateKind": "minor",
+    "title": "Workflow improvements",
+    "description": "Let STANDARD finalise finish without a CRITICAL workstream context.",
+    "summary": "Let STANDARD finalise finish without a CRITICAL workstream context.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-09-04T14:03:18.956Z"
+  },
+  {
     "version": "0926.4.0",
     "updateKind": "major",
     "title": "Workflow update",

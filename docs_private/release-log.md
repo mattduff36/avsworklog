@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.4.1
+
+**GIT COMMIT MESSAGE**
+`fix(workflow): let STANDARD finalise finish without a CRITICAL workstream context`
+
+**PUSHED AT**
+2026-09-04T14:03:18.956Z
+
+**WHAT CHANGED**
+Let STANDARD finalise finish without a CRITICAL workstream context.
+
+**VERSION HISTORY DETAILS**
+- Updated app reliability, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(workflow): let STANDARD finalise finish without a CRITICAL workstream context`
+
 ## 0926.4.0
 
 **GIT COMMIT MESSAGE**
