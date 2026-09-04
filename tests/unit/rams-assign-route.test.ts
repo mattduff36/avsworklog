@@ -240,6 +240,25 @@ describe('POST /api/rams/[id]/assign', () => {
     expect(from).not.toHaveBeenCalled();
   });
 
+  it('ASSIGN-PREREQ-ERROR-001: fails closed before delete when system-account lookup throws', async () => {
+    mockDatabase({
+      current: { data: [{ employee_id: USER_A }], error: null },
+      signed: { data: [], error: null },
+    });
+    vi.mocked(getSystemAccountIds).mockRejectedValue(new Error('Failed to load system account profiles'));
+
+    const response = await POST(
+      buildRequest({
+        employee_ids: [],
+        unassign_ids: [USER_A],
+      }),
+      { params: Promise.resolve({ id: DOC_ID }) }
+    );
+
+    expect(response.status).toBe(500);
+    expect(deleteStates[0]?.type).toBe('select');
+  });
+
   it('validates new assignees have RAMS access before delete', async () => {
     mockDatabase({
       current: { data: [], error: null },

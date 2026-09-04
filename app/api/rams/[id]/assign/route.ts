@@ -96,7 +96,7 @@ export async function POST(
 
     const admin = createAdminClient();
 
-    if (employeeIds.length > 0) {
+    if (employeeIds.length > 0 || unassignIds.length > 0) {
       const systemAccountIds = await getSystemAccountIds(admin);
       if (employeeIds.some((employeeId) => systemAccountIds.has(employeeId))) {
         return NextResponse.json(
@@ -104,7 +104,9 @@ export async function POST(
           { status: 400 }
         );
       }
+    }
 
+    if (employeeIds.length > 0) {
       const { data: employees, error: empError } = await supabase
         .from('profiles')
         .select('id')

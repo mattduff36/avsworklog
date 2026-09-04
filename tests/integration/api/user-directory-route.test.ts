@@ -30,12 +30,35 @@ describe('GET /api/users/directory', () => {
   }
 
   function mockAdminFrom(select: ReturnType<typeof vi.fn>) {
+    let profileQueries = 0;
     return vi.fn((table: string) => {
       if (table === 'inventory_kiosk_config') {
         return createInventoryKioskConfigTableMock();
       }
+      if (table === 'profiles') {
+        profileQueries += 1;
+        if (profileQueries === 1) {
+          return { select };
+        }
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(async () => ({ data: [], error: null })),
+          })),
+        };
+      }
       return { select };
     });
+  }
+
+  function mockAdminClient(from: ReturnType<typeof mockAdminFrom>) {
+    return {
+      from,
+      auth: {
+        admin: {
+          listUsers: vi.fn(async () => ({ data: { users: [] }, error: null })),
+        },
+      },
+    };
   }
 
   async function mockEffectiveRole(overrides: Partial<EffectiveRoleInfo> = {}) {
@@ -122,7 +145,7 @@ describe('GET /api/users/directory', () => {
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
 
-    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
 
     const response = await GET(
       new NextRequest('http://localhost/api/users/directory?module=rams')
@@ -176,7 +199,7 @@ describe('GET /api/users/directory', () => {
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
 
-    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
 
     const response = await GET(
       new NextRequest('http://localhost/api/users/directory?module=inspections&context=actions-assignment'),
@@ -223,7 +246,7 @@ describe('GET /api/users/directory', () => {
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
 
-    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
 
     const response = await GET(
       new NextRequest('http://localhost/api/users/directory?context=toolbox-talks-assignment'),
@@ -272,7 +295,7 @@ describe('GET /api/users/directory', () => {
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
 
-    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
 
     const response = await GET(
       new NextRequest('http://localhost/api/users/directory?module=rams&context=rams-assignment'),
@@ -350,7 +373,7 @@ describe('GET /api/users/directory', () => {
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
 
-    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
 
     const response = await GET(new NextRequest('http://localhost/api/users/directory?module=rams'));
 
@@ -408,7 +431,7 @@ describe('GET /api/users/directory', () => {
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
 
-    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
 
     const response = await GET(
       new NextRequest('http://localhost/api/users/directory?module=rams&context=rams-assignment'),
@@ -442,7 +465,7 @@ describe('GET /api/users/directory', () => {
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
 
-    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
 
     const response = await GET(new NextRequest('http://localhost/api/users/directory'));
     const payload = await response.json();
@@ -474,7 +497,7 @@ describe('GET /api/users/directory', () => {
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
 
-    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
 
     const response = await GET(
       new NextRequest('http://localhost/api/users/directory?limit=25&offset=50')
@@ -487,6 +510,37 @@ describe('GET /api/users/directory', () => {
       offset: 50,
       limit: 25,
       has_more: false,
+    });
+  });
+
+  it('ASSIGN-PREREQ-ERROR-001: fails closed when directory eligibility lookup throws', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { getUsersWithModuleAccess } = await import('@/lib/server/team-permissions');
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'manager-1' } },
+          error: null,
+        }),
+      },
+    } as unknown as SupabaseClient);
+    await mockEffectiveRole();
+    vi.mocked(getUsersWithModuleAccess).mockRejectedValue(new Error('Failed to load module access'));
+
+    const { query } = createDirectoryQuery([
+      { id: 'user-1', full_name: 'Alex Able', employee_id: 'E001' },
+    ]);
+    const select = vi.fn().mockReturnValue(query);
+    const from = mockAdminFrom(select);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
+
+    const response = await GET(new NextRequest('http://localhost/api/users/directory?module=rams'));
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'Failed to verify directory eligibility',
     });
   });
 
@@ -511,7 +565,7 @@ describe('GET /api/users/directory', () => {
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
 
-    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+    vi.mocked(createAdminClient).mockReturnValue(mockAdminClient(from) as never);
 
     const response = await GET(
       new NextRequest('http://localhost/api/users/directory?includeDeleted=true')

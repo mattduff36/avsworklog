@@ -11,17 +11,21 @@ export async function getSystemAccountIds(admin: SystemAccountAdminClient): Prom
     .from('profiles')
     .select('id')
     .eq('is_system_account', true);
-  if (!profilesError) {
-    for (const row of profiles || []) {
-      if (row.id) ids.add(row.id);
-    }
+  if (profilesError) {
+    throw new Error(profilesError.message || 'Failed to load system account profiles');
+  }
+  for (const row of profiles || []) {
+    if (row.id) ids.add(row.id);
   }
 
-  const { data: kioskConfig } = await admin
+  const { data: kioskConfig, error: kioskError } = await admin
     .from('inventory_kiosk_config')
     .select('kiosk_user_id')
     .eq('id', 1)
     .maybeSingle();
+  if (kioskError) {
+    throw new Error(kioskError.message || 'Failed to load kiosk system account');
+  }
   if (kioskConfig?.kiosk_user_id) {
     ids.add(kioskConfig.kiosk_user_id);
   }

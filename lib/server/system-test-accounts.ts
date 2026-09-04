@@ -15,28 +15,24 @@ export async function getHiddenSystemTestAccountIds(admin: AuthAdminClient): Pro
   const hiddenIds = new Set<string>();
   const listUsers = admin.auth?.admin?.listUsers?.bind(admin.auth.admin);
   if (!listUsers) {
-    return hiddenIds;
+    throw new Error('Failed to load hidden system test account auth IDs');
   }
 
   let page = 1;
   const perPage = 1000;
 
-  try {
-    while (true) {
-      const { data, error } = await listUsers({ page, perPage });
-      if (error) throw new Error(error.message || 'Failed to load auth users');
+  while (true) {
+    const { data, error } = await listUsers({ page, perPage });
+    if (error) throw new Error(error.message || 'Failed to load auth users');
 
-      for (const user of data.users) {
-        if (isHiddenSystemTestAccountEmail(user.email)) {
-          hiddenIds.add(user.id);
-        }
+    for (const user of data.users) {
+      if (isHiddenSystemTestAccountEmail(user.email)) {
+        hiddenIds.add(user.id);
       }
-
-      if (data.users.length < perPage) break;
-      page++;
     }
-  } catch (error) {
-    console.warn('Unable to load hidden system test account auth IDs:', error);
+
+    if (data.users.length < perPage) break;
+    page++;
   }
 
   return hiddenIds;

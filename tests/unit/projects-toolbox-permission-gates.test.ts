@@ -56,6 +56,30 @@ describe('Projects / Toolbox Talks permission gates (Phase 2)', () => {
     expect(toolboxPage).toContain('canUseLevel(4)');
   });
 
+  it('FD-GIT-SCOPE-001: required assignment IDs appear once in tracked test titles', () => {
+    const sources = [
+      read('tests/integration/api/user-directory-route.test.ts'),
+      read('tests/unit/projects-toolbox-permission-gates.test.ts'),
+      read('tests/unit/user-directory-client.test.ts'),
+      read('tests/unit/rams-assign-route.test.ts'),
+      read('tests/unit/rams-assignments-delete-policy-migration.test.ts'),
+    ].join('\n');
+    const requiredIds = [
+      'RLS-RAMS-DEL-001',
+      'DIR-RAMS-ASSIGN-001',
+      'DIR-RAMS-ASSIGN-002',
+      'DIR-RAMS-ASSIGN-003',
+      'DIR-RAMS-ASSIGN-004',
+      'ASSIGN-UNASSIGN-001',
+      'ASSIGN-SIGNED-001',
+      'T-EXISTING-DIR-GATES',
+    ];
+    for (const id of requiredIds) {
+      const matches = sources.match(new RegExp(`it\\('${id}:`, 'g')) ?? [];
+      expect(matches, id).toHaveLength(1);
+    }
+  });
+
   it('DIR-RAMS-ASSIGN-004: AssignEmployeesModal requests the rams-assignment directory context', () => {
     const modal = read('components/rams/AssignEmployeesModal.tsx');
     expect(modal).toContain("context: 'rams-assignment'");

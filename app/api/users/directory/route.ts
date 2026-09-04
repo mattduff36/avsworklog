@@ -148,19 +148,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message || 'Failed to load users' }, { status: 500 });
   }
 
-  const allowedUserIds = moduleName
-    ? await getUsersWithModuleAccess(moduleName as ModuleName, ids.length > 0 ? ids : undefined, admin)
-    : null;
-
   const userRows = ((data || []) as unknown) as Array<Record<string, unknown> & {
     id?: string | null;
     full_name?: string | null;
     is_system_account?: boolean | null;
   }>;
-  const visibleUserRows = await filterOperationalProfiles(
-    admin,
-    await filterHiddenSystemTestAccountProfiles(admin, userRows)
-  );
+
+  let allowedUserIds: Set<string> | null = null;
+  let visibleUserRows: typeof userRows;
+  try {
+    allowedUserIds = moduleName
+      ? await getUsersWithModuleAccess(moduleName as ModuleName, ids.length > 0 ? ids : undefined, admin)
+      : null;
+    visibleUserRows = await filterOperationalProfiles(
+      admin,
+      await filterHiddenSystemTestAccountProfiles(admin, userRows)
+    );
+  } catch {
+    return NextResponse.json({ error: 'Failed to verify directory eligibility' }, { status: 500 });
+  }
   const filtered = includeDeleted
     ? visibleUserRows
     : visibleUserRows.filter((row) => !isDeletedUserName(String(row.full_name || '')));
