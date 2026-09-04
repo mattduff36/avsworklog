@@ -43,7 +43,7 @@ export function AssignEmployeesModal({
     setLoading(true);
     try {
       const [directoryUsers, supabase] = await Promise.all([
-        fetchUserDirectory({ includeRole: true, module: 'rams' }),
+        fetchUserDirectory({ includeRole: true, module: 'rams', context: 'rams-assignment' }),
         Promise.resolve(createClient()),
       ]);
 

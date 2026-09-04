@@ -239,6 +239,188 @@ describe('GET /api/users/directory', () => {
     ]);
   });
 
+  it('DIR-RAMS-ASSIGN-001: allows RAMS Level 4 assignment directory requests to include every team', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { canEffectiveRoleUseModuleLevel } = await import('@/lib/utils/rbac');
+    const { getUsersWithModuleAccess } = await import('@/lib/server/team-permissions');
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'manager-1' } },
+          error: null,
+        }),
+      },
+    } as unknown as SupabaseClient);
+    await mockEffectiveRole({
+      role_id: 'role-manager',
+      role_name: 'manager',
+      display_name: 'Manager',
+      role_class: 'manager',
+      is_manager_admin: true,
+      team_id: 'team-workshop',
+      team_name: 'Workshop',
+    });
+    vi.mocked(canEffectiveRoleUseModuleLevel).mockResolvedValue(true);
+    vi.mocked(getUsersWithModuleAccess).mockResolvedValue(new Set(['user-1', 'user-2']));
+
+    const { query } = createDirectoryQuery([
+      { id: 'user-1', full_name: 'Alex Able', employee_id: 'E001', team: { id: 'team-workshop', name: 'Workshop' } },
+      { id: 'user-2', full_name: 'Blake Baker', employee_id: 'E002', team: { id: 'team-fleet', name: 'Fleet' } },
+    ]);
+    const select = vi.fn().mockReturnValue(query);
+    const from = mockAdminFrom(select);
+
+    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/users/directory?module=rams&context=rams-assignment'),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(canEffectiveRoleUseModuleLevel).toHaveBeenCalledWith('rams', 4);
+    expect(query.eq).not.toHaveBeenCalledWith('team_id', 'team-workshop');
+    expect(payload.users).toEqual([
+      expect.objectContaining({ id: 'user-1', has_module_access: true }),
+      expect.objectContaining({ id: 'user-2', has_module_access: true }),
+    ]);
+  });
+
+  it('DIR-RAMS-ASSIGN-002: rejects rams-assignment without Level 4 before the admin directory query', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { canEffectiveRoleUseModuleLevel } = await import('@/lib/utils/rbac');
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'manager-1' } },
+          error: null,
+        }),
+      },
+    } as unknown as SupabaseClient);
+    await mockEffectiveRole({
+      role_id: 'role-manager',
+      role_name: 'manager',
+      display_name: 'Manager',
+      role_class: 'manager',
+      is_manager_admin: true,
+      team_id: 'team-workshop',
+      team_name: 'Workshop',
+    });
+    vi.mocked(canEffectiveRoleUseModuleLevel).mockResolvedValue(false);
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/users/directory?module=rams&context=rams-assignment'),
+    );
+
+    expect(response.status).toBe(403);
+    expect(canEffectiveRoleUseModuleLevel).toHaveBeenCalledWith('rams', 4);
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it('DIR-RAMS-ASSIGN-003: directory without rams-assignment still team-scopes a non-admin manager', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'manager-1' } },
+          error: null,
+        }),
+      },
+    } as unknown as SupabaseClient);
+    await mockEffectiveRole({
+      role_id: 'role-manager',
+      role_name: 'manager',
+      display_name: 'Manager',
+      role_class: 'manager',
+      is_manager_admin: true,
+      is_super_admin: false,
+      team_id: 'team-workshop',
+      team_name: 'Workshop',
+    });
+
+    const { query } = createDirectoryQuery([
+      { id: 'user-1', full_name: 'Alex Able', employee_id: 'E001' },
+    ]);
+    const select = vi.fn().mockReturnValue(query);
+    const from = mockAdminFrom(select);
+
+    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+
+    const response = await GET(new NextRequest('http://localhost/api/users/directory?module=rams'));
+
+    expect(response.status).toBe(200);
+    expect(query.eq).toHaveBeenCalledWith('team_id', 'team-workshop');
+  });
+
+  it('rejects rams-assignment without module=rams with 400 before the admin directory query', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'manager-1' } },
+          error: null,
+        }),
+      },
+    } as unknown as SupabaseClient);
+    await mockEffectiveRole();
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/users/directory?context=rams-assignment'),
+    );
+
+    expect(response.status).toBe(400);
+    expect(createAdminClient).not.toHaveBeenCalled();
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'RAMS assignment directory requires module=rams',
+    });
+  });
+
+  it('omits users without RAMS module access from the rams-assignment directory', async () => {
+    const { createClient } = await import('@/lib/supabase/server');
+    const { createAdminClient } = await import('@/lib/supabase/admin');
+    const { canEffectiveRoleUseModuleLevel } = await import('@/lib/utils/rbac');
+    const { getUsersWithModuleAccess } = await import('@/lib/server/team-permissions');
+
+    vi.mocked(createClient).mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: 'manager-1' } },
+          error: null,
+        }),
+      },
+    } as unknown as SupabaseClient);
+    await mockEffectiveRole();
+    vi.mocked(canEffectiveRoleUseModuleLevel).mockResolvedValue(true);
+    vi.mocked(getUsersWithModuleAccess).mockResolvedValue(new Set(['user-1']));
+
+    const { query } = createDirectoryQuery([
+      { id: 'user-1', full_name: 'Alex Able', employee_id: 'E001' },
+      { id: 'user-2', full_name: 'Blake Blocked', employee_id: 'E002' },
+    ]);
+    const select = vi.fn().mockReturnValue(query);
+    const from = mockAdminFrom(select);
+
+    vi.mocked(createAdminClient).mockReturnValue({ from } as never);
+
+    const response = await GET(
+      new NextRequest('http://localhost/api/users/directory?module=rams&context=rams-assignment'),
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload.users).toEqual([
+      expect.objectContaining({ id: 'user-1', has_module_access: true }),
+    ]);
+  });
+
   it('filters deleted users out by default', async () => {
     const { createClient } = await import('@/lib/supabase/server');
     const { createAdminClient } = await import('@/lib/supabase/admin');

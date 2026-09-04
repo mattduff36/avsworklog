@@ -92,6 +92,26 @@ describe('fetchUserDirectory', () => {
     );
   });
 
+  it('DIR-RAMS-ASSIGN-004: passes rams-assignment context through to the directory endpoint', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        users: [{ id: 'user-6', full_name: 'Frankie Foreman', employee_id: 'E006' }],
+        pagination: { has_more: false },
+      }),
+    } as Response);
+
+    await fetchUserDirectory({
+      includeRole: true,
+      module: 'rams',
+      context: 'rams-assignment',
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toContain(
+      '/api/users/directory?includeRole=true&module=rams&context=rams-assignment&limit=500&offset=0',
+    );
+  });
+
   it('preserves failed response status codes for paginated requests', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: false,

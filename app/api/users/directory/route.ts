@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hasWorkshopInspectionFullVisibilityOverride } from '@/lib/utils/inspection-visibility';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleAccessModule, canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
@@ -19,6 +19,7 @@ const ACTION_ASSIGNMENT_MODULES: readonly ModuleName[] = [
 ];
 
 const TOOLBOX_TALKS_ASSIGNMENT_CONTEXT = 'toolbox-talks-assignment';
+const RAMS_ASSIGNMENT_CONTEXT = 'rams-assignment';
 
 function isTruthy(value: string | null): boolean {
   return value === '1' || value === 'true';
@@ -43,8 +44,12 @@ export async function GET(request: NextRequest) {
   const context = request.nextUrl.searchParams.get('context');
   const isActionsAssignmentDirectory = context === 'actions-assignment';
   const isToolboxTalksAssignmentDirectory = context === TOOLBOX_TALKS_ASSIGNMENT_CONTEXT;
+  const isRamsAssignmentDirectory = context === RAMS_ASSIGNMENT_CONTEXT;
   if (isActionsAssignmentDirectory && !ACTION_ASSIGNMENT_MODULES.includes(moduleName as ModuleName)) {
     return NextResponse.json({ error: 'Actions assignment directory requires a reminder module' }, { status: 400 });
+  }
+  if (isRamsAssignmentDirectory && moduleName !== 'rams') {
+    return NextResponse.json({ error: 'RAMS assignment directory requires module=rams' }, { status: 400 });
   }
 
   const effectiveRole = await getEffectiveRole();
@@ -54,6 +59,12 @@ export async function GET(request: NextRequest) {
   const canUseToolboxTalksAssignmentDirectory = isToolboxTalksAssignmentDirectory
     ? await canEffectiveRoleAccessModule('toolbox-talks')
     : false;
+  const canUseRamsAssignmentDirectory = isRamsAssignmentDirectory
+    ? await canEffectiveRoleUseModuleLevel('rams', 4)
+    : false;
+  if (isRamsAssignmentDirectory && !canUseRamsAssignmentDirectory) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
   const isInspectionDirectoryRequest =
     moduleName === 'inspections' ||
     moduleName === 'plant-inspections' ||
@@ -69,7 +80,8 @@ export async function GET(request: NextRequest) {
         effectiveRole.role_name === 'supervisor' ||
         hasWorkshopInspectionAccess ||
         canUseActionsAssignmentDirectory ||
-        canUseToolboxTalksAssignmentDirectory
+        canUseToolboxTalksAssignmentDirectory ||
+        canUseRamsAssignmentDirectory
       )
   );
   if (!canViewDirectory) {
@@ -77,7 +89,11 @@ export async function GET(request: NextRequest) {
   }
   const isAdminOrSuper = hasEffectiveRoleFullAccess(effectiveRole);
   let shouldScopeToTeam = false;
-  if (!canUseActionsAssignmentDirectory && !canUseToolboxTalksAssignmentDirectory) {
+  if (
+    !canUseActionsAssignmentDirectory &&
+    !canUseToolboxTalksAssignmentDirectory &&
+    !canUseRamsAssignmentDirectory
+  ) {
     shouldScopeToTeam = hasWorkshopInspectionAccess ||
       ((effectiveRole.is_manager_admin || effectiveRole.role_name === 'supervisor') &&
         !isAdminOrSuper &&
@@ -148,10 +164,12 @@ export async function GET(request: NextRequest) {
   const filtered = includeDeleted
     ? visibleUserRows
     : visibleUserRows.filter((row) => !isDeletedUserName(String(row.full_name || '')));
-  const users = filtered.map((userRow) => ({
-    ...userRow,
-    has_module_access: allowedUserIds ? allowedUserIds.has(String(userRow.id || '')) : undefined,
-  }));
+  const users = filtered
+    .map((userRow) => ({
+      ...userRow,
+      has_module_access: allowedUserIds ? allowedUserIds.has(String(userRow.id || '')) : undefined,
+    }))
+    .filter((userRow) => !isRamsAssignmentDirectory || userRow.has_module_access === true);
 
   return NextResponse.json({
     success: true,

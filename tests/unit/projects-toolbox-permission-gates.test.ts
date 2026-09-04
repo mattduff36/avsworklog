@@ -56,6 +56,20 @@ describe('Projects / Toolbox Talks permission gates (Phase 2)', () => {
     expect(toolboxPage).toContain('canUseLevel(4)');
   });
 
+  it('DIR-RAMS-ASSIGN-004: AssignEmployeesModal requests the rams-assignment directory context', () => {
+    const modal = read('components/rams/AssignEmployeesModal.tsx');
+    expect(modal).toContain("context: 'rams-assignment'");
+    expect(modal).toContain("module: 'rams'");
+  });
+
+  it('ASSIGN-SIGNED-001: unassign delete excludes signed rows in the mutation predicate', () => {
+    const assign = read('app/api/rams/[id]/assign/route.ts');
+    expect(assign).toContain(".eq('status', 'signed')");
+    expect(assign).toContain(".neq('status', 'signed')");
+    expect(assign).toContain(".select('employee_id')");
+    expect(assign).toContain('signedEmployeeIds');
+  });
+
   it('TOOLBOX-REPORT: toolbox reports use toolbox Level 4 only (no reports module coupling)', () => {
     const reports = read('app/api/messages/reports/route.ts');
 

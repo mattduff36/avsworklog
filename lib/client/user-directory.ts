@@ -32,7 +32,7 @@ export interface FetchUserDirectoryOptions {
   includeDeleted?: boolean;
   ids?: string[];
   module?: ModuleName;
-  context?: 'actions-assignment' | 'toolbox-talks-assignment';
+  context?: 'actions-assignment' | 'toolbox-talks-assignment' | 'rams-assignment';
   limit?: number;
   offset?: number;
 }
