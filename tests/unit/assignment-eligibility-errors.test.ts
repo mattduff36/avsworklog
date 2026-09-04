@@ -3,7 +3,7 @@ import { getSystemAccountIds } from '@/lib/server/system-accounts';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
 
 describe('assignment eligibility fail-closed helpers', () => {
-  it('ASSIGN-PREREQ-ERROR-001: getSystemAccountIds throws when the profiles query fails', async () => {
+  it('getSystemAccountIds throws when the profiles query fails', async () => {
     const admin = {
       from: vi.fn((table: string) => {
         if (table === 'profiles') {

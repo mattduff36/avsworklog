@@ -513,7 +513,7 @@ describe('GET /api/users/directory', () => {
     });
   });
 
-  it('ASSIGN-PREREQ-ERROR-001: fails closed when directory eligibility lookup throws', async () => {
+  it('fails closed when directory eligibility lookup throws', async () => {
     const { createClient } = await import('@/lib/supabase/server');
     const { createAdminClient } = await import('@/lib/supabase/admin');
     const { getUsersWithModuleAccess } = await import('@/lib/server/team-permissions');
