@@ -30,7 +30,7 @@ Token-Efficient Engineering V2.4 is the active engineering workflow (global Skil
 ## Hard project rules
 
 - Never expose environment values, tokens, cookies, or secrets.
-- Never push unless the user writes `push to GitHub`, or explicitly requests `finalise and push` / `finalise full and push` / `finalise:push`. `/fap` and `/ffap` do not authorize a push.
+- Never push unless the user writes `push to GitHub`, or explicitly requests `finalise and push` / `fap` / `/fap` / `finalise full and push` / `ffap` / `/ffap` / `finalise:push`.
 - Stay on the current branch unless the user says otherwise.
 - Do not change production data or schema without explicit permission. Persistence, auth, permissions/RLS, money, and concurrency are CRITICAL under TEE.
 - For database/persistence intent, load `.cursor/rules/database-migrations.mdc` and the migration guides before acting.

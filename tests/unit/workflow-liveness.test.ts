@@ -755,7 +755,7 @@ describe('workflow liveness hardening', () => {
     expect(readFileSync(paths.statePath, 'utf8')).toBe('{not-json');
   });
 
-  it('T-FFAP-NO-PUSH: dry-run does not correlate and commands do not push', () => {
+  it('T-FINALISE-DRY-RUN-NO-CORRELATE: dry-run does not correlate', () => {
     expect(
       shouldApplyFinaliseCorrelation({
         scriptName: 'finalise',
@@ -764,13 +764,17 @@ describe('workflow liveness hardening', () => {
       })
     ).toBe(false);
     expect(shouldApplyFinaliseCorrelation({ scriptName: 'finalise', args: [] })).toBe(true);
+  });
 
-    const ffap = readFileSync(path.join(process.cwd(), '.cursor/commands/ffap.md'), 'utf8');
+  it('AVS-FAP-PUSH-001: fap and ffap authorize matching push variants', () => {
     const fap = readFileSync(path.join(process.cwd(), '.cursor/commands/fap.md'), 'utf8');
-    expect(ffap).toMatch(/does \*\*not\*\* authorize pushing/);
-    expect(fap).toMatch(/does \*\*not\*\* authorize pushing/);
-    expect(ffap).toMatch(/Then run `npm run finalise:full`\. Never push from this alias\./);
-    expect(fap).toMatch(/Then run `npm run finalise`\. Never push from this alias\./);
+    const ffap = readFileSync(path.join(process.cwd(), '.cursor/commands/ffap.md'), 'utf8');
+    expect(fap).toMatch(/finalise:push/);
+    expect(ffap).toMatch(/finalise:full:push/);
+    expect(fap).toMatch(/authorized push phrase/iu);
+    expect(ffap).toMatch(/authorized push phrase/iu);
+    expect(fap).not.toMatch(/does \*\*not\*\* authorize pushing/iu);
+    expect(ffap).not.toMatch(/does \*\*not\*\* authorize pushing/iu);
   });
 });
 

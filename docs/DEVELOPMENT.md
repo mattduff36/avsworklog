@@ -95,7 +95,7 @@ npm run fixerrors
 npm run review:preflight
 ```
 
-Local commit is not release-ready, and release-ready is not a push. `/fap` and `/ffap` do not authorize GitHub push; use `finalise and push`, `finalise full and push`, `finalise:push`, or `push to GitHub`. `finalise` / `finalise-full` stay local.
+Local commit is not release-ready, and release-ready is not a push. `fap` / `/fap` and `ffap` / `/ffap` implement the global COMPLETE_AND_RELEASE contract and authorize `npm run finalise:push` / `npm run finalise:full:push`. The long phrases `finalise and push`, `finalise full and push`, `finalise:push`, and `push to GitHub` also authorize those scripts. `finalise` / `finalise-full` stay local.
 
 CRITICAL protocol notes (runtime is in `scripts/automation`, not hand-edited JSON):
 

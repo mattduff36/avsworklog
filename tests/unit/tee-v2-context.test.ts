@@ -32,9 +32,35 @@ describe('TEE V2 project context', () => {
     const fap = readFileSync(path.join(commandDirectory, 'fap.md'), 'utf8');
     const ffap = readFileSync(path.join(commandDirectory, 'ffap.md'), 'utf8');
     const finalise = readFileSync(path.join(commandDirectory, 'finalise.md'), 'utf8');
-    expect(fap).toMatch(/does \*\*not\*\* authorize pushing/);
-    expect(ffap).toMatch(/does \*\*not\*\* authorize pushing/);
+    const finaliseFull = readFileSync(path.join(commandDirectory, 'finalise-full.md'), 'utf8');
+    const core = readFileSync(path.join(root, '.cursor', 'rules', 'squires-core.mdc'), 'utf8');
+    const finaliseCommands = readFileSync(
+      path.join(root, '.cursor', 'rules', 'finalise-commands.mdc'),
+      'utf8'
+    );
+    expect(fap).toMatch(/authorizes `npm run finalise:push`/iu);
+    expect(ffap).toMatch(/authorizes `npm run finalise:full:push`/iu);
+    expect(fap).toMatch(/authorized push phrase/iu);
+    expect(ffap).toMatch(/authorized push phrase/iu);
+    expect(fap).toMatch(/COMPLETE_AND_RELEASE\(normal\)/);
+    expect(ffap).toMatch(/COMPLETE_AND_RELEASE\(full\)/);
+    expect(fap).not.toMatch(/does \*\*not\*\* authorize pushing/iu);
+    expect(ffap).not.toMatch(/does \*\*not\*\* authorize pushing/iu);
     expect(finalise).toMatch(/not push/iu);
+    expect(finaliseFull).toMatch(/not push/iu);
+    expect(core).toMatch(/`fap` \/ `\/fap`/);
+    expect(core).toMatch(/`ffap` \/ `\/ffap`/);
+    expect(core).not.toMatch(/do \*\*not\*\* authorize a push/iu);
+    expect(finaliseCommands).toMatch(/Map `finalise and push` and `fap`/);
+    expect(finaliseCommands).toMatch(/Map `finalise full and push` and `ffap`/);
+    expect(finaliseCommands).not.toMatch(/do \*\*not\*\* authorize a push/iu);
+    const agents = readFileSync(path.join(root, 'AGENTS.md'), 'utf8');
+    const development = readFileSync(path.join(root, 'docs', 'DEVELOPMENT.md'), 'utf8');
+    expect(agents).toMatch(/`fap` \/ `\/fap`/);
+    expect(agents).not.toMatch(/do not authorize a push/iu);
+    expect(development).toMatch(/COMPLETE_AND_RELEASE/);
+    expect(development).toContain('npm run finalise:push');
+    expect(development).not.toMatch(/do not authorize GitHub push/iu);
     expect(existsSync(path.join(root, '.cursor', 'rules', 'finalise-commands.mdc'))).toBe(true);
   });
 
