@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.3.2
+
+**GIT COMMIT MESSAGE**
+`fix(auth): stop deleted accounts remaining signed in on leftover devices`
+
+**PUSHED AT**
+2026-09-04T09:54:10.468Z
+
+**WHAT CHANGED**
+Stop deleted accounts remaining signed in on leftover devices.
+
+**VERSION HISTORY DETAILS**
+- Stop deleted accounts remaining signed in on leftover devices, with changes to background routes, shared logic, and automated tests.
+- Updated user management, with changes to background routes, app screens, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(auth): stop deleted accounts remaining signed in on leftover devices`
+
 ## 0926.3.1
 
 **GIT COMMIT MESSAGE**

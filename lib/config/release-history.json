@@ -1,5 +1,23 @@
 [
   {
+    "version": "0926.3.2",
+    "updateKind": "minor",
+    "title": "Sign in improvements",
+    "description": "Stop deleted accounts remaining signed in on leftover devices.",
+    "summary": "Stop deleted accounts remaining signed in on leftover devices.",
+    "details": [
+      "Stop deleted accounts remaining signed in on leftover devices, with changes to background routes, shared logic, and automated tests.",
+      "Updated user management, with changes to background routes, app screens, and automated tests."
+    ],
+    "areas": [
+      "Sign in"
+    ],
+    "areaKeys": [
+      "sign-in"
+    ],
+    "pushedAt": "2026-09-04T09:54:10.468Z"
+  },
+  {
     "version": "0926.3.1",
     "updateKind": "minor",
     "title": "Timesheets improvements",
