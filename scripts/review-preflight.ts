@@ -234,7 +234,6 @@ async function main(): Promise<void> {
     workstreamId,
     candidate: candidateCapture.candidate,
     stream: process.stderr,
-    isTTY: Boolean(process.stderr.isTTY),
   });
   progress.stageStart('candidate');
   progress.stageFinish('candidate', 'passed', candidateCapture.candidate.headCommit.slice(0, 12));

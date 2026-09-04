@@ -9,7 +9,13 @@ export default defineConfig({
     include: [
       'testsuite/api/**/*.test.ts',
     ],
-    reporters: ['verbose', 'json'],
+    fileParallelism: true,
+    maxWorkers: 4,
+    reporters: [
+      'verbose',
+      'json',
+      path.resolve(__dirname, '../../scripts/automation/tee-vitest-progress-reporter.cjs'),
+    ],
     outputFile: {
       json: path.resolve(__dirname, '../reports/vitest-results.json'),
     },

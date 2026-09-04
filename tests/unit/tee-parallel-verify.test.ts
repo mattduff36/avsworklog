@@ -10,6 +10,7 @@ import {
   jobIsExclusive,
   requireProcessSuccess,
   resolveTeeVerifyJobs,
+  createHumanTeeProgress,
   runProcessJob,
   runVerifyBatch,
   sanitizeSpawnEnv,
@@ -17,11 +18,20 @@ import {
   type TeeVerifyJob,
 } from '@/scripts/automation/tee-parallel-verify';
 import {
+  attachLiveProgressTerminalGuards,
   clampSuiteProgress,
   createTeeProgressReporter,
+  isCursorInteractiveProgressHost,
   notifyDisplayProgress,
   renderTeeProgressLines,
+  resolveProgressIsTty,
+  shouldUseAlternateScreen,
+  shouldUseMachineProgress,
+  ttyLiveRefreshPrefix,
+  ttyLiveRestoreSequence,
+  ttyLiveStartSequence,
 } from '@/scripts/automation/tee-progress';
+import { resolveTerminalTestPlan } from '@/scripts/testing/run-terminal-tests';
 import TeeVitestProgressReporter, {
   parseTeeVitestProgressSnapshot,
 } from '@/scripts/automation/tee-vitest-progress-reporter';
@@ -703,8 +713,11 @@ describe('TEE progress reporter', () => {
     parallel.workerUpdate('workflow', 'running', { completed: 10, total: 20 });
     parallel.workerUpdate('typecheck', 'running');
     const parallelView = renderTeeProgressLines(parallel.snapshot()).join('\n');
-    expect(parallelView).toContain('├─');
-    expect(parallelView).toContain('└─');
+    expect(parallelView).not.toContain('├─');
+    expect(parallelView).not.toContain('└─');
+    expect(parallelView).toMatch(/Verification batch\s+RUNNING/);
+    expect(parallelView).toMatch(/Workflow tests\s+\[[█░]+\] 10\/20 RUNNING/);
+    expect(parallelView).toMatch(/Typecheck\s+\[[░]+\] RUNNING/);
     expect(parallelView).toContain('Workflow tests');
     expect(parallelView).toContain('Typecheck');
   });
@@ -754,6 +767,9 @@ describe('TEE progress reporter', () => {
         complete() {
           throw new Error('complete');
         },
+        restoreTerminal() {
+          throw new Error('restoreTerminal');
+        },
         snapshot() {
           throw new Error('snapshot');
         },
@@ -761,6 +777,159 @@ describe('TEE progress reporter', () => {
     });
     expect(batch.ok).toBe(true);
     expect(batch.results[0]?.status).toBe('passed');
+  });
+
+  it('T-PV-LIVE-TTY-025: TTY enters live mode and later frames replace instead of appending', () => {
+    const chunks: string[] = [];
+    const reporter = createTeeProgressReporter({
+      title: 'TEE preflight',
+      isTTY: true,
+      ci: false,
+      stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
+      stream: { write: (chunk: string) => chunks.push(String(chunk)) } as NodeJS.WritableStream,
+    });
+    const result = { exitCode: 0, ok: true };
+    reporter.start();
+    reporter.stageStart('verify-batch');
+    const text = chunks.join('');
+    expect(text.startsWith(ttyLiveStartSequence(true))).toBe(true);
+    expect(text).toContain(ttyLiveRefreshPrefix());
+    expect(text).not.toContain('cls');
+    expect((text.match(/TEE preflight/g) || []).length).toBeGreaterThan(1);
+    expect(text.indexOf(ttyLiveRefreshPrefix())).toBeGreaterThan(text.indexOf(ttyLiveStartSequence(true)));
+    expect(result).toEqual({ exitCode: 0, ok: true });
+    reporter.restoreTerminal();
+  });
+
+  it('T-PV-LIVE-PASS-026 / T-PV-LIVE-FAIL-027: complete restores the terminal and prints one permanent frame', () => {
+    const passChunks: string[] = [];
+    const pass = createTeeProgressReporter({
+      title: 'TEE preflight',
+      isTTY: true,
+      ci: false,
+      stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
+      stream: { write: (chunk: string) => passChunks.push(String(chunk)) } as NodeJS.WritableStream,
+    });
+    pass.start();
+    pass.complete('passed');
+    const passText = passChunks.join('');
+    expect(passText).toContain(ttyLiveRestoreSequence(true));
+    expect(passText).toContain('\u001b[?25h');
+    expect(passText).toMatch(/100% PASS/);
+    expect(passText.lastIndexOf(ttyLiveRestoreSequence(true))).toBeLessThan(passText.lastIndexOf('100% PASS'));
+    pass.restoreTerminal();
+    expect(passChunks.join('')).toBe(passText);
+
+    const failChunks: string[] = [];
+    const fail = createTeeProgressReporter({
+      title: 'TEE preflight',
+      isTTY: true,
+      ci: false,
+      stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
+      stream: { write: (chunk: string) => failChunks.push(String(chunk)) } as NodeJS.WritableStream,
+    });
+    fail.start();
+    fail.complete('failed');
+    expect(failChunks.join('')).toContain(ttyLiveRestoreSequence(true));
+    expect(failChunks.join('')).toMatch(/100% FAIL/);
+    fail.restoreTerminal();
+  });
+
+  it('T-PV-LIVE-DISABLED-029: progress off remains supported and display cannot change a result', () => {
+    const result = { exitCode: 7, ok: false };
+    expect(
+      createHumanTeeProgress({
+        title: 'Preflight',
+        env: { TEE_VERIFY_PROGRESS: 'off' },
+        stderrIsTty: true,
+        stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
+      })
+    ).toBeUndefined();
+    expect(shouldUseMachineProgress({ TEE_VERIFY_PROGRESS: 'plain' }, true)).toBe(true);
+    expect(shouldUseMachineProgress({ TEE_VERIFY_PROGRESS: 'live' }, false)).toBe(false);
+    expect(shouldUseMachineProgress({ CI: 'true', TEE_VERIFY_PROGRESS: 'live' }, true)).toBe(true);
+    expect(shouldUseMachineProgress({ CURSOR_AGENT: '1', VSCODE_PID: '1' }, false)).toBe(false);
+    expect(shouldUseMachineProgress({ CI: '1', CURSOR_AGENT: '1', VSCODE_PID: '1' }, true)).toBe(true);
+    expect(isCursorInteractiveProgressHost({ TERM_PROGRAM: 'vscode' })).toBe(true);
+    expect(isCursorInteractiveProgressHost({ TERM_PROGRAM: 'vscode', CI: 'true' })).toBe(false);
+    expect(resolveProgressIsTty({ stdoutIsTty: true, stderrIsTty: false })).toBe(true);
+    expect(resolveProgressIsTty({ stdoutIsTty: false, stderrIsTty: false, env: {} })).toBe(false);
+    expect(shouldUseAlternateScreen({ TERM: 'dumb' })).toBe(false);
+    expect(shouldUseAlternateScreen({ TERM: 'dumb', CURSOR_AGENT: '1', VSCODE_PID: '1' })).toBe(true);
+    expect(shouldUseAlternateScreen({ TEE_VERIFY_PROGRESS_ALT: '0' })).toBe(false);
+    expect(ttyLiveStartSequence(false)).not.toContain('\u001b[?1049h');
+    const liveChunks: string[] = [];
+    const live = createHumanTeeProgress({
+      title: 'TEE live host',
+      env: { TEE_VERIFY_PROGRESS: 'live' },
+      stdoutIsTty: false,
+      stderrIsTty: false,
+      stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
+      stream: { write: (chunk: string) => liveChunks.push(String(chunk)) } as NodeJS.WritableStream,
+    });
+    expect(live).toBeDefined();
+    expect(liveChunks.join('')).toContain(ttyLiveStartSequence(true));
+    live?.restoreTerminal();
+    const chunks: string[] = [];
+    const reporter = createTeeProgressReporter({
+      title: 'TEE preflight',
+      isTTY: true,
+      ci: true,
+      stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
+      stream: { write: (chunk: string) => chunks.push(String(chunk)) } as NodeJS.WritableStream,
+    });
+    reporter.start();
+    reporter.complete('failed');
+    expect(chunks.join('')).not.toMatch(/\u001b|\r/);
+    expect(result).toEqual({ exitCode: 7, ok: false });
+  });
+
+  it('T-PV-LIVE-SIGINT-030: SIGINT restores the terminal then re-raises without changing the result', () => {
+    const chunks: string[] = [];
+    const reporter = createTeeProgressReporter({
+      title: 'TEE preflight',
+      isTTY: true,
+      ci: false,
+      stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
+      stream: { write: (chunk: string) => chunks.push(String(chunk)) } as NodeJS.WritableStream,
+    });
+    const result = { exitCode: 0, ok: true };
+    reporter.start();
+    const raised: NodeJS.Signals[] = [];
+    const originalKill = process.kill.bind(process);
+    const dispose = attachLiveProgressTerminalGuards(reporter);
+    const handler = process.listeners('SIGINT').at(-1);
+    process.kill = ((pid: number, signal?: NodeJS.Signals | number) => {
+      if (pid === process.pid && signal === 'SIGINT') {
+        raised.push('SIGINT');
+        return process as never;
+      }
+      return originalKill(pid, signal);
+    }) as typeof process.kill;
+    try {
+      if (typeof handler === 'function') handler('SIGINT');
+    } finally {
+      process.kill = originalKill;
+      dispose();
+    }
+    expect(chunks.join('')).toContain(ttyLiveRestoreSequence(true));
+    expect(raised).toEqual(['SIGINT']);
+    expect(result).toEqual({ exitCode: 0, ok: true });
+  });
+
+  it('T-PV-TERMINAL-PLAN: npm test scripts map onto dashboard suites without changing command identity', () => {
+    expect(resolveTerminalTestPlan(['--suite', 'vitest', '--', 'run'])).toMatchObject({
+      suite: 'vitest',
+      passthrough: ['run'],
+    });
+    expect(resolveTerminalTestPlan(['--suite', 'testsuite', '--tag', '@fleet'])).toMatchObject({
+      suite: 'testsuite',
+      tag: '@fleet',
+    });
+    expect(resolveTerminalTestPlan(['--suite', 'playwright', '--', 'contrast.spec.ts'])).toMatchObject({
+      suite: 'playwright',
+      passthrough: ['contrast.spec.ts'],
+    });
   });
 
   it('T-PV-VITEST-PROGRESS-EVENTS: reporter counts only finished tests and surfaces failures immediately', () => {

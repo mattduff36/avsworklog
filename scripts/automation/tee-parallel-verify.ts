@@ -15,8 +15,11 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'child_process';
 import { captureVerificationIdentity } from './workflow-verification-ledger';
 import {
+  attachLiveProgressTerminalGuards,
   createTeeProgressReporter,
   notifyDisplayProgress,
+  resolveInteractiveProgress,
+  shouldUseAlternateScreen,
   TEE_PROGRESS_DEFAULT_HEARTBEAT_MS,
   type TeeProgressReporter,
   type TeeProgressStatus,
@@ -696,17 +699,76 @@ export function formatVerifyBatchFailures(batch: TeeVerifyBatchResult): string {
     .join('\n\n');
 }
 
+function createGuardedProgressReporter(params: {
+  title: string;
+  stages: Array<{ id: string; label: string; weight: number }>;
+  stream?: NodeJS.WritableStream;
+  isTTY?: boolean;
+  stdoutIsTty?: boolean;
+  stderrIsTty?: boolean;
+  env?: NodeJS.ProcessEnv;
+}): TeeProgressReporter {
+  const env = params.env ?? process.env;
+  const streamTty = Boolean(params.stream && 'isTTY' in params.stream && params.stream.isTTY);
+  const { machine } = resolveInteractiveProgress({
+    env,
+    stdoutIsTty: params.stdoutIsTty ?? Boolean(process.stdout.isTTY),
+    stderrIsTty: params.stderrIsTty ?? params.isTTY ?? streamTty,
+  });
+  const reporter = createTeeProgressReporter({
+    title: params.title,
+    stream: env.TEE_VERIFY_PROGRESS === 'off' ? undefined : params.stream,
+    isTTY: !machine,
+    ci: machine,
+    useAlternateScreen: shouldUseAlternateScreen(env),
+    stages: params.stages,
+  });
+  if (!machine && env.TEE_VERIFY_PROGRESS !== 'off') {
+    attachLiveProgressTerminalGuards(reporter);
+  }
+  return reporter;
+}
+
+export function createHumanTeeProgress(params: {
+  title: string;
+  stages: Array<{ id: string; label: string; weight: number }>;
+  subtitle?: string;
+  env?: NodeJS.ProcessEnv;
+  stdoutIsTty?: boolean;
+  stderrIsTty?: boolean;
+  stream?: NodeJS.WritableStream;
+}): TeeProgressReporter | undefined {
+  const env = params.env ?? process.env;
+  if (env.TEE_VERIFY_PROGRESS === 'off') return undefined;
+  const reporter = createGuardedProgressReporter({
+    title: params.title,
+    stages: params.stages,
+    stream: params.stream ?? process.stderr,
+    env,
+    stdoutIsTty: params.stdoutIsTty ?? Boolean(process.stdout.isTTY),
+    stderrIsTty: params.stderrIsTty ?? Boolean(process.stderr.isTTY),
+  });
+  reporter.start(params.subtitle);
+  return reporter;
+}
+
 export function createVerifyProgressReporter(params: {
   title: string;
   workstreamId?: string | null;
   candidate?: FrozenVerifyCandidate | null;
   stream?: NodeJS.WritableStream;
   isTTY?: boolean;
+  stdoutIsTty?: boolean;
+  stderrIsTty?: boolean;
+  env?: NodeJS.ProcessEnv;
 }): TeeProgressReporter {
-  const reporter = createTeeProgressReporter({
+  const reporter = createGuardedProgressReporter({
     title: params.title,
     stream: params.stream,
     isTTY: params.isTTY,
+    stdoutIsTty: params.stdoutIsTty,
+    stderrIsTty: params.stderrIsTty,
+    env: params.env,
     stages: [
       { id: 'candidate', label: 'Candidate capture', weight: 6 },
       { id: 'foundation', label: 'Protocol validation', weight: 6 },
@@ -716,12 +778,10 @@ export function createVerifyProgressReporter(params: {
       { id: 'convergence', label: 'Evidence convergence', weight: 10 },
     ],
   });
-  reporter.start(params.workstreamId ?? undefined);
-  if (params.candidate) {
-    reporter.setSubtitle(
-      `${params.workstreamId ?? ''} ${params.candidate.headCommit.slice(0, 12)}`.trim()
-    );
-  }
+  const subtitle = [params.workstreamId, params.candidate?.headCommit.slice(0, 12)]
+    .filter((part): part is string => Boolean(part))
+    .join(' — ');
+  reporter.start(subtitle || undefined);
   return reporter;
 }
 
@@ -729,11 +789,17 @@ export function createFinaliseProgressReporter(params: {
   title?: string;
   stream?: NodeJS.WritableStream;
   isTTY?: boolean;
+  stdoutIsTty?: boolean;
+  stderrIsTty?: boolean;
+  env?: NodeJS.ProcessEnv;
 }): TeeProgressReporter {
-  const reporter = createTeeProgressReporter({
+  const reporter = createGuardedProgressReporter({
     title: params.title ?? 'TEE finalise',
     stream: params.stream,
     isTTY: params.isTTY,
+    stdoutIsTty: params.stdoutIsTty,
+    stderrIsTty: params.stderrIsTty,
+    env: params.env,
     stages: [
       { id: 'git-unmerged', label: 'Git merge conflicts', weight: 6 },
       { id: 'git-changed-files', label: 'Git change scope', weight: 4 },

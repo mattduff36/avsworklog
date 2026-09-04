@@ -1,6 +1,10 @@
 /**
  * Human-only TEE progress. Never treat percent/ETA as evidence or authority.
  * Progress advances only from real reporter events. 100% only at terminal complete().
+ *
+ * TTY layout matches the FFTS live dashboard: alternate screen, hierarchical
+ * stages, block bars, WAITING/RUNNING/PASS/FAIL. Non-TTY and CI stay compact
+ * and newline-safe with no control codes.
  */
 
 export type TeeProgressStatus = 'pending' | 'running' | 'passed' | 'failed';
@@ -77,11 +81,22 @@ export interface TeeProgressReporter {
   workerUpdate(id: string, status: TeeProgressStatus, extra?: TeeWorkerProgressUpdate): void;
   heartbeat(): void;
   complete(status: 'passed' | 'failed', detail?: string): void;
+  restoreTerminal(): void;
   snapshot(): TeeProgressSnapshot;
 }
 
 const DEFAULT_HEARTBEAT_MS = 15_000;
+const ETA_MIN_ELAPSED_MS = 20_000;
+const ETA_MIN_FRACTION = 0.15;
 const BAR_WIDTH = 10;
+const LABEL_WIDTH = 20;
+const ANSI_CLEAR_DOWN = '\u001b[J';
+export const ANSI_ENTER_ALT_SCREEN = '\u001b[?1049h';
+export const ANSI_LEAVE_ALT_SCREEN = '\u001b[?1049l';
+export const ANSI_HIDE_CURSOR = '\u001b[?25l';
+export const ANSI_SHOW_CURSOR = '\u001b[?25h';
+export const ANSI_CURSOR_HOME = '\u001b[H';
+export const ANSI_ERASE_SCREEN = '\u001b[2J';
 
 export function notifyDisplayProgress(fn: () => void): void {
   try {
@@ -91,6 +106,69 @@ export function notifyDisplayProgress(fn: () => void): void {
   }
 }
 
+export function isCursorInteractiveProgressHost(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.CI === 'true' || env.CI === '1') return false;
+  if (env.TEE_VERIFY_PROGRESS === 'off' || env.TEE_VERIFY_PROGRESS === 'plain') return false;
+  if (env.TEE_VERIFY_PROGRESS === 'live') return true;
+  const program = (env.TERM_PROGRAM ?? '').toLowerCase();
+  if (program === 'vscode' || program === 'cursor') return true;
+  return Boolean(env.CURSOR_AGENT && env.VSCODE_PID);
+}
+
+export function resolveProgressIsTty(params: {
+  env?: NodeJS.ProcessEnv;
+  stdoutIsTty?: boolean;
+  stderrIsTty?: boolean;
+}): boolean {
+  const env = params.env ?? process.env;
+  if (params.stderrIsTty === true || params.stdoutIsTty === true) return true;
+  return isCursorInteractiveProgressHost(env);
+}
+
+export function resolveInteractiveProgress(params?: {
+  env?: NodeJS.ProcessEnv;
+  stdoutIsTty?: boolean;
+  stderrIsTty?: boolean;
+}): { interactive: boolean; machine: boolean } {
+  const env = params?.env ?? process.env;
+  const interactive = resolveProgressIsTty({
+    env,
+    stdoutIsTty: params?.stdoutIsTty ?? Boolean(process.stdout.isTTY),
+    stderrIsTty: params?.stderrIsTty ?? Boolean(process.stderr.isTTY),
+  });
+  const machine = shouldUseMachineProgress(env, interactive);
+  return { interactive: !machine, machine };
+}
+
+export function shouldUseAlternateScreen(env: NodeJS.ProcessEnv = process.env): boolean {
+  if (env.TEE_VERIFY_PROGRESS_ALT === '0' || env.TEE_VERIFY_PROGRESS_ALT === 'off') return false;
+  if (env.TERM === 'dumb' && !isCursorInteractiveProgressHost(env)) return false;
+  return true;
+}
+
+export function shouldUseMachineProgress(env: NodeJS.ProcessEnv, isTty: boolean | undefined): boolean {
+  if (env.TEE_VERIFY_PROGRESS === 'off' || env.TEE_VERIFY_PROGRESS === 'plain') return true;
+  if (env.CI === 'true' || env.CI === '1') return true;
+  if (env.TEE_VERIFY_PROGRESS === 'live') return false;
+  if (isCursorInteractiveProgressHost(env)) return false;
+  return isTty !== true;
+}
+
+export function ttyLiveStartSequence(useAlternateScreen = true): string {
+  if (useAlternateScreen) {
+    return `${ANSI_ENTER_ALT_SCREEN}${ANSI_HIDE_CURSOR}${ANSI_ERASE_SCREEN}${ANSI_CURSOR_HOME}`;
+  }
+  return `${ANSI_HIDE_CURSOR}${ANSI_ERASE_SCREEN}${ANSI_CURSOR_HOME}`;
+}
+
+export function ttyLiveRefreshPrefix(): string {
+  return `${ANSI_CURSOR_HOME}${ANSI_CLEAR_DOWN}`;
+}
+
+export function ttyLiveRestoreSequence(useAlternateScreen = true): string {
+  return useAlternateScreen ? `${ANSI_SHOW_CURSOR}${ANSI_LEAVE_ALT_SCREEN}` : ANSI_SHOW_CURSOR;
+}
+
 function clampPercent(value: number): number {
   if (!Number.isFinite(value) || value < 0) return 0;
   if (value > 100) return 100;
@@ -98,10 +176,16 @@ function clampPercent(value: number): number {
 }
 
 function formatDuration(ms: number): string {
-  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+export function formatApproximateRemaining(ms: number): string {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 10) return `~${minutes}m`;
+  return `~${Math.round(minutes / 5) * 5}m`;
 }
 
 export function clampSuiteProgress(
@@ -116,24 +200,32 @@ export function clampSuiteProgress(
   return { completed: Math.min(safeCompleted, safeTotal), total: safeTotal };
 }
 
+function padLabel(label: string, width = LABEL_WIDTH): string {
+  return label.length >= width ? label.slice(0, width) : `${label}${' '.repeat(width - label.length)}`;
+}
+
+function barBlocks(fraction: number | null, width = BAR_WIDTH): string {
+  if (fraction == null) return '░'.repeat(width);
+  const clamped = Math.max(0, Math.min(1, fraction));
+  const filled = Math.round(clamped * width);
+  return `${'█'.repeat(filled)}${'░'.repeat(width - filled)}`;
+}
+
 export function renderProgressBar(params: {
   status: TeeProgressStatus;
   ratio?: number | null;
   pulse?: number;
 }): string {
   if (params.status === 'passed' || params.status === 'failed') {
-    return `[${'█'.repeat(BAR_WIDTH)}]`;
+    return `[${barBlocks(1)}]`;
   }
   if (params.status === 'pending') {
-    return `[${'░'.repeat(BAR_WIDTH)}]`;
+    return `[${barBlocks(0)}]`;
   }
   if (typeof params.ratio === 'number' && Number.isFinite(params.ratio)) {
-    const filled = Math.max(0, Math.min(BAR_WIDTH, Math.round(Math.max(0, Math.min(1, params.ratio)) * BAR_WIDTH)));
-    return `[${'█'.repeat(filled)}${'░'.repeat(BAR_WIDTH - filled)}]`;
+    return `[${barBlocks(Math.max(0, Math.min(1, params.ratio)))}]`;
   }
-  const pulse = params.pulse ?? 0;
-  const filled = 3 + (pulse % 5);
-  return `[${'█'.repeat(filled)}${'░'.repeat(BAR_WIDTH - filled)}]`;
+  return `[${barBlocks(null)}]`;
 }
 
 function statusLabel(status: TeeProgressStatus): string {
@@ -154,84 +246,104 @@ function formatCount(worker: TeeProgressWorkerSnapshot): string {
   return '';
 }
 
-function suiteEtaMs(worker: TeeProgressWorkerSnapshot, nowMs: number): number | null {
-  if (worker.status !== 'running' || worker.startedAtMs === null) return null;
-  const clamped = clampSuiteProgress(worker.completed ?? 0, worker.total);
-  if (clamped.total == null || clamped.completed <= 0 || clamped.completed >= clamped.total) {
-    return null;
-  }
-  const elapsed = Math.max(1, nowMs - worker.startedAtMs);
-  const remaining = (elapsed / clamped.completed) * (clamped.total - clamped.completed);
-  return Math.round(remaining);
-}
-
 export function formatDurationMs(ms: number): string {
   return formatDuration(ms);
 }
 
+function effectiveParentStatus(workers: readonly TeeProgressWorkerSnapshot[]): TeeProgressStatus {
+  if (workers.length === 0) return 'pending';
+  if (workers.some((worker) => worker.status === 'running')) return 'running';
+  if (workers.some((worker) => worker.status === 'failed')) return 'failed';
+  if (workers.every((worker) => worker.status === 'pending')) return 'pending';
+  if (workers.every((worker) => worker.status === 'passed')) return 'passed';
+  return 'running';
+}
+
+function formatStageClock(
+  startedAtMs: number | null,
+  endedAtMs: number | null,
+  nowMs: number
+): string {
+  if (startedAtMs === null) return '';
+  return formatDuration((endedAtMs ?? nowMs) - startedAtMs);
+}
+
+function formatCountedRow(params: {
+  indent: string;
+  label: string;
+  status: TeeProgressStatus;
+  ratio: number | null;
+  count: string;
+  clock: string;
+}): string {
+  const parts = [
+    `${params.indent}${padLabel(params.label)} ${renderProgressBar({
+      status: params.status,
+      ratio: params.ratio,
+    })}`,
+    params.count,
+    statusLabel(params.status),
+    params.clock,
+  ].filter((part) => part.length > 0);
+  return parts.join(' ');
+}
+
 export function renderTeeProgressLines(snapshot: TeeProgressSnapshot): string[] {
   const etaPart =
-    snapshot.etaMs === null ? '' : ` · ~${formatDuration(snapshot.etaMs)} remaining`;
+    snapshot.completed || snapshot.etaMs === null
+      ? formatDuration(snapshot.elapsedMs)
+      : `${formatDuration(snapshot.elapsedMs)} · ${formatApproximateRemaining(snapshot.etaMs)} remaining`;
   const overallRatio = (snapshot.completed ? 100 : snapshot.percent) / 100;
-  const labelWidth = Math.max(
-    20,
-    ...snapshot.stages.map((stage) => stage.label.length),
-    'Overall'.length
-  );
+  const overallSuffix = snapshot.completed ? ` ${statusLabel(snapshot.status)}` : '';
   const lines = [
     `${snapshot.title}${snapshot.subtitle ? ` — ${snapshot.subtitle}` : ''}`,
     '',
-    `${'Overall'.padEnd(labelWidth, ' ')} ${renderProgressBar({
+    `${padLabel('Overall')} ${renderProgressBar({
       status: snapshot.completed ? snapshot.status : 'running',
       ratio: overallRatio,
-      pulse: snapshot.heartbeatCount,
-    })} ${String(snapshot.completed ? 100 : snapshot.percent).padStart(3, ' ')}%   ${formatDuration(
-      snapshot.elapsedMs
-    )}${etaPart}`,
+    })} ${String(snapshot.completed ? 100 : snapshot.percent).padStart(3, ' ')}%${overallSuffix}   ${etaPart}`,
     '',
   ];
   const parentId = snapshot.workerParentStageId;
   const workers = parentId ? snapshot.workers : [];
   for (const stage of snapshot.stages) {
-    const duration =
-      stage.startedAtMs === null
-        ? ''
-        : formatDuration((stage.endedAtMs ?? snapshot.nowMs) - stage.startedAtMs);
+    const duration = formatStageClock(stage.startedAtMs, stage.endedAtMs, snapshot.nowMs);
+    if (parentId === stage.id && workers.length > 0) {
+      const parentStatus = snapshot.completed ? snapshot.status : effectiveParentStatus(workers);
+      lines.push(`${padLabel(stage.label)} ${statusLabel(parentStatus)}`);
+      for (const worker of workers) {
+        const ratio = workerRatio(worker);
+        const count = formatCount(worker);
+        const workerDuration = formatStageClock(worker.startedAtMs, worker.endedAtMs, snapshot.nowMs);
+        lines.push(
+          formatCountedRow({
+            indent: '  ',
+            label: worker.label,
+            status: worker.status,
+            ratio,
+            count,
+            clock: workerDuration,
+          })
+        );
+        if (worker.status === 'running' && worker.current) {
+          lines.push(`    Current: ${worker.current}`);
+        }
+        for (const failure of (worker.failures ?? []).slice(0, 5)) {
+          lines.push(`    FAIL: ${failure}`);
+        }
+      }
+      continue;
+    }
     lines.push(
-      `${stage.label.padEnd(labelWidth, ' ')} ${renderProgressBar({
+      formatCountedRow({
+        indent: '',
+        label: stage.label,
         status: stage.status,
-        ratio: stage.status === 'running' ? stage.ratio ?? null : undefined,
-        pulse: snapshot.heartbeatCount,
-      })} ${statusLabel(stage.status).padEnd(7, ' ')} ${duration}`.trimEnd()
+        ratio: stage.status === 'running' ? stage.ratio ?? null : null,
+        count: '',
+        clock: duration,
+      })
     );
-    if (parentId !== stage.id) continue;
-    workers.forEach((worker, index) => {
-      const isLast = index === workers.length - 1;
-      const branch = isLast ? '└─' : '├─';
-      const ratio = workerRatio(worker);
-      const count = formatCount(worker);
-      const workerDuration =
-        worker.startedAtMs === null
-          ? ''
-          : formatDuration((worker.endedAtMs ?? snapshot.nowMs) - worker.startedAtMs);
-      const eta = suiteEtaMs(worker, snapshot.nowMs);
-      const etaText = eta === null ? '' : ` · ~${formatDuration(eta)}`;
-      lines.push(
-        `  ${branch} ${worker.label.padEnd(Math.max(16, worker.label.length), ' ')} ${renderProgressBar({
-          status: worker.status,
-          ratio,
-          pulse: snapshot.heartbeatCount,
-        })} ${count ? `${count} ` : ''}${statusLabel(worker.status)}${
-          workerDuration ? ` ${workerDuration}` : ''
-        }${etaText}`.trimEnd()
-      );
-      if (worker.status === 'running' && worker.current) {
-        lines.push(`       Current: ${worker.current}`);
-      }
-      for (const failure of worker.failures ?? []) {
-        lines.push(`       FAIL: ${failure}`);
-      }
-    });
   }
   return lines;
 }
@@ -243,6 +355,9 @@ export function createTeeProgressReporter(options: {
   isTTY?: boolean;
   now?: () => number;
   heartbeatMs?: number;
+  ci?: boolean;
+  useAlternateScreen?: boolean;
+  onRestore?: () => void;
 }): TeeProgressReporter {
   const stages = options.stages.map((stage) => ({
     ...stage,
@@ -257,6 +372,8 @@ export function createTeeProgressReporter(options: {
   const now = options.now ?? (() => Date.now());
   const stream = options.stream;
   const isTTY = options.isTTY ?? Boolean(stream && 'isTTY' in stream && stream.isTTY);
+  const machineSafe = options.ci === true || isTTY !== true;
+  const useAlternateScreen = options.useAlternateScreen !== false;
   const startedAt = now();
   let subtitle: string | undefined;
   let currentStageId: string | null = null;
@@ -265,14 +382,10 @@ export function createTeeProgressReporter(options: {
   let completed = false;
   let terminalStatus: TeeProgressStatus = 'running';
   let heartbeatCount = 0;
-  let lastRenderLineCount = 0;
   let etaMs: number | null = null;
-  let lastEtaSample:
-    | {
-        elapsedMs: number;
-        completedWeight: number;
-      }
-    | undefined;
+  let liveStarted = false;
+  let terminalRestored = false;
+  let lastPaint = '';
   const workers = new Map<string, TeeProgressWorkerSnapshot>();
   const lines: string[] = [];
 
@@ -320,7 +433,12 @@ export function createTeeProgressReporter(options: {
   function updateEta(): void {
     const completedW = completedWeight() + currentPartialWeight();
     const elapsed = elapsedMs();
-    if (completedW <= 0 || elapsed < 3_000) {
+    if (
+      completedW <= 0 ||
+      elapsed < ETA_MIN_ELAPSED_MS ||
+      totalWeight <= 0 ||
+      completedW / totalWeight < ETA_MIN_FRACTION
+    ) {
       etaMs = null;
       return;
     }
@@ -328,9 +446,6 @@ export function createTeeProgressReporter(options: {
     if (remaining <= 0) {
       etaMs = null;
       return;
-    }
-    if (!lastEtaSample || completedW > lastEtaSample.completedWeight) {
-      lastEtaSample = { elapsedMs: elapsed, completedWeight: completedW };
     }
     const rate = completedW / elapsed;
     if (rate <= 0) {
@@ -382,33 +497,52 @@ export function createTeeProgressReporter(options: {
     };
   }
 
+  function writeStream(text: string): void {
+    stream?.write(text);
+  }
+
+  function restoreTerminal(): void {
+    if (machineSafe || !liveStarted || terminalRestored) return;
+    writeStream(ttyLiveRestoreSequence(useAlternateScreen));
+    terminalRestored = true;
+    options.onRestore?.();
+  }
+
   function writeOutput(mode: 'full' | 'status' | 'tick' = 'tick'): void {
     if (!stream) return;
-    const rendered = renderTeeProgressLines(captureSnapshot());
-    if (isTTY) {
-      if (lastRenderLineCount > 0) {
-        stream.write(`\x1b[${lastRenderLineCount}A`);
-      }
-      for (const line of rendered) {
-        stream.write(`\x1b[2K${line}\n`);
-      }
-      lastRenderLineCount = rendered.length;
+    const rendered = `${renderTeeProgressLines(captureSnapshot()).join('\n')}\n`;
+    if (machineSafe) {
+      if (mode === 'tick') return;
+      const compact = `[${String(percent).padStart(3, ' ')}%] ${
+        stages.find((stage) => stage.id === currentStageId)?.label ?? options.title
+      }`;
+      const extras = [...workers.values()]
+        .filter((worker) => worker.status === 'running' || mode === 'full')
+        .map((worker) => {
+          const count = worker.total != null ? `${worker.completed ?? 0}/${worker.total}` : '';
+          return `${worker.label} ${statusLabel(worker.status)}${count ? ` ${count}` : ''}`;
+        })
+        .join(' · ');
+      const line = extras ? `${compact} · ${extras}` : compact;
+      writeStream(`${line}\n`);
+      pushLine(line);
       return;
     }
-    if (mode === 'tick') return;
-    const compact = `[${String(percent).padStart(3, ' ')}%] ${
-      stages.find((stage) => stage.id === currentStageId)?.label ?? options.title
-    }`;
-    const extras = [...workers.values()]
-      .filter((worker) => worker.status === 'running' || mode === 'full')
-      .map((worker) => {
-        const count = worker.total != null ? `${worker.completed ?? 0}/${worker.total}` : '';
-        return `${worker.label} ${statusLabel(worker.status)}${count ? ` ${count}` : ''}`;
-      })
-      .join(' · ');
-    const line = extras ? `${compact} · ${extras}` : compact;
-    stream.write(`${line}\n`);
-    pushLine(line);
+    if (completed) {
+      restoreTerminal();
+      writeStream(rendered);
+      lastPaint = rendered;
+      return;
+    }
+    if (!liveStarted) {
+      writeStream(`${ttyLiveStartSequence(useAlternateScreen)}${rendered}`);
+      liveStarted = true;
+      lastPaint = rendered;
+      return;
+    }
+    if (mode === 'tick' && rendered === lastPaint) return;
+    writeStream(`${ttyLiveRefreshPrefix()}${rendered}`);
+    lastPaint = rendered;
   }
 
   const reporter: TeeProgressReporter = {
@@ -423,6 +557,7 @@ export function createTeeProgressReporter(options: {
     setSubtitle(nextSubtitle: string) {
       notifyDisplayProgress(() => {
         subtitle = nextSubtitle;
+        writeOutput('tick');
       });
     },
     stageStart(id: string, detail?: string) {
@@ -547,12 +682,46 @@ export function createTeeProgressReporter(options: {
         writeOutput('full');
       });
     },
+    restoreTerminal() {
+      notifyDisplayProgress(() => {
+        restoreTerminal();
+      });
+    },
     snapshot() {
       return captureSnapshot();
     },
   };
 
   return reporter;
+}
+
+export function attachLiveProgressTerminalGuards(
+  reporter: Pick<TeeProgressReporter, 'restoreTerminal'>
+): () => void {
+  const restore = (): void => {
+    reporter.restoreTerminal();
+  };
+  const onSigint = (): void => {
+    restore();
+    process.kill(process.pid, 'SIGINT');
+  };
+  const onSigterm = (): void => {
+    restore();
+    process.kill(process.pid, 'SIGTERM');
+  };
+  process.once('exit', restore);
+  process.once('SIGINT', onSigint);
+  process.once('SIGTERM', onSigterm);
+  process.once('uncaughtException', restore);
+  process.once('unhandledRejection', restore);
+  return () => {
+    process.removeListener('exit', restore);
+    process.removeListener('SIGINT', onSigint);
+    process.removeListener('SIGTERM', onSigterm);
+    process.removeListener('uncaughtException', restore);
+    process.removeListener('unhandledRejection', restore);
+    restore();
+  };
 }
 
 export const TEE_PROGRESS_DEFAULT_HEARTBEAT_MS = DEFAULT_HEARTBEAT_MS;

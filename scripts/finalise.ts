@@ -65,7 +65,7 @@ import {
   runVerifyBatch,
   type TeeProgressReporter,
 } from './automation/tee-parallel-verify';
-import { formatDurationMs, notifyDisplayProgress } from './automation/tee-progress';
+import { formatDurationMs, notifyDisplayProgress, resolveInteractiveProgress } from './automation/tee-progress';
 
 config({ path: path.resolve(process.cwd(), '.env.local') });
 
@@ -1193,10 +1193,9 @@ async function main(): Promise<void> {
 
     const progress = createFinaliseProgressReporter({
       stream: process.stderr,
-      isTTY: Boolean(process.stderr.isTTY),
     });
     activeFinaliseProgress = progress;
-    activeFinaliseProgressTTY = Boolean(process.stderr.isTTY);
+    activeFinaliseProgressTTY = resolveInteractiveProgress().interactive;
 
     printProgress('Running read-only finalise prechecks...', 1);
     const prechecks = await run.step('Read-only finalise prechecks', () =>

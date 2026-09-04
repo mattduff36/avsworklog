@@ -8,11 +8,13 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     // Avoid high-core machines starving individual tests under full-suite load.
+    fileParallelism: true,
     maxWorkers: 4,
     hookTimeout: 120_000,
     teardownTimeout: 120_000,
     testTimeout: 120_000,
     setupFiles: ['./tests/setup.ts'],
+    reporters: ['default', './scripts/automation/tee-vitest-progress-reporter.cjs'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
