@@ -1,5 +1,29 @@
 [
   {
+    "version": "0926.5.0",
+    "updateKind": "major",
+    "title": "Workshop Tasks update",
+    "description": "Make Windows full-suite wake-lock and SQL fixtures executable. Ship asset whereabouts on the final recovery branch.",
+    "summary": "Make Windows full-suite wake-lock and SQL fixtures executable. Ship asset whereabouts on the final recovery branch.",
+    "details": [
+      "Ship asset whereabouts on the final recovery branch, with changes to background routes, app screens, interface components, shared logic, shared typing, and automated tests.",
+      "Updated fleet, with changes to background routes, interface components, shared logic, and automated tests.",
+      "Updated sign in, with changes to shared logic and automated tests.",
+      "Updated actions, with changes to automated tests."
+    ],
+    "areas": [
+      "App reliability",
+      "Workshop Tasks",
+      "Make Windows full-suite wake-lock",
+      "SQL fixtures executable. Ship asset whereabouts on the final recovery branch"
+    ],
+    "areaKeys": [
+      "app-reliability",
+      "workshop-tasks"
+    ],
+    "pushedAt": "2026-09-04T16:08:33.520Z"
+  },
+  {
     "version": "0926.4.1",
     "updateKind": "minor",
     "title": "Workflow improvements",

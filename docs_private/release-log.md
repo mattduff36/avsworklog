@@ -2,6 +2,31 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.5.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop-tasks): ship asset whereabouts on the final recovery branch`
+
+**PUSHED AT**
+2026-09-04T16:08:33.520Z
+
+**WHAT CHANGED**
+Make Windows full-suite wake-lock and SQL fixtures executable. Ship asset whereabouts on the final recovery branch.
+
+**VERSION HISTORY DETAILS**
+- Ship asset whereabouts on the final recovery branch, with changes to background routes, app screens, interface components, shared logic, shared typing, and automated tests.
+- Updated fleet, with changes to background routes, interface components, shared logic, and automated tests.
+- Updated sign in, with changes to shared logic and automated tests.
+- Updated actions, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(tests): make Windows full-suite wake-lock and SQL fixtures executable`
+- `feat(workshop-tasks): ship asset whereabouts on the final recovery branch`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0926.4.1
 
 **GIT COMMIT MESSAGE**
