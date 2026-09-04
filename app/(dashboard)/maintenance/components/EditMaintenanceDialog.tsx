@@ -492,7 +492,6 @@ export function EditMaintenanceDialog({
         await updateMutation.mutateAsync({ id: vehicle.id, updates });
       }
     } catch (error) {
-      console.error('Error saving maintenance changes:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to save maintenance changes');
       return;
     }

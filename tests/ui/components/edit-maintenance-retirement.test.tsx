@@ -329,3 +329,43 @@ describe('EditMaintenanceDialog retirement handoff', () => {
     );
   });
 });
+
+describe('EditMaintenanceDialog save failure logging', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.taskResult.data = [];
+    mocks.taskResult.error = null;
+    mocks.taskLimit.mockImplementation(async () => mocks.taskResult);
+    mockAssignmentFetch();
+  });
+
+  it('FIXERRORS-C1-001 shows one failure toast without a duplicate dialog console error', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.updateMutation.mutateAsync.mockRejectedValue(new Error('Internal server error'));
+
+    render(
+      <EditMaintenanceDialog
+        open
+        onOpenChange={vi.fn()}
+        vehicle={vehicle as never}
+      />
+    );
+
+    fireEvent.change(screen.getByLabelText(/Update Comment/), {
+      target: { value: 'Updated MOT dates after inspection' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => {
+      expect(mocks.updateMutation.mutateAsync).toHaveBeenCalledOnce();
+      expect(mocks.toastError).toHaveBeenCalledTimes(1);
+      expect(mocks.toastError).toHaveBeenCalledWith('Internal server error');
+    });
+
+    expect(consoleError.mock.calls.some(([message]) => (
+      typeof message === 'string' && message.includes('Error saving maintenance changes')
+    ))).toBe(false);
+
+    consoleError.mockRestore();
+  });
+});
