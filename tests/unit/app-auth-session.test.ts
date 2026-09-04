@@ -17,7 +17,9 @@ const {
   getSupabaseUserMock,
   randomTokenMock,
   kioskDeviceMaybeSingleMock,
+  profileMaybeSingleMock,
   updateEqMock,
+  updateIsMock,
 } = vi.hoisted(() => ({
   maybeSingleMock: vi.fn(),
   singleMock: vi.fn(),
@@ -29,7 +31,9 @@ const {
   getSupabaseUserMock: vi.fn(),
   randomTokenMock: vi.fn(),
   kioskDeviceMaybeSingleMock: vi.fn(),
+  profileMaybeSingleMock: vi.fn(),
   updateEqMock: vi.fn(),
+  updateIsMock: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -50,6 +54,16 @@ vi.mock('@/lib/supabase/admin', () => ({
         };
       }
 
+      if (table === 'profiles') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: profileMaybeSingleMock,
+            })),
+          })),
+        };
+      }
+
       return {
         select: vi.fn(() => ({
           eq: vi.fn(() => ({
@@ -64,12 +78,18 @@ vi.mock('@/lib/supabase/admin', () => ({
         update: vi.fn(() => {
           const chain: {
             eq: ReturnType<typeof vi.fn>;
+            is: ReturnType<typeof vi.fn>;
             select: ReturnType<typeof vi.fn>;
           } = {
             eq: updateEqMock.mockImplementation(() => chain),
+            is: updateIsMock.mockImplementation(() => chain),
             select: vi.fn(() => ({
               single: singleMock,
               maybeSingle: singleMock,
+              then: (
+                resolve: (value: { data: Array<{ id: string }>; error: null }) => unknown,
+                reject?: (reason: unknown) => unknown
+              ) => Promise.resolve({ data: [{ id: 'session-1' }], error: null }).then(resolve, reject),
             })),
           };
           return chain;
@@ -111,7 +131,13 @@ vi.mock('@/lib/supabase/server', () => ({
   })),
 }));
 
-import { getCurrentAuthenticatedProfile, validateAppSession } from '@/lib/server/app-auth/session';
+import {
+  DeletedAccountSessionError,
+  getCurrentAuthenticatedProfile,
+  issueAppSession,
+  revokeAllAppSessionsForProfile,
+  validateAppSession,
+} from '@/lib/server/app-auth/session';
 
 describe('app auth session helpers', () => {
   beforeEach(() => {
@@ -163,6 +189,10 @@ describe('app auth session helpers', () => {
     randomTokenMock.mockReturnValue('new-raw-secret');
     kioskDeviceMaybeSingleMock.mockResolvedValue({
       data: { id: 'kiosk-device-1' },
+      error: null,
+    });
+    profileMaybeSingleMock.mockResolvedValue({
+      data: { full_name: 'User One' },
       error: null,
     });
     getAppAuthProfileMock.mockResolvedValue({
@@ -455,5 +485,65 @@ describe('app auth session helpers', () => {
     expect(current?.validation.session).toBeNull();
     expect(current?.profile.id).toBe('user-2');
     expect(getAppAuthProfileMock).toHaveBeenCalledWith('user-2', 'user-2@example.com');
+  });
+
+  it('rejects an otherwise valid session when the profile is a deleted user', async () => {
+    profileMaybeSingleMock.mockResolvedValueOnce({
+      data: { full_name: 'Tim Wilson (Deleted User)' },
+      error: null,
+    });
+
+    const validation = await validateAppSession();
+
+    expect(validation.status).toBe('invalid');
+    expect(validation.failureReason).toBe('account_deleted');
+    expect(validation.session).toBeNull();
+  });
+
+  it('does not fall back to a legacy Supabase user when that profile is deleted', async () => {
+    getCurrentAppSessionCookiePayloadMock.mockResolvedValueOnce(null);
+    getSupabaseUserMock.mockResolvedValueOnce({
+      data: {
+        user: {
+          id: 'user-2',
+          email: 'user-2@example.com',
+        },
+      },
+      error: null,
+    });
+    getAppAuthProfileMock.mockResolvedValueOnce({
+      id: 'user-2',
+      email: 'user-2@example.com',
+      full_name: 'User Two (Deleted User)',
+      role: null,
+      team: null,
+    });
+
+    const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
+
+    expect(current).toBeNull();
+  });
+
+  it('refuses to issue an app session for a deleted profile', async () => {
+    profileMaybeSingleMock.mockResolvedValueOnce({
+      data: { full_name: 'Tim Wilson (Deleted User)' },
+      error: null,
+    });
+
+    await expect(
+      issueAppSession({
+        profileId: 'user-1',
+        source: 'password_login',
+      })
+    ).rejects.toBeInstanceOf(DeletedAccountSessionError);
+    expect(singleMock).not.toHaveBeenCalled();
+  });
+
+  it('revokes every active app session for a profile', async () => {
+    const revokedCount = await revokeAllAppSessionsForProfile('user-1', 'account_deleted');
+
+    expect(revokedCount).toBe(1);
+    expect(updateEqMock).toHaveBeenCalledWith('profile_id', 'user-1');
+    expect(updateIsMock).toHaveBeenCalledWith('revoked_at', null);
   });
 });

@@ -206,4 +206,46 @@ describe('auth login route', () => {
       })
     );
   });
+
+  it('returns 401 when the password matches a deleted account', async () => {
+    signInWithPassword.mockResolvedValue({
+      data: {
+        user: {
+          id: 'user-1',
+          email: 'user-1@example.com',
+        },
+      },
+      error: null,
+    });
+    vi.mocked(getAppAuthProfile).mockResolvedValue({
+      id: 'user-1',
+      full_name: 'User One (Deleted User)',
+      phone_number: null,
+      employee_id: '001',
+      avatar_url: null,
+      must_change_password: false,
+      annual_holiday_allowance_days: null,
+      super_admin: false,
+      team_id: null,
+      team: null,
+      role: null,
+      email: 'user-1@example.com',
+    });
+
+    const request = new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'user-1@example.com',
+        password: 'correct-password',
+      }),
+    });
+
+    const response = await loginPost(request as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload.error).toBe('Invalid email or password');
+    expect(issueAppSession).not.toHaveBeenCalled();
+  });
 });

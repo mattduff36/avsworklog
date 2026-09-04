@@ -265,6 +265,19 @@ export async function updateWebAuthnCredentialCounter({
   if (error) throw new Error(error.message);
 }
 
+export async function revokeWebAuthnCredentialsForProfile(profileId: string): Promise<number> {
+  const supabaseAdmin = createAdminClient();
+  const { data, error } = await supabaseAdmin
+    .from('webauthn_credentials')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('profile_id', profileId)
+    .is('revoked_at', null)
+    .select('id');
+
+  if (error) throw new Error(error.message);
+  return (data || []).length;
+}
+
 export async function revokeWebAuthnCredentialsForDevice({
   profileId,
   rawDeviceId,

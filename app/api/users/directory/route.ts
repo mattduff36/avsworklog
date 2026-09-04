@@ -9,6 +9,7 @@ import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 import { filterOperationalProfiles } from '@/lib/server/system-accounts';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
+import { isDeletedUserName } from '@/lib/users/deleted-user';
 
 const ACTION_ASSIGNMENT_MODULES: readonly ModuleName[] = [
   'inspections',
@@ -21,10 +22,6 @@ const TOOLBOX_TALKS_ASSIGNMENT_CONTEXT = 'toolbox-talks-assignment';
 
 function isTruthy(value: string | null): boolean {
   return value === '1' || value === 'true';
-}
-
-function isDeletedUserName(fullName: string | null | undefined): boolean {
-  return Boolean(fullName && fullName.includes('(Deleted User)'));
 }
 
 export async function GET(request: NextRequest) {

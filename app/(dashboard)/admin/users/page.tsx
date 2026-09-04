@@ -77,6 +77,7 @@ import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { formatDateTime } from '@/lib/utils/date';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
 import { getDisplayedTeamName, isSystemAccountProfile, SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
+import { isDeletedUserName } from '@/lib/users/deleted-user';
 import {
   computeQuickEditFloatingPosition,
   type FloatingPositionResult,
@@ -245,7 +246,7 @@ function normalizeHalfDayString(rawValue: string): string {
 }
 
 function isDeletedUserProfile(user: { full_name?: string | null }): boolean {
-  return Boolean(user.full_name?.includes('(Deleted User)'));
+  return isDeletedUserName(user.full_name);
 }
 
 function formatAdminFleetAssignment(assignment: AdminFleetAssignmentSummary | null | undefined): string {

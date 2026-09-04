@@ -7,7 +7,8 @@ import { createWebAuthnAuditEvent } from '@/lib/server/webauthn/audit';
 import { clearAllAuthCookies } from '@/lib/server/app-auth/response';
 import { setAppSessionCookieInResponse } from '@/lib/server/app-auth/cookies';
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
-import { issueAppSession, revokeAppSession, validateAppSession } from '@/lib/server/app-auth/session';
+import { issueAppSession, revokeAppSession, validateAppSession, DeletedAccountSessionError } from '@/lib/server/app-auth/session';
+import { isDeletedUserName } from '@/lib/users/deleted-user';
 import { getWebAuthnRequestConfig } from '@/lib/server/webauthn/config';
 import { trackServerUsageEvent } from '@/lib/server/user-analytics';
 import { getInventoryKioskPostLoginPath } from '@/lib/server/inventory-kiosk';
@@ -130,7 +131,25 @@ export async function POST(request: NextRequest) {
       counter: verification.authenticationInfo.newCounter,
     });
 
-    const existing = await validateAppSession();
+    const [profile, existing, postLoginPath] = await Promise.all([
+      getAppAuthProfile(credential.profile_id, null),
+      validateAppSession(),
+      getInventoryKioskPostLoginPath(credential.profile_id),
+    ]);
+    if (isDeletedUserName(profile.full_name)) {
+      await trackServerUsageEvent({
+        eventName: 'auth_login_failed',
+        userId: credential.profile_id,
+        request,
+        metadata: {
+          method: 'biometric',
+          reason: 'account_deleted',
+          status: 401,
+        },
+      });
+      return NextResponse.json({ error: 'Biometric login failed' }, { status: 401 });
+    }
+
     const nextSession = await issueAppSession({
       profileId: credential.profile_id,
       source: 'biometric_login',
@@ -143,11 +162,6 @@ export async function POST(request: NextRequest) {
     if (existing.session) {
       await revokeAppSession(existing.session.id, 'replaced_by_biometric_login', nextSession.row.id);
     }
-
-    const [profile, postLoginPath] = await Promise.all([
-      getAppAuthProfile(credential.profile_id, null),
-      getInventoryKioskPostLoginPath(credential.profile_id),
-    ]);
     await trackServerUsageEvent({
       eventName: 'auth_login_success',
       userId: credential.profile_id,
@@ -187,6 +201,9 @@ export async function POST(request: NextRequest) {
     setAppSessionCookieInResponse(response, nextSession.cookieValue, nextSession.cookieExpiresAt);
     return response;
   } catch (error) {
+    if (error instanceof DeletedAccountSessionError) {
+      return NextResponse.json({ error: 'Biometric login failed' }, { status: 401 });
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Biometric login failed' },
       { status: 500 }

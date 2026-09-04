@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
 import { isSystemAccountProfile, isSystemTeam, SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
+import { isDeletedUserName } from '@/lib/users/deleted-user';
 import { hasRoleFullAccess } from '@/lib/utils/role-access';
 import {
   getModuleAccessMode,
@@ -457,7 +458,7 @@ function getProfileTeamName(profile: Pick<ProfilePermissionRow, 'team'>): string
 }
 
 function isDeletedProfile(profile: Pick<ProfilePermissionRow, 'full_name'>): boolean {
-  return Boolean(profile.full_name?.includes('(Deleted User)'));
+  return isDeletedUserName(profile.full_name);
 }
 
 function buildUserOverrideMap(permissionRows: UserModulePermissionRow[]): Map<string, Map<ModuleName, PermissionAccessLevel>> {

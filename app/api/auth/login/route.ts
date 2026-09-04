@@ -5,7 +5,8 @@ import {
 } from '@/lib/server/app-auth/cookies';
 import { clearAllAuthCookies } from '@/lib/server/app-auth/response';
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
-import { issueAppSession, validateAppSession, revokeAppSession } from '@/lib/server/app-auth/session';
+import { issueAppSession, validateAppSession, revokeAppSession, DeletedAccountSessionError } from '@/lib/server/app-auth/session';
+import { isDeletedUserName } from '@/lib/users/deleted-user';
 import { createClient } from '@/lib/supabase/server';
 import { trackServerUsageEvent } from '@/lib/server/user-analytics';
 import { getInventoryKioskPostLoginPath } from '@/lib/server/inventory-kiosk';
@@ -90,7 +91,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existing = await validateAppSession();
+    const [profile, existing, postLoginPath] = await Promise.all([
+      getAppAuthProfile(user.id, user.email || null),
+      validateAppSession(),
+      getInventoryKioskPostLoginPath(user.id),
+    ]);
+    if (isDeletedUserName(profile.full_name)) {
+      await trackServerUsageEvent({
+        eventName: 'auth_login_failed',
+        userId: user.id,
+        request,
+        metadata: {
+          method: 'password',
+          reason: 'account_deleted',
+          status: 401,
+        },
+      });
+      return NextResponse.json(
+        { error: 'Invalid email or password' },
+        { status: 401 }
+      );
+    }
+
     const nextSession = await issueAppSession({
       profileId: user.id,
       source: 'password_login',
@@ -103,11 +125,6 @@ export async function POST(request: NextRequest) {
     if (existing.session) {
       await revokeAppSession(existing.session.id, 'replaced_by_password_login', nextSession.row.id);
     }
-
-    const [profile, postLoginPath] = await Promise.all([
-      getAppAuthProfile(user.id, user.email || null),
-      getInventoryKioskPostLoginPath(user.id),
-    ]);
     await trackServerUsageEvent({
       eventName: 'auth_login_success',
       userId: user.id,
@@ -137,6 +154,12 @@ export async function POST(request: NextRequest) {
     setAppSessionCookieInResponse(response, nextSession.cookieValue, nextSession.cookieExpiresAt);
     return response;
   } catch (error) {
+    if (error instanceof DeletedAccountSessionError) {
+      return NextResponse.json(
+        { error: 'Invalid email or password' },
+        { status: 401 }
+      );
+    }
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Login failed' },
       { status: 500 }

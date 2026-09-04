@@ -17,6 +17,7 @@ import {
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { randomToken, sha256Hex } from '@/lib/server/app-auth/jwt';
 import { upsertWebAuthnDevice, getWebAuthnDevice } from '@/lib/server/webauthn/devices';
+import { isDeletedUserName } from '@/lib/users/deleted-user';
 
 export type AppAuthSessionSource =
   | 'password_login'
@@ -51,7 +52,15 @@ export type AppSessionFailureReason =
   | 'session_expired'
   | 'secret_mismatch'
   | 'kiosk_device_inactive'
-  | 'rotation_conflict';
+  | 'rotation_conflict'
+  | 'account_deleted';
+
+export class DeletedAccountSessionError extends Error {
+  constructor() {
+    super('This account has been deleted');
+    this.name = 'DeletedAccountSessionError';
+  }
+}
 
 export interface AppSessionValidationResult {
   status: 'missing' | 'invalid' | 'active';
@@ -183,6 +192,28 @@ async function markDeviceAuthenticated(deviceId: string | null): Promise<void> {
       last_seen_at: new Date().toISOString(),
     })
     .eq('id', deviceId);
+}
+
+async function getProfileFullName(profileId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from('profiles')
+    .select('full_name')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data as { full_name?: string | null } | null)?.full_name ?? null;
+}
+
+async function assertProfileCanIssueAppSession(profileId: string): Promise<void> {
+  const fullName = await getProfileFullName(profileId);
+  if (isDeletedUserName(fullName)) {
+    throw new DeletedAccountSessionError();
+  }
 }
 
 async function getSessionRow(sessionId: string): Promise<AppAuthSessionRow | null> {
@@ -324,6 +355,8 @@ export async function issueAppSession(
     throw new Error('A trusted kiosk device is required for a kiosk device session');
   }
 
+  await assertProfileCanIssueAppSession(options.profileId);
+
   const admin = createAdminClient();
   const now = new Date();
   const rememberMe = options.rememberMe === true;
@@ -401,6 +434,29 @@ export async function revokeAppSession(
 
 }
 
+export async function revokeAllAppSessionsForProfile(
+  profileId: string,
+  reason: string
+): Promise<number> {
+  const admin = createAdminClient();
+  const nowIso = new Date().toISOString();
+  const { data, error } = await admin
+    .from('app_auth_sessions')
+    .update({
+      revoked_at: nowIso,
+      revoked_reason: reason,
+    })
+    .eq('profile_id', profileId)
+    .is('revoked_at', null)
+    .select('id');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data || []).length;
+}
+
 export async function validateAppSession(
   options: { includeEmail?: boolean } = {}
 ): Promise<AppSessionValidationResult> {
@@ -433,6 +489,11 @@ export async function validateAppSession(
     return inactiveSessionResult('invalid', 'kiosk_device_inactive', {
       kioskDeviceIdHint: row.kiosk_device_id,
     });
+  }
+
+  const profileFullName = await getProfileFullName(row.profile_id);
+  if (isDeletedUserName(profileFullName)) {
+    return inactiveSessionResult('invalid', 'account_deleted');
   }
 
   let currentRow = row;
@@ -509,6 +570,9 @@ export async function getCurrentAuthenticatedProfileFromSupabase(
 
   const email = options.includeEmail ? user.email || null : null;
   const profile = await getAppAuthProfile(user.id, email);
+  if (isDeletedUserName(profile.full_name)) {
+    return null;
+  }
 
   return {
     validation: {

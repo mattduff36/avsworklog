@@ -8,6 +8,9 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { isMissingTeamManagerSchemaError, reconcileProfileHierarchy } from '@/lib/server/team-managers';
 import { hasRoleFullAccess } from '@/lib/utils/role-access';
 import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
+import { toDeletedUserName } from '@/lib/users/deleted-user';
+import { revokeAllAppSessionsForProfile } from '@/lib/server/app-auth/session';
+import { revokeWebAuthnCredentialsForProfile } from '@/lib/server/webauthn/credentials';
 
 function isMissingHierarchySchemaError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -431,9 +434,7 @@ export async function DELETE(
     if (mode === 'keep-data') {
       // MODE 1: Keep company data, only delete user account
       // Update user's name to mark as deleted (use admin client to bypass RLS)
-      const deletedName = userProfile.full_name.includes('(Deleted User)') 
-        ? userProfile.full_name 
-        : `${userProfile.full_name} (Deleted User)`;
+      const deletedName = toDeletedUserName(userProfile.full_name || 'Unknown');
 
       await supabaseAdmin
         .from('profiles')
@@ -481,6 +482,9 @@ export async function DELETE(
       const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         ...banPayload
       });
+
+      await revokeAllAppSessionsForProfile(userId, 'account_deleted');
+      await revokeWebAuthnCredentialsForProfile(userId);
 
       if (banError) {
         console.error('Error disabling user:', banError);
