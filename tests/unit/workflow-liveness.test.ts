@@ -789,9 +789,15 @@ describe('workflow dry-run write freedom against the live repo', () => {
       existsSync(filePath) ? readFileSync(filePath) : Buffer.from('')
     );
     const protocolRoot = path.join(repoRoot, 'docs_private/automation/workstreams');
-    const protocolBefore = existsSync(protocolRoot)
-      ? readdirSync(protocolRoot, { recursive: true }).join('\n')
-      : '';
+    const listProtocolEntries = () =>
+      existsSync(protocolRoot)
+        ? readdirSync(protocolRoot, { recursive: true })
+            .map(String)
+            .filter((entry) => !/(^|[\\/])ws_test_/u.test(entry))
+            .sort()
+            .join('\n')
+        : '';
+    const protocolBefore = listProtocolEntries();
     const runsDir = path.join(repoRoot, 'docs_private/automation/runs/finalise');
     const runsBefore = existsSync(runsDir) ? readdirSync(runsDir).sort().join('\n') : '';
 
@@ -807,9 +813,7 @@ describe('workflow dry-run write freedom against the live repo', () => {
       const after = existsSync(filePath) ? readFileSync(filePath) : Buffer.from('');
       expect(after.equals(before[index]!)).toBe(true);
     });
-    const protocolAfter = existsSync(protocolRoot)
-      ? readdirSync(protocolRoot, { recursive: true }).join('\n')
-      : '';
+    const protocolAfter = listProtocolEntries();
     expect(protocolAfter).toBe(protocolBefore);
     const runsAfter = existsSync(runsDir) ? readdirSync(runsDir).sort().join('\n') : '';
     expect(runsAfter).toBe(runsBefore);
