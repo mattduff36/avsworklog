@@ -636,6 +636,11 @@ describe('team permission helpers', () => {
     ];
 
     const supabaseAdmin = {
+      auth: {
+        admin: {
+          listUsers: async () => ({ data: { users: [] }, error: null }),
+        },
+      },
       from: (table: string) => {
         if (table === 'profiles') {
           return {
@@ -725,6 +730,11 @@ describe('team permission helpers', () => {
     ];
 
     const supabaseAdmin = {
+      auth: {
+        admin: {
+          listUsers: async () => ({ data: { users: [] }, error: null }),
+        },
+      },
       from: (table: string) => {
         if (table === 'profiles') {
           return {
