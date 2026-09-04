@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.5.3
+
+**GIT COMMIT MESSAGE**
+`docs(rules): default long TEE commands to the integrated Terminal`
+
+**PUSHED AT**
+2026-09-04T21:14:37.134Z
+
+**WHAT CHANGED**
+Update help and FAQ. Default long TEE commands to the integrated Terminal.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `docs(help): update help and FAQ`
+- `docs(rules): default long TEE commands to the integrated Terminal`
+
 ## 0926.5.2
 
 **GIT COMMIT MESSAGE**

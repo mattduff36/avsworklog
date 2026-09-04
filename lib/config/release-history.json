@@ -1,5 +1,23 @@
 [
   {
+    "version": "0926.5.3",
+    "updateKind": "minor",
+    "title": "Rules guidance update",
+    "description": "Updated help and FAQ. Default long TEE commands to the integrated Terminal.",
+    "summary": "Updated help and FAQ. Default long TEE commands to the integrated Terminal.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Help and FAQ",
+      "FAQ. Default long TEE commands to the integrated Terminal"
+    ],
+    "areaKeys": [
+      "help"
+    ],
+    "pushedAt": "2026-09-04T21:14:37.134Z"
+  },
+  {
     "version": "0926.5.2",
     "updateKind": "minor",
     "title": "Maintenance improvements",
