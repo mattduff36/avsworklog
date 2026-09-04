@@ -25,6 +25,19 @@ describe('timesheet dual gates', () => {
     expect(resolveTimesheetManagerApprovedAction('manager_approved')).toEqual({ type: 'already_done' });
   });
 
+  it('FD-VERIFY-TS-GATE-001 keeps Manager Approved transitions on the process-lock candidate', () => {
+    expect(resolveTimesheetManagerApprovedAction('submitted')).toEqual({
+      type: 'apply',
+      nextStatus: 'manager_approved',
+    });
+    expect(resolveTimesheetManagerApprovedAction('approved')).toEqual({
+      type: 'apply',
+      nextStatus: 'processed',
+    });
+    expect(resolveTimesheetManagerApprovedAction('processed')).toEqual({ type: 'already_done' });
+    expect(resolveTimesheetManagerApprovedAction('manager_approved')).toEqual({ type: 'already_done' });
+  });
+
   it('TS-GATE-002 allows Payroll Received from submitted and manager_approved', () => {
     expect(resolveTimesheetPayrollReceivedAction('submitted')).toEqual({
       type: 'apply',

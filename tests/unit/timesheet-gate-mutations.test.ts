@@ -74,6 +74,19 @@ describe('timesheet gate mutations', () => {
     expect(rejectClient.statements.some((item) => item.sql.includes('UPDATE public.timesheets'))).toBe(false);
   });
 
+  it('FD-VERIFY-TS-GATE-004 keeps stale expected_status fail-closed on the process-lock candidate', async () => {
+    const processClient = new GateClient('approved');
+    await expect(
+      applyTimesheetManagerApproved({
+        timesheetId: TIMESHEET_ID,
+        actorId: ACTOR_ID,
+        expectedStatus: 'submitted',
+        createClient: () => processClient,
+      })
+    ).rejects.toBeInstanceOf(TimesheetGateConflictError);
+    expect(processClient.statements.some((item) => item.sql.includes('UPDATE public.timesheets'))).toBe(false);
+  });
+
   it('TS-GATE-003 clears both gates and the snapshot pointer on reject', async () => {
     const client = new GateClient('approved');
     const result = await applyTimesheetReject({
