@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.4.0
+
+**GIT COMMIT MESSAGE**
+`feat(workflow): add parallel TEE verification, hierarchical progress, and Windows spawn hardening`
+
+**PUSHED AT**
+2026-09-04T13:57:10.512Z
+
+**WHAT CHANGED**
+Add parallel TEE verification, hierarchical progress, and Windows spawn hardening.
+
+**VERSION HISTORY DETAILS**
+- Updated reports, with changes to automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `feat(workflow): add parallel TEE verification, hierarchical progress, and Windows spawn hardening`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0926.3.2
 
 **GIT COMMIT MESSAGE**

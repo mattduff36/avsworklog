@@ -1,5 +1,22 @@
 [
   {
+    "version": "0926.4.0",
+    "updateKind": "major",
+    "title": "Workflow update",
+    "description": "Added parallel TEE verification, hierarchical progress, and Windows spawn hardening.",
+    "summary": "Added parallel TEE verification, hierarchical progress, and Windows spawn hardening.",
+    "details": [
+      "Updated reports, with changes to automation scripts."
+    ],
+    "areas": [
+      "Parallel TEE verification",
+      "Hierarchical progress",
+      "Windows spawn hardening"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-09-04T13:57:10.512Z"
+  },
+  {
     "version": "0926.3.2",
     "updateKind": "minor",
     "title": "Sign in improvements",
