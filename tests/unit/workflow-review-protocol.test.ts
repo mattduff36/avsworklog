@@ -15,6 +15,7 @@ import {
   WORKFLOW_ROUTING_REQUIRED_EXIT_CODE,
   applyProtocolTransition,
   readProtocolRecord,
+  recordFinaliseOwnedCommit,
   writeProtocolRecord,
 } from '@/scripts/automation/workflow-review-protocol';
 import {
@@ -592,6 +593,18 @@ it('WF-EXTRA-001 behavioral', () => {});
     expect(matched.correlation.workstreamIds).toEqual(['ws_explicit_1']);
     expect(matched.correlation.identityStatus).toBe('present');
     expect(matched.correlation.checkpointId).toBe('ckpt_explicit');
+  });
+
+  it('WF-STANDARD-FINALISE-001: owned-commit recording is a no-op without CRITICAL finalise context', () => {
+    const repoRoot = makeTempRoot('standard-owned-commit');
+    initGitRepo(repoRoot);
+    const paths = getWorkflowPaths(repoRoot);
+    saveWorkflowReviewState(paths.statePath, createEmptyWorkflowReviewState());
+    const result = recordFinaliseOwnedCommit(repoRoot);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.ownedCommits).toEqual([]);
+    }
   });
 
   it('WF-COMPAT-001: default high-risk plan contract includes two-pass-v1', () => {

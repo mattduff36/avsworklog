@@ -316,7 +316,11 @@ export function recordFinaliseOwnedCommit(repoRoot: string): {
     }
     const state = loaded.state;
     const active = getActiveFinaliseContext(state);
-    if (!active?.activatedHeadCommit) {
+    if (!active) {
+      // Ordinary FAST/STANDARD finalise has no C9 activation chain.
+      return { ok: true as const, ownedCommits: [] };
+    }
+    if (!active.activatedHeadCommit) {
       return { ok: false as const, message: 'no active finalise context with activatedHeadCommit' };
     }
     const appended = appendOwnedCommit({
