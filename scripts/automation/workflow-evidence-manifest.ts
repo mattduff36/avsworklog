@@ -444,6 +444,15 @@ function isRepoUnitTestFile(relative: string): boolean {
   );
 }
 
+function isRepoChangedProofTestFile(relative: string): boolean {
+  const normalized = relative.replace(/\\/g, '/');
+  return (
+    isRepoUnitTestFile(relative) ||
+    (/\.(test|spec)\.(ts|tsx|js|mjs)$/u.test(normalized) &&
+      (normalized.startsWith('tests/integration/') || normalized.startsWith('tests/ui/')))
+  );
+}
+
 function discoverBehavioralTestIds(
   repoRoot: string,
   ids: string[],
@@ -632,7 +641,7 @@ export function buildEvidenceManifest(params: {
   }
 
   const changedUnitTestFiles = [
-    ...new Set(changedFiles.filter((relative) => isRepoUnitTestFile(relative))),
+    ...new Set(changedFiles.filter((relative) => isRepoChangedProofTestFile(relative))),
   ]
     .filter((relative) => existsSync(path.join(params.repoRoot, relative)))
     .sort();
@@ -1074,7 +1083,7 @@ export async function buildEvidenceManifestAsync(params: {
     return kind === 'vitest_case' || kind === 'vitest_suite';
   });
   const changedUnitTestFiles = [
-    ...new Set(changedFiles.filter((relative) => isRepoUnitTestFile(relative))),
+    ...new Set(changedFiles.filter((relative) => isRepoChangedProofTestFile(relative))),
   ]
     .filter((relative) => existsSync(path.join(params.repoRoot, relative)))
     .sort();

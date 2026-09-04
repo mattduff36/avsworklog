@@ -33,6 +33,7 @@ import {
 import { formatDate } from '@/lib/utils/date';
 import { cn } from '@/lib/utils/cn';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { WorkshopTaskLocationButton } from '@/components/workshop-tasks/WorkshopTaskLocationButton';
 import type { Action, AssetTab, Vehicle, WorkshopTaskStatusFilter, WorkshopTaskTileFilter } from '../types';
 import type { InspectionPhoto } from '@/types/inspection';
 
@@ -74,6 +75,7 @@ interface WorkshopTasksOverviewTabProps {
   onCreateTask: () => void;
   onOpenTaskModal: (task: Action) => void;
   onOpenComments: (task: Action) => void;
+  onOpenWhereabouts: (task: Action) => void;
   onMarkInProgress: (task: Action) => void;
   onMarkComplete: (task: Action) => void;
   onMarkOnHold: (task: Action) => void;
@@ -192,6 +194,7 @@ export function WorkshopTasksOverviewTab({
   onCreateTask,
   onOpenTaskModal,
   onOpenComments,
+  onOpenWhereabouts,
   onMarkInProgress,
   onMarkComplete,
   onMarkOnHold,
@@ -677,6 +680,7 @@ export function WorkshopTasksOverviewTab({
                                 </p>
                               )}
                             </div>
+                            <div className="flex flex-col items-stretch gap-2 lg:items-end">
                             <div className={taskActionGroupClass}>
                               <Button
                                 onClick={(e) => {
@@ -727,6 +731,13 @@ export function WorkshopTasksOverviewTab({
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
                               </Button>
+                            </div>
+                            <WorkshopTaskLocationButton
+                              task={task}
+                              onOpen={() => onOpenWhereabouts(task)}
+                              disabled={isUpdating}
+                              className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
+                            />
                             </div>
                           </div>
 
@@ -837,6 +848,7 @@ export function WorkshopTasksOverviewTab({
                                 </p>
                               )}
                             </div>
+                            <div className="flex flex-col items-stretch gap-2 lg:items-end">
                             <div className={taskActionGroupClass}>
                               <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
@@ -862,6 +874,13 @@ export function WorkshopTasksOverviewTab({
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
                               </Button>
+                            </div>
+                            <WorkshopTaskLocationButton
+                              task={task}
+                              onOpen={() => onOpenWhereabouts(task)}
+                              disabled={isUpdating}
+                              className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
+                            />
                             </div>
                           </div>
 
@@ -952,6 +971,7 @@ export function WorkshopTasksOverviewTab({
                                 <p className="text-sm text-muted-foreground">{task.workshop_comments}</p>
                               )}
                             </div>
+                            <div className="flex flex-col items-stretch gap-2 lg:items-end">
                             <div className={taskActionGroupClass}>
                               <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
@@ -965,6 +985,13 @@ export function WorkshopTasksOverviewTab({
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
                               </Button>
+                            </div>
+                            <WorkshopTaskLocationButton
+                              task={task}
+                              onOpen={() => onOpenWhereabouts(task)}
+                              disabled={isUpdating}
+                              className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
+                            />
                             </div>
                           </div>
 
@@ -1226,6 +1253,12 @@ export function WorkshopTasksOverviewTab({
                               </TableCell>
                               <TableCell className="w-[7rem] px-2 text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="ml-auto flex w-fit justify-end gap-1">
+                                  <WorkshopTaskLocationButton
+                                    task={row.task}
+                                    onOpen={() => onOpenWhereabouts(row.task)}
+                                    iconOnly
+                                    className="h-7 w-7 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
+                                  />
                                   <Button
                                     onClick={() => onOpenComments(row.task)}
                                     size="sm"
@@ -1331,6 +1364,7 @@ export function WorkshopTasksOverviewTab({
                                       )}
                                     </div>
                                   </div>
+                                  <div className="flex flex-col items-stretch gap-2 lg:items-end">
                                   <div className={taskActionGroupClass}>
                                     <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                       <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
@@ -1354,6 +1388,12 @@ export function WorkshopTasksOverviewTab({
                                         Undo
                                       </Button>
                                     )}
+                                  </div>
+                                  <WorkshopTaskLocationButton
+                                    task={task}
+                                    onOpen={() => onOpenWhereabouts(task)}
+                                    className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
+                                  />
                                   </div>
                                 </div>
                               </div>

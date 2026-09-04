@@ -44,6 +44,10 @@ const TaskCommentsDrawer = dynamic(
   () => import('@/components/workshop-tasks/TaskCommentsDrawer').then(m => ({ default: m.TaskCommentsDrawer })),
   { ssr: false, loading: () => <ModalChunkLoader message="Loading comments..." /> },
 );
+const AssetWhereaboutsDialog = dynamic(
+  () => import('@/components/workshop-tasks/AssetWhereaboutsDialog').then(m => ({ default: m.AssetWhereaboutsDialog })),
+  { ssr: false, loading: () => <ModalChunkLoader message="Loading location..." /> },
+);
 const WorkshopTaskModal = dynamic(
   () => import('@/components/workshop-tasks/WorkshopTaskModal').then(m => ({ default: m.WorkshopTaskModal })),
   { ssr: false, loading: () => <ModalChunkLoader message="Loading task details..." /> },
@@ -157,6 +161,8 @@ export default function WorkshopTasksPage() {
   const [editingSubcategory, setEditingSubcategory] = useState<Subcategory | null>(null);
   const [showCommentsDrawer, setShowCommentsDrawer] = useState(false);
   const [commentsTask, setCommentsTask] = useState<Action | null>(null);
+  const [showWhereaboutsDialog, setShowWhereaboutsDialog] = useState(false);
+  const [whereaboutsTask, setWhereaboutsTask] = useState<Action | null>(null);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [modalTask, setModalTask] = useState<Action | null>(null);
   const [showErrorDetailsModal, setShowErrorDetailsModal] = useState(false);
@@ -371,6 +377,7 @@ export default function WorkshopTasksPage() {
     showOnHoldModal ||
     showResumeModal ||
     showCommentsDrawer ||
+    showWhereaboutsDialog ||
     showTaskModal;
   const wakeLock = useWorkshopActiveWakeLock('workshop-tasks-page', isWorkshopWorkflowActive);
   const wakeLockStatusMessage = (() => {
@@ -469,6 +476,7 @@ export default function WorkshopTasksPage() {
           onCreateTask={() => setShowAddModal(true)}
           onOpenTaskModal={handleTaskModalOpen}
           onOpenComments={(task) => { setCommentsTask(task); setShowCommentsDrawer(true); }}
+          onOpenWhereabouts={(task) => { setWhereaboutsTask(task); setShowWhereaboutsDialog(true); }}
           onMarkInProgress={(task) => { setSelectedTask(task); setLoggedComment(''); setShowStatusModal(true); }}
           onMarkComplete={(task) => { setCompletingTask(task); setShowCompleteModal(true); }}
           onMarkOnHold={(task) => { setOnHoldingTask(task); setOnHoldComment(''); setShowOnHoldModal(true); }}
@@ -536,8 +544,19 @@ export default function WorkshopTasksPage() {
       <WorkshopTaskStatusDialogs userId={user?.id || null} statusTask={selectedTask} showStatusModal={showStatusModal} onShowStatusModalChange={setShowStatusModal} loggedComment={loggedComment} onLoggedCommentChange={setLoggedComment} onCancelStatusModal={() => { setShowStatusModal(false); setSelectedTask(null); setLoggedComment(''); }} onConfirmMarkInProgress={lifecycle.confirmMarkInProgress} showOnHoldModal={showOnHoldModal} onShowOnHoldModalChange={setShowOnHoldModal} onHoldComment={onHoldComment} onOnHoldCommentChange={setOnHoldComment} onCancelOnHoldModal={() => { setShowOnHoldModal(false); setOnHoldingTask(null); setOnHoldComment(''); }} onConfirmMarkOnHold={lifecycle.confirmMarkOnHold} onHoldingTask={onHoldingTask} showResumeModal={showResumeModal} onShowResumeModalChange={setShowResumeModal} resumeComment={resumeComment} onResumeCommentChange={setResumeComment} onCancelResumeModal={() => { setShowResumeModal(false); setResumingTask(null); setResumeComment(''); }} onConfirmResumeTask={lifecycle.confirmResumeTask} resumingTask={resumingTask} updatingStatus={updatingStatus} />
       <WorkshopTaskAdminDialogs showSettings={showSettings} showCategoryModal={showCategoryModal} onShowCategoryModalChange={setShowCategoryModal} editingCategory={editingCategory} categoryName={categoryName} onCategoryNameChange={setCategoryName} submittingCategory={submittingCategory} onSaveCategory={crud.handleSaveCategory} onResetCategoryForm={() => { setShowCategoryModal(false); setEditingCategory(null); setCategoryName(''); }} showDeleteConfirm={showDeleteConfirm} onShowDeleteConfirmChange={setShowDeleteConfirm} taskToDelete={taskToDelete} getVehicleReg={getVehicleReg} deleting={deleting} onConfirmDeleteTask={crud.confirmDeleteTask} onResetDeleteTask={() => { setShowDeleteConfirm(false); setTaskToDelete(null); }} />
       {commentsTask && <TaskCommentsDrawer open={showCommentsDrawer} onOpenChange={setShowCommentsDrawer} taskId={commentsTask.id} taskTitle={getVehicleReg(commentsTask)} userId={user?.id || null} />}
+      {whereaboutsTask && (
+        <AssetWhereaboutsDialog
+          open={showWhereaboutsDialog}
+          onOpenChange={(open) => {
+            setShowWhereaboutsDialog(open);
+            if (!open) setWhereaboutsTask(null);
+          }}
+          task={whereaboutsTask}
+          assetLabel={getVehicleReg(whereaboutsTask)}
+        />
+      )}
       {(showTaskModal || !!modalTask) && (
-        <WorkshopTaskModal open={showTaskModal} onOpenChange={handleTaskModalOpenChange} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { handleTaskModalOpenChange(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { handleTaskModalOpenChange(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { handleTaskModalOpenChange(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { handleTaskModalOpenChange(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { handleTaskModalOpenChange(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { handleTaskModalOpenChange(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} onTaskUpdated={fetcher.fetchTasks} />
+        <WorkshopTaskModal open={showTaskModal} onOpenChange={handleTaskModalOpenChange} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { handleTaskModalOpenChange(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { handleTaskModalOpenChange(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { handleTaskModalOpenChange(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { handleTaskModalOpenChange(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { handleTaskModalOpenChange(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { handleTaskModalOpenChange(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} onOpenWhereabouts={(task) => { setWhereaboutsTask(task as Action); setShowWhereaboutsDialog(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} onTaskUpdated={fetcher.fetchTasks} />
       )}
       {selectedCategoryForSubcategory && <SubcategoryDialog open={showSubcategoryModal} onOpenChange={setShowSubcategoryModal} mode={subcategoryMode} categoryId={selectedCategoryForSubcategory.id} categoryName={selectedCategoryForSubcategory.name} subcategory={editingSubcategory} onSuccess={fetcher.fetchSubcategories} />}
       {showErrorDetailsModal && (

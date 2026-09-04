@@ -1,8 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getEffectiveRole } from '@/lib/utils/view-as';
+import { getEffectiveRole, getEffectiveRoleForUser } from '@/lib/utils/view-as';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import type { ModuleName, PermissionAccessLevel } from '@/types/roles';
 import { getPermissionLevelsForUser } from '@/lib/server/team-permissions';
+
+export type EffectiveActorRef = {
+  userId: string;
+  email?: string | null;
+};
 
 interface RoleRecord {
   id: string;
@@ -11,13 +16,21 @@ interface RoleRecord {
   is_super_admin: boolean;
 }
 
-export async function canEffectiveRoleAccessModule(moduleName: ModuleName): Promise<boolean> {
-  const accessLevel = await getEffectiveModuleAccessLevel(moduleName);
+export async function canEffectiveRoleAccessModule(
+  moduleName: ModuleName,
+  actor?: EffectiveActorRef
+): Promise<boolean> {
+  const accessLevel = await getEffectiveModuleAccessLevel(moduleName, actor);
   return accessLevel > 0;
 }
 
-export async function getEffectiveModuleAccessLevel(moduleName: ModuleName): Promise<PermissionAccessLevel> {
-  const effectiveRole = await getEffectiveRole();
+export async function getEffectiveModuleAccessLevel(
+  moduleName: ModuleName,
+  actor?: EffectiveActorRef
+): Promise<PermissionAccessLevel> {
+  const effectiveRole = actor
+    ? await getEffectiveRoleForUser(actor.userId, actor.email)
+    : await getEffectiveRole();
   if (!effectiveRole.user_id || !effectiveRole.role_id) {
     return 0;
   }

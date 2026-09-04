@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { applyValidationCookieIfNeeded } from '@/lib/server/app-auth/response';
+import type { AppSessionValidationResult } from '@/lib/server/app-auth/session';
+import { requireSingleAssetTrackerAccess } from '@/lib/server/fleet-tracker-auth';
 import { enrichTrackerLocationWithVanNickname } from '@/lib/server/fleet-tracker-enrichment';
 
 const BASE = process.env.FLEETSMART_BASE_URL ?? 'https://www.fleetsmartlive.com';
@@ -189,12 +192,32 @@ async function fetchLatestLocation(
   return result;
 }
 
+function jsonWithSession(
+  validation: AppSessionValidationResult,
+  body: unknown,
+  status = 200
+): NextResponse {
+  const response = NextResponse.json(body, { status });
+  applyValidationCookieIfNeeded(response, validation);
+  return response;
+}
+
 /* ---------- route handler ---------- */
 export async function GET(request: NextRequest) {
+  const access = await requireSingleAssetTrackerAccess();
+  if (!access.ok) {
+    return jsonWithSession(
+      access.validation,
+      { error: access.status === 401 ? 'unauthorized' : 'forbidden' },
+      access.status
+    );
+  }
+
   if (!CLIENT_ID || !API_KEY) {
-    return NextResponse.json(
+    return jsonWithSession(
+      access.validation,
       { error: 'missing_credentials', message: 'FleetSmart API credentials not configured' },
-      { status: 500 }
+      500
     );
   }
 
@@ -203,9 +226,10 @@ export async function GET(request: NextRequest) {
   const regNumber = searchParams.get('regNumber') ?? undefined;
 
   if (!plantId && !regNumber) {
-    return NextResponse.json(
+    return jsonWithSession(
+      access.validation,
       { error: 'bad_request', message: 'Provide either plantId or regNumber query param' },
-      { status: 400 }
+      400
     );
   }
 
@@ -214,20 +238,24 @@ export async function GET(request: NextRequest) {
     const matched = matchAsset(vehicles, plantId, regNumber);
 
     if (!matched) {
-      return NextResponse.json({ error: 'not_found', message: 'Asset not found in FleetSmart' });
+      return jsonWithSession(access.validation, {
+        error: 'not_found',
+        message: 'Asset not found in FleetSmart',
+      });
     }
 
     const location = await fetchLatestLocation(matched.id);
 
     if (!location) {
-      return NextResponse.json({
+      return jsonWithSession(access.validation, {
         error: 'no_location',
         message: 'Asset found but no location data available',
         vehicleName: matched.name,
       });
     }
 
-    return NextResponse.json(
+    return jsonWithSession(
+      access.validation,
       await enrichTrackerLocationWithVanNickname({
         vehicleId: matched.id,
         name: matched.name,
@@ -243,22 +271,25 @@ export async function GET(request: NextRequest) {
     const message = err instanceof Error ? err.message : 'Unknown error';
 
     if (message.includes('401') || message.includes('403')) {
-      return NextResponse.json(
+      return jsonWithSession(
+        access.validation,
         { error: 'auth_error', message: 'FleetSmart authentication failed' },
-        { status: 401 }
+        401
       );
     }
     if (message.includes('429')) {
-      return NextResponse.json(
+      return jsonWithSession(
+        access.validation,
         { error: 'rate_limited', message: 'FleetSmart rate limit exceeded. Try again shortly.' },
-        { status: 429 }
+        429
       );
     }
 
     console.error('[FleetSmart API]', message);
-    return NextResponse.json(
+    return jsonWithSession(
+      access.validation,
       { error: 'server_error', message: 'Failed to fetch FleetSmart data' },
-      { status: 500 }
+      500
     );
   }
 }

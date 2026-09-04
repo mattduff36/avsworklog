@@ -43,29 +43,38 @@ export interface EffectiveRoleInfo {
  *    is set, fetch the override role and return it as the effective role.
  * 4. Otherwise, return the caller's actual role.
  */
-export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
-  const none: EffectiveRoleInfo = {
-    role_id: null,
-    role_name: null,
-    display_name: null,
-    role_class: null,
-    is_manager_admin: false,
-    is_super_admin: false,
-    is_viewing_as: false,
-    is_actual_super_admin: false,
-    user_id: null,
-    team_id: null,
-    team_name: null,
-  };
+const EMPTY_EFFECTIVE_ROLE: EffectiveRoleInfo = {
+  role_id: null,
+  role_name: null,
+  display_name: null,
+  role_class: null,
+  is_manager_admin: false,
+  is_super_admin: false,
+  is_viewing_as: false,
+  is_actual_super_admin: false,
+  user_id: null,
+  team_id: null,
+  team_name: null,
+};
 
+export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
   try {
     const current = await getCurrentAuthenticatedProfile({ includeEmail: true });
     if (!current) {
-      return none;
+      return EMPTY_EFFECTIVE_ROLE;
     }
+    return getEffectiveRoleForUser(current.profile.id, current.profile.email);
+  } catch (error) {
+    console.error('[getEffectiveRole] Error:', error);
+    return EMPTY_EFFECTIVE_ROLE;
+  }
+}
 
-    const userId = current.profile.id;
-    const userEmail = current.profile.email;
+export async function getEffectiveRoleForUser(
+  userId: string,
+  userEmail?: string | null
+): Promise<EffectiveRoleInfo> {
+  try {
 
     // Fetch actual profile + role using admin client to bypass RLS
     const admin = createAdminClient();
@@ -89,7 +98,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
       .single();
 
     if (profileError || !profile) {
-      return none;
+      return EMPTY_EFFECTIVE_ROLE;
     }
     const typedProfile = profile as unknown as {
       super_admin: boolean | null;
@@ -201,7 +210,7 @@ export async function getEffectiveRole(): Promise<EffectiveRoleInfo> {
     };
     return resolved;
   } catch (error) {
-    console.error('[getEffectiveRole] Error:', error);
-    return none;
+    console.error('[getEffectiveRoleForUser] Error:', error);
+    return EMPTY_EFFECTIVE_ROLE;
   }
 }

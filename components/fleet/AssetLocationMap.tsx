@@ -17,6 +17,7 @@ interface AssetLocationMapProps {
   onMatchResult?: (hasMatch: boolean) => void;
   onLocationData?: (data: TrackerLocationData) => void;
   onClick?: () => void;
+  prefetchAllLocations?: boolean;
 }
 
 function getLocationEndpoint(locationProvider: 'fleetsmart' | 'velocityfleet'): string {
@@ -41,6 +42,7 @@ export function AssetLocationMap({
   onMatchResult,
   onLocationData,
   onClick,
+  prefetchAllLocations = true,
 }: AssetLocationMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maptilersdk.Map | null>(null);
@@ -70,6 +72,7 @@ export function AssetLocationMap({
       return;
     }
 
+    const controller = new AbortController();
     let cancelled = false;
 
     async function fetchLocation() {
@@ -78,7 +81,10 @@ export function AssetLocationMap({
         if (locationProvider === 'fleetsmart' && plantId) params.set('plantId', plantId);
         if (regNumber) params.set('regNumber', regNumber);
 
-        const res = await fetch(`${getLocationEndpoint(locationProvider)}?${params.toString()}`);
+        const res = await fetch(`${getLocationEndpoint(locationProvider)}?${params.toString()}`, {
+          signal: controller.signal,
+          cache: 'no-store',
+        });
 
         if (!res.ok) {
           if (!cancelled) {
@@ -118,14 +124,17 @@ export function AssetLocationMap({
           onMatchResultRef.current?.(true);
           onLocationDataRef.current?.(loc);
 
-          // Pre-warm the all-locations cache in the background so the
-          // modal map has data ready when the user clicks to expand.
-          fetch(getAllLocationsEndpoint(locationProvider)).catch(() => {});
+          if (prefetchAllLocations) {
+            fetch(getAllLocationsEndpoint(locationProvider)).catch(() => {});
+          }
         } else {
           setHasMatch(false);
           onMatchResultRef.current?.(false);
         }
-      } catch {
+      } catch (error) {
+        if (cancelled || (error instanceof DOMException && error.name === 'AbortError')) {
+          return;
+        }
         if (!cancelled) {
           setHasMatch(false);
           onMatchResultRef.current?.(false);
@@ -137,18 +146,31 @@ export function AssetLocationMap({
       }
     }
 
-    fetchLocation();
+    void fetchLocation();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
   }, [plantId, regNumber, locationProvider]);
 
-  // Initialise map once we have location
+  // Rebuild the map when the selected-asset location changes.
   useEffect(() => {
-    if (!locationData || !mapContainerRef.current) return;
-    if (mapRef.current) return; // already initialised
+    if (!locationData || !mapContainerRef.current) {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+      return;
+    }
 
     const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY;
     if (!apiKey) return;
+
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
 
     maptilersdk.config.apiKey = apiKey;
 

@@ -82,6 +82,7 @@ function renderOverview() {
           onCreateTask={vi.fn()}
           onOpenTaskModal={vi.fn()}
           onOpenComments={vi.fn()}
+          onOpenWhereabouts={vi.fn()}
           onMarkInProgress={vi.fn()}
           onMarkComplete={vi.fn()}
           onMarkOnHold={vi.fn()}
@@ -165,6 +166,7 @@ function renderStatefulOverview(initialFilter: WorkshopTaskTileFilter = 'all') {
             onCreateTask={vi.fn()}
             onOpenTaskModal={vi.fn()}
             onOpenComments={vi.fn()}
+          onOpenWhereabouts={vi.fn()}
             onMarkInProgress={vi.fn()}
             onMarkComplete={vi.fn()}
             onMarkOnHold={vi.fn()}

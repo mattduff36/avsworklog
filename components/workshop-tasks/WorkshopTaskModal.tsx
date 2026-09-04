@@ -17,6 +17,7 @@ import {
   FileText,
   Pause,
 } from 'lucide-react';
+import { WorkshopTaskLocationButton } from '@/components/workshop-tasks/WorkshopTaskLocationButton';
 import { formatDate } from '@/lib/utils/date';
 import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTimeline';
 import {
@@ -78,6 +79,7 @@ interface WorkshopTaskModalProps {
   onMarkComplete: (task: Task) => void;
   onMarkOnHold: (task: Task) => void;
   onResume: (task: Task) => void;
+  onOpenWhereabouts?: (task: Task) => void;
   isUpdating: boolean;
   onTaskUpdated?: () => Promise<void>;
   inspectionPhotos?: InspectionPhoto[];
@@ -93,6 +95,7 @@ export function WorkshopTaskModal({
   onMarkComplete,
   onMarkOnHold,
   onResume,
+  onOpenWhereabouts,
   isUpdating,
   onTaskUpdated,
   inspectionPhotos = [],
@@ -372,6 +375,14 @@ export function WorkshopTaskModal({
 
             {/* Action Buttons */}
             <div className={`flex flex-wrap items-center ${tabletModeEnabled ? 'gap-3' : 'gap-2'}`}>
+              {onOpenWhereabouts ? (
+                <WorkshopTaskLocationButton
+                  task={task}
+                  onOpen={() => onOpenWhereabouts(task)}
+                  disabled={isUpdating}
+                  className={`border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800 ${taskActionButtonClass}`}
+                />
+              ) : null}
               {task.status === 'pending' && (
                 <>
                   <Button
