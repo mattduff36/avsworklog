@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.3.1
+
+**GIT COMMIT MESSAGE**
+`fix(timesheets): lock Manager Approved process to the server actor rule`
+
+**PUSHED AT**
+2026-09-04T01:04:50.158Z
+
+**WHAT CHANGED**
+Prove first-review gate verification blockers. Bind TS-GATE-001 and TS-GATE-004 to the process lock candidate. Give each Manager Approved required ID a unique case. Lock Manager Approved process to the server actor rule.
+
+**VERSION HISTORY DETAILS**
+- Prove first-review gate verification blockers, with changes to background routes, shared logic, and automated tests.
+- Updated approvals, with changes to shared logic and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `test(timesheets): prove first-review gate verification blockers`
+- `test(timesheets): bind TS-GATE-001 and TS-GATE-004 to the process lock candidate`
+- `test(timesheets): give each Manager Approved required ID a unique case`
+- `fix(timesheets): lock Manager Approved process to the server actor rule`
+
 ## 0926.3.0
 
 **GIT COMMIT MESSAGE**
