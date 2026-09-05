@@ -1,5 +1,22 @@
 [
   {
+    "version": "0926.6.0",
+    "updateKind": "major",
+    "title": "Workshop Tasks update",
+    "description": "Updated workshop tasks.",
+    "summary": "Updated workshop tasks.",
+    "details": [
+      "Updated workshop tasks, with changes to app screens, interface components, shared logic, and automated tests."
+    ],
+    "areas": [
+      "Workshop Tasks"
+    ],
+    "areaKeys": [
+      "workshop-tasks"
+    ],
+    "pushedAt": "2026-09-05T01:21:23.957Z"
+  },
+  {
     "version": "0926.5.3",
     "updateKind": "minor",
     "title": "Rules guidance update",
