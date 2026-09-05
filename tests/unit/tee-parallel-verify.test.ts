@@ -11,6 +11,7 @@ import {
   requireProcessSuccess,
   resolveTeeVerifyJobs,
   createHumanTeeProgress,
+  resolveWindowsProcessCommand,
   runProcessJob,
   runVerifyBatch,
   sanitizeSpawnEnv,
@@ -432,16 +433,29 @@ describe('TEE parallel verification runner', () => {
     expect(ok.exitCode).toBe(0);
     expect(ok.stdout).toMatch(/spawn-ok/);
 
-    const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    expect(resolveWindowsProcessCommand('npm')).toBe(process.platform === 'win32' ? 'npm.cmd' : 'npm');
+    expect(resolveWindowsProcessCommand('npx')).toBe(process.platform === 'win32' ? 'npx.cmd' : 'npx');
+    expect(resolveWindowsProcessCommand('git')).toBe('git');
+
     const npmVersion = await runProcessJob({
       cwd: process.cwd(),
-      command: npmCommand,
+      command: 'npm',
       args: ['-v'],
       windowsHide: true,
     });
     expect(npmVersion.status).toBe('passed');
     expect(npmVersion.exitCode).toBe(0);
     expect(npmVersion.stdout.trim()).toMatch(/^\d+\.\d+/);
+
+    const npxVersion = await runProcessJob({
+      cwd: process.cwd(),
+      command: 'npx',
+      args: ['--version'],
+      windowsHide: true,
+    });
+    expect(npxVersion.status).toBe('passed');
+    expect(npxVersion.exitCode).toBe(0);
+    expect(npxVersion.stdout.trim()).toMatch(/^\d+\.\d+/);
 
     const missing = await runProcessJob({
       cwd: process.cwd(),

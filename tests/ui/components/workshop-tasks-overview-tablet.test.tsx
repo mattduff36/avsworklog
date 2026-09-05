@@ -281,6 +281,10 @@ describe('WorkshopTasksOverviewTab status tile filters', () => {
     expect(screen.getByText('Pending Tasks (1)')).toBeTruthy();
     expect(screen.getByText('HP-1')).toBeTruthy();
     expect(screen.queryByText('PENDING-1')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Comments' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Location' })).toBeTruthy();
+    expect(screen.queryByText('Comments')).toBeNull();
+    expect(screen.queryByText('Location')).toBeNull();
   });
 
   it('keeps the status dropdown synced with selected database-backed tiles', async () => {

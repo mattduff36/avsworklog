@@ -14,6 +14,7 @@ interface WorkshopTaskLocationButtonProps {
   disabled?: boolean;
   className?: string;
   iconOnly?: boolean;
+  variant?: 'outline' | 'ghost';
 }
 
 export function WorkshopTaskLocationButton({
@@ -22,6 +23,7 @@ export function WorkshopTaskLocationButton({
   disabled = false,
   className = '',
   iconOnly = false,
+  variant = 'outline',
 }: WorkshopTaskLocationButtonProps) {
   const asset = resolveWorkshopTaskAsset(task);
   return (
@@ -34,7 +36,7 @@ export function WorkshopTaskLocationButton({
       }}
       disabled={disabled || !asset}
       size="sm"
-      variant="outline"
+      variant={variant}
       className={className}
       title="Location"
       aria-label="Location"

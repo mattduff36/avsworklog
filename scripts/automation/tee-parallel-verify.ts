@@ -223,6 +223,13 @@ export function sanitizeSpawnEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.P
   return clean as NodeJS.ProcessEnv;
 }
 
+export function resolveWindowsProcessCommand(command: string): string {
+  if (process.platform !== 'win32') return command;
+  if (command === 'npm') return 'npm.cmd';
+  if (command === 'npx') return 'npx.cmd';
+  return command;
+}
+
 export function defaultWindowsHide(): boolean {
   return process.platform !== 'win32';
 }
@@ -275,15 +282,16 @@ export function runProcessJob(params: {
     };
     const start = (options: { windowsHide: boolean; shell: boolean }): void => {
       let child: ReturnType<typeof spawn>;
+      const command = resolveWindowsProcessCommand(params.command);
       try {
         child = options.shell
-          ? spawnFn([params.command, ...params.args.map(quoteWindowsArg)].join(' '), {
+          ? spawnFn([command, ...params.args.map(quoteWindowsArg)].join(' '), {
               cwd: params.cwd,
               env,
               shell: true,
               windowsHide: options.windowsHide,
             })
-          : spawnFn(params.command, params.args, {
+          : spawnFn(command, params.args, {
               cwd: params.cwd,
               env,
               shell: false,

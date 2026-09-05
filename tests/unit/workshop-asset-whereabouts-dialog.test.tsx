@@ -10,9 +10,29 @@ vi.mock('next/dynamic', () => ({
   default: () => () => null,
 }));
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/workshop-tasks',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 describe('workshop location UI proof', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('shows the workshop brand loader while location details load', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+
+    render(
+      <AssetWhereaboutsDialog
+        open
+        onOpenChange={vi.fn()}
+        task={{ plant_id: '11111111-1111-4111-8111-111111111111' }}
+        assetLabel="331"
+      />
+    );
+
+    expect(await screen.findByLabelText('Loading location details...')).toBeInTheDocument();
   });
 
   it('WT-WHERE-UI-STOP does not open the task modal', () => {
@@ -182,6 +202,52 @@ describe('workshop location UI proof', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getByText('Van Driver')).toBeInTheDocument());
     expect(screen.queryByText('Plant Driver')).not.toBeInTheDocument();
-    expect(screen.getByText(/Location — Van 12/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Location' })).toBeInTheDocument();
+    expect(screen.getByText('Van 12')).toBeInTheDocument();
+  });
+
+  it('shows one primary location line per event and keeps driver in the summary only', async () => {
+    const plantId = '11111111-1111-4111-8111-111111111111';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        asset: { id: plantId, type: 'plant', label: '331', plantId: '331', regNumber: null },
+        lastCheckAt: '2026-09-03',
+        lastDriverName: 'Jane Barlow',
+        lastDriverPhone: null,
+        meter: null,
+        fleetHistoryHref: `/fleet/plant/${plantId}/history`,
+        canOpenFleetHistory: false,
+        events: [
+          {
+            id: 'inspection:1',
+            source: 'inspection',
+            occurredAt: '2026-09-04T12:26:00.000Z',
+            jobCode: '40139-GH',
+            siteAddress: 'Tarmac Mountsorrel — Railhead',
+            customerName: 'Tarmac Trading Limited',
+            jobTitle: 'Railhead Concrete Traction Strip',
+            driverName: 'Jane Barlow',
+            inspectionId: 'insp-1',
+          },
+        ],
+      }),
+    }));
+
+    render(
+      <AssetWhereaboutsDialog
+        open
+        onOpenChange={vi.fn()}
+        task={{ plant_id: plantId }}
+        assetLabel="331"
+      />
+    );
+
+    await waitFor(() => expect(screen.getByText('40139-GH')).toBeInTheDocument());
+    expect(screen.getByText('Last driver')).toBeInTheDocument();
+    expect(screen.getAllByText('Jane Barlow')).toHaveLength(1);
+    expect(screen.queryByText('Tarmac Trading Limited — Railhead Concrete Traction Strip')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tarmac Mountsorrel — Railhead')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Driver:/)).not.toBeInTheDocument();
   });
 });

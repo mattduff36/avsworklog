@@ -1,4 +1,5 @@
 import type {
+  WorkshopAssetWhereaboutsEvent,
   WorkshopAssetWhereaboutsPayload,
 } from '@/types/workshop-asset-whereabouts';
 import type { WorkshopTaskAssetRef } from '@/lib/workshop-tasks/task-asset';
@@ -31,4 +32,25 @@ export function resolveWhereaboutsMapTarget(
     assetLabel: payload.asset.label,
     locationProvider: asset.assetType === 'van' ? 'velocityfleet' : 'fleetsmart',
   };
+}
+
+export function formatWhereaboutsEventPrimary(
+  event: Pick<
+    WorkshopAssetWhereaboutsEvent,
+    'jobCode' | 'siteAddress' | 'customerName' | 'jobTitle' | 'driverName'
+  >
+): string {
+  const jobCode = event.jobCode?.trim();
+  if (jobCode) return jobCode;
+
+  const siteAddress = event.siteAddress?.trim();
+  if (siteAddress) return siteAddress;
+
+  const catalogue = [event.customerName, event.jobTitle]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(' — ');
+  if (catalogue) return catalogue;
+
+  return 'No location recorded';
 }

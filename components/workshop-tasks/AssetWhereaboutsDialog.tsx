@@ -6,12 +6,13 @@ import Link from 'next/link';
 import { ExternalLink, Phone } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { formatDate, formatDateTime } from '@/lib/utils/date';
 import { formatTrackerTimestamp, parseTrackerTimestamp } from '@/lib/utils/tracker-dates';
 import { formatAssetMeterReading, getAssetMeterLabel } from '@/lib/workshop-tasks/asset-meter';
 import { resolveWorkshopTaskAsset } from '@/lib/workshop-tasks/task-asset';
 import {
+  formatWhereaboutsEventPrimary,
   isWhereaboutsPayloadForAsset,
   resolveWhereaboutsMapTarget,
 } from '@/lib/workshop-tasks/whereabouts-dialog';
@@ -19,7 +20,12 @@ import type { WorkshopAssetWhereaboutsPayload } from '@/types/workshop-asset-whe
 
 const AssetLocationMap = dynamic(
   () => import('@/components/fleet/AssetLocationMap').then((mod) => ({ default: mod.AssetLocationMap })),
-  { ssr: false }
+  {
+    ssr: false,
+    loading: () => (
+      <PanelLoader message="Loading map..." accent="workshop" className="h-56 min-h-[14rem]" />
+    ),
+  }
 );
 
 const TRACKER_STALE_MS = 4 * 60 * 60 * 1000;
@@ -104,64 +110,75 @@ export function AssetWhereaboutsDialog({
   const matchedPayload = isWhereaboutsPayloadForAsset(payload, asset) ? payload : null;
   const mapTarget = resolveWhereaboutsMapTarget(asset, matchedPayload);
   const stale = isTrackerStale(trackerUpdatedAt);
+  const displayLabel = matchedPayload?.asset.label || assetLabel;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-xl sm:max-w-2xl max-h-[min(40rem,100dvh)] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Location — {matchedPayload?.asset.label || assetLabel}</DialogTitle>
-          <DialogDescription>
+      <DialogContent
+        className="flex w-[calc(100vw-2rem)] max-w-4xl flex-col overflow-hidden border-border"
+        style={{ maxHeight: 'min(85vh, calc(100dvh - 4rem))' }}
+      >
+        <DialogHeader className="shrink-0 pr-8 text-left">
+          <DialogTitle>Location</DialogTitle>
+          <p className="text-xs text-muted-foreground">{displayLabel}</p>
+          <DialogDescription className="text-muted-foreground">
             Last-known tracker location, recent jobs, and the last driver for this asset.
           </DialogDescription>
         </DialogHeader>
 
         {loading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-40 w-full" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-24 w-full" />
-          </div>
+          <PanelLoader
+            message="Loading location details..."
+            accent="workshop"
+            className="min-h-[16rem] py-10"
+          />
         ) : error ? (
           <p className="text-sm text-muted-foreground">{error}</p>
         ) : (
-          <div className="space-y-4">
-            {mapTarget ? (
-              <div className="space-y-2">
-                <AssetLocationMap
-                  plantId={mapTarget.plantId}
-                  regNumber={mapTarget.regNumber}
-                  assetLabel={mapTarget.assetLabel}
-                  locationProvider={mapTarget.locationProvider}
-                  loadingVariant="compact"
-                  className="h-48 min-h-[12rem]"
-                  prefetchAllLocations={false}
-                  onMatchResult={setTrackerMatch}
-                  onLocationData={(data) => setTrackerUpdatedAt(data.updatedAt)}
-                />
-                {trackerMatch === false ? (
-                  <p className="text-sm text-muted-foreground">No tracker location for this asset.</p>
-                ) : null}
-                {trackerMatch && trackerUpdatedAt ? (
-                  <p className={`text-xs ${stale ? 'text-amber-300' : 'text-muted-foreground'}`}>
-                    Last reported: {formatTrackerTimestamp(trackerUpdatedAt)}
-                    {stale ? ' — tracker has not updated recently.' : ''}
-                  </p>
-                ) : null}
-              </div>
-            ) : !asset ? (
-              <p className="text-sm text-muted-foreground">This task is not linked to an asset.</p>
-            ) : null}
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto md:grid-cols-2 md:overflow-hidden">
+            <div className="flex min-h-0 flex-col gap-2">
+              {mapTarget ? (
+                <>
+                  <AssetLocationMap
+                    plantId={mapTarget.plantId}
+                    regNumber={mapTarget.regNumber}
+                    assetLabel={mapTarget.assetLabel}
+                    locationProvider={mapTarget.locationProvider}
+                    loadingVariant="compact"
+                    className="h-56 min-h-[14rem] md:h-full md:min-h-[16rem]"
+                    prefetchAllLocations={false}
+                    onMatchResult={setTrackerMatch}
+                    onLocationData={(data) => setTrackerUpdatedAt(data.updatedAt)}
+                  />
+                  {trackerMatch === false ? (
+                    <p className="text-xs text-muted-foreground">No tracker location for this asset.</p>
+                  ) : null}
+                  {trackerMatch && trackerUpdatedAt ? (
+                    <p className={`text-xs ${stale ? 'text-amber-300' : 'text-muted-foreground'}`}>
+                      Last reported:{' '}
+                      <span className={stale ? 'text-amber-200' : 'text-foreground'}>
+                        {formatTrackerTimestamp(trackerUpdatedAt)}
+                      </span>
+                    </p>
+                  ) : null}
+                </>
+              ) : !asset ? (
+                <p className="text-sm text-muted-foreground">This task is not linked to an asset.</p>
+              ) : null}
+            </div>
 
             {matchedPayload ? (
-              <>
-                <div className="grid gap-2 text-sm sm:grid-cols-3">
+              <div className="flex min-h-0 flex-col gap-4">
+                <div className="grid shrink-0 grid-cols-3 gap-3">
                   <div>
                     <p className="text-xs text-muted-foreground">Last check</p>
-                    <p>{matchedPayload.lastCheckAt ? formatDate(matchedPayload.lastCheckAt) : 'None in recent checks'}</p>
+                    <p className="text-sm text-foreground">
+                      {matchedPayload.lastCheckAt ? formatDate(matchedPayload.lastCheckAt) : 'None in recent checks'}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">Last driver</p>
-                    <p>{matchedPayload.lastDriverName || 'Unknown'}</p>
+                    <p className="text-sm text-foreground">{matchedPayload.lastDriverName || 'Unknown'}</p>
                     {matchedPayload.lastDriverPhone ? (
                       <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                         <Phone className="h-3 w-3" />
@@ -175,39 +192,36 @@ export function AssetWhereaboutsDialog({
                     <p className="text-xs text-muted-foreground">
                       {matchedPayload.meter ? getAssetMeterLabel(matchedPayload.meter.unit) : 'Meter'}
                     </p>
-                    <p>{matchedPayload.meter ? formatAssetMeterReading(matchedPayload.meter.value) : 'Not recorded'}</p>
+                    <p className="text-sm text-foreground">
+                      {matchedPayload.meter ? formatAssetMeterReading(matchedPayload.meter.value) : 'Not recorded'}
+                    </p>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">Recent jobs and checks</p>
+                <div className="flex min-h-0 flex-1 flex-col gap-2">
+                  <p className="shrink-0 text-xs font-medium text-muted-foreground">Recent jobs and checks</p>
                   {matchedPayload.events.length === 0 ? (
                     <p className="text-sm text-muted-foreground">
                       No recent allocation or checks in the last 14 days.
                     </p>
                   ) : (
-                    <ul className="space-y-2">
+                    <ul className="min-h-0 space-y-2 md:flex-1 md:overflow-y-auto">
                       {matchedPayload.events.map((event) => (
                         <li
                           key={event.id}
-                          className="rounded-md border border-border bg-background/60 px-3 py-2 text-sm"
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-background/60 px-3 py-2"
                         >
-                          <div className="mb-1 flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="text-xs">
+                          <p className="min-w-0 truncate text-sm text-foreground">
+                            {formatWhereaboutsEventPrimary(event)}
+                          </p>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
                               {event.source === 'allocation' ? 'Allocated' : 'Daily check'}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
                               {formatDateTime(event.occurredAt)}
                             </span>
                           </div>
-                          {event.jobCode ? <p className="font-medium">{event.jobCode}</p> : null}
-                          {event.jobTitle || event.customerName ? (
-                            <p className="text-muted-foreground">
-                              {[event.customerName, event.jobTitle].filter(Boolean).join(' — ')}
-                            </p>
-                          ) : null}
-                          {event.siteAddress ? <p>{event.siteAddress}</p> : null}
-                          {event.driverName ? <p>Driver: {event.driverName}</p> : null}
                         </li>
                       ))}
                     </ul>
@@ -217,13 +231,13 @@ export function AssetWhereaboutsDialog({
                 {matchedPayload.canOpenFleetHistory ? (
                   <Link
                     href={matchedPayload.fleetHistoryHref}
-                    className="inline-flex items-center gap-1 text-sm text-blue-300 underline underline-offset-2"
+                    className="inline-flex shrink-0 items-center gap-1 text-sm text-blue-300 underline underline-offset-2"
                   >
                     Open fleet history
                     <ExternalLink className="h-3.5 w-3.5" />
                   </Link>
                 ) : null}
-              </>
+              </div>
             ) : null}
           </div>
         )}

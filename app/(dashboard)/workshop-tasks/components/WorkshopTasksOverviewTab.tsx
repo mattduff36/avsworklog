@@ -214,6 +214,76 @@ export function WorkshopTasksOverviewTab({
   const taskActionGroupClass = tabletModeEnabled
     ? 'flex flex-wrap items-center gap-1.5 w-full lg:w-auto'
     : 'flex flex-wrap items-center gap-1.5 w-full md:w-auto';
+  const cardIconActionClass = tabletModeEnabled
+    ? 'h-11 w-11 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800'
+    : 'h-7 w-7 p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800';
+  const cardDeleteActionClass = tabletModeEnabled
+    ? 'h-11 w-11 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50'
+    : 'h-7 w-7 p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50';
+
+  const renderCardUtilityActions = (
+    task: Action,
+    isUpdating: boolean,
+    options: { showEdit?: boolean; showDelete?: boolean } = {}
+  ) => {
+    const canMutateWorkshopTask = task.action_type === 'workshop_vehicle_task';
+    return (
+      <div className="flex items-center gap-1">
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpenComments(task);
+          }}
+          disabled={isUpdating}
+          size="sm"
+          variant="ghost"
+          className={cardIconActionClass}
+          title="Comments"
+          aria-label="Comments"
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+        </Button>
+        <WorkshopTaskLocationButton
+          task={task}
+          onOpen={() => onOpenWhereabouts(task)}
+          disabled={isUpdating}
+          iconOnly
+          variant="ghost"
+          className={cardIconActionClass}
+        />
+        {options.showEdit && canMutateWorkshopTask ? (
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              onEditTask(task);
+            }}
+            disabled={isUpdating}
+            size="sm"
+            variant="ghost"
+            className={cardIconActionClass}
+            title="Edit task"
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
+        {options.showDelete && canMutateWorkshopTask ? (
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDeleteTask(task);
+            }}
+            disabled={isUpdating}
+            size="sm"
+            variant="ghost"
+            className={cardDeleteActionClass}
+            title="Delete task"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
+      </div>
+    );
+  };
   const getTaskPhotos = (taskId: string) => taskInspectionPhotos[taskId] ?? [];
   const statusSelectValue: WorkshopTaskStatusFilter = statusFilter === 'high_priority' ? 'pending' : statusFilter;
   const visibleTaskCount = pendingTasks.length + inProgressTasks.length + onHoldTasks.length + completedTasks.length;
@@ -680,21 +750,7 @@ export function WorkshopTasksOverviewTab({
                                 </p>
                               )}
                             </div>
-                            <div className="flex flex-col items-stretch gap-2 lg:items-end">
                             <div className={taskActionGroupClass}>
-                              <Button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onOpenComments(task);
-                                }}
-                                disabled={isUpdating}
-                                size="sm"
-                                variant="outline"
-                                className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
-                              >
-                                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                                Comments
-                              </Button>
                               <Button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -732,43 +788,13 @@ export function WorkshopTasksOverviewTab({
                                 Complete
                               </Button>
                             </div>
-                            <WorkshopTaskLocationButton
-                              task={task}
-                              onOpen={() => onOpenWhereabouts(task)}
-                              disabled={isUpdating}
-                              className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
-                            />
-                            </div>
                           </div>
 
                           <div className="flex items-center justify-between w-full">
                             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                               <span>Created: {formatDate(task.created_at)}</span>
                             </div>
-                            {task.action_type === 'workshop_vehicle_task' && (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  onClick={(e) => { e.stopPropagation(); onEditTask(task); }}
-                                  disabled={isUpdating}
-                                  size="sm"
-                                  variant="ghost"
-                                  className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800`}
-                                  title="Edit task"
-                                >
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  onClick={(e) => { e.stopPropagation(); onDeleteTask(task); }}
-                                  disabled={isUpdating}
-                                  size="sm"
-                                  variant="ghost"
-                                  className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50`}
-                                  title="Delete task"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )}
+                            {renderCardUtilityActions(task, isUpdating, { showEdit: true, showDelete: true })}
                           </div>
                         </div>
                       </CardContent>
@@ -848,12 +874,7 @@ export function WorkshopTasksOverviewTab({
                                 </p>
                               )}
                             </div>
-                            <div className="flex flex-col items-stretch gap-2 lg:items-end">
                             <div className={taskActionGroupClass}>
-                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
-                                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                                Comments
-                              </Button>
                               <Button onClick={(e) => { e.stopPropagation(); onUndoLogged(task.id); }} variant="outline" disabled={isUpdating} size="sm" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
                                 <Undo2 className="h-3.5 w-3.5 mr-1.5" />
                                 Undo
@@ -875,13 +896,6 @@ export function WorkshopTasksOverviewTab({
                                 Complete
                               </Button>
                             </div>
-                            <WorkshopTaskLocationButton
-                              task={task}
-                              onOpen={() => onOpenWhereabouts(task)}
-                              disabled={isUpdating}
-                              className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
-                            />
-                            </div>
                           </div>
 
                           <div className="flex items-center justify-between w-full">
@@ -893,13 +907,7 @@ export function WorkshopTasksOverviewTab({
                                 </span>
                               )}
                             </div>
-                            {task.action_type === 'workshop_vehicle_task' && (
-                              <div className="flex items-center gap-1">
-                                <Button onClick={(e) => { e.stopPropagation(); onEditTask(task); }} disabled={isUpdating} size="sm" variant="ghost" className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800`} title="Edit task">
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )}
+                            {renderCardUtilityActions(task, isUpdating, { showEdit: true })}
                           </div>
                         </div>
                       </CardContent>
@@ -971,12 +979,7 @@ export function WorkshopTasksOverviewTab({
                                 <p className="text-sm text-muted-foreground">{task.workshop_comments}</p>
                               )}
                             </div>
-                            <div className="flex flex-col items-stretch gap-2 lg:items-end">
                             <div className={taskActionGroupClass}>
-                              <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} disabled={isUpdating} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
-                                <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                                Comments
-                              </Button>
                               <Button onClick={(e) => { e.stopPropagation(); onResumeTask(task); }} disabled={isUpdating} size="sm" className={`${taskActionButtonClass} transition-all border-0 bg-workshop hover:bg-workshop-dark text-white`}>
                                 <Clock className="h-3.5 w-3.5 mr-1.5" />
                                 Resume
@@ -985,13 +988,6 @@ export function WorkshopTasksOverviewTab({
                                 <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                                 Complete
                               </Button>
-                            </div>
-                            <WorkshopTaskLocationButton
-                              task={task}
-                              onOpen={() => onOpenWhereabouts(task)}
-                              disabled={isUpdating}
-                              className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
-                            />
                             </div>
                           </div>
 
@@ -1002,16 +998,7 @@ export function WorkshopTasksOverviewTab({
                                 <span>Placed On Hold: {formatDate(task.logged_at)}</span>
                               )}
                             </div>
-                            {task.action_type === 'workshop_vehicle_task' && (
-                              <div className="flex items-center gap-1">
-                                <Button onClick={(e) => { e.stopPropagation(); onEditTask(task); }} disabled={isUpdating} size="sm" variant="ghost" className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-muted-foreground hover:text-muted-foreground hover:bg-slate-800`} title="Edit task">
-                                  <Edit className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button onClick={(e) => { e.stopPropagation(); onDeleteTask(task); }} disabled={isUpdating} size="sm" variant="ghost" className={`${tabletModeEnabled ? 'h-11 w-11' : 'h-7 w-7'} p-0 text-red-500 hover:text-red-400 hover:bg-red-950/50`} title="Delete task">
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )}
+                            {renderCardUtilityActions(task, isUpdating, { showEdit: true, showDelete: true })}
                           </div>
                         </div>
                       </CardContent>
@@ -1364,12 +1351,7 @@ export function WorkshopTasksOverviewTab({
                                       )}
                                     </div>
                                   </div>
-                                  <div className="flex flex-col items-stretch gap-2 lg:items-end">
                                   <div className={taskActionGroupClass}>
-                                    <Button onClick={(e) => { e.stopPropagation(); onOpenComments(task); }} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
-                                      <MessageSquare className="h-3.5 w-3.5 mr-1.5" />
-                                      Comments
-                                    </Button>
                                     {isServiceWorkshopTask(task) ? (
                                       canCorrectService && onCorrectService ? (
                                         <Button
@@ -1389,12 +1371,9 @@ export function WorkshopTasksOverviewTab({
                                       </Button>
                                     )}
                                   </div>
-                                  <WorkshopTaskLocationButton
-                                    task={task}
-                                    onOpen={() => onOpenWhereabouts(task)}
-                                    className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}
-                                  />
-                                  </div>
+                                </div>
+                                <div className="flex items-center justify-end w-full">
+                                  {renderCardUtilityActions(task, false)}
                                 </div>
                               </div>
                             </div>

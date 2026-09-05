@@ -7,6 +7,11 @@ vi.mock('next/dynamic', () => ({
   default: () => () => null,
 }));
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/workshop-tasks',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 const ASSET_ID = '11111111-1111-4111-8111-111111111111';
 
 describe('workshop location UI', () => {

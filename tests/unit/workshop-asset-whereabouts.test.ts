@@ -33,6 +33,7 @@ import {
 } from '@/lib/server/workshop-tasks/job-catalogue-enrich';
 import { resolveWorkshopTaskAsset } from '@/lib/workshop-tasks/task-asset';
 import {
+  formatWhereaboutsEventPrimary,
   isWhereaboutsPayloadForAsset,
   resolveWhereaboutsMapTarget,
 } from '@/lib/workshop-tasks/whereabouts-dialog';
@@ -441,5 +442,36 @@ describe('workshop asset whereabouts helpers', () => {
     };
     expect(isWhereaboutsPayloadForAsset(vanPayload, plantAsset)).toBe(false);
     expect(resolveWhereaboutsMapTarget(plantAsset, vanPayload)).toBeNull();
+  });
+
+  it('formats a whereabouts event to one primary location line', () => {
+    expect(formatWhereaboutsEventPrimary(event({
+      jobCode: '40139-GH',
+      siteAddress: 'Tarmac Mountsorrel — Railhead',
+      customerName: 'Tarmac Trading Limited',
+      jobTitle: 'Railhead Concrete Traction Strip',
+      driverName: 'Jane Barlow',
+    }))).toBe('40139-GH');
+
+    expect(formatWhereaboutsEventPrimary(event({
+      jobCode: '  ',
+      siteAddress: 'Yard A',
+      customerName: 'Acme',
+      jobTitle: 'Trench',
+      driverName: 'Jane Barlow',
+    }))).toBe('Yard A');
+
+    expect(formatWhereaboutsEventPrimary(event({
+      customerName: 'Acme',
+      jobTitle: 'Trench',
+      driverName: 'Jane Barlow',
+    }))).toBe('Acme — Trench');
+
+    expect(formatWhereaboutsEventPrimary(event({
+      driverName: 'Jane Barlow',
+    }))).toBe('No location recorded');
+    expect(formatWhereaboutsEventPrimary(event({
+      driverName: 'Jane Barlow',
+    }))).not.toContain('Jane Barlow');
   });
 });
