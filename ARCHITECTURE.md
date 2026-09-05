@@ -50,7 +50,7 @@ Zustand is not used. `nuqs` is page-local, not a global provider.
 6. page tree
 7. `DatabaseOutageBlocker`
 8. Sonner `Toaster`
-9. Vercel `Analytics` only when `NODE_ENV === 'production'` and `VERCEL === '1'`
+9. Vercel `Analytics` and `SpeedInsights` only when `NODE_ENV === 'production'` and `VERCEL === '1'`
 
 There is no root `NuqsAdapter`. Pages that use `nuqs` wrap themselves in `NuqsClientAdapter`.
 

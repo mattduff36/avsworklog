@@ -22,6 +22,11 @@ const Analytics = dynamic(
   { ssr: false }
 );
 
+const SpeedInsights = dynamic(
+  () => import('@vercel/speed-insights/next').then((mod) => mod.SpeedInsights),
+  { ssr: false }
+);
+
 interface AppProvidersProps {
   children: React.ReactNode;
   shouldLoadAnalytics: boolean;
@@ -38,7 +43,12 @@ export function AppProviders({ children, shouldLoadAnalytics }: AppProvidersProp
           {children}
           <DatabaseOutageBlocker />
           <Toaster />
-          {shouldLoadAnalytics ? <Analytics /> : null}
+          {shouldLoadAnalytics ? (
+            <>
+              <Analytics />
+              <SpeedInsights />
+            </>
+          ) : null}
         </AuthProvider>
       </QueryProvider>
     </>
