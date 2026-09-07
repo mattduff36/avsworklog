@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { AttachmentHybridFormModal } from './AttachmentHybridFormModal';
+import { canEnableAttachmentCorrection } from '@/lib/workshop-tasks/attachment-correction-access';
 import type {
   AttachmentSchemaResponse,
   AttachmentSchemaSnapshot,
@@ -15,11 +16,17 @@ interface AttachmentDetails {
   templateName: string;
   snapshot: AttachmentSchemaSnapshot;
   responses: AttachmentSchemaResponse[];
+  preimageHash?: string;
+}
+
+export interface AttachmentHistoryOpenContext {
+  task?: { status?: string | null; actioned_at?: string | null } | null;
 }
 
 interface AttachmentHistoryViewerProps {
+  canCorrectCompleted?: boolean;
   children: (props: {
-    openAttachment: (attachmentId: string) => void;
+    openAttachment: (attachmentId: string, context?: AttachmentHistoryOpenContext) => void;
     loadingAttachmentId: string | null;
   }) => React.ReactNode;
 }
@@ -27,14 +34,21 @@ interface AttachmentHistoryViewerProps {
 /**
  * Shared component for viewing attachment details from history pages.
  * Fetches attachment data on-demand and opens a read-only modal.
- * Renders children as a function to give the parent control over card layout.
+ * Managers can wrench-enable correction for completed, non-archived tasks.
  */
-export function AttachmentHistoryViewer({ children }: AttachmentHistoryViewerProps) {
+export function AttachmentHistoryViewer({
+  canCorrectCompleted = false,
+  children,
+}: AttachmentHistoryViewerProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [details, setDetails] = useState<AttachmentDetails | null>(null);
+  const [openTask, setOpenTask] = useState<AttachmentHistoryOpenContext['task']>(null);
 
-  const openAttachment = useCallback(async (attachmentId: string) => {
+  const openAttachment = useCallback(async (
+    attachmentId: string,
+    context?: AttachmentHistoryOpenContext,
+  ) => {
     setLoadingId(attachmentId);
     try {
       const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}`, {
@@ -50,12 +64,14 @@ export function AttachmentHistoryViewer({ children }: AttachmentHistoryViewerPro
         throw new Error('Attachment has no V2 schema snapshot');
       }
 
+      setOpenTask(context?.task ?? null);
       setDetails({
         id: attachment.id,
         status: attachment.status,
         templateName: attachment.workshop_attachment_templates?.name || 'Attachment',
         snapshot: attachment.schema_snapshot,
         responses: attachment.field_responses || [],
+        preimageHash: attachment.preimageHash,
       });
       setModalOpen(true);
     } catch (err) {
@@ -65,6 +81,32 @@ export function AttachmentHistoryViewer({ children }: AttachmentHistoryViewerPro
       setLoadingId(null);
     }
   }, []);
+
+  const handleCorrect = async (responses: AttachmentSchemaResponse[], reason: string) => {
+    if (!details?.preimageHash) {
+      toast.error('Refresh the attachment before correcting it.');
+      throw new Error('Missing attachment preimage hash');
+    }
+    const response = await fetch(`/api/workshop-tasks/attachments/${details.id}/correct-responses`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        responses,
+        reason,
+        expectedPreimageHash: details.preimageHash,
+      }),
+    });
+    const data = await response.json().catch(() => ({})) as { error?: string };
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to correct attachment responses');
+    }
+  };
+
+  const canEnableCorrection = canEnableAttachmentCorrection({
+    canCorrectCompleted,
+    task: openTask,
+    attachmentStatus: details?.status,
+  });
 
   return (
     <>
@@ -81,6 +123,8 @@ export function AttachmentHistoryViewer({ children }: AttachmentHistoryViewerPro
           readOnly
           isCompleted={details.status === 'completed'}
           attachmentId={details.id}
+          canEnableCorrection={canEnableCorrection}
+          onCorrect={canEnableCorrection ? handleCorrect : undefined}
         />
       )}
     </>

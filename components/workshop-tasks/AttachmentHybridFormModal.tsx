@@ -14,7 +14,7 @@ import { TabletActionBar } from '@/components/ui/tablet-action-bar';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { useWorkshopDraftPersistence } from '@/lib/hooks/useWorkshopDraftPersistence';
-import { Download, Loader2, X } from 'lucide-react';
+import { Download, Loader2, Wrench, X } from 'lucide-react';
 import type {
   AttachmentSchemaField,
   AttachmentSchemaResponse,
@@ -38,7 +38,8 @@ interface AttachmentHybridFormModalProps {
   onActiveSectionChange?: (sectionKey: string) => void;
   onScrollPositionChange?: (scrollTop: number) => void;
   onSave: (responses: AttachmentSchemaResponse[], markComplete: boolean) => Promise<void>;
-  correctionMode?: boolean;
+  canEnableCorrection?: boolean;
+  initialCorrectionEnabled?: boolean;
   onCorrect?: (responses: AttachmentSchemaResponse[], reason: string) => Promise<void>;
   canUndoComplete?: boolean;
   undoCompleteLabel?: string | null;
@@ -284,7 +285,8 @@ export function AttachmentHybridFormModal({
   onActiveSectionChange,
   onScrollPositionChange,
   onSave,
-  correctionMode = false,
+  canEnableCorrection = false,
+  initialCorrectionEnabled = false,
   onCorrect,
   canUndoComplete = false,
   undoCompleteLabel = null,
@@ -300,6 +302,7 @@ export function AttachmentHybridFormModal({
   const [guidedMode, setGuidedMode] = useState(false);
   const [saving, setSaving] = useState(false);
   const [correctionComment, setCorrectionComment] = useState('');
+  const [correctionEnabled, setCorrectionEnabled] = useState(false);
   const [responses, setResponses] = useState<Record<string, LocalResponseValue>>({});
   const [activeSignatureKey, setActiveSignatureKey] = useState<string | null>(null);
   const [signatureNames, setSignatureNames] = useState<Record<string, string>>({});
@@ -307,6 +310,7 @@ export function AttachmentHybridFormModal({
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const initializedSessionKeyRef = useRef<string | null>(null);
   const restoredScrollSessionKeyRef = useRef<string | null>(null);
+  const correctionSessionKeyRef = useRef<string | null>(null);
   const mainScrollAreaRef = useRef<HTMLDivElement | null>(null);
   const formSessionKey = `${attachmentId || 'new-attachment'}:${snapshot.id}:${snapshot.template_version_id}`;
 
@@ -331,6 +335,19 @@ export function AttachmentHybridFormModal({
     setSignatureNames(initialResponseState.signatureNames);
     setInitialResponsesFingerprint(initialResponseState.fingerprint);
   }, [existingResponses, formSessionKey, initialActiveSectionKey, open, sections]);
+
+  useEffect(() => {
+    if (!open) {
+      correctionSessionKeyRef.current = null;
+      setCorrectionEnabled(false);
+      setCorrectionComment('');
+      return;
+    }
+    if (correctionSessionKeyRef.current === formSessionKey) return;
+    correctionSessionKeyRef.current = formSessionKey;
+    setCorrectionEnabled(Boolean(canEnableCorrection && initialCorrectionEnabled));
+    setCorrectionComment('');
+  }, [canEnableCorrection, formSessionKey, initialCorrectionEnabled, open]);
 
   useEffect(() => {
     if (!open || !activeSectionKey) return;
@@ -377,6 +394,28 @@ export function AttachmentHybridFormModal({
       && getResponsesFingerprint(responses) !== initialResponsesFingerprint,
     [initialResponsesFingerprint, responses],
   );
+  const fieldsLocked = readOnly && !correctionEnabled;
+
+  function resetLocalResponses() {
+    const initialResponseState = getInitialResponseState(existingResponses);
+    setResponses(initialResponseState.responses);
+    setSignatureNames(initialResponseState.signatureNames);
+    setInitialResponsesFingerprint(initialResponseState.fingerprint);
+    setCorrectionComment('');
+    setActiveSignatureKey(null);
+  }
+
+  function handleToggleCorrection() {
+    if (correctionEnabled) {
+      if (isDirty) {
+        resetLocalResponses();
+      }
+      setCorrectionEnabled(false);
+      setCorrectionComment('');
+      return;
+    }
+    setCorrectionEnabled(true);
+  }
   const { clearDraft } = useWorkshopDraftPersistence({
     enabled: open && !readOnly && !isCompleted && Boolean(attachmentId),
     draftId: `workshop-attachment:${attachmentId || 'none'}`,
@@ -503,7 +542,7 @@ export function AttachmentHybridFormModal({
   }
 
   async function handleCorrect() {
-    if (!onCorrect || saving) return;
+    if (!onCorrect || saving || !correctionEnabled) return;
     if (correctionComment.trim().length < 10) {
       toast.error('Correction comment must be at least 10 characters');
       return;
@@ -600,7 +639,7 @@ export function AttachmentHybridFormModal({
                   type="button"
                   variant="outline"
                   onClick={() => setFieldResponse(section.section_key, field, option.value)}
-                  disabled={readOnly}
+                  disabled={fieldsLocked}
                   aria-pressed={isSelected}
                   className={getChoiceButtonClasses(option.tone, isSelected, tabletModeEnabled)}
                 >
@@ -620,7 +659,7 @@ export function AttachmentHybridFormModal({
                 value={noteValue}
                 onChange={(event) => setFieldResponseJson(section.section_key, field, { note: event.target.value })}
                 placeholder="Add details for this item"
-                disabled={readOnly}
+                disabled={fieldsLocked}
                 rows={3}
               />
             </div>
@@ -646,7 +685,7 @@ export function AttachmentHybridFormModal({
                   type="button"
                   variant="outline"
                   onClick={() => setFieldResponse(section.section_key, field, option.value)}
-                  disabled={readOnly}
+                  disabled={fieldsLocked}
                   aria-pressed={isSelected}
                   className={getChoiceButtonClasses(option.tone, isSelected, tabletModeEnabled)}
                 >
@@ -678,7 +717,7 @@ export function AttachmentHybridFormModal({
               setFieldResponseJson(section.section_key, field, { signed_by_name: value });
             }}
             placeholder="Signer name"
-            disabled={readOnly}
+            disabled={fieldsLocked}
             className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}
           />
           {signatureDataUrl && (
@@ -696,7 +735,7 @@ export function AttachmentHybridFormModal({
               </p>
             </div>
           )}
-          {!readOnly && (
+          {!fieldsLocked && (
             <>
               {!isPadOpen && (
                 <Button variant="outline" type="button" onClick={() => setActiveSignatureKey(key)}>
@@ -741,7 +780,7 @@ export function AttachmentHybridFormModal({
             id={key}
             value={responseValue}
             onChange={(event) => setFieldResponse(section.section_key, field, event.target.value)}
-            disabled={readOnly}
+            disabled={fieldsLocked}
             rows={3}
           />
         </div>
@@ -761,7 +800,7 @@ export function AttachmentHybridFormModal({
             type="number"
             value={responseValue}
             onChange={(event) => setFieldResponse(section.section_key, field, event.target.value)}
-            disabled={readOnly}
+            disabled={fieldsLocked}
             className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}
           />
         </div>
@@ -781,7 +820,7 @@ export function AttachmentHybridFormModal({
             type="date"
             value={responseValue}
             onChange={(event) => setFieldResponse(section.section_key, field, event.target.value)}
-            disabled={readOnly}
+            disabled={fieldsLocked}
             className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}
           />
         </div>
@@ -799,7 +838,7 @@ export function AttachmentHybridFormModal({
           id={key}
           value={responseValue}
           onChange={(event) => setFieldResponse(section.section_key, field, event.target.value)}
-          disabled={readOnly}
+          disabled={fieldsLocked}
           className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}
         />
       </div>
@@ -854,6 +893,23 @@ export function AttachmentHybridFormModal({
               </DialogDescription>
             </DialogHeader>
             <div className="mt-1 flex items-center gap-2 shrink-0">
+              {canEnableCorrection ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={handleToggleCorrection}
+                  disabled={saving || undoingComplete}
+                  aria-pressed={correctionEnabled}
+                  title="Correct attachment"
+                  aria-label="Correct attachment"
+                  className={`h-8 w-8 border-amber-600/50 p-0 text-amber-700 hover:bg-amber-50 hover:text-amber-800 dark:text-amber-300 dark:hover:bg-amber-900/30 dark:hover:text-amber-100 ${
+                    tabletModeEnabled ? 'min-h-11 min-w-11' : ''
+                  } ${correctionEnabled ? 'bg-amber-50 dark:bg-amber-900/30' : ''}`}
+                >
+                  <Wrench className="h-4 w-4" />
+                </Button>
+              ) : null}
               {attachmentId && (
                 <Button
                   type="button"
@@ -883,7 +939,7 @@ export function AttachmentHybridFormModal({
               </Button>
             </div>
           </div>
-          {!readOnly && (
+          {!fieldsLocked && (
             <div className="mt-3 pt-3 border-t border-border/60 flex items-center gap-3">
               <Switch
                 checked={guidedMode}
@@ -896,7 +952,7 @@ export function AttachmentHybridFormModal({
               </Label>
             </div>
           )}
-          {readOnly && (
+          {fieldsLocked && (
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className={isCompleted ? 'bg-green-600 text-white' : ''}>
                 {isCompleted ? 'Completed' : 'Read Only'}
@@ -956,7 +1012,7 @@ export function AttachmentHybridFormModal({
                         <p className="text-sm text-muted-foreground mt-1">{activeSection.description}</p>
                       )}
                     </div>
-                    {!readOnly && guidedMode && (
+                    {!fieldsLocked && guidedMode && (
                       <Button
                         type="button"
                         variant="outline"
@@ -988,22 +1044,20 @@ export function AttachmentHybridFormModal({
           </main>
         </div>
 
-        {!readOnly && (
+        {correctionEnabled ? (
           <>
-            {correctionMode ? (
-              <div className="px-5 space-y-2">
-                <Label htmlFor="attachment-correction-reason" className="text-foreground">
-                  Correction comment
-                </Label>
-                <Textarea
-                  id="attachment-correction-reason"
-                  value={correctionComment}
-                  onChange={(event) => setCorrectionComment(event.target.value)}
-                  placeholder="Explain why this attachment is being corrected (min 10 characters)"
-                  rows={3}
-                />
-              </div>
-            ) : null}
+            <div className="px-5 space-y-2">
+              <Label htmlFor="attachment-correction-reason" className="text-foreground">
+                Correction comment
+              </Label>
+              <Textarea
+                id="attachment-correction-reason"
+                value={correctionComment}
+                onChange={(event) => setCorrectionComment(event.target.value)}
+                placeholder="Explain why this attachment is being corrected (min 10 characters)"
+                rows={3}
+              />
+            </div>
             {tabletModeEnabled ? (
               <div className="px-5 pb-4">
                 <TabletActionBar
@@ -1015,18 +1069,16 @@ export function AttachmentHybridFormModal({
                     variant: 'outline',
                   }}
                   secondaryAction={{
-                    label: correctionMode ? (isDirty ? 'Discard Changes' : 'Close') : (saving ? 'Saving...' : 'Save Draft'),
-                    onClick: correctionMode ? discardDraftAndClose : () => { void handleSave(false); },
+                    label: isDirty ? 'Discard Changes' : 'Close',
+                    onClick: discardDraftAndClose,
                     disabled: saving,
                     variant: 'secondary',
                   }}
                   primaryAction={{
-                    label: saving ? 'Saving...' : correctionMode ? 'Save correction' : 'Complete Attachment',
-                    onClick: () => { void (correctionMode ? handleCorrect() : handleSave(true)); },
+                    label: saving ? 'Saving...' : 'Save correction',
+                    onClick: () => { void handleCorrect(); },
                     disabled: saving,
-                    className: correctionMode
-                      ? 'bg-workshop hover:bg-workshop-dark text-white'
-                      : 'bg-green-600 hover:bg-green-700 text-white',
+                    className: 'bg-workshop hover:bg-workshop-dark text-white',
                   }}
                 />
               </div>
@@ -1035,11 +1087,6 @@ export function AttachmentHybridFormModal({
                 <Button variant="outline" onClick={discardDraftAndClose} disabled={saving}>
                   {isDirty ? 'Discard Changes' : 'Cancel'}
                 </Button>
-                {!correctionMode ? (
-                <Button variant="outline" onClick={() => { void handleSave(false); }} disabled={saving}>
-                  {saving ? 'Saving...' : 'Save Draft'}
-                </Button>
-                ) : null}
                 <Button
                   variant="outline"
                   onClick={() => navigateSection('previous')}
@@ -1056,21 +1103,69 @@ export function AttachmentHybridFormModal({
                 >
                   Next Section
                 </Button>
-                {correctionMode ? (
-                  <Button className="bg-workshop hover:bg-workshop-dark text-white" onClick={() => { void handleCorrect(); }} disabled={saving}>
-                    {saving ? 'Saving...' : 'Save correction'}
-                  </Button>
-                ) : (
-                  <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => { void handleSave(true); }} disabled={saving}>
-                    {saving ? 'Saving...' : 'Complete Attachment'}
-                  </Button>
-                )}
+                <Button className="bg-workshop hover:bg-workshop-dark text-white" onClick={() => { void handleCorrect(); }} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save correction'}
+                </Button>
               </DialogFooter>
             )}
           </>
-        )}
-
-        {readOnly && (
+        ) : !readOnly ? (
+          <>
+            {tabletModeEnabled ? (
+              <div className="px-5 pb-4">
+                <TabletActionBar
+                  statusText={`${completedRequired}/${totalRequired} required complete`}
+                  tertiaryAction={{
+                    label: isDirty ? 'Discard Changes' : 'Close',
+                    onClick: discardDraftAndClose,
+                    disabled: saving,
+                    variant: 'outline',
+                  }}
+                  secondaryAction={{
+                    label: saving ? 'Saving...' : 'Save Draft',
+                    onClick: () => { void handleSave(false); },
+                    disabled: saving,
+                    variant: 'secondary',
+                  }}
+                  primaryAction={{
+                    label: saving ? 'Saving...' : 'Complete Attachment',
+                    onClick: () => { void handleSave(true); },
+                    disabled: saving,
+                    className: 'bg-green-600 hover:bg-green-700 text-white',
+                  }}
+                />
+              </div>
+            ) : (
+              <DialogFooter className="px-5 py-4 border-t border-border">
+                <Button variant="outline" onClick={discardDraftAndClose} disabled={saving}>
+                  {isDirty ? 'Discard Changes' : 'Cancel'}
+                </Button>
+                <Button variant="outline" onClick={() => { void handleSave(false); }} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Draft'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigateSection('previous')}
+                  disabled={saving}
+                  className="border-workshop/40 bg-workshop/10 text-workshop hover:bg-workshop/20"
+                >
+                  Previous Section
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => navigateSection('next')}
+                  disabled={saving}
+                  className="border-workshop/40 bg-workshop/10 text-workshop hover:bg-workshop/20"
+                >
+                  Next Section
+                </Button>
+                <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => { void handleSave(true); }} disabled={saving}>
+                  {saving ? 'Saving...' : 'Complete Attachment'}
+                </Button>
+              </DialogFooter>
+            )}
+          </>
+        ) : (
           <DialogFooter className="px-5 py-4 border-t border-border">
             {canUndoComplete && onUndoComplete && (
               <Button

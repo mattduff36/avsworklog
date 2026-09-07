@@ -159,6 +159,7 @@ function shouldLogPlantHistoryFetchError(error: unknown) {
 }
 
 function DocumentsTabContent({ plantId, workshopTasks }: { plantId: string; workshopTasks: WorkshopTask[] }) {
+  const { isManager, isAdmin } = useAuth();
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -243,7 +244,7 @@ function DocumentsTabContent({ plantId, workshopTasks }: { plantId: string; work
   }, {} as Record<string, TaskAttachment[]>);
 
   return (
-    <AttachmentHistoryViewer>
+    <AttachmentHistoryViewer canCorrectCompleted={isManager || isAdmin}>
       {({ openAttachment, loadingAttachmentId }) => (
         <div className="space-y-4">
           {Object.entries(attachmentsByTask).map(([taskId, taskAttachments]) => {
@@ -293,7 +294,7 @@ function DocumentsTabContent({ plantId, workshopTasks }: { plantId: string; work
                           <button
                             type="button"
                             key={attachment.id}
-                            onClick={() => openAttachment(attachment.id)}
+                            onClick={() => openAttachment(attachment.id, { task })}
                             disabled={isLoading}
                             className="relative w-full text-left flex items-center justify-between p-3 rounded-lg bg-slate-700/30 hover:bg-slate-700/50 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                           >

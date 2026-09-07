@@ -26,9 +26,10 @@ import {
   TabletAwareSelectItem,
   TabletAwareSelectTrigger,
 } from '@/components/ui/tablet-mode-controls';
-import { Loader2 } from 'lucide-react';
+import { FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
+import { useTaskAttachments } from '@/lib/hooks/useTaskAttachments';
 import { isArchivedWorkshopTask } from '@/lib/workshop-tasks/archive';
 import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
@@ -49,6 +50,7 @@ interface CorrectTaskDialogProps {
   plantSubcategories: Subcategory[];
   hgvSubcategories: Subcategory[];
   recentVehicleIds?: string[];
+  onCorrectAttachment?: (attachmentId: string) => void;
   getAssetDisplay: (
     asset?: {
       reg_number?: string | null;
@@ -116,8 +118,17 @@ export function CorrectTaskDialog({
   recentVehicleIds = [],
   getAssetDisplay,
   onCorrected,
+  onCorrectAttachment,
 }: CorrectTaskDialogProps) {
   const { tabletModeEnabled } = useTabletMode();
+  const { attachments, loading: loadingAttachments } = useTaskAttachments({
+    taskId: task?.id ?? null,
+    enabled: open && Boolean(task?.id),
+  });
+  const completedAttachments = useMemo(
+    () => attachments.filter((attachment) => attachment.status === 'completed'),
+    [attachments],
+  );
   const isServiceTask = Boolean(task && isServiceWorkshopTask(task));
   const assetType = assetTypeFromTask(task);
   const meter = meterCopy(assetType);
@@ -525,6 +536,26 @@ export function CorrectTaskDialog({
               {comments.length}/300 characters (minimum {WORKSHOP_TASK_COMMENT_MIN_LENGTH})
             </p>
           </div>
+
+          {!loadingAttachments && completedAttachments.length > 0 ? (
+            <div className="space-y-2">
+              <Label className="text-foreground">Correct attachments</Label>
+              <div className="space-y-2">
+                {completedAttachments.map((attachment) => (
+                  <TabletAwareButton
+                    key={attachment.id}
+                    type="button"
+                    variant="outline"
+                    onClick={() => onCorrectAttachment?.(attachment.id)}
+                    className="w-full justify-start border-border text-foreground hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <FileText className="mr-2 h-4 w-4 text-workshop" />
+                    {attachment.workshop_attachment_templates?.name || 'Attachment'}
+                  </TabletAwareButton>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="correct-comment" className="text-foreground">

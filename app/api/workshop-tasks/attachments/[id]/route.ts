@@ -6,6 +6,10 @@ import {
 import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import {
+  canonicalizeAttachmentResponses,
+  hashAttachmentResponses,
+} from '@/lib/workshop-tasks/completed-correction';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -62,6 +66,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         ...attachment,
         schema_snapshot: schemaSnapshot,
         field_responses: fieldResponses,
+        preimageHash: hashAttachmentResponses(canonicalizeAttachmentResponses(fieldResponses)),
       },
     }, {
       headers: NO_STORE_HEADERS,

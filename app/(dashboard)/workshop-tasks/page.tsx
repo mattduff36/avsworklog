@@ -137,6 +137,7 @@ export default function WorkshopTasksPage() {
   const [completingTask, setCompletingTask] = useState<Action | null>(null);
   const [showCorrectServiceModal, setShowCorrectServiceModal] = useState(false);
   const [correctingTask, setCorrectingTask] = useState<Action | null>(null);
+  const [pendingCorrectionAttachmentId, setPendingCorrectionAttachmentId] = useState<string | null>(null);
   const [showOnHoldModal, setShowOnHoldModal] = useState(false);
   const [onHoldingTask, setOnHoldingTask] = useState<Action | null>(null);
   const [onHoldComment, setOnHoldComment] = useState('');
@@ -405,6 +406,7 @@ export default function WorkshopTasksPage() {
     setShowTaskModal(nextOpen);
     if (!nextOpen) {
       setModalTask(null);
+      setPendingCorrectionAttachmentId(null);
       if (requestedTaskId) {
         clearTaskIdFromUrl();
       }
@@ -642,6 +644,16 @@ export default function WorkshopTasksPage() {
           recentVehicleIds={recentVehicleIds}
           getAssetDisplay={getAssetDisplay}
           onCorrected={() => { void refreshTasks(); }}
+          onCorrectAttachment={(attachmentId) => {
+            const task = correctingTask;
+            setShowCorrectServiceModal(false);
+            setCorrectingTask(null);
+            setPendingCorrectionAttachmentId(attachmentId);
+            if (task) {
+              setModalTask(task);
+              setShowTaskModal(true);
+            }
+          }}
         />
       )}
       <WorkshopTaskStatusDialogs userId={user?.id || null} statusTask={selectedTask} showStatusModal={showStatusModal} onShowStatusModalChange={setShowStatusModal} loggedComment={loggedComment} onLoggedCommentChange={setLoggedComment} onCancelStatusModal={() => { setShowStatusModal(false); setSelectedTask(null); setLoggedComment(''); }} onConfirmMarkInProgress={lifecycle.confirmMarkInProgress} showOnHoldModal={showOnHoldModal} onShowOnHoldModalChange={setShowOnHoldModal} onHoldComment={onHoldComment} onOnHoldCommentChange={setOnHoldComment} onCancelOnHoldModal={() => { setShowOnHoldModal(false); setOnHoldingTask(null); setOnHoldComment(''); }} onConfirmMarkOnHold={lifecycle.confirmMarkOnHold} onHoldingTask={onHoldingTask} showResumeModal={showResumeModal} onShowResumeModalChange={setShowResumeModal} resumeComment={resumeComment} onResumeCommentChange={setResumeComment} onCancelResumeModal={() => { setShowResumeModal(false); setResumingTask(null); setResumeComment(''); }} onConfirmResumeTask={lifecycle.confirmResumeTask} resumingTask={resumingTask} updatingStatus={updatingStatus} />
@@ -659,7 +671,7 @@ export default function WorkshopTasksPage() {
         />
       )}
       {(showTaskModal || !!modalTask) && (
-        <WorkshopTaskModal open={showTaskModal} onOpenChange={handleTaskModalOpenChange} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { handleTaskModalOpenChange(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { handleTaskModalOpenChange(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { handleTaskModalOpenChange(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { handleTaskModalOpenChange(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { handleTaskModalOpenChange(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { handleTaskModalOpenChange(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} onOpenWhereabouts={(task) => { setWhereaboutsTask(task as Action); setShowWhereaboutsDialog(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} onTaskUpdated={refreshTasks} canCorrectCompleted={Boolean(showSettings && modalTask && !isArchivedWorkshopTask(modalTask))} onCorrectService={(task) => { handleTaskModalOpenChange(false); setCorrectingTask(task as Action); setShowCorrectServiceModal(true); }} />
+        <WorkshopTaskModal open={showTaskModal} onOpenChange={handleTaskModalOpenChange} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { handleTaskModalOpenChange(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { handleTaskModalOpenChange(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { handleTaskModalOpenChange(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { handleTaskModalOpenChange(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { handleTaskModalOpenChange(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { handleTaskModalOpenChange(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} onOpenWhereabouts={(task) => { setWhereaboutsTask(task as Action); setShowWhereaboutsDialog(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} onTaskUpdated={refreshTasks} canCorrectCompleted={Boolean(showSettings && modalTask && !isArchivedWorkshopTask(modalTask))} onCorrectService={(task) => { handleTaskModalOpenChange(false); setCorrectingTask(task as Action); setShowCorrectServiceModal(true); }} pendingCorrectionAttachmentId={pendingCorrectionAttachmentId} onPendingCorrectionConsumed={() => setPendingCorrectionAttachmentId(null)} />
       )}
       {selectedCategoryForSubcategory && <SubcategoryDialog open={showSubcategoryModal} onOpenChange={setShowSubcategoryModal} mode={subcategoryMode} categoryId={selectedCategoryForSubcategory.id} categoryName={selectedCategoryForSubcategory.name} subcategory={editingSubcategory} onSuccess={fetcher.fetchSubcategories} />}
       {showErrorDetailsModal && (

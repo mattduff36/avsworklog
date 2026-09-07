@@ -85,6 +85,8 @@ interface WorkshopTaskModalProps {
   inspectionPhotos?: InspectionPhoto[];
   canCorrectCompleted?: boolean;
   onCorrectService?: (task: Task) => void;
+  pendingCorrectionAttachmentId?: string | null;
+  onPendingCorrectionConsumed?: () => void;
 }
 
 export function WorkshopTaskModal({
@@ -103,6 +105,8 @@ export function WorkshopTaskModal({
   inspectionPhotos = [],
   canCorrectCompleted = false,
   onCorrectService,
+  pendingCorrectionAttachmentId = null,
+  onPendingCorrectionConsumed,
 }: WorkshopTaskModalProps) {
   const { tabletModeEnabled } = useTabletMode();
   const taskActionButtonClass = tabletModeEnabled ? 'min-h-11 text-base px-4' : '';
@@ -508,6 +512,8 @@ export function WorkshopTaskModal({
             taskId={task.id}
             taskStatus={getTaskStatus(task)}
             canCorrectCompleted={allowCompletedCorrection && task.action_type === 'workshop_vehicle_task'}
+            pendingCorrectionAttachmentId={pendingCorrectionAttachmentId}
+            onPendingCorrectionConsumed={onPendingCorrectionConsumed}
             workshopCategoryId={
               task.workshop_category_id
               || task.workshop_task_categories?.id

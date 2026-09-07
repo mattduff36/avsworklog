@@ -9,6 +9,7 @@ import {
   hashAttachmentResponses,
   timestampsMatch,
 } from '@/lib/workshop-tasks/completed-correction';
+import { canEnableAttachmentCorrection } from '@/lib/workshop-tasks/attachment-correction-access';
 import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
 
 function readRepo(relativePath: string): string {
@@ -178,10 +179,26 @@ describe('completed workshop corrections', () => {
     expect(page).toContain('const { user, profile, isManager, isAdmin } = useAuth()');
     expect(page).toContain('canCorrectCompleted={Boolean(showSettings && modalTask && !isArchivedWorkshopTask(modalTask))}');
     expect(attachments).toContain('canCorrectCompleted && isTaskCompleted');
-    expect(attachments).toContain('correctionMode');
+    expect(attachments).toContain('canEnableCorrection');
+    expect(attachments).toContain('initialCorrectionEnabled');
     expect(attachments).toContain('onCorrect={handleCorrectSchemaResponses}');
-    expect(attachments).not.toContain('Correct attachment');
+    expect(attachments).not.toContain('correctionMode');
     expect(attachments).toContain('handleOpenForm(attachment)');
+    expect(attachments).toContain('pendingCorrectionAttachmentId');
+    expect(readRepo('components/workshop-tasks/CorrectTaskDialog.tsx')).toContain('Correct attachments');
+    expect(readRepo('components/workshop-tasks/CorrectTaskDialog.tsx')).toContain('onCorrectAttachment');
+    expect(page).toContain('pendingCorrectionAttachmentId');
+    expect(page).toContain('onCorrectAttachment');
+    expect(readRepo('components/workshop-tasks/AttachmentHybridFormModal.tsx')).toContain('aria-label="Correct attachment"');
+    expect(readRepo('components/workshop-tasks/AttachmentHistoryViewer.tsx')).toContain('canCorrectCompleted');
+    expect(readRepo('components/workshop-tasks/AttachmentHistoryViewer.tsx')).toContain('canEnableAttachmentCorrection');
+    expect(readRepo('app/(dashboard)/fleet/vans/[vanId]/history/page.tsx')).toContain('openAttachment(attachment.id, { task })');
+    expect(readRepo('app/(dashboard)/fleet/vans/[vanId]/history/page.tsx')).toContain('canCorrectCompleted={isManager || isAdmin}');
+    expect(readRepo('app/(dashboard)/fleet/hgvs/[hgvId]/history/page.tsx')).toContain('openAttachment(attachment.id, { task })');
+    expect(readRepo('app/(dashboard)/fleet/hgvs/[hgvId]/history/page.tsx')).toContain('canCorrectCompleted={isManager || isAdmin}');
+    expect(readRepo('app/(dashboard)/fleet/plant/[plantId]/history/page.tsx')).toContain('openAttachment(attachment.id, { task })');
+    expect(readRepo('app/(dashboard)/fleet/plant/[plantId]/history/page.tsx')).toContain('canCorrectCompleted={isManager || isAdmin}');
+    expect(readRepo('app/api/workshop-tasks/attachments/[id]/route.ts')).toContain('preimageHash');
     expect(readRepo('app/(dashboard)/workshop-tasks/components/WorkshopHistoricalTasksSection.tsx')).toContain('title="Correct Task"');
     expect(readRepo('app/(dashboard)/workshop-tasks/components/WorkshopHistoricalTasksSection.tsx')).not.toContain('Correct details');
     expect(readRepo('components/workshop-tasks/WorkshopTaskModal.tsx')).toContain('aria-label="Correct Task"');
@@ -189,6 +206,37 @@ describe('completed workshop corrections', () => {
     expect(readRepo('lib/providers/auth-provider.tsx')).toContain(
       'const roleForFlags = isViewingAs ? effectiveRole : profile?.role ?? null'
     );
+  });
+
+  it('WT-CORR-ATTACH-003 only unlocks completed non-archived attachments for managers', () => {
+    const completedTask = { status: 'completed', actioned_at: new Date().toISOString() };
+    const archivedTask = { status: 'completed', actioned_at: '2025-01-01T00:00:00.000Z' };
+
+    expect(canEnableAttachmentCorrection({
+      canCorrectCompleted: true,
+      task: completedTask,
+      attachmentStatus: 'completed',
+    })).toBe(true);
+    expect(canEnableAttachmentCorrection({
+      canCorrectCompleted: false,
+      task: completedTask,
+      attachmentStatus: 'completed',
+    })).toBe(false);
+    expect(canEnableAttachmentCorrection({
+      canCorrectCompleted: true,
+      task: { status: 'in_progress', actioned_at: null },
+      attachmentStatus: 'completed',
+    })).toBe(false);
+    expect(canEnableAttachmentCorrection({
+      canCorrectCompleted: true,
+      task: completedTask,
+      attachmentStatus: 'pending',
+    })).toBe(false);
+    expect(canEnableAttachmentCorrection({
+      canCorrectCompleted: true,
+      task: archivedTask,
+      attachmentStatus: 'completed',
+    })).toBe(false);
   });
 
   it('rejects attachment corrections without a long enough reason', () => {

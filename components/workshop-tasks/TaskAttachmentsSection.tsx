@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,8 @@ interface TaskAttachmentsSectionProps {
   workshopCategoryId?: string | null;
   onUpdate?: () => void;
   canCorrectCompleted?: boolean;
+  pendingCorrectionAttachmentId?: string | null;
+  onPendingCorrectionConsumed?: () => void;
 }
 
 export function TaskAttachmentsSection({
@@ -32,6 +34,8 @@ export function TaskAttachmentsSection({
   workshopCategoryId = null,
   onUpdate,
   canCorrectCompleted = false,
+  pendingCorrectionAttachmentId = null,
+  onPendingCorrectionConsumed,
 }: TaskAttachmentsSectionProps) {
   const { attachments, loading, addAttachment, saveSchemaResponses, correctSchemaResponses, undoCompleteAttachment } = useTaskAttachments({ taskId });
   const { templates } = useAttachmentTemplates();
@@ -45,6 +49,8 @@ export function TaskAttachmentsSection({
   const [undoingAttachmentId, setUndoingAttachmentId] = useState<string | null>(null);
   const [activeSectionKeyByAttachmentId, setActiveSectionKeyByAttachmentId] = useState<Record<string, string>>({});
   const [scrollTopByAttachmentId, setScrollTopByAttachmentId] = useState<Record<string, number>>({});
+  const [forcedCorrectionAttachmentId, setForcedCorrectionAttachmentId] = useState<string | null>(null);
+  const attachmentsFetchStartedRef = useRef(false);
 
   const isTaskCompleted = taskStatus === 'completed';
   const activeAttachment = useMemo(
@@ -130,8 +136,36 @@ export function TaskAttachmentsSection({
     setShowForm(open);
     if (!open) {
       setActiveAttachmentId(null);
+      setForcedCorrectionAttachmentId(null);
     }
   };
+
+  useEffect(() => {
+    if (loading) {
+      attachmentsFetchStartedRef.current = true;
+    }
+  }, [loading]);
+
+  useEffect(() => {
+    if (!pendingCorrectionAttachmentId || loading || !attachmentsFetchStartedRef.current) return;
+
+    const found = attachments.find((attachment) => attachment.id === pendingCorrectionAttachmentId);
+    if (!found) {
+      toast.error('That attachment is no longer available.');
+      onPendingCorrectionConsumed?.();
+      return;
+    }
+    if (!found.schema_snapshot?.snapshot_json?.sections?.length) {
+      toast.error('This attachment is missing a V2 schema snapshot.');
+      onPendingCorrectionConsumed?.();
+      return;
+    }
+
+    setActiveAttachmentId(found.id);
+    setForcedCorrectionAttachmentId(found.id);
+    setShowForm(true);
+    onPendingCorrectionConsumed?.();
+  }, [attachments, loading, onPendingCorrectionConsumed, pendingCorrectionAttachmentId]);
 
   const handleActiveSectionChange = useCallback((sectionKey: string) => {
     if (!activeAttachmentId) return;
@@ -441,11 +475,12 @@ export function TaskAttachmentsSection({
               snapshot={activeAttachment.schema_snapshot}
               existingResponses={activeAttachment.field_responses || []}
               onSave={handleSaveSchemaResponses}
-              readOnly={
-                (isTaskCompleted || activeAttachment.status === 'completed')
-                && !(canCorrectCompleted && isTaskCompleted && activeAttachment.status === 'completed')
+              readOnly={isTaskCompleted || activeAttachment.status === 'completed'}
+              canEnableCorrection={canCorrectCompleted && isTaskCompleted && activeAttachment.status === 'completed'}
+              initialCorrectionEnabled={
+                pendingCorrectionAttachmentId === activeAttachment.id
+                || forcedCorrectionAttachmentId === activeAttachment.id
               }
-              correctionMode={canCorrectCompleted && isTaskCompleted && activeAttachment.status === 'completed'}
               onCorrect={handleCorrectSchemaResponses}
               isCompleted={activeAttachment.status === 'completed'}
               attachmentId={activeAttachment.id}

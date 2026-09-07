@@ -547,4 +547,83 @@ describe('AttachmentHybridFormModal', () => {
       configurable: true,
     });
   });
+
+  it('WT-CORR-ATTACH-001 keeps completed attachments locked until the wrench is used', async () => {
+    render(
+      <TabletModeProvider>
+        <AttachmentHybridFormModal
+          open
+          onOpenChange={vi.fn()}
+          templateName="6 Week Inspection - HGV"
+          snapshot={snapshot}
+          existingResponses={existingInspectionResponses}
+          attachmentId="attachment-locked"
+          readOnly
+          isCompleted
+          canEnableCorrection
+          onSave={vi.fn(async () => undefined)}
+          onCorrect={vi.fn(async () => undefined)}
+        />
+      </TabletModeProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Correct attachment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pass' })).toBeDisabled();
+    expect(screen.queryByLabelText('Correction comment')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save correction' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Close' }).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Correct attachment' }));
+
+    expect(screen.getByLabelText('Correction comment')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pass' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save correction' })).toBeInTheDocument();
+  });
+
+  it('WT-CORR-ATTACH-002 opens already unlocked when initialCorrectionEnabled is set', () => {
+    render(
+      <TabletModeProvider>
+        <AttachmentHybridFormModal
+          open
+          onOpenChange={vi.fn()}
+          templateName="6 Week Inspection - HGV"
+          snapshot={snapshot}
+          existingResponses={existingInspectionResponses}
+          attachmentId="attachment-deeplink"
+          readOnly
+          isCompleted
+          canEnableCorrection
+          initialCorrectionEnabled
+          onSave={vi.fn(async () => undefined)}
+          onCorrect={vi.fn(async () => undefined)}
+        />
+      </TabletModeProvider>,
+    );
+
+    expect(screen.getByLabelText('Correction comment')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save correction' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pass' })).toBeEnabled();
+  });
+
+  it('hides the correction wrench from employees', () => {
+    render(
+      <TabletModeProvider>
+        <AttachmentHybridFormModal
+          open
+          onOpenChange={vi.fn()}
+          templateName="6 Week Inspection - HGV"
+          snapshot={snapshot}
+          existingResponses={existingInspectionResponses}
+          attachmentId="attachment-employee"
+          readOnly
+          isCompleted
+          onSave={vi.fn(async () => undefined)}
+        />
+      </TabletModeProvider>,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Correct attachment' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Pass' })).toBeDisabled();
+    expect(screen.getAllByRole('button', { name: 'Close' }).length).toBeGreaterThan(0);
+  });
 });
