@@ -215,11 +215,9 @@ describe('bank holiday self-override confirm', () => {
     expect(client.statements.some((sql) => sql.includes('UPDATE public.absences'))).toBe(true);
     expect(client.statements.some((sql) => sql.includes('timesheet_bank_holiday_work_confirmations'))).toBe(true);
     expect(client.statements.at(-1)).toContain('COMMIT');
-  });
 
-  it('BH-TRIAL-OVERRIDE-001 rejects standard annual leave', async () => {
-    const client = new ConfirmClient();
-    client.absences = [
+    const leaveClient = new ConfirmClient();
+    leaveClient.absences = [
       {
         id: ABSENCE_ID,
         date: BANK_HOLIDAY_DATE,
@@ -241,11 +239,11 @@ describe('bank holiday self-override confirm', () => {
           dates: [BANK_HOLIDAY_DATE],
           phrase: 'BANK HOLIDAY',
         },
-        createClient: () => client,
+        createClient: () => leaveClient,
       })
     ).rejects.toBeInstanceOf(TimesheetBankHolidayWorkError);
-    expect(client.statements.some((sql) => sql.includes('UPDATE public.absences'))).toBe(false);
-    expect(client.statements.some((sql) => sql.includes('ROLLBACK'))).toBe(true);
+    expect(leaveClient.statements.some((sql) => sql.includes('UPDATE public.absences'))).toBe(false);
+    expect(leaveClient.statements.some((sql) => sql.includes('ROLLBACK'))).toBe(true);
   });
 
   it('BH-TRIAL-OFF-001 fails closed when the trial is disabled', async () => {
@@ -294,11 +292,9 @@ describe('bank holiday submit fail-closed', () => {
     expect(client).toBeInstanceOf(Object);
     expect(client.statements.some((sql) => sql.includes('INSERT INTO public.timesheet_entries'))).toBe(false);
     expect(client.statements.some((sql) => sql.includes('ROLLBACK'))).toBe(true);
-  });
 
-  it('BH-TRIAL-SUBMIT-001 allows submit after the date is confirmed', async () => {
-    const client = new SubmitClient();
-    client.absences = [
+    const confirmedClient = new SubmitClient();
+    confirmedClient.absences = [
       {
         id: ABSENCE_ID,
         date: BANK_HOLIDAY_DATE,
@@ -309,15 +305,15 @@ describe('bank holiday submit fail-closed', () => {
         reason_name: 'Annual Leave',
       },
     ];
-    client.confirmedDates = [BANK_HOLIDAY_DATE];
+    confirmedClient.confirmedDates = [BANK_HOLIDAY_DATE];
 
     const result = await applyTimesheetSubmit({
       body: submitBody({ timesheetId: TIMESHEET_ID }),
-      createClient: () => client,
+      createClient: () => confirmedClient,
     });
     expect(result.status).toBe('submitted');
-    expect(client.statements.some((sql) => sql.includes('INSERT INTO public.timesheet_entries'))).toBe(true);
-    expect(client.statements.at(-1)).toContain('COMMIT');
+    expect(confirmedClient.statements.some((sql) => sql.includes('INSERT INTO public.timesheet_entries'))).toBe(true);
+    expect(confirmedClient.statements.at(-1)).toContain('COMMIT');
   });
 });
 
