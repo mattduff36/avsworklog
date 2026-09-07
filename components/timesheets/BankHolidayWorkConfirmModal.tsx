@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -43,10 +43,6 @@ export function BankHolidayWorkConfirmModal({
   onConfirm,
 }: BankHolidayWorkConfirmModalProps) {
   const [phrase, setPhrase] = useState('');
-
-  useEffect(() => {
-    if (open) setPhrase('');
-  }, [open]);
 
   const canConfirm = isBankHolidayConfirmPhrase(phrase) && !confirming;
 

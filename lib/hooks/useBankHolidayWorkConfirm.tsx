@@ -176,6 +176,7 @@ export function useBankHolidayWorkConfirm(options: UseBankHolidayWorkConfirmOpti
 
   const modal = (
     <BankHolidayWorkConfirmModal
+      key={open ? pendingDates.join(',') : 'closed'}
       open={open}
       dates={pendingDates}
       confirming={confirming}

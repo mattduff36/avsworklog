@@ -9,7 +9,6 @@ import {
 import {
   applyTimesheetSubmit,
   TimesheetSubmitBodySchema,
-  TimesheetSubmitError,
   type TimesheetSubmitBody,
   type TimesheetSubmitPgClient,
 } from '@/lib/server/timesheet-submit';
