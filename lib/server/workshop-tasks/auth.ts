@@ -2,7 +2,7 @@ import {
   validateAppSession,
   type AppSessionValidationResult,
 } from '@/lib/server/app-auth/session';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleAccessModule, isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
 
 export type WorkshopTasksAccess =
   | { ok: true; userId: string; validation: AppSessionValidationResult }
@@ -23,4 +23,19 @@ export async function requireWorkshopTasksAccess(): Promise<WorkshopTasksAccess>
   }
 
   return { ok: true, userId: validation.profileId, validation };
+}
+
+export async function requireWorkshopTasksManagerAccess(): Promise<WorkshopTasksAccess> {
+  const access = await requireWorkshopTasksAccess();
+  if (!access.ok) return access;
+
+  const isManager = await isEffectiveRoleManagerOrHigher({
+    userId: access.userId,
+    email: access.validation.email,
+  });
+  if (!isManager) {
+    return { ok: false, status: 403, validation: access.validation };
+  }
+
+  return access;
 }

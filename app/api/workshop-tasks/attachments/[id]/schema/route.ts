@@ -8,6 +8,10 @@ import { createClient } from '@/lib/supabase/server';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { validateRequiredSchemaResponses } from '@/lib/workshop-attachments/schema-validation';
 import type { AttachmentSchemaSection } from '@/types/workshop-attachments-v2';
+import {
+  canonicalizeAttachmentResponses,
+  hashAttachmentResponses,
+} from '@/lib/workshop-tasks/completed-correction';
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -69,11 +73,23 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       getAdminFieldResponsesForAttachment(attachmentId),
     ]);
 
+    const preimageHash = hashAttachmentResponses(
+      canonicalizeAttachmentResponses(
+        ((responses || []) as Array<{
+          section_key?: string | null;
+          field_key?: string | null;
+          response_value?: string | null;
+          response_json?: Record<string, unknown> | null;
+        }>)
+      )
+    );
+
     return NextResponse.json({
       success: true,
       attachment,
       snapshot,
       responses,
+      preimageHash,
     }, {
       headers: NO_STORE_HEADERS,
     });
@@ -117,7 +133,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     const { data: attachment, error: attachmentError } = await db
       .from('workshop_task_attachments')
-      .select('id, status')
+      .select('id, status, task_id')
       .eq('id', attachmentId)
       .single();
 
@@ -125,8 +141,15 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
     }
 
-    const typedAttachment = attachment as AttachmentStatusRow;
-    if (typedAttachment.status === 'completed') {
+    const typedAttachment = attachment as AttachmentStatusRow & { task_id?: string | null };
+    const { data: parentTask } = typedAttachment.task_id
+      ? await db
+          .from('actions')
+          .select('id, status')
+          .eq('id', typedAttachment.task_id)
+          .single()
+      : { data: null };
+    if (typedAttachment.status === 'completed' || parentTask?.status === 'completed') {
       return NextResponse.json(
         { error: 'Attachment is completed and cannot be modified.' },
         { status: 409 },

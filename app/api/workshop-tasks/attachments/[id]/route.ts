@@ -108,6 +108,35 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    const { data: attachment, error: attachmentLookupError } = await db
+      .from('workshop_task_attachments')
+      .select('id, task_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (attachmentLookupError) {
+      throw attachmentLookupError;
+    }
+    if (!attachment) {
+      return NextResponse.json({ error: 'Attachment not found' }, { status: 404 });
+    }
+
+    const { data: parentTask, error: parentTaskError } = await db
+      .from('actions')
+      .select('status')
+      .eq('id', (attachment as { task_id: string }).task_id)
+      .maybeSingle();
+
+    if (parentTaskError) {
+      throw parentTaskError;
+    }
+    if ((parentTask as { status?: string } | null)?.status === 'completed') {
+      return NextResponse.json(
+        { error: 'Attachments cannot be removed from a completed task' },
+        { status: 409 }
+      );
+    }
+
     const { error: deleteError } = await db
       .from('workshop_task_attachments')
       .delete()

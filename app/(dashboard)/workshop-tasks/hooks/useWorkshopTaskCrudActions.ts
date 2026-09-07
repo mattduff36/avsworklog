@@ -32,6 +32,7 @@ interface UseWorkshopTaskCrudActionsParams {
   editComments: string;
   editMileage: string;
   editCurrentMileage: number | null;
+  editCorrectionReason: string;
   initialEditCategoryId: string;
   initialEditHadSubcategory: boolean;
   taskToDelete: Action | null;
@@ -56,6 +57,7 @@ interface UseWorkshopTaskCrudActionsParams {
   setEditComments: (value: string) => void;
   setEditMileage: (value: string) => void;
   setEditCurrentMileage: (value: number | null) => void;
+  setEditCorrectionReason: (value: string) => void;
   setInitialEditCategoryId: (value: string) => void;
   setInitialEditHadSubcategory: (value: boolean) => void;
   setShowDeleteConfirm: (open: boolean) => void;
@@ -114,6 +116,7 @@ export function useWorkshopTaskCrudActions({
   editComments,
   editMileage,
   editCurrentMileage,
+  editCorrectionReason,
   initialEditCategoryId,
   initialEditHadSubcategory,
   taskToDelete,
@@ -138,6 +141,7 @@ export function useWorkshopTaskCrudActions({
   setEditComments,
   setEditMileage,
   setEditCurrentMileage,
+  setEditCorrectionReason,
   setInitialEditCategoryId,
   setInitialEditHadSubcategory,
   setShowDeleteConfirm,
@@ -305,7 +309,8 @@ export function useWorkshopTaskCrudActions({
     setEditCategoryId(resolvedCategoryId);
     setEditSubcategoryId(task.workshop_subcategory_id || '');
     setEditComments(task.workshop_comments || '');
-    setEditMileage('');
+    setEditMileage(task.asset_meter_reading != null ? String(task.asset_meter_reading) : '');
+    setEditCorrectionReason('');
     setInitialEditCategoryId(resolvedCategoryId);
     setInitialEditHadSubcategory(!!task.workshop_subcategory_id);
 
@@ -373,6 +378,7 @@ export function useWorkshopTaskCrudActions({
     setEditComments('');
     setEditMileage('');
     setEditCurrentMileage(null);
+    setEditCorrectionReason('');
     setInitialEditCategoryId('');
     setInitialEditHadSubcategory(false);
   };
@@ -380,6 +386,64 @@ export function useWorkshopTaskCrudActions({
   const handleSaveEdit = async () => {
     if (!userId) {
       toast.error('You must be logged in to edit tasks');
+      return;
+    }
+
+    if (editingTask?.status === 'completed') {
+      if (editCorrectionReason.trim().length < 10) {
+        toast.error('Correction comment must be at least 10 characters');
+        return;
+      }
+      if (editComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
+        toast.error(`Comments must be at least ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters`);
+        return;
+      }
+
+      const categoryName =
+        editingTask.workshop_task_categories?.name ||
+        editingTask.workshop_task_subcategories?.workshop_task_categories?.name ||
+        '';
+      const isServiceTask = /^service(\s|\(|$)/i.test(categoryName);
+      const mileageValue = parseInt(editMileage, 10);
+      const selectedVehicle = vehicles.find(v => v.id === editVehicleId);
+      const payload: Record<string, unknown> = {
+        reason: editCorrectionReason.trim(),
+        expectedUpdatedAt: editingTask.updated_at,
+        workshop_comments: editComments.trim(),
+      };
+      if (!isServiceTask) {
+        if (!Number.isFinite(mileageValue) || mileageValue < 0) {
+          toast.error('Please enter a valid meter reading');
+          return;
+        }
+        payload.meter_reading = mileageValue;
+        if (selectedVehicle?.asset_type === 'van' || selectedVehicle?.asset_type === 'hgv' || selectedVehicle?.asset_type === 'plant') {
+          payload.vehicle_id = editVehicleId;
+          payload.asset_type = selectedVehicle.asset_type;
+        }
+        payload.workshop_category_id = editCategoryId || null;
+        payload.workshop_subcategory_id = editSubcategoryId || null;
+      }
+
+      try {
+        setSubmitting(true);
+        const response = await fetch(`/api/workshop-tasks/tasks/${editingTask.id}/correct-completed`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({})) as { error?: string };
+        if (!response.ok) {
+          throw new Error(data.error || 'Failed to correct completed task');
+        }
+        toast.success('Completed task corrected');
+        resetEditForm();
+        await fetchTasks();
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to correct completed task');
+      } finally {
+        setSubmitting(false);
+      }
       return;
     }
 
@@ -721,6 +785,18 @@ export function useWorkshopTaskCrudActions({
   };
 
   const isSaveEditDisabled = (() => {
+    if (editingTask?.status === 'completed') {
+      const categoryName =
+        editingTask.workshop_task_categories?.name ||
+        editingTask.workshop_task_subcategories?.workshop_task_categories?.name ||
+        '';
+      const isServiceTask = /^service(\s|\(|$)/i.test(categoryName);
+      if (submitting || editComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH || editCorrectionReason.trim().length < 10) {
+        return true;
+      }
+      if (isServiceTask) return false;
+      if (!editVehicleId || !editCategoryId || !editMileage.trim()) return true;
+    }
     if (submitting || !editVehicleId || !editCategoryId || editComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH || !editMileage.trim()) return true;
     const editSubsArr = editingTask?.plant_id ? plantSubcategories : editingTask?.hgv_id ? hgvSubcategories : subcategories;
     const editHasSubs = editSubsArr.filter(s => s.category_id === editCategoryId).length > 0;

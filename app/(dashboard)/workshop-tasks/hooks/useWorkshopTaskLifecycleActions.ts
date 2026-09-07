@@ -9,6 +9,7 @@ import { inferMaintenanceLink } from '@/lib/utils/workshopMaintenanceSync';
 import type { CompletionData } from '@/components/workshop-tasks/MarkTaskCompleteDialog';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Action } from '../types';
+import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
 
 interface UseWorkshopTaskLifecycleActionsParams {
   supabase: SupabaseClient;
@@ -451,10 +452,7 @@ export function useWorkshopTaskLifecycleActions({
   const handleUndoComplete = async (taskId: string) => {
     try {
       const task = tasks.find(t => t.id === taskId);
-      const isServiceTask = Boolean(
-        task?.workshop_task_categories?.name &&
-          /^service(\s|\(|$)/i.test(task.workshop_task_categories.name),
-      );
+      const isServiceTask = Boolean(task && isServiceWorkshopTask(task));
       if (isServiceTask) {
         toast.error('Completed Service tasks cannot be undone. Use an audited correction instead.');
         return;

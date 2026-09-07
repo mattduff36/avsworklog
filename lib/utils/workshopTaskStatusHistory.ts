@@ -1,7 +1,7 @@
 export type StatusHistoryEvent = {
   id: string;
   type: 'status';
-  status: 'logged' | 'on_hold' | 'completed' | 'resumed' | 'undo' | 'pending';
+  status: 'logged' | 'on_hold' | 'completed' | 'resumed' | 'undo' | 'pending' | 'corrected';
   created_at: string;
   author_id: string | null;
   author_name?: string | null;
@@ -12,6 +12,9 @@ export type StatusHistoryEvent = {
     signature_data?: string;
     signed_at?: string;
     timestamp_adjusted?: boolean;
+    event_kind?: 'completed_task_correction';
+    before?: { [key: string]: string | number | boolean | null };
+    after?: { [key: string]: string | number | boolean | null };
   };
 };
 

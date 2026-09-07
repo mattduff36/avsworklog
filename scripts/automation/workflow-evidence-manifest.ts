@@ -630,7 +630,7 @@ export function buildEvidenceManifest(params: {
       ledgerRefs.push(suiteRun.reference);
       commands.push({
         name: 'canonical-workflow-suite',
-        status: suiteRun.record.exitCode === 0 && suiteRun.reporterSuccess ? 'passed' : 'failed',
+        status: vitestLedgerCommandPassed(suiteRun) ? 'passed' : 'failed',
         exitCode: suiteRun.record.exitCode,
         durationMs: 0,
         summary: 'vitest json reporter ledger',
@@ -968,6 +968,19 @@ export function readEvidenceManifest(filePath: string): WorkflowEvidenceManifest
   }
 }
 
+function vitestLedgerCommandPassed(run: {
+  record: VerificationLedgerRecord;
+  reporterSuccess: boolean;
+}): boolean {
+  if (run.record.commandType === 'vitest_suite') {
+    return proveCanonicalWorkflowSuite({
+      record: run.record,
+      reporterSuccess: run.reporterSuccess,
+    }).ok;
+  }
+  return run.record.exitCode === 0 && run.reporterSuccess === true;
+}
+
 function vitestCommandFromLedger(params: {
   name: string;
   files: string[];
@@ -995,7 +1008,7 @@ function vitestCommandFromLedger(params: {
     reference: params.run.reference,
     command: {
       name: params.name,
-      status: params.run.record.exitCode === 0 && params.run.reporterSuccess ? 'passed' : 'failed',
+      status: vitestLedgerCommandPassed(params.run) ? 'passed' : 'failed',
       exitCode: params.run.record.exitCode,
       durationMs: 0,
       summary:

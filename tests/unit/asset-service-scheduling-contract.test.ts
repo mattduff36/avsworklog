@@ -153,7 +153,8 @@ describe('SVC-STATE-001 strict service category identity', () => {
   it('SVC-STATE-001 rejects null and mismatched service categories', () => {
     const server = readRepo('lib/server/asset-service.ts');
     expect(server.match(/!config\.workshopCategoryId/g)?.length).toBeGreaterThanOrEqual(2);
-    expect(server.match(/!task\.workshop_category_id/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(server).toContain('!task.workshop_category_id ||');
+    expect(server.match(/isUnifiedServiceMembership/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });
 
@@ -315,7 +316,7 @@ describe('SVC-RLS-001 permission boundaries', () => {
     const closure = readRepo('supabase/migrations/20260808_asset_service_closure_fixes.sql');
     expect(settings).toContain('isEffectiveRoleManagerOrHigher');
     expect(complete).toContain('userHasPermission');
-    expect(correct).toContain('isEffectiveRoleManagerOrHigher');
+    expect(correct).toContain('requireWorkshopTasksManagerAccess');
     expect(maintenance).toContain('isEffectiveRoleManagerOrHigher');
     expect(schema).toContain('ENABLE ROW LEVEL SECURITY');
     expect(fixes).toContain('trg_protect_vehicle_maintenance_service_state');

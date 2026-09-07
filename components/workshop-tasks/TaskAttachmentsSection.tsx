@@ -23,6 +23,7 @@ interface TaskAttachmentsSectionProps {
   taskStatus: string;
   workshopCategoryId?: string | null;
   onUpdate?: () => void;
+  canCorrectCompleted?: boolean;
 }
 
 export function TaskAttachmentsSection({
@@ -30,8 +31,9 @@ export function TaskAttachmentsSection({
   taskStatus,
   workshopCategoryId = null,
   onUpdate,
+  canCorrectCompleted = false,
 }: TaskAttachmentsSectionProps) {
-  const { attachments, loading, addAttachment, saveSchemaResponses, undoCompleteAttachment } = useTaskAttachments({ taskId });
+  const { attachments, loading, addAttachment, saveSchemaResponses, correctSchemaResponses, undoCompleteAttachment } = useTaskAttachments({ taskId });
   const { templates } = useAttachmentTemplates();
   const [linkedTemplateIds, setLinkedTemplateIds] = useState<string[] | null>(null);
   
@@ -159,6 +161,23 @@ export function TaskAttachmentsSection({
   ) => {
     if (!activeAttachment) return;
     await saveSchemaResponses(activeAttachment.id, responses, markComplete);
+    onUpdate?.();
+  };
+
+  const handleCorrectSchemaResponses = async (
+    responses: AttachmentSchemaResponse[],
+    reason: string,
+  ) => {
+    if (!activeAttachment?.preimageHash) {
+      toast.error('Refresh the attachment before correcting it.');
+      return;
+    }
+    await correctSchemaResponses(
+      activeAttachment.id,
+      responses,
+      reason,
+      activeAttachment.preimageHash,
+    );
     onUpdate?.();
   };
 
@@ -422,7 +441,12 @@ export function TaskAttachmentsSection({
               snapshot={activeAttachment.schema_snapshot}
               existingResponses={activeAttachment.field_responses || []}
               onSave={handleSaveSchemaResponses}
-              readOnly={isTaskCompleted || activeAttachment.status === 'completed'}
+              readOnly={
+                (isTaskCompleted || activeAttachment.status === 'completed')
+                && !(canCorrectCompleted && isTaskCompleted && activeAttachment.status === 'completed')
+              }
+              correctionMode={canCorrectCompleted && isTaskCompleted && activeAttachment.status === 'completed'}
+              onCorrect={handleCorrectSchemaResponses}
               isCompleted={activeAttachment.status === 'completed'}
               attachmentId={activeAttachment.id}
               initialActiveSectionKey={activeSectionKeyByAttachmentId[activeAttachment.id]}

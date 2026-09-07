@@ -17,6 +17,7 @@ import {
   TabletAwareSelectTrigger,
 } from '@/components/ui/tablet-mode-controls';
 import type { Action, AssetTab, Category, Subcategory, Vehicle } from '../types';
+import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
 
 interface AttachmentTemplate {
   id: string;
@@ -93,6 +94,8 @@ interface WorkshopTaskFormDialogsProps {
   editMileage: string;
   onEditMileageChange: (value: string) => void;
   editCurrentMileage: number | null;
+  editCorrectionReason: string;
+  onEditCorrectionReasonChange: (value: string) => void;
   editComments: string;
   onEditCommentsChange: (value: string) => void;
   isSaveEditDisabled: boolean;
@@ -150,6 +153,8 @@ export function WorkshopTaskFormDialogs({
   editMileage,
   onEditMileageChange,
   editCurrentMileage,
+  editCorrectionReason,
+  onEditCorrectionReasonChange,
   editComments,
   onEditCommentsChange,
   isSaveEditDisabled,
@@ -159,6 +164,8 @@ export function WorkshopTaskFormDialogs({
   const { tabletModeEnabled } = useTabletMode();
   const addDialogContentRef = useRef<HTMLDivElement>(null);
   const editDialogContentRef = useRef<HTMLDivElement>(null);
+  const isCompletedEdit = editingTask?.status === 'completed';
+  const lockServiceIdentity = Boolean(isCompletedEdit && editingTask && isServiceWorkshopTask(editingTask));
 
   const isAddFormDirty = Boolean(
     selectedVehicleId ||
@@ -560,6 +567,7 @@ export function WorkshopTaskFormDialogs({
       <Dialog open={showEditModal} onOpenChange={handleEditDialogOpenChange}>
         <DialogContent
           ref={editDialogContentRef}
+          data-accent="workshop"
           className={`bg-white dark:bg-slate-900 border-border text-foreground max-w-lg overflow-y-auto max-h-[92vh] ${
             tabletModeEnabled ? 'max-w-xl p-5 sm:p-6' : ''
           }`}
@@ -577,9 +585,15 @@ export function WorkshopTaskFormDialogs({
           }}
         >
           <DialogHeader>
-            <DialogTitle className="text-foreground text-xl">Edit Workshop Task</DialogTitle>
+            <DialogTitle className="text-foreground text-xl">
+              {editingTask?.status === 'completed' ? 'Correct Completed Task' : 'Edit Workshop Task'}
+            </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              Update the workshop task details
+              {isCompletedEdit
+                ? lockServiceIdentity
+                  ? 'Managers can correct comments here. Use Correct Service for KM/miles/hours and next service type.'
+                  : 'Managers can correct completed task details. This stays completed and writes an audit record.'
+                : 'Update the workshop task details'}
             </DialogDescription>
           </DialogHeader>
 
@@ -588,7 +602,7 @@ export function WorkshopTaskFormDialogs({
               <Label htmlFor="edit-vehicle" className="text-foreground">
                 {editingTask?.plant_id ? 'Plant' : editingTask?.hgv_id ? 'HGV' : 'Van'} <span className="text-red-500">*</span>
               </Label>
-              <Select value={editVehicleId} onValueChange={onEditVehicleIdChange}>
+              <Select value={editVehicleId} onValueChange={onEditVehicleIdChange} disabled={lockServiceIdentity}>
                 <TabletAwareSelectTrigger id="edit-vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder={editingTask?.plant_id ? 'Select plant' : editingTask?.hgv_id ? 'Select HGV' : 'Select van'} />
                 </TabletAwareSelectTrigger>
@@ -638,7 +652,7 @@ export function WorkshopTaskFormDialogs({
               <Label htmlFor="edit-category" className="text-foreground">
                 Category <span className="text-red-500">*</span>
               </Label>
-              <Select value={editCategoryId} onValueChange={onEditCategoryIdChange}>
+              <Select value={editCategoryId} onValueChange={onEditCategoryIdChange} disabled={lockServiceIdentity}>
                 <TabletAwareSelectTrigger id="edit-category" className="bg-white dark:bg-slate-800 border-border text-foreground">
                   <SelectValue placeholder="Select category" />
                 </TabletAwareSelectTrigger>
@@ -668,7 +682,7 @@ export function WorkshopTaskFormDialogs({
                   <Label htmlFor="edit-subcategory" className="text-foreground">
                     Subcategory {isRequired && <span className="text-red-500">*</span>}
                   </Label>
-                  <Select value={editSubcategoryId} onValueChange={onEditSubcategoryIdChange}>
+                  <Select value={editSubcategoryId} onValueChange={onEditSubcategoryIdChange} disabled={lockServiceIdentity}>
                     <TabletAwareSelectTrigger id="edit-subcategory" className="bg-white dark:bg-slate-800 border-border text-foreground">
                       <SelectValue placeholder="Select subcategory" />
                     </TabletAwareSelectTrigger>
@@ -697,6 +711,8 @@ export function WorkshopTaskFormDialogs({
                 className="bg-white dark:bg-slate-800 border-border text-foreground"
                 min="0"
                 step="1"
+                disabled={lockServiceIdentity}
+                readOnly={lockServiceIdentity}
               />
               {editCurrentMileage !== null && (
                 <p className="text-xs text-muted-foreground">
@@ -721,6 +737,21 @@ export function WorkshopTaskFormDialogs({
                 {editComments.length}/300 characters (minimum {WORKSHOP_TASK_COMMENT_MIN_LENGTH})
               </p>
             </div>
+
+            {isCompletedEdit ? (
+              <div className="space-y-2">
+                <Label htmlFor="edit-correction-reason" className="text-foreground">
+                  Correction comment <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="edit-correction-reason"
+                  value={editCorrectionReason}
+                  onChange={(e) => onEditCorrectionReasonChange(e.target.value)}
+                  placeholder="Explain why this completed task is being corrected (min 10 characters)"
+                  className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[80px]"
+                />
+              </div>
+            ) : null}
           </div>
 
           <DialogFooter className={tabletModeEnabled ? 'gap-3 pt-2' : 'gap-3'}>
@@ -739,7 +770,7 @@ export function WorkshopTaskFormDialogs({
               disabled={isSaveEditDisabled}
               className="bg-workshop hover:bg-workshop-dark text-white"
             >
-              {submitting ? 'Saving...' : 'Save Changes'}
+              {submitting ? 'Saving...' : isCompletedEdit ? 'Save correction' : 'Save Changes'}
             </TabletAwareButton>
           </DialogFooter>
         </DialogContent>

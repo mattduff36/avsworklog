@@ -76,7 +76,17 @@ export function CorrectServiceTaskDialog({
         let suggested = '';
         if (contextResponse?.ok) {
           const contextPayload = await contextResponse.json();
-          const candidate = contextPayload.context?.suggestedNextTemplateId as string | undefined;
+          const context = contextPayload.context as {
+            suggestedNextTemplateId?: string | null;
+            currentNextTemplateId?: string | null;
+            currentCompletionMeter?: number | null;
+          } | undefined;
+          const currentMeter = context?.currentCompletionMeter;
+          if (typeof currentMeter === 'number' && Number.isFinite(currentMeter)) {
+            setCompletionMeter(String(Math.trunc(currentMeter)));
+          }
+          const candidate =
+            context?.currentNextTemplateId || context?.suggestedNextTemplateId || '';
           if (candidate && nextTemplates.some((template) => template.templateId === candidate)) {
             suggested = candidate;
           }
@@ -139,7 +149,7 @@ export function CorrectServiceTaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md text-white" data-accent="workshop">
         <DialogHeader>
           <DialogTitle>Correct Service Completion</DialogTitle>
           <DialogDescription>
@@ -198,7 +208,11 @@ export function CorrectServiceTaskDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>
-          <Button onClick={() => void handleSubmit()} disabled={submitting || loadingTemplates}>
+          <Button
+            onClick={() => void handleSubmit()}
+            disabled={submitting || loadingTemplates}
+            className="bg-workshop hover:bg-workshop-dark text-white"
+          >
             {submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

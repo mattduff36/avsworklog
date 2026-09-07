@@ -1,9 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppSessionValidationResult } from '@/lib/server/app-auth/session';
 
-const { validateAppSession, canEffectiveRoleAccessModule, createClient } = vi.hoisted(() => ({
+const {
+  validateAppSession,
+  canEffectiveRoleAccessModule,
+  isEffectiveRoleManagerOrHigher,
+  createClient,
+} = vi.hoisted(() => ({
   validateAppSession: vi.fn(),
   canEffectiveRoleAccessModule: vi.fn(),
+  isEffectiveRoleManagerOrHigher: vi.fn(),
   createClient: vi.fn(),
 }));
 
@@ -17,9 +23,10 @@ vi.mock('@/lib/supabase/server', () => ({
 
 vi.mock('@/lib/utils/rbac', () => ({
   canEffectiveRoleAccessModule,
+  isEffectiveRoleManagerOrHigher,
 }));
 
-import { requireWorkshopTasksAccess } from '@/lib/server/workshop-tasks/auth';
+import { requireWorkshopTasksAccess, requireWorkshopTasksManagerAccess } from '@/lib/server/workshop-tasks/auth';
 import { requireSingleAssetTrackerAccess } from '@/lib/server/fleet-tracker-auth';
 
 function sessionResult(
@@ -171,5 +178,34 @@ describe('workshop and tracker access helpers', () => {
     });
     expect(canEffectiveRoleAccessModule).not.toHaveBeenCalled();
     expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it('requires an effective manager after workshop access', async () => {
+    const active = sessionResult({
+      status: 'active',
+      profileId: 'actor',
+      email: 'actor@example.com',
+      failureReason: null,
+    });
+    validateAppSession.mockResolvedValue(active);
+    canEffectiveRoleAccessModule.mockResolvedValue(true);
+    isEffectiveRoleManagerOrHigher.mockResolvedValue(false);
+
+    await expect(requireWorkshopTasksManagerAccess()).resolves.toEqual({
+      ok: false,
+      status: 403,
+      validation: active,
+    });
+    expect(isEffectiveRoleManagerOrHigher).toHaveBeenCalledWith({
+      userId: 'actor',
+      email: 'actor@example.com',
+    });
+
+    isEffectiveRoleManagerOrHigher.mockResolvedValue(true);
+    await expect(requireWorkshopTasksManagerAccess()).resolves.toEqual({
+      ok: true,
+      userId: 'actor',
+      validation: active,
+    });
   });
 });

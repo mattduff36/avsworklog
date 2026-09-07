@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils/cn';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { WorkshopTaskLocationButton } from '@/components/workshop-tasks/WorkshopTaskLocationButton';
 import type { Action, AssetTab, Vehicle, WorkshopTaskStatusFilter, WorkshopTaskTileFilter } from '../types';
+import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
 import type { InspectionPhoto } from '@/types/inspection';
 
 interface WorkshopTasksOverviewTabProps {
@@ -86,14 +87,6 @@ interface WorkshopTasksOverviewTabProps {
   onCorrectService?: (task: Action) => void;
   onEditTask: (task: Action) => void;
   onDeleteTask: (task: Action) => void;
-}
-
-function isServiceWorkshopTask(task: Action): boolean {
-  const categoryName =
-    task.workshop_task_categories?.name ||
-    task.workshop_task_subcategories?.workshop_task_categories?.name ||
-    '';
-  return /^service(\s|\(|$)/i.test(categoryName);
 }
 
 type CompletedSortField =
@@ -1256,6 +1249,18 @@ export function WorkshopTasksOverviewTab({
                                   >
                                     <MessageSquare className="h-3.5 w-3.5" />
                                   </Button>
+                                  {canCorrectService ? (
+                                    <Button
+                                      onClick={() => onEditTask(row.task)}
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 w-7 border-amber-600/50 p-0 text-amber-300 hover:bg-amber-900/30 hover:text-amber-100"
+                                      title="Correct details"
+                                      aria-label="Correct details"
+                                    >
+                                      <Edit className="h-3.5 w-3.5" />
+                                    </Button>
+                                  ) : null}
                                   {isServiceWorkshopTask(row.task) ? (
                                     canCorrectService && onCorrectService ? (
                                       <Button
@@ -1352,6 +1357,17 @@ export function WorkshopTasksOverviewTab({
                                     </div>
                                   </div>
                                   <div className={taskActionGroupClass}>
+                                    {canCorrectService ? (
+                                      <Button
+                                        onClick={(e) => { e.stopPropagation(); onEditTask(task); }}
+                                        size="sm"
+                                        variant="outline"
+                                        className={`${taskActionButtonClass} border-amber-600/50 text-amber-300 hover:text-amber-100 hover:bg-amber-900/30`}
+                                      >
+                                        <Edit className="h-3.5 w-3.5 mr-1.5" />
+                                        Correct details
+                                      </Button>
+                                    ) : null}
                                     {isServiceWorkshopTask(task) ? (
                                       canCorrectService && onCorrectService ? (
                                         <Button

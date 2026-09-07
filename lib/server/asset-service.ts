@@ -11,6 +11,10 @@ import {
   type ServiceMeterUnit,
   type ServiceRotationStep,
 } from '@/lib/utils/assetServiceRotation';
+import {
+  isUnifiedServiceMembership,
+  loadSubcategoryParentCategoryId,
+} from '@/lib/server/workshop-tasks/service-identity';
 
 const { Client } = pg;
 
@@ -39,6 +43,42 @@ function createPgClient(): pg.Client {
     password: url.password ? decodeURIComponent(url.password) : undefined,
     ssl: { rejectUnauthorized: false },
   });
+}
+
+/** Dual-write HGV custom value for rollback window */
+async function upsertHgvServiceCategoryValues(
+  client: pg.Client,
+  input: {
+    maintenanceCategoryId: string;
+    hgvId: string;
+    dueMeter: number;
+    lastMeter: number;
+    actorId: string;
+  },
+): Promise<void> {
+  const updated = await client.query(
+    `
+    UPDATE public.asset_maintenance_category_values
+    SET due_mileage = $3,
+        last_mileage = $4,
+        last_updated_by = $5,
+        last_updated_at = NOW(),
+        updated_at = NOW()
+    WHERE maintenance_category_id = $1
+      AND hgv_id = $2
+    `,
+    [input.maintenanceCategoryId, input.hgvId, input.dueMeter, input.lastMeter, input.actorId],
+  );
+  if ((updated.rowCount ?? 0) > 0) return;
+
+  await client.query(
+    `
+    INSERT INTO public.asset_maintenance_category_values (
+      maintenance_category_id, hgv_id, due_mileage, last_mileage, last_updated_by, last_updated_at
+    ) VALUES ($1, $2, $3, $4, $5, NOW())
+    `,
+    [input.maintenanceCategoryId, input.hgvId, input.dueMeter, input.lastMeter, input.actorId],
+  );
 }
 
 async function withTransaction<T>(work: (client: pg.Client) => Promise<T>): Promise<T> {
@@ -735,43 +775,14 @@ export async function completeServiceWorkshopTask(input: CompleteServiceTaskInpu
       ],
     );
 
-    // Dual-write HGV custom value for rollback window
     if (assetType === 'hgv') {
-      const updated = await client.query(
-        `
-        UPDATE public.asset_maintenance_category_values
-        SET due_mileage = $3,
-            last_mileage = $4,
-            last_updated_by = $5,
-            last_updated_at = NOW(),
-            updated_at = NOW()
-        WHERE maintenance_category_id = $1
-          AND hgv_id = $2
-        `,
-        [
-          config.maintenanceCategoryId,
-          assetId,
-          dueMeter,
-          Math.trunc(input.completionMeter),
-          input.actorId,
-        ],
-      );
-      if ((updated.rowCount ?? 0) === 0) {
-        await client.query(
-          `
-          INSERT INTO public.asset_maintenance_category_values (
-            maintenance_category_id, hgv_id, due_mileage, last_mileage, last_updated_by, last_updated_at
-          ) VALUES ($1, $2, $3, $4, $5, NOW())
-          `,
-          [
-            config.maintenanceCategoryId,
-            assetId,
-            dueMeter,
-            Math.trunc(input.completionMeter),
-            input.actorId,
-          ],
-        );
-      }
+      await upsertHgvServiceCategoryValues(client, {
+        maintenanceCategoryId: config.maintenanceCategoryId,
+        hgvId: assetId,
+        dueMeter,
+        lastMeter: Math.trunc(input.completionMeter),
+        actorId: input.actorId,
+      });
     }
 
     await client.query(
@@ -950,11 +961,13 @@ export async function correctServiceWorkshopTask(input: CorrectServiceTaskInput)
       hgv_id: string | null;
       plant_id: string | null;
       workshop_category_id: string | null;
+      workshop_subcategory_id: string | null;
       action_type: string;
       title: string | null;
     }>(
       `
-      SELECT id, status, van_id, hgv_id, plant_id, workshop_category_id, action_type, title
+      SELECT id, status, van_id, hgv_id, plant_id, workshop_category_id,
+             workshop_subcategory_id, action_type, title
       FROM public.actions
       WHERE id = $1
       FOR UPDATE
@@ -979,10 +992,19 @@ export async function correctServiceWorkshopTask(input: CorrectServiceTaskInput)
     if (!assetId) throw new AssetServiceError('Task has no linked asset', 400);
 
     const config = await loadServiceConfig(client, assetType);
+    const subcategoryParentId = await loadSubcategoryParentCategoryId(
+      client,
+      task.workshop_subcategory_id
+    );
+    if (task.workshop_subcategory_id && !subcategoryParentId) {
+      throw new AssetServiceError('Subcategory not found', 400);
+    }
     if (
-      !config.workshopCategoryId ||
-      !task.workshop_category_id ||
-      task.workshop_category_id !== config.workshopCategoryId
+      !isUnifiedServiceMembership(
+        config.workshopCategoryId,
+        task.workshop_category_id,
+        subcategoryParentId
+      )
     ) {
       throw new AssetServiceError('Task category is not a Service category for this asset type');
     }
@@ -1079,25 +1101,13 @@ export async function correctServiceWorkshopTask(input: CorrectServiceTaskInput)
     );
 
     if (assetType === 'hgv') {
-      await client.query(
-        `
-        UPDATE public.asset_maintenance_category_values
-        SET due_mileage = $3,
-            last_mileage = $4,
-            last_updated_by = $5,
-            last_updated_at = NOW(),
-            updated_at = NOW()
-        WHERE maintenance_category_id = $1
-          AND hgv_id = $2
-        `,
-        [
-          config.maintenanceCategoryId,
-          assetId,
-          dueMeter,
-          Math.trunc(input.completionMeter),
-          input.actorId,
-        ],
-      );
+      await upsertHgvServiceCategoryValues(client, {
+        maintenanceCategoryId: config.maintenanceCategoryId,
+        hgvId: assetId,
+        dueMeter,
+        lastMeter: Math.trunc(input.completionMeter),
+        actorId: input.actorId,
+      });
     }
 
     await client.query(
@@ -1186,10 +1196,11 @@ export async function getServiceCorrectionContext(taskId: string) {
       hgv_id: string | null;
       plant_id: string | null;
       workshop_category_id: string | null;
+      workshop_subcategory_id: string | null;
       action_type: string;
     }>(
       `
-      SELECT van_id, hgv_id, plant_id, workshop_category_id, action_type
+      SELECT van_id, hgv_id, plant_id, workshop_category_id, workshop_subcategory_id, action_type
       FROM public.actions
       WHERE id = $1
       LIMIT 1
@@ -1208,10 +1219,19 @@ export async function getServiceCorrectionContext(taskId: string) {
         ? 'plant'
         : 'van';
     const config = await loadServiceConfig(client, assetType);
+    const subcategoryParentId = await loadSubcategoryParentCategoryId(
+      client,
+      task.workshop_subcategory_id
+    );
+    if (task.workshop_subcategory_id && !subcategoryParentId) {
+      throw new AssetServiceError('Subcategory not found', 400);
+    }
     if (
-      !config.workshopCategoryId ||
-      !task.workshop_category_id ||
-      task.workshop_category_id !== config.workshopCategoryId
+      !isUnifiedServiceMembership(
+        config.workshopCategoryId,
+        task.workshop_category_id,
+        subcategoryParentId
+      )
     ) {
       throw new AssetServiceError('Task category is not a Service category for this asset type');
     }
@@ -1219,31 +1239,48 @@ export async function getServiceCorrectionContext(taskId: string) {
     const { rows: events } = await client.query<{
       completed_template_id: string;
       completed_rotation_step_id: string | null;
+      next_template_id: string | null;
+      completion_meter: number | null;
+      meter_unit: string | null;
+      event_type: string;
     }>(
       `
-      SELECT completed_template_id, completed_rotation_step_id
+      SELECT
+        completed_template_id,
+        completed_rotation_step_id,
+        next_template_id,
+        completion_meter,
+        meter_unit::text AS meter_unit,
+        event_type
       FROM public.asset_service_events
       WHERE task_id = $1
-        AND event_type = 'completion'
-      ORDER BY created_at ASC
+      ORDER BY created_at DESC
       LIMIT 1
       `,
       [taskId],
     );
-    const completion = events[0];
-    if (!completion) {
-      return { suggestedNextTemplateId: null };
+    const latest = events[0];
+    if (!latest) {
+      return {
+        suggestedNextTemplateId: null,
+        currentNextTemplateId: null,
+        currentCompletionMeter: null,
+        meterUnit: getDefaultMeterUnit(assetType),
+      };
     }
 
     const completedStep =
-      (completion.completed_rotation_step_id
-        ? config.steps.find((step) => step.id === completion.completed_rotation_step_id)
+      (latest.completed_rotation_step_id
+        ? config.steps.find((step) => step.id === latest.completed_rotation_step_id)
         : null) ||
-      resolveStepForTemplateFirst(config.steps, completion.completed_template_id);
+      resolveStepForTemplateFirst(config.steps, latest.completed_template_id);
     const successor = completedStep ? getSuccessorStep(config.steps, completedStep.id) : null;
 
     return {
-      suggestedNextTemplateId: successor?.attachmentTemplateId ?? null,
+      suggestedNextTemplateId: latest.next_template_id ?? successor?.attachmentTemplateId ?? null,
+      currentNextTemplateId: latest.next_template_id ?? null,
+      currentCompletionMeter: latest.completion_meter,
+      meterUnit: latest.meter_unit ?? getDefaultMeterUnit(assetType),
     };
   });
 }

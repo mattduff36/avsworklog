@@ -37,6 +37,7 @@ import {
   type InspectionReferenceType,
 } from '@/lib/utils/reference-ids';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
 
 type Task = Database['public']['Tables']['actions']['Row'] & {
   status_history?: unknown[] | null;
@@ -83,6 +84,8 @@ interface WorkshopTaskModalProps {
   isUpdating: boolean;
   onTaskUpdated?: () => Promise<void>;
   inspectionPhotos?: InspectionPhoto[];
+  canCorrectCompleted?: boolean;
+  onCorrectService?: (task: Task) => void;
 }
 
 export function WorkshopTaskModal({
@@ -99,6 +102,8 @@ export function WorkshopTaskModal({
   isUpdating,
   onTaskUpdated,
   inspectionPhotos = [],
+  canCorrectCompleted = false,
+  onCorrectService,
 }: WorkshopTaskModalProps) {
   const { tabletModeEnabled } = useTabletMode();
   const taskActionButtonClass = tabletModeEnabled ? 'min-h-11 text-base px-4' : '';
@@ -449,6 +454,31 @@ export function WorkshopTaskModal({
                   </Button>
                 </>
               )}
+              {task.action_type === 'workshop_vehicle_task' && task.status === 'completed' && canCorrectCompleted && (
+                <>
+                  {isServiceWorkshopTask(task) && onCorrectService ? (
+                    <Button
+                      onClick={() => onCorrectService(task)}
+                      disabled={isUpdating}
+                      size="sm"
+                      className={`bg-workshop hover:bg-workshop-dark text-white border-0 ${taskActionButtonClass}`}
+                    >
+                      <Wrench className="h-4 w-4 mr-2" />
+                      Correct Service
+                    </Button>
+                  ) : null}
+                  <Button
+                    onClick={() => onEdit(task)}
+                    disabled={isUpdating}
+                    size="sm"
+                    variant="outline"
+                    className={`border-amber-400/60 text-amber-200 hover:text-amber-100 hover:bg-amber-900/30 ${taskActionButtonClass}`}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Correct details
+                  </Button>
+                </>
+              )}
               {task.action_type === 'workshop_vehicle_task' && task.status !== 'completed' && (
                 <>
                   <Button
@@ -484,6 +514,7 @@ export function WorkshopTaskModal({
             key={`${task.id}-${attachmentsRefreshKey}`}
             taskId={task.id}
             taskStatus={getTaskStatus(task)}
+            canCorrectCompleted={canCorrectCompleted && task.action_type === 'workshop_vehicle_task'}
             workshopCategoryId={
               task.workshop_category_id
               || task.workshop_task_categories?.id

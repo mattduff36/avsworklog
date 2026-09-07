@@ -38,6 +38,8 @@ interface AttachmentHybridFormModalProps {
   onActiveSectionChange?: (sectionKey: string) => void;
   onScrollPositionChange?: (scrollTop: number) => void;
   onSave: (responses: AttachmentSchemaResponse[], markComplete: boolean) => Promise<void>;
+  correctionMode?: boolean;
+  onCorrect?: (responses: AttachmentSchemaResponse[], reason: string) => Promise<void>;
   canUndoComplete?: boolean;
   undoCompleteLabel?: string | null;
   onUndoComplete?: () => Promise<void>;
@@ -282,6 +284,8 @@ export function AttachmentHybridFormModal({
   onActiveSectionChange,
   onScrollPositionChange,
   onSave,
+  correctionMode = false,
+  onCorrect,
   canUndoComplete = false,
   undoCompleteLabel = null,
   onUndoComplete,
@@ -295,6 +299,7 @@ export function AttachmentHybridFormModal({
   const [activeSectionKey, setActiveSectionKey] = useState<string>('');
   const [guidedMode, setGuidedMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [correctionComment, setCorrectionComment] = useState('');
   const [responses, setResponses] = useState<Record<string, LocalResponseValue>>({});
   const [activeSignatureKey, setActiveSignatureKey] = useState<string | null>(null);
   const [signatureNames, setSignatureNames] = useState<Record<string, string>>({});
@@ -495,6 +500,30 @@ export function AttachmentHybridFormModal({
 
   async function handleSave(markComplete: boolean) {
     await saveAttachment({ markComplete });
+  }
+
+  async function handleCorrect() {
+    if (!onCorrect || saving) return;
+    if (correctionComment.trim().length < 10) {
+      toast.error('Correction comment must be at least 10 characters');
+      return;
+    }
+    const invalidField = findFirstInvalidRequired(sections, responses);
+    if (invalidField) {
+      setActiveSectionKey(invalidField.sectionKey);
+      toast.error(`Complete required field: ${invalidField.label}`);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onCorrect(buildResponsesPayload(responses), correctionComment.trim());
+      toast.success('Attachment correction saved');
+      onOpenChange(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to correct attachment');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function navigateSection(direction: 'next' | 'previous') {
@@ -961,6 +990,20 @@ export function AttachmentHybridFormModal({
 
         {!readOnly && (
           <>
+            {correctionMode ? (
+              <div className="px-5 space-y-2">
+                <Label htmlFor="attachment-correction-reason" className="text-foreground">
+                  Correction comment
+                </Label>
+                <Textarea
+                  id="attachment-correction-reason"
+                  value={correctionComment}
+                  onChange={(event) => setCorrectionComment(event.target.value)}
+                  placeholder="Explain why this attachment is being corrected (min 10 characters)"
+                  rows={3}
+                />
+              </div>
+            ) : null}
             {tabletModeEnabled ? (
               <div className="px-5 pb-4">
                 <TabletActionBar
@@ -972,16 +1015,18 @@ export function AttachmentHybridFormModal({
                     variant: 'outline',
                   }}
                   secondaryAction={{
-                    label: saving ? 'Saving...' : 'Save Draft',
-                    onClick: () => { void handleSave(false); },
+                    label: correctionMode ? (isDirty ? 'Discard Changes' : 'Close') : (saving ? 'Saving...' : 'Save Draft'),
+                    onClick: correctionMode ? discardDraftAndClose : () => { void handleSave(false); },
                     disabled: saving,
                     variant: 'secondary',
                   }}
                   primaryAction={{
-                    label: saving ? 'Saving...' : 'Complete Attachment',
-                    onClick: () => { void handleSave(true); },
+                    label: saving ? 'Saving...' : correctionMode ? 'Save correction' : 'Complete Attachment',
+                    onClick: () => { void (correctionMode ? handleCorrect() : handleSave(true)); },
                     disabled: saving,
-                    className: 'bg-green-600 hover:bg-green-700 text-white',
+                    className: correctionMode
+                      ? 'bg-workshop hover:bg-workshop-dark text-white'
+                      : 'bg-green-600 hover:bg-green-700 text-white',
                   }}
                 />
               </div>
@@ -990,9 +1035,11 @@ export function AttachmentHybridFormModal({
                 <Button variant="outline" onClick={discardDraftAndClose} disabled={saving}>
                   {isDirty ? 'Discard Changes' : 'Cancel'}
                 </Button>
+                {!correctionMode ? (
                 <Button variant="outline" onClick={() => { void handleSave(false); }} disabled={saving}>
                   {saving ? 'Saving...' : 'Save Draft'}
                 </Button>
+                ) : null}
                 <Button
                   variant="outline"
                   onClick={() => navigateSection('previous')}
@@ -1009,9 +1056,15 @@ export function AttachmentHybridFormModal({
                 >
                   Next Section
                 </Button>
-                <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => { void handleSave(true); }} disabled={saving}>
-                  {saving ? 'Saving...' : 'Complete Attachment'}
-                </Button>
+                {correctionMode ? (
+                  <Button className="bg-workshop hover:bg-workshop-dark text-white" onClick={() => { void handleCorrect(); }} disabled={saving}>
+                    {saving ? 'Saving...' : 'Save correction'}
+                  </Button>
+                ) : (
+                  <Button className="bg-green-600 hover:bg-green-700 text-white" onClick={() => { void handleSave(true); }} disabled={saving}>
+                    {saving ? 'Saving...' : 'Complete Attachment'}
+                  </Button>
+                )}
               </DialogFooter>
             )}
           </>

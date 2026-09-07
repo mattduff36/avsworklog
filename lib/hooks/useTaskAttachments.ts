@@ -17,6 +17,7 @@ export type TaskAttachmentWithDetails = TaskAttachment & {
   workshop_attachment_templates: AttachmentTemplate | null;
   schema_snapshot?: AttachmentSchemaSnapshot | null;
   field_responses?: AttachmentSchemaResponse[];
+  preimageHash?: string;
 };
 
 interface UseTaskAttachmentsOptions {
@@ -31,6 +32,12 @@ interface UseTaskAttachmentsReturn {
   refetch: () => Promise<void>;
   addAttachment: (templateId: string) => Promise<TaskAttachmentWithDetails | null>;
   saveSchemaResponses: (attachmentId: string, responses: AttachmentSchemaResponse[], markComplete?: boolean) => Promise<boolean>;
+  correctSchemaResponses: (
+    attachmentId: string,
+    responses: AttachmentSchemaResponse[],
+    reason: string,
+    expectedPreimageHash: string
+  ) => Promise<boolean>;
   undoCompleteAttachment: (attachmentId: string) => Promise<boolean>;
 }
 
@@ -169,6 +176,32 @@ export function useTaskAttachments({
     }
   }, [fetchAttachments, refreshAttachment]);
 
+  const correctSchemaResponses = useCallback(async (
+    attachmentId: string,
+    responses: AttachmentSchemaResponse[],
+    reason: string,
+    expectedPreimageHash: string
+  ): Promise<boolean> => {
+    try {
+      const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}/correct-responses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ responses, reason, expectedPreimageHash }),
+      });
+
+      await readJsonResponse<ApiErrorResponse>(
+        response,
+        'Failed to correct attachment responses'
+      );
+
+      await refreshAttachment(attachmentId);
+      return true;
+    } catch (err) {
+      console.error('Error correcting schema responses:', err);
+      throw err;
+    }
+  }, [refreshAttachment]);
+
   const undoCompleteAttachment = useCallback(async (attachmentId: string): Promise<boolean> => {
     try {
       const response = await fetch(`/api/workshop-tasks/attachments/${attachmentId}/undo-complete`, {
@@ -200,6 +233,7 @@ export function useTaskAttachments({
     refetch: fetchAttachments,
     addAttachment,
     saveSchemaResponses,
+    correctSchemaResponses,
     undoCompleteAttachment,
   };
 }

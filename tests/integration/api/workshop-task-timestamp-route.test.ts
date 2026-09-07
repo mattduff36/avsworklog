@@ -3,27 +3,21 @@ import { NextRequest } from 'next/server';
 import { PATCH } from '@/app/api/workshop-tasks/tasks/[taskId]/timeline/[timelineItemId]/timestamp/route';
 
 const {
-  mockCreateClient,
+  mockRequireWorkshopTasksAccess,
   mockCreateAdminSupabaseClient,
-  mockUserHasPermission,
   mockLogServerError,
 } = vi.hoisted(() => ({
-  mockCreateClient: vi.fn(),
+  mockRequireWorkshopTasksAccess: vi.fn(),
   mockCreateAdminSupabaseClient: vi.fn(),
-  mockUserHasPermission: vi.fn(),
   mockLogServerError: vi.fn(),
 }));
 
-vi.mock('@/lib/supabase/server', () => ({
-  createClient: mockCreateClient,
+vi.mock('@/lib/server/workshop-tasks/auth', () => ({
+  requireWorkshopTasksAccess: mockRequireWorkshopTasksAccess,
 }));
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: mockCreateAdminSupabaseClient,
-}));
-
-vi.mock('@/lib/utils/permissions', () => ({
-  userHasPermission: mockUserHasPermission,
 }));
 
 vi.mock('@/lib/utils/server-error-logger', () => ({
@@ -228,15 +222,21 @@ describe('PATCH /api/workshop-tasks/tasks/[taskId]/timeline/[timelineItemId]/tim
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockCreateClient.mockResolvedValue({
-      auth: {
-        getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'manager-1' } },
-          error: null,
-        }),
+    mockRequireWorkshopTasksAccess.mockResolvedValue({
+      ok: true,
+      userId: 'manager-1',
+      validation: {
+        status: 'active',
+        session: null,
+        profileId: 'manager-1',
+        email: null,
+        cookieValue: null,
+        cookieExpiresAt: null,
+        secretRotated: false,
+        failureReason: null,
+        kioskDeviceIdHint: null,
       },
     });
-    mockUserHasPermission.mockResolvedValue(true);
     mockLogServerError.mockResolvedValue(undefined);
   });
 

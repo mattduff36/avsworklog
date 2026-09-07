@@ -42,6 +42,12 @@ const getStatusConfig = (status: StatusHistoryEvent['status']) => {
         dotClass: 'bg-green-500',
         label: 'marked complete',
       };
+    case 'corrected':
+      return {
+        icon: <CheckCircle2 className="h-4 w-4 text-amber-300 mt-0.5" />,
+        dotClass: 'bg-amber-500',
+        label: 'corrected completed task',
+      };
     case 'undo':
       return {
         icon: <Undo2 className="h-4 w-4 text-slate-400 mt-0.5" />,
@@ -68,6 +74,8 @@ function getAdjustmentLabel(status: StatusHistoryEvent['status']) {
       return 'Resumed';
     case 'completed':
       return 'Completed';
+    case 'corrected':
+      return 'Correction';
     case 'undo':
       return 'Undo';
     case 'pending':
@@ -176,12 +184,16 @@ export function WorkshopTaskTimeline({
                       )}
                     </div>
                   )}
-                  {renderTimestamp({
-                    itemType: 'status_event',
-                    timelineItemId: item.timelineItemId,
-                    label: `${getAdjustmentLabel(item.status)} event`,
-                    currentTimestamp: item.created_at,
-                  })}
+                  {item.status === 'corrected' || item.meta?.event_kind === 'completed_task_correction' ? (
+                    <p className="text-xs text-muted-foreground">{formatDateTime(item.created_at)}</p>
+                  ) : (
+                    renderTimestamp({
+                      itemType: 'status_event',
+                      timelineItemId: item.timelineItemId,
+                      label: `${getAdjustmentLabel(item.status)} event`,
+                      currentTimestamp: item.created_at,
+                    })
+                  )}
                 </div>
               </div>
             </div>

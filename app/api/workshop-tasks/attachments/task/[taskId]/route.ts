@@ -10,6 +10,10 @@ import {
   insertWorkshopTaskAttachmentExactOne,
 } from '@/lib/server/asset-service';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import {
+  canonicalizeAttachmentResponses,
+  hashAttachmentResponses,
+} from '@/lib/workshop-tasks/completed-correction';
 
 interface RouteParams {
   params: Promise<{ taskId: string }>;
@@ -138,12 +142,22 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     // Combine data
     const typedAttachments = (attachments || []) as Array<{ id: string; template_id: string } & Record<string, unknown>>;
     const typedSnapshots = schemaSnapshots as Array<{ attachment_id?: string }>;
-    const typedFieldResponses = fieldResponsesV2 as Array<{ attachment_id?: string }>;
-    const result = typedAttachments.map(attachment => ({
-      ...attachment,
-      schema_snapshot: typedSnapshots.find((snapshot) => snapshot.attachment_id === attachment.id) || null,
-      field_responses: typedFieldResponses.filter((response) => response.attachment_id === attachment.id),
-    }));
+    const typedFieldResponses = fieldResponsesV2 as Array<{
+      attachment_id?: string;
+      section_key?: string | null;
+      field_key?: string | null;
+      response_value?: string | null;
+      response_json?: Record<string, unknown> | null;
+    }>;
+    const result = typedAttachments.map(attachment => {
+      const fieldResponses = typedFieldResponses.filter((response) => response.attachment_id === attachment.id);
+      return {
+        ...attachment,
+        schema_snapshot: typedSnapshots.find((snapshot) => snapshot.attachment_id === attachment.id) || null,
+        field_responses: fieldResponses,
+        preimageHash: hashAttachmentResponses(canonicalizeAttachmentResponses(fieldResponses)),
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -198,7 +212,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Verify task exists and is a workshop task
     const { data: task, error: taskError } = await db
       .from('actions')
-      .select('id, action_type, workshop_category_id, workshop_subcategory_id')
+      .select('id, action_type, status, workshop_category_id, workshop_subcategory_id')
       .eq('id', taskId)
       .single();
 
@@ -210,6 +224,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json(
         { error: 'Attachments can only be added to workshop tasks' },
         { status: 400 }
+      );
+    }
+
+    if ((task as { status: string | null }).status === 'completed') {
+      return NextResponse.json(
+        { error: 'Attachments cannot be added to a completed task' },
+        { status: 409 }
       );
     }
 

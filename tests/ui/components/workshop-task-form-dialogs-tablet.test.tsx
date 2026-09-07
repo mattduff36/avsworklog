@@ -157,6 +157,8 @@ function createBaseProps(): React.ComponentProps<typeof WorkshopTaskFormDialogs>
     editMileage: '',
     onEditMileageChange: vi.fn(),
     editCurrentMileage: null,
+    editCorrectionReason: '',
+    onEditCorrectionReasonChange: vi.fn(),
     editComments: '',
     onEditCommentsChange: vi.fn(),
     isSaveEditDisabled: false,

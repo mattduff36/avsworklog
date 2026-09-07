@@ -13,6 +13,7 @@ export default defineConfig({
     hookTimeout: 120_000,
     teardownTimeout: 120_000,
     testTimeout: 120_000,
+    disableConsoleIntercept: true,
     setupFiles: ['./tests/setup.ts'],
     reporters: ['default', './scripts/automation/tee-vitest-progress-reporter.cjs'],
     coverage: {

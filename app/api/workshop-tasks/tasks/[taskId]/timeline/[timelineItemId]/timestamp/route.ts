@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextRequest } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
-import { userHasPermission } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { requireWorkshopTasksAccess } from '@/lib/server/workshop-tasks/auth';
+import { jsonWithWorkshopSession } from '@/lib/server/workshop-tasks/http';
 import { syncWorkshopTaskCompletionDependents, type RelatedName } from '@/lib/server/workshop-task-completion-sync';
 import {
   AdjustWorkshopTaskTimestampSchema,
@@ -83,33 +83,24 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string; timelineItemId: string }> }
 ) {
+  const access = await requireWorkshopTasksAccess();
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const hasPermission = await userHasPermission(user.id, 'workshop-tasks');
-    if (!hasPermission) {
-      return NextResponse.json(
-        { error: 'Forbidden: workshop-tasks permission required' },
-        { status: 403 }
+    if (!access.ok) {
+      return jsonWithWorkshopSession(
+        access.validation,
+        { error: access.status === 401 ? 'Unauthorized' : 'Forbidden: workshop-tasks permission required' },
+        access.status
       );
     }
 
     const paramsValidation = validateParams(await params, TimelineTimestampParamsSchema);
     if (!paramsValidation.success) {
-      return NextResponse.json({ error: paramsValidation.error }, { status: 400 });
+      return jsonWithWorkshopSession(access.validation, { error: paramsValidation.error }, 400);
     }
 
     const bodyValidation = await validateRequest(request, AdjustWorkshopTaskTimestampSchema);
     if (!bodyValidation.success) {
-      return NextResponse.json({ error: bodyValidation.error }, { status: 400 });
+      return jsonWithWorkshopSession(access.validation, { error: bodyValidation.error }, 400);
     }
 
     const { taskId, timelineItemId } = paramsValidation.data;
@@ -162,11 +153,11 @@ export async function PATCH(
     const typedTask = task as ActionRow | null;
 
     if (taskError || !typedTask) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+      return jsonWithWorkshopSession(access.validation, { error: 'Task not found' }, 404);
     }
 
     if (!['inspection_defect', 'workshop_vehicle_task'].includes(typedTask.action_type)) {
-      return NextResponse.json({ error: 'Task is not a workshop task' }, { status: 400 });
+      return jsonWithWorkshopSession(access.validation, { error: 'Task is not a workshop task' }, 400);
     }
 
     const { data: comments, error: commentsError } = await supabaseAdmin
@@ -229,7 +220,7 @@ export async function PATCH(
         : null;
 
     if (itemType === 'status_event' && (timelineItemId === 'started' || timelineItemId === 'completed') && !aliasedStatusEvent) {
-      return NextResponse.json({ error: 'Status timeline item not found' }, { status: 404 });
+      return jsonWithWorkshopSession(access.validation, { error: 'Status timeline item not found' }, 404);
     }
 
     const validationTargetId =
@@ -256,12 +247,12 @@ export async function PATCH(
     );
 
     if (validationError) {
-      return NextResponse.json({ error: validationError }, { status: 400 });
+      return jsonWithWorkshopSession(access.validation, { error: validationError }, 400);
     }
 
     if (itemType === 'created') {
       if (timelineItemId !== 'created') {
-        return NextResponse.json({ error: 'Invalid created timeline target' }, { status: 400 });
+        return jsonWithWorkshopSession(access.validation, { error: 'Invalid created timeline target' }, 400);
       }
 
       const updates: ActionUpdate = {
@@ -278,7 +269,7 @@ export async function PATCH(
         throw updateError;
       }
 
-      return NextResponse.json({
+      return jsonWithWorkshopSession(access.validation, {
         success: true,
         taskId,
         timelineItemId: 'created',
@@ -290,7 +281,7 @@ export async function PATCH(
     if (itemType === 'comment') {
       const matchingComment = typedComments.find((comment) => comment.id === timelineItemId);
       if (!matchingComment) {
-        return NextResponse.json({ error: 'Comment timeline item not found' }, { status: 404 });
+        return jsonWithWorkshopSession(access.validation, { error: 'Comment timeline item not found' }, 404);
       }
 
       const { error: updateError } = await supabaseAdmin
@@ -303,7 +294,7 @@ export async function PATCH(
         throw updateError;
       }
 
-      return NextResponse.json({
+      return jsonWithWorkshopSession(access.validation, {
         success: true,
         taskId,
         timelineItemId: matchingComment.id,
@@ -316,7 +307,18 @@ export async function PATCH(
     const targetStatusEvent = resolveMilestoneStatusEvent(taskForValidation, timelineItemId);
 
     if (!targetStatusEvent) {
-      return NextResponse.json({ error: 'Status timeline item not found' }, { status: 404 });
+      return jsonWithWorkshopSession(access.validation, { error: 'Status timeline item not found' }, 404);
+    }
+
+    if (
+      targetStatusEvent.status === 'corrected' ||
+      targetStatusEvent.meta?.event_kind === 'completed_task_correction'
+    ) {
+      return jsonWithWorkshopSession(
+        access.validation,
+        { error: 'Correction events cannot have their timestamps adjusted' },
+        400
+      );
     }
 
     const nextStatusHistory = sortStatusHistory(
@@ -380,12 +382,12 @@ export async function PATCH(
         supabaseAdmin,
         task: typedTask,
         completedAt: latestCompletedEvent.created_at,
-        userId: user.id,
+        userId: access.userId,
         historyComment: `Updated from workshop task completed timestamp adjustment: ${typedTask.title || 'Task'}`,
       });
     }
 
-    return NextResponse.json({
+    return jsonWithWorkshopSession(access.validation, {
       success: true,
       taskId,
       timelineItemId: targetStatusEvent.id,
@@ -402,6 +404,6 @@ export async function PATCH(
         endpoint: 'PATCH /api/workshop-tasks/tasks/[taskId]/timeline/[timelineItemId]/timestamp',
       },
     });
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return jsonWithWorkshopSession(access.validation, { error: 'Internal server error' }, 500);
   }
 }

@@ -110,6 +110,7 @@ function persistSyntheticLedger(params: {
   requiredIds?: string[];
   expectedSuiteManifestHash?: string;
   persist?: boolean;
+  exitCode?: number;
 }):
   | { ok: true; reference: VerificationLedgerReference; record: import('@/scripts/automation/workflow-verification-ledger').VerificationLedgerRecord }
   | { ok: false; message: string } {
@@ -154,7 +155,7 @@ function persistSyntheticLedger(params: {
     cwd: params.repoRoot,
     startedAt: new Date().toISOString(),
     completedAt: new Date().toISOString(),
-    exitCode: reporter.success ? 0 : 1,
+    exitCode: params.exitCode ?? (reporter.success ? 0 : 1),
     runnerName: 'vitest',
     runnerVersion: '3.2.4',
     reporterAbsolutePath: reporterPath,
@@ -452,6 +453,53 @@ it('T-LEDGER-DUPLICATE-ID-FAIL-CLOSED second', () => {});
       proveCanonicalWorkflowSuite({
         record: zero.record,
         reporterSuccess: true,
+        manifest,
+      }).ok
+    ).toBe(false);
+  });
+
+  it('T-LEDGER-SUITE-EXIT1-REPORTER-SUCCESS: successful reporter with all-passed assertions proves the suite', () => {
+    const repoRoot = makeTempRoot('suite-exit1');
+    initGitRepo(repoRoot);
+    const manifest: CanonicalWorkflowSuiteManifest = {
+      schemaVersion: '1',
+      id: 'fixture-suite',
+      files: ['a.test.ts'],
+    };
+    const passed = expectOk(
+      persistSyntheticLedger({
+        repoRoot,
+        workstreamId: 'ws_suite_exit1',
+        titles: [{ title: 'suite a', file: 'a.test.ts' }],
+        commandType: 'vitest_suite',
+        requiredIds: [],
+        expectedSuiteManifestHash: hashCanonicalWorkflowSuiteManifest(manifest),
+        exitCode: 1,
+      })
+    );
+    expect(
+      proveCanonicalWorkflowSuite({
+        record: passed.record,
+        reporterSuccess: true,
+        manifest,
+      }).ok
+    ).toBe(true);
+
+    const failed = expectOk(
+      persistSyntheticLedger({
+        repoRoot,
+        workstreamId: 'ws_suite_exit1_fail',
+        titles: [{ title: 'suite a', file: 'a.test.ts', status: 'failed' }],
+        commandType: 'vitest_suite',
+        requiredIds: [],
+        expectedSuiteManifestHash: hashCanonicalWorkflowSuiteManifest(manifest),
+        exitCode: 1,
+      })
+    );
+    expect(
+      proveCanonicalWorkflowSuite({
+        record: failed.record,
+        reporterSuccess: false,
         manifest,
       }).ok
     ).toBe(false);

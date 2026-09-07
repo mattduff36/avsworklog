@@ -221,7 +221,9 @@ export function resolveMilestoneStatusEvent(
 
   if (timelineItemId === 'completed') {
     if (task.actioned_at) {
-      const byScalarMatch = history.find((event) => event.created_at === task.actioned_at);
+      const byScalarMatch = history.find(
+        (event) => event.status === 'completed' && event.created_at === task.actioned_at
+      );
       if (byScalarMatch) {
         return byScalarMatch;
       }

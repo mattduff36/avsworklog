@@ -91,8 +91,12 @@ export async function isEffectiveRoleAdminOrSuper(): Promise<boolean> {
   return hasEffectiveRoleFullAccess(effectiveRole);
 }
 
-export async function isEffectiveRoleManagerOrHigher(): Promise<boolean> {
-  const effectiveRole = await getEffectiveRole();
+export async function isEffectiveRoleManagerOrHigher(
+  actor?: EffectiveActorRef
+): Promise<boolean> {
+  const effectiveRole = actor
+    ? await getEffectiveRoleForUser(actor.userId, actor.email)
+    : await getEffectiveRole();
   if (!effectiveRole.user_id) {
     return false;
   }
