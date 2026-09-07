@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { requireWorkshopTasksAccess } from '@/lib/server/workshop-tasks/auth';
+import { requireWorkshopTasksManagerAccess } from '@/lib/server/workshop-tasks/auth';
 import { jsonWithWorkshopSession } from '@/lib/server/workshop-tasks/http';
 import { syncWorkshopTaskCompletionDependents, type RelatedName } from '@/lib/server/workshop-task-completion-sync';
 import {
@@ -83,12 +83,12 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ taskId: string; timelineItemId: string }> }
 ) {
-  const access = await requireWorkshopTasksAccess();
+  const access = await requireWorkshopTasksManagerAccess();
   try {
     if (!access.ok) {
       return jsonWithWorkshopSession(
         access.validation,
-        { error: access.status === 401 ? 'Unauthorized' : 'Forbidden: workshop-tasks permission required' },
+        { error: access.status === 401 ? 'Unauthorized' : 'Only managers or admins can adjust task timestamps' },
         access.status
       );
     }

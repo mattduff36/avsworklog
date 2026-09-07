@@ -3,14 +3,14 @@ import { NextRequest } from 'next/server';
 import type { AppSessionValidationResult } from '@/lib/server/app-auth/session';
 
 const {
-  mockRequireWorkshopTasksAccess,
+  mockRequireWorkshopTasksManagerAccess,
   mockCreateAdminSupabaseClient,
   mockCreateUserClient,
   mockCreateAdminClient,
   mockLogServerError,
   mockGetAdminSchemaSnapshotForAttachment,
 } = vi.hoisted(() => ({
-  mockRequireWorkshopTasksAccess: vi.fn(),
+  mockRequireWorkshopTasksManagerAccess: vi.fn(),
   mockCreateAdminSupabaseClient: vi.fn(),
   mockCreateUserClient: vi.fn(),
   mockCreateAdminClient: vi.fn(),
@@ -19,7 +19,7 @@ const {
 }));
 
 vi.mock('@/lib/server/workshop-tasks/auth', () => ({
-  requireWorkshopTasksAccess: mockRequireWorkshopTasksAccess,
+  requireWorkshopTasksManagerAccess: mockRequireWorkshopTasksManagerAccess,
 }));
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -85,7 +85,7 @@ describe('completed workshop correction first-review blockers', () => {
   });
 
   it('WT-CORR-B2 authorizes timestamp writes before admin and 409s completed schema POSTs', async () => {
-    mockRequireWorkshopTasksAccess.mockResolvedValue({
+    mockRequireWorkshopTasksManagerAccess.mockResolvedValue({
       ok: false,
       status: 401,
       validation: missingSession(),
@@ -106,7 +106,7 @@ describe('completed workshop correction first-review blockers', () => {
     expect(mockCreateAdminSupabaseClient).not.toHaveBeenCalled();
 
     const actionUpdate = vi.fn();
-    mockRequireWorkshopTasksAccess.mockResolvedValue({
+    mockRequireWorkshopTasksManagerAccess.mockResolvedValue({
       ok: true,
       userId: 'manager-1',
       validation: activeSession(),

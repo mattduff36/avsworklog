@@ -98,7 +98,8 @@ describe('completed workshop corrections', () => {
       expect(source).not.toContain('supabase.auth.getUser');
     }
     const timestamp = readRepo('app/api/workshop-tasks/tasks/[taskId]/timeline/[timelineItemId]/timestamp/route.ts');
-    expect(timestamp).toContain('requireWorkshopTasksAccess');
+    expect(timestamp).toContain('requireWorkshopTasksManagerAccess');
+    expect(timestamp).not.toContain('requireWorkshopTasksAccess');
     expect(timestamp).toContain('jsonWithWorkshopSession');
     expect(timestamp).not.toContain('supabase.auth.getUser');
     expect(timestamp).not.toContain('userHasPermission');

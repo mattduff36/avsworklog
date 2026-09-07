@@ -3,17 +3,17 @@ import { NextRequest } from 'next/server';
 import { PATCH } from '@/app/api/workshop-tasks/tasks/[taskId]/timeline/[timelineItemId]/timestamp/route';
 
 const {
-  mockRequireWorkshopTasksAccess,
+  mockRequireWorkshopTasksManagerAccess,
   mockCreateAdminSupabaseClient,
   mockLogServerError,
 } = vi.hoisted(() => ({
-  mockRequireWorkshopTasksAccess: vi.fn(),
+  mockRequireWorkshopTasksManagerAccess: vi.fn(),
   mockCreateAdminSupabaseClient: vi.fn(),
   mockLogServerError: vi.fn(),
 }));
 
 vi.mock('@/lib/server/workshop-tasks/auth', () => ({
-  requireWorkshopTasksAccess: mockRequireWorkshopTasksAccess,
+  requireWorkshopTasksManagerAccess: mockRequireWorkshopTasksManagerAccess,
 }));
 
 vi.mock('@supabase/supabase-js', () => ({
@@ -222,7 +222,7 @@ describe('PATCH /api/workshop-tasks/tasks/[taskId]/timeline/[timelineItemId]/tim
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockRequireWorkshopTasksAccess.mockResolvedValue({
+    mockRequireWorkshopTasksManagerAccess.mockResolvedValue({
       ok: true,
       userId: 'manager-1',
       validation: {
@@ -238,6 +238,38 @@ describe('PATCH /api/workshop-tasks/tasks/[taskId]/timeline/[timelineItemId]/tim
       },
     });
     mockLogServerError.mockResolvedValue(undefined);
+  });
+
+  it('WT-CORR-AUTH-COMPLETED-TIMESTAMP returns 403 before creating an admin client', async () => {
+    const adminFrom = vi.fn();
+    mockRequireWorkshopTasksManagerAccess.mockResolvedValue({
+      ok: false,
+      status: 403,
+      validation: {
+        status: 'active',
+        session: null,
+        profileId: 'employee-1',
+        email: null,
+        cookieValue: null,
+        cookieExpiresAt: null,
+        secretRotated: false,
+        failureReason: null,
+        kioskDeviceIdHint: null,
+      },
+    });
+    mockCreateAdminSupabaseClient.mockReturnValue({ from: adminFrom });
+
+    const response = await callRoute({
+      timelineItemId: 'completed',
+      itemType: 'status_event',
+      timestamp: '2026-04-13T12:30:00.000Z',
+    });
+    const payload = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(payload.error).toBe('Only managers or admins can adjust task timestamps');
+    expect(mockCreateAdminSupabaseClient).not.toHaveBeenCalled();
+    expect(adminFrom).not.toHaveBeenCalled();
   });
 
   it('updates the created timestamp for the task row', async () => {
