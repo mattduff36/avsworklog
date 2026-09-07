@@ -49,11 +49,11 @@ The active descendant owns remaining work. After two failed premium rounds, rema
     "payroll-adjacent-timesheet-hours"
   ],
   "requiredTests": [
-    { "id": "BH-TRIAL-PHRASE-001", "status": "resolved" },
-    { "id": "BH-TRIAL-OVERRIDE-001", "status": "resolved" },
-    { "id": "BH-TRIAL-SUBMIT-001", "status": "resolved" },
-    { "id": "BH-TRIAL-OFF-001", "status": "resolved" },
-    { "id": "BH-TRIAL-SETTINGS-001", "status": "resolved" }
+    { "id": "BH-TRIAL-PHRASE-001", "status": "completed" },
+    { "id": "BH-TRIAL-OVERRIDE-001", "status": "completed" },
+    { "id": "BH-TRIAL-SUBMIT-001", "status": "completed" },
+    { "id": "BH-TRIAL-OFF-001", "status": "completed" },
+    { "id": "BH-TRIAL-SETTINGS-001", "status": "completed" }
   ],
   "unresolvedRisks": [
     {
