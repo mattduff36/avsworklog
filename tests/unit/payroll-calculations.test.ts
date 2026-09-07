@@ -228,6 +228,25 @@ describe('signed payroll rule engine', () => {
       .toBe(result.payableMinutes);
   });
 
+  it('PAY-RECALC-PLANT-001 maps 06:00–16:00 × 3 weekdays plus 1h travel to Plant bands', () => {
+    const result = calculatePayrollWeek({
+      weekEnding: '2026-09-06',
+      rule: getSignedPayrollRule('plant'),
+      days: [2, 3, 4].map((dayOfWeek) => ({
+        dayOfWeek,
+        timeStarted: '06:00',
+        timeFinished: '16:00',
+        operatorTravelHours: 1,
+      })),
+    });
+    expect(result.basicMinutes).toBe(1440);
+    expect(result.overtimeMinutes).toBe(270);
+    expect(result.doubleTimeMinutes).toBe(0);
+    expect(result.payableMinutes).toBe(1710);
+    expect(result.operatorTravelMinutes).toBe(180);
+    expect(result.iprUnits).toBe(0.6);
+  });
+
   it('PAY-TRAVEL-001 and PAY-IPR-001 keep Plant travel separate and cap IPR', () => {
     const days: PayrollDayInput[] = Array.from({ length: 7 }, (_, index) => ({
       dayOfWeek: index + 1,

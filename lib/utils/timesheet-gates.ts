@@ -7,6 +7,10 @@ export const TIMESHEET_PAYROLL_EDIT_PAY_IMPACT_MISMATCH_CODE =
 export const TIMESHEET_PAYROLL_EDIT_SNAPSHOTLESS_CODE = 'timesheet_payroll_edit_snapshotless_legacy';
 export const TIMESHEET_PAYROLL_EDIT_IDEMPOTENCY_CONFLICT_CODE =
   'timesheet_payroll_edit_idempotency_conflict';
+export const TIMESHEET_PAYROLL_RECALCULATE_NOSNAP_CODE =
+  'timesheet_payroll_recalculate_no_snapshot';
+export const TIMESHEET_PAYROLL_RECALCULATE_STATUS_CODE =
+  'timesheet_payroll_recalculate_status';
 export const TIMESHEET_ADJUST_RETIRED_CODE = 'timesheet_adjust_retired';
 
 export const TIMESHEET_ADJUST_RETIRED_MESSAGE =

@@ -19,7 +19,7 @@ import {
 } from '@/components/timesheets/PayrollSnapshotCard';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Save, Send, Edit2, CheckCircle2, XCircle, Download, UserCheck, AlertTriangle, ArrowLeft, BedDouble } from 'lucide-react';
+import { Save, Send, Edit2, CheckCircle2, XCircle, Download, UserCheck, AlertTriangle, ArrowLeft, BedDouble, RefreshCcw } from 'lucide-react';
 import Link from 'next/link';
 import { BackButton } from '@/components/ui/back-button';
 import { formatDate } from '@/lib/utils/date';
@@ -40,6 +40,7 @@ import { DAY_NAMES, Timesheet, TimesheetEntry } from '@/types/timesheet';
 import SignaturePad from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
 import { TimesheetPayrollEditModal } from '@/components/timesheets/TimesheetPayrollEditModal';
+import { TimesheetPayrollRecalculateModal } from '@/components/timesheets/TimesheetPayrollRecalculateModal';
 import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
 import {
   getTimesheetApprovalActionVisibility,
@@ -118,6 +119,7 @@ export default function ViewTimesheetPage() {
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [showProcessedDialog, setShowProcessedDialog] = useState(false);
   const [showPayrollEditModal, setShowPayrollEditModal] = useState(false);
+  const [showPayrollRecalculateModal, setShowPayrollRecalculateModal] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [rejectionComments, setRejectionComments] = useState('');
   const [originalData, setOriginalData] = useState<{entries: TimesheetEntry[], regNumber: string | null} | null>(null);
@@ -349,12 +351,50 @@ export default function ViewTimesheetPage() {
     () => normalizeTimesheetEntriesForDisplay(timesheet, entries, offDayStates),
     [timesheet, entries, offDayStates]
   );
+  const canMarkPayrollReceived = canActorMarkTimesheetPayrollReceived({
+    hasFullAdminAccess: Boolean(isAdmin || isSuperAdmin),
+    roleName: effectiveRole?.name,
+    teamName: effectiveRole?.team_name,
+  });
+  const canAuthoriseThisTimesheet = Boolean(
+    timesheet &&
+      canActorAuthoriseTimesheetTarget({
+        actor: {
+          actorProfileId: user?.id ?? '',
+          actorTeamId: absenceSecondarySnapshot?.team_id ?? effectiveRole?.team_id ?? null,
+          approvalsAccessLevel: resolveClientApprovalsAccessLevel({
+            isAdminTier: Boolean(isAdmin || isSuperAdmin),
+            permissionLevels,
+          }),
+          hasAccountsOverride:
+            Boolean(isAdmin || isSuperAdmin) ||
+            hasAccountsTimesheetFullVisibilityOverride(effectiveRole?.name, effectiveRole?.team_name),
+          permissions: absenceSecondarySnapshot?.permissions ?? null,
+        },
+        target: {
+          profileId: timesheet.user_id,
+          teamId: employeeTeamId,
+        },
+      })
+  );
+  const canPerformPayrollReceived = canActorPerformTimesheetPayrollReceived({
+    canMarkPayrollReceived,
+    canAuthoriseTarget: canAuthoriseThisTimesheet,
+    actorProfileId: user?.id,
+    targetProfileId: timesheet?.user_id,
+  });
+  const canRecalculatePayroll = Boolean(
+    canPerformPayrollReceived
+    && payrollSnapshot
+    && timesheet
+    && (timesheet.status === 'approved' || timesheet.status === 'processed')
+  );
 
   useEffect(() => {
     if (
       !timesheet
       || !['submitted', 'adjusted', 'approved', 'manager_approved', 'processed'].includes(timesheet.status)
-      || (payrollSnapshot && timesheet.status !== 'adjusted' && !editing)
+      || (payrollSnapshot && timesheet.status !== 'adjusted' && !editing && !canRecalculatePayroll)
     ) {
       setPayrollPreview(null);
       return;
@@ -398,7 +438,7 @@ export default function ViewTimesheetPage() {
         if ((previewError as Error).name !== 'AbortError') setPayrollPreview(null);
       });
     return () => controller.abort();
-  }, [displayEntries, offDayStates, payrollSnapshot, timesheet, editing]);
+  }, [canRecalculatePayroll, displayEntries, offDayStates, payrollSnapshot, timesheet, editing]);
 
   const trimTrailingEmptyJobNumbers = (values: string[]): string[] => {
     const next = [...values];
@@ -887,39 +927,6 @@ export default function ViewTimesheetPage() {
     }
   };
 
-  const canMarkPayrollReceived = canActorMarkTimesheetPayrollReceived({
-    hasFullAdminAccess: Boolean(isAdmin || isSuperAdmin),
-    roleName: effectiveRole?.name,
-    teamName: effectiveRole?.team_name,
-  });
-  const canAuthoriseThisTimesheet = Boolean(
-    timesheet &&
-      canActorAuthoriseTimesheetTarget({
-        actor: {
-          actorProfileId: user?.id ?? '',
-          actorTeamId: absenceSecondarySnapshot?.team_id ?? effectiveRole?.team_id ?? null,
-          approvalsAccessLevel: resolveClientApprovalsAccessLevel({
-            isAdminTier: Boolean(isAdmin || isSuperAdmin),
-            permissionLevels,
-          }),
-          hasAccountsOverride:
-            Boolean(isAdmin || isSuperAdmin) ||
-            hasAccountsTimesheetFullVisibilityOverride(effectiveRole?.name, effectiveRole?.team_name),
-          permissions: absenceSecondarySnapshot?.permissions ?? null,
-        },
-        target: {
-          profileId: timesheet.user_id,
-          teamId: employeeTeamId,
-        },
-      })
-  );
-  const canPerformPayrollReceived = canActorPerformTimesheetPayrollReceived({
-    canMarkPayrollReceived,
-    canAuthoriseTarget: canAuthoriseThisTimesheet,
-    actorProfileId: user?.id,
-    targetProfileId: timesheet?.user_id,
-  });
-
   const handleApprove = async () => {
     if (!timesheet || !canPerformPayrollReceived) return;
 
@@ -1118,6 +1125,56 @@ export default function ViewTimesheetPage() {
       const errorContextId = 'timesheet-details-payroll-edit-error';
       console.error('Payroll edit error:', err, { errorContextId });
       toast.error(err instanceof Error ? err.message : 'Failed to save payroll edit', { id: errorContextId });
+      throw err;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePayrollRecalculate = async (reason: string) => {
+    if (!timesheet || !canRecalculatePayroll || !user || !timesheet.current_payroll_snapshot_id) return;
+    if (!timesheet.updated_at) {
+      toast.error('This timesheet is missing a timestamp. Reload and try again.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError('');
+      const response = await fetch(`/api/timesheets/${timesheet.id}/payroll-recalculate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          reason,
+          idempotency_key: crypto.randomUUID(),
+          expected_status: timesheet.status,
+          expected_updated_at: timesheet.updated_at,
+          expected_snapshot_id: timesheet.current_payroll_snapshot_id,
+        }),
+      });
+      const data = (await response.json()) as { error?: string; payImpact?: boolean; noop?: boolean };
+      if (!response.ok) {
+        if (response.status === 409) {
+          toast.error(data.error || 'Timesheet changed. Reloading.');
+          await fetchTimesheet(timesheet.id);
+          return;
+        }
+        throw new Error(data.error || 'Failed to recalculate payroll');
+      }
+
+      toast.success(
+        data.noop
+          ? 'Current payroll rule already matches this snapshot'
+          : data.payImpact
+            ? 'Payroll snapshot recalculated and Manager Approved cleared'
+            : 'Payroll snapshot recalculated'
+      );
+      setShowPayrollRecalculateModal(false);
+      await fetchTimesheet(timesheet.id);
+    } catch (err) {
+      const errorContextId = 'timesheet-details-payroll-recalculate-error';
+      console.error('Payroll recalculate error:', err, { errorContextId });
+      toast.error(err instanceof Error ? err.message : 'Failed to recalculate payroll', { id: errorContextId });
       throw err;
     } finally {
       setSaving(false);
@@ -1714,9 +1771,20 @@ export default function ViewTimesheetPage() {
           </div>
 
           {payrollSnapshot && <PayrollSnapshotCard snapshot={payrollSnapshot} />}
+          {canRecalculatePayroll && !editing && (
+            <div className="rounded-md border border-border bg-secondary/40 p-4 text-sm">
+              <p className="font-medium text-foreground">Current payroll rule</p>
+              <p className="mt-1 text-muted-foreground">
+                Frozen snapshot uses {payrollSnapshot?.rule_set?.name || 'the stored rule'}.
+                {payrollPreview
+                  ? ` Live assignment would now use ${payrollPreview.ruleSetKey}.`
+                  : ' Loading the live assignment preview…'}
+              </p>
+            </div>
+          )}
           {payrollPreview && (
             <PayrollSnapshotCard
-              title={`${timesheet.status === 'adjusted' ? 'Reapproval' : 'Provisional'} Payroll Breakdown — ${payrollPreview.ruleSetKey}`}
+              title={`${timesheet.status === 'adjusted' ? 'Reapproval' : canRecalculatePayroll && !editing ? 'Current-rule' : 'Provisional'} Payroll Breakdown — ${payrollPreview.ruleSetKey}`}
               snapshot={{
                 revision: 0,
                 basic_minutes: payrollPreview.basicMinutes,
@@ -1833,6 +1901,16 @@ export default function ViewTimesheetPage() {
               >
                 <XCircle className="h-4 w-4 mr-2" />
                 Reject
+              </Button>
+            )}
+            {canRecalculatePayroll && !editing && (
+              <Button
+                variant="outline"
+                onClick={() => setShowPayrollRecalculateModal(true)}
+                disabled={saving}
+              >
+                <RefreshCcw className="h-4 w-4 mr-2" />
+                Recalculate from current payroll rule
               </Button>
             )}
             {canApprove && !editing && (
@@ -1953,6 +2031,33 @@ export default function ViewTimesheetPage() {
             overtimeHours: minutesToHours(payrollPreview.overtimeMinutes),
             doubleTimeHours: minutesToHours(payrollPreview.doubleTimeMinutes),
             subsistenceDays: payrollPreview.subsistenceDays,
+          } : null}
+        />
+      )}
+
+      {timesheet && (
+        <TimesheetPayrollRecalculateModal
+          open={showPayrollRecalculateModal}
+          onClose={() => setShowPayrollRecalculateModal(false)}
+          onConfirm={handlePayrollRecalculate}
+          employeeName={(timesheet as Timesheet & { profile?: { full_name?: string | null } }).profile?.full_name || 'Employee'}
+          weekEnding={formatDate(timesheet.week_ending)}
+          currentRuleName={payrollSnapshot?.rule_set?.name || 'Stored snapshot'}
+          previewRuleName={payrollPreview?.ruleSetKey || 'current assignment'}
+          isComplete={isTimesheetComplete(timesheet.status)}
+          beforeTotals={payrollSnapshot ? {
+            basicHours: minutesToHours(payrollSnapshot.basic_minutes),
+            overtimeHours: minutesToHours(payrollSnapshot.overtime_minutes),
+            doubleTimeHours: minutesToHours(payrollSnapshot.double_time_minutes),
+            travelHours: minutesToHours(payrollSnapshot.operator_travel_minutes),
+            iprUnits: Number(payrollSnapshot.ipr_units),
+          } : null}
+          afterTotals={payrollPreview ? {
+            basicHours: minutesToHours(payrollPreview.basicMinutes),
+            overtimeHours: minutesToHours(payrollPreview.overtimeMinutes),
+            doubleTimeHours: minutesToHours(payrollPreview.doubleTimeMinutes),
+            travelHours: minutesToHours(payrollPreview.operatorTravelMinutes),
+            iprUnits: payrollPreview.iprUnits,
           } : null}
         />
       )}

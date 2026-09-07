@@ -312,15 +312,33 @@ async function loadCanonicalLeaveByDay(
   );
 }
 
-export async function insertPayrollSnapshotForLockedTimesheet(
+export interface PreparedPayrollSnapshot {
+  resolution: {
+    rule_set_id: string;
+    rule_version_id: string;
+    assignment_source: PayrollAssignmentSource;
+    assignment_source_id: string | null;
+  };
+  rule: PayrollRuleConfiguration;
+  days: PayrollDayInput[];
+  breakdown: PayrollWeekBreakdown;
+  sourceEvidence: {
+    engineVersion: number;
+    assignment: {
+      source: PayrollAssignmentSource;
+      sourceId: string | null;
+    };
+    rule: PayrollRuleConfiguration;
+    days: PayrollDayInput[];
+    breakdown: PayrollWeekBreakdown;
+  };
+  inputHash: string;
+}
+
+export async function preparePayrollSnapshotForLockedTimesheet(
   client: PayrollPgClient,
-  input: {
-    timesheet: TimesheetPayrollLockRow;
-    actorId: string;
-    idempotencyKey: string;
-  }
-): Promise<{ snapshotId: string; revision: number; breakdown: PayrollWeekBreakdown }> {
-  const timesheet = input.timesheet;
+  timesheet: TimesheetPayrollLockRow
+): Promise<PreparedPayrollSnapshot> {
   const [{ row: resolution, rule }, entriesResult, leaveByDay, bankHolidays] = await Promise.all([
     resolveRule(client, timesheet),
     client.query<EntryRow>(
@@ -385,6 +403,34 @@ export async function insertPayrollSnapshotForLockedTimesheet(
   const inputHash = createHash('sha256')
     .update(JSON.stringify(sourceEvidence))
     .digest('hex');
+
+  return {
+    resolution: {
+      rule_set_id: resolution.rule_set_id,
+      rule_version_id: resolution.rule_version_id,
+      assignment_source: resolution.assignment_source,
+      assignment_source_id: resolution.assignment_source_id,
+    },
+    rule,
+    days,
+    breakdown,
+    sourceEvidence,
+    inputHash,
+  };
+}
+
+export async function insertPayrollSnapshotForLockedTimesheet(
+  client: PayrollPgClient,
+  input: {
+    timesheet: TimesheetPayrollLockRow;
+    actorId: string;
+    idempotencyKey: string;
+    prepared?: PreparedPayrollSnapshot;
+  }
+): Promise<{ snapshotId: string; revision: number; breakdown: PayrollWeekBreakdown }> {
+  const timesheet = input.timesheet;
+  const prepared = input.prepared ?? await preparePayrollSnapshotForLockedTimesheet(client, timesheet);
+  const { resolution, breakdown, sourceEvidence, inputHash } = prepared;
 
   const revisionResult = await client.query<{ next_revision: number }>(
     `
