@@ -1,5 +1,22 @@
 [
   {
+    "version": "0926.7.1",
+    "updateKind": "minor",
+    "title": "Workshop Tasks improvements",
+    "description": "Expose completed attachment correction.",
+    "summary": "Expose completed attachment correction.",
+    "details": [
+      "Expose completed attachment correction, with changes to interface components and automated tests."
+    ],
+    "areas": [
+      "Workshop Tasks"
+    ],
+    "areaKeys": [
+      "workshop-tasks"
+    ],
+    "pushedAt": "2026-09-07T14:16:33.738Z"
+  },
+  {
     "version": "0926.7.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",

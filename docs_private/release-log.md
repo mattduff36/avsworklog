@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.7.1
+
+**GIT COMMIT MESSAGE**
+`fix(workshop-tasks): expose completed attachment correction`
+
+**PUSHED AT**
+2026-09-07T14:16:33.738Z
+
+**WHAT CHANGED**
+Expose completed attachment correction.
+
+**VERSION HISTORY DETAILS**
+- Expose completed attachment correction, with changes to interface components and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(workshop-tasks): expose completed attachment correction`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0926.7.0
 
 **GIT COMMIT MESSAGE**
