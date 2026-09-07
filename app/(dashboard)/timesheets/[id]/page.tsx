@@ -62,6 +62,7 @@ import { declineTrainingBookingsClient } from '@/lib/client/training-bookings';
 import { toast } from 'sonner';
 import { isNetworkFetchError } from '@/lib/utils/http-error';
 import { submitTimesheet } from '@/lib/client/timesheet-submit';
+import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
 import {
   type ApprovedAbsenceForTimesheet,
   type TimesheetOffDayState,
@@ -137,6 +138,26 @@ export default function ViewTimesheetPage() {
   const [trainingDeclineDayOfWeek, setTrainingDeclineDayOfWeek] = useState<number | null>(null);
   const [decliningTraining, setDecliningTraining] = useState(false);
   const [employeeTeamId, setEmployeeTeamId] = useState<string | null>(null);
+  const [approvedAbsences, setApprovedAbsences] = useState<ApprovedAbsenceForTimesheet[]>([]);
+  const bankHolidayConfirm = useBankHolidayWorkConfirm({
+    weekEnding: timesheet?.week_ending || '',
+    userId: timesheet?.user_id || null,
+    timesheetId: timesheet?.id || null,
+    timesheetType: timesheet?.timesheet_type === 'plant' ? 'plant' : 'civils',
+    templateVersion: timesheet?.template_version === 2 ? 2 : 1,
+    offDayStates,
+  });
+
+  useEffect(() => {
+    if (!timesheet?.week_ending || !bankHolidayConfirm.trialReady) {
+      return;
+    }
+    setOffDayStates(
+      resolveTimesheetOffDayStates(timesheet.week_ending, approvedAbsences, null, {
+        bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled,
+      })
+    );
+  }, [approvedAbsences, bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, timesheet?.week_ending]);
 
   const getActionErrorMessage = (err: unknown, fallback: string) => {
     return err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
@@ -305,7 +326,7 @@ export default function ViewTimesheetPage() {
         const { startIso, endIso } = getTimesheetWeekIsoBounds(timesheetData.week_ending);
         const { data: absenceData, error: absenceError } = await supabase
           .from('absences')
-          .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, is_bank_holiday, absence_reasons(name,color,is_paid)')
           .eq('profile_id', timesheetData.user_id)
           .in('status', ['pending', 'approved', 'processed'])
           .lte('date', endIso);
@@ -317,10 +338,10 @@ export default function ViewTimesheetPage() {
           return row.date <= endIso && rowEnd >= startIso;
         });
 
-        setOffDayStates(resolveTimesheetOffDayStates(timesheetData.week_ending, approvedAbsences, null));
+        setApprovedAbsences(approvedAbsences);
       } catch (absenceLookupError) {
         console.warn('Failed to resolve leave state for timesheet details view:', absenceLookupError);
-        setOffDayStates(resolveTimesheetOffDayStates(timesheetData.week_ending, [], null));
+        setApprovedAbsences([]);
       }
       
       // Enable editing for draft or rejected timesheets
@@ -677,6 +698,11 @@ export default function ViewTimesheetPage() {
         return { success: true };
       }
 
+      const confirmation = await bankHolidayConfirm.ensureConfirmed(entriesToPersist);
+      if (!confirmation.ok) {
+        return { success: false, errorMessage: 'Bank holiday hours were not confirmed' };
+      }
+
       const timesheetUpdate: Database['public']['Tables']['timesheets']['Update'] = {
         updated_at: new Date().toISOString(),
       };
@@ -896,6 +922,11 @@ export default function ViewTimesheetPage() {
         const errorMessage = 'Please enter hours or mark Did Not Work for all 7 days before submitting.';
         setError(errorMessage);
         toast.error(errorMessage);
+        return;
+      }
+
+      const confirmation = await bankHolidayConfirm.ensureConfirmed(persistableEntries);
+      if (!confirmation.ok) {
         return;
       }
 
@@ -2070,6 +2101,7 @@ export default function ViewTimesheetPage() {
         onCancel={handleCancelTrainingDecline}
         onConfirm={handleConfirmTrainingDecline}
       />
+      {bankHolidayConfirm.modal}
     </div>
   );
 }

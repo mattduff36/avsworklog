@@ -5817,6 +5817,7 @@ export type Database = {
           id: string
           employee_id: string | null
           full_name: string
+          deleted_at: string | null
           role: string | null
           created_at: string | null
           updated_at: string | null
@@ -5844,6 +5845,7 @@ export type Database = {
           id: string
           employee_id?: string | null
           full_name: string
+          deleted_at?: string | null
           role?: string | null
           created_at?: string | null
           updated_at?: string | null
@@ -5871,6 +5873,7 @@ export type Database = {
           id?: string
           employee_id?: string | null
           full_name?: string
+          deleted_at?: string | null
           role?: string | null
           created_at?: string | null
           updated_at?: string | null
@@ -8845,6 +8848,87 @@ export type Database = {
           },
         ]
       }
+      timesheet_bank_holiday_work_confirmations: {
+        Row: {
+          id: string
+          timesheet_id: string
+          work_date: string
+          absence_id: string
+          confirmed_by: string
+          confirmed_at: string
+        }
+        Insert: {
+          id?: string
+          timesheet_id: string
+          work_date: string
+          absence_id: string
+          confirmed_by: string
+          confirmed_at?: string
+        }
+        Update: {
+          id?: string
+          timesheet_id?: string
+          work_date?: string
+          absence_id?: string
+          confirmed_by?: string
+          confirmed_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'timesheet_bank_holiday_work_confirmations_timesheet_id_fkey'
+            columns: ['timesheet_id']
+            isOneToOne: false
+            referencedRelation: 'timesheets'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_bank_holiday_work_confirmations_absence_id_fkey'
+            columns: ['absence_id']
+            isOneToOne: false
+            referencedRelation: 'absences'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'timesheet_bank_holiday_work_confirmations_confirmed_by_fkey'
+            columns: ['confirmed_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      timesheet_module_settings: {
+        Row: {
+          id: boolean
+          bank_holiday_self_override_enabled: boolean
+          updated_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: boolean
+          bank_holiday_self_override_enabled?: boolean
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: boolean
+          bank_holiday_self_override_enabled?: boolean
+          updated_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'timesheet_module_settings_updated_by_fkey'
+            columns: ['updated_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       timesheets: {
         Row: {
           id: string
@@ -11187,6 +11271,12 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_profile_open_year_annual_leave_bookings: {
+        Args: {
+          p_profile_id: string
+        }
+        Returns: number
+      }
       can_actor_manage_daily_allocation: {
         Args: {
           target_profile_id: string

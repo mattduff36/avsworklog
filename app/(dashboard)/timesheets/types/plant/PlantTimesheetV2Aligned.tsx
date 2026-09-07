@@ -94,6 +94,7 @@ import {
 } from '@/lib/utils/timesheet-did-not-work-bookings';
 import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-not-work-bookings';
 import { submitTimesheet } from '@/lib/client/timesheet-submit';
+import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   buildValidationErrors,
@@ -373,6 +374,15 @@ export function PlantTimesheetV2({
     () => applyPendingTrainingBookingsToOffDayStates(offDayStates, pendingDidNotWorkBookings),
     [offDayStates, pendingDidNotWorkBookings]
   );
+  const bankHolidayConfirm = useBankHolidayWorkConfirm({
+    weekEnding,
+    userId: selectedEmployeeId || null,
+    timesheetId: existingTimesheetId,
+    timesheetType: 'plant',
+    templateVersion: 2,
+    offDayStates: effectiveOffDayStates,
+    onAdoptTimesheetId: setExistingTimesheetId,
+  });
   const offDayMap = useMemo(
     () =>
       offDayKey === currentOffDayKey
@@ -698,6 +708,10 @@ export function PlantTimesheetV2({
       setLoadingOffDays(true);
       return;
     }
+    if (!bankHolidayConfirm.trialReady) {
+      setLoadingOffDays(true);
+      return;
+    }
 
     const requestKey = `${selectedEmployeeId}:${weekEnding}`;
     let cancelled = false;
@@ -708,7 +722,7 @@ export function PlantTimesheetV2({
         const { startIso, endIso } = getTimesheetWeekIsoBounds(weekEnding);
         const absenceResult = await supabase
           .from('absences')
-          .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, is_bank_holiday, absence_reasons(name,color,is_paid)')
           .eq('profile_id', selectedEmployeeId)
           .in('status', ['pending', 'approved', 'processed'])
           .lte('date', endIso);
@@ -737,7 +751,8 @@ export function PlantTimesheetV2({
         const resolvedStates = resolveTimesheetOffDayStates(
           weekEnding,
           filteredAbsences,
-          resolvedPattern
+          resolvedPattern,
+          { bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled }
         );
 
         if (cancelled) return;
@@ -750,7 +765,9 @@ export function PlantTimesheetV2({
           console.error('Failed to resolve timesheet off-day states:', offDayError);
         }
         if (!cancelled) {
-          setOffDayStates(resolveTimesheetOffDayStates(weekEnding, [], null));
+          setOffDayStates(resolveTimesheetOffDayStates(weekEnding, [], null, {
+            bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled,
+          }));
           setOffDayKey(requestKey);
         }
       } finally {
@@ -765,7 +782,7 @@ export function PlantTimesheetV2({
     return () => {
       cancelled = true;
     };
-  }, [offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
+  }, [bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
 
   useEffect(() => {
     if (!existingTimesheetLoaded) return;
@@ -1263,14 +1280,20 @@ export function PlantTimesheetV2({
     });
 
     try {
-      let timesheetId = existingTimesheetId;
+      const confirmation = await bankHolidayConfirm.ensureConfirmed(persistableEntries);
+      if (!confirmation.ok) return;
+      if (confirmation.timesheetId && confirmation.timesheetId !== existingTimesheetId) {
+        setExistingTimesheetId(confirmation.timesheetId);
+      }
+
+      let timesheetId = confirmation.timesheetId || existingTimesheetId;
 
       if (status === 'submitted') {
         if (!signatureData) {
           throw new Error('Signature is required to submit a timesheet');
         }
         const submitted = await submitTimesheet({
-          timesheetId: existingTimesheetId,
+          timesheetId: confirmation.timesheetId || existingTimesheetId,
           userId: selectedEmployeeId,
           weekEnding,
           timesheetType: 'plant',
@@ -2670,6 +2693,7 @@ export function PlantTimesheetV2({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {bankHolidayConfirm.modal}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { applyValidationCookieIfNeeded } from '@/lib/server/app-auth/response';
@@ -8,18 +9,25 @@ import {
 } from '@/lib/server/app-auth/session';
 import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
 import {
-  TIMESHEET_SUBMIT_FORBIDDEN,
-  TimesheetSubmitBodySchema,
-  TimesheetSubmitError,
-  applyTimesheetSubmit,
-  authorizeTimesheetSubmit,
-} from '@/lib/server/timesheet-submit';
+  TimesheetBankHolidayWorkError,
+  confirmBankHolidayWork,
+} from '@/lib/server/timesheet-bank-holiday-work';
+import { authorizeTimesheetSubmit } from '@/lib/server/timesheet-submit';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
-import { notifyBankHolidayWorkOnSubmit } from '@/lib/server/timesheet-bank-holiday-work-notification';
 
-const FORBIDDEN_BODY = { error: TIMESHEET_SUBMIT_FORBIDDEN, code: 'FORBIDDEN' as const };
+const ConfirmBodySchema = z
+  .object({
+    timesheetId: z.string().uuid().nullable().optional(),
+    userId: z.string().uuid(),
+    weekEnding: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+    timesheetType: z.enum(['civils', 'plant']).optional(),
+    templateVersion: z.union([z.literal(1), z.literal(2)]).optional(),
+    dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/u)).min(1).max(7),
+    phrase: z.string().min(1).max(64),
+  })
+  .strict();
 
 function jsonWithSession(
   session: AppSessionValidationResult,
@@ -47,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     const canAccessTimesheets = await canEffectiveRoleAccessModule('timesheets');
     if (!canAccessTimesheets) {
-      return jsonWithSession(session, FORBIDDEN_BODY, 403);
+      return jsonWithSession(session, { error: 'Forbidden', code: 'FORBIDDEN' }, 403);
     }
 
     let rawBody: unknown;
@@ -56,15 +64,16 @@ export async function POST(request: NextRequest) {
     } catch {
       return jsonWithSession(
         session,
-        { error: 'Invalid timesheet submit payload', code: 'INVALID_INPUT' },
+        { error: 'Invalid bank holiday confirm payload', code: 'INVALID_INPUT' },
         400
       );
     }
-    const parsed = TimesheetSubmitBodySchema.safeParse(rawBody);
+
+    const parsed = ConfirmBodySchema.safeParse(rawBody);
     if (!parsed.success) {
       return jsonWithSession(
         session,
-        { error: 'Invalid timesheet submit payload', code: 'INVALID_INPUT' },
+        { error: 'Invalid bank holiday confirm payload', code: 'INVALID_INPUT' },
         400
       );
     }
@@ -78,7 +87,7 @@ export async function POST(request: NextRequest) {
     if (targetError || !target) {
       return jsonWithSession(
         session,
-        { error: 'Invalid timesheet submit payload', code: 'INVALID_INPUT' },
+        { error: 'Invalid bank holiday confirm payload', code: 'INVALID_INPUT' },
         400
       );
     }
@@ -99,35 +108,35 @@ export async function POST(request: NextRequest) {
       targetUserId: parsed.data.userId,
       canAuthoriseTarget,
     })) {
-      return jsonWithSession(session, FORBIDDEN_BODY, 403);
+      return jsonWithSession(session, { error: 'Forbidden', code: 'FORBIDDEN' }, 403);
     }
 
-    const result = await applyTimesheetSubmit({ body: parsed.data });
-    try {
-      await notifyBankHolidayWorkOnSubmit({
-        timesheetId: result.id,
+    const result = await confirmBankHolidayWork({
+      input: {
         actorId,
-      });
-    } catch (notificationError) {
-      console.warn('Bank holiday work notification was not sent:', notificationError);
-    }
-    return jsonWithSession(session, result);
+        targetUserId: parsed.data.userId,
+        weekEnding: parsed.data.weekEnding,
+        timesheetId: parsed.data.timesheetId,
+        timesheetType: parsed.data.timesheetType,
+        templateVersion: parsed.data.templateVersion,
+        dates: parsed.data.dates,
+        phrase: parsed.data.phrase,
+      },
+    });
+    return jsonWithSession(session, { success: true, ...result });
   } catch (error) {
-    if (error instanceof TimesheetSubmitError) {
-      if (error.status === 403) {
-        return jsonWithSession(session, FORBIDDEN_BODY, 403);
-      }
+    if (error instanceof TimesheetBankHolidayWorkError) {
       return jsonWithSession(session, { error: error.message, code: error.code }, error.status);
     }
 
     void logServerError({
-      error: error instanceof Error ? error : new Error('Failed to submit timesheet'),
-      componentName: 'timesheet-submit',
-      additionalData: { route: '/api/timesheets/submit' },
+      error: error instanceof Error ? error : new Error('Failed to confirm bank holiday hours'),
+      componentName: 'timesheet-bank-holiday-work-confirm',
+      additionalData: { route: '/api/timesheets/bank-holiday-work-confirm' },
     });
     return jsonWithSession(
       session,
-      { error: 'Failed to submit timesheet', code: 'SAVE_FAILED' },
+      { error: 'Failed to confirm bank holiday hours', code: 'SAVE_FAILED' },
       500
     );
   }

@@ -6,6 +6,10 @@ import {
   type AdjustPgClient,
   type AdjustableTimesheetEntryInput,
 } from '@/lib/server/timesheet-adjust';
+import {
+  TimesheetBankHolidayWorkError,
+  assertSubmittedBankHolidayHoursConfirmed,
+} from '@/lib/server/timesheet-bank-holiday-work';
 
 const { Client } = pg;
 
@@ -467,6 +471,19 @@ export async function applyTimesheetSubmit(options: {
     }
 
     await applyHeaderDraftFields(client, locked.id, options.body);
+    try {
+      await assertSubmittedBankHolidayHoursConfirmed(client, {
+        timesheetId: locked.id,
+        userId: options.body.userId,
+        weekEnding: options.body.weekEnding,
+        entries: options.body.entries,
+      });
+    } catch (error) {
+      if (error instanceof TimesheetBankHolidayWorkError) {
+        throw new TimesheetSubmitError(error.code, error.message, error.status);
+      }
+      throw error;
+    }
     await persistTimesheetEntries(client, locked.id, toSubmitEntries(options.body.entries));
     const persistedCount = await countEntries(client, locked.id);
     if (persistedCount !== 7) {

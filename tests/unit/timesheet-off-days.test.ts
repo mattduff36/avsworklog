@@ -55,6 +55,52 @@ describe('timesheet off-day resolver', () => {
     expect(tuesday?.paidLeaveHours).toBe(PAID_LEAVE_DAILY_HOURS);
   });
 
+  it('BH-TRIAL-UNLOCK-001 unlocks real bank-holiday days when the trial is on', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          status: 'approved',
+          is_half_day: false,
+          is_bank_holiday: true,
+          allow_timesheet_work_on_leave: false,
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN,
+      { bankHolidaySelfOverrideEnabled: true }
+    );
+
+    const tuesday = states.find((row) => row.day_of_week === 2);
+    expect(tuesday?.isBankHoliday).toBe(true);
+    expect(tuesday?.isLeaveLocked).toBe(false);
+  });
+
+  it('BH-TRIAL-AL-001 keeps ordinary annual leave locked when the trial is on', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          status: 'approved',
+          is_half_day: false,
+          is_bank_holiday: false,
+          allow_timesheet_work_on_leave: false,
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN,
+      { bankHolidaySelfOverrideEnabled: true }
+    );
+
+    const tuesday = states.find((row) => row.day_of_week === 2);
+    expect(tuesday?.isBankHoliday).toBe(false);
+    expect(tuesday?.isLeaveLocked).toBe(true);
+  });
+
   it('clears subsistence markers from locked leave days', () => {
     const entries = buildEntries();
     entries[1] = {
@@ -636,6 +682,7 @@ describe('timesheet off-day normalization', () => {
         leaveReasonColor: null,
         trainingReasonColor: null,
         isAnnualLeave: false,
+        isBankHoliday: false,
       },
     ], {
       enforceLeaveOverwrite: true,

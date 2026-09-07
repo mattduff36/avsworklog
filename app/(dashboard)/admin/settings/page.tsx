@@ -3,7 +3,7 @@
 import { Suspense, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { BookOpen, Calculator, FileSliders, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { BookOpen, Calculator, CalendarCheck, FileSliders, ShieldCheck, SlidersHorizontal } from 'lucide-react';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
@@ -17,6 +17,7 @@ import {
 } from '@/components/security/SensitiveModuleGate';
 import { TimesheetTypeExceptionsCard } from './components/TimesheetTypeExceptionsCard';
 import { PayrollRulesSettingsCard } from './components/PayrollRulesSettingsCard';
+import { BankHolidaySelfOverrideCard } from './components/BankHolidaySelfOverrideCard';
 
 const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
 
@@ -143,7 +144,7 @@ function AdminSettingsContent() {
                 individual needs a different form from their team default.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3 pt-5 md:grid-cols-2">
+            <CardContent className="grid gap-3 pt-5 md:grid-cols-3">
               <a
                 href="#payroll-rules"
                 className="group rounded-lg border border-border bg-background/70 p-4 transition-colors hover:border-[hsl(var(--avs-yellow)/0.5)] hover:bg-[hsl(var(--avs-yellow)/0.05)]"
@@ -176,9 +177,26 @@ function AdminSettingsContent() {
                   </div>
                 </div>
               </a>
+              <a
+                href="#bank-holiday-self-override"
+                className="group rounded-lg border border-border bg-background/70 p-4 transition-colors hover:border-avs-yellow/50 hover:bg-[hsl(var(--avs-yellow)/0.05)]"
+              >
+                <div className="flex items-start gap-3">
+                  <CalendarCheck className="mt-0.5 h-5 w-5 shrink-0 text-avs-yellow" />
+                  <div>
+                    <p className="font-semibold text-foreground group-hover:text-[hsl(var(--avs-yellow))]">
+                      Bank holiday self-override trial
+                    </p>
+                    <p className={SETTINGS_HELPER_TEXT_CLASS}>
+                      Let staff confirm hours on booked bank holidays, or restore manager-only override.
+                    </p>
+                  </div>
+                </div>
+              </a>
             </CardContent>
           </Card>
           <PayrollRulesSettingsCard />
+          <BankHolidaySelfOverrideCard />
           <TimesheetTypeExceptionsCard />
         </TabsContent>
       </Tabs>

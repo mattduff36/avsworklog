@@ -81,6 +81,7 @@ import {
 } from '@/lib/utils/timesheet-did-not-work-bookings';
 import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-not-work-bookings';
 import { submitTimesheet } from '@/lib/client/timesheet-submit';
+import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
 
 /**
  * Civils Timesheet Component
@@ -183,10 +184,6 @@ export function CivilsTimesheet({
   // Bank holidays cache (fetched from GOV.UK API)
   const [bankHolidays, setBankHolidays] = useState<Set<string>>(new Set());
   
-  // Bank holiday warning modal
-  const [showBankHolidayWarning, setShowBankHolidayWarning] = useState(false);
-  const [bankHolidayDayIndex, setBankHolidayDayIndex] = useState<number | null>(null);
-  const [bankHolidayDate, setBankHolidayDate] = useState<string>('');
   const [offDayRefreshToken, setOffDayRefreshToken] = useState(0);
   const [trainingDeclineDayIndex, setTrainingDeclineDayIndex] = useState<number | null>(null);
   const [decliningTraining, setDecliningTraining] = useState(false);
@@ -223,6 +220,15 @@ export function CivilsTimesheet({
     () => applyPendingTrainingBookingsToOffDayStates(offDayStates, pendingDidNotWorkBookings),
     [offDayStates, pendingDidNotWorkBookings]
   );
+  const bankHolidayConfirm = useBankHolidayWorkConfirm({
+    weekEnding,
+    userId: selectedEmployeeId || null,
+    timesheetId: existingTimesheetId,
+    timesheetType,
+    templateVersion: 1,
+    offDayStates: effectiveOffDayStates,
+    onAdoptTimesheetId: setExistingTimesheetId,
+  });
 
   const offDayMap = useMemo(() => {
     if (offDayKey !== currentOffDayKey) return new Map<number, TimesheetOffDayState>();
@@ -300,6 +306,10 @@ export function CivilsTimesheet({
       setLoadingOffDays(true);
       return;
     }
+    if (!bankHolidayConfirm.trialReady) {
+      setLoadingOffDays(true);
+      return;
+    }
 
     const requestKey = `${selectedEmployeeId}:${weekEnding}`;
     let cancelled = false;
@@ -310,7 +320,7 @@ export function CivilsTimesheet({
         const { startIso, endIso } = getTimesheetWeekIsoBounds(weekEnding);
         const absenceResult = await supabase
           .from('absences')
-          .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+          .select('id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, is_bank_holiday, absence_reasons(name,color,is_paid)')
           .eq('profile_id', selectedEmployeeId)
           .in('status', ['pending', 'approved', 'processed'])
           .lte('date', endIso);
@@ -340,7 +350,8 @@ export function CivilsTimesheet({
         const resolvedStates = resolveTimesheetOffDayStates(
           weekEnding,
           filteredAbsences,
-          resolvedPattern
+          resolvedPattern,
+          { bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled }
         );
 
         if (cancelled) return;
@@ -353,7 +364,9 @@ export function CivilsTimesheet({
           console.error('Failed to resolve timesheet off-day states:', offDayError);
         }
         if (!cancelled) {
-          setOffDayStates(resolveTimesheetOffDayStates(weekEnding, [], null));
+          setOffDayStates(resolveTimesheetOffDayStates(weekEnding, [], null, {
+            bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled,
+          }));
           setOffDayKey(requestKey);
         }
       } finally {
@@ -368,7 +381,7 @@ export function CivilsTimesheet({
     return () => {
       cancelled = true;
     };
-  }, [offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
+  }, [bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
 
   useEffect(() => {
     if (!existingTimesheetLoaded) return;
@@ -516,82 +529,6 @@ export function CivilsTimesheet({
     }
   };
 
-  // Check if a specific day is a bank holiday
-  const isDayBankHoliday = (dayIndex: number): boolean => {
-    const entryDate = getDayDate(dayIndex);
-    const year = entryDate.getFullYear();
-    const month = String(entryDate.getMonth() + 1).padStart(2, '0');
-    const day = String(entryDate.getDate()).padStart(2, '0');
-    const dateString = `${year}-${month}-${day}`;
-    return bankHolidays.has(dateString);
-  };
-
-  // Get formatted date for display
-  const getFormattedDate = (dayIndex: number): string =>
-    getDayDate(dayIndex).toLocaleDateString('en-GB', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    });
-
-  // Show bank holiday warning if needed
-  const checkAndShowBankHolidayWarning = (dayIndex: number, value: string) => {
-    // Only show if:
-    // 1. It's a bank holiday
-    // 2. Warning hasn't been shown for this day yet
-    // 3. User has entered any value (works with mobile time pickers and manual entry)
-    // 4. Day is not already marked as "did not work"
-    const entry = entries[dayIndex];
-
-    if (
-      isDayBankHoliday(dayIndex) &&
-      !isLeaveLockedDay(dayIndex) &&
-      !entry.bankHolidayWarningShown &&
-      !entry.did_not_work &&
-      value && value.trim().length > 0
-    ) {
-      setBankHolidayDayIndex(dayIndex);
-      setBankHolidayDate(getFormattedDate(dayIndex));
-      setShowBankHolidayWarning(true);
-    }
-  };
-
-  // Handle "Yes" on bank holiday warning - mark as shown and continue
-  const handleBankHolidayYes = () => {
-    if (bankHolidayDayIndex !== null) {
-      const newEntries = [...entries];
-      newEntries[bankHolidayDayIndex] = {
-        ...newEntries[bankHolidayDayIndex],
-        bankHolidayWarningShown: true,
-      };
-      setEntries(newEntries);
-    }
-    setShowBankHolidayWarning(false);
-    setBankHolidayDayIndex(null);
-  };
-
-  // Handle "No" on bank holiday warning - clear entries and enable "did not work"
-  const handleBankHolidayNo = () => {
-    if (bankHolidayDayIndex !== null) {
-      const newEntries = [...entries];
-      newEntries[bankHolidayDayIndex] = {
-        ...newEntries[bankHolidayDayIndex],
-        time_started: '',
-        time_finished: '',
-        job_number: '',
-        job_numbers: [],
-        did_not_work: true,
-        working_in_yard: false,
-        daily_total: 0,
-        bankHolidayWarningShown: true, // Mark as shown so it doesn't pop up again
-      };
-      setEntries(newEntries);
-    }
-    setShowBankHolidayWarning(false);
-    setBankHolidayDayIndex(null);
-  };
-
   const trimTrailingEmptyJobNumbers = (values: string[]): string[] => {
     const next = [...values];
     while (next.length > 0 && next[next.length - 1]?.trim() === '') {
@@ -606,11 +543,6 @@ export function CivilsTimesheet({
 
   // Handle job number input with auto-dash formatting (NNNN-LL format)
   const handleJobNumberChange = (dayIndex: number, jobIndex: number, value: string) => {
-    // Check for bank holiday warning when user enters a job number
-    if (value && value.trim().length > 0) {
-      checkAndShowBankHolidayWarning(dayIndex, value);
-    }
-
     const nextJobNumbers = getEditableJobNumbers(entries[dayIndex]);
     nextJobNumbers[jobIndex] = normalizeJobNumberInput(value);
     updateEntry(dayIndex, 'job_numbers', trimTrailingEmptyJobNumbers(nextJobNumbers));
@@ -960,11 +892,7 @@ export function CivilsTimesheet({
         }
       }
     } else {
-      // Check for bank holiday warning on time fields (triggers on any value change, including mobile time pickers)
       if ((field === 'time_started' || field === 'time_finished') && typeof value === 'string') {
-        if (value && value.trim().length > 0) {
-          checkAndShowBankHolidayWarning(dayIndex, value);
-        }
         // Round time inputs to 15-minute intervals
         value = roundToQuarterHour(value);
         const rangeError = getTimeWindowError(dayIndex, value);
@@ -1411,14 +1339,20 @@ export function CivilsTimesheet({
         };
       });
 
-      let timesheetId: string;
+      const confirmation = await bankHolidayConfirm.ensureConfirmed(persistableEntries);
+      if (!confirmation.ok) return;
+      if (confirmation.timesheetId && confirmation.timesheetId !== existingTimesheetId) {
+        setExistingTimesheetId(confirmation.timesheetId);
+      }
+
+      let timesheetId: string = confirmation.timesheetId || existingTimesheetId || '';
 
       if (status === 'submitted') {
         if (!signatureData) {
           throw new Error('Signature is required to submit a timesheet');
         }
         const submitted = await submitTimesheet({
-          timesheetId: existingTimesheetId,
+          timesheetId: confirmation.timesheetId || existingTimesheetId,
           userId: selectedEmployeeId,
           weekEnding,
           timesheetType,
@@ -1428,7 +1362,7 @@ export function CivilsTimesheet({
           entries: persistableEntries,
         });
         timesheetId = submitted.id;
-      } else if (existingTimesheetId) {
+      } else if (timesheetId) {
         // Update existing timesheet
         type TimesheetUpdate = Database['public']['Tables']['timesheets']['Update'];
         const timesheetData: TimesheetUpdate = {
@@ -1445,7 +1379,7 @@ export function CivilsTimesheet({
         const { data: timesheet, error: timesheetError } = await supabase
           .from('timesheets')
           .update(timesheetData)
-          .eq('id', existingTimesheetId)
+          .eq('id', timesheetId)
           .select()
           .single();
 
@@ -2473,40 +2407,7 @@ export function CivilsTimesheet({
         </DialogContent>
       </Dialog>
 
-      {/* Bank Holiday Warning Dialog */}
-      <Dialog open={showBankHolidayWarning} onOpenChange={setShowBankHolidayWarning}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-md overflow-y-auto bg-slate-900 border-yellow-500/50 text-white">
-          <DialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/20 border border-yellow-500/50">
-                <AlertCircle className="h-5 w-5 text-yellow-400" />
-              </div>
-              <DialogTitle className="text-white text-xl">Bank Holiday Warning</DialogTitle>
-            </div>
-            <DialogDescription className="text-muted-foreground text-base pt-2">
-              <span className="font-semibold text-yellow-400">{bankHolidayDate}</span> is a bank holiday.
-              <br />
-              <br />
-              Are you sure you worked on this day?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="mt-4 flex gap-3 sm:gap-3">
-            <Button
-              onClick={handleBankHolidayNo}
-              variant="outline"
-              className="flex-1 border-slate-600 text-white hover:bg-slate-800"
-            >
-              No
-            </Button>
-            <Button
-              onClick={handleBankHolidayYes}
-              className="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white font-semibold"
-            >
-              Yes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {bankHolidayConfirm.modal}
     </div>
   );
 }

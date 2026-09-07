@@ -17,6 +17,7 @@ export interface ApprovedAbsenceForTimesheet {
   is_half_day?: boolean | null;
   half_day_session?: LeaveSession | null;
   allow_timesheet_work_on_leave?: boolean | null;
+  is_bank_holiday?: boolean | null;
   absence_reasons?: { name?: string | null; color?: string | null; is_paid?: boolean | null } | null;
 }
 
@@ -64,6 +65,7 @@ export interface TimesheetOffDayState {
   leaveReasonColor: string | null;
   trainingReasonColor: string | null;
   isAnnualLeave: boolean;
+  isBankHoliday: boolean;
 }
 
 export interface TimesheetEntryLike {
@@ -191,14 +193,24 @@ function computeWorkedHours(entry: TimesheetEntryLike, offDay: TimesheetOffDaySt
   return roundHours(Math.max(0, workedHours));
 }
 
-function toLeaveLabel(row: ApprovedAbsenceForTimesheet): TimesheetLeaveLabel {
+function toLeaveLabel(
+  row: ApprovedAbsenceForTimesheet,
+  options?: { bankHolidaySelfOverrideEnabled?: boolean }
+): TimesheetLeaveLabel {
   const reasonName = row.absence_reasons?.name?.trim() || 'Approved Leave';
   const isHalf = Boolean(row.is_half_day);
   const session: LeaveSession | 'FULL' = isHalf && row.half_day_session ? row.half_day_session : 'FULL';
   const isAnnualLeave = normalizeReasonName(reasonName) === 'annual leave';
   const isTraining = isTrainingReasonName(reasonName);
   const isPending = normalizeReasonName(row.status) === 'pending';
-  const allowsTimesheetWork = isAnnualLeave && Boolean(row.allow_timesheet_work_on_leave);
+  const trialUnlocksBankHoliday =
+    Boolean(options?.bankHolidaySelfOverrideEnabled) &&
+    Boolean(row.is_bank_holiday) &&
+    isAnnualLeave &&
+    !isHalf &&
+    !isPending;
+  const allowsTimesheetWork =
+    isAnnualLeave && (Boolean(row.allow_timesheet_work_on_leave) || trialUnlocksBankHoliday);
 
   return {
     absenceId: row.id || null,
@@ -216,7 +228,8 @@ function toLeaveLabel(row: ApprovedAbsenceForTimesheet): TimesheetLeaveLabel {
 export function resolveTimesheetOffDayStates(
   weekEnding: string,
   approvedAbsences: ApprovedAbsenceForTimesheet[],
-  pattern?: WorkShiftPattern | null
+  pattern?: WorkShiftPattern | null,
+  options?: { bankHolidaySelfOverrideEnabled?: boolean }
 ): TimesheetOffDayState[] {
   return Array.from({ length: 7 }, (_, index) => {
     const dayOfWeek = index + 1;
@@ -233,7 +246,7 @@ export function resolveTimesheetOffDayStates(
     });
 
     const resolvedLabels = dayRows
-      .map(toLeaveLabel)
+      .map((row) => toLeaveLabel(row, options))
       .sort((a, b) => {
         const weight = (session: LeaveSession | 'FULL') => {
           if (session === 'FULL') return 0;
@@ -304,6 +317,7 @@ export function resolveTimesheetOffDayStates(
     const hasPendingTrainingBooking = pendingTrainingAbsenceIds.length > 0 || effectivePendingTrainingLabels.length > 0;
     const isAnnualLeave =
       isOnApprovedLeave && effectiveLeaveLabels.some((label) => normalizeReasonName(label.reasonName) === 'annual leave');
+    const isBankHoliday = dayRows.some((row) => Boolean(row.is_bank_holiday) && normalizeReasonName(row.status) !== 'pending');
 
     return {
       day_of_week: dayOfWeek,
@@ -332,6 +346,7 @@ export function resolveTimesheetOffDayStates(
       leaveReasonColor: firstLabel?.color || null,
       trainingReasonColor,
       isAnnualLeave,
+      isBankHoliday,
     };
   });
 }
