@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.8.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop-tasks): update Workshop Tasks and Actions`
+
+**PUSHED AT**
+2026-09-07T18:08:46.509Z
+
+**WHAT CHANGED**
+Update Workshop Tasks and Actions.
+
+**VERSION HISTORY DETAILS**
+- Updated Workshop Tasks and Actions, with changes to app screens, interface components, shared logic, and automated tests.
+- Updated actions, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(workshop-tasks): update Workshop Tasks and Actions`
+
 ## 0926.7.1
 
 **GIT COMMIT MESSAGE**
