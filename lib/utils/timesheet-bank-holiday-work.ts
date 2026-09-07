@@ -20,6 +20,14 @@ export function isBankHolidayConfirmPhrase(value: string): boolean {
   return value.trim().toLowerCase() === BANK_HOLIDAY_CONFIRM_PHRASE.toLowerCase();
 }
 
+export function resolveBankHolidayConfirmGate(input: {
+  trialReady: boolean;
+  trialEnabled: boolean;
+}): 'not-ready' | 'disabled' | 'required' {
+  if (!input.trialReady) return 'not-ready';
+  return input.trialEnabled ? 'required' : 'disabled';
+}
+
 export function timesheetEntryHasWorkingHours(entry: BankHolidayWorkHoursInput): boolean {
   const hasStartOrFinish = Boolean(entry.time_started?.trim() || entry.time_finished?.trim());
   const hasPlantHours =

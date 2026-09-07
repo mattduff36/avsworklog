@@ -15,6 +15,7 @@ import {
 import {
   getUnconfirmedBankHolidayDates,
   isBankHolidayConfirmPhrase,
+  resolveBankHolidayConfirmGate,
 } from '@/lib/utils/timesheet-bank-holiday-work';
 import { resolveBankHolidayWorkRecipientIds } from '@/lib/server/timesheet-bank-holiday-work-notification';
 
@@ -168,6 +169,14 @@ class SubmitClient implements TimesheetSubmitPgClient {
     return { rows: [] };
   }
 }
+
+describe('bank holiday confirm readiness', () => {
+  it('fails closed until the trial flag is known', () => {
+    expect(resolveBankHolidayConfirmGate({ trialReady: false, trialEnabled: false })).toBe('not-ready');
+    expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: false })).toBe('disabled');
+    expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: true })).toBe('required');
+  });
+});
 
 describe('bank holiday self-override phrase', () => {
   it('BH-TRIAL-PHRASE-001 accepts only case-insensitive BANK HOLIDAY and mutates nothing on reject', async () => {

@@ -12,6 +12,7 @@ import { createClient } from '@/lib/supabase/client';
 import {
   collectWorkingDatesFromEntries,
   getUnconfirmedBankHolidayDates,
+  resolveBankHolidayConfirmGate,
   type BankHolidayWorkHoursInput,
 } from '@/lib/utils/timesheet-bank-holiday-work';
 import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
@@ -41,6 +42,7 @@ export function useBankHolidayWorkConfirm(options: UseBankHolidayWorkConfirmOpti
   const supabase = useMemo(() => createClient(), []);
   const pendingResolveRef = useRef<((result: BankHolidayConfirmResult) => void) | null>(null);
   const trialEnabledRef = useRef(false);
+  const trialReadyRef = useRef(false);
   const confirmedDatesRef = useRef<string[]>([]);
   const timesheetIdRef = useRef<string | null>(options.timesheetId);
   const userIdRef = useRef(options.userId);
@@ -63,6 +65,8 @@ export function useBankHolidayWorkConfirm(options: UseBankHolidayWorkConfirmOpti
         if (!cancelled) {
           trialEnabledRef.current = enabled;
           setTrialEnabled(enabled);
+          trialReadyRef.current = true;
+          setTrialReady(true);
         }
       })
       .catch(() => {
@@ -70,9 +74,6 @@ export function useBankHolidayWorkConfirm(options: UseBankHolidayWorkConfirmOpti
           trialEnabledRef.current = false;
           setTrialEnabled(false);
         }
-      })
-      .finally(() => {
-        if (!cancelled) setTrialReady(true);
       });
     return () => {
       cancelled = true;
@@ -114,7 +115,15 @@ export function useBankHolidayWorkConfirm(options: UseBankHolidayWorkConfirmOpti
   const ensureConfirmed = useCallback(
     async (entries: BankHolidayWorkHoursInput[]): Promise<BankHolidayConfirmResult> => {
       const currentTimesheetId = timesheetIdRef.current;
-      if (!trialEnabledRef.current) {
+      const gate = resolveBankHolidayConfirmGate({
+        trialReady: trialReadyRef.current,
+        trialEnabled: trialEnabledRef.current,
+      });
+      if (gate === 'not-ready') {
+        toast.error('Bank holiday setting is still loading. Try again in a moment.');
+        return { ok: false, timesheetId: currentTimesheetId };
+      }
+      if (gate === 'disabled') {
         return { ok: true, timesheetId: currentTimesheetId };
       }
 

@@ -1904,7 +1904,7 @@ export default function ViewTimesheetPage() {
                 onClick={() => {
                   void handleSave();
                 }}
-                disabled={saving}
+                disabled={saving || !bankHolidayConfirm.trialReady}
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving...' : 'Save Changes'}
@@ -1915,7 +1915,7 @@ export default function ViewTimesheetPage() {
             {canSubmit && (
               <Button
                 onClick={handleSubmit}
-                disabled={saving}
+                disabled={saving || !bankHolidayConfirm.trialReady}
               >
                 <Send className="h-4 w-4 mr-2" />
                 {saving ? 'Submitting...' : 'Submit for Approval'}
