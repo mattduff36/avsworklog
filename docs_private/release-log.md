@@ -2,6 +2,31 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.7.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop-tasks): audited completed-task and attachment corrections`
+
+**PUSHED AT**
+2026-09-07T13:44:13.968Z
+
+**WHAT CHANGED**
+Manager-gate completed timestamp adjustments. Audited completed-task and attachment corrections.
+
+**VERSION HISTORY DETAILS**
+- Manager-gate completed timestamp adjustments, with changes to background routes, app screens, interface components, shared logic, automated tests, and data storage.
+- Updated data storage, with changes to data storage.
+- Updated actions, with changes to app screens.
+- Updated sign in, with changes to shared logic and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(workshop-tasks): manager-gate completed timestamp adjustments`
+- `feat(workshop-tasks): audited completed-task and attachment corrections`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 0926.6.0
 
 **GIT COMMIT MESSAGE**

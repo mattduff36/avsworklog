@@ -1,5 +1,27 @@
 [
   {
+    "version": "0926.7.0",
+    "updateKind": "major",
+    "title": "Workshop Tasks update",
+    "description": "Manager-gate completed timestamp adjustments. Audited completed-task and attachment corrections.",
+    "summary": "Manager-gate completed timestamp adjustments. Audited completed-task and attachment corrections.",
+    "details": [
+      "Manager-gate completed timestamp adjustments, with changes to background routes, app screens, interface components, shared logic, automated tests, and data storage.",
+      "Updated data storage, with changes to data storage.",
+      "Updated actions, with changes to app screens.",
+      "Updated sign in, with changes to shared logic and automated tests."
+    ],
+    "areas": [
+      "Workshop Tasks",
+      "Manager-gate completed timestamp adjustments. Audited completed-task",
+      "Attachment corrections"
+    ],
+    "areaKeys": [
+      "workshop-tasks"
+    ],
+    "pushedAt": "2026-09-07T13:44:13.968Z"
+  },
+  {
     "version": "0926.6.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",
