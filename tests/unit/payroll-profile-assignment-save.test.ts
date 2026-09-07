@@ -61,12 +61,34 @@ describe('savePayrollProfileAssignment validation', () => {
       actorId: 'actor',
     })).rejects.toThrow(/Sunday/);
 
-    await expect(savePayrollProfileAssignment({
+    expect(() => validatePayrollProfileAssignmentInput({
       profileId: '11111111-1111-4111-8111-111111111111',
       ruleSetKey: 'plant',
       effectiveWeekEnding: '2020-01-05',
-      actorId: 'actor',
-    })).rejects.toThrow(/cannot start before/);
+    })).toThrow(/cannot start before/);
+  });
+
+  it('PAY-OVERRIDE-BACKDATE-001 accepts a Sunday on or after payroll rollout and rejects an earlier Sunday', () => {
+    const now = new Date(2026, 8, 7);
+    expect(validatePayrollProfileAssignmentInput({
+      profileId: PROFILE_ID,
+      ruleSetKey: 'plant',
+      effectiveWeekEnding: '2026-08-16',
+      earliestWeekEnding: '2026-08-16',
+      now,
+    })).toEqual({
+      profileId: PROFILE_ID,
+      ruleSetKey: 'plant',
+      effectiveWeekEnding: '2026-08-16',
+    });
+
+    expect(() => validatePayrollProfileAssignmentInput({
+      profileId: PROFILE_ID,
+      ruleSetKey: 'plant',
+      effectiveWeekEnding: '2026-08-09',
+      earliestWeekEnding: '2026-08-16',
+      now,
+    })).toThrow(/payroll rollout week ending \(2026-08-16\)/);
   });
 
   it('PAY-OVERRIDE-SAVE-001 and PAY-VERIFY-001 accept a future Sunday and classify insert, retry and conflict', () => {

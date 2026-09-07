@@ -793,6 +793,7 @@ export function validatePayrollProfileAssignmentInput(input: {
   ruleSetKey: PayrollRuleSetKey | 'none';
   effectiveWeekEnding: string;
   now?: Date;
+  earliestWeekEnding?: string | null;
 }): {
   profileId: string;
   ruleSetKey: PayrollRuleSetKey | 'none';
@@ -808,8 +809,14 @@ export function validatePayrollProfileAssignmentInput(input: {
     throw new Error('Employee overrides must start on a Sunday week ending.');
   }
   const currentWeekEnding = getCurrentPayrollWeekEndingSunday(input.now);
-  if (input.effectiveWeekEnding < currentWeekEnding) {
-    throw new Error(`Employee overrides cannot start before the current week ending (${currentWeekEnding}).`);
+  const floorWeekEnding = input.earliestWeekEnding && isSundayIsoDate(input.earliestWeekEnding)
+    ? input.earliestWeekEnding
+    : currentWeekEnding;
+  if (input.effectiveWeekEnding < floorWeekEnding) {
+    const floorLabel = input.earliestWeekEnding && isSundayIsoDate(input.earliestWeekEnding)
+      ? 'the payroll rollout week ending'
+      : 'the current week ending';
+    throw new Error(`Employee overrides cannot start before ${floorLabel} (${floorWeekEnding}).`);
   }
   return {
     profileId: input.profileId,
@@ -837,12 +844,27 @@ export async function savePayrollProfileAssignment(input: {
   actorId: string;
   createClient?: () => PayrollAdminSqlClient;
 }): Promise<{ alreadyExists: boolean }> {
-  const validated = validatePayrollProfileAssignmentInput(input);
+  validatePayrollProfileAssignmentInput({
+    ...input,
+    earliestWeekEnding: input.effectiveWeekEnding,
+  });
 
   const client = input.createClient ? input.createClient() : createPayrollAdminPgClient();
   await client.connect();
   try {
     await client.query('BEGIN TRANSACTION ISOLATION LEVEL SERIALIZABLE');
+    const rolloutResult = await client.query<{ effective_week_ending: string }>(
+      `
+        SELECT effective_week_ending::text
+        FROM public.payroll_rollout_activations
+        ORDER BY effective_week_ending DESC
+        LIMIT 1
+      `
+    );
+    const validated = validatePayrollProfileAssignmentInput({
+      ...input,
+      earliestWeekEnding: rolloutResult.rows[0]?.effective_week_ending ?? null,
+    });
     const profileResult = await client.query<{ id: string }>(
       `
         SELECT id

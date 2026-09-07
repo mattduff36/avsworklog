@@ -227,7 +227,9 @@ describe('payroll rollout contract', () => {
     expect(saveFn).toContain('INSERT INTO public.payroll_profile_rule_assignments');
     expect(saveFn).not.toContain('payroll_rule_versions');
     expect(saveFn).not.toContain('payroll_team_rule_assignments');
-    expect(saveFn).not.toContain('payroll_rollout_activations');
+    expect(saveFn).toContain('FROM public.payroll_rollout_activations');
+    expect(saveFn).not.toMatch(/INSERT INTO public\.payroll_rollout_activations/i);
+    expect(saveFn).not.toMatch(/UPDATE public\.payroll_rollout_activations/i);
     expect(saveFn).toContain('PayrollAssignmentConflictError');
     expect(saveFn).toContain('validatePayrollProfileAssignmentInput');
     expect(saveFn).toContain('decidePayrollAssignmentWrite');

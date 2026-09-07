@@ -119,6 +119,25 @@ function getUpcomingSundays(count: number): string[] {
   });
 }
 
+function listSundaysFromRollout(rolloutWeekEnding: string | null, upcomingCount: number): string[] {
+  const upcoming = getUpcomingSundays(upcomingCount);
+  if (!rolloutWeekEnding || !/^\d{4}-\d{2}-\d{2}$/.test(rolloutWeekEnding)) {
+    return upcoming;
+  }
+  const lastUpcoming = upcoming[upcoming.length - 1];
+  if (!lastUpcoming || rolloutWeekEnding > lastUpcoming) {
+    return upcoming;
+  }
+  const [year, month, day] = rolloutWeekEnding.split('-').map(Number);
+  const cursor = new Date(year, month - 1, day);
+  const sundays: string[] = [];
+  while (formatLocalIsoDate(cursor) <= lastUpcoming) {
+    sundays.push(formatLocalIsoDate(cursor));
+    cursor.setDate(cursor.getDate() + 7);
+  }
+  return sundays.length > 0 ? sundays : upcoming;
+}
+
 function formatSundayLabel(isoDate: string): string {
   const [year, month, day] = isoDate.split('-').map(Number);
   const date = new Date(year, month - 1, day);
@@ -457,12 +476,16 @@ export function PayrollRulesSettingsCard() {
   const [testBankHoliday, setTestBankHoliday] = useState(false);
   const [testResult, setTestResult] = useState<PayrollWeekBreakdown | null>(null);
   const upcomingSundays = useMemo(() => getUpcomingSundays(6), []);
+  const sundayOptions = useMemo(
+    () => listSundaysFromRollout(matrix?.rolloutWeekEnding ?? null, 6),
+    [matrix?.rolloutWeekEnding]
+  );
   const effectiveWeekOptions = useMemo(() => {
-    if (effectiveWeekEnding && !upcomingSundays.includes(effectiveWeekEnding)) {
-      return [effectiveWeekEnding, ...upcomingSundays];
+    if (effectiveWeekEnding && !sundayOptions.includes(effectiveWeekEnding)) {
+      return [effectiveWeekEnding, ...sundayOptions];
     }
-    return upcomingSundays;
-  }, [effectiveWeekEnding, upcomingSundays]);
+    return sundayOptions;
+  }, [effectiveWeekEnding, sundayOptions]);
 
   const load = useCallback(async () => {
     try {
@@ -478,9 +501,14 @@ export function PayrollRulesSettingsCard() {
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    if (effectiveWeekEnding || upcomingSundays.length === 0) return;
-    setEffectiveWeekEnding(upcomingSundays[0]);
-  }, [effectiveWeekEnding, upcomingSundays]);
+    if (effectiveWeekEnding || sundayOptions.length === 0) return;
+    const currentWeekEnding = upcomingSundays[0];
+    setEffectiveWeekEnding(
+      currentWeekEnding && sundayOptions.includes(currentWeekEnding)
+        ? currentWeekEnding
+        : sundayOptions[sundayOptions.length - 1]
+    );
+  }, [effectiveWeekEnding, sundayOptions, upcomingSundays]);
 
   useEffect(() => {
     if (!matrix || teamAssignments.length > 0) return;
@@ -856,7 +884,7 @@ export function PayrollRulesSettingsCard() {
                   </SelectContent>
                 </Select>
                 <p className={HELPER_TEXT_CLASS}>
-                  Choose the client-approved Sunday. Only the next six Sundays are listed.
+                  Sundays run from the payroll rollout week through the next six upcoming Sundays. The current week stays selected by default.
                 </p>
               </div>
 
@@ -949,8 +977,10 @@ export function PayrollRulesSettingsCard() {
                     <div className="space-y-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3">
                       <p className="text-xs leading-relaxed text-muted-foreground">
                         Saving an override does not activate new payroll rule versions. It writes one dated
-                        assignment per employee. The same Sunday cannot be corrected later; choose a later
-                        Sunday to change it.
+                        assignment per employee. An earlier Sunday updates live preview for open weeks;
+                        weeks that already have a frozen payroll snapshot stay as stored until Accounts
+                        recalculate them. The same Sunday cannot be corrected later; choose a later Sunday
+                        to change it.
                       </p>
                       <label className="flex items-start gap-2 text-sm text-foreground">
                         <Checkbox
