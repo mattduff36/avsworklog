@@ -5,7 +5,7 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isProfileVisibleInReportScope } from '@/lib/server/report-scope';
 import { getTimesheetReportScopedProfileIds } from '@/lib/server/reports-timesheet-scope';
-import { getSystemAccountIds } from '@/lib/server/system-accounts';
+import { getReportHiddenProfileIds } from '@/lib/server/system-accounts';
 
 export async function GET(request: NextRequest) {
   try {
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     const scopedIds = scopedProfileIds ? Array.from(scopedProfileIds) : null;
-    const hiddenProfileIds = await getSystemAccountIds(createAdminClient());
+    const hiddenProfileIds = await getReportHiddenProfileIds(createAdminClient());
 
     const now = new Date();
     const startOfWeek = new Date(now);
@@ -74,7 +74,8 @@ export async function GET(request: NextRequest) {
       .from('profiles')
       .select('id, roles!inner(is_manager_admin)', { count: 'exact' })
       .eq('roles.is_manager_admin', false)
-      .eq('is_system_account', false);
+      .eq('is_system_account', false)
+      .not('full_name', 'ilike', '%(Deleted User)%');
 
     if (scopedIds) {
       weekTimesheetsQuery = weekTimesheetsQuery.in('user_id', scopedIds);

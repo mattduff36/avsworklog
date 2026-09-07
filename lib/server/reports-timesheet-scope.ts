@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSystemAccountIds } from '@/lib/server/system-accounts';
+import { getReportHiddenProfileIds } from '@/lib/server/system-accounts';
+import { isDeletedUserName } from '@/lib/users/deleted-user';
 import {
   filterRowsForReportProfileScope,
   getReportScopeContext,
@@ -10,6 +11,7 @@ interface TimesheetScopeRow {
   user_id: string;
   employee?: {
     team_id?: string | null;
+    full_name?: string | null;
   } | null;
 }
 
@@ -29,7 +31,7 @@ export async function filterTimesheetRowsForReportScope<T extends TimesheetScope
 
   const [moduleScopedProfileIds, hiddenProfileIds] = await Promise.all([
     getTimesheetReportScopedProfileIds(),
-    getSystemAccountIds(createAdminClient()),
+    getReportHiddenProfileIds(createAdminClient()),
   ]);
 
   return filterRowsForReportProfileScope(
@@ -37,5 +39,5 @@ export async function filterTimesheetRowsForReportScope<T extends TimesheetScope
     moduleScopedProfileIds,
     hiddenProfileIds,
     (row) => row.user_id
-  );
+  ).filter((row) => !isDeletedUserName(row.employee?.full_name));
 }

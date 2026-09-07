@@ -5,7 +5,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { buildSafeReportFilename, parseReportDateRange, validateRequiredReportDateRange } from '@/lib/server/report-date-range';
-import { getTimesheetReportScopedProfileIds } from '@/lib/server/reports-timesheet-scope';
+import { filterTimesheetRowsForReportScope, getTimesheetReportScopedProfileIds } from '@/lib/server/reports-timesheet-scope';
 import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import { 
   generateExcelFile, 
@@ -358,7 +358,7 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching absences:', absenceError);
     }
 
-    const scopedTimesheets = (timesheets || []) as TimesheetRow[];
+    const scopedTimesheets = await filterTimesheetRowsForReportScope((timesheets || []) as TimesheetRow[]);
     if (scopedTimesheets.length === 0) {
       return NextResponse.json({ error: 'No timesheets found for the specified criteria' }, { status: 404 });
     }

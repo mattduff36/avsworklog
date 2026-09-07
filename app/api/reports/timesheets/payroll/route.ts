@@ -5,7 +5,7 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { getDidNotWorkReasonInfo } from '@/lib/utils/timesheetDidNotWork';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { buildSafeReportFilename, parseReportDateRange, validateRequiredReportDateRange } from '@/lib/server/report-date-range';
-import { getTimesheetReportScopedProfileIds } from '@/lib/server/reports-timesheet-scope';
+import { filterTimesheetRowsForReportScope, getTimesheetReportScopedProfileIds } from '@/lib/server/reports-timesheet-scope';
 import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
 import {
   generateExcelFile,
@@ -290,7 +290,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: hydrateError.message }, { status: 500 });
     }
 
-    const scopedTimesheets = (hydratedTimesheets || []) as unknown as TimesheetRow[];
+    const scopedTimesheets = await filterTimesheetRowsForReportScope(
+      (hydratedTimesheets || []) as unknown as TimesheetRow[]
+    );
     if (scopedTimesheets.length === 0) {
       return NextResponse.json({ error: 'No approved timesheets found for the specified criteria' }, { status: 404 });
     }

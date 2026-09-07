@@ -3,8 +3,7 @@ import { getActorAbsenceSecondaryPermissions, canActorUseScopedAbsencePermission
 import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getSystemAccountIds } from '@/lib/server/system-accounts';
-import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
+import { filterHiddenReportSubjects, getReportHiddenProfileIds } from '@/lib/server/system-accounts';
 
 interface AbsenceReasonRow {
   name?: string | null;
@@ -342,16 +341,17 @@ export async function getPrintableAbsenceWeeklyReportData(input: {
     throw new Error('Forbidden');
   }
 
-  const [activeRows, archivedRows, scopeContext, systemAccountIds] = await Promise.all([
+  const [activeRows, archivedRows, scopeContext, hiddenProfileIds] = await Promise.all([
     fetchAbsenceRows(supabase, 'absences', dateFrom, dateTo),
     fetchAbsenceRows(supabase, 'absences_archive', dateFrom, dateTo),
     getReportScopeContext(),
-    getSystemAccountIds(createAdminClient()),
+    getReportHiddenProfileIds(createAdminClient()),
   ]);
 
-  let scopedRows = [...activeRows, ...archivedRows]
-    .filter((row) => doesOverlapRange(row, dateFrom, dateTo))
-    .filter((row) => !systemAccountIds.has(row.profile_id) && !isSystemAccountProfile(row.employee || {}));
+  let scopedRows = filterHiddenReportSubjects(
+    [...activeRows, ...archivedRows].filter((row) => doesOverlapRange(row, dateFrom, dateTo)),
+    hiddenProfileIds
+  );
 
   if (!scopeContext.isAdminTier) {
     const actorUserId = scopeContext.effectiveRole.user_id;

@@ -10,6 +10,8 @@ const HIDE_MARKERS = [
   'filterSystemAccounts',
   'filterOperationalProfiles',
   'getSystemAccountIds',
+  'getReportHiddenProfileIds',
+  'filterHiddenReportSubjects',
   'isSystemAccountProfile',
   'filterRowsForReportProfileScope',
   'isProfileVisibleInReportScope',

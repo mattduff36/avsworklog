@@ -5,6 +5,8 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { buildSafeReportFilename, parseReportDateRange, validateRequiredReportDateRange } from '@/lib/server/report-date-range';
 import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { filterHiddenReportSubjects, getReportHiddenProfileIds } from '@/lib/server/system-accounts';
 import { 
   generateExcelFile, 
   formatExcelDate, 
@@ -159,7 +161,7 @@ export async function GET(request: NextRequest) {
     const plantScope = scopedModuleIds.get('plant-inspections') || null;
     const hgvScope = scopedModuleIds.get('hgv-inspections') || null;
 
-    const [vanResult, plantResult, hgvResult] = await Promise.all([
+    const [vanResult, plantResult, hgvResult, hiddenProfileIds] = await Promise.all([
       canAccessVanChecks
         ? (async () => {
             let query = supabase
@@ -257,6 +259,7 @@ export async function GET(request: NextRequest) {
             return query;
           })()
         : Promise.resolve({ data: [], error: null }),
+      getReportHiddenProfileIds(createAdminClient()),
     ]);
 
     if (vanResult.error) {
@@ -269,8 +272,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: hgvResult.error.message }, { status: 500 });
     }
 
+    const visibleVan = filterHiddenReportSubjects((vanResult.data || []) as VanInspectionRow[], hiddenProfileIds);
+    const visiblePlant = filterHiddenReportSubjects((plantResult.data || []) as PlantInspectionRow[], hiddenProfileIds);
+    const visibleHgv = filterHiddenReportSubjects((hgvResult.data || []) as HgvInspectionRow[], hiddenProfileIds);
+
     const unifiedRows: UnifiedDailyCheckRow[] = [
-      ...((vanResult.data || []) as VanInspectionRow[]).map((inspection) => ({
+      ...visibleVan.map((inspection) => ({
         source: 'van' as const,
         assetReference: formatFleetAssetLabel({
           identifier: inspection.vehicle?.reg_number || '-',
@@ -285,7 +292,7 @@ export async function GET(request: NextRequest) {
         submittedAt: inspection.submitted_at || null,
         reviewedAt: inspection.reviewed_at || null,
       })),
-      ...((plantResult.data || []) as PlantInspectionRow[]).map((inspection) => ({
+      ...visiblePlant.map((inspection) => ({
         source: 'plant' as const,
         assetReference:
           inspection.is_hired_plant
@@ -303,7 +310,7 @@ export async function GET(request: NextRequest) {
         submittedAt: inspection.submitted_at || null,
         reviewedAt: inspection.reviewed_at || null,
       })),
-      ...((hgvResult.data || []) as HgvInspectionRow[]).map((inspection) => ({
+      ...visibleHgv.map((inspection) => ({
         source: 'hgv' as const,
         assetReference: formatFleetAssetLabel({
           identifier: inspection.hgv?.reg_number || 'HGV',

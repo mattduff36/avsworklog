@@ -11,6 +11,8 @@ import type { InspectionItem } from '@/types/inspection';
 import type { ModuleName } from '@/types/roles';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { filterHiddenReportSubjects, getReportHiddenProfileIds } from '@/lib/server/system-accounts';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { getReportDateRangeSpanDays } from '@/lib/server/report-date-range';
 import {
@@ -423,7 +425,8 @@ async function fetchScopedInspections(
   ];
 
   combined.sort((a, b) => a.inspection_date.localeCompare(b.inspection_date));
-  return combined;
+  const hiddenProfileIds = await getReportHiddenProfileIds(createAdminClient());
+  return filterHiddenReportSubjects(combined, hiddenProfileIds);
 }
 
 export async function POST(request: NextRequest) {

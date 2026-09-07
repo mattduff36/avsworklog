@@ -5,6 +5,8 @@ import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { buildSafeReportFilename, parseReportDateRange, validateRequiredReportDateRange } from '@/lib/server/report-date-range';
 import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { filterHiddenReportSubjects, getReportHiddenProfileIds } from '@/lib/server/system-accounts';
 import { 
   generateExcelFile, 
   formatExcelDate, 
@@ -146,7 +148,7 @@ export async function GET(request: NextRequest) {
     const plantScope = scopedModuleIds.get('plant-inspections') || null;
     const hgvScope = scopedModuleIds.get('hgv-inspections') || null;
 
-    const [vanResult, plantResult, hgvResult] = await Promise.all([
+    const [vanResult, plantResult, hgvResult, hiddenProfileIds] = await Promise.all([
       canAccessVanChecks
         ? (async () => {
             let query = supabase
@@ -250,6 +252,7 @@ export async function GET(request: NextRequest) {
             return query;
           })()
         : Promise.resolve({ data: [], error: null }),
+      getReportHiddenProfileIds(createAdminClient()),
     ]);
 
     if (vanResult.error) {
@@ -266,9 +269,12 @@ export async function GET(request: NextRequest) {
     const excelData: Array<Record<string, string>> = [];
 
     const allInspections = [
-      ...((vanResult.data || []) as VanInspectionRow[]).map((row) => ({ source: 'VAN' as const, row })),
-      ...((plantResult.data || []) as PlantInspectionRow[]).map((row) => ({ source: 'PLANT' as const, row })),
-      ...((hgvResult.data || []) as HgvInspectionRow[]).map((row) => ({ source: 'HGV' as const, row })),
+      ...filterHiddenReportSubjects((vanResult.data || []) as VanInspectionRow[], hiddenProfileIds)
+        .map((row) => ({ source: 'VAN' as const, row })),
+      ...filterHiddenReportSubjects((plantResult.data || []) as PlantInspectionRow[], hiddenProfileIds)
+        .map((row) => ({ source: 'PLANT' as const, row })),
+      ...filterHiddenReportSubjects((hgvResult.data || []) as HgvInspectionRow[], hiddenProfileIds)
+        .map((row) => ({ source: 'HGV' as const, row })),
     ];
 
     if (allInspections.length === 0) {

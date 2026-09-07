@@ -67,12 +67,12 @@ describe('SYSACC-02 absence and bank-holiday eligibility', () => {
     expect(allowanceTotals).toContain("eq('is_system_account', false)");
 
     const bookings = readSource('app/api/reports/absence-leave/bookings/route.ts');
-    expect(bookings).toContain('getSystemAccountIds');
-    expect(bookings).toContain('isSystemAccountProfile');
+    expect(bookings).toContain('getReportHiddenProfileIds');
+    expect(bookings).toContain('filterHiddenReportSubjects');
 
     const weeklyPrint = readSource('lib/server/absence-weekly-print-report.ts');
-    expect(weeklyPrint).toContain('getSystemAccountIds');
-    expect(weeklyPrint).toContain('isSystemAccountProfile');
+    expect(weeklyPrint).toContain('getReportHiddenProfileIds');
+    expect(weeklyPrint).toContain('filterHiddenReportSubjects');
   });
 });
 
@@ -326,7 +326,7 @@ describe('SYSACC-R1 remaining operational pickers', () => {
 
     const timesheetScope = readSource('lib/server/reports-timesheet-scope.ts');
     expect(timesheetScope).toContain('filterRowsForReportProfileScope');
-    expect(timesheetScope).toContain('getSystemAccountIds');
+    expect(timesheetScope).toContain('getReportHiddenProfileIds');
 
     const reportScope = readSource('lib/server/report-scope.ts');
     expect(reportScope).toContain("eq('is_system_account', false)");
@@ -364,6 +364,7 @@ describe('SYSACC-R1 remaining operational pickers', () => {
         || source.includes('filterSystemAccounts')
         || source.includes('filterOperationalProfiles')
         || source.includes('getSystemAccountIds')
+        || source.includes('getReportHiddenProfileIds')
         || source.includes('!isSystemAccountProfile')
       ).toBe(true);
     }
