@@ -63,5 +63,5 @@ export type Subcategory = {
 export type AssetTab = 'all' | 'van' | 'plant' | 'hgv';
 export type PageTab = 'overview' | 'settings';
 export type TaxonomyMode = 'van' | 'plant' | 'hgv';
-export type WorkshopTaskStatusFilter = 'all' | 'pending' | 'logged' | 'on_hold' | 'completed';
+export type WorkshopTaskStatusFilter = 'all' | 'pending' | 'logged' | 'on_hold' | 'completed' | 'archived';
 export type WorkshopTaskTileFilter = WorkshopTaskStatusFilter | 'high_priority';

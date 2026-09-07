@@ -64,6 +64,8 @@ function renderOverview() {
           onHoldTasks={[]}
           completedTaskCount={0}
           completedTasks={[]}
+          archivedTaskCount={0}
+          archivedTasks={[]}
           showPending={true}
           onShowPendingChange={vi.fn()}
           showInProgress={true}
@@ -72,6 +74,8 @@ function renderOverview() {
           onShowOnHoldChange={vi.fn()}
           showCompleted={false}
           onShowCompletedChange={vi.fn()}
+          showArchived={false}
+          onShowArchivedChange={vi.fn()}
           updatingStatus={new Set()}
           taskAttachmentCounts={new Map()}
           taskInspectionPhotos={{}}
@@ -104,6 +108,7 @@ function renderStatefulOverview(initialFilter: WorkshopTaskTileFilter = 'all') {
     const [showInProgress, setShowInProgress] = useState(initialFilter === 'logged');
     const [showOnHold, setShowOnHold] = useState(initialFilter === 'on_hold');
     const [showCompleted, setShowCompleted] = useState(initialFilter === 'completed');
+    const [showArchived, setShowArchived] = useState(initialFilter === 'archived');
     const pendingTasks = mixedTasks.filter((task) => task.status === 'pending');
     const highPriorityPendingTasks = pendingTasks.filter(isHighPriorityTask);
     const inProgressTasks = mixedTasks.filter((task) => task.status === 'logged');
@@ -123,6 +128,7 @@ function renderStatefulOverview(initialFilter: WorkshopTaskTileFilter = 'all') {
       setShowInProgress(nextFilter === 'logged');
       setShowOnHold(nextFilter === 'on_hold');
       setShowCompleted(nextFilter === 'completed');
+      setShowArchived(nextFilter === 'archived');
     };
 
     return (
@@ -148,6 +154,8 @@ function renderStatefulOverview(initialFilter: WorkshopTaskTileFilter = 'all') {
             onHoldTasks={visibleOnHoldTasks}
             completedTaskCount={completedTasks.length}
             completedTasks={visibleCompletedTasks}
+            archivedTaskCount={0}
+            archivedTasks={[]}
             showPending={showPending}
             onShowPendingChange={setShowPending}
             showInProgress={showInProgress}
@@ -156,6 +164,8 @@ function renderStatefulOverview(initialFilter: WorkshopTaskTileFilter = 'all') {
             onShowOnHoldChange={setShowOnHold}
             showCompleted={showCompleted}
             onShowCompletedChange={setShowCompleted}
+            showArchived={showArchived}
+            onShowArchivedChange={setShowArchived}
             updatingStatus={new Set()}
             taskAttachmentCounts={new Map()}
             taskInspectionPhotos={{}}
@@ -298,6 +308,19 @@ describe('WorkshopTasksOverviewTab status tile filters', () => {
 
     expect(screen.getByRole('button', { name: /show completed workshop tasks/i }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getAllByRole('combobox')[0].textContent).toContain('Completed');
+  });
+
+  it('shows an Archived tile and expands that section only', async () => {
+    renderStatefulOverview();
+
+    const archivedTile = screen.getByRole('button', { name: /show archived workshop tasks/i });
+    expect(archivedTile).toBeTruthy();
+
+    fireEvent.click(archivedTile);
+
+    expect(archivedTile.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.queryByText(/Pending Tasks \(/i)).toBeNull();
+    expect(screen.queryByText(/Completed Tasks \(/i)).toBeNull();
   });
 });
 

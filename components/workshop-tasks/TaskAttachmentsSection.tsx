@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileText, Plus, Check, Clock, ChevronRight, Download, Loader2, Pencil, RotateCcw } from 'lucide-react';
+import { FileText, Plus, Check, Clock, ChevronRight, Download, Loader2, RotateCcw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTaskAttachments, TaskAttachmentWithDetails } from '@/lib/hooks/useTaskAttachments';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
@@ -323,22 +323,6 @@ export function TaskAttachmentsSection({
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {canCorrectCompleted && isTaskCompleted && attachment.status === 'completed' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleOpenForm(attachment);
-                          }}
-                          className="h-8 border-workshop/40 bg-workshop/10 px-2 text-workshop hover:bg-workshop/20"
-                          title="Correct this completed attachment"
-                        >
-                          <Pencil className="mr-1 h-3.5 w-3.5" />
-                          Correct attachment
-                        </Button>
-                      )}
                       {canUndoComplete && (
                         <Button
                           variant="outline"

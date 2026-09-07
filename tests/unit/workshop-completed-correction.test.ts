@@ -19,10 +19,11 @@ function readRepo(relativePath: string): string {
 
 describe('completed workshop corrections', () => {
   it('WT-CORR-CTA-001 uses explicit workshop CTA colours', () => {
-    const dialog = readRepo('components/workshop-tasks/CorrectServiceTaskDialog.tsx');
+    const dialog = readRepo('components/workshop-tasks/CorrectTaskDialog.tsx');
     expect(dialog).toContain('data-accent="workshop"');
     expect(dialog).toContain('bg-workshop hover:bg-workshop-dark text-white');
-    expect(dialog).toContain('DialogContent className="sm:max-w-md text-white"');
+    expect(dialog).toContain('Correct Task');
+    expect(dialog).not.toContain('sm:max-w-md text-white');
   });
 
   it('WT-CORR-TASK-003 builds a corrected history event kind', () => {
@@ -138,11 +139,11 @@ describe('completed workshop corrections', () => {
     expect(server).toContain("event_type, notes, corrects_event_id");
     expect(server).toContain("'correction'");
     expect(server).toContain('calculateNextDueMeter(input.completionMeter, config.intervalValue)');
-    expect(readRepo('app/(dashboard)/workshop-tasks/hooks/useWorkshopTaskCrudActions.ts')).toContain(
+    expect(readRepo('components/workshop-tasks/CorrectTaskDialog.tsx')).toContain(
       '/correct-completed'
     );
     expect(readRepo('app/(dashboard)/workshop-tasks/hooks/useWorkshopTaskCrudActions.ts')).not.toContain(
-      'completionMeter'
+      '/correct-completed'
     );
   });
 
@@ -175,10 +176,16 @@ describe('completed workshop corrections', () => {
     const page = readRepo('app/(dashboard)/workshop-tasks/page.tsx');
     const attachments = readRepo('components/workshop-tasks/TaskAttachmentsSection.tsx');
     expect(page).toContain('const { user, profile, isManager, isAdmin } = useAuth()');
-    expect(page).toContain('canCorrectCompleted={showSettings}');
+    expect(page).toContain('canCorrectCompleted={Boolean(showSettings && modalTask && !isArchivedWorkshopTask(modalTask))}');
     expect(attachments).toContain('canCorrectCompleted && isTaskCompleted');
-    expect(attachments).toContain('Correct attachment');
+    expect(attachments).toContain('correctionMode');
+    expect(attachments).toContain('onCorrect={handleCorrectSchemaResponses}');
+    expect(attachments).not.toContain('Correct attachment');
     expect(attachments).toContain('handleOpenForm(attachment)');
+    expect(readRepo('app/(dashboard)/workshop-tasks/components/WorkshopHistoricalTasksSection.tsx')).toContain('title="Correct Task"');
+    expect(readRepo('app/(dashboard)/workshop-tasks/components/WorkshopHistoricalTasksSection.tsx')).not.toContain('Correct details');
+    expect(readRepo('components/workshop-tasks/WorkshopTaskModal.tsx')).toContain('aria-label="Correct Task"');
+    expect(readRepo('components/workshop-tasks/WorkshopTaskModal.tsx')).not.toContain('Correct details');
     expect(readRepo('lib/providers/auth-provider.tsx')).toContain(
       'const roleForFlags = isViewingAs ? effectiveRole : profile?.role ?? null'
     );

@@ -122,5 +122,42 @@ describe('TaskCommentsDrawer tablet safeguards', () => {
 
     expect(screen.getByRole('button', { name: 'Discard Draft' })).toBeInTheDocument();
   });
+
+  it('hides comment mutations when the drawer is read-only', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        items: [{
+          id: 'comment-1',
+          type: 'comment',
+          created_at: '2026-01-01T00:00:00Z',
+          author: { id: 'user-1', full_name: 'Matt' },
+          body: 'Visible archived comment',
+          can_edit: true,
+          can_delete: true,
+        }],
+      }),
+    })));
+
+    render(
+      <TabletModeProvider>
+        <TaskCommentsDrawer
+          open
+          onOpenChange={vi.fn()}
+          taskId="task-1"
+          taskTitle="VAN-1"
+          readOnly
+        />
+      </TabletModeProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Visible archived comment')).toBeInTheDocument();
+    });
+    expect(screen.queryByPlaceholderText('Add a comment...')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Add Comment/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /edit/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /delete/i })).toBeNull();
+  });
 });
 

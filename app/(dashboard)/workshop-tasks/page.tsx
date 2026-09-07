@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { PanelLoader } from '@/components/ui/panel-loader';
-import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause } from 'lucide-react';
+import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause, Archive } from 'lucide-react';
+import { isArchivedWorkshopTask, shouldFetchArchivedWorkshopRows } from '@/lib/workshop-tasks/archive';
 import { ErrorDetailsResponse } from '@/types/error-details';
 import { WorkshopTasksOverviewTab } from './components/WorkshopTasksOverviewTab';
 import { WorkshopTaskStatusDialogs } from './components/WorkshopTaskStatusDialogs';
@@ -72,8 +73,8 @@ const MarkTaskCompleteDialog = dynamic(
   () => import('@/components/workshop-tasks/MarkTaskCompleteDialog').then(m => ({ default: m.MarkTaskCompleteDialog })),
   { ssr: false, loading: () => <ModalChunkLoader message="Loading completion dialog..." /> },
 );
-const CorrectServiceTaskDialog = dynamic(
-  () => import('@/components/workshop-tasks/CorrectServiceTaskDialog').then(m => ({ default: m.CorrectServiceTaskDialog })),
+const CorrectTaskDialog = dynamic(
+  () => import('@/components/workshop-tasks/CorrectTaskDialog').then(m => ({ default: m.CorrectTaskDialog })),
   { ssr: false, loading: () => <ModalChunkLoader message="Loading correction dialog..." /> },
 );
 const ErrorDetailsModal = dynamic(
@@ -110,6 +111,12 @@ export default function WorkshopTasksPage() {
   const [showInProgress, setShowInProgress] = useState(false);
   const [showOnHold, setShowOnHold] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedTasks, setArchivedTasks] = useState<Action[]>([]);
+  const [archivedCount, setArchivedCount] = useState(0);
+  const [archivedLoading, setArchivedLoading] = useState(false);
+  const [archivedLoadedKey, setArchivedLoadedKey] = useState('');
+  const archivedPhotoIdsRef = useRef<string[]>([]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -194,7 +201,9 @@ export default function WorkshopTasksPage() {
   const isHighPriorityHgvDefectTask = (task?: Action) => Boolean(task && task.action_type === 'inspection_defect' && task.hgv_id);
   const getStatusIcon = (status: string, task?: Action) =>
     status === 'completed'
-      ? <CheckCircle2 className="h-5 w-5 text-green-400" />
+      ? isArchivedWorkshopTask(task)
+        ? <Archive className="h-5 w-5 text-slate-400" />
+        : <CheckCircle2 className="h-5 w-5 text-green-400" />
       : status === 'logged'
         ? <Clock className="h-5 w-5 text-blue-400" />
         : status === 'on_hold'
@@ -287,14 +296,72 @@ export default function WorkshopTasksPage() {
   const visibleInProgressTasks = statusFilter === 'all' || statusFilter === 'logged' ? inProgressTasks : [];
   const visibleOnHoldTasks = statusFilter === 'all' || statusFilter === 'on_hold' ? onHoldTasks : [];
   const visibleCompletedTasks = statusFilter === 'all' || statusFilter === 'completed' ? completedTasks : [];
-  const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
+  const visibleArchivedTasks = statusFilter === 'all' || statusFilter === 'archived' ? archivedTasks : [];
+  const archivedCacheKey = `${vehicleFilter}|${assetTab}`;
+  const taskIds = useMemo(() => {
+    const archivedIds = archivedPhotoIdsRef.current;
+    return Array.from(new Set([...tasks.map((task) => task.id), ...archivedIds]));
+  }, [archivedTasks, tasks]);
   const { photosByTask: taskInspectionPhotos } = useTaskInspectionPhotos(
     taskIds,
-    { enabled: tasks.length > 0 }
+    { enabled: taskIds.length > 0 }
   );
 
-  const crud = useWorkshopTaskCrudActions({ supabase, userId: user?.id, categoryTaxonomyMode, vehicles, subcategories, plantSubcategories, hgvSubcategories, selectedVehicleId, selectedCategoryId, selectedSubcategoryId, workshopComments, newMeterReading, currentMeterReading, meterReadingType, selectedAttachmentTemplateIds, categoryHasSubcategories, editingTask, editVehicleId, editCategoryId, editSubcategoryId, editComments, editMileage, editCurrentMileage, editCorrectionReason, initialEditCategoryId, initialEditHadSubcategory, taskToDelete, categoryName, editingCategory, submitting, setSubmitting, setShowAddModal, setSelectedVehicleId, setSelectedCategoryId, setSelectedSubcategoryId, setWorkshopComments, setNewMeterReading, setCurrentMeterReading, setMeterReadingType, setSelectedAttachmentTemplateIds, setEditingTask, setShowEditModal, setEditVehicleId, setEditCategoryId, setEditSubcategoryId, setEditComments, setEditMileage, setEditCurrentMileage, setEditCorrectionReason, setInitialEditCategoryId, setInitialEditHadSubcategory, setShowDeleteConfirm, setTaskToDelete, setTasks, setDeleting, setShowCategoryModal, setCategoryName, setSubmittingCategory, setEditingCategory, setShowSubcategoryModal, setSubcategoryMode, setSelectedCategoryForSubcategory, setEditingSubcategory, setShowErrorDetailsModal, setErrorDetailsLoading, setErrorDetails, setRecentVehicleIds, fetchTasks: fetcher.fetchTasks, fetchCategories: fetcher.fetchCategories, fetchPlantCategories: fetcher.fetchPlantCategories, fetchHgvCategories: fetcher.fetchHgvCategories, fetchSubcategories: fetcher.fetchSubcategories, getAssetIdLabel });
-  const lifecycle = useWorkshopTaskLifecycleActions({ supabase, userId: user?.id, profileName: profile?.full_name, tasks, fetchTasks: fetcher.fetchTasks, selectedTask, loggedComment, onHoldingTask, onHoldComment, resumingTask, resumeComment, completingTask, setUpdatingStatus, setShowStatusModal, setSelectedTask, setLoggedComment, setShowOnHoldModal, setShowResumeModal, setShowCompleteModal, setCompletingTask });
+  const fetchArchivedCount = fetcher.fetchArchivedCount;
+  const fetchArchivedTasks = fetcher.fetchArchivedTasks;
+  const fetchTaskById = fetcher.fetchTaskById;
+  const fetchTasks = fetcher.fetchTasks;
+
+  const refreshArchivedCount = useCallback(async () => {
+    const count = await fetchArchivedCount(assetTab);
+    if (count === null) {
+      return;
+    }
+    setArchivedCount(count);
+    return count;
+  }, [assetTab, fetchArchivedCount]);
+
+  const loadArchivedTasks = useCallback(async () => {
+    setArchivedLoading(true);
+    try {
+      const rows = await fetchArchivedTasks(assetTab);
+      if (rows) {
+        setArchivedTasks(rows);
+        setArchivedLoadedKey(archivedCacheKey);
+        archivedPhotoIdsRef.current = rows.map((task) => task.id);
+      }
+    } finally {
+      setArchivedLoading(false);
+    }
+  }, [archivedCacheKey, assetTab, fetchArchivedTasks]);
+
+  const refreshTasks = useCallback(async () => {
+    await fetchTasks();
+    await refreshArchivedCount();
+    if (showArchived) {
+      await loadArchivedTasks();
+    } else {
+      setArchivedLoadedKey('');
+    }
+  }, [fetchTasks, loadArchivedTasks, refreshArchivedCount, showArchived]);
+
+  const crud = useWorkshopTaskCrudActions({ supabase, userId: user?.id, categoryTaxonomyMode, vehicles, subcategories, plantSubcategories, hgvSubcategories, selectedVehicleId, selectedCategoryId, selectedSubcategoryId, workshopComments, newMeterReading, currentMeterReading, meterReadingType, selectedAttachmentTemplateIds, categoryHasSubcategories, editingTask, editVehicleId, editCategoryId, editSubcategoryId, editComments, editMileage, editCurrentMileage, editCorrectionReason, initialEditCategoryId, initialEditHadSubcategory, taskToDelete, categoryName, editingCategory, submitting, setSubmitting, setShowAddModal, setSelectedVehicleId, setSelectedCategoryId, setSelectedSubcategoryId, setWorkshopComments, setNewMeterReading, setCurrentMeterReading, setMeterReadingType, setSelectedAttachmentTemplateIds, setEditingTask, setShowEditModal, setEditVehicleId, setEditCategoryId, setEditSubcategoryId, setEditComments, setEditMileage, setEditCurrentMileage, setEditCorrectionReason, setInitialEditCategoryId, setInitialEditHadSubcategory, setShowDeleteConfirm, setTaskToDelete, setTasks, setDeleting, setShowCategoryModal, setCategoryName, setSubmittingCategory, setEditingCategory, setShowSubcategoryModal, setSubcategoryMode, setSelectedCategoryForSubcategory, setEditingSubcategory, setShowErrorDetailsModal, setErrorDetailsLoading, setErrorDetails, setRecentVehicleIds, fetchTasks: refreshTasks, fetchCategories: fetcher.fetchCategories, fetchPlantCategories: fetcher.fetchPlantCategories, fetchHgvCategories: fetcher.fetchHgvCategories, fetchSubcategories: fetcher.fetchSubcategories, getAssetIdLabel });
+  const lifecycle = useWorkshopTaskLifecycleActions({ supabase, userId: user?.id, profileName: profile?.full_name, tasks, fetchTasks: refreshTasks, selectedTask, loggedComment, onHoldingTask, onHoldComment, resumingTask, resumeComment, completingTask, setUpdatingStatus, setShowStatusModal, setSelectedTask, setLoggedComment, setShowOnHoldModal, setShowResumeModal, setShowCompleteModal, setCompletingTask });
+
+  useEffect(() => {
+    void refreshArchivedCount();
+  }, [refreshArchivedCount]);
+
+  useEffect(() => {
+    if (!shouldFetchArchivedWorkshopRows({
+      showArchived,
+      loadedKey: archivedLoadedKey,
+      cacheKey: archivedCacheKey,
+    })) {
+      return;
+    }
+    void loadArchivedTasks();
+  }, [archivedCacheKey, archivedLoadedKey, loadArchivedTasks, showArchived]);
 
   function handlePageTabChange(nextTab: 'overview' | 'settings') {
     if (nextTab === 'settings') {
@@ -310,6 +377,7 @@ export default function WorkshopTasksPage() {
     setShowInProgress(nextFilter === 'logged');
     setShowOnHold(nextFilter === 'on_hold');
     setShowCompleted(nextFilter === 'completed');
+    setShowArchived(nextFilter === 'archived');
   }
 
   function handleAssetTabChange(nextTab: 'all' | 'van' | 'plant' | 'hgv') {
@@ -344,20 +412,35 @@ export default function WorkshopTasksPage() {
   }
 
   useEffect(() => {
-    if (!requestedTaskId || tasks.length === 0) {
+    if (!requestedTaskId || loading) {
       return;
     }
 
-    const requestedTask = tasks.find((task) => task.id === requestedTaskId);
-    if (!requestedTask) {
+    const requestedTask =
+      tasks.find((task) => task.id === requestedTaskId) ||
+      archivedTasks.find((task) => task.id === requestedTaskId);
+
+    if (requestedTask) {
+      if (!showTaskModal || modalTask?.id !== requestedTask.id) {
+        setModalTask(requestedTask);
+        setShowTaskModal(true);
+      }
       return;
     }
 
-    if (!showTaskModal || modalTask?.id !== requestedTask.id) {
-      setModalTask(requestedTask);
+    let cancelled = false;
+    void fetchTaskById(requestedTaskId).then((task) => {
+      if (cancelled || !task) {
+        return;
+      }
+      setModalTask(task);
       setShowTaskModal(true);
-    }
-  }, [requestedTaskId, tasks, showTaskModal, modalTask?.id]);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [archivedTasks, fetchTaskById, loading, modalTask?.id, requestedTaskId, showTaskModal, tasks]);
 
   useEffect(() => {
     if (!modalTask) {
@@ -455,6 +538,9 @@ export default function WorkshopTasksPage() {
           inProgressTaskCount={inProgressTasks.length}
           onHoldTaskCount={onHoldTasks.length}
           completedTaskCount={completedTasks.length}
+          archivedTaskCount={archivedCount}
+          archivedTasks={visibleArchivedTasks}
+          archivedLoading={archivedLoading}
           pendingTasks={visiblePendingTasks}
           inProgressTasks={visibleInProgressTasks}
           onHoldTasks={visibleOnHoldTasks}
@@ -467,6 +553,8 @@ export default function WorkshopTasksPage() {
           onShowOnHoldChange={setShowOnHold}
           showCompleted={showCompleted}
           onShowCompletedChange={setShowCompleted}
+          showArchived={showArchived}
+          onShowArchivedChange={setShowArchived}
           updatingStatus={updatingStatus}
           taskAttachmentCounts={taskAttachmentCounts}
           taskInspectionPhotos={taskInspectionPhotos}
@@ -485,7 +573,13 @@ export default function WorkshopTasksPage() {
           onUndoLogged={lifecycle.handleUndoLogged}
           onUndoComplete={lifecycle.handleUndoComplete}
           canCorrectService={showSettings}
-          onCorrectService={(task) => { setCorrectingTask(task); setShowCorrectServiceModal(true); }}
+          onCorrectService={(task) => {
+            if (isArchivedWorkshopTask(task)) {
+              return;
+            }
+            setCorrectingTask(task);
+            setShowCorrectServiceModal(true);
+          }}
           onEditTask={crud.handleEditTask}
           onDeleteTask={crud.handleDeleteTask}
         />
@@ -526,25 +620,33 @@ export default function WorkshopTasksPage() {
         )}
       </Tabs>
 
-      <WorkshopTaskFormDialogs userId={user?.id || null} showAddModal={showAddModal} onShowAddModalChange={setShowAddModal} assetTab={assetTab} selectedVehicleId={selectedVehicleId} onSelectedVehicleIdChange={setSelectedVehicleId} vehicles={vehicles} getAssetDisplay={getAssetDisplay} selectedCategoryId={selectedCategoryId} onSelectedCategoryIdChange={crud.handleCategoryChange} activeCategories={activeCategories} categoryHasSubcategories={categoryHasSubcategories} selectedSubcategoryId={selectedSubcategoryId} onSelectedSubcategoryIdChange={setSelectedSubcategoryId} filteredSubcategories={filteredSubcategories} meterReadingType={meterReadingType} newMeterReading={newMeterReading} onNewMeterReadingChange={setNewMeterReading} currentMeterReading={currentMeterReading} workshopComments={workshopComments} onWorkshopCommentsChange={setWorkshopComments} attachmentTemplates={attachmentTemplates} selectedAttachmentTemplateIds={selectedAttachmentTemplateIds} onSelectedAttachmentTemplateIdsChange={setSelectedAttachmentTemplateIds} submitting={submitting} onResetAddForm={crud.resetAddForm} onFetchCurrentMeterReading={fetcher.fetchCurrentMeterReading} onCreateTask={crud.handleAddTask} showEditModal={showEditModal} onShowEditModalChange={setShowEditModal} editingTask={editingTask} editVehicleId={editVehicleId} onEditVehicleIdChange={crud.handleEditVehicleChange} recentVehicleIds={recentVehicleIds} editCategoryId={editCategoryId} onEditCategoryIdChange={(value) => { setEditCategoryId(value); setEditSubcategoryId(''); }} categories={categories} plantCategories={plantCategories} hgvCategories={hgvCategories} editSubcategoryId={editSubcategoryId} onEditSubcategoryIdChange={setEditSubcategoryId} subcategories={subcategories} plantSubcategories={plantSubcategories} hgvSubcategories={hgvSubcategories} initialEditCategoryId={initialEditCategoryId} initialEditHadSubcategory={initialEditHadSubcategory} editMileage={editMileage} onEditMileageChange={setEditMileage} editCurrentMileage={editCurrentMileage} editCorrectionReason={editCorrectionReason} onEditCorrectionReasonChange={setEditCorrectionReason} editComments={editComments} onEditCommentsChange={setEditComments} isSaveEditDisabled={crud.isSaveEditDisabled} onSaveEdit={crud.handleSaveEdit} onResetEditForm={crud.resetEditForm} />
+      <WorkshopTaskFormDialogs userId={user?.id || null} showAddModal={showAddModal} onShowAddModalChange={setShowAddModal} assetTab={assetTab} selectedVehicleId={selectedVehicleId} onSelectedVehicleIdChange={setSelectedVehicleId} vehicles={vehicles} getAssetDisplay={getAssetDisplay} selectedCategoryId={selectedCategoryId} onSelectedCategoryIdChange={crud.handleCategoryChange} activeCategories={activeCategories} categoryHasSubcategories={categoryHasSubcategories} selectedSubcategoryId={selectedSubcategoryId} onSelectedSubcategoryIdChange={setSelectedSubcategoryId} filteredSubcategories={filteredSubcategories} meterReadingType={meterReadingType} newMeterReading={newMeterReading} onNewMeterReadingChange={setNewMeterReading} currentMeterReading={currentMeterReading} workshopComments={workshopComments} onWorkshopCommentsChange={setWorkshopComments} attachmentTemplates={attachmentTemplates} selectedAttachmentTemplateIds={selectedAttachmentTemplateIds} onSelectedAttachmentTemplateIdsChange={setSelectedAttachmentTemplateIds} submitting={submitting} onResetAddForm={crud.resetAddForm} onFetchCurrentMeterReading={fetcher.fetchCurrentMeterReading} onCreateTask={crud.handleAddTask} showEditModal={showEditModal} onShowEditModalChange={setShowEditModal} editingTask={editingTask} editVehicleId={editVehicleId} onEditVehicleIdChange={crud.handleEditVehicleChange} recentVehicleIds={recentVehicleIds} editCategoryId={editCategoryId} onEditCategoryIdChange={(value) => { setEditCategoryId(value); setEditSubcategoryId(''); }} categories={categories} plantCategories={plantCategories} hgvCategories={hgvCategories} editSubcategoryId={editSubcategoryId} onEditSubcategoryIdChange={setEditSubcategoryId} subcategories={subcategories} plantSubcategories={plantSubcategories} hgvSubcategories={hgvSubcategories} initialEditCategoryId={initialEditCategoryId} initialEditHadSubcategory={initialEditHadSubcategory} editMileage={editMileage} onEditMileageChange={setEditMileage} editCurrentMileage={editCurrentMileage} editComments={editComments} onEditCommentsChange={setEditComments} isSaveEditDisabled={crud.isSaveEditDisabled} onSaveEdit={crud.handleSaveEdit} onResetEditForm={crud.resetEditForm} />
       {(showCompleteModal || !!completingTask) && (
         <MarkTaskCompleteDialog open={showCompleteModal} onOpenChange={setShowCompleteModal} task={completingTask} onConfirm={lifecycle.confirmMarkComplete} isSubmitting={completingTask ? updatingStatus.has(completingTask.id) : false} userId={user?.id || null} />
       )}
       {(showCorrectServiceModal || !!correctingTask) && (
-        <CorrectServiceTaskDialog
+        <CorrectTaskDialog
           open={showCorrectServiceModal}
           onOpenChange={(open) => {
             setShowCorrectServiceModal(open);
             if (!open) setCorrectingTask(null);
           }}
-          taskId={correctingTask?.id || null}
-          assetType={correctingTask?.hgv_id ? 'hgv' : correctingTask?.plant_id ? 'plant' : 'van'}
-          onCorrected={() => { void fetcher.fetchTasks(); }}
+          task={correctingTask}
+          vehicles={vehicles}
+          categories={categories}
+          plantCategories={plantCategories}
+          hgvCategories={hgvCategories}
+          subcategories={subcategories}
+          plantSubcategories={plantSubcategories}
+          hgvSubcategories={hgvSubcategories}
+          recentVehicleIds={recentVehicleIds}
+          getAssetDisplay={getAssetDisplay}
+          onCorrected={() => { void refreshTasks(); }}
         />
       )}
       <WorkshopTaskStatusDialogs userId={user?.id || null} statusTask={selectedTask} showStatusModal={showStatusModal} onShowStatusModalChange={setShowStatusModal} loggedComment={loggedComment} onLoggedCommentChange={setLoggedComment} onCancelStatusModal={() => { setShowStatusModal(false); setSelectedTask(null); setLoggedComment(''); }} onConfirmMarkInProgress={lifecycle.confirmMarkInProgress} showOnHoldModal={showOnHoldModal} onShowOnHoldModalChange={setShowOnHoldModal} onHoldComment={onHoldComment} onOnHoldCommentChange={setOnHoldComment} onCancelOnHoldModal={() => { setShowOnHoldModal(false); setOnHoldingTask(null); setOnHoldComment(''); }} onConfirmMarkOnHold={lifecycle.confirmMarkOnHold} onHoldingTask={onHoldingTask} showResumeModal={showResumeModal} onShowResumeModalChange={setShowResumeModal} resumeComment={resumeComment} onResumeCommentChange={setResumeComment} onCancelResumeModal={() => { setShowResumeModal(false); setResumingTask(null); setResumeComment(''); }} onConfirmResumeTask={lifecycle.confirmResumeTask} resumingTask={resumingTask} updatingStatus={updatingStatus} />
       <WorkshopTaskAdminDialogs showSettings={showSettings} showCategoryModal={showCategoryModal} onShowCategoryModalChange={setShowCategoryModal} editingCategory={editingCategory} categoryName={categoryName} onCategoryNameChange={setCategoryName} submittingCategory={submittingCategory} onSaveCategory={crud.handleSaveCategory} onResetCategoryForm={() => { setShowCategoryModal(false); setEditingCategory(null); setCategoryName(''); }} showDeleteConfirm={showDeleteConfirm} onShowDeleteConfirmChange={setShowDeleteConfirm} taskToDelete={taskToDelete} getVehicleReg={getVehicleReg} deleting={deleting} onConfirmDeleteTask={crud.confirmDeleteTask} onResetDeleteTask={() => { setShowDeleteConfirm(false); setTaskToDelete(null); }} />
-      {commentsTask && <TaskCommentsDrawer open={showCommentsDrawer} onOpenChange={setShowCommentsDrawer} taskId={commentsTask.id} taskTitle={getVehicleReg(commentsTask)} userId={user?.id || null} />}
+      {commentsTask && <TaskCommentsDrawer open={showCommentsDrawer} onOpenChange={setShowCommentsDrawer} taskId={commentsTask.id} taskTitle={getVehicleReg(commentsTask)} userId={user?.id || null} readOnly={isArchivedWorkshopTask(commentsTask)} />}
       {whereaboutsTask && (
         <AssetWhereaboutsDialog
           open={showWhereaboutsDialog}
@@ -557,7 +659,7 @@ export default function WorkshopTasksPage() {
         />
       )}
       {(showTaskModal || !!modalTask) && (
-        <WorkshopTaskModal open={showTaskModal} onOpenChange={handleTaskModalOpenChange} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { handleTaskModalOpenChange(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { handleTaskModalOpenChange(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { handleTaskModalOpenChange(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { handleTaskModalOpenChange(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { handleTaskModalOpenChange(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { handleTaskModalOpenChange(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} onOpenWhereabouts={(task) => { setWhereaboutsTask(task as Action); setShowWhereaboutsDialog(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} onTaskUpdated={fetcher.fetchTasks} canCorrectCompleted={showSettings} onCorrectService={(task) => { handleTaskModalOpenChange(false); setCorrectingTask(task as Action); setShowCorrectServiceModal(true); }} />
+        <WorkshopTaskModal open={showTaskModal} onOpenChange={handleTaskModalOpenChange} task={modalTask} inspectionPhotos={modalTask ? taskInspectionPhotos[modalTask.id] || [] : []} onEdit={(task) => { handleTaskModalOpenChange(false); crud.handleEditTask(task as Action); }} onDelete={(task) => { handleTaskModalOpenChange(false); crud.handleDeleteTask(task as Action); }} onMarkInProgress={(task) => { handleTaskModalOpenChange(false); setSelectedTask(task as Action); setLoggedComment(''); setShowStatusModal(true); }} onMarkComplete={(task) => { handleTaskModalOpenChange(false); setCompletingTask(task as Action); setShowCompleteModal(true); }} onMarkOnHold={(task) => { handleTaskModalOpenChange(false); setOnHoldingTask(task as Action); setOnHoldComment(''); setShowOnHoldModal(true); }} onResume={(task) => { handleTaskModalOpenChange(false); setResumingTask(task as Action); setResumeComment(''); setShowResumeModal(true); }} onOpenWhereabouts={(task) => { setWhereaboutsTask(task as Action); setShowWhereaboutsDialog(true); }} isUpdating={modalTask ? updatingStatus.has(modalTask.id) : false} onTaskUpdated={refreshTasks} canCorrectCompleted={Boolean(showSettings && modalTask && !isArchivedWorkshopTask(modalTask))} onCorrectService={(task) => { handleTaskModalOpenChange(false); setCorrectingTask(task as Action); setShowCorrectServiceModal(true); }} />
       )}
       {selectedCategoryForSubcategory && <SubcategoryDialog open={showSubcategoryModal} onOpenChange={setShowSubcategoryModal} mode={subcategoryMode} categoryId={selectedCategoryForSubcategory.id} categoryName={selectedCategoryForSubcategory.name} subcategory={editingSubcategory} onSuccess={fetcher.fetchSubcategories} />}
       {showErrorDetailsModal && (

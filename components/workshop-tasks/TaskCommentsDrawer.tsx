@@ -37,6 +37,7 @@ interface TaskCommentsDrawerProps {
   taskId: string;
   taskTitle: string;
   userId?: string | null;
+  readOnly?: boolean;
 }
 
 export function TaskCommentsDrawer({
@@ -45,6 +46,7 @@ export function TaskCommentsDrawer({
   taskId,
   taskTitle,
   userId = null,
+  readOnly = false,
 }: TaskCommentsDrawerProps) {
   const { tabletModeEnabled } = useTabletMode();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -59,7 +61,7 @@ export function TaskCommentsDrawer({
     [newComment, editingCommentId, editText]
   );
   const { clearDraft: clearNewCommentDraft } = useWorkshopDraftPersistence({
-    enabled: open,
+    enabled: open && !readOnly,
     draftId: `workshop-task-comment-new:${userId || 'anonymous'}:${taskId}`,
     kind: 'workshop-task-comment-new',
     ownerId: userId,
@@ -68,7 +70,7 @@ export function TaskCommentsDrawer({
     onRestore: (draft) => setNewComment(draft.newComment || ''),
   });
   const { clearDraft: clearEditCommentDraft } = useWorkshopDraftPersistence({
-    enabled: open && Boolean(editingCommentId),
+    enabled: open && !readOnly && Boolean(editingCommentId),
     draftId: `workshop-task-comment-edit:${userId || 'anonymous'}:${taskId}:${editingCommentId || 'none'}`,
     kind: 'workshop-task-comment-edit',
     ownerId: userId,
@@ -105,6 +107,9 @@ export function TaskCommentsDrawer({
   }, [open, taskId]);
 
   const handleAddComment = async () => {
+    if (readOnly) {
+      return;
+    }
     if (!newComment.trim()) {
       toast.error('Comment cannot be empty');
       return;
@@ -147,6 +152,9 @@ export function TaskCommentsDrawer({
   };
 
   const handleEditComment = async (commentId: string) => {
+    if (readOnly) {
+      return;
+    }
     if (!editText.trim()) {
       toast.error('Comment cannot be empty');
       return;
@@ -191,6 +199,9 @@ export function TaskCommentsDrawer({
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    if (readOnly) {
+      return;
+    }
     if (!confirm('Are you sure you want to delete this comment?')) {
       return;
     }
@@ -317,7 +328,7 @@ export function TaskCommentsDrawer({
                     {item.updated_at && ' (edited)'}
                   </span>
                 </div>
-                {!isEditing && (item.can_edit || item.can_delete) && (
+                {!readOnly && !isEditing && (item.can_edit || item.can_delete) && (
                   <div className="flex gap-1">
                     {item.can_edit && (
                       <Button
@@ -420,7 +431,7 @@ export function TaskCommentsDrawer({
           ) : timeline.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
             <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-50" />
-            <p>No comments yet. Add the first comment.</p>
+            <p>{readOnly ? 'No comments on this archived task.' : 'No comments yet. Add the first comment.'}</p>
             </div>
           ) : (
             timeline.map(renderTimelineItem)
@@ -428,6 +439,7 @@ export function TaskCommentsDrawer({
         </div>
 
         {/* Add Comment */}
+        {readOnly ? null : (
         <div className="border-t pt-4 space-y-2">
           <Textarea
             value={newComment}
@@ -466,6 +478,7 @@ export function TaskCommentsDrawer({
             </Button>
           </div>
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

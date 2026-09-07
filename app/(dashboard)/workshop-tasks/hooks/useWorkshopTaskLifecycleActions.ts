@@ -10,6 +10,7 @@ import type { CompletionData } from '@/components/workshop-tasks/MarkTaskComplet
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Action } from '../types';
 import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
+import { isArchivedWorkshopTask } from '@/lib/workshop-tasks/archive';
 
 interface UseWorkshopTaskLifecycleActionsParams {
   supabase: SupabaseClient;
@@ -452,6 +453,10 @@ export function useWorkshopTaskLifecycleActions({
   const handleUndoComplete = async (taskId: string) => {
     try {
       const task = tasks.find(t => t.id === taskId);
+      if (!task || isArchivedWorkshopTask(task)) {
+        toast.error('Archived tasks are view-only and cannot be undone.');
+        return;
+      }
       const isServiceTask = Boolean(task && isServiceWorkshopTask(task));
       if (isServiceTask) {
         toast.error('Completed Service tasks cannot be undone. Use an audited correction instead.');

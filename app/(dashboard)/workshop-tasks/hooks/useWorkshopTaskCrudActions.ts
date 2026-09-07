@@ -4,6 +4,7 @@ import { recordRecentVehicleId } from '@/lib/utils/recentVehicles';
 import { showErrorWithDetails, fetchErrorDetails } from '@/lib/utils/error-details';
 import { inferAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
+import { isArchivedWorkshopTask } from '@/lib/workshop-tasks/archive';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { ErrorDetailsResponse } from '@/types/error-details';
 import type { Action, Category, Subcategory, Vehicle } from '../types';
@@ -296,6 +297,10 @@ export function useWorkshopTaskCrudActions({
   };
 
   const handleEditTask = async (task: Action) => {
+    if (isArchivedWorkshopTask(task)) {
+      toast.error('Archived tasks are view-only and cannot be edited.');
+      return;
+    }
     setEditingTask(task);
     setEditVehicleId(task.van_id ?? task.hgv_id ?? task.plant_id ?? '');
 
@@ -386,6 +391,11 @@ export function useWorkshopTaskCrudActions({
   const handleSaveEdit = async () => {
     if (!userId) {
       toast.error('You must be logged in to edit tasks');
+      return;
+    }
+
+    if (editingTask && isArchivedWorkshopTask(editingTask)) {
+      toast.error('Archived tasks are view-only and cannot be edited.');
       return;
     }
 
@@ -585,12 +595,20 @@ export function useWorkshopTaskCrudActions({
   };
 
   const handleDeleteTask = (task: Action) => {
+    if (isArchivedWorkshopTask(task)) {
+      toast.error('Archived tasks are view-only and cannot be deleted.');
+      return;
+    }
     setTaskToDelete(task);
     setShowDeleteConfirm(true);
   };
 
   const confirmDeleteTask = async () => {
     if (!taskToDelete) return;
+    if (isArchivedWorkshopTask(taskToDelete)) {
+      toast.error('Archived tasks are view-only and cannot be deleted.');
+      return;
+    }
 
     try {
       setDeleting(true);

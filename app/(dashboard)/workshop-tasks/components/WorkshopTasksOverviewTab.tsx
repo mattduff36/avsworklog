@@ -1,17 +1,13 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import {
   AlertTriangle,
-  ArrowUpDown,
   Camera,
   CheckCircle2,
   ChevronDown,
@@ -24,7 +20,6 @@ import {
   Pause,
   Plus,
   Loader2,
-  Search,
   Trash2,
   Truck,
   Undo2,
@@ -34,8 +29,8 @@ import { formatDate } from '@/lib/utils/date';
 import { cn } from '@/lib/utils/cn';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { WorkshopTaskLocationButton } from '@/components/workshop-tasks/WorkshopTaskLocationButton';
+import { WorkshopHistoricalTasksSection } from './WorkshopHistoricalTasksSection';
 import type { Action, AssetTab, Vehicle, WorkshopTaskStatusFilter, WorkshopTaskTileFilter } from '../types';
-import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
 import type { InspectionPhoto } from '@/types/inspection';
 
 interface WorkshopTasksOverviewTabProps {
@@ -58,6 +53,9 @@ interface WorkshopTasksOverviewTabProps {
   onHoldTasks: Action[];
   completedTaskCount: number;
   completedTasks: Action[];
+  archivedTaskCount: number;
+  archivedTasks: Action[];
+  archivedLoading?: boolean;
   showPending: boolean;
   onShowPendingChange: (show: boolean) => void;
   showInProgress: boolean;
@@ -66,6 +64,8 @@ interface WorkshopTasksOverviewTabProps {
   onShowOnHoldChange: (show: boolean) => void;
   showCompleted: boolean;
   onShowCompletedChange: (show: boolean) => void;
+  showArchived: boolean;
+  onShowArchivedChange: (show: boolean) => void;
   updatingStatus: Set<string>;
   taskAttachmentCounts: Map<string, number>;
   taskInspectionPhotos: Record<string, InspectionPhoto[]>;
@@ -89,66 +89,6 @@ interface WorkshopTasksOverviewTabProps {
   onDeleteTask: (task: Action) => void;
 }
 
-type CompletedSortField =
-  | 'completedAt'
-  | 'asset'
-  | 'source'
-  | 'category'
-  | 'summary';
-
-type CompletedSortDirection = 'asc' | 'desc';
-
-type CompletedTaskRow = {
-  id: string;
-  task: Action;
-  asset: string;
-  source: string;
-  category: string;
-  subcategory: string;
-  summary: string;
-  createdAt: string | null;
-  completedAt: string | null;
-  searchText: string;
-};
-
-function normalizeFilterValue(value: string) {
-  return value.trim().toLowerCase();
-}
-
-function SortableHeader({
-  label,
-  field,
-  currentField,
-  direction,
-  onSort,
-  className,
-}: {
-  label: string;
-  field: CompletedSortField;
-  currentField: CompletedSortField;
-  direction: CompletedSortDirection;
-  onSort: (field: CompletedSortField) => void;
-  className?: string;
-}) {
-  const isActive = currentField === field;
-  const isDesc = isActive && direction === 'desc';
-
-  return (
-    <button
-      type="button"
-      onClick={() => onSort(field)}
-      className={`flex items-center gap-1 text-left transition-colors hover:text-foreground ${className ?? ''}`}
-    >
-      <span>{label}</span>
-      <ArrowUpDown
-        className={`h-3 w-3 transition-transform ${
-          isActive ? 'text-green-400' : 'text-muted-foreground/50'
-        } ${isDesc ? 'rotate-180' : ''}`}
-      />
-    </button>
-  );
-}
-
 export function WorkshopTasksOverviewTab({
   assetTab,
   onAssetTabChange,
@@ -169,6 +109,9 @@ export function WorkshopTasksOverviewTab({
   onHoldTasks,
   completedTaskCount,
   completedTasks,
+  archivedTaskCount,
+  archivedTasks,
+  archivedLoading = false,
   showPending,
   onShowPendingChange,
   showInProgress,
@@ -177,6 +120,8 @@ export function WorkshopTasksOverviewTab({
   onShowOnHoldChange,
   showCompleted,
   onShowCompletedChange,
+  showArchived,
+  onShowArchivedChange,
   updatingStatus,
   taskAttachmentCounts,
   taskInspectionPhotos,
@@ -199,7 +144,8 @@ export function WorkshopTasksOverviewTab({
   onEditTask,
   onDeleteTask,
 }: WorkshopTasksOverviewTabProps) {
-  const showInitialLoading = loading && tabFilteredTasks.length === 0;
+  const visibleArchivedCount = statusFilter === 'all' || statusFilter === 'archived' ? archivedTaskCount : 0;
+  const showInitialLoading = loading && tabFilteredTasks.length === 0 && archivedTaskCount === 0;
   const { tabletModeEnabled } = useTabletMode();
   const hasHighPriorityPending = highPriorityPendingCount > 0;
   const pendingHeaderIconClass = hasHighPriorityPending ? 'text-red-500' : 'text-amber-400';
@@ -279,20 +225,7 @@ export function WorkshopTasksOverviewTab({
   };
   const getTaskPhotos = (taskId: string) => taskInspectionPhotos[taskId] ?? [];
   const statusSelectValue: WorkshopTaskStatusFilter = statusFilter === 'high_priority' ? 'pending' : statusFilter;
-  const visibleTaskCount = pendingTasks.length + inProgressTasks.length + onHoldTasks.length + completedTasks.length;
-  const [completedLoadState, setCompletedLoadState] = useState({ key: '', count: 20 });
-  const [completedSearch, setCompletedSearch] = useState('');
-  const [completedDateFrom, setCompletedDateFrom] = useState('');
-  const [completedDateTo, setCompletedDateTo] = useState('');
-  const [completedAssetFilter, setCompletedAssetFilter] = useState('');
-  const [completedSourceFilter, setCompletedSourceFilter] = useState('all');
-  const [completedCategoryFilter, setCompletedCategoryFilter] = useState('all');
-  const [completedSummaryFilter, setCompletedSummaryFilter] = useState('');
-  const [completedSortField, setCompletedSortField] = useState<CompletedSortField>('completedAt');
-  const [completedSortDirection, setCompletedSortDirection] = useState<CompletedSortDirection>('desc');
-
-  const completedFilterKey = `${completedAssetFilter}|${completedCategoryFilter}|${completedDateFrom}|${completedDateTo}|${completedSearch}|${completedSortDirection}|${completedSortField}|${completedSourceFilter}|${completedSummaryFilter}`;
-  const completedVisibleCount = completedLoadState.key === completedFilterKey ? completedLoadState.count : 20;
+  const visibleTaskCount = pendingTasks.length + inProgressTasks.length + onHoldTasks.length + completedTasks.length + visibleArchivedCount;
 
   const renderInspectionPhotoBadge = (task: Action) => {
     const count = getTaskPhotos(task.id).length;
@@ -336,147 +269,18 @@ export function WorkshopTasksOverviewTab({
     ) : null
   );
 
-  const completedRows = useMemo<CompletedTaskRow[]>(
-    () =>
-      completedTasks.map((task) => {
-        const category =
-          task.workshop_task_subcategories?.workshop_task_categories?.name ||
-          task.workshop_task_categories?.name ||
-          '';
-        const subcategory = task.workshop_task_subcategories?.name || '';
-        const summary = (task.description || task.workshop_comments || task.title || '').trim();
-        const asset = getVehicleReg(task);
-        const source = getSourceLabel(task);
-
-        return {
-          id: task.id,
-          task,
-          asset,
-          source,
-          category,
-          subcategory,
-          summary,
-          createdAt: task.created_at,
-          completedAt: task.actioned_at,
-          searchText: [asset, source, category, subcategory, task.title, task.description, task.workshop_comments]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase(),
-        };
-      }),
-    [completedTasks, getSourceLabel, getVehicleReg]
-  );
-
-  const completedSourceOptions = useMemo(
-    () => Array.from(new Set(completedRows.map((row) => row.source).filter(Boolean))).sort(),
-    [completedRows]
-  );
-  const completedCategoryOptions = useMemo(
-    () => Array.from(new Set(completedRows.map((row) => row.category).filter(Boolean))).sort(),
-    [completedRows]
-  );
-  const filteredCompletedRows = useMemo(() => {
-    const searchValue = normalizeFilterValue(completedSearch);
-    const assetFilterValue = normalizeFilterValue(completedAssetFilter);
-    const summaryFilterValue = normalizeFilterValue(completedSummaryFilter);
-    const fromDate = completedDateFrom ? new Date(`${completedDateFrom}T00:00:00`).getTime() : null;
-    const toDate = completedDateTo ? new Date(`${completedDateTo}T23:59:59.999`).getTime() : null;
-
-    return completedRows.filter((row) => {
-      if (searchValue && !row.searchText.includes(searchValue)) {
-        return false;
-      }
-
-      if (assetFilterValue && !row.asset.toLowerCase().includes(assetFilterValue)) {
-        return false;
-      }
-
-      if (completedSourceFilter !== 'all' && row.source !== completedSourceFilter) {
-        return false;
-      }
-
-      if (completedCategoryFilter !== 'all' && row.category !== completedCategoryFilter) {
-        return false;
-      }
-
-      if (summaryFilterValue && !row.summary.toLowerCase().includes(summaryFilterValue)) {
-        return false;
-      }
-
-      const completedTime = row.completedAt ? new Date(row.completedAt).getTime() : null;
-      if (fromDate !== null && (completedTime === null || completedTime < fromDate)) {
-        return false;
-      }
-      if (toDate !== null && (completedTime === null || completedTime > toDate)) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [
-    completedAssetFilter,
-    completedCategoryFilter,
-    completedDateFrom,
-    completedDateTo,
-    completedRows,
-    completedSearch,
-    completedSourceFilter,
-    completedSummaryFilter,
-  ]);
-
-  const sortedCompletedRows = useMemo(() => {
-    const rows = [...filteredCompletedRows];
-
-    rows.sort((a, b) => {
-      const compareMultiplier = completedSortDirection === 'asc' ? 1 : -1;
-
-      if (completedSortField === 'completedAt') {
-        const aTime = a[completedSortField] ? new Date(a[completedSortField] as string).getTime() : 0;
-        const bTime = b[completedSortField] ? new Date(b[completedSortField] as string).getTime() : 0;
-        return (aTime - bTime) * compareMultiplier;
-      }
-
-      const aValue = (a[completedSortField] || '').toString().toLowerCase();
-      const bValue = (b[completedSortField] || '').toString().toLowerCase();
-      return aValue.localeCompare(bValue) * compareMultiplier;
-    });
-
-    return rows;
-  }, [completedSortDirection, completedSortField, filteredCompletedRows]);
-
-  const visibleCompletedRows = useMemo(
-    () => sortedCompletedRows.slice(0, completedVisibleCount),
-    [completedVisibleCount, sortedCompletedRows]
-  );
-  const mobileVisibleCompletedRows = useMemo(
-    () => completedTasks.slice(0, completedVisibleCount),
-    [completedTasks, completedVisibleCount]
-  );
-
-  const hasMoreCompletedRows = sortedCompletedRows.length > visibleCompletedRows.length;
-  const hasMoreCompletedRowsMobile = completedTasks.length > mobileVisibleCompletedRows.length;
-
-
-  const handleCompletedSort = (field: CompletedSortField) => {
-    if (completedSortField === field) {
-      setCompletedSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
-      return;
-    }
-
-    setCompletedSortField(field);
-    setCompletedSortDirection(field === 'completedAt' ? 'desc' : 'asc');
-  };
-
-  const resetCompletedFilters = () => {
-    setCompletedSearch('');
-    setCompletedDateFrom('');
-    setCompletedDateTo('');
-    setCompletedAssetFilter('');
-    setCompletedSourceFilter('all');
-    setCompletedCategoryFilter('all');
-    setCompletedSummaryFilter('');
-    setCompletedSortField('completedAt');
-    setCompletedSortDirection('desc');
+  const historicalSectionProps = {
+    taskAttachmentCounts,
+    taskInspectionPhotos,
+    getVehicleReg,
+    getSourceLabel,
+    onOpenTaskModal,
+    onOpenComments,
+    onOpenWhereabouts,
+    onUndoComplete,
+    canCorrectService,
+    onCorrectService,
+    onEditTask,
   };
 
   const renderStatusTile = ({
@@ -556,6 +360,7 @@ export function WorkshopTasksOverviewTab({
                   <SelectItem value="logged">In Progress</SelectItem>
                   <SelectItem value="on_hold">On Hold</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -587,11 +392,11 @@ export function WorkshopTasksOverviewTab({
         className={`grid gap-4 ${
           tabletModeEnabled
             ? hasHighPriorityPending
-              ? 'grid-cols-2 xl:grid-cols-6'
-              : 'grid-cols-2 xl:grid-cols-5'
+              ? 'grid-cols-2 xl:grid-cols-7'
+              : 'grid-cols-2 xl:grid-cols-6'
             : hasHighPriorityPending
-              ? 'grid-cols-6'
-              : 'grid-cols-5'
+              ? 'grid-cols-7'
+              : 'grid-cols-6'
         }`}
       >
         {renderStatusTile({
@@ -644,11 +449,19 @@ export function WorkshopTasksOverviewTab({
           activeClassName: 'border-green-500/70 bg-green-500/15 ring-1 ring-green-500/40',
           ariaLabel: 'Show completed workshop tasks',
         })}
+        {renderStatusTile({
+          filter: 'archived',
+          label: 'Archived',
+          count: archivedTaskCount,
+          countClassName: 'text-slate-500 dark:text-slate-400',
+          activeClassName: 'border-slate-500/70 bg-slate-500/15 ring-1 ring-slate-500/40',
+          ariaLabel: 'Show archived workshop tasks',
+        })}
       </div>
 
       {showInitialLoading ? (
         <PanelLoader message="Loading tasks..." accent="workshop" className="min-h-[400px]" />
-      ) : tabFilteredTasks.length === 0 ? (
+      ) : tabFilteredTasks.length === 0 && archivedTaskCount === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Wrench className="h-16 w-16 text-muted-foreground mb-4" />
@@ -1003,434 +816,24 @@ export function WorkshopTasksOverviewTab({
             </div>
           )}
 
-          {completedTasks.length > 0 && (
-            <div className="border-2 border-green-500/30 rounded-lg overflow-hidden bg-green-500/5">
-              <button
-                onClick={() => onShowCompletedChange(!showCompleted)}
-                className="w-full flex items-center justify-between p-4 bg-green-500/10 hover:bg-green-500/20 transition-colors border-b-2 border-green-500/30"
-              >
-                <h2 className="text-xl font-semibold text-foreground flex items-center gap-2">
-                  <CheckCircle2 className="h-5 w-5 text-green-400" />
-                  Completed Tasks ({completedTasks.length})
-                </h2>
-                {showCompleted ? (
-                  <ChevronUp className="h-5 w-5 text-green-400" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-green-400" />
-                )}
-              </button>
-              {showCompleted && (
-                <div className="space-y-4 p-4">
-                  <div className="hidden md:flex items-end justify-between gap-4 rounded-lg border border-border bg-slate-900/40 p-4">
-                    <div className="grid flex-1 grid-cols-1 gap-3 lg:grid-cols-[minmax(260px,1.6fr)_repeat(2,minmax(140px,1fr))]">
-                      <div className="space-y-2">
-                        <Label htmlFor="completed-search">Search</Label>
-                        <div className="relative">
-                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                          <Input
-                            id="completed-search"
-                            value={completedSearch}
-                            onChange={(e) => setCompletedSearch(e.target.value)}
-                            placeholder="Search asset, summary, category..."
-                            className="pl-9"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="completed-date-from">Completed From</Label>
-                        <Input
-                          id="completed-date-from"
-                          type="date"
-                          value={completedDateFrom}
-                          onChange={(e) => setCompletedDateFrom(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="completed-date-to">Completed To</Label>
-                        <Input
-                          id="completed-date-to"
-                          type="date"
-                          value={completedDateTo}
-                          onChange={(e) => setCompletedDateTo(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <p className="text-sm text-muted-foreground">
-                        Showing {visibleCompletedRows.length} of {sortedCompletedRows.length}
-                      </p>
-                      <Button type="button" variant="outline" onClick={resetCompletedFilters}>
-                        Reset
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="hidden overflow-x-auto rounded-lg border border-border bg-white dark:bg-slate-900 md:block">
-                    <TooltipProvider>
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                          <TableHead className="w-[11rem]">
-                            <SortableHeader
-                              label="Completed"
-                              field="completedAt"
-                              currentField={completedSortField}
-                              direction={completedSortDirection}
-                              onSort={handleCompletedSort}
-                            />
-                          </TableHead>
-                          <TableHead className="w-[14rem]">
-                            <SortableHeader
-                              label="Asset"
-                              field="asset"
-                              currentField={completedSortField}
-                              direction={completedSortDirection}
-                              onSort={handleCompletedSort}
-                            />
-                          </TableHead>
-                          <TableHead className="w-[10rem]">
-                            <SortableHeader
-                              label="Source"
-                              field="source"
-                              currentField={completedSortField}
-                              direction={completedSortDirection}
-                              onSort={handleCompletedSort}
-                            />
-                          </TableHead>
-                          <TableHead className="w-[10rem]">
-                            <SortableHeader
-                              label="Category"
-                              field="category"
-                              currentField={completedSortField}
-                              direction={completedSortDirection}
-                              onSort={handleCompletedSort}
-                            />
-                          </TableHead>
-                          <TableHead>
-                            <SortableHeader
-                              label="Summary"
-                              field="summary"
-                              currentField={completedSortField}
-                              direction={completedSortDirection}
-                              onSort={handleCompletedSort}
-                            />
-                          </TableHead>
-                          <TableHead className="w-[7rem] pr-3 text-right">Actions</TableHead>
-                        </TableRow>
-                        <TableRow className="bg-slate-50/60 dark:bg-slate-900/60 hover:bg-slate-50/60 dark:hover:bg-slate-900/60">
-                          <TableHead className="w-[7rem]" />
-                          <TableHead>
-                            <Input
-                              value={completedAssetFilter}
-                              onChange={(e) => setCompletedAssetFilter(e.target.value)}
-                              placeholder="Filter asset"
-                              className="h-8"
-                            />
-                          </TableHead>
-                          <TableHead>
-                            <Select value={completedSourceFilter} onValueChange={setCompletedSourceFilter}>
-                              <SelectTrigger className="h-8">
-                                <SelectValue placeholder="All sources" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All</SelectItem>
-                                {completedSourceOptions.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableHead>
-                          <TableHead>
-                            <Select value={completedCategoryFilter} onValueChange={setCompletedCategoryFilter}>
-                              <SelectTrigger className="h-8">
-                                <SelectValue placeholder="All categories" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="all">All</SelectItem>
-                                {completedCategoryOptions.map((option) => (
-                                  <SelectItem key={option} value={option}>
-                                    {option}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableHead>
-                          <TableHead>
-                            <Input
-                              value={completedSummaryFilter}
-                              onChange={(e) => setCompletedSummaryFilter(e.target.value)}
-                              placeholder="Filter summary"
-                              className="h-8"
-                            />
-                          </TableHead>
-                          <TableHead />
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {visibleCompletedRows.length > 0 ? (
-                          visibleCompletedRows.map((row) => (
-                            <TableRow
-                              key={row.id}
-                              className="cursor-pointer transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/30"
-                              onClick={() => onOpenTaskModal(row.task)}
-                            >
-                              <TableCell className="text-sm text-green-400">
-                                {row.completedAt ? (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="inline-flex cursor-help underline decoration-dotted underline-offset-4">
-                                        {formatDate(row.completedAt)}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Created: {row.createdAt ? formatDate(row.createdAt) : '-'}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                ) : (
-                                  '-'
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-foreground">{row.asset}</span>
-                                  {taskAttachmentCounts.get(row.task.id) && taskAttachmentCounts.get(row.task.id)! > 0 && (
-                                    <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
-                                      <Paperclip className="h-3 w-3 mr-1" />
-                                      {taskAttachmentCounts.get(row.task.id)}
-                                    </Badge>
-                                  )}
-                                  {renderInspectionPhotoBadge(row.task)}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {renderSourceBadge(row.task, row.source)}
-                              </TableCell>
-                              <TableCell className="text-sm text-muted-foreground">
-                                {row.subcategory ? (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="inline-flex cursor-help underline decoration-dotted underline-offset-4">
-                                        {row.category || '-'}
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Subcategory: {row.subcategory}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                ) : (
-                                  row.category || '-'
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <p className="text-sm font-medium text-foreground">{row.task.title}</p>
-                                  {row.summary && (
-                                    <p className="line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">{row.summary}</p>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="w-[7rem] px-2 text-right" onClick={(e) => e.stopPropagation()}>
-                                <div className="ml-auto flex w-fit justify-end gap-1">
-                                  <WorkshopTaskLocationButton
-                                    task={row.task}
-                                    onOpen={() => onOpenWhereabouts(row.task)}
-                                    iconOnly
-                                    className="h-7 w-7 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
-                                  />
-                                  <Button
-                                    onClick={() => onOpenComments(row.task)}
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 w-7 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
-                                    title="Comments"
-                                    aria-label="Comments"
-                                  >
-                                    <MessageSquare className="h-3.5 w-3.5" />
-                                  </Button>
-                                  {canCorrectService ? (
-                                    <Button
-                                      onClick={() => onEditTask(row.task)}
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 w-7 border-amber-600/50 p-0 text-amber-300 hover:bg-amber-900/30 hover:text-amber-100"
-                                      title="Correct details"
-                                      aria-label="Correct details"
-                                    >
-                                      <Edit className="h-3.5 w-3.5" />
-                                    </Button>
-                                  ) : null}
-                                  {isServiceWorkshopTask(row.task) ? (
-                                    canCorrectService && onCorrectService ? (
-                                      <Button
-                                        onClick={() => onCorrectService(row.task)}
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-7 w-7 border-amber-600/50 p-0 text-amber-300 hover:bg-amber-900/30 hover:text-amber-100"
-                                        title="Correct service"
-                                        aria-label="Correct service"
-                                      >
-                                        <Wrench className="h-3.5 w-3.5" />
-                                      </Button>
-                                    ) : null
-                                  ) : (
-                                    <Button
-                                      onClick={() => onUndoComplete(row.task.id)}
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-7 w-7 border-slate-600 p-0 text-muted-foreground hover:bg-slate-800 hover:text-white"
-                                      title="Undo"
-                                      aria-label="Undo"
-                                    >
-                                      <Undo2 className="h-3.5 w-3.5" />
-                                    </Button>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={6} className="py-10 text-center text-muted-foreground">
-                              No completed tasks match the current filters.
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                    </TooltipProvider>
-                  </div>
-
-                  <div className="space-y-3 md:hidden">
-                    {mobileVisibleCompletedRows.map((task) => {
-                      const row = completedRows.find((candidate) => candidate.id === task.id);
-                      const assetLabel = row?.asset || getVehicleReg(task);
-                      const sourceLabel = row?.source || getSourceLabel(task);
-                      return (
-                        <Card
-                          key={task.id}
-                          className="bg-white dark:bg-slate-900 border-border opacity-70 hover:opacity-90 transition-opacity cursor-pointer"
-                          onClick={() => onOpenTaskModal(task)}
-                        >
-                          <CardContent className="pt-6">
-                            <div className="flex flex-col items-start gap-4">
-                              <div className="flex-1 space-y-2 w-full">
-                                <div className="flex flex-col lg:flex-row items-start justify-between gap-4">
-                                  <div className="flex-1 w-full">
-                                    <div className="flex items-center gap-2 mb-2">
-                                      <CheckCircle2 className="h-5 w-5 text-green-400" />
-                                      <h3 className="font-semibold text-lg text-foreground">{assetLabel}</h3>
-                                      {renderSourceBadge(task, sourceLabel)}
-                                      {taskAttachmentCounts.get(task.id) && taskAttachmentCounts.get(task.id)! > 0 && (
-                                        <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30 text-xs">
-                                          <Paperclip className="h-3 w-3 mr-1" />
-                                          {taskAttachmentCounts.get(task.id)}
-                                        </Badge>
-                                      )}
-                                      {renderInspectionPhotoBadge(task)}
-                                    </div>
-                                    <div className="flex flex-wrap gap-2 mb-1">
-                                      {task.workshop_task_subcategories?.workshop_task_categories && (
-                                        <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
-                                          {task.workshop_task_subcategories.workshop_task_categories.name}
-                                        </Badge>
-                                      )}
-                                      {task.workshop_task_subcategories && (
-                                        <Badge variant="outline" className="bg-orange-500/10 text-orange-300 border-orange-500/30">
-                                          {task.workshop_task_subcategories.name}
-                                        </Badge>
-                                      )}
-                                      {!task.workshop_task_subcategories && task.workshop_task_categories && (
-                                        <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/30">
-                                          {task.workshop_task_categories.name}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                    {renderInspectionDescription(task)}
-                                    <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                      {task.actioned_at && (
-                                        <span className="text-green-400">
-                                          Completed: {formatDate(task.actioned_at)}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className={taskActionGroupClass}>
-                                    {canCorrectService ? (
-                                      <Button
-                                        onClick={(e) => { e.stopPropagation(); onEditTask(task); }}
-                                        size="sm"
-                                        variant="outline"
-                                        className={`${taskActionButtonClass} border-amber-600/50 text-amber-300 hover:text-amber-100 hover:bg-amber-900/30`}
-                                      >
-                                        <Edit className="h-3.5 w-3.5 mr-1.5" />
-                                        Correct details
-                                      </Button>
-                                    ) : null}
-                                    {isServiceWorkshopTask(task) ? (
-                                      canCorrectService && onCorrectService ? (
-                                        <Button
-                                          onClick={(e) => { e.stopPropagation(); onCorrectService(task); }}
-                                          size="sm"
-                                          variant="outline"
-                                          className={`${taskActionButtonClass} border-amber-600/50 text-amber-300 hover:text-amber-100 hover:bg-amber-900/30`}
-                                        >
-                                          <Wrench className="h-3.5 w-3.5 mr-1.5" />
-                                          Correct
-                                        </Button>
-                                      ) : null
-                                    ) : (
-                                      <Button onClick={(e) => { e.stopPropagation(); onUndoComplete(task.id); }} size="sm" variant="outline" className={`${taskActionButtonClass} border-slate-600 text-muted-foreground hover:text-white hover:bg-slate-800`}>
-                                        <Undo2 className="h-3.5 w-3.5 mr-1.5" />
-                                        Undo
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex items-center justify-end w-full">
-                                  {renderCardUtilityActions(task, false)}
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      );
-                    })}
-                    {mobileVisibleCompletedRows.length === 0 && (
-                      <div className="rounded-lg border border-border bg-slate-900/40 p-6 text-center text-sm text-muted-foreground">
-                        No completed tasks yet.
-                      </div>
-                    )}
-                  </div>
-
-                  {hasMoreCompletedRows && (
-                    <div className="hidden items-center justify-center pt-2 md:flex">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setCompletedLoadState(prev => ({ key: completedFilterKey, count: (prev.key === completedFilterKey ? prev.count : 20) + 10 }))}
-                      >
-                        Show More
-                      </Button>
-                    </div>
-                  )}
-
-                  {hasMoreCompletedRowsMobile && (
-                    <div className="flex items-center justify-center pt-2 md:hidden">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setCompletedLoadState(prev => ({ key: completedFilterKey, count: (prev.key === completedFilterKey ? prev.count : 20) + 10 }))}
-                      >
-                        Show More
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          <WorkshopHistoricalTasksSection
+            variant="completed"
+            tasks={completedTasks}
+            displayCount={completedTasks.length}
+            show={showCompleted}
+            onShowChange={onShowCompletedChange}
+            {...historicalSectionProps}
+          />
+          <WorkshopHistoricalTasksSection
+            variant="archived"
+            tasks={archivedTasks}
+            displayCount={visibleArchivedCount}
+            show={showArchived}
+            onShowChange={onShowArchivedChange}
+            loading={archivedLoading}
+            viewOnly
+            {...historicalSectionProps}
+          />
         </div>
       )}
     </TabsContent>

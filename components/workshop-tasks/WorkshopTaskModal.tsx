@@ -27,6 +27,7 @@ import {
 import { TaskAttachmentsSection } from '@/components/workshop-tasks/TaskAttachmentsSection';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
+import { isArchivedWorkshopTask } from '@/lib/workshop-tasks/archive';
 import { InspectionPhotoGallery } from '@/components/inspections/InspectionPhotoGallery';
 import type { InspectionPhoto } from '@/types/inspection';
 import type { Database } from '@/types/database';
@@ -37,8 +38,6 @@ import {
   type InspectionReferenceType,
 } from '@/lib/utils/reference-ids';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
-import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
-
 type Task = Database['public']['Tables']['actions']['Row'] & {
   status_history?: unknown[] | null;
   workshop_task_categories?: {
@@ -116,6 +115,8 @@ export function WorkshopTaskModal({
   const [attachmentsRefreshKey, setAttachmentsRefreshKey] = useState(0);
 
   if (!task) return null;
+  const isArchived = isArchivedWorkshopTask(task);
+  const allowCompletedCorrection = canCorrectCompleted && !isArchived;
 
   const categoryName =
     task.workshop_task_subcategories?.workshop_task_categories?.name ||
@@ -193,6 +194,10 @@ export function WorkshopTaskModal({
   ) => {
     if (!value) {
       return <span className="ml-2 text-muted-foreground">Unknown</span>;
+    }
+
+    if (isArchived) {
+      return <span className={`ml-2 ${colorClass}`}>{formatDate(value)}</span>;
     }
 
     return (
@@ -454,31 +459,19 @@ export function WorkshopTaskModal({
                   </Button>
                 </>
               )}
-              {task.action_type === 'workshop_vehicle_task' && task.status === 'completed' && canCorrectCompleted && (
-                <>
-                  {isServiceWorkshopTask(task) && onCorrectService ? (
-                    <Button
-                      onClick={() => onCorrectService(task)}
-                      disabled={isUpdating}
-                      size="sm"
-                      className={`bg-workshop hover:bg-workshop-dark text-white border-0 ${taskActionButtonClass}`}
-                    >
-                      <Wrench className="h-4 w-4 mr-2" />
-                      Correct Service
-                    </Button>
-                  ) : null}
-                  <Button
-                    onClick={() => onEdit(task)}
-                    disabled={isUpdating}
-                    size="sm"
-                    variant="outline"
-                    className={`border-amber-400/60 text-amber-200 hover:text-amber-100 hover:bg-amber-900/30 ${taskActionButtonClass}`}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Correct details
-                  </Button>
-                </>
-              )}
+              {task.action_type === 'workshop_vehicle_task' && task.status === 'completed' && allowCompletedCorrection && onCorrectService ? (
+                <Button
+                  onClick={() => onCorrectService(task)}
+                  disabled={isUpdating}
+                  size="sm"
+                  variant="outline"
+                  className={`h-8 w-8 border-amber-600/50 p-0 text-amber-300 hover:bg-amber-900/30 hover:text-amber-100 ${tabletModeEnabled ? 'min-h-11 min-w-11' : ''}`}
+                  title="Correct Task"
+                  aria-label="Correct Task"
+                >
+                  <Wrench className="h-4 w-4" />
+                </Button>
+              ) : null}
               {task.action_type === 'workshop_vehicle_task' && task.status !== 'completed' && (
                 <>
                   <Button
@@ -514,7 +507,7 @@ export function WorkshopTaskModal({
             key={`${task.id}-${attachmentsRefreshKey}`}
             taskId={task.id}
             taskStatus={getTaskStatus(task)}
-            canCorrectCompleted={canCorrectCompleted && task.action_type === 'workshop_vehicle_task'}
+            canCorrectCompleted={allowCompletedCorrection && task.action_type === 'workshop_vehicle_task'}
             workshopCategoryId={
               task.workshop_category_id
               || task.workshop_task_categories?.id
@@ -538,7 +531,7 @@ export function WorkshopTaskModal({
             <WorkshopTaskTimeline
               task={taskForTimeline}
               comments={taskComments[task.id] || []}
-              onAdjustTimestamp={openAdjustTimestampDialog}
+              onAdjustTimestamp={isArchived ? undefined : openAdjustTimestampDialog}
             />
           )}
         </div>
