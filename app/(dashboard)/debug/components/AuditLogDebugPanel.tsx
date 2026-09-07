@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState, type MouseEvent, type ReactNode } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,15 +34,18 @@ import {
 import { toast } from 'sonner';
 import { AuditLogEntry } from '../types';
 
-interface AuditLogDebugPanelProps {
-  supabase: ReturnType<typeof createClient>;
-}
-
 type AuditTimeFilter = 'all' | '24h' | '7d' | '30d' | '90d';
 type AuditChangeFilter = 'all' | 'with_changes' | 'without_changes';
 type AuditTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
-const INITIAL_AUDIT_LOG_LIMIT = 1000;
-const AUDIT_LOG_BATCH_SIZE = 1000;
+const AUDIT_LOG_PAGE_SIZE = 200;
+const SEARCH_DEBOUNCE_MS = 300;
+
+interface AuditLogFacets {
+  users: Array<{ id: string; label: string }>;
+  hasSystemEntry: boolean;
+  tables: string[];
+  actions: Array<{ value: string; label: string }>;
+}
 
 interface AuditSummaryMetric {
   title: string;
@@ -139,13 +141,13 @@ function AuditMetricCard({ metric }: { metric: AuditSummaryMetric }) {
   );
 }
 
-export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
+export function AuditLogDebugPanel() {
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-  const [auditLogsLimit, setAuditLogsLimit] = useState(INITIAL_AUDIT_LOG_LIMIT);
   const [auditLogsLoading, setAuditLogsLoading] = useState(true);
   const [loadingMoreAudits, setLoadingMoreAudits] = useState(false);
   const [expandedAudits, setExpandedAudits] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('all');
   const [selectedTeamId, setSelectedTeamId] = useState('all');
   const [selectedTable, setSelectedTable] = useState('all');
@@ -153,11 +155,20 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
   const [selectedTimeWindow, setSelectedTimeWindow] = useState<AuditTimeFilter>('all');
   const [selectedChangeFilter, setSelectedChangeFilter] = useState<AuditChangeFilter>('all');
   const [teamNameById, setTeamNameById] = useState<Record<string, string>>({});
+  const [facets, setFacets] = useState<AuditLogFacets | null>(null);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [searchApplied, setSearchApplied] = useState(false);
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
 
   useEffect(() => {
     void fetchTeamDirectory();
-    void fetchAuditLogs();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchTeamDirectory = async () => {
@@ -176,69 +187,75 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
     }
   };
 
-  const fetchAuditLogs = async (limit?: number) => {
-    const effectiveLimit = limit ?? auditLogsLimit;
-    const isInitialLoad = auditLogs.length === 0 && !limit;
+  const buildAuditLogParams = (cursor?: string | null, includeFacets = false) => {
+    const params = new URLSearchParams();
+    params.set('limit', String(AUDIT_LOG_PAGE_SIZE));
+    if (includeFacets) params.set('includeFacets', '1');
+    if (cursor) params.set('cursor', cursor);
+    if (debouncedSearchQuery.trim().length >= 3) params.set('q', debouncedSearchQuery.trim());
+    if (selectedUserId !== 'all') params.set('userId', selectedUserId);
+    if (selectedTeamId !== 'all') params.set('teamId', selectedTeamId);
+    if (selectedTable !== 'all') params.set('table', selectedTable);
+    if (selectedAction !== 'all') params.set('action', selectedAction);
+    if (selectedTimeWindow !== 'all') params.set('timeWindow', selectedTimeWindow);
+    if (selectedChangeFilter !== 'all') params.set('changeFilter', selectedChangeFilter);
+    return params;
+  };
 
-    if (isInitialLoad) {
+  const fetchAuditLogs = useCallback(async (options?: { cursor?: string | null; append?: boolean }) => {
+    const isAppend = Boolean(options?.append && options.cursor);
+    if (isAppend) {
+      setLoadingMoreAudits(true);
+    } else {
       setAuditLogsLoading(true);
     }
 
     try {
-      const { data: auditData, error } = await supabase
-        .from('audit_log')
-        .select('*, profiles!audit_log_user_id_fkey(full_name, team_id)')
-        .order('created_at', { ascending: false })
-        .limit(effectiveLimit);
+      const params = buildAuditLogParams(options?.cursor, !isAppend);
+      const response = await fetch(`/api/debug/audit-logs?${params.toString()}`, { cache: 'no-store' });
+      const payload = await response.json().catch(() => ({}));
 
-      if (error) {
-        console.error('Error fetching audit logs:', error);
-        toast.error(`Failed to fetch audit logs: ${error.message}`);
+      if (!response.ok) {
+        toast.error(payload.error || 'Failed to fetch audit logs');
         return;
       }
 
-      if (auditData) {
-        setAuditLogs(
-          auditData.map(
-            (log: {
-              id: string;
-              table_name: string;
-              record_id: string;
-              user_id: string | null;
-              action: string;
-              changes: unknown;
-              created_at: string | null;
-              profiles?: { full_name: string; team_id: string | null } | null;
-            }) => ({
-              id: log.id,
-              table_name: log.table_name,
-              record_id: log.record_id,
-              user_id: log.user_id,
-              user_name: log.profiles?.full_name || 'System',
-              team_id: log.profiles?.team_id || null,
-              action: log.action,
-              changes: log.changes as Record<string, { old?: unknown; new?: unknown }> | null,
-              created_at: log.created_at,
-            }),
-          ),
-        );
+      const nextLogs = (payload.logs || []) as AuditLogEntry[];
+      setAuditLogs((current) => {
+        if (!isAppend) return nextLogs;
+        const seen = new Set(current.map((log) => log.id));
+        return [...current, ...nextLogs.filter((log) => !seen.has(log.id))];
+      });
+      setHasMore(Boolean(payload.pagination?.has_more));
+      setNextCursor(payload.pagination?.next_cursor || null);
+      setSearchApplied(Boolean(payload.searchApplied));
+      if (payload.facets) {
+        setFacets(payload.facets as AuditLogFacets);
       }
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       toast.error('Failed to fetch audit logs');
     } finally {
-      if (isInitialLoad) {
-        setAuditLogsLoading(false);
-      }
+      setAuditLogsLoading(false);
+      setLoadingMoreAudits(false);
     }
-  };
+  }, [
+    debouncedSearchQuery,
+    selectedAction,
+    selectedChangeFilter,
+    selectedTable,
+    selectedTeamId,
+    selectedTimeWindow,
+    selectedUserId,
+  ]);
+
+  useEffect(() => {
+    void fetchAuditLogs();
+  }, [fetchAuditLogs]);
 
   const loadMoreAuditLogs = async () => {
-    setLoadingMoreAudits(true);
-    const newLimit = auditLogsLimit + AUDIT_LOG_BATCH_SIZE;
-    setAuditLogsLimit(newLimit);
-    await fetchAuditLogs(newLimit);
-    setLoadingMoreAudits(false);
+    if (!nextCursor || loadingMoreAudits) return;
+    await fetchAuditLogs({ cursor: nextCursor, append: true });
   };
 
   const toggleAuditExpanded = (id: string) => {
@@ -261,23 +278,6 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
     return Boolean(changes && Object.keys(changes).length > 0);
   };
 
-  const isWithinTimeWindow = (createdAt: string | null, timeWindow: AuditTimeFilter): boolean => {
-    if (timeWindow === 'all') return true;
-    if (!createdAt) return false;
-
-    const now = Date.now();
-    const createdAtMs = new Date(createdAt).getTime();
-    if (Number.isNaN(createdAtMs)) return false;
-
-    const windowMsByFilter: Record<Exclude<AuditTimeFilter, 'all'>, number> = {
-      '24h': 24 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000,
-      '30d': 30 * 24 * 60 * 60 * 1000,
-      '90d': 90 * 24 * 60 * 60 * 1000,
-    };
-    return now - createdAtMs <= windowMsByFilter[timeWindow];
-  };
-
   const hasActiveFilters =
     Boolean(searchQuery.trim()) ||
     selectedUserId !== 'all' ||
@@ -288,123 +288,29 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
     selectedChangeFilter !== 'all';
 
   const userOptions = useMemo(() => {
-    const usersById = new Map<string, string>();
-    let hasSystemEntry = false;
-
-    auditLogs.forEach((log) => {
-      if (!log.user_id) {
-        hasSystemEntry = true;
-        return;
-      }
-      if (!usersById.has(log.user_id)) {
-        usersById.set(log.user_id, log.user_name);
-      }
-    });
-
-    const users = Array.from(usersById.entries())
-      .map(([id, label]) => ({ id, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-
-    return { users, hasSystemEntry };
-  }, [auditLogs]);
+    const users = [...(facets?.users || [])].sort((a, b) => a.label.localeCompare(b.label));
+    return { users, hasSystemEntry: facets?.hasSystemEntry ?? true };
+  }, [facets]);
 
   const teamOptions = useMemo(() => {
-    const uniqueTeamIds = new Set<string>();
-    let hasUnassigned = false;
-
-    auditLogs.forEach((log) => {
-      if (!log.team_id) {
-        hasUnassigned = true;
-        return;
-      }
-      uniqueTeamIds.add(log.team_id);
-    });
-
-    const teams = Array.from(uniqueTeamIds)
-      .map((teamId) => ({ id: teamId, label: getTeamName(teamId) }))
+    const teams = Object.entries(teamNameById)
+      .map(([id, label]) => ({ id, label }))
       .sort((a, b) => a.label.localeCompare(b.label));
-
-    return { teams, hasUnassigned };
-  }, [auditLogs, getTeamName]);
+    return { teams, hasUnassigned: true };
+  }, [teamNameById]);
 
   const tableOptions = useMemo(() => {
-    return Array.from(new Set(auditLogs.map((log) => log.table_name))).sort((a, b) =>
+    return [...(facets?.tables || [])].sort((a, b) =>
       formatTableName(a).localeCompare(formatTableName(b))
     );
-  }, [auditLogs]);
+  }, [facets]);
 
   const actionOptions = useMemo(() => {
-    const actionMap = new Map<string, string>();
-    auditLogs.forEach((log) => {
-      const normalized = log.action.toLowerCase();
-      if (!actionMap.has(normalized)) {
-        actionMap.set(normalized, log.action.toUpperCase());
-      }
-    });
-
-    return Array.from(actionMap.entries())
-      .map(([value, label]) => ({ value, label }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-  }, [auditLogs]);
-
-  const filteredAuditLogs = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-
-    return auditLogs.filter((log) => {
-      if (selectedUserId !== 'all') {
-        if (selectedUserId === 'system' && log.user_id) return false;
-        if (selectedUserId !== 'system' && log.user_id !== selectedUserId) return false;
-      }
-
-      if (selectedTeamId !== 'all') {
-        if (selectedTeamId === 'unassigned' && log.team_id) return false;
-        if (selectedTeamId !== 'unassigned' && log.team_id !== selectedTeamId) return false;
-      }
-
-      if (selectedTable !== 'all' && log.table_name !== selectedTable) return false;
-      if (selectedAction !== 'all' && log.action.toLowerCase() !== selectedAction) return false;
-      if (!isWithinTimeWindow(log.created_at, selectedTimeWindow)) return false;
-
-      const logHasChanges = hasChangeDetails(log.changes);
-      if (selectedChangeFilter === 'with_changes' && !logHasChanges) return false;
-      if (selectedChangeFilter === 'without_changes' && logHasChanges) return false;
-
-      if (!normalizedQuery) return true;
-
-      const searchableSummary = [
-        formatTableName(log.table_name),
-        log.table_name,
-        log.action,
-        log.user_name,
-        getTeamName(log.team_id),
-        log.record_id,
-      ]
-        .join(' ')
-        .toLowerCase();
-
-      if (searchableSummary.includes(normalizedQuery)) return true;
-
-      if (!log.changes) return false;
-      try {
-        return JSON.stringify(log.changes).toLowerCase().includes(normalizedQuery);
-      } catch {
-        return false;
-      }
-    });
-  }, [
-    auditLogs,
-    searchQuery,
-    selectedAction,
-    selectedChangeFilter,
-    selectedTable,
-    selectedTeamId,
-    selectedTimeWindow,
-    selectedUserId,
-    getTeamName,
-  ]);
+    return [...(facets?.actions || [])].sort((a, b) => a.label.localeCompare(b.label));
+  }, [facets]);
 
   const auditSummary = useMemo(() => {
-    const entries = filteredAuditLogs;
+    const entries = auditLogs;
     const uniqueUsers = new Set(entries.map((log) => log.user_id || 'system')).size;
     const withChanges = entries.filter((log) => hasChangeDetails(log.changes)).length;
     const destructiveActions = entries.filter((log) =>
@@ -419,8 +325,8 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
         title: 'Visible changes',
         value: formatNumber(entries.length),
         detail: hasActiveFilters
-          ? `Filtered from ${formatNumber(auditLogs.length)} loaded audit entries.`
-          : `Loaded from the latest ${formatNumber(auditLogs.length)} audit entries.`,
+          ? `Of the ${formatNumber(auditLogs.length)} loaded matches. Filters search the full audit log.`
+          : `Loaded pages only. Latest ${formatNumber(auditLogs.length)} audit entries.`,
         tone: 'info',
         icon: <BarChart3 className="h-5 w-5" />,
       },
@@ -459,10 +365,11 @@ export function AuditLogDebugPanel({ supabase }: AuditLogDebugPanelProps) {
       latestEntry,
       topTeam,
     };
-  }, [auditLogs.length, filteredAuditLogs, getTeamName, hasActiveFilters]);
+  }, [auditLogs, getTeamName, hasActiveFilters]);
 
   const clearFilters = () => {
     setSearchQuery('');
+    setDebouncedSearchQuery('');
     setSelectedUserId('all');
     setSelectedTeamId('all');
     setSelectedTable('all');
@@ -547,18 +454,18 @@ ${log.changes && Object.keys(log.changes).length > 0
               Database Change Log
             </CardTitle>
             <CardDescription>
-              Track all database changes and modifications (Showing {filteredAuditLogs.length} of {auditLogs.length} entries)
+              Track all database changes and modifications (Showing {formatNumber(auditLogs.length)} loaded entries{hasMore ? ', more available' : ''})
             </CardDescription>
           </div>
-          <Button onClick={() => fetchAuditLogs(auditLogsLimit)} variant="outline" size="sm" disabled={loadingMoreAudits}>
+          <Button onClick={() => fetchAuditLogs()} variant="outline" size="sm" disabled={loadingMoreAudits || auditLogsLoading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loadingMoreAudits ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </CardHeader>
       <CardContent>
-        {auditLogs.length > 0 && (
-          <div className="mb-5 space-y-4">
+        <div className="mb-5 space-y-4">
+          {auditLogs.length > 0 && (
             <div className="rounded-xl border border-slate-700/70 bg-slate-950/35 p-4">
               <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
                 <div>
@@ -577,6 +484,7 @@ ${log.changes && Object.keys(log.changes).length > 0
                 ))}
               </div>
             </div>
+          )}
 
             <div className="space-y-4 rounded-xl border border-slate-700/70 bg-slate-950/35 p-4">
             <div className="flex flex-col md:flex-row gap-2">
@@ -588,6 +496,9 @@ ${log.changes && Object.keys(log.changes).length > 0
                   placeholder="Search user, team, module, action, record ID, or change values..."
                   className="pl-10"
                 />
+                {searchQuery.trim().length > 0 && searchQuery.trim().length < 3 ? (
+                  <p className="mt-1 text-xs text-muted-foreground">Type at least 3 characters to search the full audit log.</p>
+                ) : null}
               </div>
               <Button variant="outline" onClick={clearFilters} disabled={!hasActiveFilters}>
                 <X className="h-4 w-4 mr-2" />
@@ -699,27 +610,28 @@ ${log.changes && Object.keys(log.changes).length > 0
                 </Select>
               </div>
             </div>
+            {hasMore && hasActiveFilters ? (
+              <p className="text-xs text-muted-foreground">
+                Showing the first {formatNumber(auditLogs.length)} matches
+                {searchApplied ? ' for this search' : ''}. Refine the filter or click Show more.
+              </p>
+            ) : null}
             </div>
           </div>
-        )}
 
-        {auditLogsLoading ? (
+        {auditLogsLoading && auditLogs.length === 0 ? (
           <PanelLoader message="Loading audit logs..." accent="debug" className="py-8" />
         ) : auditLogs.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No audit log entries found</p>
-            <p className="text-sm mt-1">Database changes will appear here</p>
-          </div>
-        ) : filteredAuditLogs.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            <History className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No audit log entries match the current filters</p>
-            <p className="text-sm mt-1">Try clearing filters or loading more entries</p>
+            <p>{hasActiveFilters ? 'No audit log entries match the current filters' : 'No audit log entries found'}</p>
+            <p className="text-sm mt-1">
+              {hasActiveFilters ? 'Try clearing filters or using a more specific search.' : 'Database changes will appear here'}
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {filteredAuditLogs.map((log) => {
+            {auditLogs.map((log) => {
               const isExpanded = expandedAudits.includes(log.id);
 
               return (
@@ -811,7 +723,7 @@ ${log.changes && Object.keys(log.changes).length > 0
           </div>
         )}
 
-        {auditLogs.length > 0 && auditLogs.length >= auditLogsLimit && (
+        {hasMore && (
           <div className="flex justify-center pt-4 border-t">
             <Button onClick={loadMoreAuditLogs} variant="outline" disabled={loadingMoreAudits}>
               {loadingMoreAudits ? (
@@ -822,7 +734,7 @@ ${log.changes && Object.keys(log.changes).length > 0
               ) : (
                 <>
                   <ChevronDown className="h-4 w-4 mr-2" />
-                  Show {AUDIT_LOG_BATCH_SIZE.toLocaleString('en-GB')} More Entries
+                  Show {AUDIT_LOG_PAGE_SIZE.toLocaleString('en-GB')} More Entries
                 </>
               )}
             </Button>

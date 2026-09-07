@@ -205,7 +205,7 @@ export default function DebugPage() {
         </TabsContent>
 
         <TabsContent value="audit-log">
-          <AuditLogDebugPanel supabase={supabase} />
+          <AuditLogDebugPanel />
         </TabsContent>
 
         <TabsContent value="usage-analytics">
