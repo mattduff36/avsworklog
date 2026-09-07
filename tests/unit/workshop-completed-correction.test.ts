@@ -173,8 +173,12 @@ describe('completed workshop corrections', () => {
 
   it('keeps UI correction behind View-As aware manager flags', () => {
     const page = readRepo('app/(dashboard)/workshop-tasks/page.tsx');
+    const attachments = readRepo('components/workshop-tasks/TaskAttachmentsSection.tsx');
     expect(page).toContain('const { user, profile, isManager, isAdmin } = useAuth()');
     expect(page).toContain('canCorrectCompleted={showSettings}');
+    expect(attachments).toContain('canCorrectCompleted && isTaskCompleted');
+    expect(attachments).toContain('Correct attachment');
+    expect(attachments).toContain('handleOpenForm(attachment)');
     expect(readRepo('lib/providers/auth-provider.tsx')).toContain(
       'const roleForFlags = isViewingAs ? effectiveRole : profile?.role ?? null'
     );
