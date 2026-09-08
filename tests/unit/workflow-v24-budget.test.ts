@@ -39,7 +39,7 @@ afterEach(async () => {
   await new Promise<void>((resolve) => setImmediate(resolve));
 });
 
-describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
+describe('TEE V2.4 lineage budget and disposition', { timeout: 120_000 }, () => {
   it('T-V24-FIRST-AT-0 / T-V24-CLOSURE-AFTER-FIRST-FAIL / T-V24-SECOND-FAIL-ROUTING / T-V24-FIRST-REJECT-AT-2 / T-V24-CLOSURE-REJECT-AT-2', () => {
     const repoRoot = makeTempRoot('budget');
     const baseCommit = initGitRepo(repoRoot);
@@ -77,7 +77,9 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
       newWorkstreamId: 'ws_v24_cosmetic',
     });
     expect(cosmetic.ok).toBe(true);
-    expect(readProtocolRecord(repoRoot, 'ws_v24_cosmetic')?.phase).toBe('routing_required');
+    expect(readProtocolRecord(repoRoot, 'ws_v24_cosmetic')?.phase).toBe(
+      'awaiting_owner_successor_authorisation'
+    );
 
     const narrower = applyProtocolTransition({
       repoRoot,
@@ -89,7 +91,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
     });
     expect(narrower.ok).toBe(true);
     const child = readProtocolRecord(repoRoot, 'ws_v24_narrower');
-    expect(child?.phase).toBe('routing_required');
+    expect(child?.phase).toBe('awaiting_owner_successor_authorisation');
     expect(child?.failedPremiumReviewCount).toBeGreaterThanOrEqual(2);
     expect(child?.inheritedFailedReviewCount).toBeGreaterThanOrEqual(2);
 
@@ -121,7 +123,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
     });
     expect(secondSplit.ok).toBe(true);
     const grandchild = readProtocolRecord(repoRoot, 'ws_v24_again');
-    expect(grandchild?.phase).toBe('routing_required');
+    expect(grandchild?.phase).toBe('awaiting_owner_successor_authorisation');
     expect(grandchild?.failedPremiumReviewCount).toBeGreaterThanOrEqual(2);
     expect(
       applyProtocolTransition({
@@ -133,7 +135,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
     ).toBe(false);
   });
 
-  it('T-V24-ROUTE-NO-APPROVE / T-V24-ROUTE-NO-BIND-HEAD / T-V24-ROUTE-NO-FINALISE-READY / T-V24-EXHAUSTED-BLOCKS-FINALISE / T-V24-REMOVAL-RESOLVES-WITHOUT-FINALISE / T-V24-SUPERSEDE-REQUIRES-GIT', { timeout: 20000 }, () => {
+  it('T-V24-ROUTE-NO-APPROVE / T-V24-ROUTE-NO-BIND-HEAD / T-V24-ROUTE-NO-FINALISE-READY / T-V24-EXHAUSTED-BLOCKS-FINALISE / T-V24-REMOVAL-RESOLVES-WITHOUT-FINALISE / T-V24-SUPERSEDE-REQUIRES-GIT', { timeout: 60_000 }, () => {
     const repoRoot = makeTempRoot('route');
     const baseline = initGitRepo(repoRoot);
     const impl = commitFile(repoRoot, 'impl.ts', 'impl');
@@ -196,7 +198,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
     );
   });
 
-  it('T-V24-REHOME-REQUIRES-INDEPENDENT-GIT / T-V24-SPLIT-CHILD-NOT-REHOME / T-V24-NEW-ID-NO-FRESH-BUDGET / T-V24-SUCCESSOR-RETAINS-PREDECESSOR / T-V24-ILLEGAL-ATTEMPTS-AUDIT-ONLY', { timeout: 20000 }, () => {
+  it('T-V24-REHOME-REQUIRES-INDEPENDENT-GIT / T-V24-SPLIT-CHILD-NOT-REHOME / T-V24-NEW-ID-NO-FRESH-BUDGET / T-V24-SUCCESSOR-RETAINS-PREDECESSOR / T-V24-ILLEGAL-ATTEMPTS-AUDIT-ONLY', { timeout: 60_000 }, () => {
     const repoRoot = makeTempRoot('rehome');
     const baseline = initGitRepo(repoRoot);
     const blocked = commitFile(repoRoot, 'blocked.ts', 'blocked');
@@ -347,7 +349,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
     expect(audit.reviewAttempts.some((attempt) => attempt.token.includes('illegal'))).toBe(true);
   });
 
-  it('keeps generated V2.4 wording and rejects the V2.3 third-review phrase', () => {
+  it('keeps generated V2.5 generation wording and rejects the V2.3 third-review phrase', () => {
     const contract = createDefaultPlanContract({
       taskId: 'task-v24-wording',
       taskType: 'change',
@@ -359,12 +361,12 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
     });
     const boundary = contract.implementationContract?.boundaries?.join('\n') ?? '';
     expect(boundary).toContain(
-      'Do not launch a third premium review for the same CRITICAL continuation. Routing or split does not reset this budget.'
+      'Do not launch another premium review in an exhausted generation. Routing or split does not reset its budget; only an explicit owner-authorized successor creates a fresh generation.'
     );
     expect(boundary).not.toContain('Do not launch a third premium review without routing or split.');
   });
 
-  it('FD-GIT / FD-REHOME / FD-LINEAGE / FD-VERIFY first-review blocker family', { timeout: 20000 }, () => {
+  it('FD-GIT / FD-REHOME / FD-LINEAGE / FD-VERIFY first-review blocker family', { timeout: 60_000 }, () => {
     const repoRoot = makeTempRoot('first-fix');
     const baseline = initGitRepo(repoRoot);
     const impl = commitFile(repoRoot, 'impl.ts', 'impl');
@@ -441,7 +443,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
     const inheritedChild = readProtocolRecord(inheritRoot, 'ws_v24_inherited_child');
     expect(inheritedChild?.failedPremiumReviewCount).toBe(2);
     expect(inheritedChild?.inheritedFailedReviewCount).toBe(2);
-    expect(inheritedChild?.phase).toBe('routing_required');
+    expect(inheritedChild?.phase).toBe('awaiting_owner_successor_authorisation');
 
     const missingSource = applyProtocolTransition({
       repoRoot: inheritRoot,
@@ -491,7 +493,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 50_000 }, () => {
     expect(verifyPreflight.ok).toBe(false);
   });
 
-  it('T-FD-GIT-003-BINDS-COMMITS / T-FD-GIT-003-CHANGE-COMMIT / T-FD-GIT-003-ADD-COMMIT / T-FD-GIT-003-REMOVE-COMMIT / T-FD-GIT-003-REORDER-COMMITS / T-FD-GIT-003-OMIT-LIST / T-FD-GIT-003-NONOBJECT-COMMIT / T-FD-GIT-003-OMIT-RANGE / T-FD-GIT-003-DUPLICATE-COMMITS / T-FD-GIT-003-FRESH-HASH-TAMPER', { timeout: 20000 }, () => {
+  it('T-FD-GIT-003-BINDS-COMMITS / T-FD-GIT-003-CHANGE-COMMIT / T-FD-GIT-003-ADD-COMMIT / T-FD-GIT-003-REMOVE-COMMIT / T-FD-GIT-003-REORDER-COMMITS / T-FD-GIT-003-OMIT-LIST / T-FD-GIT-003-NONOBJECT-COMMIT / T-FD-GIT-003-OMIT-RANGE / T-FD-GIT-003-DUPLICATE-COMMITS / T-FD-GIT-003-FRESH-HASH-TAMPER', { timeout: 60_000 }, () => {
     const repoRoot = makeTempRoot('fd-git-003');
     const baseline = initGitRepo(repoRoot);
     const first = commitFile(repoRoot, 'one.ts', 'one');

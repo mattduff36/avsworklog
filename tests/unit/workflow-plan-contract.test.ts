@@ -12,7 +12,10 @@ import {
   validatePlanFile,
   validatePlanMarkdown,
 } from '@/scripts/automation/workflow-plan-contract';
-import { WORKFLOW_MODEL_TIER_REGISTRY_VERSION } from '@/scripts/automation/workflow-model-tier';
+import {
+  WORKFLOW_COMPATIBLE_MODEL_TIER_REGISTRY_VERSIONS,
+  WORKFLOW_MODEL_TIER_REGISTRY_VERSION,
+} from '@/scripts/automation/workflow-model-tier';
 import { runWorkflowPlanValidate } from '@/scripts/workflow-plan-validate';
 
 function validPlanMarkdown(contract = createDefaultPlanContract({
@@ -93,6 +96,27 @@ describe('workflow plan contract', () => {
     expect(parsed.contract?.implementationContract?.rollback).toBeTruthy();
     expect(parsed.contract?.sourceWorkstreamIds).toEqual(['ws-source-a', 'ws-source-b']);
     expect(extractPlanContractMarker(markdown).status).toBe('present');
+  });
+
+  it('PLAN-V25-MIGRATION: accepts V2.4 registry contracts during V2.5 migration', () => {
+    const legacyContract = {
+      ...createDefaultPlanContract({
+        taskId: 'legacy-plan',
+        taskType: 'change',
+        risk: 'high',
+        initialParentTier: 'economical',
+        routingDecision: 'economical_default',
+        rationale: 'Legacy high-risk plan remains valid while its registry metadata migrates.',
+        fallbackEscalation: 'Escalate if deterministic verification fails.',
+        requiredTests: [{ id: 'LEGACY-001', status: 'unresolved' as const }],
+        independentReviewReasons: ['persistence'],
+      }),
+      registryVersion: '2',
+    };
+    const parsed = validatePlanMarkdown(validPlanMarkdown(legacyContract), {
+      acceptRegistryVersions: WORKFLOW_COMPATIBLE_MODEL_TIER_REGISTRY_VERSIONS,
+    });
+    expect(parsed.status).toBe('present');
   });
 
   it('PLAN-002: missing marker, duplicate test IDs, high-risk contract gaps, and heading gaps fail validation', () => {

@@ -172,6 +172,8 @@ export function isCriticalProtocolWorkstream(
 export type WorkflowProtocolLineageRole =
   | 'active_leaf'
   | 'parked_split_ancestor'
+  | 'historical_successor_predecessor'
+  | 'owner_authorized_direct_continuation'
   | 'parked_unstarted'
   | 'orphan_split'
   | 'finalised'
@@ -228,6 +230,20 @@ function indexImmediateChildren(
     children.set(parentId, existing);
   }
   return children;
+}
+
+function indexOwnerSuccessors(
+  records: Iterable<WorkflowProtocolRecord>
+): Map<string, string[]> {
+  const successors = new Map<string, string[]>();
+  for (const record of records) {
+    const predecessorId = record.successorGeneration?.predecessorWorkstreamId;
+    if (!predecessorId) continue;
+    const existing = successors.get(predecessorId) ?? [];
+    existing.push(record.workstreamId);
+    successors.set(predecessorId, existing);
+  }
+  return successors;
 }
 
 function lineageRootId(
@@ -461,6 +477,7 @@ export function getFinaliseProtocolReadiness(
     if (row.protocol) byId.set(row.workstreamId, row.protocol);
   }
   const children = indexImmediateChildren(byId.values());
+  const ownerSuccessors = indexOwnerSuccessors(byId.values());
 
   if (active) {
     const protocol = byId.get(active.workstreamId);
@@ -537,6 +554,9 @@ export function getFinaliseProtocolReadiness(
     const childWorkstreamIds = (children.get(protocol.workstreamId) ?? []).filter((id) =>
       byId.has(id)
     );
+    const ownerSuccessorIds = (ownerSuccessors.get(protocol.workstreamId) ?? []).filter((id) =>
+      byId.has(id)
+    );
     const parentId = immediateParentId(protocol);
     if (hasAncestorCycle(protocol, byId)) {
       pushBlocker(
@@ -559,6 +579,58 @@ export function getFinaliseProtocolReadiness(
           role: 'malformed',
           phase: protocol.phase,
           message: `CRITICAL workstream ${protocol.workstreamId} has dangling parent ${parentId}; protocol integrity error`,
+          protocol,
+          byId,
+          childWorkstreamIds,
+        })
+      );
+      continue;
+    }
+    if (
+      protocol.successorGeneration &&
+      !byId.has(protocol.successorGeneration.predecessorWorkstreamId)
+    ) {
+      pushBlocker(
+        makeBlocker({
+          workstreamId: protocol.workstreamId,
+          role: 'malformed',
+          phase: protocol.phase,
+          message: `owner-authorized successor ${protocol.workstreamId} has a missing predecessor ${protocol.successorGeneration.predecessorWorkstreamId}`,
+          protocol,
+          byId,
+          childWorkstreamIds,
+        })
+      );
+      continue;
+    }
+    if (
+      protocol.successorGeneration &&
+      (protocol.successorGeneration.relation !== 'owner_authorized_successor' ||
+        protocol.successorGeneration.authorizationSource !== 'explicit_owner' ||
+        !/^[0-9a-f]{64}$/u.test(protocol.successorGeneration.authorizationHash) ||
+        !Number.isInteger(protocol.successorGeneration.generation) ||
+        protocol.successorGeneration.generation < 2)
+    ) {
+      pushBlocker(
+        makeBlocker({
+          workstreamId: protocol.workstreamId,
+          role: 'malformed',
+          phase: protocol.phase,
+          message: `owner successor ${protocol.workstreamId} has malformed authorization evidence`,
+          protocol,
+          byId,
+          childWorkstreamIds,
+        })
+      );
+      continue;
+    }
+    if (ownerSuccessorIds.length > 1) {
+      pushBlocker(
+        makeBlocker({
+          workstreamId: protocol.workstreamId,
+          role: 'malformed',
+          phase: protocol.phase,
+          message: `exhausted generation ${protocol.workstreamId} has multiple owner successors: ${ownerSuccessorIds.join(', ')}`,
           protocol,
           byId,
           childWorkstreamIds,
@@ -710,6 +782,38 @@ export function getFinaliseProtocolReadiness(
       continue;
     }
 
+    if (ownerSuccessorIds.length === 1) {
+      if (
+        protocol.phase !== 'routing_required' &&
+        protocol.phase !== 'awaiting_owner_successor_authorisation'
+      ) {
+        pushBlocker(
+          makeBlocker({
+            workstreamId: protocol.workstreamId,
+            role: 'malformed',
+            phase: protocol.phase,
+            message: `owner successor ${ownerSuccessorIds[0]} points to non-exhausted predecessor phase ${protocol.phase}`,
+            protocol,
+            byId,
+            childWorkstreamIds,
+          })
+        );
+        continue;
+      }
+      lineages.push(
+        makeBlocker({
+          workstreamId: protocol.workstreamId,
+          role: 'historical_successor_predecessor',
+          phase: protocol.phase,
+          message: `exhausted generation ${protocol.workstreamId} remains historical; owner-authorized successor ${ownerSuccessorIds[0]} owns continuation`,
+          protocol,
+          byId,
+          childWorkstreamIds,
+        })
+      );
+      continue;
+    }
+
     if (!isCriticalProtocolWorkstream(repoRoot, protocol)) {
       lineages.push(
         makeBlocker({
@@ -722,6 +826,68 @@ export function getFinaliseProtocolReadiness(
           childWorkstreamIds,
         })
       );
+      continue;
+    }
+
+    if (protocol.phase === 'direct_continuation_authorized') {
+      const generation = protocol.successorGeneration;
+      if (
+        !generation ||
+        (generation.mode !== 'direct' && generation.mode !== 'tee-light') ||
+        generation.authorizationSource !== 'explicit_owner' ||
+        !/^[0-9a-f]{64}$/u.test(generation.authorizationHash) ||
+        !Number.isInteger(generation.generation) ||
+        generation.generation < 2
+      ) {
+        pushBlocker(
+          makeBlocker({
+            workstreamId: protocol.workstreamId,
+            role: 'malformed',
+            phase: protocol.phase,
+            message: `direct continuation ${protocol.workstreamId} lacks valid owner authorization evidence`,
+            protocol,
+            byId,
+            childWorkstreamIds,
+          })
+        );
+        continue;
+      }
+      lineages.push(
+        makeBlocker({
+          workstreamId: protocol.workstreamId,
+          role: 'owner_authorized_direct_continuation',
+          phase: protocol.phase,
+          message: `${generation.mode} continuation generation ${generation.generation} is owner-authorized; normal finalise verification remains required`,
+          protocol,
+          byId,
+          childWorkstreamIds,
+        })
+      );
+      if (protocol.openBlockerIds.length > 0) {
+        pushBlocker(
+          makeBlocker({
+            workstreamId: protocol.workstreamId,
+            role: 'owner_authorized_direct_continuation',
+            phase: protocol.phase,
+            message: `direct continuation ${protocol.workstreamId} must resolve inherited blockers before finalise: ${protocol.openBlockerIds.join(', ')}`,
+            protocol,
+            byId,
+            childWorkstreamIds,
+          })
+        );
+      } else {
+        pushBlocker(
+          makeBlocker({
+            workstreamId: protocol.workstreamId,
+            role: 'owner_authorized_direct_continuation',
+            phase: protocol.phase,
+            message: `direct continuation ${protocol.workstreamId} is verified and blocker-free; run workflow-protocol finalise-start to activate auditable finalise correlation`,
+            protocol,
+            byId,
+            childWorkstreamIds,
+          })
+        );
+      }
       continue;
     }
 
@@ -750,7 +916,13 @@ export function getFinaliseProtocolReadiness(
     }
 
     if (protocol.phase === 'finalise_ready') {
-      if (!reviewAllowsFinaliseStart(protocol)) {
+      const ownerAuthorizedDirect =
+        (protocol.successorGeneration?.mode === 'direct' ||
+          protocol.successorGeneration?.mode === 'tee-light') &&
+        protocol.successorGeneration.authorizationSource === 'explicit_owner' &&
+        /^[0-9a-f]{64}$/u.test(protocol.successorGeneration.authorizationHash) &&
+        protocol.openBlockerIds.length === 0;
+      if (!ownerAuthorizedDirect && !reviewAllowsFinaliseStart(protocol)) {
         pushBlocker(
           makeBlocker({
             workstreamId: protocol.workstreamId,
@@ -803,37 +975,43 @@ export function getFinaliseProtocolReadiness(
           currentHead,
           extraCommits,
         });
+        const refreshCommand = ownerAuthorizedDirect
+          ? protocolCommand(protocol.workstreamId, 'finalise-start')
+          : protocolCommand(protocol.workstreamId, 'review-start', ' --pass delta');
         pushBlocker(
           makeBlocker({
             workstreamId: protocol.workstreamId,
             role: 'active_leaf',
             phase: protocol.phase,
-            message: `HEAD has moved since the reviewed commit ${protocol.headCommit}; current HEAD is ${currentHead}; extra commits: ${extraCommits.join(', ') || 'unable to list'}. Run ${protocolCommand(protocol.workstreamId, 'review-start', ' --pass delta')} then retry finalise-start. Do not rewrite review metadata to the current HEAD.`,
+            message: `HEAD has moved since finalise activation ${protocol.headCommit}; current HEAD is ${currentHead}; extra commits: ${extraCommits.join(', ') || 'unable to list'}. Run ${refreshCommand} then retry finalise.`,
             protocol,
             byId,
             childWorkstreamIds,
-            suggestedCommands: [
-              protocolCommand(protocol.workstreamId, 'review-start', ' --pass delta'),
-            ],
+            suggestedCommands: [refreshCommand],
           })
         );
         continue;
       }
       const currentTree = getCurrentTreeFingerprint(repoRoot).inputFingerprint;
-      const expectedTree = protocol.reviewedTreeFingerprint;
+      const expectedTree =
+        protocol.reviewedTreeFingerprint ??
+        (active?.workstreamId === protocol.workstreamId
+          ? active.activatedTreeFingerprint
+          : undefined);
       if (expectedTree && expectedTree !== currentTree) {
+        const refreshCommand = ownerAuthorizedDirect
+          ? protocolCommand(protocol.workstreamId, 'finalise-start')
+          : protocolCommand(protocol.workstreamId, 'review-start', ' --pass delta');
         pushBlocker(
           makeBlocker({
             workstreamId: protocol.workstreamId,
             role: 'active_leaf',
             phase: protocol.phase,
-            message: `working tree fingerprint moved since the reviewed tree; run ${protocolCommand(protocol.workstreamId, 'review-start', ' --pass delta')}`,
+            message: `working tree fingerprint moved since finalise activation; run ${refreshCommand}`,
             protocol,
             byId,
             childWorkstreamIds,
-            suggestedCommands: [
-              protocolCommand(protocol.workstreamId, 'review-start', ' --pass delta'),
-            ],
+            suggestedCommands: [refreshCommand],
           })
         );
         continue;
@@ -882,13 +1060,17 @@ export function getFinaliseProtocolReadiness(
       continue;
     }
 
-    if (protocol.phase === 'routing_required' || lineageBudgetExhausted(protocol)) {
+    if (
+      protocol.phase === 'routing_required' ||
+      protocol.phase === 'awaiting_owner_successor_authorisation' ||
+      lineageBudgetExhausted(protocol)
+    ) {
       pushBlocker(
         makeBlocker({
           workstreamId: protocol.workstreamId,
           role: 'active_leaf',
           phase: protocol.phase,
-          message: `CRITICAL workstream ${protocol.workstreamId} has exhausted its lineage-scoped premium review budget and remains a release blocker while its implementation is in this history. Route, isolate/re-home, remove-from-release, revert, or evidence-backed supersede. Do not review-start --pass first.`,
+          message: `CRITICAL workstream ${protocol.workstreamId} has exhausted generation review budget. Explicit owner authorization may create a same-context successor; route/re-home/removal remains optional. Do not review-start again in this generation.`,
           protocol,
           byId,
           childWorkstreamIds,
@@ -1039,12 +1221,26 @@ function explicitContextIsValid(
   if (!protocol) return { ok: false, reason: 'protocol-missing' };
   if (protocol.phase !== 'finalise_ready') return { ok: false, reason: `phase=${protocol.phase}` };
   if (protocol.activeCheckpointId !== checkpointId) return { ok: false, reason: 'checkpoint-mismatch' };
-  if (!reviewAllowsFinaliseStart(protocol)) return { ok: false, reason: 'review-not-passed' };
+  const directContinuation =
+    (protocol.successorGeneration?.mode === 'direct' ||
+      protocol.successorGeneration?.mode === 'tee-light') &&
+    protocol.successorGeneration.authorizationSource === 'explicit_owner' &&
+    /^[0-9a-f]{64}$/u.test(protocol.successorGeneration.authorizationHash) &&
+    protocol.openBlockerIds.length === 0;
+  if (!directContinuation && !reviewAllowsFinaliseStart(protocol)) {
+    return { ok: false, reason: 'review-not-passed' };
+  }
   const git = readWorkflowGitBinding(repoRoot);
   if (!protocol.branchName || protocol.branchName !== git.branchName) {
     return { ok: false, reason: 'branch-mismatch' };
   }
   const active = getActiveFinaliseContext(state);
+  if (active?.activatedTreeFingerprint) {
+    const currentTree = getCurrentTreeFingerprint(repoRoot).inputFingerprint;
+    if (currentTree !== active.activatedTreeFingerprint) {
+      return { ok: false, reason: 'tree-fingerprint-mismatch' };
+    }
+  }
   const expectedHead =
     lastOwnedCommit(active?.ownedCommits, active?.activatedHeadCommit ?? protocol.headCommit) ??
     protocol.headCommit;

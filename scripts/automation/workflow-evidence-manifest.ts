@@ -30,6 +30,11 @@ import {
   type TeeVerifyJob,
 } from './tee-parallel-verify';
 import { notifyDisplayProgress, type TeeProgressReporter } from './tee-progress';
+import {
+  assessWorkflowVerificationRequirements,
+  type WorkflowCapabilityEvidence,
+  type WorkflowVerificationRequirement,
+} from './workflow-tool-capability';
 
 export type EvidenceManifestKind = 'preflight' | 'fix-delta';
 export type EvidenceCommandStatus = 'passed' | 'failed' | 'skipped' | 'unknown';
@@ -88,6 +93,7 @@ export interface WorkflowEvidenceManifest {
     ledgerContentHash?: string;
   }>;
   verificationLedgers?: VerificationLedgerReference[];
+  verificationCapabilities?: WorkflowCapabilityEvidence[];
   productTreeFingerprint?: string;
   privacy: {
     redacted: true;
@@ -95,6 +101,48 @@ export interface WorkflowEvidenceManifest {
 }
 
 const HEAD_SHA_RE = /^[0-9a-f]{7,64}$/i;
+
+function recordVerificationCapabilities(
+  commands: EvidenceCommandResult[],
+  ledgerRefs: VerificationLedgerReference[],
+  requirements: WorkflowVerificationRequirement[] | undefined
+): WorkflowCapabilityEvidence[] | undefined {
+  if (!requirements || requirements.length === 0) return undefined;
+  const evidence = assessWorkflowVerificationRequirements(requirements);
+  const passedCommands = new Set(
+    commands
+      .filter(
+        (command) =>
+          command.status === 'passed' &&
+          command.exitCode === 0 &&
+          typeof command.command === 'string' &&
+          command.command.trim().length > 0
+      )
+      .map((command) => command.name)
+  );
+  const ledgerHashes = new Set(ledgerRefs.map((reference) => reference.contentHash));
+  const failures = evidence.filter(
+    (entry) =>
+      !entry.assessment.satisfied ||
+      entry.evidenceCommandNames.length === 0 ||
+      entry.evidenceCommandNames.some((name) => !passedCommands.has(name)) ||
+      (entry.property === 'postgres-concurrency' &&
+        ((entry.evidenceLedgerContentHashes?.length ?? 0) === 0 ||
+          entry.evidenceLedgerContentHashes?.some((hash) => !ledgerHashes.has(hash)))) ||
+      (entry.substitutionAssessment !== undefined && !entry.substitutionAssessment.allowed)
+  );
+  commands.push({
+    name: 'verification-capabilities',
+    status: failures.length === 0 ? 'passed' : 'failed',
+    exitCode: failures.length === 0 ? 0 : 1,
+    durationMs: 0,
+    summary:
+      failures.length === 0
+        ? `recorded ${evidence.length} satisfied verification capabilities`
+        : `unsatisfied verification properties: ${failures.map((entry) => entry.property).join(', ')}`,
+  });
+  return evidence;
+}
 
 function spawnGitSync(repoRoot: string, args: string[]) {
   return spawnSync(process.platform === 'win32' ? 'git.exe' : 'git', args, {
@@ -551,6 +599,7 @@ export function buildEvidenceManifest(params: {
   blockerEvidence?: WorkflowEvidenceManifest['blockerEvidence'];
   commandResults?: EvidenceCommandResult[];
   verificationLedgerRefs?: VerificationLedgerReference[];
+  verificationRequirements?: WorkflowVerificationRequirement[];
   commandRunner?: EvidenceCommandRunner;
   staticCheckResults?: EvidenceCommandResult[];
 }): { manifest: WorkflowEvidenceManifest; relativePath: string; absolutePath: string } {
@@ -797,6 +846,11 @@ export function buildEvidenceManifest(params: {
     });
   }
 
+  const verificationCapabilities = recordVerificationCapabilities(
+    commands,
+    ledgerRefs,
+    params.verificationRequirements
+  );
   const requiredTests = discoverBehavioralTestIds(params.repoRoot, requiredIds, executedIds);
 
   const checksPassed =
@@ -845,6 +899,7 @@ export function buildEvidenceManifest(params: {
     closedBlockerIds: params.kind === 'fix-delta' ? uniqueBlockers : params.closedBlockerIds,
     blockerEvidence: derivedBlockerEvidence,
     verificationLedgers: ledgerRefs,
+    verificationCapabilities,
     privacy: { redacted: true },
   };
 
@@ -1036,6 +1091,7 @@ export async function buildEvidenceManifestAsync(params: {
   blockerEvidence?: WorkflowEvidenceManifest['blockerEvidence'];
   commandResults?: EvidenceCommandResult[];
   verificationLedgerRefs?: VerificationLedgerReference[];
+  verificationRequirements?: WorkflowVerificationRequirement[];
   extraJobs?: Array<TeeVerifyJob<EvidenceCommandResult>>;
   candidate?: FrozenVerifyCandidate;
   progress?: TeeProgressReporter;

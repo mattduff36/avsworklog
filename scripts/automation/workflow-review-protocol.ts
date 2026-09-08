@@ -10,6 +10,7 @@ import type {
   WorkflowRehomeProvenance,
   WorkflowReviewState,
   WorkflowRouteDispositionTarget,
+  WorkflowTeeMode,
 } from './types';
 import { getCurrentTreeFingerprint, recomputeManifestProvenIds } from './workflow-evidence-manifest';
 import { requiredTestIdsForBlocker } from './workflow-verification-ledger';
@@ -57,7 +58,8 @@ export type WorkflowProtocolCommand =
   | 'review-record'
   | 'fix-record'
   | 'fix-delta-refresh'
-  | 'exhaustion-acknowledge' // exhausted initialized -> routing_required; no review minted
+  | 'exhaustion-acknowledge' // exhausted initialized -> owner authorization wait; no review minted
+  | 'successor-authorize'
   | 'split'
   | 'route'
   | 'rehome-bind'
@@ -73,6 +75,7 @@ export interface WorkflowProtocolTransitionResult {
   reviewToken?: string;
   checkpointId?: string;
   splitWorkstreamId?: string;
+  successorWorkstreamId?: string;
   childRecord?: WorkflowProtocolRecord;
 }
 
@@ -721,9 +724,13 @@ export function reduceReviewStart(params: {
   });
   if (!git.ok) return fail(git.message, current);
 
-  if (current.phase === 'routing_required' || lineageBudgetExhausted(current)) {
+  if (
+    current.phase === 'routing_required' ||
+    current.phase === 'awaiting_owner_successor_authorisation' ||
+    lineageBudgetExhausted(current)
+  ) {
     return fail(
-      'routing_required: lineage premium review budget exhausted; route, isolate, remove, revert, or evidence-backed supersede. review-start rejected',
+      'premium review generation exhausted; explicit owner successor authorization is required before another generation. review-start rejected',
       current,
       WORKFLOW_ROUTING_REQUIRED_EXIT_CODE
     );
@@ -796,7 +803,7 @@ export function reduceReviewStart(params: {
     }
     if (lineageBudgetExhausted(current)) {
       return fail(
-        'review budget exhausted; routing_required',
+        'review generation exhausted; explicit owner successor authorization required',
         current,
         WORKFLOW_ROUTING_REQUIRED_EXIT_CODE
       );
@@ -936,10 +943,11 @@ export function reduceReviewRecord(params: {
   } else {
     failedCount += 1;
     if (failedCount >= 2) {
-      phase = 'routing_required';
-      nextAction = 'route_or_isolate';
+      phase = 'awaiting_owner_successor_authorisation';
+      nextAction = 'successor_authorize_or_direct_continuation';
       exitCode = WORKFLOW_ROUTING_REQUIRED_EXIT_CODE;
-      message = 'second failed premium review; routing_required';
+      message =
+        'second failed premium review; awaiting explicit owner successor authorization';
     } else {
       phase = 'fix_sweep_required';
       nextAction = 'consolidated_fix_record';
@@ -982,8 +990,15 @@ export function reduceFixRecord(params: {
 }): WorkflowProtocolTransitionResult {
   const current = readProtocolRecord(params.repoRoot, params.workstreamId);
   if (!current) return fail('protocol record missing; run init first');
-  if (current.phase !== 'fix_sweep_required') {
-    return fail(`fix-record requires fix_sweep_required (have ${current.phase})`, current);
+  const directSuccessorFix =
+    current.phase === 'direct_continuation_authorized' &&
+    (current.successorGeneration?.mode === 'direct' ||
+      current.successorGeneration?.mode === 'tee-light');
+  if (current.phase !== 'fix_sweep_required' && !directSuccessorFix) {
+    return fail(
+      `fix-record requires fix_sweep_required or an owner-authorized direct continuation (have ${current.phase})`,
+      current
+    );
   }
   if (!params.closedBlockerIds || params.closedBlockerIds.length === 0) {
     return fail('fix-record requires explicit --closed-blocker-ids', current);
@@ -1033,15 +1048,34 @@ export function reduceFixRecord(params: {
     );
   }
 
+  const inheritedSuccessorFix =
+    current.successorGeneration?.mode === 'tee-full' &&
+    current.reviewAttempts.length === 0 &&
+    current.phase === 'fix_sweep_required';
   const next: WorkflowProtocolRecord = {
     ...current,
-    phase: 'fix_recorded',
-    nextAction: 'review_start_closure',
+    phase: directSuccessorFix
+      ? 'direct_continuation_authorized'
+      : inheritedSuccessorFix
+        ? 'initialized'
+        : 'fix_recorded',
+    nextAction: directSuccessorFix
+      ? 'run_targeted_verification_then_finalise_start'
+      : inheritedSuccessorFix
+        ? 'run_preflight'
+        : 'review_start_closure',
     fixDeltaManifestPath: path.relative(params.repoRoot, validation.absolutePath).replace(/\\/g, '/'),
     openBlockerIds: [],
     updatedAt: nowIso(params.now),
   };
-  return succeed('fix delta recorded', next);
+  return succeed(
+    directSuccessorFix
+      ? 'inherited successor blockers resolved; run targeted verification then finalise-start'
+      : inheritedSuccessorFix
+      ? 'inherited successor blockers resolved; run preflight'
+      : 'fix delta recorded',
+    next
+  );
 }
 
 function sameSortedIdSet(left: string[], right: string[]): boolean {
@@ -1145,8 +1179,8 @@ export function reduceExhaustionAcknowledge(params: {
   }
   const next: WorkflowProtocolRecord = {
     ...current,
-    phase: 'routing_required',
-    nextAction: 'route_or_isolate',
+    phase: 'awaiting_owner_successor_authorisation',
+    nextAction: 'successor_authorize_or_direct_continuation',
     failedPremiumReviewCount: current.failedPremiumReviewCount,
     inheritedFailedReviewCount: current.inheritedFailedReviewCount,
     reviewAttempts: current.reviewAttempts,
@@ -1155,7 +1189,7 @@ export function reduceExhaustionAcknowledge(params: {
     updatedAt: nowIso(params.now),
   };
   return succeed(
-    'exhausted initialized lineage moved to routing_required; no review minted',
+    'exhausted initialized generation now awaits explicit owner successor authorization; no review minted',
     next
   );
 }
@@ -1257,6 +1291,128 @@ export function reduceFixDeltaRefresh(params: {
   return succeed('fix-delta refreshed on current HEAD/tree; review budget unchanged', next);
 }
 
+function listOwnerSuccessorWorkstreamIds(repoRoot: string, predecessorId: string): string[] {
+  const root = path.join(repoRoot, 'docs_private', 'automation', 'workstreams');
+  if (!existsSync(root)) return [];
+  const ids: string[] = [];
+  for (const entry of readdirSync(root, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const candidate = readProtocolRecord(repoRoot, entry.name);
+    if (
+      candidate?.successorGeneration?.relation === 'owner_authorized_successor' &&
+      candidate.successorGeneration.predecessorWorkstreamId === predecessorId
+    ) {
+      ids.push(candidate.workstreamId);
+    }
+  }
+  return ids;
+}
+
+export function reduceSuccessorAuthorize(params: {
+  repoRoot: string;
+  workstreamId: string;
+  newWorkstreamId: string;
+  mode: WorkflowTeeMode;
+  ownerAuthorization: string;
+  model?: string;
+  now?: () => Date;
+}): WorkflowProtocolTransitionResult {
+  const current = readProtocolRecord(params.repoRoot, params.workstreamId);
+  if (!current) return fail('predecessor protocol record missing');
+  if (
+    current.phase !== 'routing_required' &&
+    current.phase !== 'awaiting_owner_successor_authorisation'
+  ) {
+    return fail(
+      `successor-authorize requires an exhausted generation (have ${current.phase})`,
+      current
+    );
+  }
+  if (!lineageBudgetExhausted(current)) {
+    return fail('successor-authorize requires an exhausted two-pass generation', current);
+  }
+  if (current.activeReviewToken || current.activeReviewPass || current.activeCheckpointId) {
+    return fail('successor-authorize requires no active review or finalise authority', current);
+  }
+  if (listOwnerSuccessorWorkstreamIds(params.repoRoot, current.workstreamId).length > 0) {
+    return fail(
+      'this exhausted generation already has an owner-authorized successor; it cannot silently reset again',
+      current
+    );
+  }
+
+  const childId = params.newWorkstreamId.trim();
+  if (!childId || childId === current.workstreamId) {
+    return fail('newWorkstreamId must identify a distinct successor', current);
+  }
+  if (readProtocolRecord(params.repoRoot, childId)) {
+    return fail('newWorkstreamId already exists', current);
+  }
+  const authorization = params.ownerAuthorization.trim();
+  if (!authorization) {
+    return fail('explicit --owner-authorization text is required', current);
+  }
+  const git = assertNamedBranchForInit(params.repoRoot);
+  if (!git.ok) return fail(git.message, current);
+  const generation = (current.successorGeneration?.generation ?? 1) + 1;
+  const authorizedAt = nowIso(params.now);
+  const child = createEmptyProtocolRecord({
+    workstreamId: childId,
+    baseCommit: current.baseCommit,
+    branchName: git.binding.branchName,
+    headCommit: git.binding.headCommit,
+    planPath: params.mode === 'tee-full' ? current.planPath : null,
+    inheritedFailedReviewCount: 0,
+    now: params.now,
+  });
+  child.successorGeneration = {
+    schemaVersion: '1',
+    relation: 'owner_authorized_successor',
+    predecessorWorkstreamId: current.workstreamId,
+    predecessorBaseCommit: current.baseCommit,
+    predecessorHeadCommit: current.headCommit,
+    generation,
+    mode: params.mode,
+    modelId: params.model?.trim() || undefined,
+    authorizationSource: 'explicit_owner',
+    authorizationHash: createHash('sha256').update(authorization).digest('hex'),
+    authorizedAt,
+    inheritedBlockerFamilies: [...current.blockerFamilies],
+    inheritedOpenBlockerIds: [...current.openBlockerIds],
+    inheritedEvidenceManifestPath: current.evidenceManifestPath,
+    inheritedFixDeltaManifestPath: current.fixDeltaManifestPath,
+  };
+  child.blockerFamilies = [...current.blockerFamilies];
+  child.openBlockerIds = [...current.openBlockerIds];
+  child.failedPremiumReviewCount = 0;
+  child.inheritedFailedReviewCount = 0;
+  child.reviewAttempts = [];
+  child.updatedAt = authorizedAt;
+
+  if (params.mode === 'tee-full') {
+    child.phase = child.openBlockerIds.length > 0 ? 'fix_sweep_required' : 'initialized';
+    child.nextAction =
+      child.openBlockerIds.length > 0
+        ? 'resolve_inherited_blockers_with_fix_record'
+        : 'run_preflight';
+  } else {
+    child.phase = 'direct_continuation_authorized';
+    child.nextAction =
+      child.openBlockerIds.length > 0
+        ? 'resolve_inherited_blockers_with_fix_record'
+        : 'run_targeted_verification_then_finalise_start';
+  }
+
+  return {
+    ok: true,
+    exitCode: 0,
+    record: current,
+    childRecord: child,
+    successorWorkstreamId: child.workstreamId,
+    message: `owner-authorized generation ${generation} created in ${params.mode} mode on ${git.binding.branchName}`,
+  };
+}
+
 export function reduceSplit(params: {
   repoRoot: string;
   workstreamId: string;
@@ -1267,7 +1423,11 @@ export function reduceSplit(params: {
 }): WorkflowProtocolTransitionResult {
   const current = readProtocolRecord(params.repoRoot, params.workstreamId);
   if (!current) return fail('protocol record missing; run init first');
-  if (current.phase !== 'routing_required' && current.phase !== 'fix_sweep_required') {
+  if (
+    current.phase !== 'routing_required' &&
+    current.phase !== 'awaiting_owner_successor_authorisation' &&
+    current.phase !== 'fix_sweep_required'
+  ) {
     return fail(`split not allowed in phase ${current.phase}`, current);
   }
   if (!params.newWorkstreamId.trim()) {
@@ -1306,15 +1466,17 @@ export function reduceSplit(params: {
   child.openBlockerIds = [...current.openBlockerIds];
   child.fixDeltaManifestPath = current.fixDeltaManifestPath;
   if (inheritBudget >= 2) {
-    child.phase = 'routing_required';
-    child.nextAction = 'route_or_isolate';
+    child.phase = 'awaiting_owner_successor_authorisation';
+    child.nextAction = 'successor_authorize_or_direct_continuation';
   } else {
-    // Split is only legal from fix_sweep_required | routing_required. After one
+    // Split is only legal from fix_sweep_required or an exhausted phase. After one
     // failed premium round the child keeps closure-only ownership; it does not
-    // regain first. After two failed rounds every child is routing_required.
+    // regain first. After two failed rounds every split child remains exhausted.
     child.phase = current.phase;
     child.nextAction =
-      current.phase === 'routing_required' ? 'route_or_isolate' : 'consolidated_fix_record';
+      current.phase === 'routing_required'
+        ? 'successor_authorize_or_direct_continuation'
+        : 'consolidated_fix_record';
   }
 
   const parent: WorkflowProtocolRecord = {
@@ -1456,6 +1618,45 @@ export function reduceFinaliseStart(params: {
   );
   if (existsSync(closurePath)) {
     return fail('historically closed workstream cannot finalise-start', current);
+  }
+  const directContinuation =
+    (current.phase === 'direct_continuation_authorized' ||
+      current.phase === 'finalise_ready') &&
+    (current.successorGeneration?.mode === 'direct' ||
+      current.successorGeneration?.mode === 'tee-light') &&
+    current.successorGeneration.authorizationSource === 'explicit_owner' &&
+    /^[0-9a-f]{64}$/u.test(current.successorGeneration.authorizationHash);
+  if (directContinuation) {
+    if (current.openBlockerIds.length > 0) {
+      return fail(
+        `finalise-start requires inherited blockers to be resolved: ${current.openBlockerIds.join(', ')}`,
+        current
+      );
+    }
+    const git = assertNamedBranchForInit(params.repoRoot);
+    if (!git.ok) return fail(git.message, current);
+    if (current.branchName && current.branchName !== git.binding.branchName) {
+      return fail(
+        `owner-authorized continuation is bound to ${current.branchName}, not ${git.binding.branchName}`,
+        current
+      );
+    }
+    const checkpointId =
+      current.phase === 'finalise_ready' && current.activeCheckpointId
+        ? current.activeCheckpointId
+        : createCheckpointId(current.workstreamId);
+    return succeed(
+      'owner-authorized direct finalise context activated',
+      {
+        ...current,
+        phase: 'finalise_ready',
+        nextAction: 'run_finalise',
+        headCommit: git.binding.headCommit,
+        activeCheckpointId: checkpointId,
+        updatedAt: nowIso(params.now),
+      },
+      { checkpointId }
+    );
   }
   if (current.phase !== 'review_closed' && current.phase !== 'finalise_ready') {
     return fail(`finalise-start requires review_closed (have ${current.phase})`, current);
@@ -1713,6 +1914,9 @@ function applyProtocolTransitionUnlocked(params: {
   siblingSurfaces?: string[];
   closedBlockerIds?: string[];
   newWorkstreamId?: string;
+  teeMode?: WorkflowTeeMode;
+  ownerAuthorization?: string;
+  model?: string;
   narrowerPartition?: boolean;
   hasFixDelta?: boolean;
   sourceWorkstreamIds?: string[];
@@ -1884,6 +2088,34 @@ function applyProtocolTransitionUnlocked(params: {
     return result;
   }
 
+  if (params.command === 'successor-authorize') {
+    if (!params.newWorkstreamId) return fail('newWorkstreamId required');
+    if (
+      params.teeMode !== 'direct' &&
+      params.teeMode !== 'tee-light' &&
+      params.teeMode !== 'tee-full'
+    ) {
+      return fail('mode must be direct|tee-light|tee-full');
+    }
+    const result = reduceSuccessorAuthorize({
+      repoRoot: params.repoRoot,
+      workstreamId: params.workstreamId,
+      newWorkstreamId: params.newWorkstreamId,
+      mode: params.teeMode,
+      ownerAuthorization: params.ownerAuthorization ?? '',
+      model: params.model,
+      now: params.now,
+    });
+    if (result.ok && result.record && result.childRecord) {
+      persistParentAndOptionalChildUnlocked({
+        repoRoot: params.repoRoot,
+        parent: result.record,
+        child: result.childRecord,
+      });
+    }
+    return result;
+  }
+
   if (params.command === 'route') {
     if (!params.disposition) return fail('disposition required');
     const result = reduceRoute({
@@ -1965,6 +2197,9 @@ export function applyProtocolTransition(params: {
   siblingSurfaces?: string[];
   closedBlockerIds?: string[];
   newWorkstreamId?: string;
+  teeMode?: WorkflowTeeMode;
+  ownerAuthorization?: string;
+  model?: string;
   narrowerPartition?: boolean;
   hasFixDelta?: boolean;
   sourceWorkstreamIds?: string[];

@@ -1,10 +1,11 @@
 {
   "schemaVersion": "1",
   "id": "avs-workflow-regression-suite",
-  "purpose": "canonical workflow regression suite",
+  "purpose": "canonical TEE V2.5 workflow regression suite",
   "files": [
     "tests/unit/tee-parallel-verify.test.ts",
     "tests/unit/tee-v2-context.test.ts",
+    "tests/unit/tee-v25-workflow.test.ts",
     "tests/unit/workflow-execution-mode.test.ts",
     "tests/unit/workflow-finalise-correlation.test.ts",
     "tests/unit/workflow-legacy-reconciliation.test.ts",

@@ -251,7 +251,7 @@ export function failFirstThenClosure(
   });
   expect(secondFail.ok).toBe(false);
   expect(secondFail.exitCode).toBe(WORKFLOW_ROUTING_REQUIRED_EXIT_CODE);
-  expect(secondFail.record?.phase).toBe('routing_required');
+  expect(secondFail.record?.phase).toBe('awaiting_owner_successor_authorisation');
 }
 
 export function exhaustSourceWorkstream(

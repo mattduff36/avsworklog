@@ -40,7 +40,7 @@ function openWorkstream(
 
 describe('workflow finalise correlation and registry', () => {
   it('REGISTRY-001: role keys resolve and unknown IDs stay unknown', () => {
-    expect(WORKFLOW_MODEL_TIER_REGISTRY_VERSION).toBe('2');
+    expect(WORKFLOW_MODEL_TIER_REGISTRY_VERSION).toBe('3');
     expect(getWorkflowModelRole('economical-default')?.defaultModelId).toBe('cursor-grok-4.5');
     expect(getWorkflowModelRole('premium-fix-routing')?.tier).toBe('premium');
     expect(classifyWorkflowModelTier('cursor-grok-4.5')).toBe('economical');

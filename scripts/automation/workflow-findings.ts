@@ -1,5 +1,8 @@
 import { sanitizeEvidenceLabel } from './workflow-privacy';
-import { WORKFLOW_MODEL_TIER_REGISTRY_VERSION } from './workflow-model-tier';
+import {
+  WORKFLOW_MODEL_TIER_REGISTRY_VERSION,
+  isWorkflowModelRegistryVersionCompatible,
+} from './workflow-model-tier';
 import type {
   WorkflowCompletionMarker,
   WorkflowFinding,
@@ -91,6 +94,7 @@ export function buildWorkflowFindings(params: {
 
   if (
     protocolPhase === 'routing_required' ||
+    protocolPhase === 'awaiting_owner_successor_authorisation' ||
     (typeof failedPremiumReviewCount === 'number' && failedPremiumReviewCount >= 2)
   ) {
     findings.push(
@@ -149,6 +153,8 @@ export function buildWorkflowFindings(params: {
   }
 
   const criticalPolicy = marker.lane === 'critical' || (!marker.lane && marker.risk === 'high');
+  const fullCriticalPolicy =
+    criticalPolicy && marker.teeMode !== 'direct' && marker.teeMode !== 'tee-light';
 
   if (marker.schemaVersion === '1') {
     findings.push(
@@ -194,7 +200,7 @@ export function buildWorkflowFindings(params: {
 
   if (
     marker.schemaVersion === '3' &&
-    marker.registryVersion !== WORKFLOW_MODEL_TIER_REGISTRY_VERSION
+    !isWorkflowModelRegistryVersionCompatible(marker.registryVersion)
   ) {
     findings.push(
       finding(
@@ -250,15 +256,16 @@ export function buildWorkflowFindings(params: {
   if (
     marker.reviewClosure?.protocol === 'two-pass-v1' &&
     (marker.reviewClosure.failedPremiumReviewCount ?? 0) >= 2 &&
-    marker.reviewClosure.phase !== 'routing_required'
+    marker.reviewClosure.phase !== 'routing_required' &&
+    marker.reviewClosure.phase !== 'awaiting_owner_successor_authorisation'
   ) {
     findings.push(
       finding(
         'review-closure-bypass',
         'action',
         'failed',
-        'Marker reports exhausted review budget without routing_required',
-        'Completion markers that record two failed premium reviews must reflect routing_required and must not claim a third review launch.',
+        'Marker reports exhausted review budget without an exhausted-generation phase',
+        'Completion markers that record two failed premium reviews must reflect routing_required or awaiting_owner_successor_authorisation and must not claim another review in the same generation.',
         [
           `reviewClosure:phase=${marker.reviewClosure.phase ?? 'unknown'}`,
           `reviewClosure:failedPremiumReviewCount=${marker.reviewClosure.failedPremiumReviewCount}`,
@@ -269,8 +276,14 @@ export function buildWorkflowFindings(params: {
 
   const effectiveParentTier =
     observedParentTier === undefined ? marker.executionParentTier ?? 'unknown' : observedParentTier;
+  const requiresTierCorroboration =
+    marker.schemaVersion === '2' ||
+    marker.schemaVersion === '3' ||
+    (marker.schemaVersion === '4' &&
+      marker.teeModeSource === 'premium_model' &&
+      (marker.teeMode === 'direct' || marker.teeMode === 'tee-light'));
   if (
-    (marker.schemaVersion === '2' || marker.schemaVersion === '3') &&
+    requiresTierCorroboration &&
     observedParentTier !== undefined &&
     observedParentTier !== 'unknown' &&
     marker.executionParentTier !== observedParentTier
@@ -289,7 +302,7 @@ export function buildWorkflowFindings(params: {
       )
     );
   } else if (
-    (marker.schemaVersion === '2' || marker.schemaVersion === '3') &&
+    requiresTierCorroboration &&
     observedParentTier === 'unknown'
   ) {
     findings.push(
@@ -304,7 +317,7 @@ export function buildWorkflowFindings(params: {
     );
   }
 
-  if (criticalPolicy && marker.architectureGate === 'skipped') {
+  if (fullCriticalPolicy && marker.architectureGate === 'skipped') {
     findings.push(
       finding(
         'missing-architecture-gate',
@@ -315,7 +328,7 @@ export function buildWorkflowFindings(params: {
         ['marker:architectureGate=skipped', 'marker:risk=high']
       )
     );
-  } else if (criticalPolicy && marker.architectureGate === 'blocked') {
+  } else if (fullCriticalPolicy && marker.architectureGate === 'blocked') {
     findings.push(
       finding(
         'architecture-gate-blocked',
@@ -326,7 +339,7 @@ export function buildWorkflowFindings(params: {
         ['marker:architectureGate=blocked']
       )
     );
-  } else if (criticalPolicy && marker.architectureGate === 'not_applicable') {
+  } else if (fullCriticalPolicy && marker.architectureGate === 'not_applicable') {
     findings.push(
       finding(
         'architecture-gate-not-applicable',
@@ -337,7 +350,7 @@ export function buildWorkflowFindings(params: {
         ['marker:architectureGate=not_applicable', 'marker:risk=high']
       )
     );
-  } else if (criticalPolicy && marker.architectureGate === 'unknown') {
+  } else if (fullCriticalPolicy && marker.architectureGate === 'unknown') {
     findings.push(
       finding(
         'architecture-gate-unknown',
@@ -357,7 +370,7 @@ export function buildWorkflowFindings(params: {
     (marker.schemaVersion === '2' ||
       marker.schemaVersion === '3' ||
       marker.schemaVersion === '4') &&
-    criticalPolicy
+    fullCriticalPolicy
   ) {
     const source = marker.architectureReviewSource ?? 'unknown';
     const parentCanSelfReview = effectiveParentTier === 'premium';
@@ -384,7 +397,7 @@ export function buildWorkflowFindings(params: {
     }
   }
 
-  const finalReviewRequired = marker.finalReviewRequired ?? criticalPolicy;
+  const finalReviewRequired = marker.finalReviewRequired ?? fullCriticalPolicy;
   const escalationEvidence = marker.reviewEscalationReasons ?? [];
 
   if (

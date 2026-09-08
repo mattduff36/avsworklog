@@ -201,7 +201,7 @@ describe('workflow review protocol', () => {
     });
     expect(secondFail.ok).toBe(false);
     expect(secondFail.exitCode).toBe(WORKFLOW_ROUTING_REQUIRED_EXIT_CODE);
-    expect(secondFail.record?.phase).toBe('routing_required');
+    expect(secondFail.record?.phase).toBe('awaiting_owner_successor_authorisation');
 
     const thirdStart = applyProtocolTransition({
       repoRoot,
@@ -281,7 +281,7 @@ describe('workflow review protocol', () => {
     });
     expect(split.ok).toBe(true);
     const child = readProtocolRecord(repoRoot, 'ws_protocol_lineage_child');
-    expect(child?.phase).toBe('routing_required');
+    expect(child?.phase).toBe('awaiting_owner_successor_authorisation');
     expect((child?.failedPremiumReviewCount ?? 0) >= 2).toBe(true);
   });
 

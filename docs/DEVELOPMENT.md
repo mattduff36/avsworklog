@@ -1,6 +1,6 @@
 # Development (current)
 
-Working guide for Squires. Commands come from root `package.json`. TEE V2.4 owns lane selection, review gates, and completion markers — do not copy that procedure here.
+Working guide for Squires. Commands come from root `package.json`. TEE V2.5 owns model-aware workflow selection, lane scaffolding, and completion markers — do not copy that procedure here. Recognised premium models choose DIRECT, TEE-LIGHT, or TEE-FULL; CRITICAL risk alone does not force full protocol ceremony.
 
 ## Working method
 
@@ -101,12 +101,16 @@ Local commit is not release-ready, and release-ready is not a push. `fap` / `/fa
 
 CRITICAL protocol notes (runtime is in `scripts/automation`, not hand-edited JSON):
 
-- Split ancestors are parked history. The active descendant owns remaining work. After two failed premium rounds, remaining work is routing, isolation, or proven removal from release — not another normal final-diff pass.
+- TEE-FULL review uses two automatic premium passes per generation: first, one consolidated fix, then closure. An exhausted generation enters `awaiting_owner_successor_authorisation`.
+- `workflow-protocol successor-authorize` records an explicit owner-authorized successor. It may continue in the same repository, checkout, branch, and ancestry; no worktree or re-home proof is required.
+- Ordinary split/new IDs still inherit exhausted review budget. Owner successor generations are a separate relation, receive a fresh two-pass counter, and inherit unresolved blocker IDs/families.
+- Existing V2.4 `routing_required` records remain readable historical evidence. An explicitly authorized DIRECT/TEE-LIGHT continuation may proceed without claiming the old review passed. It must close inherited blocker IDs with fix evidence before `finalise-start`; normal finalise verification then closes the successor lifecycle.
+- Split ancestors and exhausted successor predecessors are parked history while their active continuation owns remaining work.
 - Orphan, cyclic, or malformed split lineage blocks as protocol corruption.
 - Review evidence is bound to the reviewed Git HEAD and working-tree fingerprint. After drift, run `review-start --pass delta` and a fresh final-diff review; do not silently rebind metadata.
 - Unresolved CRITICAL implementation already on the release branch still owns mutating finalise. An independent unstarted sibling does not deadlock a different matching `finalise_ready` lineage.
 - `npm run finalise -- --dry-run` is non-mutating. Run `npm run workflow-protocol -- status --blocking` before mutating finalise.
-- Do not launch a third premium review for the same CRITICAL continuation. Routing or split does not reset this budget.
+- Do not launch another premium review in an exhausted generation. A fresh generation requires a new explicit owner authorization.
 - Historical leftover records may be closed only through `workflow-protocol reconcile-legacy`, which writes a separate evidence-backed `legacy-closure.json` and does not rewrite protocol lifecycle fields. It cannot authorise finalise or skip review for current work.
 
 Do not run `npm run build` unless the user authorises a test build.
@@ -118,6 +122,12 @@ npm run test:db:local
 ```
 
 See `docs/guides/LOCAL_DATABASE_TESTING.md`.
+
+Verification requirements are capability-based:
+
+- Browser/UI acceptance may use the existing local Next.js server on `localhost:4000` with canonical Playwright. Docker is not required.
+- PostgreSQL locking/concurrency claims require disposable real PostgreSQL semantics (Docker, native local PostgreSQL, or another explicitly designated non-production disposable instance). PGlite and browser smoke are not equivalent.
+- A generated command may be substituted only when the replacement deterministically proves the same property with equal or stronger coverage and the substitution is recorded.
 
 ## Testing strategy
 

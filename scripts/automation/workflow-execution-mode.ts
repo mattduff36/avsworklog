@@ -2,12 +2,14 @@ import type {
   WorkflowExecutionMode,
   WorkflowExecutionModeDetected,
   WorkflowLane,
+  WorkflowTeeMode,
 } from './types';
 
 export type WorkflowDecisionEvidence = boolean | 'unknown';
 
 export interface WorkflowExecutionModeAssessment {
   lane: WorkflowLane;
+  teeMode?: WorkflowTeeMode;
   meaningfulWorkUnits: number | null;
   unitsIndependent: WorkflowDecisionEvidence;
   canProgressConcurrently: WorkflowDecisionEvidence;
@@ -41,11 +43,15 @@ export function recommendWorkflowExecutionMode(
   assessment: WorkflowExecutionModeAssessment
 ): WorkflowExecutionModeRecommendation {
   const parallelWorkUnits = Math.max(0, assessment.meaningfulWorkUnits ?? 0);
+  const criticalSafetyReady =
+    assessment.invariantsApproved === true &&
+    assessment.securityDataBoundariesApproved === true;
   const criticalReady =
     assessment.lane !== 'critical' ||
-    (assessment.architectureApproved === true &&
-      assessment.invariantsApproved === true &&
-      assessment.securityDataBoundariesApproved === true &&
+    (criticalSafetyReady &&
+      (assessment.teeMode === 'direct' ||
+        assessment.teeMode === 'tee-light' ||
+        assessment.architectureApproved === true) &&
       assessment.ownershipBoundariesClear === true &&
       assessment.sharedContractsFixed === true);
   const multitaskEligible =

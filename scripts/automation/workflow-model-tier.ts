@@ -2,9 +2,11 @@ import type {
   WorkflowLane,
   WorkflowParentTier,
   WorkflowRoutingDecision,
+  WorkflowTeeMode,
 } from './types';
 
-export const WORKFLOW_MODEL_TIER_REGISTRY_VERSION = '2';
+export const WORKFLOW_MODEL_TIER_REGISTRY_VERSION = '3';
+export const WORKFLOW_COMPATIBLE_MODEL_TIER_REGISTRY_VERSIONS = ['2', '3'] as const;
 
 export type WorkflowModelRoleKey =
   | 'economical-default'
@@ -43,6 +45,34 @@ export interface WorkflowRoutingContext {
 
 export type WorkflowRoutingAction = 'ask_switch' | 'pause_for_switch' | 'continue';
 
+export interface WorkflowTeeModeContext {
+  parentTier: WorkflowParentTier;
+  lane: WorkflowLane;
+  complexity: 'small' | 'medium' | 'exceptional';
+  ambiguity: 'low' | 'high';
+  blastRadius: 'local' | 'broad' | 'production';
+  reversible: boolean;
+  testQuality: 'strong' | 'limited' | 'unknown';
+  productionDataImpact: 'none' | 'read-only' | 'write' | 'destructive';
+  securityConsequences: 'none' | 'contained' | 'material';
+  independentReviewValue: 'low' | 'material';
+  userOverride?: WorkflowTeeMode;
+}
+
+export interface WorkflowTeeModeDecision {
+  mode: WorkflowTeeMode;
+  source: 'premium_model' | 'owner_override' | 'automatic_tee';
+  reason: string;
+}
+
+export const WORKFLOW_UNBYPASSABLE_SAFETY_REQUIREMENTS = [
+  'production-data-authorization',
+  'secret-protection',
+  'deployment-authorization',
+  'no-force-push-without-authorization',
+  'truthful-verification-reporting',
+] as const;
+
 export interface WorkflowRoutingEvidence {
   initialParentTier: WorkflowParentTier;
   executionParentTier: WorkflowParentTier;
@@ -74,8 +104,11 @@ export const WORKFLOW_MODEL_REGISTRY: WorkflowModelRole[] = [
       'gpt-5.6-sol',
       'gpt-5.6-sol-high',
       'gpt-5.6-sol[effort=high]',
+      'gpt-5.5-high',
       'gpt-5.4',
       'gpt-5.4-medium',
+      'gpt-5.3-codex',
+      'claude-opus-5-thinking-high',
     ],
     defaultModelId: 'gpt-5.6-sol-high',
   },
@@ -88,8 +121,11 @@ export const WORKFLOW_MODEL_REGISTRY: WorkflowModelRole[] = [
       'gpt-5.6-sol',
       'gpt-5.6-sol-high',
       'gpt-5.6-sol[effort=high]',
+      'gpt-5.5-high',
       'gpt-5.4',
       'gpt-5.4-medium',
+      'gpt-5.3-codex',
+      'claude-opus-5-thinking-high',
     ],
     defaultModelId: 'gpt-5.6-sol-high',
   },
@@ -163,24 +199,84 @@ export function classifyWorkflowModelTier(model: string | null | undefined): Wor
   return 'unknown';
 }
 
-export function getWorkflowRoutingAction(context: WorkflowRoutingContext): WorkflowRoutingAction {
-  const economicalSwitchEligible =
-    context.lane === 'standard'
-      ? context.substantialImplementation === true
-      : context.lane
-        ? false
-        : context.risk === 'routine';
-  if (
-    !context.substantive ||
-    context.parentTier !== 'premium' ||
-    !economicalSwitchEligible ||
-    context.explicitPremiumRequested
-  ) {
-    return 'continue';
+export function isWorkflowModelRegistryVersionCompatible(
+  version: string | null | undefined
+): boolean {
+  return Boolean(
+    version &&
+      (WORKFLOW_COMPATIBLE_MODEL_TIER_REGISTRY_VERSIONS as readonly string[]).includes(version)
+  );
+}
+
+export function isRecognizedPremiumModel(model: string | null | undefined): boolean {
+  return classifyWorkflowModelTier(model) === 'premium';
+}
+
+/**
+ * V2.5 separates task risk from workflow ceremony. CRITICAL is an objective risk
+ * fact, while a recognised premium model may still select DIRECT or TEE-LIGHT.
+ */
+export function selectWorkflowTeeMode(
+  context: WorkflowTeeModeContext
+): WorkflowTeeModeDecision {
+  if (context.userOverride) {
+    return {
+      mode: context.userOverride,
+      source: 'owner_override',
+      reason: 'explicit-owner-workflow-choice',
+    };
   }
-  if (context.premiumTaskDecision === 'pause_to_switch') return 'pause_for_switch';
-  if (context.premiumTaskDecision === 'continue_premium') return 'continue';
-  return 'ask_switch';
+
+  if (context.parentTier !== 'premium') {
+    return {
+      mode: 'tee-full',
+      source: 'automatic_tee',
+      reason: 'economy-or-unknown-model-uses-lane-scaffolding',
+    };
+  }
+
+  const fullMateriallyUseful =
+    context.complexity === 'exceptional' ||
+    context.productionDataImpact === 'destructive' ||
+    (context.ambiguity === 'high' &&
+      context.blastRadius !== 'local' &&
+      context.independentReviewValue === 'material');
+  if (fullMateriallyUseful) {
+    return {
+      mode: 'tee-full',
+      source: 'premium_model',
+      reason: 'structured-protocol-materially-reduces-risk',
+    };
+  }
+
+  const selectedSafeguardsUseful =
+    context.complexity === 'medium' ||
+    context.securityConsequences !== 'none' ||
+    context.productionDataImpact === 'write' ||
+    context.testQuality !== 'strong' ||
+    context.independentReviewValue === 'material' ||
+    (!context.reversible && context.blastRadius !== 'local');
+  if (selectedSafeguardsUseful) {
+    return {
+      mode: 'tee-light',
+      source: 'premium_model',
+      reason: 'selected-safeguards-materially-improve-confidence',
+    };
+  }
+
+  return {
+    mode: 'direct',
+    source: 'premium_model',
+    reason: 'expert-direct-execution-is-proportionate',
+  };
+}
+
+export function getWorkflowRoutingAction(context: WorkflowRoutingContext): WorkflowRoutingAction {
+  // V2.5 premium models choose DIRECT/TEE-LIGHT/TEE-FULL themselves. The
+  // legacy cost-routing API remains readable but must not interrupt the user
+  // merely to switch a capable model to an economical one.
+  void context;
+  return 'continue';
 }
 
 export function isWorkflowRoutingDecisionCoherent(evidence: WorkflowRoutingEvidence): boolean {

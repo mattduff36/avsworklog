@@ -14,7 +14,7 @@ This file routes agents. It is not a second engineering workflow.
 | How to work, test, and commit | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
 | Auth, permissions, RLS, secrets, production data | [`docs/SECURITY.md`](docs/SECURITY.md) |
 
-Token-Efficient Engineering V2.4 is the active engineering workflow (global Skill). Do not duplicate TEE lanes, markers, or finalise procedure here. Project rules override TEE when they are stricter.
+Token-Efficient Engineering V2.5 is the active engineering workflow (global Skill). Recognised premium models choose DIRECT, TEE-LIGHT, or TEE-FULL; CRITICAL risk does not by itself force TEE-FULL. Economy models retain automatic lane scaffolding. Do not duplicate TEE lanes, markers, or finalise procedure here. Genuine project data/security/destructive safeguards remain stricter where stated.
 
 ## Documentation precedence
 
@@ -35,6 +35,7 @@ Token-Efficient Engineering V2.4 is the active engineering workflow (global Skil
 - Do not change production data or schema without explicit permission. Persistence, auth, permissions/RLS, money, and concurrency are CRITICAL under TEE.
 - For database/persistence intent, load `.cursor/rules/database-migrations.mdc` and the migration guides before acting.
 - Application builds run only when the user authorizes a test build.
+- Workflow topology defaults to this checkout and branch. Do not create another branch or worktree merely to reset review state; optional topology changes require explicit user approval.
 
 ## What to load for a task
 

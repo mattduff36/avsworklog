@@ -264,6 +264,36 @@ describe('workflow-marker', () => {
     expect(latest.marker?.taskId).toBe('v4-fast');
   });
 
+  it('TEE25-DIRECT-MARKER permits compact CRITICAL DIRECT evidence without full ceremony', () => {
+    expect(
+      validateWorkflowCompletionMarker({
+        schemaVersion: '4',
+        lane: 'critical',
+        taskId: 'v25-direct-critical',
+        taskType: 'change',
+        verification: 'passed',
+        commit: 'completed',
+        handoff: 'completed',
+        teeMode: 'direct',
+        teeModeSource: 'premium_model',
+        executionParentTier: 'premium',
+      })
+    ).toMatchObject({ status: 'present' });
+    expect(
+      validateWorkflowCompletionMarker({
+        schemaVersion: '4',
+        lane: 'critical',
+        taskId: 'v25-invalid-direct',
+        taskType: 'change',
+        verification: 'passed',
+        commit: 'completed',
+        handoff: 'completed',
+        teeMode: 'direct',
+        teeModeSource: 'automatic_tee',
+      })
+    ).toMatchObject({ status: 'malformed' });
+  });
+
   it('TEE-V2-CRITICAL-EVIDENCE-001 rejects incomplete critical V4 evidence', () => {
     const incomplete = markerV4('critical');
     delete incomplete.reviewClosure;
@@ -413,7 +443,7 @@ describe('workflow model routing', () => {
     expect(classifyWorkflowModelTier(undefined)).toBe('unknown');
   });
 
-  it('ROUTE-001 asks once for a premium-parent routine task', () => {
+  it('ROUTE-001 keeps premium-parent workflow choice autonomous', () => {
     expect(
       getWorkflowRoutingAction({
         parentTier: 'premium',
@@ -421,10 +451,10 @@ describe('workflow model routing', () => {
         substantive: true,
         explicitPremiumRequested: false,
       })
-    ).toBe('ask_switch');
+    ).toBe('continue');
   });
 
-  it('ROUTE-002 pauses when the user elects to switch', () => {
+  it('ROUTE-002 does not apply the legacy economical-switch pause', () => {
     expect(
       getWorkflowRoutingAction({
         parentTier: 'premium',
@@ -433,7 +463,7 @@ describe('workflow model routing', () => {
         explicitPremiumRequested: false,
         premiumTaskDecision: 'pause_to_switch',
       })
-    ).toBe('pause_for_switch');
+    ).toBe('continue');
   });
 
   it('ROUTE-003 does not repeat the prompt after continuing premium', () => {
@@ -825,6 +855,17 @@ describe('workflow-findings', () => {
         'invalid-final-review-source',
       ])
     );
+    const directMismatch = buildWorkflowFindings({
+      marker: markerV4('critical', {
+        teeMode: 'direct',
+        teeModeSource: 'premium_model',
+        executionParentTier: 'premium',
+      }),
+      markerStatus: 'present',
+      transcriptSignals: emptySignals(),
+      observedParentTier: 'economical',
+    });
+    expect(directMismatch.map((finding) => finding.id)).toContain('parent-tier-mismatch');
   });
 });
 

@@ -18,6 +18,7 @@ import type {
   WorkflowUnresolvedRisk,
 } from './types';
 import {
+  WORKFLOW_COMPATIBLE_MODEL_TIER_REGISTRY_VERSIONS,
   WORKFLOW_MODEL_TIER_REGISTRY_VERSION,
   getWorkflowModelRole,
 } from './workflow-model-tier';
@@ -828,7 +829,11 @@ export function resolvePlanPath(params: {
 
 export function validatePlanMarkdown(
   planMarkdown: string,
-  options?: { enforceHeadings?: boolean; expectRegistryVersion?: string }
+  options?: {
+    enforceHeadings?: boolean;
+    expectRegistryVersion?: string;
+    acceptRegistryVersions?: readonly string[];
+  }
 ): ParsedPlanContract & { headingErrors: string[]; contradictionErrors: string[] } {
   const extracted = extractPlanContractMarker(planMarkdown);
   const headingErrors =
@@ -849,6 +854,15 @@ export function validatePlanMarkdown(
   ) {
     errors.push(
       `registryVersion ${extracted.contract.registryVersion} differs from current ${options.expectRegistryVersion}`
+    );
+  }
+  if (
+    extracted.contract &&
+    options?.acceptRegistryVersions &&
+    !options.acceptRegistryVersions.includes(extracted.contract.registryVersion)
+  ) {
+    errors.push(
+      `registryVersion ${extracted.contract.registryVersion} is not migration-compatible (${options.acceptRegistryVersions.join(', ')})`
     );
   }
 
@@ -896,7 +910,7 @@ export function validatePlanFile(params: {
   const markdown = readFileSync(pathResolution.absolutePath, 'utf8');
   const validated = validatePlanMarkdown(markdown, {
     enforceHeadings: params.enforceHeadings,
-    expectRegistryVersion: WORKFLOW_MODEL_TIER_REGISTRY_VERSION,
+    acceptRegistryVersions: WORKFLOW_COMPATIBLE_MODEL_TIER_REGISTRY_VERSIONS,
   });
   return { ...validated, pathResolution };
 }
@@ -969,12 +983,12 @@ export function createDefaultPlanContract(params: {
           invariants: [
             'Preserve fail-open stop-hook topology and mixed-version readers.',
             'Persist hashes, opaque IDs, and derived evidence only.',
-            'Bound premium final review to two-pass-v1. After two failed premium rounds remaining work is routing, isolation, or proven removal from release — not another normal final-diff pass.',
+            'Bound each TEE-FULL premium review generation to two-pass-v1. After two failed rounds, require explicit owner successor authorization before another generation.',
           ],
           boundaries: [
             'Do not rewrite immutable workflow events.',
             'Do not change user-facing finalise command phrases.',
-            'Do not launch a third premium review for the same CRITICAL continuation. Routing or split does not reset this budget.',
+            'Do not launch another premium review in an exhausted generation. Routing or split does not reset its budget; only an explicit owner-authorized successor creates a fresh generation.',
           ],
           rollback:
             'Revert new writers/rules or switch plan validation to observation-only; keep mixed-version readers accepting already-written records.',

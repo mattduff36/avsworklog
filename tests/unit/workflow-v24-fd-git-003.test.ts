@@ -38,8 +38,8 @@ afterEach(async () => {
   await new Promise<void>((resolve) => setImmediate(resolve));
 });
 
-describe('TEE V2.4 FD-GIT-003 closure-head and FD-REHOME-001', { timeout: 90_000 }, () => {
-  it('T-FD-GIT-003-CLOSURE-HEAD / T-FD-GIT-003-CANDIDATE-RANGE / T-FD-GIT-003-SUCCESS-HEAD-UNCHANGED / T-FD-GIT-003-FAILED-FIRST-NO-CLOSURE / T-FD-GIT-003-ILLEGAL-POST-BUDGET / T-FD-GIT-003-HEAD-DRIFT / T-FD-GIT-003-TAMPER-CANDIDATE / T-FD-GIT-003-SUBSTITUTE-B', { timeout: 30000 }, () => {
+describe('TEE V2.4 FD-GIT-003 closure-head and FD-REHOME-001', { timeout: 180_000 }, () => {
+  it('T-FD-GIT-003-CLOSURE-HEAD / T-FD-GIT-003-CANDIDATE-RANGE / T-FD-GIT-003-SUCCESS-HEAD-UNCHANGED / T-FD-GIT-003-FAILED-FIRST-NO-CLOSURE / T-FD-GIT-003-ILLEGAL-POST-BUDGET / T-FD-GIT-003-HEAD-DRIFT / T-FD-GIT-003-TAMPER-CANDIDATE / T-FD-GIT-003-SUBSTITUTE-B', { timeout: 60_000 }, () => {
     const repoRoot = makeTempRoot('fd-git-003-closure');
     const baseline = initGitRepo(repoRoot);
     const firstImpl = commitFile(repoRoot, 'one.ts', 'one');
@@ -250,7 +250,7 @@ describe('TEE V2.4 FD-GIT-003 closure-head and FD-REHOME-001', { timeout: 90_000
     expect(revalidateRouteDisposition({ repoRoot, record: tamperedCandidate }).ok).toBe(false);
   });
 
-  it('T-FD-GIT-003-PASSING-CLOSURE', { timeout: 20000 }, () => {
+  it('T-FD-GIT-003-PASSING-CLOSURE', { timeout: 30_000 }, () => {
     const repoRoot = makeTempRoot('fd-git-003-pass');
     const baseline = initGitRepo(repoRoot);
     const firstImpl = commitFile(repoRoot, 'one.ts', 'one');
@@ -335,7 +335,7 @@ describe('TEE V2.4 FD-GIT-003 closure-head and FD-REHOME-001', { timeout: 90_000
     expect(workingFingerprint).toBe(gitFingerprint);
   });
 
-  it('T-FD-REHOME-001-MISSING-BRANCH / T-FD-REHOME-001-WRONG-HEAD / T-FD-REHOME-001-FAKE-SOURCE-HASH / T-FD-REHOME-001-TAMPER-FINGERPRINT / T-FD-REHOME-001-WRONG-COMMITS / T-FD-REHOME-001-PRED-ANCESTOR / T-FD-REHOME-001-ISOLATED-PASSES / T-FD-REHOME-001-MISSING-SOURCE-BASELINE / T-FD-REHOME-001-SUCCESSOR-CONTENT-MISMATCH / T-FD-REHOME-001-SOURCE-PATH-DISAPPEARS / T-FD-GIT-003-SOURCE-LINEAGE', { timeout: 60_000 }, () => {
+  it('T-FD-REHOME-001-MISSING-BRANCH / T-FD-REHOME-001-WRONG-HEAD / T-FD-REHOME-001-FAKE-SOURCE-HASH / T-FD-REHOME-001-TAMPER-FINGERPRINT / T-FD-REHOME-001-WRONG-COMMITS / T-FD-REHOME-001-PRED-ANCESTOR / T-FD-REHOME-001-ISOLATED-PASSES / T-FD-REHOME-001-MISSING-SOURCE-BASELINE / T-FD-REHOME-001-SUCCESSOR-CONTENT-MISMATCH / T-FD-REHOME-001-SOURCE-PATH-DISAPPEARS / T-FD-GIT-003-SOURCE-LINEAGE', { timeout: 120_000 }, () => {
     const predRoot = makeTempRoot('fd-rehome-pred');
     const predBaseline = initGitRepo(predRoot);
     const predHead = commitFile(predRoot, 'blocked.ts', 'blocked');

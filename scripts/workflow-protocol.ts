@@ -12,6 +12,7 @@ import { applyLegacyReconciliation } from './automation/workflow-legacy-reconcil
 import type {
   WorkflowProtocolReviewPass,
   WorkflowRouteDispositionTarget,
+  WorkflowTeeMode,
 } from './automation/types';
 
 function printUsage(): void {
@@ -27,6 +28,8 @@ Commands:
   fix-record --workstream <id> --manifest <path> [--closed-blocker-ids a,b]
   fix-delta-refresh --workstream <id> --manifest <path> --closed-blocker-ids a,b
   exhaustion-acknowledge --workstream <id>
+  successor-authorize --workstream <exhausted-id> --new-workstream <id> \\
+    --mode direct|tee-light|tee-full --owner-authorization <text> [--model <registry-id>]
   # leftover route uses --disposition already_in_release; it is not approval or finalise
   split --workstream <id> --new-workstream <id> [--narrower-partition] [--has-fix-delta]
   route --workstream <id> --disposition removed_from_release|reverted|superseded|rehomed|already_in_release \\
@@ -149,6 +152,9 @@ async function main(): Promise<void> {
     siblingSurfaces: splitCsv(readFlag(args, '--sibling-surfaces')),
     closedBlockerIds: splitCsv(readFlag(args, '--closed-blocker-ids')),
     newWorkstreamId: readFlag(args, '--new-workstream'),
+    teeMode: readFlag(args, '--mode') as WorkflowTeeMode | undefined,
+    ownerAuthorization: readFlag(args, '--owner-authorization'),
+    model: readFlag(args, '--model'),
     narrowerPartition: hasFlag(args, '--narrower-partition'),
     hasFixDelta: hasFlag(args, '--has-fix-delta'),
     sourceWorkstreamIds: splitCsv(readFlag(args, '--source-workstreams')),
@@ -181,6 +187,7 @@ async function main(): Promise<void> {
     reviewToken: result.reviewToken,
     checkpointId: result.checkpointId,
     splitWorkstreamId: result.splitWorkstreamId,
+    successorWorkstreamId: result.successorWorkstreamId,
     record: result.record
       ? {
           workstreamId: result.record.workstreamId,
@@ -193,6 +200,19 @@ async function main(): Promise<void> {
           blockerFamilies: result.record.blockerFamilies,
           openBlockerIds: result.record.openBlockerIds,
           headCommit: result.record.headCommit,
+          successorGeneration: result.record.successorGeneration ?? null,
+        }
+      : null,
+    successorRecord: result.childRecord
+      ? {
+          workstreamId: result.childRecord.workstreamId,
+          phase: result.childRecord.phase,
+          nextAction: result.childRecord.nextAction,
+          failedPremiumReviewCount: result.childRecord.failedPremiumReviewCount,
+          blockerFamilies: result.childRecord.blockerFamilies,
+          openBlockerIds: result.childRecord.openBlockerIds,
+          branchName: result.childRecord.branchName,
+          successorGeneration: result.childRecord.successorGeneration ?? null,
         }
       : null,
   };

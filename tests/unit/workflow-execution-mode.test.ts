@@ -134,6 +134,31 @@ describe('TEE V2.1 execution-mode policy', () => {
     ).toBe('multitask');
   });
 
+  it('allows DIRECT/TEE-LIGHT Multitask without architecture ceremony but retains safety gates', () => {
+    expect(
+      recommendWorkflowExecutionMode(
+        assessment({
+          lane: 'critical',
+          teeMode: 'direct',
+          architectureApproved: false,
+          invariantsApproved: true,
+          securityDataBoundariesApproved: true,
+        })
+      ).recommendedMode
+    ).toBe('multitask');
+    expect(
+      recommendWorkflowExecutionMode(
+        assessment({
+          lane: 'critical',
+          teeMode: 'tee-light',
+          architectureApproved: false,
+          invariantsApproved: true,
+          securityDataBoundariesApproved: false,
+        })
+      ).recommendedMode
+    ).toBe('agent');
+  });
+
   it('advises Agent when CRITICAL approval evidence is incomplete and Multitask may be active', () => {
     expect(
       recommendWorkflowExecutionMode(

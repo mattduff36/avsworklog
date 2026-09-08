@@ -167,8 +167,8 @@ describe('exhausted initialized to routing_required', { timeout: 40_000 }, () =>
     });
     expect(ack.ok, ack.message).toBe(true);
     const routed = readProtocolRecord(repoRoot, 'ws_exh_init')!;
-    expect(routed.phase).toBe('routing_required');
-    expect(routed.nextAction).toBe('route_or_isolate');
+    expect(routed.phase).toBe('awaiting_owner_successor_authorisation');
+    expect(routed.nextAction).toBe('successor_authorize_or_direct_continuation');
     expect(routed.failedPremiumReviewCount).toBe(7);
     expect(routed.inheritedFailedReviewCount).toBe(7);
     expect(routed.reviewAttempts).toEqual([]);
@@ -183,7 +183,9 @@ describe('exhausted initialized to routing_required', { timeout: 40_000 }, () =>
     });
     expect(first.ok).toBe(false);
     expect(first.exitCode).toBe(WORKFLOW_ROUTING_REQUIRED_EXIT_CODE);
-    expect(readProtocolRecord(repoRoot, 'ws_exh_init')?.phase).toBe('routing_required');
+    expect(readProtocolRecord(repoRoot, 'ws_exh_init')?.phase).toBe(
+      'awaiting_owner_successor_authorisation'
+    );
 
     expect(
       applyProtocolTransition({

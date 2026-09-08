@@ -136,6 +136,7 @@ export function detectWorkflowAnomalies(
   }
   if (
     event.protocolPhase === 'routing_required' ||
+    event.protocolPhase === 'awaiting_owner_successor_authorisation' ||
     event.findings.some((finding) =>
       ['review-loop-unbounded', 'review-closure-bypass'].includes(finding.id)
     )
@@ -596,6 +597,8 @@ export async function buildWorkflowStopEvent(
     executionModeAccepted: markerParse.marker?.executionModeAccepted,
     parallelWorkUnits: markerParse.marker?.parallelWorkUnits,
     parallelismReason: markerParse.marker?.parallelismReason,
+    teeMode: markerParse.marker?.teeMode,
+    teeModeSource: markerParse.marker?.teeModeSource,
     transcriptStatus,
     identityStatus,
     protocolPhase,

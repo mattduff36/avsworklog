@@ -1794,8 +1794,14 @@ export function buildRouteDisposition(params: {
   git?: GitCommandRunner;
   nowIso: string;
 }): { ok: true; disposition: WorkflowRouteDisposition } | { ok: false; message: string } {
-  if (params.record.phase !== 'routing_required') {
-    return { ok: false, message: `route requires routing_required (have ${params.record.phase})` };
+  if (
+    params.record.phase !== 'routing_required' &&
+    params.record.phase !== 'awaiting_owner_successor_authorisation'
+  ) {
+    return {
+      ok: false,
+      message: `route requires an exhausted generation (have ${params.record.phase})`,
+    };
   }
   if (lineageBudgetExhausted(params.record) === false) {
     return { ok: false, message: 'route is only valid after premium review budget exhaustion' };

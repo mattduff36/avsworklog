@@ -158,6 +158,8 @@ export type WorkflowTaskType = 'change' | 'planning' | 'review';
 export type WorkflowRisk = 'high' | 'routine';
 export type WorkflowLane = 'fast' | 'standard' | 'guarded' | 'critical';
 export type WorkflowExecutionMode = 'agent' | 'multitask';
+/** V2.5 workflow ceremony selected independently from task risk. */
+export type WorkflowTeeMode = 'direct' | 'tee-light' | 'tee-full';
 export type WorkflowExecutionModeDetected = WorkflowExecutionMode | 'unknown';
 export type WorkflowParentTier = 'premium' | 'economical' | 'unknown';
 export type WorkflowRoutingDecision =
@@ -249,8 +251,10 @@ export type WorkflowProtocolPhase =
   | 'closure_review'
   | 'delta_review'
   | 'review_closed'
+  | 'awaiting_owner_successor_authorisation'
   | 'routing_required'
   | 'split'
+  | 'direct_continuation_authorized'
   | 'finalise_ready'
   | 'finalised'
   | 'reconciled'
@@ -359,6 +363,24 @@ export interface WorkflowRehomeProvenance {
 }
 
 export type WorkflowProtocolReviewPass = 'first' | 'closure' | 'delta';
+
+export interface WorkflowOwnerSuccessorGeneration {
+  schemaVersion: '1';
+  relation: 'owner_authorized_successor';
+  predecessorWorkstreamId: string;
+  predecessorBaseCommit: string;
+  predecessorHeadCommit: string | null;
+  generation: number;
+  mode: WorkflowTeeMode;
+  modelId?: string;
+  authorizationSource: 'explicit_owner';
+  authorizationHash: string;
+  authorizedAt: string;
+  inheritedBlockerFamilies: string[];
+  inheritedOpenBlockerIds: string[];
+  inheritedEvidenceManifestPath: string | null;
+  inheritedFixDeltaManifestPath: string | null;
+}
 
 export type WorkflowLegacyReconciliationKind =
   | 'released'
@@ -488,6 +510,9 @@ export interface WorkflowCompletionMarker {
   executionModeAccepted?: boolean | null;
   parallelWorkUnits?: number;
   parallelismReason?: string;
+  /** Optional V2.5 workflow-ceremony selection. */
+  teeMode?: WorkflowTeeMode;
+  teeModeSource?: 'premium_model' | 'owner_override' | 'automatic_tee' | 'unknown';
 }
 
 export interface WorkflowPlanContract {
@@ -599,6 +624,8 @@ export interface WorkflowStopEvent {
   executionModeAccepted?: boolean | null;
   parallelWorkUnits?: number;
   parallelismReason?: string;
+  teeMode?: WorkflowTeeMode;
+  teeModeSource?: 'premium_model' | 'owner_override' | 'automatic_tee' | 'unknown';
 }
 
 export interface WorkflowAnomalySignal {
@@ -657,6 +684,8 @@ export interface WorkflowProtocolRecord {
   activeCheckpointId: string | null;
   planPath: string | null;
   updatedAt: string;
+  /** V2.5 relation; absent on V2.4 records and ordinary split children. */
+  successorGeneration?: WorkflowOwnerSuccessorGeneration | null;
   legacyReconciliation?: WorkflowLegacyReconciliationAudit | null;
   rehomeProvenance?: WorkflowRehomeProvenance | null;
   routeDisposition?: WorkflowRouteDisposition | null;

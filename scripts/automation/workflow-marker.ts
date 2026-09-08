@@ -18,6 +18,7 @@ import type {
   WorkflowReviewSource,
   WorkflowRoutingDecision,
   WorkflowTaskType,
+  WorkflowTeeMode,
   WorkflowUnresolvedRisk,
 } from './types';
 import { isWorkflowRoutingDecisionCoherent } from './workflow-model-tier';
@@ -32,6 +33,13 @@ export const WORKFLOW_MARKER_SUFFIX = '-->';
 const TASK_TYPES = new Set<WorkflowTaskType>(['change', 'planning', 'review']);
 const RISKS = new Set<WorkflowRisk>(['high', 'routine']);
 const LANES = new Set<WorkflowLane>(['fast', 'standard', 'guarded', 'critical']);
+const TEE_MODES = new Set<WorkflowTeeMode>(['direct', 'tee-light', 'tee-full']);
+const TEE_MODE_SOURCES = new Set([
+  'premium_model',
+  'owner_override',
+  'automatic_tee',
+  'unknown',
+]);
 const GATE_DECISIONS = new Set<WorkflowGateDecision>([
   'approved',
   'approved_with_conditions',
@@ -370,14 +378,20 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
     value.executionModeDetected
   ) as WorkflowExecutionModeDetected | null;
   const parallelismReason = asString(value.parallelismReason);
+  const teeMode = asString(value.teeMode) as WorkflowTeeMode | null;
+  const teeModeSource = asString(value.teeModeSource) as
+    | WorkflowCompletionMarker['teeModeSource']
+    | null;
   const rawEscalationReasons = value.reviewEscalationReasons;
   const reviewEscalationReasons = Array.isArray(rawEscalationReasons)
     ? rawEscalationReasons
         .map(asString)
         .filter((reason): reason is string => Boolean(reason))
     : [];
+  const reducedCeremonyV4 =
+    schemaVersion === '4' && (teeMode === 'direct' || teeMode === 'tee-light');
   const finalReviewRequired =
-    lane === 'critical' ||
+    (lane === 'critical' && !reducedCeremonyV4) ||
     (schemaVersion !== '4' && risk === 'high') ||
     reviewEscalationReasons.length > 0 ||
     value.finalReviewRequired === true;
@@ -492,7 +506,7 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
       errors.push('routingDecision conflicts with initialParentTier or executionParentTier');
     }
   }
-  if (schemaVersion !== '4' || lane === 'critical') {
+  if (schemaVersion !== '4' || (lane === 'critical' && !reducedCeremonyV4)) {
     if (!architectureGate || !GATE_DECISIONS.has(architectureGate)) {
       errors.push('architectureGate is invalid');
     }
@@ -543,6 +557,32 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   }
   if (value.parallelismReason !== undefined && !parallelismReason) {
     errors.push('parallelismReason must be a non-empty string when provided');
+  }
+  if (value.teeMode !== undefined && (!teeMode || !TEE_MODES.has(teeMode))) {
+    errors.push('teeMode must be direct|tee-light|tee-full when provided');
+  }
+  if (
+    value.teeModeSource !== undefined &&
+    (!teeModeSource || !TEE_MODE_SOURCES.has(teeModeSource))
+  ) {
+    errors.push('teeModeSource is invalid when provided');
+  }
+  if (teeMode && !teeModeSource) {
+    errors.push('teeModeSource is required when teeMode is provided');
+  }
+  if (
+    reducedCeremonyV4 &&
+    teeModeSource !== 'owner_override' &&
+    teeModeSource !== 'premium_model'
+  ) {
+    errors.push('DIRECT/TEE-LIGHT requires owner_override or premium_model source');
+  }
+  if (
+    reducedCeremonyV4 &&
+    teeModeSource === 'premium_model' &&
+    executionParentTier !== 'premium'
+  ) {
+    errors.push('premium_model DIRECT/TEE-LIGHT requires premium executionParentTier evidence');
   }
 
   const requiredTests =
@@ -628,7 +668,7 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
     errors.push(...recommendedBuildModel.errors, ...reviewPasses.errors);
   }
 
-  if (schemaVersion === '4' && lane === 'critical') {
+  if (schemaVersion === '4' && lane === 'critical' && !reducedCeremonyV4) {
     if (!workstreamId) errors.push('critical V4 markers require workstreamId');
     errors.push(...sourceWorkstreamIds.errors);
     if (!registryVersion) errors.push('critical V4 markers require registryVersion');
@@ -759,6 +799,8 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
           ? (value.parallelWorkUnits as number)
           : undefined,
       parallelismReason: parallelismReason ?? undefined,
+      teeMode: teeMode ?? undefined,
+      teeModeSource: teeModeSource ?? undefined,
     },
     errors: [],
   };
