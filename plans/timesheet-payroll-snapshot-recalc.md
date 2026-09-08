@@ -62,7 +62,7 @@ The active descendant owns remaining work. After two failed premium rounds, rema
   "unresolvedRisks": [
     {
       "id": "kevin-production-apply-gated",
-      "note": "Kevin Corbitt week ending 2026-08-16, 2026-08-23, 2026-08-30, and 2026-09-06 snapshot rebuilds are not authorised in this coding pass."
+      "note": "Authorised and applied 2026-09-07. Weeks 2026-08-16, 2026-08-23, and 2026-08-30 are Complete; 2026-09-06 is Payroll Received. Plant snapshots 24.00 / 4.50 / 3.00 / 0.6."
     },
     {
       "id": "manager-approved-cleared-on-bucket-change",
