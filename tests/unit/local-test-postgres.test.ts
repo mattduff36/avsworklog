@@ -1,6 +1,12 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import {
+  createNativeLifecycleChildController,
+  runNativeLifecycleCommand,
+  type NativeLifecyclePhase,
+} from '../../scripts/local-native-test-postgres';
 import {
   ALL_PROVENANCE_ENV_KEYS,
   ALLOWED_STATE_KEYS,
@@ -16,6 +22,7 @@ import {
   HOST_PORT_COUNT,
   HOST_PORT_MIN,
   INHERITED_DATABASE_URL_KEYS,
+  LOCAL_TEST_SKIP_DOTENV_ENV,
   PORT_ENV_NAME,
   PROJECT_NAME_HASH_LENGTH,
   PROJECT_NAME_PREFIX,
@@ -431,6 +438,7 @@ describe('local test postgres contracts', () => {
       expect(child[PROVENANCE_ENV_KEYS.marker]).toBe(marker);
       expect(child[PROVENANCE_ENV_KEYS.project]).toBe(identity.projectName);
       expect(child[PROVENANCE_ENV_KEYS.port]).toBe(String(identity.hostPort));
+      expect(child[LOCAL_TEST_SKIP_DOTENV_ENV]).toBe('1');
       expect(child[PROVENANCE_ENV_KEYS.nonce]).toBeUndefined();
       expect(child.KEEP_ME).toBe('yes');
       expect(child.DOCKER_HOST).toBeUndefined();
@@ -692,6 +700,107 @@ describe('local test postgres contracts', () => {
         usable: true,
         reason: 'native-postgres-cluster-capable',
       });
+    });
+
+    it('LTDB-NATIVE-SIGNAL-001: awaits active initdb, startup, and test children before cleanup', async () => {
+      for (const phase of ['initdb', 'startup', 'test'] satisfies NativeLifecyclePhase[]) {
+        const child = {} as ChildProcess;
+        let releaseTermination!: () => void;
+        const terminated: ChildProcess[] = [];
+        const controller = createNativeLifecycleChildController(
+          (activeChild) =>
+            new Promise<void>((resolve) => {
+              terminated.push(activeChild);
+              releaseTermination = resolve;
+            })
+        );
+
+        controller.track(phase)(child);
+        const stopping = controller.terminateActive();
+        expect(controller.activePhase()).toBe(phase);
+        expect(terminated).toEqual([child]);
+        releaseTermination();
+        await stopping;
+        expect(controller.activePhase()).toBeNull();
+      }
+    });
+
+    it.skipIf(process.platform !== 'win32')(
+      'LTDB-NATIVE-SIGNAL-002: terminates and awaits real Windows process trees in every lifecycle phase',
+      async () => {
+        for (const phase of [
+          'initdb',
+          'version',
+          'startup',
+          'test',
+        ] satisfies NativeLifecyclePhase[]) {
+          const parent = spawn(
+            process.execPath,
+            [
+              '-e',
+              [
+                "const { spawn } = require('node:child_process');",
+                "const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });",
+                "process.stdout.write(String(child.pid) + '\\n');",
+                'setInterval(() => {}, 1000);',
+              ].join(' '),
+            ],
+            { shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }
+          );
+          const childPid = await new Promise<number>((resolve, reject) => {
+            parent.once('error', reject);
+            parent.stdout?.once('data', (chunk: Buffer) => {
+              resolve(Number.parseInt(chunk.toString().trim(), 10));
+            });
+          });
+          expect(Number.isInteger(childPid)).toBe(true);
+
+          const controller = createNativeLifecycleChildController();
+          controller.track(phase)(parent);
+          await controller.terminateActive();
+
+          expect(parent.exitCode).not.toBeNull();
+          expect(controller.activePhase()).toBeNull();
+          expect(() => process.kill(childPid, 0)).toThrow();
+        }
+      },
+      30_000
+    );
+
+    it('LTDB-NATIVE-TIMEOUT-001: lifecycle timeout settles through a caught error path', async () => {
+      await expect(
+        runNativeLifecycleCommand(
+          process.execPath,
+          ['-e', 'setInterval(() => {}, 1000)'],
+          {
+            cwd: process.cwd(),
+            env: process.env,
+            timeoutMs: 50,
+          }
+        )
+      ).rejects.toThrow('Lifecycle command timed out after 50ms');
+    });
+
+    it('LTDB-NATIVE-TIMEOUT-002: termination rejection is captured for caller cleanup', async () => {
+      await expect(
+        runNativeLifecycleCommand(
+          process.execPath,
+          ['-e', 'setInterval(() => {}, 1000)'],
+          {
+            cwd: process.cwd(),
+            env: process.env,
+            timeoutMs: 50,
+            terminate: async (child) => {
+              const closed = new Promise<void>((resolve) => child.once('close', () => resolve()));
+              child.kill('SIGTERM');
+              await closed;
+              throw new Error('injected termination failure');
+            },
+          }
+        )
+      ).rejects.toThrow(
+        'Lifecycle command timed out and termination failed: injected termination failure'
+      );
     });
   });
 

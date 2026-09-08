@@ -63,6 +63,7 @@ import { toast } from 'sonner';
 import { isNetworkFetchError } from '@/lib/utils/http-error';
 import { submitTimesheet } from '@/lib/client/timesheet-submit';
 import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
+import type { BankHolidayAuthoritativeReadState } from '@/lib/utils/timesheet-bank-holiday-work';
 import {
   type ApprovedAbsenceForTimesheet,
   type TimesheetOffDayState,
@@ -139,7 +140,8 @@ export default function ViewTimesheetPage() {
   const [decliningTraining, setDecliningTraining] = useState(false);
   const [employeeTeamId, setEmployeeTeamId] = useState<string | null>(null);
   const [approvedAbsences, setApprovedAbsences] = useState<ApprovedAbsenceForTimesheet[]>([]);
-  const [absencesReady, setAbsencesReady] = useState(false);
+  const [absenceLoadState, setAbsenceLoadState] =
+    useState<BankHolidayAuthoritativeReadState>('loading');
   const bankHolidayConfirm = useBankHolidayWorkConfirm({
     weekEnding: timesheet?.week_ending || '',
     userId: timesheet?.user_id || null,
@@ -147,11 +149,15 @@ export default function ViewTimesheetPage() {
     timesheetType: timesheet?.timesheet_type === 'plant' ? 'plant' : 'civils',
     templateVersion: timesheet?.template_version === 2 ? 2 : 1,
     offDayStates,
-    offDaysReady: absencesReady,
+    offDaysState: absenceLoadState,
   });
 
   useEffect(() => {
-    if (!timesheet?.week_ending || !bankHolidayConfirm.trialReady || !absencesReady) {
+    if (
+      !timesheet?.week_ending ||
+      !bankHolidayConfirm.trialReady ||
+      absenceLoadState !== 'ready'
+    ) {
       return;
     }
     setOffDayStates(
@@ -159,7 +165,7 @@ export default function ViewTimesheetPage() {
         bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled,
       })
     );
-  }, [absencesReady, approvedAbsences, bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, timesheet?.week_ending]);
+  }, [absenceLoadState, approvedAbsences, bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, timesheet?.week_ending]);
 
   const getActionErrorMessage = (err: unknown, fallback: string) => {
     return err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
@@ -183,7 +189,7 @@ export default function ViewTimesheetPage() {
   const fetchTimesheet = useCallback(async (id: string) => {
     try {
       setError(''); // Clear any previous errors
-      setAbsencesReady(false);
+      setAbsenceLoadState('loading');
       
       // Fetch timesheet without payroll joins; snapshots load through a scoped API.
       const { data: timesheetData, error: timesheetError } = await supabase
@@ -342,11 +348,13 @@ export default function ViewTimesheetPage() {
         });
 
         setApprovedAbsences(approvedAbsences);
+        setAbsenceLoadState('ready');
       } catch (absenceLookupError) {
         console.warn('Failed to resolve leave state for timesheet details view:', absenceLookupError);
         setApprovedAbsences([]);
-      } finally {
-        setAbsencesReady(true);
+        setOffDayStates([]);
+        setAbsenceLoadState('failed');
+        toast.error('Unable to verify leave information. Saving is blocked until you retry.');
       }
       
       // Enable editing for draft or rejected timesheets
@@ -662,8 +670,10 @@ export default function ViewTimesheetPage() {
         errorMessage: 'Timesheet is not ready to save',
       };
     }
-    if (!bankHolidayConfirm.trialReady || !absencesReady) {
-      const errorMessage = 'Bank holiday setting is still loading. Try again in a moment.';
+    if (!bankHolidayConfirm.actionReady) {
+      const errorMessage =
+        bankHolidayConfirm.readinessError ||
+        'Bank holiday and leave checks are still loading. Try again in a moment.';
       setError(errorMessage);
       return {
         success: false,
@@ -851,8 +861,11 @@ export default function ViewTimesheetPage() {
 
   const handleSubmit = async () => {
     if (!timesheet || !user) return;
-    if (!bankHolidayConfirm.trialReady || !absencesReady) {
-      setError('Bank holiday setting is still loading. Try again in a moment.');
+    if (!bankHolidayConfirm.actionReady) {
+      setError(
+        bankHolidayConfirm.readinessError ||
+          'Bank holiday and leave checks are still loading. Try again in a moment.'
+      );
       return;
     }
     
@@ -1898,6 +1911,25 @@ export default function ViewTimesheetPage() {
             </p>
           </div>
 
+          {bankHolidayConfirm.readinessError && (
+            <div
+              role="alert"
+              className="flex flex-col gap-3 rounded-md border border-red-500/40 bg-red-950/30 p-4 text-sm text-red-100 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <p>{bankHolidayConfirm.readinessError}</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  bankHolidayConfirm.retryReadiness();
+                  void fetchTimesheet(timesheet.id);
+                }}
+              >
+                Retry checks
+              </Button>
+            </div>
+          )}
+
           {editing && canPayrollEdit && dataChanged && (
             <div className="p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
               <div className="flex items-start gap-3">
@@ -1921,7 +1953,7 @@ export default function ViewTimesheetPage() {
                 onClick={() => {
                   void handleSave();
                 }}
-                disabled={saving || !bankHolidayConfirm.trialReady || !absencesReady}
+                disabled={saving || !bankHolidayConfirm.actionReady}
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving...' : 'Save Changes'}
@@ -1932,7 +1964,7 @@ export default function ViewTimesheetPage() {
             {canSubmit && (
               <Button
                 onClick={handleSubmit}
-                disabled={saving || !bankHolidayConfirm.trialReady || !absencesReady}
+                disabled={saving || !bankHolidayConfirm.actionReady}
               >
                 <Send className="h-4 w-4 mr-2" />
                 {saving ? 'Submitting...' : 'Submit for Approval'}

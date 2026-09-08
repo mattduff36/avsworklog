@@ -10,6 +10,7 @@ import {
   TimesheetBankHolidayWorkError,
   assertSubmittedBankHolidayHoursConfirmed,
 } from '@/lib/server/timesheet-bank-holiday-work';
+import { timesheetEntryHasWorkingHours } from '@/lib/utils/timesheet-bank-holiday-work';
 
 const { Client } = pg;
 
@@ -106,6 +107,17 @@ export const TimesheetSubmitBodySchema = z
         return;
       }
       seen.add(entry.day_of_week);
+      if (
+        entry.did_not_work &&
+        (timesheetEntryHasWorkingHours(entry) || entry.subsistence_payment_required === true)
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['entries', entry.day_of_week - 1],
+          message: 'Did not work entries cannot contain work hours or payment claims',
+        });
+        return;
+      }
       const hasHours = Boolean(entry.time_started && entry.time_finished);
       if (!hasHours && !entry.did_not_work) {
         ctx.addIssue({

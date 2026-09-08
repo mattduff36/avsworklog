@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
       await notifyBankHolidayWorkOnSubmit({
         timesheetId: result.id,
         actorId,
+        status: 'submitted',
       });
     } catch (notificationError) {
       console.warn('Bank holiday work notification was not sent:', notificationError);

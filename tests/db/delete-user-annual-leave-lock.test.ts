@@ -10,6 +10,7 @@ import {
   PROJECT_NAME_PREFIX,
   PROVENANCE_ENV_KEYS,
   STATE_VERSION,
+  isInheritedDatabaseUrlKey,
   validateLocalTestDatabaseUrl,
 } from '../../scripts/local-test-postgres';
 import {
@@ -84,6 +85,14 @@ describeConcurrency('delete-user annual leave disposable PostgreSQL lock', () =>
     if (!marker || !projectName || !portText || !/^[0-9]+$/u.test(portText)) {
       throw new Error('LTDB-SAFE-001: disposable local PostgreSQL runner provenance is required');
     }
+    const leakedDatabaseKeys = Object.keys(process.env).filter(
+      (key) => key !== 'TEST_DATABASE_URL' && isInheritedDatabaseUrlKey(key)
+    );
+    if (leakedDatabaseKeys.length > 0) {
+      throw new Error(
+        `LTDB-NATIVE-ENV-001: inherited database variables reappeared: ${leakedDatabaseKeys.join(', ')}`
+      );
+    }
 
     const hostPort = Number.parseInt(portText, 10);
     validateLocalTestDatabaseUrl(connectionString, hostPort);
@@ -131,15 +140,15 @@ describeConcurrency('delete-user annual leave disposable PostgreSQL lock', () =>
     tombstoneClient = await connectClient();
 
     await setupClient.query(readFileSync(resolve(process.cwd(), DELETE_USER_LEAVE_PGLITE_BASE_PATH), 'utf8'));
+    await setupClient.query(`INSERT INTO public.absence_reasons (id, name) VALUES ($1, 'Annual Leave'), ($2, 'Unpaid leave')`, [
+      IDS.annualLeave,
+      IDS.unpaidLeave,
+    ]);
     await setupClient.query(
       stripOuterMigrationTransaction(
         readFileSync(resolve(process.cwd(), DELETE_USER_LEAVE_MIGRATION_PATH), 'utf8')
       )
     );
-    await setupClient.query(`INSERT INTO public.absence_reasons (id, name) VALUES ($1, 'Annual Leave'), ($2, 'Unpaid leave')`, [
-      IDS.annualLeave,
-      IDS.unpaidLeave,
-    ]);
 
     await setAuthRole(setupClient, 'service_role');
     await setAuthRole(writerClient, 'authenticated');

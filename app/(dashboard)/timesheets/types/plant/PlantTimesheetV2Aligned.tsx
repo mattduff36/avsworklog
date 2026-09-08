@@ -95,6 +95,7 @@ import {
 import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-not-work-bookings';
 import { submitTimesheet } from '@/lib/client/timesheet-submit';
 import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
+import type { BankHolidayAuthoritativeReadState } from '@/lib/utils/timesheet-bank-holiday-work';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   buildValidationErrors,
@@ -351,7 +352,8 @@ export function PlantTimesheetV2({
 
   const [offDayStates, setOffDayStates] = useState<TimesheetOffDayState[]>([]);
   const [offDayKey, setOffDayKey] = useState('');
-  const [loadingOffDays, setLoadingOffDays] = useState(true);
+  const [offDayLoadState, setOffDayLoadState] =
+    useState<BankHolidayAuthoritativeReadState>('loading');
   const [offDayRefreshToken, setOffDayRefreshToken] = useState(0);
   const [trainingDeclineDayIndex, setTrainingDeclineDayIndex] = useState<number | null>(null);
   const [decliningTraining, setDecliningTraining] = useState(false);
@@ -374,8 +376,14 @@ export function PlantTimesheetV2({
     () => applyPendingTrainingBookingsToOffDayStates(offDayStates, pendingDidNotWorkBookings),
     [offDayStates, pendingDidNotWorkBookings]
   );
-  const offDaysReady =
-    Boolean(currentOffDayKey) && !loadingOffDays && offDayKey === currentOffDayKey;
+  const authoritativeOffDayState: BankHolidayAuthoritativeReadState =
+    !currentOffDayKey
+      ? 'idle'
+      : offDayLoadState === 'failed'
+        ? 'failed'
+        : offDayLoadState === 'ready' && offDayKey === currentOffDayKey
+          ? 'ready'
+          : 'loading';
   const bankHolidayConfirm = useBankHolidayWorkConfirm({
     weekEnding,
     userId: selectedEmployeeId || null,
@@ -383,7 +391,7 @@ export function PlantTimesheetV2({
     timesheetType: 'plant',
     templateVersion: 2,
     offDayStates: effectiveOffDayStates,
-    offDaysReady,
+    offDaysState: authoritativeOffDayState,
     onAdoptTimesheetId: setExistingTimesheetId,
   });
   const offDayMap = useMemo(
@@ -708,11 +716,11 @@ export function PlantTimesheetV2({
 
   useEffect(() => {
     if (!user || !selectedEmployeeId || !weekEnding) {
-      setLoadingOffDays(true);
+      setOffDayLoadState('idle');
       return;
     }
     if (!bankHolidayConfirm.trialReady) {
-      setLoadingOffDays(true);
+      setOffDayLoadState('loading');
       return;
     }
 
@@ -720,7 +728,7 @@ export function PlantTimesheetV2({
     let cancelled = false;
 
     const loadOffDays = async () => {
-      setLoadingOffDays(true);
+      setOffDayLoadState('loading');
       try {
         const { startIso, endIso } = getTimesheetWeekIsoBounds(weekEnding);
         const absenceResult = await supabase
@@ -761,6 +769,7 @@ export function PlantTimesheetV2({
         if (cancelled) return;
         setOffDayStates(resolvedStates);
         setOffDayKey(requestKey);
+        setOffDayLoadState('ready');
       } catch (offDayError) {
         if (isNetworkFetchError(offDayError) || isAuthErrorStatus(getErrorStatus(offDayError))) {
           console.warn('Failed to resolve timesheet off-day states (non-fatal):', offDayError);
@@ -768,14 +777,10 @@ export function PlantTimesheetV2({
           console.error('Failed to resolve timesheet off-day states:', offDayError);
         }
         if (!cancelled) {
-          setOffDayStates(resolveTimesheetOffDayStates(weekEnding, [], null, {
-            bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled,
-          }));
-          setOffDayKey(requestKey);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingOffDays(false);
+          setOffDayStates([]);
+          setOffDayKey('');
+          setOffDayLoadState('failed');
+          toast.error('Unable to verify leave information. Saving is blocked until you retry.');
         }
       }
     };
@@ -1525,7 +1530,8 @@ export function PlantTimesheetV2({
 
   const waitingForOffDayData =
     Boolean(currentOffDayKey) &&
-    (loadingOffDays || offDayKey !== currentOffDayKey);
+    authoritativeOffDayState !== 'ready' &&
+    authoritativeOffDayState !== 'failed';
   const waitingForCoreData =
     authLoading ||
     loadingPlants ||
@@ -2564,11 +2570,30 @@ export function PlantTimesheetV2({
         </p>
       </div>
 
+      {bankHolidayConfirm.readinessError && (
+        <div
+          role="alert"
+          className="flex flex-col gap-3 rounded-md border border-red-500/40 bg-red-950/30 p-4 text-sm text-red-100 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <p>{bankHolidayConfirm.readinessError}</p>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              bankHolidayConfirm.retryReadiness();
+              setOffDayRefreshToken((current) => current + 1);
+            }}
+          >
+            Retry checks
+          </Button>
+        </div>
+      )}
+
       <div className="hidden md:flex flex-row gap-3 justify-end">
         <Button
           variant="outline"
           onClick={handleSaveDraft}
-          disabled={saving || !bankHolidayConfirm.trialReady || !offDaysReady}
+          disabled={saving || !bankHolidayConfirm.actionReady}
           className="border-slate-600 text-white hover:bg-slate-800"
         >
           <Save className="h-4 w-4 mr-2" />
@@ -2576,7 +2601,7 @@ export function PlantTimesheetV2({
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={saving || !bankHolidayConfirm.trialReady || !offDaysReady}
+          disabled={saving || !bankHolidayConfirm.actionReady}
           className="bg-timesheet hover:bg-timesheet/90 text-slate-900 font-semibold"
         >
           {saving ? 'Submitting...' : 'Submit Timesheet'}
@@ -2588,7 +2613,7 @@ export function PlantTimesheetV2({
           <Button
             variant="outline"
             onClick={handleSaveDraft}
-            disabled={saving || !bankHolidayConfirm.trialReady || !offDaysReady}
+            disabled={saving || !bankHolidayConfirm.actionReady}
             className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
           >
             <Save className="h-5 w-5 mr-2" />
@@ -2615,7 +2640,7 @@ export function PlantTimesheetV2({
                 setActiveDay(String(finalIndex));
               }
             }}
-            disabled={saving || !bankHolidayConfirm.trialReady || !offDaysReady}
+            disabled={saving || !bankHolidayConfirm.actionReady}
             className="flex-1 h-14 bg-timesheet hover:bg-timesheet/90 text-slate-900 font-semibold text-base"
           >
             {saving ? 'Submitting...' : (() => {

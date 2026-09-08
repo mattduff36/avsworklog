@@ -45,10 +45,13 @@ export const TARGET_TEST_FILE = 'tests/db/daily-allocation-v2-runtime.test.ts';
 export const HGV_SAVE_TARGET_TEST_FILE = 'tests/db/hgv-inspection-save-rpc.test.ts';
 export const DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE =
   'tests/db/delete-user-annual-leave-lock.test.ts';
+export const BANK_HOLIDAY_RUNTIME_TARGET_TEST_FILE =
+  'tests/db/timesheet-bank-holiday-runtime.test.ts';
 export const ALLOWED_TARGET_TEST_FILES = [
   TARGET_TEST_FILE,
   HGV_SAVE_TARGET_TEST_FILE,
   DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
+  BANK_HOLIDAY_RUNTIME_TARGET_TEST_FILE,
 ] as const;
 export const HOST_PORT_MIN = 20_000;
 export const HOST_PORT_COUNT = 10_000;
@@ -119,6 +122,7 @@ export const PROVENANCE_ENV_KEYS = {
   port: 'AVSWORKLOG_LTDB_PORT',
   nonce: 'AVSWORKLOG_LTDB_NONCE',
 } as const;
+export const LOCAL_TEST_SKIP_DOTENV_ENV = 'AVSWORKLOG_TEST_SKIP_DOTENV';
 
 export const ALL_PROVENANCE_ENV_KEYS = Object.values(PROVENANCE_ENV_KEYS);
 
@@ -482,6 +486,7 @@ export function buildChildTestEnv(input: {
   env[PROVENANCE_ENV_KEYS.marker] = input.marker;
   env[PROVENANCE_ENV_KEYS.project] = input.projectName;
   env[PROVENANCE_ENV_KEYS.port] = String(input.hostPort);
+  env[LOCAL_TEST_SKIP_DOTENV_ENV] = '1';
   return env;
 }
 

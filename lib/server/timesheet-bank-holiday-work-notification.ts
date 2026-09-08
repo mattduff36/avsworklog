@@ -71,8 +71,12 @@ function formatWorkDates(dates: string[]): string {
 export async function notifyBankHolidayWorkOnSubmit(input: {
   timesheetId: string;
   actorId: string;
+  status: 'draft' | 'submitted';
   admin?: AdminClient;
 }): Promise<{ notified: boolean; reason?: string }> {
+  if (input.status !== 'submitted') {
+    return { notified: false, reason: 'not-submitted' };
+  }
   const admin = input.admin || createAdminClient();
 
   const { data: existingNotification, error: existingError } = await admin
@@ -105,7 +109,7 @@ export async function notifyBankHolidayWorkOnSubmit(input: {
     admin
       .from('timesheet_entries')
       .select(
-        'day_of_week, time_started, time_finished, operator_working_hours, machine_working_hours, machine_start_time, machine_finish_time'
+        'day_of_week, time_started, time_finished, operator_travel_hours, operator_yard_hours, operator_working_hours, machine_travel_hours, machine_start_time, machine_finish_time, machine_working_hours, machine_standing_hours, machine_operator_hours, maintenance_breakdown_hours, daily_total'
       )
       .eq('timesheet_id', input.timesheetId),
   ]);

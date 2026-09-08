@@ -17,10 +17,10 @@ This workflow does **not** require the Supabase CLI and does **not** require a c
 ## Three testing tiers
 
 1. **PGlite isolated/runtime tests** — in-process Postgres-compatible tests (the default for most database unit/runtime coverage). No Docker.
-2. **Disposable plain PostgreSQL** — a checkout-scoped `postgres:15-bookworm` container for real sessions, advisory locks, deadlocks, transactions, migrations, and RLS database semantics. Auth is **fixture-mocked**; this is not a Supabase stack.
+2. **Disposable plain PostgreSQL** — either the checkout-scoped `postgres:15-bookworm` container or the native Windows one-shot runner for real sessions, advisory locks, deadlocks, transactions, migrations, and RLS database semantics. Auth is **fixture-mocked**; this is not a Supabase stack.
 3. **Possible future full local Supabase stack** — Auth, PostgREST, Realtime, and Storage end-to-end behavior. Out of scope here. This workflow must not be treated as that stack.
 
-PostgreSQL **15** is the local major. The Compose tag is major-only (`postgres:15-bookworm`), so patch-level drift is expected. This does **not** prove production-major parity or full-Supabase parity.
+PostgreSQL **15** is the Compose major, and its major-only image tag permits patch-level drift. The native Windows runner accepts a complete PostgreSQL 15+ runtime and records the exact version used. This does **not** prove production-major parity or full-Supabase parity.
 
 ## Approved commands
 
@@ -29,6 +29,8 @@ Prefer the one-shot command:
 - `test:db:local` runs `tsx scripts/local-test-postgres.ts one-shot`. It starts, runs the target suite once, then stops and proves cleanup.
 - `test:db:local:hgv-save` runs the same one-shot against `tests/db/hgv-inspection-save-rpc.test.ts`.
 - `test:db:local:delete-user-leave` runs `tsx scripts/local-test-postgres.ts one-shot --target tests/db/delete-user-annual-leave-lock.test.ts` (`DEL-AL-08`). A skipped or PGlite-only run is not a pass.
+- `test:db:native:delete-user-leave` runs the same `DEL-AL-08` target in a fresh native Windows cluster without Docker.
+- `test:db:native:bank-holiday` applies the exact bank-holiday migration to a fixture schema and runs its real PostgreSQL runtime checks.
 - `test:db:local:start` runs `tsx scripts/local-test-postgres.ts start` to create a fresh disposable instance after recovery teardown.
 - `test:db:local:run` runs `tsx scripts/local-test-postgres.ts run` exactly once against the started instance.
 - `test:db:local:stop` runs `tsx scripts/local-test-postgres.ts stop`, including `down --volumes --remove-orphans`, then proves owned resources are absent.
@@ -37,6 +39,15 @@ Prefer the one-shot command:
 ```bash
 npm run test:db:local
 ```
+
+Native Windows one-shot examples:
+
+```bash
+npm run test:db:native:delete-user-leave
+npm run test:db:native:bank-holiday
+```
+
+The native runner discovers a complete installation under `C:\Program Files\PostgreSQL\<major>\bin`, creates a sentinel-owned data directory below the current user's temporary directory, starts `pg_ctl` with `-h 127.0.0.1` and the checkout-derived port, runs one target, stops the server, proves the port is closed, and removes only that owned data directory. It never installs or starts a Windows service.
 
 Manual sequence when you need to inspect the instance between steps:
 
@@ -86,7 +97,8 @@ Handled `SIGINT` / `SIGTERM` terminate the active child when possible, then run 
 
 ## Verification IDs
 
-- `LTDB-BOOT-001`: disposable Postgres became healthy on loopback, reported major 15, and matched the local test database/user identity.
+- `LTDB-BOOT-001`: disposable Compose Postgres became healthy on loopback, reported major 15, and matched the local test database/user identity.
+- `LTDB-NATIVE-001`: native PostgreSQL became healthy on loopback with the derived non-5432 port, matched the local test identity, then stopped and removed its sentinel-owned data directory.
 - `LTDB-SAFE-001`: URL, host, environment stripping, child-only `TEST_DATABASE_URL`, state allowlist, marker/freshness/consumed fail-closed, and local Docker endpoint contracts.
 - `LTDB-CLEAN-001`: after a successful child, checkout-scoped Compose resources are absent.
 - `LTDB-CLEAN-002`: after a deliberate failing child, checkout-scoped Compose resources are absent and the sentinel exit is preserved.

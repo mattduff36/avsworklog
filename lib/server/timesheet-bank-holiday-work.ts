@@ -59,6 +59,11 @@ interface EligibleAbsenceRow {
   reason_name: string;
 }
 
+interface BankHolidayConfirmationEvidence {
+  work_date: string;
+  absence_id: string;
+}
+
 export interface ConfirmBankHolidayWorkInput {
   actorId: string;
   targetUserId: string;
@@ -207,9 +212,16 @@ async function insertDraftHeader(
 async function loadWeekAbsences(
   client: BankHolidayWorkPgClient,
   profileId: string,
-  weekEnding: string
+  weekEnding: string,
+  lockMode: 'none' | 'share' | 'update' = 'none'
 ): Promise<EligibleAbsenceRow[]> {
   const bounds = getTimesheetWeekIsoBounds(weekEnding);
+  const lockClause =
+    lockMode === 'update'
+      ? 'FOR UPDATE OF a'
+      : lockMode === 'share'
+        ? 'FOR SHARE OF a'
+        : '';
   const result = await client.query<EligibleAbsenceRow>(
     `
       SELECT
@@ -226,6 +238,7 @@ async function loadWeekAbsences(
         AND a.status IN ('approved', 'processed')
         AND a.date <= $3::date
         AND COALESCE(a.end_date, a.date) >= $2::date
+      ${lockClause}
     `,
     [profileId, bounds.startIso, bounds.endIso]
   );
@@ -259,20 +272,23 @@ function resolveEligibleBankHolidayAbsence(
   return match;
 }
 
-async function loadConfirmedDates(
+async function loadConfirmationEvidence(
   client: BankHolidayWorkPgClient,
   timesheetId: string
-): Promise<string[]> {
-  const result = await client.query<{ work_date: string }>(
+): Promise<BankHolidayConfirmationEvidence[]> {
+  const result = await client.query<BankHolidayConfirmationEvidence>(
     `
-      SELECT work_date::text
+      SELECT work_date::text, absence_id::text
       FROM public.timesheet_bank_holiday_work_confirmations
       WHERE timesheet_id = $1
       ORDER BY work_date
     `,
     [timesheetId]
   );
-  return result.rows.map((row) => normalizeDate(row.work_date));
+  return result.rows.map((row) => ({
+    work_date: normalizeDate(row.work_date),
+    absence_id: row.absence_id,
+  }));
 }
 
 export async function assertSubmittedBankHolidayHoursConfirmed(
@@ -290,23 +306,28 @@ export async function assertSubmittedBankHolidayHoursConfirmed(
   const workingDates = collectWorkingDatesFromEntries(input.weekEnding, input.entries);
   if (workingDates.length === 0) return;
 
-  const absences = await loadWeekAbsences(client, input.userId, input.weekEnding);
-  const bankHolidayDates = workingDates.filter((date) => {
+  const absences = await loadWeekAbsences(client, input.userId, input.weekEnding, 'share');
+  const requiredEvidence = workingDates.flatMap((date) => {
     try {
-      resolveEligibleBankHolidayAbsence(absences, date);
-      return true;
+      const absence = resolveEligibleBankHolidayAbsence(absences, date);
+      return [{ workDate: date, absenceId: absence.id }];
     } catch {
-      return false;
+      return [];
     }
   });
-  if (bankHolidayDates.length === 0) return;
+  if (requiredEvidence.length === 0) return;
 
-  const confirmedDates = await loadConfirmedDates(client, input.timesheetId);
-  const unconfirmed = getUnconfirmedBankHolidayDates({
-    bankHolidayDates,
-    workingDates,
-    confirmedDates,
-  });
+  const confirmationEvidence = await loadConfirmationEvidence(client, input.timesheetId);
+  const unconfirmed = requiredEvidence
+    .filter(
+      (required) =>
+        !confirmationEvidence.some(
+          (confirmed) =>
+            confirmed.work_date === required.workDate &&
+            confirmed.absence_id === required.absenceId
+        )
+    )
+    .map((required) => required.workDate);
   if (unconfirmed.length > 0) {
     throw new TimesheetBankHolidayWorkError(
       'BANK_HOLIDAY_CONFIRM_REQUIRED',
@@ -381,14 +402,19 @@ export async function confirmBankHolidayWork(options: {
       throw conflict('Only draft or rejected timesheets can confirm bank-holiday hours');
     }
 
-    const absences = await loadWeekAbsences(client, input.targetUserId, input.weekEnding);
+    const absences = await loadWeekAbsences(
+      client,
+      input.targetUserId,
+      input.weekEnding,
+      'update'
+    );
     const eligible = uniqueDates.map((date) => ({
       date,
       absence: resolveEligibleBankHolidayAbsence(absences, date),
     }));
 
     const absenceIds = Array.from(new Set(eligible.map((row) => row.absence.id)));
-    await client.query(
+    const updatedAbsences = await client.query<{ id: string }>(
       `
         UPDATE public.absences
         SET allow_timesheet_work_on_leave = TRUE,
@@ -397,9 +423,13 @@ export async function confirmBankHolidayWork(options: {
           AND is_bank_holiday IS TRUE
           AND COALESCE(is_half_day, false) = false
           AND status IN ('approved', 'processed')
+        RETURNING id::text
       `,
       [absenceIds]
     );
+    if (updatedAbsences.rows.length !== absenceIds.length) {
+      throw conflict('Bank holiday absence changed before confirmation completed');
+    }
 
     for (const row of eligible) {
       await client.query(
@@ -411,13 +441,28 @@ export async function confirmBankHolidayWork(options: {
             confirmed_by
           )
           VALUES ($1, $2::date, $3, $4)
-          ON CONFLICT (timesheet_id, work_date) DO NOTHING
+          ON CONFLICT (timesheet_id, work_date) DO UPDATE
+          SET absence_id = EXCLUDED.absence_id,
+              confirmed_by = EXCLUDED.confirmed_by,
+              confirmed_at = NOW()
         `,
         [locked.id, row.date, row.absence.id, input.actorId]
       );
     }
 
-    const confirmedDates = await loadConfirmedDates(client, locked.id);
+    const evidence = await loadConfirmationEvidence(client, locked.id);
+    const confirmedDates = evidence
+      .filter((confirmed) => {
+        try {
+          return (
+            resolveEligibleBankHolidayAbsence(absences, confirmed.work_date).id ===
+            confirmed.absence_id
+          );
+        } catch {
+          return false;
+        }
+      })
+      .map((confirmed) => confirmed.work_date);
     await client.query('COMMIT');
     return { timesheetId: locked.id, confirmedDates };
   } catch (error) {

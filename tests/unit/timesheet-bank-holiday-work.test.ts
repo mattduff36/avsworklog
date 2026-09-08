@@ -13,12 +13,18 @@ import {
   type TimesheetSubmitPgClient,
 } from '@/lib/server/timesheet-submit';
 import {
+  collectWorkingDatesFromEntries,
   getUnconfirmedBankHolidayDates,
   isBankHolidayConfirmPhrase,
   isMissingTimesheetModuleSettingsError,
+  resolveBankHolidayActionReadiness,
   resolveBankHolidayConfirmGate,
+  shouldReplaceTimesheetDraftEntries,
 } from '@/lib/utils/timesheet-bank-holiday-work';
-import { resolveBankHolidayWorkRecipientIds } from '@/lib/server/timesheet-bank-holiday-work-notification';
+import {
+  notifyBankHolidayWorkOnSubmit,
+  resolveBankHolidayWorkRecipientIds,
+} from '@/lib/server/timesheet-bank-holiday-work-notification';
 
 const OWNER_ID = '11111111-1111-4111-8111-111111111111';
 const TIMESHEET_ID = '22222222-2222-4222-8222-222222222222';
@@ -75,6 +81,7 @@ class ConfirmClient implements BankHolidayWorkPgClient {
     },
   ];
   insertedDates: string[] = [];
+  confirmationAbsenceId = ABSENCE_ID;
 
   async connect(): Promise<void> {}
   async end(): Promise<void> {}
@@ -105,14 +112,23 @@ class ConfirmClient implements BankHolidayWorkPgClient {
       return { rows: this.absences as Row[] };
     }
     if (sql.includes('UPDATE public.absences')) {
-      return { rows: [] };
+      return { rows: this.absences.map((absence) => ({ id: absence.id }) as Row) };
     }
     if (sql.includes('INSERT INTO public.timesheet_bank_holiday_work_confirmations')) {
-      this.insertedDates.push(String(values?.[1] || ''));
+      const workDate = String(values?.[1] || '');
+      if (!this.insertedDates.includes(workDate)) this.insertedDates.push(workDate);
+      this.confirmationAbsenceId = String(values?.[2] || '');
       return { rows: [] };
     }
     if (sql.includes('FROM public.timesheet_bank_holiday_work_confirmations')) {
-      return { rows: this.insertedDates.map((work_date) => ({ work_date }) as Row) };
+      return {
+        rows: this.insertedDates.map(
+          (work_date) => ({
+            work_date,
+            absence_id: this.confirmationAbsenceId,
+          }) as Row
+        ),
+      };
     }
     return { rows: [] };
   }
@@ -159,7 +175,11 @@ class SubmitClient implements TimesheetSubmitPgClient {
       return { rows: this.absences as Row[] };
     }
     if (sql.includes('FROM public.timesheet_bank_holiday_work_confirmations')) {
-      return { rows: this.confirmedDates.map((work_date) => ({ work_date }) as Row) };
+      return {
+        rows: this.confirmedDates.map(
+          (work_date) => ({ work_date, absence_id: ABSENCE_ID }) as Row
+        ),
+      };
     }
     if (sql.includes('INSERT INTO public.timesheet_entries')) {
       return { rows: [{ id: 'entry-1' } as Row] };
@@ -177,6 +197,122 @@ describe('bank holiday confirm readiness', () => {
     expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: true, offDaysReady: false })).toBe('not-ready');
     expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: false, offDaysReady: true })).toBe('disabled');
     expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: true, offDaysReady: true })).toBe('required');
+  });
+
+  it('BH-READ-FAIL-CLOSED: a failed authoritative leave read cannot unlock Save or Submit', () => {
+    expect(
+      resolveBankHolidayActionReadiness({
+        trialState: 'ready',
+        trialEnabled: true,
+        leaveState: 'failed',
+        confirmationState: 'ready',
+      })
+    ).toEqual({ status: 'failed', failureSource: 'leave' });
+  });
+
+  it('BH-CONFIRM-READINESS: unresolved evidence blocks while the trial is enabled', () => {
+    expect(
+      resolveBankHolidayActionReadiness({
+        trialState: 'ready',
+        trialEnabled: true,
+        leaveState: 'ready',
+        confirmationState: 'loading',
+      })
+    ).toEqual({ status: 'loading', failureSource: null });
+  });
+
+  it('BH-CONFIRM-READ-FAIL: confirmation read failure fails closed', () => {
+    expect(
+      resolveBankHolidayActionReadiness({
+        trialState: 'ready',
+        trialEnabled: true,
+        leaveState: 'ready',
+        confirmationState: 'failed',
+      })
+    ).toEqual({ status: 'failed', failureSource: 'confirmation' });
+  });
+
+  it('legacy OFF does not require a confirmation table read after authoritative leave loads', () => {
+    expect(
+      resolveBankHolidayActionReadiness({
+        trialState: 'ready',
+        trialEnabled: false,
+        leaveState: 'ready',
+        confirmationState: 'failed',
+      })
+    ).toEqual({ status: 'ready', failureSource: null });
+  });
+});
+
+describe('bank holiday confirmation draft adoption', () => {
+  it('BH-DRAFT-ADOPT-001: replaces entries for a server-adopted existing draft ID', () => {
+    const originalTimesheetId: string | null = null;
+    const confirmationTimesheetId = TIMESHEET_ID;
+    const resolvedTimesheetId = confirmationTimesheetId || originalTimesheetId || '';
+
+    expect(
+      shouldReplaceTimesheetDraftEntries({
+        status: 'draft',
+        resolvedTimesheetId,
+      })
+    ).toBe(true);
+    expect(
+      shouldReplaceTimesheetDraftEntries({
+        status: 'submitted',
+        resolvedTimesheetId,
+      })
+    ).toBe(false);
+  });
+});
+
+describe('bank holiday persisted work-field coverage', () => {
+  it('BH-WORK-FIELDS-001: travel-only Plant work is a bank-holiday working date', () => {
+    expect(
+      collectWorkingDatesFromEntries(WEEK_ENDING, [
+        { day_of_week: 1, operator_travel_hours: 1.5 },
+      ])
+    ).toEqual([BANK_HOLIDAY_DATE]);
+  });
+
+  it('rejects did-not-work entries containing payable travel or subsistence', () => {
+    const travelEntries = sevenEntries();
+    travelEntries[0] = {
+      ...travelEntries[0],
+      time_started: null,
+      time_finished: null,
+      did_not_work: true,
+      daily_total: 0,
+      operator_travel_hours: 1,
+    } as TimesheetSubmitBody['entries'][number];
+    expect(() => submitBody({ entries: travelEntries })).toThrow(
+      'Did not work entries cannot contain work hours or payment claims'
+    );
+
+    const subsistenceEntries = sevenEntries();
+    subsistenceEntries[0] = {
+      ...subsistenceEntries[0],
+      time_started: null,
+      time_finished: null,
+      did_not_work: true,
+      daily_total: 0,
+      subsistence_payment_required: true,
+    } as TimesheetSubmitBody['entries'][number];
+    expect(() => submitBody({ entries: subsistenceEntries })).toThrow(
+      'Did not work entries cannot contain work hours or payment claims'
+    );
+  });
+
+  it('BH-PAID-LEAVE-REGRESSION-001: accepts paid-leave daily credit without work fields', () => {
+    const paidLeaveEntries = sevenEntries();
+    paidLeaveEntries[0] = {
+      ...paidLeaveEntries[0],
+      time_started: null,
+      time_finished: null,
+      did_not_work: true,
+      daily_total: 9,
+    };
+
+    expect(() => submitBody({ entries: paidLeaveEntries })).not.toThrow();
   });
 });
 
@@ -255,6 +391,36 @@ describe('bank holiday self-override confirm', () => {
     ).rejects.toBeInstanceOf(TimesheetBankHolidayWorkError);
     expect(leaveClient.statements.some((sql) => sql.includes('UPDATE public.absences'))).toBe(false);
     expect(leaveClient.statements.some((sql) => sql.includes('ROLLBACK'))).toBe(true);
+  });
+
+  it('rebinds stale same-date evidence to the current locked absence', async () => {
+    const currentAbsenceId = '44444444-4444-4444-8444-444444444444';
+    const client = new ConfirmClient();
+    client.insertedDates = [BANK_HOLIDAY_DATE];
+    client.confirmationAbsenceId = ABSENCE_ID;
+    client.absences = [{ ...client.absences[0], id: currentAbsenceId }];
+
+    const result = await confirmBankHolidayWork({
+      input: {
+        actorId: OWNER_ID,
+        targetUserId: OWNER_ID,
+        weekEnding: WEEK_ENDING,
+        timesheetId: TIMESHEET_ID,
+        dates: [BANK_HOLIDAY_DATE],
+        phrase: 'BANK HOLIDAY',
+      },
+      createClient: () => client,
+    });
+
+    expect(result.confirmedDates).toEqual([BANK_HOLIDAY_DATE]);
+    expect(client.confirmationAbsenceId).toBe(currentAbsenceId);
+    expect(
+      client.statements.some(
+        (sql) =>
+          sql.includes('ON CONFLICT (timesheet_id, work_date) DO UPDATE') &&
+          sql.includes('absence_id = EXCLUDED.absence_id')
+      )
+    ).toBe(true);
   });
 
   it('treats a missing settings table as trial disabled so existing saves keep working', async () => {
@@ -355,6 +521,30 @@ describe('bank holiday submit fail-closed', () => {
     expect(confirmedClient.statements.some((sql) => sql.includes('INSERT INTO public.timesheet_entries'))).toBe(true);
     expect(confirmedClient.statements.at(-1)).toContain('COMMIT');
   });
+
+  it('rejects stale confirmation evidence for a different absence booking', async () => {
+    const client = new SubmitClient();
+    client.absences = [
+      {
+        id: '44444444-4444-4444-8444-444444444444',
+        date: BANK_HOLIDAY_DATE,
+        end_date: BANK_HOLIDAY_DATE,
+        is_half_day: false,
+        is_bank_holiday: true,
+        status: 'approved',
+        reason_name: 'Annual Leave',
+      },
+    ];
+    client.confirmedDates = [BANK_HOLIDAY_DATE];
+
+    await expect(
+      applyTimesheetSubmit({
+        body: submitBody({ timesheetId: TIMESHEET_ID }),
+        createClient: () => client,
+      })
+    ).rejects.toMatchObject({ code: 'BANK_HOLIDAY_CONFIRM_REQUIRED', status: 400 });
+    expect(client.statements.some((sql) => sql.includes('INSERT INTO public.timesheet_entries'))).toBe(false);
+  });
 });
 
 describe('bank holiday settings contract', () => {
@@ -411,7 +601,7 @@ describe('bank holiday confirmation repeat contract', () => {
 });
 
 describe('bank holiday submit notification contract', () => {
-  it('BH-TRIAL-NOTIFY-001 notifies team managers plus Accounts and is submit-only', () => {
+  it('BH-E2E-08 and BH-E2E-09: recipients are managers plus Accounts and dispatch is submit-only', async () => {
     expect(
       resolveBankHolidayWorkRecipientIds({
         employeeId: 'employee-1',
@@ -449,10 +639,143 @@ describe('bank holiday submit notification contract', () => {
       path.join(process.cwd(), 'app/(dashboard)/timesheets/[id]/page.tsx'),
       'utf8'
     );
-    expect(civilsSave).toContain('offDaysReady');
-    expect(plantSave).toContain('offDaysReady');
-    expect(detailPage).toContain('offDaysReady: absencesReady');
-    expect(detailPage).toContain('!absencesReady');
+    expect(civilsSave).toContain('offDaysState: authoritativeOffDayState');
+    expect(plantSave).toContain('offDaysState: authoritativeOffDayState');
+    expect(detailPage).toContain('offDaysState: absenceLoadState');
+    expect(detailPage).toContain("setAbsenceLoadState('failed')");
+    expect(civilsSave).not.toContain('setOffDayStates(resolveTimesheetOffDayStates(weekEnding, [],');
+    expect(plantSave).not.toContain('setOffDayStates(resolveTimesheetOffDayStates(weekEnding, [],');
+
+    const insertedRecipients: Array<Record<string, unknown>> = [];
+    type FakeResult = { data: unknown; error: null };
+    class FakeAdminQuery {
+      private selected = '';
+      private operation: 'select' | 'insert' = 'select';
+      private payload: unknown;
+
+      constructor(private readonly table: string) {}
+
+      select(columns: string) {
+        this.selected = columns;
+        return this;
+      }
+      insert(payload: unknown) {
+        this.operation = 'insert';
+        this.payload = payload;
+        return this;
+      }
+      eq() {
+        return this;
+      }
+      is() {
+        return this;
+      }
+      ilike() {
+        return this;
+      }
+      limit() {
+        return this;
+      }
+      in() {
+        return this;
+      }
+      async maybeSingle(): Promise<FakeResult> {
+        const result = this.result();
+        return {
+          data: Array.isArray(result.data) ? result.data[0] || null : result.data,
+          error: null,
+        };
+      }
+      async single(): Promise<FakeResult> {
+        return this.maybeSingle();
+      }
+      then(
+        onFulfilled?: (value: FakeResult) => unknown,
+        onRejected?: (reason: unknown) => unknown
+      ): Promise<unknown> {
+        return Promise.resolve(this.result()).then(onFulfilled, onRejected);
+      }
+
+      private result(): FakeResult {
+        if (this.table === 'messages') {
+          return {
+            data: this.operation === 'insert' ? { id: 'message-1' } : [],
+            error: null,
+          };
+        }
+        if (this.table === 'timesheets') {
+          return {
+            data: { id: TIMESHEET_ID, user_id: 'employee-1', week_ending: WEEK_ENDING },
+            error: null,
+          };
+        }
+        if (this.table === 'timesheet_bank_holiday_work_confirmations') {
+          return { data: [{ work_date: BANK_HOLIDAY_DATE }], error: null };
+        }
+        if (this.table === 'timesheet_entries') {
+          return {
+            data: [{ day_of_week: 1, operator_travel_hours: 1.5 }],
+            error: null,
+          };
+        }
+        if (this.table === 'profiles' && this.selected.includes('full_name')) {
+          return {
+            data: {
+              id: 'employee-1',
+              full_name: 'Employee One',
+              team: {
+                manager_1_profile_id: 'manager-1',
+                manager_2_profile_id: 'manager-2',
+              },
+            },
+            error: null,
+          };
+        }
+        if (this.table === 'profiles') {
+          return {
+            data: [{ id: 'accounts-1', is_placeholder: false, is_system_account: false }],
+            error: null,
+          };
+        }
+        if (this.table === 'notification_preferences') {
+          return { data: [], error: null };
+        }
+        if (this.table === 'message_recipients') {
+          insertedRecipients.push(...(this.payload as Array<Record<string, unknown>>));
+          return { data: null, error: null };
+        }
+        throw new Error(`Unexpected table ${this.table}`);
+      }
+    }
+    const admin = { from: (table: string) => new FakeAdminQuery(table) };
+
+    let draftDataAccessed = false;
+    const draftResult = await notifyBankHolidayWorkOnSubmit({
+      actorId: OWNER_ID,
+      timesheetId: TIMESHEET_ID,
+      status: 'draft',
+      admin: {
+        from: () => {
+          draftDataAccessed = true;
+          throw new Error('Draft notification must not access persistence');
+        },
+      } as never,
+    });
+    expect(draftResult).toEqual({ notified: false, reason: 'not-submitted' });
+    expect(draftDataAccessed).toBe(false);
+
+    await notifyBankHolidayWorkOnSubmit({
+      actorId: OWNER_ID,
+      timesheetId: TIMESHEET_ID,
+      status: 'submitted',
+      admin: admin as never,
+    });
+
+    expect(insertedRecipients.map((row) => row.user_id).sort()).toEqual([
+      'accounts-1',
+      'manager-1',
+      'manager-2',
+    ]);
 
     const modal = fs.readFileSync(
       path.join(process.cwd(), 'components/timesheets/BankHolidayWorkConfirmModal.tsx'),
