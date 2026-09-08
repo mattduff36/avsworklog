@@ -72,6 +72,16 @@ export interface TimesheetEntryLike {
   day_of_week: number;
   time_started: string;
   time_finished: string;
+  operator_travel_hours?: string | number | null;
+  operator_yard_hours?: string | number | null;
+  operator_working_hours?: number | null;
+  machine_travel_hours?: string | number | null;
+  machine_start_time?: string | null;
+  machine_finish_time?: string | null;
+  machine_working_hours?: number | null;
+  machine_standing_hours?: string | number | null;
+  machine_operator_hours?: string | number | null;
+  maintenance_breakdown_hours?: string | number | null;
   job_number: string;
   job_numbers?: string[];
   working_in_yard: boolean;
@@ -110,9 +120,27 @@ function roundHours(value: number): number {
 }
 
 function hasExplicitWorkingInput(entry: TimesheetEntryLike): boolean {
+  const hasPlantInput = [
+    entry.operator_travel_hours,
+    entry.operator_yard_hours,
+    entry.operator_working_hours,
+    entry.machine_travel_hours,
+    entry.machine_working_hours,
+    entry.machine_standing_hours,
+    entry.machine_operator_hours,
+    entry.maintenance_breakdown_hours,
+  ].some((hours) =>
+    typeof hours === 'string'
+      ? hours.trim().length > 0
+      : typeof hours === 'number' && hours > 0
+  );
+
   return Boolean(
     (entry.time_started && entry.time_started.trim()) ||
       (entry.time_finished && entry.time_finished.trim()) ||
+      entry.machine_start_time?.trim() ||
+      entry.machine_finish_time?.trim() ||
+      hasPlantInput ||
       getEntryJobNumbers(entry).length > 0 ||
       entry.working_in_yard
   );
@@ -397,6 +425,40 @@ export function normalizeTimesheetEntriesForOffDays(
         didNotWorkReason: parseDidNotWorkReason(primaryReason),
         daily_total: offDay.paidLeaveHours,
         remarks: offDay.displayRemarks || primaryReason,
+      };
+    }
+
+    const isUnlockedFullDayBankHolidayLeave =
+      offDay.isAnnualLeave &&
+      offDay.isBankHoliday &&
+      !offDay.isLeaveLocked &&
+      offDay.leaveLabels.some(
+        (label) => label.session === 'FULL' && !label.blocksWorkingEntry
+      );
+
+    if (isUnlockedFullDayBankHolidayLeave && !hasExplicitWorkingInput(entry)) {
+      return {
+        ...entry,
+        time_started: '',
+        time_finished: '',
+        operator_travel_hours: '',
+        operator_yard_hours: '',
+        operator_working_hours: null,
+        machine_travel_hours: '',
+        machine_start_time: '',
+        machine_finish_time: '',
+        machine_working_hours: null,
+        machine_standing_hours: '',
+        machine_operator_hours: '',
+        maintenance_breakdown_hours: '',
+        job_number: '',
+        job_numbers: [],
+        working_in_yard: false,
+        subsistence_payment_required: false,
+        did_not_work: true,
+        didNotWorkReason: 'Holiday',
+        daily_total: offDay.paidLeaveHours,
+        remarks: offDay.displayRemarks || offDay.leaveReasonName || 'Annual Leave',
       };
     }
 

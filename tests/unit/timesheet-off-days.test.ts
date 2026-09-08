@@ -562,6 +562,147 @@ describe('timesheet off-day normalization', () => {
     expect(normalized[1].remarks).toBe('Annual Leave');
   });
 
+  it('BH-LEAVE-NOWORK-001 keeps unlocked full-day bank-holiday leave valid when no work was entered', () => {
+    const entries = buildEntries();
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          status: 'approved',
+          is_half_day: false,
+          is_bank_holiday: true,
+          allow_timesheet_work_on_leave: false,
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN,
+      { bankHolidaySelfOverrideEnabled: true }
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[1]).toMatchObject({
+      did_not_work: true,
+      didNotWorkReason: 'Holiday',
+      time_started: '',
+      time_finished: '',
+      job_number: '',
+      job_numbers: [],
+      working_in_yard: false,
+      subsistence_payment_required: false,
+      daily_total: PAID_LEAVE_DAILY_HOURS,
+      remarks: 'Annual Leave',
+    });
+  });
+
+  it('BH-LEAVE-WORK-001 preserves entered work on unlocked full-day bank-holiday leave', () => {
+    const entries = buildEntries();
+    entries[1] = {
+      ...entries[1],
+      time_started: '08:00',
+      time_finished: '12:00',
+      job_number: '1234-AB',
+      job_numbers: ['1234-AB'],
+    };
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          status: 'approved',
+          is_half_day: false,
+          is_bank_holiday: true,
+          allow_timesheet_work_on_leave: false,
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN,
+      { bankHolidaySelfOverrideEnabled: true }
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[1]).toMatchObject({
+      did_not_work: false,
+      time_started: '08:00',
+      time_finished: '12:00',
+      daily_total: 13,
+      remarks: 'Annual Leave',
+    });
+  });
+
+  it('BH-LEAVE-PLANT-WORK-001 preserves string-valued Plant work on unlocked bank-holiday leave', () => {
+    const entries = buildEntries();
+    entries[1] = {
+      ...entries[1],
+      operator_travel_hours: '1.5',
+    };
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          status: 'approved',
+          is_half_day: false,
+          is_bank_holiday: true,
+          allow_timesheet_work_on_leave: false,
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN,
+      { bankHolidaySelfOverrideEnabled: true }
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[1]).toMatchObject({
+      did_not_work: false,
+      operator_travel_hours: '1.5',
+    });
+  });
+
+  it('HALF-LEAVE-NOWORK-001 does not promote half-day leave without work to a full leave-only row', () => {
+    const entries = buildEntries();
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-24',
+          end_date: null,
+          is_half_day: true,
+          half_day_session: 'AM',
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN
+    );
+
+    const normalized = normalizeTimesheetEntriesForOffDays(entries, states, {
+      enforceLeaveOverwrite: true,
+      applyNonShiftDefaults: true,
+    });
+
+    expect(normalized[1]).toMatchObject({
+      did_not_work: false,
+      didNotWorkReason: null,
+      daily_total: 4.5,
+      remarks: 'Annual Leave (AM)',
+    });
+  });
+
   it('defaults non-shift days to Off Shift when no work was entered', () => {
     const entries = buildEntries();
     const states = resolveTimesheetOffDayStates('2026-03-29', [], STANDARD_WORK_SHIFT_PATTERN);
