@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
+import ts from 'typescript';
 import {
   CorrectAttachmentResponsesBodySchema,
   CorrectCompletedTaskBodySchema,
@@ -16,6 +17,76 @@ function readRepo(relativePath: string): string {
   const absolute = resolve(process.cwd(), relativePath);
   expect(existsSync(absolute)).toBe(true);
   return readFileSync(absolute, 'utf8');
+}
+
+function parseRepoSource(relativePath: string): ts.SourceFile {
+  return ts.createSourceFile(
+    relativePath,
+    readRepo(relativePath),
+    ts.ScriptTarget.Latest,
+    true,
+    relativePath.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+}
+
+function findArrowFunction(sourceFile: ts.SourceFile, name: string): ts.ArrowFunction {
+  let result: ts.ArrowFunction | undefined;
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === name
+      && node.initializer
+      && ts.isArrowFunction(node.initializer)
+    ) {
+      result = node.initializer;
+      return;
+    }
+    node.forEachChild(visit);
+  };
+  sourceFile.forEachChild(visit);
+  expect(result, `Expected ${name} arrow function in ${sourceFile.fileName}`).toBeDefined();
+  return result!;
+}
+
+function findDescendant<T extends ts.Node>(
+  root: ts.Node,
+  predicate: (node: ts.Node) => node is T,
+): T | undefined {
+  return findDescendants(root, predicate)[0];
+}
+
+function findDescendants<T extends ts.Node>(
+  root: ts.Node,
+  predicate: (node: ts.Node) => node is T,
+): T[] {
+  const results: T[] = [];
+  const visit = (node: ts.Node): void => {
+    if (predicate(node)) {
+      results.push(node);
+    }
+    node.forEachChild(visit);
+  };
+  visit(root);
+  return results;
+}
+
+function callTargetsPath(node: ts.Node, pathSuffix: string): node is ts.CallExpression {
+  if (
+    !ts.isCallExpression(node)
+    || !ts.isIdentifier(node.expression)
+    || node.expression.text !== 'fetch'
+    || node.arguments.length === 0
+  ) {
+    return false;
+  }
+
+  const target = node.arguments[0];
+  if (ts.isStringLiteralLike(target)) return target.text.endsWith(pathSuffix);
+  if (!ts.isTemplateExpression(target)) return false;
+  const staticTemplateText =
+    target.head.text + target.templateSpans.map((span) => span.literal.text).join('');
+  return staticTemplateText.endsWith(pathSuffix);
 }
 
 describe('completed workshop corrections', () => {
@@ -140,12 +211,67 @@ describe('completed workshop corrections', () => {
     expect(server).toContain("event_type, notes, corrects_event_id");
     expect(server).toContain("'correction'");
     expect(server).toContain('calculateNextDueMeter(input.completionMeter, config.intervalValue)');
-    expect(readRepo('components/workshop-tasks/CorrectTaskDialog.tsx')).toContain(
-      '/correct-completed'
+    const dialogSubmit = findArrowFunction(
+      parseRepoSource('components/workshop-tasks/CorrectTaskDialog.tsx'),
+      'handleSubmit',
     );
-    expect(readRepo('app/(dashboard)/workshop-tasks/hooks/useWorkshopTaskCrudActions.ts')).not.toContain(
-      '/correct-completed'
+    const dialogServiceCalls = findDescendants(
+      dialogSubmit,
+      (node): node is ts.CallExpression => callTargetsPath(node, '/correct-service'),
     );
+    expect(dialogServiceCalls).toHaveLength(1);
+    const [dialogServiceCall] = dialogServiceCalls;
+    expect(
+      findDescendant(
+        dialogSubmit,
+        (node): node is ts.IfStatement =>
+          ts.isIfStatement(node)
+          && ts.isIdentifier(node.expression)
+          && node.expression.text === 'serviceDirty'
+          && Boolean(dialogServiceCall && findDescendant(
+              node.thenStatement,
+              (candidate): candidate is ts.CallExpression => candidate === dialogServiceCall,
+            )),
+      ),
+    ).toBeDefined();
+
+    const legacyEditor = findArrowFunction(
+      parseRepoSource('app/(dashboard)/workshop-tasks/hooks/useWorkshopTaskCrudActions.ts'),
+      'handleSaveEdit',
+    );
+    const meterAssignments = findDescendants(
+      legacyEditor,
+      (node): node is ts.BinaryExpression =>
+        ts.isBinaryExpression(node)
+        && node.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        && ts.isPropertyAccessExpression(node.left)
+        && ts.isIdentifier(node.left.expression)
+        && node.left.expression.text === 'payload'
+        && node.left.name.text === 'meter_reading',
+    );
+    expect(meterAssignments).toHaveLength(1);
+    const [meterAssignment] = meterAssignments;
+    expect(
+      findDescendant(
+        legacyEditor,
+        (node): node is ts.IfStatement =>
+          ts.isIfStatement(node)
+          && ts.isPrefixUnaryExpression(node.expression)
+          && node.expression.operator === ts.SyntaxKind.ExclamationToken
+          && ts.isIdentifier(node.expression.operand)
+          && node.expression.operand.text === 'isServiceTask'
+          && Boolean(meterAssignment && findDescendant(
+              node.thenStatement,
+              (candidate): candidate is ts.BinaryExpression => candidate === meterAssignment,
+            )),
+      ),
+    ).toBeDefined();
+    expect(
+      findDescendant(
+        legacyEditor,
+        (node): node is ts.CallExpression => callTargetsPath(node, '/correct-service'),
+      ),
+    ).toBeUndefined();
   });
 
   it('WT-CORR-SVC-002 correction context returns latest effective meter and upserts HGV values', () => {

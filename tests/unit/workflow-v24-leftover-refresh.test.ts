@@ -37,6 +37,7 @@ import {
 
 const REAL_REPO = process.cwd();
 const ISOLATE_PARENT = 'b4a5aa09992c23c8358876421996606e7d7701fc';
+const ISOLATE_HEAD = '1db031680c35f86c82cdf81c53a878f174997670';
 const LEGAL_FIRST_HEAD = 'f223f06dd52d2f005b4ea4c6f1a66a87712a5274';
 const LEGAL_CLOSURE_HEAD = 'a331d0c88c98aee014d4ec624a796407359cf7a2';
 const throwawayIds: string[] = [];
@@ -418,7 +419,7 @@ describe('first-review binding repairs', () => {
   it('T-SUCCESSOR-RANGE-001', () => {
     const diff = spawnSync(
       'git',
-      ['diff', '--name-only', `${ISOLATE_PARENT}..HEAD`],
+      ['diff', '--name-only', `${ISOLATE_PARENT}..${ISOLATE_HEAD}`],
       { cwd: REAL_REPO, encoding: 'utf8', shell: false }
     );
     const files = new Set(
