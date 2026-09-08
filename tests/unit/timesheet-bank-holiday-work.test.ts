@@ -112,7 +112,12 @@ class ConfirmClient implements BankHolidayWorkPgClient {
       return { rows: this.absences as Row[] };
     }
     if (sql.includes('UPDATE public.absences')) {
-      return { rows: this.absences.map((absence) => ({ id: absence.id }) as Row) };
+      const ids = Array.isArray(values?.[0]) ? values[0].map((id) => String(id)) : [];
+      return {
+        rows: this.absences
+          .filter((absence) => absence.is_bank_holiday && (ids.length === 0 || ids.includes(absence.id)))
+          .map((absence) => ({ id: absence.id }) as Row),
+      };
     }
     if (sql.includes('INSERT INTO public.timesheet_bank_holiday_work_confirmations')) {
       const workDate = String(values?.[1] || '');
@@ -387,10 +392,78 @@ describe('bank holiday self-override confirm', () => {
           phrase: 'BANK HOLIDAY',
         },
         createClient: () => leaveClient,
+        loadUkBankHolidayDates: async () => new Set(['2026-01-01']),
       })
     ).rejects.toBeInstanceOf(TimesheetBankHolidayWorkError);
     expect(leaveClient.statements.some((sql) => sql.includes('UPDATE public.absences'))).toBe(false);
     expect(leaveClient.statements.some((sql) => sql.includes('ROLLBACK'))).toBe(true);
+  });
+
+  it('BH-TRIAL-CONFIRM-AL-001 confirms unflagged annual leave on a verified bank holiday without override', async () => {
+    const client = new ConfirmClient();
+    client.absences = [
+      {
+        id: ABSENCE_ID,
+        date: '2026-08-31',
+        end_date: '2026-09-04',
+        is_half_day: false,
+        is_bank_holiday: false,
+        status: 'approved',
+        reason_name: 'Annual Leave',
+      },
+    ];
+
+    const result = await confirmBankHolidayWork({
+      input: {
+        actorId: OWNER_ID,
+        targetUserId: OWNER_ID,
+        weekEnding: WEEK_ENDING,
+        timesheetId: TIMESHEET_ID,
+        dates: [BANK_HOLIDAY_DATE],
+        phrase: 'BANK HOLIDAY',
+      },
+      createClient: () => client,
+      loadUkBankHolidayDates: async () => new Set([BANK_HOLIDAY_DATE]),
+    });
+
+    expect(result).toEqual({
+      timesheetId: TIMESHEET_ID,
+      confirmedDates: [BANK_HOLIDAY_DATE],
+    });
+    expect(client.statements.some((sql) => sql.includes('UPDATE public.absences'))).toBe(false);
+    expect(client.statements.some((sql) => sql.includes('timesheet_bank_holiday_work_confirmations'))).toBe(true);
+    expect(client.statements.at(-1)).toContain('COMMIT');
+  });
+
+  it('does not set override on a multi-day flagged bank-holiday booking', async () => {
+    const client = new ConfirmClient();
+    client.absences = [
+      {
+        id: ABSENCE_ID,
+        date: '2026-08-31',
+        end_date: '2026-09-04',
+        is_half_day: false,
+        is_bank_holiday: true,
+        status: 'approved',
+        reason_name: 'Annual Leave',
+      },
+    ];
+
+    const result = await confirmBankHolidayWork({
+      input: {
+        actorId: OWNER_ID,
+        targetUserId: OWNER_ID,
+        weekEnding: WEEK_ENDING,
+        timesheetId: TIMESHEET_ID,
+        dates: [BANK_HOLIDAY_DATE],
+        phrase: 'BANK HOLIDAY',
+      },
+      createClient: () => client,
+      loadUkBankHolidayDates: async () => new Set([BANK_HOLIDAY_DATE]),
+    });
+
+    expect(result.confirmedDates).toEqual([BANK_HOLIDAY_DATE]);
+    expect(client.statements.some((sql) => sql.includes('UPDATE public.absences'))).toBe(false);
   });
 
   it('rebinds stale same-date evidence to the current locked absence', async () => {
@@ -520,6 +593,30 @@ describe('bank holiday submit fail-closed', () => {
     expect(result.status).toBe('submitted');
     expect(confirmedClient.statements.some((sql) => sql.includes('INSERT INTO public.timesheet_entries'))).toBe(true);
     expect(confirmedClient.statements.at(-1)).toContain('COMMIT');
+  });
+
+  it('requires confirmation for unflagged annual leave on a verified bank holiday', async () => {
+    const client = new SubmitClient();
+    client.absences = [
+      {
+        id: ABSENCE_ID,
+        date: BANK_HOLIDAY_DATE,
+        end_date: '2026-09-04',
+        is_half_day: false,
+        is_bank_holiday: false,
+        status: 'approved',
+        reason_name: 'Annual Leave',
+      },
+    ];
+
+    await expect(
+      applyTimesheetSubmit({
+        body: submitBody({ timesheetId: TIMESHEET_ID }),
+        createClient: () => client,
+        loadUkBankHolidayDates: async () => new Set([BANK_HOLIDAY_DATE]),
+      })
+    ).rejects.toMatchObject({ code: 'BANK_HOLIDAY_CONFIRM_REQUIRED', status: 400 });
+    expect(client.statements.some((sql) => sql.includes('INSERT INTO public.timesheet_entries'))).toBe(false);
   });
 
   it('rejects stale confirmation evidence for a different absence booking', async () => {

@@ -5,6 +5,8 @@ import {
 
 export const BANK_HOLIDAY_CONFIRM_PHRASE = 'BANK HOLIDAY';
 export const BANK_HOLIDAY_WORK_CREATED_VIA = 'timesheet_bank_holiday_work';
+export const BANK_HOLIDAY_WORK_ENTRY_HELPER =
+  'To record work on this bank holiday, enter hours here. You will type BANK HOLIDAY when you save.';
 
 export type BankHolidayAuthoritativeReadState = 'idle' | 'loading' | 'ready' | 'failed';
 export type BankHolidayReadFailureSource = 'trial' | 'leave' | 'confirmation';

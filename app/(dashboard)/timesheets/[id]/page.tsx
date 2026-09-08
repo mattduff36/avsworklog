@@ -63,12 +63,17 @@ import { toast } from 'sonner';
 import { isNetworkFetchError } from '@/lib/utils/http-error';
 import { submitTimesheet } from '@/lib/client/timesheet-submit';
 import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
-import type { BankHolidayAuthoritativeReadState } from '@/lib/utils/timesheet-bank-holiday-work';
+import { fetchUKBankHolidays } from '@/lib/utils/bank-holidays';
+import {
+  BANK_HOLIDAY_WORK_ENTRY_HELPER,
+  type BankHolidayAuthoritativeReadState,
+} from '@/lib/utils/timesheet-bank-holiday-work';
 import {
   type ApprovedAbsenceForTimesheet,
   type TimesheetOffDayState,
   getTimesheetWeekIsoBounds,
   resolveTimesheetOffDayStates,
+  shouldDisableTimesheetWorkingInputs,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import { isPlantTimesheetV2, normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
@@ -140,6 +145,7 @@ export default function ViewTimesheetPage() {
   const [decliningTraining, setDecliningTraining] = useState(false);
   const [employeeTeamId, setEmployeeTeamId] = useState<string | null>(null);
   const [approvedAbsences, setApprovedAbsences] = useState<ApprovedAbsenceForTimesheet[]>([]);
+  const [ukBankHolidayDates, setUkBankHolidayDates] = useState<Set<string>>(new Set());
   const [absenceLoadState, setAbsenceLoadState] =
     useState<BankHolidayAuthoritativeReadState>('loading');
   const bankHolidayConfirm = useBankHolidayWorkConfirm({
@@ -163,9 +169,14 @@ export default function ViewTimesheetPage() {
     setOffDayStates(
       resolveTimesheetOffDayStates(timesheet.week_ending, approvedAbsences, null, {
         bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled,
+        ukBankHolidayDates,
       })
     );
-  }, [absenceLoadState, approvedAbsences, bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, timesheet?.week_ending]);
+  }, [absenceLoadState, approvedAbsences, bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, timesheet?.week_ending, ukBankHolidayDates]);
+
+  useEffect(() => {
+    void fetchUKBankHolidays('england-and-wales').then(setUkBankHolidayDates);
+  }, []);
 
   const getActionErrorMessage = (err: unknown, fallback: string) => {
     return err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
@@ -513,6 +524,8 @@ export default function ViewTimesheetPage() {
         : value;
 
     if (field === 'did_not_work') {
+      const dayOffState = offDayStates.find((state) => state.day_of_week === currentEntry.day_of_week);
+      if (dayOffState?.isLeaveLocked) return;
       const nextDidNotWork = Boolean(value);
       const nextRemarks =
         nextDidNotWork && (!currentEntry.remarks || currentEntry.remarks.trim().length === 0)
@@ -1508,9 +1521,23 @@ export default function ViewTimesheetPage() {
               <tbody>
                 {entries.map((entry, index) => {
                   const displayEntry = displayEntries[index] || entry;
+                  const dayOffState = offDayStates.find((state) => state.day_of_week === entry.day_of_week);
+                  const disableWorkingInputs = shouldDisableTimesheetWorkingInputs({
+                    isLeaveLocked: Boolean(dayOffState?.isLeaveLocked),
+                    isOnApprovedLeave: Boolean(dayOffState?.isOnApprovedLeave),
+                    didNotWork: Boolean(entry.did_not_work),
+                    isPartialLeave: Boolean(dayOffState?.isPartialLeave),
+                  });
                   return (
                   <tr key={entry.day_of_week} className="border-b">
-                    <td className="p-2 font-medium">{DAY_NAMES[index]}</td>
+                    <td className="p-2 font-medium">
+                      <div>{DAY_NAMES[index]}</div>
+                      {dayOffState?.isBankHoliday && !dayOffState.isLeaveLocked && bankHolidayConfirm.trialEnabled ? (
+                        <p className="text-[10px] font-normal text-muted-foreground">
+                          {BANK_HOLIDAY_WORK_ENTRY_HELPER}
+                        </p>
+                      ) : null}
+                    </td>
                     <td className="p-2">
                       {canEdit ? (
                         <Input
@@ -1518,7 +1545,7 @@ export default function ViewTimesheetPage() {
                           step="900"
                           value={entry.time_started || ''}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                           className="w-32 text-slate-900"
                         />
                       ) : (
@@ -1532,7 +1559,7 @@ export default function ViewTimesheetPage() {
                           step="900"
                           value={entry.time_finished || ''}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                           className="w-32 text-slate-900"
                         />
                       ) : (
@@ -1551,7 +1578,7 @@ export default function ViewTimesheetPage() {
                           onChange={(jobIndex, value) => handleJobNumberChange(index, jobIndex, value)}
                           onAdd={() => handleAddJobNumberField(index)}
                           onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
-                          disabled={entry.did_not_work || entry.working_in_yard}
+                          disabled={disableWorkingInputs || entry.working_in_yard}
                           placeholder={entry.working_in_yard ? 'YARD' : 'Job #'}
                           jobCodeOptions={jobCodeOptions}
                           jobCodeOptionsLoading={jobCodeOptionsLoading}
@@ -1569,6 +1596,7 @@ export default function ViewTimesheetPage() {
                           type="checkbox"
                           checked={entry.did_not_work}
                           onChange={(e) => updateEntry(index, 'did_not_work', e.target.checked)}
+                          disabled={Boolean(dayOffState?.isLeaveLocked)}
                           className="w-4 h-4"
                         />
                       ) : (
@@ -1581,7 +1609,7 @@ export default function ViewTimesheetPage() {
                           type="checkbox"
                           checked={entry.working_in_yard}
                           onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                           className="w-4 h-4"
                         />
                       ) : (
@@ -1594,7 +1622,7 @@ export default function ViewTimesheetPage() {
                           type="checkbox"
                           checked={Boolean(entry.subsistence_payment_required)}
                           onChange={() => handleSubsistenceToggle(index)}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                           className="w-4 h-4"
                           aria-label={`${DAY_NAMES[index]} subsistence payment required`}
                         />
@@ -1612,7 +1640,7 @@ export default function ViewTimesheetPage() {
                             const val = e.target.value === '' ? null : parseFloat(e.target.value);
                             updateEntry(index, 'daily_total', val);
                           }}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                           className={`w-24 text-right font-semibold ${
                             manuallyEditedDays.has(index) 
                               ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700' 
@@ -1631,6 +1659,7 @@ export default function ViewTimesheetPage() {
                           value={entry.remarks || ''}
                           onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
                           placeholder="Notes"
+                          disabled={Boolean(dayOffState?.isOnApprovedLeave)}
                         />
                       ) : (
                         <span className="text-sm">{entry.remarks || (entry.did_not_work ? 'Did Not Work' : '-')}</span>
@@ -1655,10 +1684,22 @@ export default function ViewTimesheetPage() {
           <div className="md:hidden space-y-4">
             {entries.map((entry, index) => {
               const displayEntry = displayEntries[index] || entry;
+              const dayOffState = offDayStates.find((state) => state.day_of_week === entry.day_of_week);
+              const disableWorkingInputs = shouldDisableTimesheetWorkingInputs({
+                isLeaveLocked: Boolean(dayOffState?.isLeaveLocked),
+                isOnApprovedLeave: Boolean(dayOffState?.isOnApprovedLeave),
+                didNotWork: Boolean(entry.did_not_work),
+                isPartialLeave: Boolean(dayOffState?.isPartialLeave),
+              });
               return (
               <Card key={entry.day_of_week}>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">{DAY_NAMES[index]}</CardTitle>
+                  {dayOffState?.isBankHoliday && !dayOffState.isLeaveLocked && bankHolidayConfirm.trialEnabled ? (
+                    <CardDescription className="text-xs">
+                      {BANK_HOLIDAY_WORK_ENTRY_HELPER}
+                    </CardDescription>
+                  ) : null}
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
@@ -1670,7 +1711,7 @@ export default function ViewTimesheetPage() {
                           step="900"
                           value={entry.time_started || ''}
                           onChange={(e) => updateEntry(index, 'time_started', e.target.value)}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                         />
                       ) : (
                         <p className="text-sm">{entry.time_started || '-'}</p>
@@ -1684,7 +1725,7 @@ export default function ViewTimesheetPage() {
                           step="900"
                           value={entry.time_finished || ''}
                           onChange={(e) => updateEntry(index, 'time_finished', e.target.value)}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                         />
                       ) : (
                         <p className="text-sm">{entry.time_finished || '-'}</p>
@@ -1707,7 +1748,7 @@ export default function ViewTimesheetPage() {
                         onChange={(jobIndex, value) => handleJobNumberChange(index, jobIndex, value)}
                         onAdd={() => handleAddJobNumberField(index)}
                         onRemove={(jobIndex) => handleRemoveJobNumberField(index, jobIndex)}
-                        disabled={entry.did_not_work || entry.working_in_yard}
+                        disabled={disableWorkingInputs || entry.working_in_yard}
                         placeholder={entry.working_in_yard ? 'YARD' : 'Job #'}
                         jobCodeOptions={jobCodeOptions}
                         jobCodeOptionsLoading={jobCodeOptionsLoading}
@@ -1727,6 +1768,7 @@ export default function ViewTimesheetPage() {
                           id={`did-not-work-${index}`}
                           checked={entry.did_not_work}
                           onChange={(e) => updateEntry(index, 'did_not_work', e.target.checked)}
+                          disabled={Boolean(dayOffState?.isLeaveLocked)}
                           className="w-4 h-4"
                         />
                         <Label htmlFor={`did-not-work-${index}`} className="text-sm">
@@ -1745,7 +1787,7 @@ export default function ViewTimesheetPage() {
                           id={`yard-${index}`}
                           checked={entry.working_in_yard}
                           onChange={(e) => updateEntry(index, 'working_in_yard', e.target.checked)}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                           className="w-4 h-4"
                         />
                         <Label htmlFor={`yard-${index}`} className="text-sm">
@@ -1764,7 +1806,7 @@ export default function ViewTimesheetPage() {
                           id={`subsistence-${index}`}
                           checked={Boolean(entry.subsistence_payment_required)}
                           onChange={() => handleSubsistenceToggle(index)}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                           className="w-4 h-4"
                         />
                         <Label htmlFor={`subsistence-${index}`} className="text-sm">
@@ -1784,6 +1826,7 @@ export default function ViewTimesheetPage() {
                         value={entry.remarks || ''}
                         onChange={(e) => updateEntry(index, 'remarks', e.target.value)}
                         placeholder="Any notes..."
+                        disabled={Boolean(dayOffState?.isOnApprovedLeave)}
                       />
                     ) : (
                       <p className="text-sm">{entry.remarks || (entry.did_not_work ? 'Did Not Work' : '-')}</p>
@@ -1801,7 +1844,7 @@ export default function ViewTimesheetPage() {
                             const val = e.target.value === '' ? null : parseFloat(e.target.value);
                             updateEntry(index, 'daily_total', val);
                           }}
-                          disabled={entry.did_not_work}
+                          disabled={disableWorkingInputs}
                           className={`w-24 text-right text-lg font-bold ${
                             manuallyEditedDays.has(index) 
                               ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700' 

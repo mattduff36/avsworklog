@@ -21,6 +21,8 @@ import {
 const describePostgres = process.env.TEST_DATABASE_URL ? describe : describe.skip;
 const BASE_PATH = 'tests/db/timesheet-bank-holiday-base.sql';
 const MIGRATION_PATH = 'supabase/migrations/20260908_timesheet_bank_holiday_self_override.sql';
+const CONFIRMATION_GRANT_MIGRATION_PATH =
+  'supabase/migrations/20260908180000_timesheet_bank_holiday_confirmation_grant.sql';
 const WEEK_ENDING = '2026-09-06';
 const BANK_HOLIDAY_DATE = '2026-08-31';
 
@@ -77,13 +79,16 @@ describePostgres('bank holiday disposable PostgreSQL runtime', () => {
   async function seedAbsence(input: {
     profileId: string;
     isBankHoliday: boolean;
+    date?: string;
+    endDate?: string;
   }): Promise<string> {
     const id = randomUUID();
+    const date = input.date || BANK_HOLIDAY_DATE;
     await setup.query(
       `INSERT INTO public.absences (
          id, profile_id, reason_id, date, end_date, status, is_bank_holiday
-       ) VALUES ($1, $2, $3, $4, $4, 'approved', $5)`,
-      [id, input.profileId, annualLeaveReasonId, BANK_HOLIDAY_DATE, input.isBankHoliday]
+       ) VALUES ($1, $2, $3, $4, $5, 'approved', $6)`,
+      [id, input.profileId, annualLeaveReasonId, date, input.endDate || date, input.isBankHoliday]
     );
     return id;
   }
@@ -119,6 +124,11 @@ describePostgres('bank holiday disposable PostgreSQL runtime', () => {
     await setup.query(
       stripOuterMigrationTransaction(
         readFileSync(resolve(process.cwd(), MIGRATION_PATH), 'utf8')
+      )
+    );
+    await setup.query(
+      stripOuterMigrationTransaction(
+        readFileSync(resolve(process.cwd(), CONFIRMATION_GRANT_MIGRATION_PATH), 'utf8')
       )
     );
     annualLeaveReasonId = randomUUID();
@@ -304,6 +314,7 @@ describePostgres('bank holiday disposable PostgreSQL runtime', () => {
           phrase: 'BANK HOLIDAY',
         },
         createClient: () => new Client({ connectionString, ssl: false }),
+        loadUkBankHolidayDates: async () => new Set(['2026-01-01']),
       })
     ).rejects.toMatchObject({ code: 'INVALID_INPUT', status: 400 });
 
@@ -360,5 +371,102 @@ describePostgres('bank holiday disposable PostgreSQL runtime', () => {
         entries,
       })
     ).resolves.toBeUndefined();
+  });
+
+  it('BH-TRIAL-CONFIRM-AL-001 persists hours on a confirmed calendar bank holiday without week-wide override', async () => {
+    const profileId = await seedProfile();
+    const absenceId = await seedAbsence({
+      profileId,
+      isBankHoliday: false,
+      date: BANK_HOLIDAY_DATE,
+      endDate: '2026-09-04',
+    });
+    const timesheetId = await seedTimesheet(profileId);
+
+    await confirmBankHolidayWork({
+      input: {
+        actorId: profileId,
+        targetUserId: profileId,
+        weekEnding: WEEK_ENDING,
+        timesheetId,
+        dates: [BANK_HOLIDAY_DATE],
+        phrase: 'BANK HOLIDAY',
+      },
+      createClient: () => new Client({ connectionString, ssl: false }),
+      loadUkBankHolidayDates: async () => new Set([BANK_HOLIDAY_DATE]),
+    });
+
+    const override = await setup.query<{ allow_timesheet_work_on_leave: boolean }>(
+      `SELECT allow_timesheet_work_on_leave
+       FROM public.absences
+       WHERE id = $1`,
+      [absenceId]
+    );
+    expect(override.rows).toEqual([{ allow_timesheet_work_on_leave: false }]);
+
+    const monday = await setup.query<{ time_started: string | null; did_not_work: boolean }>(
+      `INSERT INTO public.timesheet_entries (
+         timesheet_id, day_of_week, did_not_work, time_started, time_finished, daily_total
+       ) VALUES ($1, 1, false, '08:00', '16:00', 8)
+       RETURNING time_started::text, did_not_work`,
+      [timesheetId]
+    );
+    expect(monday.rows[0]?.did_not_work).toBe(false);
+    expect(monday.rows[0]?.time_started).toMatch(/^08:00/);
+
+    const tuesday = await setup.query<{ time_started: string | null; did_not_work: boolean }>(
+      `INSERT INTO public.timesheet_entries (
+         timesheet_id, day_of_week, did_not_work, time_started, time_finished, daily_total
+       ) VALUES ($1, 2, false, '08:00', '16:00', 8)
+       RETURNING time_started::text, did_not_work`,
+      [timesheetId]
+    );
+    expect(tuesday.rows).toEqual([{ time_started: null, did_not_work: true }]);
+  });
+
+  it('keeps sickness locked on a confirmed bank-holiday date', async () => {
+    const profileId = await seedProfile();
+    const absenceId = await seedAbsence({
+      profileId,
+      isBankHoliday: false,
+      date: BANK_HOLIDAY_DATE,
+    });
+    const sicknessReasonId = randomUUID();
+    await setup.query(
+      `INSERT INTO public.absence_reasons (id, name, is_paid)
+       VALUES ($1, 'Sickness', true)`,
+      [sicknessReasonId]
+    );
+    await setup.query(
+      `INSERT INTO public.absences (
+         id, profile_id, reason_id, date, end_date, status, is_bank_holiday
+       ) VALUES ($1, $2, $3, $4, $4, 'approved', false)`,
+      [randomUUID(), profileId, sicknessReasonId, BANK_HOLIDAY_DATE]
+    );
+    const timesheetId = await seedTimesheet(profileId);
+
+    await confirmBankHolidayWork({
+      input: {
+        actorId: profileId,
+        targetUserId: profileId,
+        weekEnding: WEEK_ENDING,
+        timesheetId,
+        dates: [BANK_HOLIDAY_DATE],
+        phrase: 'BANK HOLIDAY',
+      },
+      createClient: () => new Client({ connectionString, ssl: false }),
+      loadUkBankHolidayDates: async () => new Set([BANK_HOLIDAY_DATE]),
+    });
+    expect(absenceId).toBeTruthy();
+
+    const monday = await setup.query<{ time_started: string | null; did_not_work: boolean }>(
+      `INSERT INTO public.timesheet_entries (
+         timesheet_id, day_of_week, did_not_work, time_started, time_finished, daily_total
+       ) VALUES ($1, 1, false, '08:00', '16:00', 8)
+       RETURNING time_started::text, did_not_work`,
+      [timesheetId]
+    );
+    expect(monday.rows[0]?.did_not_work).toBe(true);
+    expect(monday.rows[0]?.time_started).toBeNull();
   });
 });

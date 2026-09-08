@@ -8,6 +8,7 @@ import {
   timesheetEntryHasWorkingHours,
   type BankHolidayWorkHoursInput,
 } from '@/lib/utils/timesheet-bank-holiday-work';
+import { fetchUKBankHolidaysStrict } from '@/lib/utils/bank-holidays';
 import {
   formatLocalIsoDate,
   getTimesheetWeekIsoBounds,
@@ -245,31 +246,95 @@ async function loadWeekAbsences(
   return result.rows;
 }
 
-function resolveEligibleBankHolidayAbsence(
+function coveringAbsences(absences: EligibleAbsenceRow[], workDate: string): EligibleAbsenceRow[] {
+  return absences.filter((row) => enumerateAbsenceDates(row).includes(workDate));
+}
+
+function isSingleDayAbsence(row: EligibleAbsenceRow): boolean {
+  return normalizeDate(row.date) === normalizeDate(row.end_date || row.date);
+}
+
+function findFlaggedBankHolidayAbsence(
   absences: EligibleAbsenceRow[],
   workDate: string
-): EligibleAbsenceRow {
-  const covering = absences.filter((row) => enumerateAbsenceDates(row).includes(workDate));
-  const standardLeave = covering.find(
-    (row) =>
-      normalizeReason(row.reason_name) === 'annual leave' &&
-      row.is_bank_holiday !== true &&
-      row.is_half_day !== true
-  );
-  if (standardLeave) {
-    throw invalidInput('Standard annual leave cannot be confirmed as bank-holiday work');
-  }
-
-  const match = covering.find(
+): EligibleAbsenceRow | undefined {
+  return coveringAbsences(absences, workDate).find(
     (row) =>
       row.is_bank_holiday === true &&
       row.is_half_day !== true &&
+      isSingleDayAbsence(row) &&
       normalizeReason(row.reason_name) === 'annual leave'
   );
-  if (!match) {
-    throw invalidInput('Each date must be a booked full-day bank holiday');
+}
+
+function findCoveringAnnualLeaveAbsence(
+  absences: EligibleAbsenceRow[],
+  workDate: string
+): EligibleAbsenceRow | undefined {
+  return coveringAbsences(absences, workDate).find(
+    (row) =>
+      normalizeReason(row.reason_name) === 'annual leave' &&
+      row.is_half_day !== true
+  );
+}
+
+function dateNeedsUkBankHolidayCalendar(
+  absences: EligibleAbsenceRow[],
+  workDate: string
+): boolean {
+  return !findFlaggedBankHolidayAbsence(absences, workDate) &&
+    Boolean(findCoveringAnnualLeaveAbsence(absences, workDate));
+}
+
+function resolveEligibleBankHolidayAbsence(
+  absences: EligibleAbsenceRow[],
+  workDate: string,
+  ukBankHolidayDates: ReadonlySet<string> | null
+): EligibleAbsenceRow {
+  const flagged = findFlaggedBankHolidayAbsence(absences, workDate);
+  if (flagged) return flagged;
+
+  const coveringLeave = findCoveringAnnualLeaveAbsence(absences, workDate);
+  if (coveringLeave) {
+    if (!ukBankHolidayDates) {
+      throw new TimesheetBankHolidayWorkError(
+        'CALENDAR_UNAVAILABLE',
+        'Unable to verify UK bank holidays',
+        409
+      );
+    }
+    if (ukBankHolidayDates.has(workDate)) {
+      return coveringLeave;
+    }
+    throw invalidInput('Standard annual leave cannot be confirmed as bank-holiday work');
   }
-  return match;
+
+  throw invalidInput('Each date must be a booked full-day bank holiday');
+}
+
+async function loadUkBankHolidayDatesIfNeeded(
+  absences: EligibleAbsenceRow[],
+  dates: string[],
+  loadUkBankHolidayDates: () => Promise<Set<string>>
+): Promise<Set<string> | null> {
+  if (!dates.some((date) => dateNeedsUkBankHolidayCalendar(absences, date))) {
+    return null;
+  }
+
+  try {
+    const loaded = await loadUkBankHolidayDates();
+    if (loaded.size === 0) {
+      throw new Error('UK bank holiday calendar was empty');
+    }
+    return loaded;
+  } catch (error) {
+    if (error instanceof TimesheetBankHolidayWorkError) throw error;
+    throw new TimesheetBankHolidayWorkError(
+      'CALENDAR_UNAVAILABLE',
+      'Unable to verify UK bank holidays',
+      409
+    );
+  }
 }
 
 async function loadConfirmationEvidence(
@@ -298,6 +363,9 @@ export async function assertSubmittedBankHolidayHoursConfirmed(
     userId: string;
     weekEnding: string;
     entries: BankHolidayWorkHoursInput[];
+  },
+  options?: {
+    loadUkBankHolidayDates?: () => Promise<Set<string>>;
   }
 ): Promise<void> {
   const enabled = await isTrialEnabled(client);
@@ -307,11 +375,19 @@ export async function assertSubmittedBankHolidayHoursConfirmed(
   if (workingDates.length === 0) return;
 
   const absences = await loadWeekAbsences(client, input.userId, input.weekEnding, 'share');
+  const ukBankHolidayDates = await loadUkBankHolidayDatesIfNeeded(
+    absences,
+    workingDates,
+    options?.loadUkBankHolidayDates || fetchUKBankHolidaysStrict
+  );
   const requiredEvidence = workingDates.flatMap((date) => {
     try {
-      const absence = resolveEligibleBankHolidayAbsence(absences, date);
+      const absence = resolveEligibleBankHolidayAbsence(absences, date, ukBankHolidayDates);
       return [{ workDate: date, absenceId: absence.id }];
-    } catch {
+    } catch (error) {
+      if (error instanceof TimesheetBankHolidayWorkError && error.code === 'CALENDAR_UNAVAILABLE') {
+        throw error;
+      }
       return [];
     }
   });
@@ -340,6 +416,7 @@ export async function assertSubmittedBankHolidayHoursConfirmed(
 export async function confirmBankHolidayWork(options: {
   input: ConfirmBankHolidayWorkInput;
   createClient?: BankHolidayWorkPgClientFactory;
+  loadUkBankHolidayDates?: () => Promise<Set<string>>;
 }): Promise<ConfirmBankHolidayWorkResult> {
   const { input } = options;
   if (!UUID_PATTERN.test(input.actorId) || !UUID_PATTERN.test(input.targetUserId)) {
@@ -408,27 +485,40 @@ export async function confirmBankHolidayWork(options: {
       input.weekEnding,
       'update'
     );
+    const ukBankHolidayDates = await loadUkBankHolidayDatesIfNeeded(
+      absences,
+      uniqueDates,
+      options.loadUkBankHolidayDates || fetchUKBankHolidaysStrict
+    );
     const eligible = uniqueDates.map((date) => ({
       date,
-      absence: resolveEligibleBankHolidayAbsence(absences, date),
+      absence: resolveEligibleBankHolidayAbsence(absences, date, ukBankHolidayDates),
     }));
 
-    const absenceIds = Array.from(new Set(eligible.map((row) => row.absence.id)));
-    const updatedAbsences = await client.query<{ id: string }>(
-      `
-        UPDATE public.absences
-        SET allow_timesheet_work_on_leave = TRUE,
-            updated_at = NOW()
-        WHERE id = ANY($1::uuid[])
-          AND is_bank_holiday IS TRUE
-          AND COALESCE(is_half_day, false) = false
-          AND status IN ('approved', 'processed')
-        RETURNING id::text
-      `,
-      [absenceIds]
+    const flaggedAbsenceIds = Array.from(
+      new Set(
+        eligible
+          .filter((row) => row.absence.is_bank_holiday === true && isSingleDayAbsence(row.absence))
+          .map((row) => row.absence.id)
+      )
     );
-    if (updatedAbsences.rows.length !== absenceIds.length) {
-      throw conflict('Bank holiday absence changed before confirmation completed');
+    if (flaggedAbsenceIds.length > 0) {
+      const updatedAbsences = await client.query<{ id: string }>(
+        `
+          UPDATE public.absences
+          SET allow_timesheet_work_on_leave = TRUE,
+              updated_at = NOW()
+          WHERE id = ANY($1::uuid[])
+            AND is_bank_holiday IS TRUE
+            AND COALESCE(is_half_day, false) = false
+            AND status IN ('approved', 'processed')
+          RETURNING id::text
+        `,
+        [flaggedAbsenceIds]
+      );
+      if (updatedAbsences.rows.length !== flaggedAbsenceIds.length) {
+        throw conflict('Bank holiday absence changed before confirmation completed');
+      }
     }
 
     for (const row of eligible) {
@@ -455,8 +545,11 @@ export async function confirmBankHolidayWork(options: {
       .filter((confirmed) => {
         try {
           return (
-            resolveEligibleBankHolidayAbsence(absences, confirmed.work_date).id ===
-            confirmed.absence_id
+            resolveEligibleBankHolidayAbsence(
+              absences,
+              confirmed.work_date,
+              ukBankHolidayDates
+            ).id === confirmed.absence_id
           );
         } catch {
           return false;

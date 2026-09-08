@@ -29,6 +29,23 @@ const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours
  * @param division - Which UK division: 'england-and-wales', 'scotland', or 'northern-ireland'
  * @returns Set of bank holiday dates in YYYY-MM-DD format
  */
+export async function fetchUKBankHolidaysStrict(
+  division: 'england-and-wales' | 'scotland' | 'northern-ireland' = 'england-and-wales'
+): Promise<Set<string>> {
+  const response = await fetch('https://www.gov.uk/bank-holidays.json');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch bank holidays: ${response.statusText}`);
+  }
+
+  const data: BankHolidayData = await response.json();
+  const divisionData = data[division];
+  if (!divisionData?.events?.length) {
+    throw new Error(`UK bank holiday calendar was empty for ${division}`);
+  }
+
+  return new Set(divisionData.events.map((event) => event.date));
+}
+
 export async function fetchUKBankHolidays(
   division: 'england-and-wales' | 'scotland' | 'northern-ireland' = 'england-and-wales'
 ): Promise<Set<string>> {

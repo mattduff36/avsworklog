@@ -5,6 +5,7 @@ import {
   normalizeTimesheetEntriesForOffDays,
   PAID_LEAVE_DAILY_HOURS,
   resolveTimesheetOffDayStates,
+  shouldDisableTimesheetWorkingInputs,
   type TimesheetEntryLike,
 } from '@/lib/utils/timesheet-off-days';
 import { cloneWorkShiftPattern, STANDARD_WORK_SHIFT_PATTERN } from '@/lib/utils/work-shifts';
@@ -76,6 +77,93 @@ describe('timesheet off-day resolver', () => {
     const tuesday = states.find((row) => row.day_of_week === 2);
     expect(tuesday?.isBankHoliday).toBe(true);
     expect(tuesday?.isLeaveLocked).toBe(false);
+  });
+
+  it('BH-TRIAL-UNLOCK-002 unlocks only the calendar bank-holiday day inside unflagged annual leave', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-23',
+          end_date: '2026-03-27',
+          status: 'approved',
+          is_half_day: false,
+          is_bank_holiday: false,
+          allow_timesheet_work_on_leave: false,
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN,
+      {
+        bankHolidaySelfOverrideEnabled: true,
+        ukBankHolidayDates: new Set(['2026-03-24']),
+      }
+    );
+
+    const monday = states.find((row) => row.day_of_week === 1);
+    const tuesday = states.find((row) => row.day_of_week === 2);
+    const wednesday = states.find((row) => row.day_of_week === 3);
+    expect(monday?.isLeaveLocked).toBe(true);
+    expect(monday?.isBankHoliday).toBe(false);
+    expect(tuesday?.isBankHoliday).toBe(true);
+    expect(tuesday?.isLeaveLocked).toBe(false);
+    expect(wednesday?.isLeaveLocked).toBe(true);
+  });
+
+  it('BH-TRIAL-UNLOCK-003 keeps neighbouring days locked on a multi-day flagged bank-holiday booking', () => {
+    const states = resolveTimesheetOffDayStates(
+      '2026-03-29',
+      [
+        {
+          date: '2026-03-23',
+          end_date: '2026-03-27',
+          status: 'approved',
+          is_half_day: false,
+          is_bank_holiday: true,
+          allow_timesheet_work_on_leave: false,
+          absence_reasons: { name: 'Annual Leave', is_paid: true },
+        },
+      ],
+      STANDARD_WORK_SHIFT_PATTERN,
+      {
+        bankHolidaySelfOverrideEnabled: true,
+        ukBankHolidayDates: new Set(['2026-03-24']),
+      }
+    );
+
+    const monday = states.find((row) => row.day_of_week === 1);
+    const tuesday = states.find((row) => row.day_of_week === 2);
+    expect(monday?.isLeaveLocked).toBe(true);
+    expect(monday?.isBankHoliday).toBe(false);
+    expect(tuesday?.isBankHoliday).toBe(true);
+    expect(tuesday?.isLeaveLocked).toBe(false);
+  });
+
+  it('BH-FORM-UNLOCK-001 keeps unlocked leave inputs editable while Did Not Work is still on', () => {
+    expect(
+      shouldDisableTimesheetWorkingInputs({
+        isLeaveLocked: false,
+        isOnApprovedLeave: true,
+        didNotWork: true,
+        isPartialLeave: false,
+      })
+    ).toBe(false);
+    expect(
+      shouldDisableTimesheetWorkingInputs({
+        isLeaveLocked: true,
+        isOnApprovedLeave: true,
+        didNotWork: true,
+        isPartialLeave: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldDisableTimesheetWorkingInputs({
+        isLeaveLocked: false,
+        isOnApprovedLeave: false,
+        didNotWork: true,
+        isPartialLeave: false,
+      })
+    ).toBe(true);
   });
 
   it('BH-TRIAL-AL-001 keeps ordinary annual leave locked when the trial is on', () => {

@@ -444,6 +444,7 @@ export function toSubmitEntries(entries: TimesheetSubmitBody['entries']): Adjust
 export async function applyTimesheetSubmit(options: {
   body: TimesheetSubmitBody;
   createClient?: TimesheetSubmitPgClientFactory;
+  loadUkBankHolidayDates?: () => Promise<Set<string>>;
 }): Promise<TimesheetSubmitResult> {
   const persistable = toPersistableEntries(toSubmitEntries(options.body.entries));
   if (persistable.length !== 7) {
@@ -484,12 +485,16 @@ export async function applyTimesheetSubmit(options: {
 
     await applyHeaderDraftFields(client, locked.id, options.body);
     try {
-      await assertSubmittedBankHolidayHoursConfirmed(client, {
-        timesheetId: locked.id,
-        userId: options.body.userId,
-        weekEnding: options.body.weekEnding,
-        entries: options.body.entries,
-      });
+      await assertSubmittedBankHolidayHoursConfirmed(
+        client,
+        {
+          timesheetId: locked.id,
+          userId: options.body.userId,
+          weekEnding: options.body.weekEnding,
+          entries: options.body.entries,
+        },
+        { loadUkBankHolidayDates: options.loadUkBankHolidayDates }
+      );
     } catch (error) {
       if (error instanceof TimesheetBankHolidayWorkError) {
         throw new TimesheetSubmitError(error.code, error.message, error.status);

@@ -47,6 +47,7 @@ import {
   isTimeWithinWorkWindow,
   normalizeTimesheetEntriesForOffDays,
   resolveTimesheetOffDayStates,
+  shouldDisableTimesheetWorkingInputs,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import {
@@ -83,6 +84,7 @@ import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-no
 import { submitTimesheet } from '@/lib/client/timesheet-submit';
 import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
 import {
+  BANK_HOLIDAY_WORK_ENTRY_HELPER,
   shouldReplaceTimesheetDraftEntries,
   type BankHolidayAuthoritativeReadState,
 } from '@/lib/utils/timesheet-bank-holiday-work';
@@ -365,7 +367,10 @@ export function CivilsTimesheet({
           weekEnding,
           filteredAbsences,
           resolvedPattern,
-          { bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled }
+          {
+            bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled,
+            ukBankHolidayDates: bankHolidays,
+          }
         );
 
         if (cancelled) return;
@@ -392,7 +397,7 @@ export function CivilsTimesheet({
     return () => {
       cancelled = true;
     };
-  }, [bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
+  }, [bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, bankHolidays, offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
 
   useEffect(() => {
     if (!existingTimesheetLoaded) return;
@@ -448,7 +453,6 @@ export function CivilsTimesheet({
   }
 
   const isLeaveLockedDay = (dayIndex: number): boolean => Boolean(getOffDayForIndex(dayIndex)?.isLeaveLocked);
-  const isLeaveDay = (dayIndex: number): boolean => Boolean(getOffDayForIndex(dayIndex)?.isOnApprovedLeave);
   const getWorkWindowForDay = (dayIndex: number) => getOffDayForIndex(dayIndex)?.workWindow ?? null;
 
   const toMinutes = (time: string): number => {
@@ -844,7 +848,7 @@ export function CivilsTimesheet({
     
     // Special handling for "did_not_work" toggle
     if (field === 'did_not_work') {
-      if (isLeaveDay(dayIndex)) return;
+      if (isLeaveLockedDay(dayIndex)) return;
       if (value === true) {
         const requiredReason = options?.didNotWorkReason?.trim();
         // Setting did_not_work to true
@@ -943,6 +947,28 @@ export function CivilsTimesheet({
           ...newEntries[dayIndex],
           job_number: '',
           job_numbers: [],
+        };
+      }
+
+      if (
+        newEntries[dayIndex].did_not_work &&
+        (
+          field === 'time_started' ||
+          field === 'time_finished' ||
+          field === 'job_numbers' ||
+          field === 'working_in_yard' ||
+          field === 'night_shift'
+        ) &&
+        (field === 'working_in_yard' || field === 'night_shift' ? value === true : Boolean(
+          field === 'job_numbers'
+            ? Array.isArray(value) && value.some((jobNumber) => jobNumber.trim().length > 0)
+            : typeof value === 'string' && value.trim().length > 0
+        ))
+      ) {
+        newEntries[dayIndex] = {
+          ...newEntries[dayIndex],
+          did_not_work: false,
+          didNotWorkReason: null,
         };
       }
 
@@ -1764,8 +1790,12 @@ export function CivilsTimesheet({
                 const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
                 const hasPendingTrainingBooking = Boolean(dayOffState?.hasPendingTrainingBooking);
                 const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
-                const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
-                const disableWorkingInputs = isLeaveLocked || disableForDidNotWork;
+                const disableWorkingInputs = shouldDisableTimesheetWorkingInputs({
+                  isLeaveLocked,
+                  isOnApprovedLeave: isLeaveDayForRow,
+                  didNotWork: entry.did_not_work,
+                  isPartialLeave,
+                });
                 const disableStatusForTraining = hasTrainingBooking;
                 const disableJobNumberInput = disableWorkingInputs || entry.working_in_yard || hasTrainingBooking;
                 const jobNumberPlaceholder = hasTrainingBooking
@@ -1887,7 +1917,7 @@ export function CivilsTimesheet({
                         <button
                           type="button"
                           onClick={() => handleDidNotWorkToggle(index)}
-                          disabled={isLeaveDayForRow || disableStatusForTraining}
+                          disabled={isLeaveLocked || disableStatusForTraining}
                           className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
                             entry.did_not_work
                               ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
@@ -1968,6 +1998,11 @@ export function CivilsTimesheet({
                                   {halfDayTrainingHelperText}
                                 </p>
                               )}
+                              {dayOffState?.isBankHoliday && !isLeaveLocked && bankHolidayConfirm.trialEnabled ? (
+                                <p className="text-xs text-muted-foreground">
+                                  {BANK_HOLIDAY_WORK_ENTRY_HELPER}
+                                </p>
+                              ) : null}
                             </div>
                           ) : (
                             <p
@@ -2021,8 +2056,12 @@ export function CivilsTimesheet({
                   const hasPendingTrainingBooking = Boolean(dayOffState?.hasPendingTrainingBooking);
                   const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
                   const workWindow = dayOffState?.workWindow ?? null;
-                  const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
-                  const disableWorkingInputs = isLeaveLocked || disableForDidNotWork;
+                  const disableWorkingInputs = shouldDisableTimesheetWorkingInputs({
+                    isLeaveLocked,
+                    isOnApprovedLeave: isLeaveDayForRow,
+                    didNotWork: entry.did_not_work,
+                    isPartialLeave,
+                  });
                   const disableStatusForTraining = hasTrainingBooking;
                   const disableJobNumberInput = disableWorkingInputs || entry.working_in_yard || hasTrainingBooking;
                   const jobNumberPlaceholder = hasTrainingBooking
@@ -2109,7 +2148,7 @@ export function CivilsTimesheet({
                           <button
                             type="button"
                             onClick={() => handleDidNotWorkToggle(index)}
-                            disabled={isLeaveDayForRow || disableStatusForTraining}
+                            disabled={isLeaveLocked || disableStatusForTraining}
                             className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
                               entry.did_not_work
                                 ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
@@ -2194,6 +2233,11 @@ export function CivilsTimesheet({
                                     {halfDayTrainingHelperText}
                                   </p>
                                 )}
+                                {dayOffState?.isBankHoliday && !isLeaveLocked && bankHolidayConfirm.trialEnabled ? (
+                                  <p className="max-w-40 text-[10px] text-muted-foreground">
+                                    {BANK_HOLIDAY_WORK_ENTRY_HELPER}
+                                  </p>
+                                ) : null}
                               </div>
                             ) : (
                               <p

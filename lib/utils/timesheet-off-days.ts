@@ -38,6 +38,18 @@ export interface TimesheetWorkWindow {
   end: string;
 }
 
+export interface TimesheetOffDayResolveOptions {
+  bankHolidaySelfOverrideEnabled?: boolean;
+  ukBankHolidayDates?: ReadonlySet<string> | readonly string[];
+}
+
+export interface TimesheetWorkingInputDisableState {
+  isLeaveLocked: boolean;
+  isOnApprovedLeave: boolean;
+  didNotWork: boolean;
+  isPartialLeave: boolean;
+}
+
 export interface TimesheetOffDayState {
   day_of_week: number;
   date: string;
@@ -117,6 +129,44 @@ function parseDidNotWorkReason(value: string | null | undefined): TimesheetDidNo
 
 function roundHours(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function hasUkBankHolidayDate(
+  dates: TimesheetOffDayResolveOptions['ukBankHolidayDates'],
+  date: string
+): boolean {
+  if (!dates) return false;
+  if ('has' in dates) return dates.has(date);
+  return dates.includes(date);
+}
+
+function isSingleDayAbsence(row: Pick<ApprovedAbsenceForTimesheet, 'date' | 'end_date'>): boolean {
+  return row.date === (row.end_date || row.date);
+}
+
+function trialUnlocksBankHolidayLeave(
+  row: ApprovedAbsenceForTimesheet,
+  options?: TimesheetOffDayResolveOptions & { entryDateIso?: string }
+): boolean {
+  if (!options?.bankHolidaySelfOverrideEnabled) return false;
+  const entryDateIso = options.entryDateIso;
+  const calendarUnlock = Boolean(entryDateIso && hasUkBankHolidayDate(options.ukBankHolidayDates, entryDateIso));
+  const flaggedSingleDayUnlock = Boolean(row.is_bank_holiday) && isSingleDayAbsence(row);
+  return calendarUnlock || flaggedSingleDayUnlock;
+}
+
+export function isUnlockedTimesheetLeaveDay(
+  offDay: Pick<TimesheetOffDayState, 'isOnApprovedLeave' | 'isLeaveLocked'>
+): boolean {
+  return offDay.isOnApprovedLeave && !offDay.isLeaveLocked;
+}
+
+export function shouldDisableTimesheetWorkingInputs(
+  input: TimesheetWorkingInputDisableState
+): boolean {
+  if (input.isLeaveLocked) return true;
+  if (input.isOnApprovedLeave) return false;
+  return input.didNotWork && !input.isPartialLeave;
 }
 
 function hasExplicitWorkingInput(entry: TimesheetEntryLike): boolean {
@@ -223,7 +273,7 @@ function computeWorkedHours(entry: TimesheetEntryLike, offDay: TimesheetOffDaySt
 
 function toLeaveLabel(
   row: ApprovedAbsenceForTimesheet,
-  options?: { bankHolidaySelfOverrideEnabled?: boolean }
+  options?: TimesheetOffDayResolveOptions & { entryDateIso?: string }
 ): TimesheetLeaveLabel {
   const reasonName = row.absence_reasons?.name?.trim() || 'Approved Leave';
   const isHalf = Boolean(row.is_half_day);
@@ -232,11 +282,10 @@ function toLeaveLabel(
   const isTraining = isTrainingReasonName(reasonName);
   const isPending = normalizeReasonName(row.status) === 'pending';
   const trialUnlocksBankHoliday =
-    Boolean(options?.bankHolidaySelfOverrideEnabled) &&
-    Boolean(row.is_bank_holiday) &&
     isAnnualLeave &&
     !isHalf &&
-    !isPending;
+    !isPending &&
+    trialUnlocksBankHolidayLeave(row, options);
   const allowsTimesheetWork =
     isAnnualLeave && (Boolean(row.allow_timesheet_work_on_leave) || trialUnlocksBankHoliday);
 
@@ -257,7 +306,7 @@ export function resolveTimesheetOffDayStates(
   weekEnding: string,
   approvedAbsences: ApprovedAbsenceForTimesheet[],
   pattern?: WorkShiftPattern | null,
-  options?: { bankHolidaySelfOverrideEnabled?: boolean }
+  options?: TimesheetOffDayResolveOptions
 ): TimesheetOffDayState[] {
   return Array.from({ length: 7 }, (_, index) => {
     const dayOfWeek = index + 1;
@@ -274,7 +323,7 @@ export function resolveTimesheetOffDayStates(
     });
 
     const resolvedLabels = dayRows
-      .map((row) => toLeaveLabel(row, options))
+      .map((row) => toLeaveLabel(row, { ...options, entryDateIso }))
       .sort((a, b) => {
         const weight = (session: LeaveSession | 'FULL') => {
           if (session === 'FULL') return 0;
@@ -345,7 +394,23 @@ export function resolveTimesheetOffDayStates(
     const hasPendingTrainingBooking = pendingTrainingAbsenceIds.length > 0 || effectivePendingTrainingLabels.length > 0;
     const isAnnualLeave =
       isOnApprovedLeave && effectiveLeaveLabels.some((label) => normalizeReasonName(label.reasonName) === 'annual leave');
-    const isBankHoliday = dayRows.some((row) => Boolean(row.is_bank_holiday) && normalizeReasonName(row.status) !== 'pending');
+    const isFlaggedBankHoliday = dayRows.some(
+      (row) =>
+        Boolean(row.is_bank_holiday) &&
+        normalizeReasonName(row.status) !== 'pending' &&
+        (isSingleDayAbsence(row) || hasUkBankHolidayDate(options?.ukBankHolidayDates, entryDateIso))
+    );
+    const isCalendarBankHolidayLeave =
+      hasUkBankHolidayDate(options?.ukBankHolidayDates, entryDateIso) &&
+      dayRows.some((row) => {
+        const reasonName = normalizeReasonName(row.absence_reasons?.name);
+        return (
+          reasonName === 'annual leave' &&
+          !row.is_half_day &&
+          normalizeReasonName(row.status) !== 'pending'
+        );
+      });
+    const isBankHoliday = isFlaggedBankHoliday || isCalendarBankHolidayLeave;
 
     return {
       day_of_week: dayOfWeek,

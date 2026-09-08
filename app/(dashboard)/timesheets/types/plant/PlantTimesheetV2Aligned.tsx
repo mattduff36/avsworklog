@@ -60,6 +60,7 @@ import {
   isTimeWithinWorkWindow,
   normalizeTimesheetEntriesForOffDays,
   resolveTimesheetOffDayStates,
+  shouldDisableTimesheetWorkingInputs,
 } from '@/lib/utils/timesheet-off-days';
 import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
 import {
@@ -95,7 +96,10 @@ import {
 import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-not-work-bookings';
 import { submitTimesheet } from '@/lib/client/timesheet-submit';
 import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
-import type { BankHolidayAuthoritativeReadState } from '@/lib/utils/timesheet-bank-holiday-work';
+import {
+  BANK_HOLIDAY_WORK_ENTRY_HELPER,
+  type BankHolidayAuthoritativeReadState,
+} from '@/lib/utils/timesheet-bank-holiday-work';
 import type { WorkShiftPattern } from '@/types/work-shifts';
 import {
   buildValidationErrors,
@@ -763,7 +767,10 @@ export function PlantTimesheetV2({
           weekEnding,
           filteredAbsences,
           resolvedPattern,
-          { bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled }
+          {
+            bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled,
+            ukBankHolidayDates: bankHolidays,
+          }
         );
 
         if (cancelled) return;
@@ -790,7 +797,7 @@ export function PlantTimesheetV2({
     return () => {
       cancelled = true;
     };
-  }, [bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
+  }, [bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, bankHolidays, offDayRefreshToken, selectedEmployeeId, supabase, user, weekEnding]);
 
   useEffect(() => {
     if (!existingTimesheetLoaded) return;
@@ -910,6 +917,21 @@ export function PlantTimesheetV2({
       ) as PlantEntryDraft;
       Object.assign(nextTimes, machineMirrorUpdates);
       let updated = recalculateEntry(nextTimes, getRecalculateOptionsForOffDay(offDayState));
+      const enteredWorkingValue =
+        field !== 'did_not_work' &&
+        field !== 'subsistence_payment_required' &&
+        (
+          typeof normalizedValue === 'boolean'
+            ? normalizedValue
+            : String(normalizedValue).trim().length > 0
+        );
+      if (updated.did_not_work && enteredWorkingValue) {
+        updated = {
+          ...updated,
+          did_not_work: false,
+          didNotWorkReason: null,
+        };
+      }
       if (
         (field === 'time_started' || field === 'time_finished') &&
         !hasWorkedTimesForSubsistence(updated)
@@ -939,6 +961,30 @@ export function PlantTimesheetV2({
           ...updated,
           subsistence_payment_required: isRequired,
           remarks: syncSubsistenceRemark(updated.remarks, isRequired),
+        };
+      }
+      const enteredWorkingValue = [
+        updates.time_started,
+        updates.time_finished,
+        updates.job_number,
+        ...(updates.job_numbers || []),
+        updates.operator_travel_hours,
+        updates.operator_yard_hours,
+        updates.machine_travel_hours,
+        updates.machine_start_time,
+        updates.machine_finish_time,
+        updates.machine_standing_hours,
+        updates.maintenance_breakdown_hours,
+      ].some((value) => typeof value === 'string' && value.trim().length > 0)
+        || updates.working_in_yard === true
+        || updates.night_shift === true
+        || (typeof updates.operator_working_hours === 'number' && updates.operator_working_hours > 0)
+        || (typeof updates.machine_working_hours === 'number' && updates.machine_working_hours > 0);
+      if (updated.did_not_work && enteredWorkingValue && updates.did_not_work !== true) {
+        updated = {
+          ...updated,
+          did_not_work: false,
+          didNotWorkReason: null,
         };
       }
       next[dayIndex] = updated;
@@ -1038,6 +1084,7 @@ export function PlantTimesheetV2({
   };
 
   const toggleDidNotWork = (dayIndex: number) => {
+    if (getOffDayForIndex(dayIndex)?.isLeaveLocked) return;
     const currentEntry = entries[dayIndex];
     const nextDidNotWork = !currentEntry.did_not_work;
 
@@ -1822,8 +1869,12 @@ export function PlantTimesheetV2({
                 const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
                 const hasPendingTrainingBooking = Boolean(dayOffState?.hasPendingTrainingBooking);
                 const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
-                const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
-                const disableInputs = isLeaveLocked || disableForDidNotWork;
+                const disableInputs = shouldDisableTimesheetWorkingInputs({
+                  isLeaveLocked,
+                  isOnApprovedLeave: isLeaveDayForRow,
+                  didNotWork: entry.did_not_work,
+                  isPartialLeave,
+                });
                 const disableStatusForTraining = hasTrainingBooking;
                 const disableJobNumberInput = disableInputs || entry.working_in_yard || hasTrainingBooking;
                 const jobNumberPlaceholder = hasTrainingBooking
@@ -1879,6 +1930,11 @@ export function PlantTimesheetV2({
                             {halfDayTrainingHelperText}
                           </p>
                         )}
+                        {dayOffState?.isBankHoliday && !isLeaveLocked && bankHolidayConfirm.trialEnabled ? (
+                          <p className="text-xs text-muted-foreground">
+                            {BANK_HOLIDAY_WORK_ENTRY_HELPER}
+                          </p>
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -2007,7 +2063,7 @@ export function PlantTimesheetV2({
                           <button
                             type="button"
                             onClick={() => toggleDidNotWork(index)}
-                            disabled={isLeaveDayForRow || disableStatusForTraining}
+                            disabled={isLeaveLocked || disableStatusForTraining}
                             className={`flex flex-col items-center justify-center h-24 rounded-lg border-2 transition-all ${
                               entry.did_not_work
                                 ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
@@ -2070,6 +2126,11 @@ export function PlantTimesheetV2({
                                     {halfDayTrainingHelperText}
                                   </p>
                                 )}
+                                {dayOffState?.isBankHoliday && !isLeaveLocked && bankHolidayConfirm.trialEnabled ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    {BANK_HOLIDAY_WORK_ENTRY_HELPER}
+                                  </p>
+                                ) : null}
                               </div>
                             ) : (
                               <p
@@ -2226,8 +2287,12 @@ export function PlantTimesheetV2({
                   const hasTrainingBooking = Boolean(dayOffState?.hasTrainingBooking);
                   const hasPendingTrainingBooking = Boolean(dayOffState?.hasPendingTrainingBooking);
                   const isPartialLeave = Boolean(dayOffState?.isPartialLeave);
-                  const disableForDidNotWork = entry.did_not_work && !isPartialLeave;
-                  const disableInputs = isLeaveLocked || disableForDidNotWork;
+                  const disableInputs = shouldDisableTimesheetWorkingInputs({
+                    isLeaveLocked,
+                    isOnApprovedLeave: isLeaveDayForRow,
+                    didNotWork: entry.did_not_work,
+                    isPartialLeave,
+                  });
                   const workWindow = dayOffState?.workWindow ?? null;
                   const disableStatusForTraining = hasTrainingBooking;
                   const disableJobNumberInput = disableInputs || entry.working_in_yard || hasTrainingBooking;
@@ -2324,7 +2389,7 @@ export function PlantTimesheetV2({
                               <button
                                 type="button"
                                 onClick={() => toggleDidNotWork(index)}
-                                disabled={isLeaveDayForRow || disableStatusForTraining}
+                                disabled={isLeaveLocked || disableStatusForTraining}
                                 className={`flex items-center justify-center w-10 h-10 rounded-lg border-2 transition-all ${
                                   entry.did_not_work
                                     ? 'bg-amber-500/20 border-amber-500 shadow-lg shadow-amber-500/20'
@@ -2408,6 +2473,11 @@ export function PlantTimesheetV2({
                                         {halfDayTrainingHelperText}
                                       </p>
                                     )}
+                                    {dayOffState?.isBankHoliday && !isLeaveLocked && bankHolidayConfirm.trialEnabled ? (
+                                      <p className="max-w-40 text-[10px] text-muted-foreground">
+                                        {BANK_HOLIDAY_WORK_ENTRY_HELPER}
+                                      </p>
+                                    ) : null}
                                   </div>
                                 ) : (
                                   <p
