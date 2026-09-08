@@ -9,7 +9,6 @@ import {
   captureFrozenVerifyCandidate,
   createVerifyProgressReporter,
   resolveTeeVerifyJobs,
-  type TeeVerifyJob,
 } from './automation/tee-parallel-verify';
 import { collectPremiumPacketEvidence } from './automation/tee-premium-packet';
 import {
@@ -25,6 +24,19 @@ import {
   extractPlanContractMarker,
   resolvePlanPath,
 } from './automation/workflow-plan-contract';
+import { runVitestJsonAndPersistLedgerAsync } from './automation/workflow-verification-ledger';
+import {
+  createDefaultDependencies,
+  createLocalTestPostgresOrchestrator,
+  DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
+  deriveCheckoutIdentity,
+  formatLocalTestDatabaseUrl,
+  buildDatabaseComment,
+  getLifecyclePaths,
+  parseLifecycleState,
+  PROVENANCE_ENV_KEYS,
+  validateLocalTestDatabaseUrl,
+} from './local-test-postgres';
 
 function readFlag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -67,6 +79,81 @@ const EXTRA_REQUIRED_TEST_COMMANDS: Record<
     kind: 'db',
   },
 };
+
+const LOCAL_POSTGRES_LEDGER_TEST_IDS = {
+  'DEL-AL-08': DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
+} as const;
+
+function restoreProcessEnv(previous: Record<string, string | undefined>): void {
+  for (const [key, value] of Object.entries(previous)) {
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  }
+}
+
+async function runDisposablePostgresRequiredTestLedger(params: {
+  repoRoot: string;
+  workstreamId: string;
+  requiredId: keyof typeof LOCAL_POSTGRES_LEDGER_TEST_IDS;
+}): Promise<{
+  kind: 'vitest';
+  name: string;
+  files: string[];
+  run: Awaited<ReturnType<typeof runVitestJsonAndPersistLedgerAsync>>;
+}> {
+  const targetFile = LOCAL_POSTGRES_LEDGER_TEST_IDS[params.requiredId];
+  const commandId = `required-test-${params.requiredId}`;
+  const orch = createLocalTestPostgresOrchestrator(
+    createDefaultDependencies({ repoRoot: params.repoRoot })
+  );
+  orch.setTargetTestFile(targetFile);
+  let started = false;
+  const previousEnv: Record<string, string | undefined> = {};
+  const assignEnv = (key: string, value: string) => {
+    if (!(key in previousEnv)) {
+      previousEnv[key] = process.env[key];
+    }
+    process.env[key] = value;
+  };
+  try {
+    await orch.start();
+    started = true;
+    const deps = createDefaultDependencies({ repoRoot: params.repoRoot });
+    const identity = deriveCheckoutIdentity(await deps.realpath(params.repoRoot));
+    const paths = getLifecyclePaths(deps.tmpDir, identity.projectName);
+    const state = parseLifecycleState(await deps.readFile(paths.stateFile));
+    const url = validateLocalTestDatabaseUrl(
+      formatLocalTestDatabaseUrl(identity.hostPort),
+      identity.hostPort
+    );
+    assignEnv('TEST_DATABASE_URL', url);
+    assignEnv(PROVENANCE_ENV_KEYS.marker, buildDatabaseComment(state.projectId, state.nonce));
+    assignEnv(PROVENANCE_ENV_KEYS.project, identity.projectName);
+    assignEnv(PROVENANCE_ENV_KEYS.port, String(identity.hostPort));
+    const run = await runVitestJsonAndPersistLedgerAsync({
+      repoRoot: params.repoRoot,
+      workstreamId: params.workstreamId,
+      commandId,
+      commandType: 'vitest_case',
+      files: [targetFile],
+      requiredIds: [params.requiredId],
+    });
+    return {
+      kind: 'vitest',
+      name: commandId,
+      files: [targetFile],
+      run,
+    };
+  } finally {
+    restoreProcessEnv(previousEnv);
+    if (started) {
+      await orch.stop();
+    }
+  }
+}
 
 async function maybeLiveInventory(liveDb: boolean) {
   if (!liveDb) {
@@ -209,7 +296,12 @@ async function main(): Promise<void> {
   }
 
   const extraIds = requiredTestIds.filter((id) => EXTRA_REQUIRED_TEST_COMMANDS[id]);
-  const extraJobs: Array<TeeVerifyJob<Awaited<ReturnType<typeof runCommandAsync>>>> = [];
+  const extraLedgerIds = requiredTestIds.filter(
+    (id): id is keyof typeof LOCAL_POSTGRES_LEDGER_TEST_IDS =>
+      Object.prototype.hasOwnProperty.call(LOCAL_POSTGRES_LEDGER_TEST_IDS, id)
+  );
+  const extraJobs: NonNullable<Parameters<typeof buildEvidenceManifestAsync>[0]['extraJobs']> =
+    [];
   if (!skipChecks) {
     for (const id of extraIds) {
       const spec = EXTRA_REQUIRED_TEST_COMMANDS[id];
@@ -221,6 +313,21 @@ async function main(): Promise<void> {
         exclusive: true,
         weight: 3,
         run: () => runCommandAsync(repoRoot, spec.name, spec.command, spec.args),
+      });
+    }
+    for (const id of extraLedgerIds) {
+      extraJobs.push({
+        id: `required-test-${id}`,
+        label: `required-test-${id}`,
+        kind: 'db',
+        exclusive: true,
+        weight: 3,
+        run: () =>
+          runDisposablePostgresRequiredTestLedger({
+            repoRoot,
+            workstreamId,
+            requiredId: id,
+          }),
       });
     }
   }

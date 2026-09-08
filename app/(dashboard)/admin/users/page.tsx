@@ -2431,10 +2431,11 @@ export default function UsersAdminPage() {
                       </div>
                       <p className="text-sm text-slate-400 mt-1">
                         Preserve timesheets, inspections, and other submitted work for audits and reporting.
+                        Booked annual leave is removed so it no longer appears on calendars or allocation.
                         User will be marked as &quot;{selectedUser.full_name} (Deleted User)&quot; in all records.
                       </p>
                       <div className="mt-2 text-xs text-muted-foreground">
-                        ✓ Personal account deleted  • ✓ Company data preserved  • ✓ Audit trail maintained
+                        ✓ Personal account deleted  • ✓ Company data kept except booked annual leave  • ✓ Audit trail maintained
                       </div>
                     </div>
                   </div>

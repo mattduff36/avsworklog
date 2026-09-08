@@ -11,6 +11,7 @@ import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 import { toDeletedUserName } from '@/lib/users/deleted-user';
 import { revokeAllAppSessionsForProfile } from '@/lib/server/app-auth/session';
 import { revokeWebAuthnCredentialsForProfile } from '@/lib/server/webauthn/credentials';
+import { removeOpenYearAnnualLeaveBookingsForProfile } from '@/lib/server/delete-user-annual-leave';
 
 function isMissingHierarchySchemaError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -432,17 +433,24 @@ export async function DELETE(
     }
 
     if (mode === 'keep-data') {
-      // MODE 1: Keep company data, only delete user account
-      // Update user's name to mark as deleted (use admin client to bypass RLS)
+      // MODE 1: Keep company data, delete the account, remove booked annual leave.
       const deletedName = toDeletedUserName(userProfile.full_name || 'Unknown');
+      const deletedAt = new Date().toISOString();
 
-      await supabaseAdmin
+      const { error: tombstoneError } = await supabaseAdmin
         .from('profiles')
-        .update({ full_name: deletedName })
+        .update({ full_name: deletedName, deleted_at: deletedAt })
         .eq('id', userId);
 
+      if (tombstoneError) {
+        console.error('Error marking user deleted:', tombstoneError);
+        return NextResponse.json(
+          { error: 'Failed to mark user as deleted' },
+          { status: 500 }
+        );
+      }
+
       // Nullify reviewer/assigner references (keeps audit trail of who created data)
-      // Use admin client to bypass RLS policies
       await supabaseAdmin
         .from('timesheets')
         .update({ reviewed_by: null })
@@ -468,14 +476,12 @@ export async function DELETE(
         .update({ actioned_by: null })
         .eq('actioned_by', userId);
 
-      // Disable the auth user (ban until far future) instead of deleting
-      // This prevents cascade deletion of profile while making account inaccessible
       const farFuture = new Date('2099-12-31').toISOString();
       const banPayload = {
         banned_until: farFuture,
         user_metadata: {
           ...userProfile,
-          deleted_at: new Date().toISOString(),
+          deleted_at: deletedAt,
           account_status: 'deleted'
         }
       } as unknown as Parameters<typeof supabaseAdmin.auth.admin.updateUserById>[1];
@@ -483,8 +489,16 @@ export async function DELETE(
         ...banPayload
       });
 
-      await revokeAllAppSessionsForProfile(userId, 'account_deleted');
-      await revokeWebAuthnCredentialsForProfile(userId);
+      try {
+        await revokeAllAppSessionsForProfile(userId, 'account_deleted');
+        await revokeWebAuthnCredentialsForProfile(userId);
+      } catch (revokeError) {
+        console.error('Error revoking deleted-user access:', revokeError);
+        return NextResponse.json(
+          { error: 'Failed to revoke deleted user access' },
+          { status: 500 }
+        );
+      }
 
       if (banError) {
         console.error('Error disabling user:', banError);
@@ -494,9 +508,19 @@ export async function DELETE(
         );
       }
 
+      try {
+        await removeOpenYearAnnualLeaveBookingsForProfile(supabaseAdmin, userId);
+      } catch (leaveError) {
+        console.error('Error removing booked annual leave:', leaveError);
+        return NextResponse.json(
+          { error: 'Failed to remove booked annual leave' },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json({
         success: true,
-        message: 'User account deleted - company data preserved',
+        message: 'User account deleted - company data preserved except booked annual leave',
         mode: 'keep-data'
       });
     } else {

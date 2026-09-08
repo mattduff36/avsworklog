@@ -22,6 +22,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -42,7 +43,13 @@ export const STATE_VERSION = 1;
 export const DATABASE_COMMENT_PREFIX = 'avsworklog-ltdb';
 export const TARGET_TEST_FILE = 'tests/db/daily-allocation-v2-runtime.test.ts';
 export const HGV_SAVE_TARGET_TEST_FILE = 'tests/db/hgv-inspection-save-rpc.test.ts';
-export const ALLOWED_TARGET_TEST_FILES = [TARGET_TEST_FILE, HGV_SAVE_TARGET_TEST_FILE] as const;
+export const DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE =
+  'tests/db/delete-user-annual-leave-lock.test.ts';
+export const ALLOWED_TARGET_TEST_FILES = [
+  TARGET_TEST_FILE,
+  HGV_SAVE_TARGET_TEST_FILE,
+  DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
+] as const;
 export const HOST_PORT_MIN = 20_000;
 export const HOST_PORT_COUNT = 10_000;
 export const COMPOSE_UP_WAIT_TIMEOUT_SECONDS = 90;
@@ -58,6 +65,36 @@ export const TEMP_SCOPE_DIR_NAME = 'avsworklog-ltdb';
 export const EXPECTED_POSTGRES_MAJOR = 15;
 export const CLEANUP_FAILURE_EXIT_CODE = 1;
 export const DOCKER_OVERRIDE_ENV_KEYS = ['DOCKER_HOST', 'DOCKER_CONTEXT'] as const;
+export const NATIVE_POSTGRES_SHARE_CATALOG = 'postgres.bki';
+
+export type NativePostgresClusterAssessment = {
+  usable: boolean;
+  reason:
+    | 'native-postgres-cluster-capable'
+    | 'native-postgres-server-binaries-missing'
+    | 'native-postgres-share-catalog-missing';
+};
+
+export function nativePostgresShareDir(binDir: string): string {
+  return path.join(path.dirname(binDir), 'share');
+}
+
+export function assessNativePostgresClusterCapability(
+  binDir: string,
+  pathExists: (target: string) => boolean = existsSync,
+): NativePostgresClusterAssessment {
+  const exe = process.platform === 'win32' ? '.exe' : '';
+  const initdb = path.join(binDir, `initdb${exe}`);
+  const postgres = path.join(binDir, `postgres${exe}`);
+  const catalog = path.join(nativePostgresShareDir(binDir), NATIVE_POSTGRES_SHARE_CATALOG);
+  if (!pathExists(initdb) || !pathExists(postgres)) {
+    return { usable: false, reason: 'native-postgres-server-binaries-missing' };
+  }
+  if (!pathExists(catalog)) {
+    return { usable: false, reason: 'native-postgres-share-catalog-missing' };
+  }
+  return { usable: true, reason: 'native-postgres-cluster-capable' };
+}
 
 export const STABLE_IDS = {
   BOOT: 'LTDB-BOOT-001',

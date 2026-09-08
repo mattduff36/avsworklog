@@ -1092,7 +1092,17 @@ export async function buildEvidenceManifestAsync(params: {
   commandResults?: EvidenceCommandResult[];
   verificationLedgerRefs?: VerificationLedgerReference[];
   verificationRequirements?: WorkflowVerificationRequirement[];
-  extraJobs?: Array<TeeVerifyJob<EvidenceCommandResult>>;
+  extraJobs?: Array<
+    TeeVerifyJob<
+      | EvidenceCommandResult
+      | {
+          kind: 'vitest';
+          name: string;
+          files: string[];
+          run: Awaited<ReturnType<typeof runVitestJsonAndPersistLedgerAsync>>;
+        }
+    >
+  >;
   candidate?: FrozenVerifyCandidate;
   progress?: TeeProgressReporter;
   maxJobs?: number;

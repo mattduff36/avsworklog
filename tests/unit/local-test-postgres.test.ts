@@ -42,6 +42,8 @@ import {
   createLocalTestPostgresOrchestrator,
   deriveCheckoutIdentity,
   findFreshnessViolations,
+  assessNativePostgresClusterCapability,
+  nativePostgresShareDir,
   formatLocalTestDatabaseUrl,
   getLifecyclePaths,
   isInheritedDatabaseUrlKey,
@@ -51,6 +53,7 @@ import {
   parseCliCommand,
   parseCliInvocation,
   HGV_SAVE_TARGET_TEST_FILE,
+  DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
   parseDockerResourceLines,
   parseLifecycleState,
   parseLockPid,
@@ -75,6 +78,8 @@ export const EXPECTED_LOCAL_TEST_DB_NPM_SCRIPTS = {
   'test:db:local:stop': 'tsx scripts/local-test-postgres.ts stop',
   'test:db:local': 'tsx scripts/local-test-postgres.ts one-shot',
   'test:db:local:verify-cleanup': 'tsx scripts/local-test-postgres.ts verify-failure-cleanup',
+  'test:db:local:delete-user-leave':
+    'tsx scripts/local-test-postgres.ts one-shot --target tests/db/delete-user-annual-leave-lock.test.ts',
 } as const;
 
 /** Parent integration: after wiring package.json, this must hold. */
@@ -655,9 +660,38 @@ describe('local test postgres contracts', () => {
         command: 'one-shot',
         targetFile: HGV_SAVE_TARGET_TEST_FILE,
       });
+      expect(
+        parseCliInvocation(['one-shot', '--target', DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE])
+      ).toEqual({
+        command: 'one-shot',
+        targetFile: DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
+      });
       expect(() => parseCliInvocation(['one-shot', '--target', 'tests/db/not-allowed.test.ts'])).toThrow(
         LocalTestPostgresError
       );
+    });
+  });
+
+  describe('native PostgreSQL cluster capability', () => {
+    it('requires initdb, postgres, and share/postgres.bki before a disposable cluster is usable', () => {
+      const binDir = path.join('C:', 'Program Files', 'PostgreSQL', '18', 'bin');
+      const exe = process.platform === 'win32' ? '.exe' : '';
+      expect(nativePostgresShareDir(binDir)).toBe(
+        path.join('C:', 'Program Files', 'PostgreSQL', '18', 'share')
+      );
+      expect(
+        assessNativePostgresClusterCapability(binDir, (target) =>
+          target.endsWith(`${path.sep}initdb${exe}`) || target.endsWith(`${path.sep}postgres${exe}`)
+        )
+      ).toEqual({ usable: false, reason: 'native-postgres-share-catalog-missing' });
+      expect(assessNativePostgresClusterCapability(binDir, () => false)).toEqual({
+        usable: false,
+        reason: 'native-postgres-server-binaries-missing',
+      });
+      expect(assessNativePostgresClusterCapability(binDir, () => true)).toEqual({
+        usable: true,
+        reason: 'native-postgres-cluster-capable',
+      });
     });
   });
 

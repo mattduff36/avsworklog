@@ -16,6 +16,7 @@ export interface AppAuthTeam {
 export interface AppAuthProfile {
   id: string;
   full_name: string | null;
+  deleted_at?: string | null;
   phone_number: string | null;
   employee_id: string | null;
   avatar_url: string | null;
@@ -35,6 +36,7 @@ export async function getAppAuthProfile(profileId: string, email: string | null)
     .select(`
       id,
       full_name,
+      deleted_at,
       phone_number,
       employee_id,
       avatar_url,

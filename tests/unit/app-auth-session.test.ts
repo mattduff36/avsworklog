@@ -500,6 +500,19 @@ describe('app auth session helpers', () => {
     expect(validation.session).toBeNull();
   });
 
+  it('rejects an otherwise valid session when the profile has deleted_at set', async () => {
+    profileMaybeSingleMock.mockResolvedValueOnce({
+      data: { full_name: 'Tim Wilson', deleted_at: '2026-09-07T10:00:00.000Z' },
+      error: null,
+    });
+
+    const validation = await validateAppSession();
+
+    expect(validation.status).toBe('invalid');
+    expect(validation.failureReason).toBe('account_deleted');
+    expect(validation.session).toBeNull();
+  });
+
   it('does not fall back to a legacy Supabase user when that profile is deleted', async () => {
     getCurrentAppSessionCookiePayloadMock.mockResolvedValueOnce(null);
     getSupabaseUserMock.mockResolvedValueOnce({

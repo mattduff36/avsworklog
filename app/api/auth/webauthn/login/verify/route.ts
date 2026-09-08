@@ -8,7 +8,7 @@ import { clearAllAuthCookies } from '@/lib/server/app-auth/response';
 import { setAppSessionCookieInResponse } from '@/lib/server/app-auth/cookies';
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { issueAppSession, revokeAppSession, validateAppSession, DeletedAccountSessionError } from '@/lib/server/app-auth/session';
-import { isDeletedUserName } from '@/lib/users/deleted-user';
+import { isDeletedProfile } from '@/lib/users/deleted-user';
 import { getWebAuthnRequestConfig } from '@/lib/server/webauthn/config';
 import { trackServerUsageEvent } from '@/lib/server/user-analytics';
 import { getInventoryKioskPostLoginPath } from '@/lib/server/inventory-kiosk';
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
       validateAppSession(),
       getInventoryKioskPostLoginPath(credential.profile_id),
     ]);
-    if (isDeletedUserName(profile.full_name)) {
+    if (isDeletedProfile(profile)) {
       await trackServerUsageEvent({
         eventName: 'auth_login_failed',
         userId: credential.profile_id,

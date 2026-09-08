@@ -4,8 +4,9 @@
 
 ## Prerequisites
 
-- Docker Desktop (Linux containers) must be installed and running.
-- Confirm Compose works before starting:
+- Docker Desktop (Linux containers) is one optional way to provide disposable real PostgreSQL. It is not required if a complete native PostgreSQL server install can create a loopback-only cluster.
+- A usable native server needs `initdb`, `postgres`, and `share/postgres.bki`. Command-line tools alone, or `postgres.exe` without that catalog file, cannot create a cluster and are not sufficient.
+- Confirm Compose works before starting the Docker path:
 
 ```bash
 docker compose version
@@ -26,6 +27,8 @@ PostgreSQL **15** is the local major. The Compose tag is major-only (`postgres:1
 Prefer the one-shot command:
 
 - `test:db:local` runs `tsx scripts/local-test-postgres.ts one-shot`. It starts, runs the target suite once, then stops and proves cleanup.
+- `test:db:local:hgv-save` runs the same one-shot against `tests/db/hgv-inspection-save-rpc.test.ts`.
+- `test:db:local:delete-user-leave` runs `tsx scripts/local-test-postgres.ts one-shot --target tests/db/delete-user-annual-leave-lock.test.ts` (`DEL-AL-08`). A skipped or PGlite-only run is not a pass.
 - `test:db:local:start` runs `tsx scripts/local-test-postgres.ts start` to create a fresh disposable instance after recovery teardown.
 - `test:db:local:run` runs `tsx scripts/local-test-postgres.ts run` exactly once against the started instance.
 - `test:db:local:stop` runs `tsx scripts/local-test-postgres.ts stop`, including `down --volumes --remove-orphans`, then proves owned resources are absent.

@@ -56,6 +56,7 @@ vi.mock('@/lib/server/app-auth/session', () => ({
   issueAppSession: issueAppSessionMock,
   revokeAppSession: revokeAppSessionMock,
   validateAppSession: validateAppSessionMock,
+  DeletedAccountSessionError: class DeletedAccountSessionError extends Error {},
 }));
 
 vi.mock('@/lib/server/app-auth/profile', () => ({
@@ -193,6 +194,48 @@ describe('auth webauthn login verify route', () => {
       id: 'profile-1',
       email: 'person@example.com',
       full_name: 'Person One (Deleted User)',
+      phone_number: null,
+      employee_id: null,
+      avatar_url: null,
+      must_change_password: false,
+      role: null,
+      team: null,
+    });
+
+    const request = new Request('http://localhost/api/auth/webauthn/login/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        challenge: 'challenge-1',
+        response: {
+          id: 'credential-1',
+          rawId: 'credential-1',
+          type: 'public-key',
+          response: {
+            authenticatorData: 'authenticator-data',
+            clientDataJSON: 'client-data',
+            signature: 'signature',
+            userHandle: 'user-handle',
+          },
+          clientExtensionResults: {},
+        },
+      }),
+    });
+
+    const response = await verifyPost(request as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload.error).toBe('Biometric login failed');
+    expect(issueAppSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects biometric login when deleted_at is set', async () => {
+    getAppAuthProfileMock.mockResolvedValue({
+      id: 'profile-1',
+      email: 'person@example.com',
+      full_name: 'Person One',
+      deleted_at: '2026-09-07T10:00:00.000Z',
       phone_number: null,
       employee_id: null,
       avatar_url: null,

@@ -17,7 +17,7 @@ import {
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { randomToken, sha256Hex } from '@/lib/server/app-auth/jwt';
 import { upsertWebAuthnDevice, getWebAuthnDevice } from '@/lib/server/webauthn/devices';
-import { isDeletedUserName } from '@/lib/users/deleted-user';
+import { isDeletedProfile } from '@/lib/users/deleted-user';
 
 export type AppAuthSessionSource =
   | 'password_login'
@@ -194,11 +194,14 @@ async function markDeviceAuthenticated(deviceId: string | null): Promise<void> {
     .eq('id', deviceId);
 }
 
-async function getProfileFullName(profileId: string): Promise<string | null> {
+async function getProfileDeletedState(profileId: string): Promise<{
+  full_name: string | null;
+  deleted_at: string | null;
+} | null> {
   const admin = createAdminClient();
   const { data, error } = await admin
     .from('profiles')
-    .select('full_name')
+    .select('full_name, deleted_at')
     .eq('id', profileId)
     .maybeSingle();
 
@@ -206,12 +209,17 @@ async function getProfileFullName(profileId: string): Promise<string | null> {
     throw new Error(error.message);
   }
 
-  return (data as { full_name?: string | null } | null)?.full_name ?? null;
+  if (!data) return null;
+
+  return {
+    full_name: data.full_name ?? null,
+    deleted_at: data.deleted_at ?? null,
+  };
 }
 
 async function assertProfileCanIssueAppSession(profileId: string): Promise<void> {
-  const fullName = await getProfileFullName(profileId);
-  if (isDeletedUserName(fullName)) {
+  const profile = await getProfileDeletedState(profileId);
+  if (isDeletedProfile(profile)) {
     throw new DeletedAccountSessionError();
   }
 }
@@ -491,8 +499,8 @@ export async function validateAppSession(
     });
   }
 
-  const profileFullName = await getProfileFullName(row.profile_id);
-  if (isDeletedUserName(profileFullName)) {
+  const profileState = await getProfileDeletedState(row.profile_id);
+  if (isDeletedProfile(profileState)) {
     return inactiveSessionResult('invalid', 'account_deleted');
   }
 
@@ -570,7 +578,7 @@ export async function getCurrentAuthenticatedProfileFromSupabase(
 
   const email = options.includeEmail ? user.email || null : null;
   const profile = await getAppAuthProfile(user.id, email);
-  if (isDeletedUserName(profile.full_name)) {
+  if (isDeletedProfile(profile)) {
     return null;
   }
 
