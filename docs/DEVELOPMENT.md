@@ -1,6 +1,6 @@
 # Development (current)
 
-Working guide for Squires. Commands come from root `package.json`. TEE V2.5 owns model-aware workflow selection, lane scaffolding, and completion markers — do not copy that procedure here. Recognised premium models choose DIRECT, TEE-LIGHT, or TEE-FULL; CRITICAL risk alone does not force full protocol ceremony.
+Working guide for Squires. Commands come from root `package.json`. TEE V2.5 owns model-aware workflow selection, lane scaffolding, and completion markers — do not copy that procedure here. Only explicitly registered TEE-autonomous models self-select DIRECT, TEE-LIGHT, or TEE-FULL. GPT-5.6 Sol is autonomous; Cursor Grok 4.6 and unknown models remain TEE-managed and use the lightest-safe normal lane. CRITICAL risk alone does not force autonomous TEE-FULL ceremony.
 
 ## Working method
 

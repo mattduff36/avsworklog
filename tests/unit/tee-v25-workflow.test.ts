@@ -4,8 +4,12 @@ import { spawnSync } from 'child_process';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   WORKFLOW_UNBYPASSABLE_SAFETY_REQUIREMENTS,
+  classifyWorkflowModelAutonomy,
+  isTeeAutonomousModel,
   selectWorkflowTeeMode,
 } from '@/scripts/automation/workflow-model-tier';
+import { buildWorkflowFindings } from '@/scripts/automation/workflow-findings';
+import { validateWorkflowCompletionMarker } from '@/scripts/automation/workflow-marker';
 import {
   applyProtocolTransition,
   readProtocolRecord,
@@ -63,6 +67,7 @@ function premiumContext(
   overrides: Partial<Parameters<typeof selectWorkflowTeeMode>[0]> = {}
 ): Parameters<typeof selectWorkflowTeeMode>[0] {
   return {
+    modelId: 'gpt-5.6-sol-high',
     parentTier: 'premium',
     lane: 'standard',
     complexity: 'small',
@@ -266,6 +271,109 @@ describe('TEE V2.5 owner-controlled successor generations', { timeout: 50_000 },
 });
 
 describe('TEE V2.5 model-aware workflow selection', () => {
+  it('TEE25-AUTONOMY-REGISTRY-020 grants self-selection only to explicit registry members', () => {
+    expect(isTeeAutonomousModel('gpt-5.6-sol-high')).toBe(true);
+    for (const model of [
+      'cursor-grok-4.6-xhigh-fast',
+      'grok-4.6',
+      'gpt-5.5-high',
+      'claude-opus-5-thinking-high',
+      'self-described-capable-model',
+    ]) {
+      expect(isTeeAutonomousModel(model)).toBe(false);
+      expect(
+        selectWorkflowTeeMode(
+          premiumContext({
+            modelId: model,
+            parentTier: 'premium',
+          })
+        )
+      ).toMatchObject({
+        mode: 'tee-managed',
+        source: 'automatic_tee',
+      });
+    }
+  });
+
+  it('TEE25-GROK-MANAGED-021 keeps Grok 4.6 managed and rejects premium marker claims', () => {
+    expect(
+      selectWorkflowTeeMode(
+        premiumContext({
+          modelId: 'cursor-grok-4.6-xhigh-fast',
+          parentTier: 'economical',
+        })
+      )
+    ).toMatchObject({
+      mode: 'tee-managed',
+      source: 'automatic_tee',
+    });
+
+    const parsed = validateWorkflowCompletionMarker({
+      schemaVersion: '4',
+      lane: 'standard',
+      taskId: 'grok-false-premium',
+      taskType: 'change',
+      verification: 'passed',
+      commit: 'completed',
+      handoff: 'completed',
+      teeMode: 'direct',
+      teeModeSource: 'premium_model',
+      executionParentTier: 'premium',
+    });
+    expect(parsed.status).toBe('present');
+    const findings = buildWorkflowFindings({
+      marker: parsed.marker,
+      markerStatus: parsed.status,
+      transcriptSignals: null,
+      observedParentTier: 'economical',
+      observedModelId: 'cursor-grok-4.6-xhigh-fast',
+    });
+    expect(findings.map((finding) => finding.id)).toContain(
+      'unregistered-model-autonomy-claim'
+    );
+  });
+
+  it('TEE25-SOL-AUTONOMOUS-022 keeps GPT-5.6 Sol autonomous', () => {
+    expect(classifyWorkflowModelAutonomy('gpt-5.6-sol-high')).toBe('tee-autonomous');
+    expect(selectWorkflowTeeMode(premiumContext())).toMatchObject({
+      mode: 'direct',
+      source: 'premium_model',
+    });
+  });
+
+  it('TEE25-UNKNOWN-MODEL-MANAGED-023 fails unknown identity toward managed TEE', () => {
+    for (const modelId of [undefined, null, 'unknown-model']) {
+      expect(
+        selectWorkflowTeeMode(
+          premiumContext({
+            modelId,
+            parentTier: modelId ? 'unknown' : 'premium',
+          })
+        )
+      ).toMatchObject({
+        mode: 'tee-managed',
+        source: 'automatic_tee',
+      });
+    }
+  });
+
+  it('TEE25-CHEAP-SIMPLE-LIGHT-024 keeps simple Grok audit work in STANDARD', () => {
+    expect(
+      selectWorkflowTeeMode(
+        premiumContext({
+          modelId: 'cursor-grok-4.6-xhigh-fast',
+          parentTier: 'economical',
+          lane: 'standard',
+          productionDataImpact: 'read-only',
+        })
+      )
+    ).toEqual({
+      mode: 'tee-managed',
+      source: 'automatic_tee',
+      reason: 'tee-managed-standard-lane',
+    });
+  });
+
   it('TEE25-PREMIUM-DIRECT-013 permits recognised premium DIRECT execution', () => {
     expect(selectWorkflowTeeMode(premiumContext())).toMatchObject({
       mode: 'direct',
@@ -307,7 +415,11 @@ describe('TEE V2.5 model-aware workflow selection', () => {
     }
       expect(
         selectWorkflowTeeMode(
-          premiumContext({ parentTier: 'economical', userOverride: 'direct' })
+          premiumContext({
+            modelId: 'cursor-grok-4.6-xhigh-fast',
+            parentTier: 'economical',
+            userOverride: 'direct',
+          })
         )
       ).toMatchObject({
         mode: 'direct',

@@ -17,5 +17,5 @@ alwaysApply: true
 - Treat a post-product-commit release failure as fail-closed: preserve local work, do not push, and follow the printed recovery command.
 - Local commit is not release-ready, and release-ready is not a push.
 - Run `npm run workflow-protocol -- status --blocking` before mutating finalise. Valid split ancestors and exhausted predecessor generations with an owner-authorized successor are historical. Ordinary split/new IDs do not reset review budget. `successor-authorize` may create a fresh owner-authorized generation in the same checkout/branch and must carry unresolved blockers. Review evidence stays bound to its reviewed Git HEAD and working-tree fingerprint. Dry-run is non-mutating. Do not hand-edit protocol JSON.
-- Premium DIRECT/TEE-LIGHT continuation authorization may release old V2.4 workflow locks without rewriting failed historical evidence; normal finalise verification and every genuine safety rule still apply.
+- TEE-autonomous or explicitly owner-directed DIRECT/TEE-LIGHT continuation authorization may release old V2.4 workflow locks without rewriting failed historical evidence; normal finalise verification and every genuine safety rule still apply.
 - Never create or require a branch/worktree merely to reset review state. Optional topology changes require explicit user approval.

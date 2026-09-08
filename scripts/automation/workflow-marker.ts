@@ -33,7 +33,12 @@ export const WORKFLOW_MARKER_SUFFIX = '-->';
 const TASK_TYPES = new Set<WorkflowTaskType>(['change', 'planning', 'review']);
 const RISKS = new Set<WorkflowRisk>(['high', 'routine']);
 const LANES = new Set<WorkflowLane>(['fast', 'standard', 'guarded', 'critical']);
-const TEE_MODES = new Set<WorkflowTeeMode>(['direct', 'tee-light', 'tee-full']);
+const TEE_MODES = new Set<WorkflowTeeMode>([
+  'tee-managed',
+  'direct',
+  'tee-light',
+  'tee-full',
+]);
 const TEE_MODE_SOURCES = new Set([
   'premium_model',
   'owner_override',
@@ -559,7 +564,7 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
     errors.push('parallelismReason must be a non-empty string when provided');
   }
   if (value.teeMode !== undefined && (!teeMode || !TEE_MODES.has(teeMode))) {
-    errors.push('teeMode must be direct|tee-light|tee-full when provided');
+    errors.push('teeMode must be tee-managed|direct|tee-light|tee-full when provided');
   }
   if (
     value.teeModeSource !== undefined &&
@@ -570,6 +575,12 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
   if (teeMode && !teeModeSource) {
     errors.push('teeModeSource is required when teeMode is provided');
   }
+  if (teeMode === 'tee-managed' && teeModeSource !== 'automatic_tee') {
+    errors.push('tee-managed requires automatic_tee source');
+  }
+  if (teeMode === 'tee-managed' && executionParentTier === 'premium') {
+    errors.push('tee-managed cannot claim premium executionParentTier');
+  }
   if (
     reducedCeremonyV4 &&
     teeModeSource !== 'owner_override' &&
@@ -578,11 +589,11 @@ export function validateWorkflowCompletionMarker(value: unknown): ParsedWorkflow
     errors.push('DIRECT/TEE-LIGHT requires owner_override or premium_model source');
   }
   if (
-    reducedCeremonyV4 &&
     teeModeSource === 'premium_model' &&
+    teeMode !== 'tee-managed' &&
     executionParentTier !== 'premium'
   ) {
-    errors.push('premium_model DIRECT/TEE-LIGHT requires premium executionParentTier evidence');
+    errors.push('premium_model autonomy requires premium executionParentTier evidence');
   }
 
   const requiredTests =

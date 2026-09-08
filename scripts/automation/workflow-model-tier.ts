@@ -1,12 +1,13 @@
 import type {
   WorkflowLane,
+  WorkflowModelAutonomy,
   WorkflowParentTier,
   WorkflowRoutingDecision,
   WorkflowTeeMode,
 } from './types';
 
-export const WORKFLOW_MODEL_TIER_REGISTRY_VERSION = '3';
-export const WORKFLOW_COMPATIBLE_MODEL_TIER_REGISTRY_VERSIONS = ['2', '3'] as const;
+export const WORKFLOW_MODEL_TIER_REGISTRY_VERSION = '4';
+export const WORKFLOW_COMPATIBLE_MODEL_TIER_REGISTRY_VERSIONS = ['2', '3', '4'] as const;
 
 export type WorkflowModelRoleKey =
   | 'economical-default'
@@ -46,6 +47,8 @@ export interface WorkflowRoutingContext {
 export type WorkflowRoutingAction = 'ask_switch' | 'pause_for_switch' | 'continue';
 
 export interface WorkflowTeeModeContext {
+  /** Exact active model identity from Cursor telemetry. Missing/unknown is TEE-managed. */
+  modelId: string | null | undefined;
   parentTier: WorkflowParentTier;
   lane: WorkflowLane;
   complexity: 'small' | 'medium' | 'exceptional';
@@ -90,6 +93,10 @@ export const WORKFLOW_MODEL_REGISTRY: WorkflowModelRole[] = [
       'cursor-grok-4.5-high-fast',
       'grok-4.5',
       'grok-4.5-high-fast',
+      'cursor-grok-4.6',
+      'cursor-grok-4.6-xhigh-fast',
+      'grok-4.6',
+      'grok-4.6-xhigh-fast',
       'composer-2.5',
       'composer-2.5-fast',
     ],
@@ -171,6 +178,17 @@ const ECONOMICAL_MODEL_IDS = new Set(
   )
 );
 
+/**
+ * Explicit autonomy allowlist. Role tier, price, context size, or claimed
+ * capability never grants TEE autonomy.
+ */
+export const TEE_AUTONOMOUS_MODEL_IDS = [
+  'gpt-5.6-sol',
+  'gpt-5.6-sol-high',
+  'gpt-5.6-sol[effort=high]',
+] as const;
+const TEE_AUTONOMOUS_MODEL_ID_SET = new Set<string>(TEE_AUTONOMOUS_MODEL_IDS);
+
 const ROLE_BY_KEY = new Map(WORKFLOW_MODEL_REGISTRY.map((role) => [role.role, role]));
 
 export function getWorkflowModelRole(role: string | null | undefined): WorkflowModelRole | null {
@@ -208,13 +226,28 @@ export function isWorkflowModelRegistryVersionCompatible(
   );
 }
 
+/** @deprecated Premium role tier is not an autonomy grant. */
 export function isRecognizedPremiumModel(model: string | null | undefined): boolean {
-  return classifyWorkflowModelTier(model) === 'premium';
+  return isTeeAutonomousModel(model);
+}
+
+export function classifyWorkflowModelAutonomy(
+  model: string | null | undefined
+): WorkflowModelAutonomy {
+  if (!model?.trim()) return 'tee-managed';
+  return TEE_AUTONOMOUS_MODEL_ID_SET.has(model.trim().toLowerCase())
+    ? 'tee-autonomous'
+    : 'tee-managed';
+}
+
+export function isTeeAutonomousModel(model: string | null | undefined): boolean {
+  return classifyWorkflowModelAutonomy(model) === 'tee-autonomous';
 }
 
 /**
  * V2.5 separates task risk from workflow ceremony. CRITICAL is an objective risk
- * fact, while a recognised premium model may still select DIRECT or TEE-LIGHT.
+ * fact, while an explicitly registered autonomous model may still select
+ * DIRECT or TEE-LIGHT.
  */
 export function selectWorkflowTeeMode(
   context: WorkflowTeeModeContext
@@ -227,11 +260,11 @@ export function selectWorkflowTeeMode(
     };
   }
 
-  if (context.parentTier !== 'premium') {
+  if (!isTeeAutonomousModel(context.modelId)) {
     return {
-      mode: 'tee-full',
+      mode: 'tee-managed',
       source: 'automatic_tee',
-      reason: 'economy-or-unknown-model-uses-lane-scaffolding',
+      reason: `tee-managed-${context.lane}-lane`,
     };
   }
 

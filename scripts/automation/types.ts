@@ -159,7 +159,8 @@ export type WorkflowRisk = 'high' | 'routine';
 export type WorkflowLane = 'fast' | 'standard' | 'guarded' | 'critical';
 export type WorkflowExecutionMode = 'agent' | 'multitask';
 /** V2.5 workflow ceremony selected independently from task risk. */
-export type WorkflowTeeMode = 'direct' | 'tee-light' | 'tee-full';
+export type WorkflowTeeMode = 'tee-managed' | 'direct' | 'tee-light' | 'tee-full';
+export type WorkflowModelAutonomy = 'tee-autonomous' | 'tee-managed';
 export type WorkflowExecutionModeDetected = WorkflowExecutionMode | 'unknown';
 export type WorkflowParentTier = 'premium' | 'economical' | 'unknown';
 export type WorkflowRoutingDecision =
@@ -590,6 +591,7 @@ export interface WorkflowStopEvent {
   selectedModel: string;
   selectedModelSource: 'model_id' | 'model' | 'unavailable';
   selectedModelTier: WorkflowParentTier;
+  selectedModelAutonomy?: WorkflowModelAutonomy;
   selectedModelRole?: string;
   status: 'completed' | 'aborted' | 'error' | 'unknown';
   loopCount: number;

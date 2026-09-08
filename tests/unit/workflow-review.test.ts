@@ -294,6 +294,28 @@ describe('workflow-marker', () => {
     ).toMatchObject({ status: 'malformed' });
   });
 
+  it('TEE25-MANAGED-MARKER prevents TEE-managed premium execution claims', () => {
+    const managed = {
+      schemaVersion: '4',
+      lane: 'standard',
+      taskId: 'v25-managed',
+      taskType: 'change',
+      verification: 'passed',
+      commit: 'completed',
+      handoff: 'completed',
+      teeMode: 'tee-managed',
+      teeModeSource: 'automatic_tee',
+      executionParentTier: 'economical',
+    };
+    expect(validateWorkflowCompletionMarker(managed)).toMatchObject({ status: 'present' });
+    expect(
+      validateWorkflowCompletionMarker({
+        ...managed,
+        executionParentTier: 'premium',
+      })
+    ).toMatchObject({ status: 'malformed' });
+  });
+
   it('TEE-V2-CRITICAL-EVIDENCE-001 rejects incomplete critical V4 evidence', () => {
     const incomplete = markerV4('critical');
     delete incomplete.reviewClosure;
@@ -1403,6 +1425,7 @@ describe('workflow-review cadence', () => {
     expect(events[0]?.selectedModel).toBe('composer-2.5-fast');
     expect(events[0]?.selectedModelSource).toBe('model_id');
     expect(events[0]?.selectedModelTier).toBe('economical');
+    expect(events[0]?.selectedModelAutonomy).toBe('tee-managed');
   });
 
   it('creates unique pending follow-up paths and does not persist forbidden fields', async () => {

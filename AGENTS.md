@@ -14,7 +14,7 @@ This file routes agents. It is not a second engineering workflow.
 | How to work, test, and commit | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
 | Auth, permissions, RLS, secrets, production data | [`docs/SECURITY.md`](docs/SECURITY.md) |
 
-Token-Efficient Engineering V2.5 is the active engineering workflow (global Skill). Recognised premium models choose DIRECT, TEE-LIGHT, or TEE-FULL; CRITICAL risk does not by itself force TEE-FULL. Economy models retain automatic lane scaffolding. Do not duplicate TEE lanes, markers, or finalise procedure here. Genuine project data/security/destructive safeguards remain stricter where stated.
+Token-Efficient Engineering V2.5 is the active engineering workflow (global Skill). Only models explicitly registered as TEE-autonomous may self-select DIRECT, TEE-LIGHT, or TEE-FULL; GPT-5.6 Sol is autonomous, while Cursor Grok 4.6 and unknown models remain TEE-managed. CRITICAL risk does not by itself force TEE-FULL, and TEE-managed models retain lightest-safe FAST/STANDARD/GUARDED/CRITICAL routing. Do not duplicate TEE lanes, markers, or finalise procedure here. Genuine project data/security/destructive safeguards remain stricter where stated.
 
 ## Documentation precedence
 

@@ -1,6 +1,7 @@
 import { sanitizeEvidenceLabel } from './workflow-privacy';
 import {
   WORKFLOW_MODEL_TIER_REGISTRY_VERSION,
+  isTeeAutonomousModel,
   isWorkflowModelRegistryVersionCompatible,
 } from './workflow-model-tier';
 import type {
@@ -34,6 +35,7 @@ export function buildWorkflowFindings(params: {
   markerStatus: 'present' | 'missing' | 'malformed';
   transcriptSignals: WorkflowTranscriptSignals | null;
   observedParentTier?: WorkflowParentTier;
+  observedModelId?: string;
   planValidationStatus?: 'present' | 'missing' | 'malformed' | 'not_applicable' | 'unknown';
   planRecommendationAdherence?: WorkflowPlanRecommendationAdherence;
   transcriptStatus?: 'parsed' | 'null' | 'missing' | 'malformed';
@@ -46,6 +48,7 @@ export function buildWorkflowFindings(params: {
     markerStatus,
     transcriptSignals,
     observedParentTier,
+    observedModelId,
     planValidationStatus,
     planRecommendationAdherence,
     transcriptStatus,
@@ -276,12 +279,32 @@ export function buildWorkflowFindings(params: {
 
   const effectiveParentTier =
     observedParentTier === undefined ? marker.executionParentTier ?? 'unknown' : observedParentTier;
+  const claimsPremiumAutonomy = marker.teeModeSource === 'premium_model';
+  if (
+    marker.schemaVersion === '4' &&
+    !isTeeAutonomousModel(observedModelId) &&
+    (claimsPremiumAutonomy ||
+      (observedModelId !== undefined && marker.executionParentTier === 'premium'))
+  ) {
+    findings.push(
+      finding(
+        'unregistered-model-autonomy-claim',
+        'action',
+        'failed',
+        'Completion marker claims unregistered model autonomy',
+        'DIRECT/TEE-LIGHT/TEE-FULL self-selection and premium execution claims require an exact active model ID in the trusted TEE autonomy registry.',
+        [
+          `event:selectedModel=${observedModelId ?? 'unavailable'}`,
+          `marker:teeModeSource=${marker.teeModeSource ?? 'unknown'}`,
+          `marker:executionParentTier=${marker.executionParentTier ?? 'unknown'}`,
+        ]
+      )
+    );
+  }
   const requiresTierCorroboration =
     marker.schemaVersion === '2' ||
     marker.schemaVersion === '3' ||
-    (marker.schemaVersion === '4' &&
-      marker.teeModeSource === 'premium_model' &&
-      (marker.teeMode === 'direct' || marker.teeMode === 'tee-light'));
+    (marker.schemaVersion === '4' && marker.teeModeSource === 'premium_model');
   if (
     requiresTierCorroboration &&
     observedParentTier !== undefined &&

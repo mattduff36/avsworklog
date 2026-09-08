@@ -12,6 +12,7 @@ import {
 } from '@/scripts/automation/workflow-events';
 import type { WorkflowWorkstreamRecord } from '@/scripts/automation/types';
 import {
+  classifyWorkflowModelAutonomy,
   classifyWorkflowModelTier,
   getWorkflowModelRole,
   resolveWorkflowModelRoleKey,
@@ -40,11 +41,14 @@ function openWorkstream(
 
 describe('workflow finalise correlation and registry', () => {
   it('REGISTRY-001: role keys resolve and unknown IDs stay unknown', () => {
-    expect(WORKFLOW_MODEL_TIER_REGISTRY_VERSION).toBe('3');
+    expect(WORKFLOW_MODEL_TIER_REGISTRY_VERSION).toBe('4');
     expect(getWorkflowModelRole('economical-default')?.defaultModelId).toBe('cursor-grok-4.5');
     expect(getWorkflowModelRole('premium-fix-routing')?.tier).toBe('premium');
     expect(classifyWorkflowModelTier('cursor-grok-4.5')).toBe('economical');
+    expect(classifyWorkflowModelTier('cursor-grok-4.6-xhigh-fast')).toBe('economical');
     expect(classifyWorkflowModelTier('gpt-5.6-sol-high')).toBe('premium');
+    expect(classifyWorkflowModelAutonomy('cursor-grok-4.6-xhigh-fast')).toBe('tee-managed');
+    expect(classifyWorkflowModelAutonomy('gpt-5.6-sol-high')).toBe('tee-autonomous');
     expect(classifyWorkflowModelTier('brand-new-model-xyz')).toBe('unknown');
     expect(resolveWorkflowModelRoleKey('unknown-model')).toBe('unknown');
   });

@@ -19,6 +19,7 @@ import {
 import { buildWorkflowFindings, estimatePremiumTokenReduction, ESTIMATE_FORMULA_VERSION } from './workflow-findings';
 import { extractWorkflowCompletionMarker } from './workflow-marker';
 import {
+  classifyWorkflowModelAutonomy,
   classifyWorkflowModelTier,
   resolveWorkflowModelRoleKey,
 } from './workflow-model-tier';
@@ -391,7 +392,7 @@ function writeReviewArtifacts(params: {
       `### Event ${event.eventId}`,
       '',
       `- Month: ${event.monthKey}`,
-      `- Model: ${event.selectedModel} (${event.selectedModelSource}; tier ${event.selectedModelTier ?? 'unknown'})`,
+      `- Model: ${event.selectedModel} (${event.selectedModelSource}; tier ${event.selectedModelTier ?? 'unknown'}; autonomy ${event.selectedModelAutonomy ?? 'tee-managed'})`,
       `- Marker: ${event.markerStatus}`,
       ...event.findings.map(
         (finding) => `- [${finding.severity}/${finding.status}] ${finding.title}: ${finding.detail}`
@@ -469,6 +470,7 @@ export async function buildWorkflowStopEvent(
       : 'unknown';
   const { selectedModel, selectedModelSource } = selectModel(input);
   const selectedModelTier = classifyWorkflowModelTier(selectedModel);
+  const selectedModelAutonomy = classifyWorkflowModelAutonomy(selectedModel);
   const selectedModelRole = resolveWorkflowModelRoleKey(selectedModel);
   const conversationHash = hashIdentifier(input.conversation_id);
   const generationHash = hashIdentifier(input.generation_id || `${input.conversation_id}:${now.toISOString()}`);
@@ -553,6 +555,7 @@ export async function buildWorkflowStopEvent(
     markerStatus: markerParse.status,
     transcriptSignals,
     observedParentTier: selectedModelTier,
+    observedModelId: selectedModel,
     planValidationStatus,
     planRecommendationAdherence,
     transcriptStatus,
@@ -570,6 +573,7 @@ export async function buildWorkflowStopEvent(
     selectedModel,
     selectedModelSource,
     selectedModelTier,
+    selectedModelAutonomy,
     selectedModelRole,
     status,
     loopCount,
