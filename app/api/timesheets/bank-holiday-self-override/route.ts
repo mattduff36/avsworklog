@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { isMissingTimesheetModuleSettingsError } from '@/lib/utils/timesheet-bank-holiday-work';
 
 export async function GET() {
   const supabase = await createClient();
@@ -25,6 +26,12 @@ export async function GET() {
     .maybeSingle();
 
   if (settingsError) {
+    if (isMissingTimesheetModuleSettingsError(settingsError)) {
+      return NextResponse.json({
+        success: true,
+        bankHolidaySelfOverrideEnabled: false,
+      });
+    }
     return NextResponse.json({ error: 'Failed to load timesheet settings' }, { status: 500 });
   }
 

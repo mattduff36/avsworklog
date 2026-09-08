@@ -15,6 +15,7 @@ import {
 import {
   getUnconfirmedBankHolidayDates,
   isBankHolidayConfirmPhrase,
+  isMissingTimesheetModuleSettingsError,
   resolveBankHolidayConfirmGate,
 } from '@/lib/utils/timesheet-bank-holiday-work';
 import { resolveBankHolidayWorkRecipientIds } from '@/lib/server/timesheet-bank-holiday-work-notification';
@@ -171,10 +172,11 @@ class SubmitClient implements TimesheetSubmitPgClient {
 }
 
 describe('bank holiday confirm readiness', () => {
-  it('fails closed until the trial flag is known', () => {
-    expect(resolveBankHolidayConfirmGate({ trialReady: false, trialEnabled: false })).toBe('not-ready');
-    expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: false })).toBe('disabled');
-    expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: true })).toBe('required');
+  it('fails closed until the trial flag and off-day state are known', () => {
+    expect(resolveBankHolidayConfirmGate({ trialReady: false, trialEnabled: false, offDaysReady: true })).toBe('not-ready');
+    expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: true, offDaysReady: false })).toBe('not-ready');
+    expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: false, offDaysReady: true })).toBe('disabled');
+    expect(resolveBankHolidayConfirmGate({ trialReady: true, trialEnabled: true, offDaysReady: true })).toBe('required');
   });
 });
 
@@ -253,6 +255,35 @@ describe('bank holiday self-override confirm', () => {
     ).rejects.toBeInstanceOf(TimesheetBankHolidayWorkError);
     expect(leaveClient.statements.some((sql) => sql.includes('UPDATE public.absences'))).toBe(false);
     expect(leaveClient.statements.some((sql) => sql.includes('ROLLBACK'))).toBe(true);
+  });
+
+  it('treats a missing settings table as trial disabled so existing saves keep working', async () => {
+    const client = new ConfirmClient();
+    const originalQuery = client.query.bind(client);
+    client.query = async (text, values) => {
+      if (String(text).includes('timesheet_module_settings')) {
+        const error = Object.assign(new Error('relation "timesheet_module_settings" does not exist'), {
+          code: '42P01',
+        });
+        throw error;
+      }
+      return originalQuery(text, values);
+    };
+
+    await expect(
+      confirmBankHolidayWork({
+        input: {
+          actorId: OWNER_ID,
+          targetUserId: OWNER_ID,
+          weekEnding: WEEK_ENDING,
+          timesheetId: TIMESHEET_ID,
+          dates: [BANK_HOLIDAY_DATE],
+          phrase: 'BANK HOLIDAY',
+        },
+        createClient: () => client,
+      })
+    ).rejects.toMatchObject({ code: 'TRIAL_DISABLED', status: 409 });
+    expect(client.statements.some((sql) => sql.includes('UPDATE public.absences'))).toBe(false);
   });
 
   it('BH-TRIAL-OFF-001 fails closed when the trial is disabled', async () => {
@@ -352,6 +383,10 @@ describe('bank holiday settings contract', () => {
     expect(sql).not.toContain('FOR INSERT');
     expect(sql).not.toContain('FOR UPDATE');
     expect(sql).toContain('trg_enforce_absence_bank_holiday_provenance');
+    expect(readRoute).toContain('isMissingTimesheetModuleSettingsError');
+    expect(isMissingTimesheetModuleSettingsError({ code: 'PGRST205', message: 'timesheet_module_settings schema cache' })).toBe(true);
+    expect(isMissingTimesheetModuleSettingsError({ code: '42P01', message: 'relation does not exist' })).toBe(true);
+    expect(isMissingTimesheetModuleSettingsError({ code: '42501', message: 'permission denied' })).toBe(false);
   });
 });
 
@@ -409,5 +444,21 @@ describe('bank holiday submit notification contract', () => {
     expect(civilsSave).not.toContain('notifyBankHolidayWorkOnSubmit');
     expect(plantSave).not.toContain('notifyBankHolidayWorkOnSubmit');
     expect(civilsSave).not.toContain('Bank Holiday Warning');
+
+    const detailPage = fs.readFileSync(
+      path.join(process.cwd(), 'app/(dashboard)/timesheets/[id]/page.tsx'),
+      'utf8'
+    );
+    expect(civilsSave).toContain('offDaysReady');
+    expect(plantSave).toContain('offDaysReady');
+    expect(detailPage).toContain('offDaysReady: absencesReady');
+    expect(detailPage).toContain('!absencesReady');
+
+    const modal = fs.readFileSync(
+      path.join(process.cwd(), 'components/timesheets/BankHolidayWorkConfirmModal.tsx'),
+      'utf8'
+    );
+    expect(modal).toContain('isBankHolidayConfirmPhrase');
+    expect(modal).toContain('manager(s) and Payroll (Accounts team)');
   });
 });

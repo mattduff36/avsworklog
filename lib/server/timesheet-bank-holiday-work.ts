@@ -4,6 +4,7 @@ import {
   getTimesheetIsoDateForDay,
   getUnconfirmedBankHolidayDates,
   isBankHolidayConfirmPhrase,
+  isMissingTimesheetModuleSettingsError,
   timesheetEntryHasWorkingHours,
   type BankHolidayWorkHoursInput,
 } from '@/lib/utils/timesheet-bank-holiday-work';
@@ -117,15 +118,31 @@ function enumerateAbsenceDates(row: EligibleAbsenceRow): string[] {
 }
 
 async function isTrialEnabled(client: BankHolidayWorkPgClient): Promise<boolean> {
-  const result = await client.query<{ bank_holiday_self_override_enabled: boolean }>(
-    `
+  try {
+    const result = await client.query<{ bank_holiday_self_override_enabled: boolean }>(
+      `
       SELECT bank_holiday_self_override_enabled
       FROM public.timesheet_module_settings
       WHERE id = TRUE
       LIMIT 1
     `
-  );
-  return result.rows[0]?.bank_holiday_self_override_enabled !== false;
+    );
+    return result.rows[0]?.bank_holiday_self_override_enabled !== false;
+  } catch (error) {
+    if (
+      isMissingTimesheetModuleSettingsError(
+        error && typeof error === 'object'
+          ? {
+              code: 'code' in error ? String(error.code) : undefined,
+              message: error instanceof Error ? error.message : undefined,
+            }
+          : undefined
+      )
+    ) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 async function lockTimesheetById(

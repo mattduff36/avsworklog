@@ -374,6 +374,8 @@ export function PlantTimesheetV2({
     () => applyPendingTrainingBookingsToOffDayStates(offDayStates, pendingDidNotWorkBookings),
     [offDayStates, pendingDidNotWorkBookings]
   );
+  const offDaysReady =
+    Boolean(currentOffDayKey) && !loadingOffDays && offDayKey === currentOffDayKey;
   const bankHolidayConfirm = useBankHolidayWorkConfirm({
     weekEnding,
     userId: selectedEmployeeId || null,
@@ -381,6 +383,7 @@ export function PlantTimesheetV2({
     timesheetType: 'plant',
     templateVersion: 2,
     offDayStates: effectiveOffDayStates,
+    offDaysReady,
     onAdoptTimesheetId: setExistingTimesheetId,
   });
   const offDayMap = useMemo(
@@ -2565,7 +2568,7 @@ export function PlantTimesheetV2({
         <Button
           variant="outline"
           onClick={handleSaveDraft}
-          disabled={saving || !bankHolidayConfirm.trialReady}
+          disabled={saving || !bankHolidayConfirm.trialReady || !offDaysReady}
           className="border-slate-600 text-white hover:bg-slate-800"
         >
           <Save className="h-4 w-4 mr-2" />
@@ -2573,7 +2576,7 @@ export function PlantTimesheetV2({
         </Button>
         <Button
           onClick={handleSubmit}
-          disabled={saving || !bankHolidayConfirm.trialReady}
+          disabled={saving || !bankHolidayConfirm.trialReady || !offDaysReady}
           className="bg-timesheet hover:bg-timesheet/90 text-slate-900 font-semibold"
         >
           {saving ? 'Submitting...' : 'Submit Timesheet'}
@@ -2585,7 +2588,7 @@ export function PlantTimesheetV2({
           <Button
             variant="outline"
             onClick={handleSaveDraft}
-            disabled={saving || !bankHolidayConfirm.trialReady}
+            disabled={saving || !bankHolidayConfirm.trialReady || !offDaysReady}
             className="flex-1 h-14 border-slate-600 text-white hover:bg-slate-800"
           >
             <Save className="h-5 w-5 mr-2" />
@@ -2612,7 +2615,7 @@ export function PlantTimesheetV2({
                 setActiveDay(String(finalIndex));
               }
             }}
-            disabled={saving || !bankHolidayConfirm.trialReady}
+            disabled={saving || !bankHolidayConfirm.trialReady || !offDaysReady}
             className="flex-1 h-14 bg-timesheet hover:bg-timesheet/90 text-slate-900 font-semibold text-base"
           >
             {saving ? 'Submitting...' : (() => {

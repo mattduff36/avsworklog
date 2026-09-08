@@ -20,11 +20,27 @@ export function isBankHolidayConfirmPhrase(value: string): boolean {
   return value.trim().toLowerCase() === BANK_HOLIDAY_CONFIRM_PHRASE.toLowerCase();
 }
 
+export function isMissingTimesheetModuleSettingsError(error: {
+  code?: string | null;
+  message?: string | null;
+} | null | undefined): boolean {
+  if (!error) return false;
+  const code = error.code || '';
+  const message = (error.message || '').toLowerCase();
+  return (
+    code === '42P01' ||
+    code === 'PGRST205' ||
+    (message.includes('timesheet_module_settings') &&
+      (message.includes('does not exist') || message.includes('schema cache')))
+  );
+}
+
 export function resolveBankHolidayConfirmGate(input: {
   trialReady: boolean;
   trialEnabled: boolean;
+  offDaysReady: boolean;
 }): 'not-ready' | 'disabled' | 'required' {
-  if (!input.trialReady) return 'not-ready';
+  if (!input.trialReady || !input.offDaysReady) return 'not-ready';
   return input.trialEnabled ? 'required' : 'disabled';
 }
 

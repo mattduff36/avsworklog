@@ -139,6 +139,7 @@ export default function ViewTimesheetPage() {
   const [decliningTraining, setDecliningTraining] = useState(false);
   const [employeeTeamId, setEmployeeTeamId] = useState<string | null>(null);
   const [approvedAbsences, setApprovedAbsences] = useState<ApprovedAbsenceForTimesheet[]>([]);
+  const [absencesReady, setAbsencesReady] = useState(false);
   const bankHolidayConfirm = useBankHolidayWorkConfirm({
     weekEnding: timesheet?.week_ending || '',
     userId: timesheet?.user_id || null,
@@ -146,10 +147,11 @@ export default function ViewTimesheetPage() {
     timesheetType: timesheet?.timesheet_type === 'plant' ? 'plant' : 'civils',
     templateVersion: timesheet?.template_version === 2 ? 2 : 1,
     offDayStates,
+    offDaysReady: absencesReady,
   });
 
   useEffect(() => {
-    if (!timesheet?.week_ending || !bankHolidayConfirm.trialReady) {
+    if (!timesheet?.week_ending || !bankHolidayConfirm.trialReady || !absencesReady) {
       return;
     }
     setOffDayStates(
@@ -157,7 +159,7 @@ export default function ViewTimesheetPage() {
         bankHolidaySelfOverrideEnabled: bankHolidayConfirm.trialEnabled,
       })
     );
-  }, [approvedAbsences, bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, timesheet?.week_ending]);
+  }, [absencesReady, approvedAbsences, bankHolidayConfirm.trialEnabled, bankHolidayConfirm.trialReady, timesheet?.week_ending]);
 
   const getActionErrorMessage = (err: unknown, fallback: string) => {
     return err instanceof Error && err.message.trim().length > 0 ? err.message : fallback;
@@ -181,6 +183,7 @@ export default function ViewTimesheetPage() {
   const fetchTimesheet = useCallback(async (id: string) => {
     try {
       setError(''); // Clear any previous errors
+      setAbsencesReady(false);
       
       // Fetch timesheet without payroll joins; snapshots load through a scoped API.
       const { data: timesheetData, error: timesheetError } = await supabase
@@ -342,6 +345,8 @@ export default function ViewTimesheetPage() {
       } catch (absenceLookupError) {
         console.warn('Failed to resolve leave state for timesheet details view:', absenceLookupError);
         setApprovedAbsences([]);
+      } finally {
+        setAbsencesReady(true);
       }
       
       // Enable editing for draft or rejected timesheets
@@ -657,6 +662,14 @@ export default function ViewTimesheetPage() {
         errorMessage: 'Timesheet is not ready to save',
       };
     }
+    if (!bankHolidayConfirm.trialReady || !absencesReady) {
+      const errorMessage = 'Bank holiday setting is still loading. Try again in a moment.';
+      setError(errorMessage);
+      return {
+        success: false,
+        errorMessage,
+      };
+    }
 
     setSaving(true);
     setError('');
@@ -838,6 +851,10 @@ export default function ViewTimesheetPage() {
 
   const handleSubmit = async () => {
     if (!timesheet || !user) return;
+    if (!bankHolidayConfirm.trialReady || !absencesReady) {
+      setError('Bank holiday setting is still loading. Try again in a moment.');
+      return;
+    }
     
     if (!signature) {
       setShowSignaturePad(true);
@@ -1904,7 +1921,7 @@ export default function ViewTimesheetPage() {
                 onClick={() => {
                   void handleSave();
                 }}
-                disabled={saving || !bankHolidayConfirm.trialReady}
+                disabled={saving || !bankHolidayConfirm.trialReady || !absencesReady}
               >
                 <Save className="h-4 w-4 mr-2" />
                 {saving ? 'Saving...' : 'Save Changes'}
@@ -1915,7 +1932,7 @@ export default function ViewTimesheetPage() {
             {canSubmit && (
               <Button
                 onClick={handleSubmit}
-                disabled={saving || !bankHolidayConfirm.trialReady}
+                disabled={saving || !bankHolidayConfirm.trialReady || !absencesReady}
               >
                 <Send className="h-4 w-4 mr-2" />
                 {saving ? 'Submitting...' : 'Submit for Approval'}

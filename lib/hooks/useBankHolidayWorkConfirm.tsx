@@ -29,6 +29,7 @@ interface UseBankHolidayWorkConfirmOptions {
   timesheetType: 'civils' | 'plant';
   templateVersion: 1 | 2;
   offDayStates: TimesheetOffDayState[];
+  offDaysReady: boolean;
   onAdoptTimesheetId?: (timesheetId: string) => void;
 }
 
@@ -43,6 +44,7 @@ export function useBankHolidayWorkConfirm(options: UseBankHolidayWorkConfirmOpti
   const pendingResolveRef = useRef<((result: BankHolidayConfirmResult) => void) | null>(null);
   const trialEnabledRef = useRef(false);
   const trialReadyRef = useRef(false);
+  const offDaysReadyRef = useRef(false);
   const confirmedDatesRef = useRef<string[]>([]);
   const timesheetIdRef = useRef<string | null>(options.timesheetId);
   const userIdRef = useRef(options.userId);
@@ -53,6 +55,7 @@ export function useBankHolidayWorkConfirm(options: UseBankHolidayWorkConfirmOpti
   timesheetIdRef.current = options.timesheetId;
   userIdRef.current = options.userId;
   weekEndingRef.current = options.weekEnding;
+  offDaysReadyRef.current = options.offDaysReady;
   onAdoptTimesheetIdRef.current = options.onAdoptTimesheetId;
   bankHolidayDatesRef.current = options.offDayStates
     .filter((state) => state.isBankHoliday)
@@ -118,6 +121,7 @@ export function useBankHolidayWorkConfirm(options: UseBankHolidayWorkConfirmOpti
       const gate = resolveBankHolidayConfirmGate({
         trialReady: trialReadyRef.current,
         trialEnabled: trialEnabledRef.current,
+        offDaysReady: offDaysReadyRef.current,
       });
       if (gate === 'not-ready') {
         toast.error('Bank holiday setting is still loading. Try again in a moment.');
