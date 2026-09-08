@@ -2,6 +2,46 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.9.0
+
+**GIT COMMIT MESSAGE**
+`feat(workflow): upgrade TEE to v2.5`
+
+**PUSHED AT**
+2026-09-08T02:36:45.783Z
+
+**WHAT CHANGED**
+Strengthen service path proof. Record completed reconciliation. Close bank holiday release blockers. Gate TEE autonomy by registry. Fail closed until bank holiday leave state loads. Tombstone keep-data deletes and remove booked leave. Upgrade TEE to v2.5. Paginate audit log search. Fail closed until bank holiday trial flag loads. Keep one assertion block per bank holiday required ID. Clear bank holiday confirm phrase without an effect. Mark bank holiday required tests completed. Add bank holiday self-override trial. Recalculate payroll snapshots from current rule. Lock completed attachments until wrench unlock. Allow override Sundays from rollout. Hide deleted users from operational exports.
+
+**VERSION HISTORY DETAILS**
+- Close bank holiday release blockers, with changes to background routes, app screens, interface components, shared logic, automated tests, and data storage.
+- Updated absence and leave, with changes to background routes, shared logic, automated tests, and data storage.
+- Strengthen service path proof, with changes to background routes, app screens, interface components, shared logic, and automated tests.
+- Paginate audit log search, with changes to background routes, app screens, and automated tests.
+- Hide deleted users from operational exports, with changes to background routes, shared logic, and automated tests.
+- Updated data storage, with changes to shared typing, automated tests, data storage, and documentation.
+- Updated sign in, with changes to background routes, shared logic, and automated tests.
+- Updated admin settings, with changes to background routes and app screens.
+
+**COMMITS IN THIS RELEASE**
+- `test(workshop): strengthen service path proof`
+- `docs(payroll): record completed reconciliation`
+- `fix(timesheets): close bank holiday release blockers`
+- `fix(workflow): gate TEE autonomy by registry`
+- `fix(timesheets): fail closed until bank holiday leave state loads`
+- `fix(admin): tombstone keep-data deletes and remove booked leave`
+- `feat(workflow): upgrade TEE to v2.5`
+- `feat(debug): paginate audit log search`
+- `fix(timesheets): fail closed until bank holiday trial flag loads`
+- `test(timesheets): keep one assertion block per bank holiday required ID`
+- `fix(timesheets): clear bank holiday confirm phrase without an effect`
+- `chore(timesheets): mark bank holiday required tests completed`
+- `feat(timesheets): add bank holiday self-override trial`
+- `fix(timesheets): recalculate payroll snapshots from current rule`
+- `fix(workshop-tasks): lock completed attachments until wrench unlock`
+- `fix(payroll): allow override Sundays from rollout`
+- `fix(reports): hide deleted users from operational exports`
+
 ## 0926.8.0
 
 **GIT COMMIT MESSAGE**
