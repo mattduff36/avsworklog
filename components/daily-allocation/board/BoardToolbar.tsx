@@ -88,7 +88,7 @@ export function BoardToolbar({
   return (
     <div className="flex flex-col gap-3" data-testid="daily-allocation-toolbar">
       <div
-        className="flex flex-nowrap items-center gap-3 overflow-x-auto"
+        className="flex flex-nowrap items-center gap-3 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
         data-testid="daily-allocation-board-title-row"
       >
         {title ? (
@@ -129,14 +129,14 @@ export function BoardToolbar({
         ) : null}
 
         {onJobSearchChange ? (
-          <div className="relative ml-auto w-36 max-w-72 shrink-0">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <div className="relative ml-auto w-40 max-w-72 shrink-0 overflow-hidden">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input
               value={jobSearch || ''}
               onChange={(event) => onJobSearchChange(event.target.value)}
               placeholder="Search jobs"
               aria-label="Search jobs"
-              className="pl-9"
+              className="h-9 overflow-hidden py-0 pl-9 leading-none"
             />
           </div>
         ) : null}

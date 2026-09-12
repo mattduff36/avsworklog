@@ -66,6 +66,8 @@ describe('BoardToolbar', () => {
     const instructionRow = screen.getByTestId('daily-allocation-board-instruction-row');
     expect(titleRow).toHaveClass('flex-nowrap');
     expect(titleRow.className.split(/\s+/)).not.toContain('flex-col');
+    expect(titleRow).toHaveClass('overflow-y-hidden');
+    expect(screen.getByLabelText('Search jobs')).toHaveClass('overflow-hidden');
     expect(titleRow).toContainElement(screen.getByTestId('daily-allocation-view-heading'));
     expect(titleRow).toContainElement(screen.getByLabelText('Search jobs'));
     expect(titleRow).toContainElement(screen.getByLabelText('Active team'));

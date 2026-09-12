@@ -96,6 +96,8 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(resources).not.toContain('h-fit');
     expect(resources).toContain('Drag a job onto the board, or select a job then Add visit.');
     expect(resources).toContain('RESOURCE_GUIDANCE_CLASS');
+    expect(resources).toContain('whitespace-nowrap');
+    expect(resources).toContain('fitSingleLineFontSize');
     expect(resources).not.toContain('Touch: press and hold the grip handle');
 
     const viewportFit = readFileSync(

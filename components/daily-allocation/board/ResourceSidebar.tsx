@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, type MouseEvent } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { AlertTriangle, GripVertical, Search, X } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/react';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,10 @@ import {
   ResourceOccupancyLegend,
   ResourceOccupancyStrip,
 } from '@/components/daily-allocation/board/ResourceOccupancyStrip';
+import {
+  DAILY_ALLOCATION_TAB_FONT_MAX_PX,
+  fitSingleLineFontSize,
+} from '@/components/daily-allocation/board/fit-single-line-font';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { cn } from '@/lib/utils/cn';
 import type {
@@ -101,6 +105,40 @@ function DragHandle({
     >
       <GripVertical aria-hidden="true" className="h-4 w-4" />
     </span>
+  );
+}
+
+function ResourceTabTrigger({
+  value,
+  label,
+  count,
+}: {
+  value: ResourceSidebarTab;
+  label: string;
+  count: number;
+}) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [fontSize, setFontSize] = useState(DAILY_ALLOCATION_TAB_FONT_MAX_PX);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const fit = () => setFontSize(fitSingleLineFontSize(el));
+    fit();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(fit);
+    observer?.observe(el);
+    return () => observer?.disconnect();
+  }, [label, count]);
+
+  return (
+    <TabsTrigger
+      ref={ref}
+      value={value}
+      className="min-w-0 whitespace-nowrap px-1.5"
+      style={{ fontSize }}
+    >
+      {label} ({count})
+    </TabsTrigger>
   );
 }
 
@@ -271,12 +309,12 @@ export function ResourceSidebar({
         >
           <TabsList
             aria-label="Resource type"
-            className="grid w-full grid-cols-3"
+            className="grid w-full grid-cols-3 flex-nowrap"
             data-testid="daily-allocation-resource-tabs"
           >
-            <TabsTrigger value="jobs">Jobs ({filteredJobs.length})</TabsTrigger>
-            <TabsTrigger value="employees">Employees ({filteredEmployees.length})</TabsTrigger>
-            <TabsTrigger value="plant">Plant ({filteredPlant.length})</TabsTrigger>
+            <ResourceTabTrigger value="jobs" label="Jobs" count={filteredJobs.length} />
+            <ResourceTabTrigger value="employees" label="Employees" count={filteredEmployees.length} />
+            <ResourceTabTrigger value="plant" label="Plant" count={filteredPlant.length} />
           </TabsList>
         </Tabs>
 
