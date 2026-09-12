@@ -1,5 +1,25 @@
 [
   {
+    "version": "0926.9.1",
+    "updateKind": "minor",
+    "title": "Timesheets improvements",
+    "description": "Updated app reliability. Unlock bank-holiday hour entry during the trial. Preserve leave-only bank holiday submits.",
+    "summary": "Updated app reliability. Unlock bank-holiday hour entry during the trial. Preserve leave-only bank holiday submits.",
+    "details": [
+      "Unlock bank-holiday hour entry during the trial, with changes to app screens, shared logic, automated tests, and data storage.",
+      "Updated data storage, with changes to data storage."
+    ],
+    "areas": [
+      "App reliability",
+      "Timesheets"
+    ],
+    "areaKeys": [
+      "app-reliability",
+      "timesheets"
+    ],
+    "pushedAt": "2026-09-12T02:07:39.533Z"
+  },
+  {
     "version": "0926.9.0",
     "updateKind": "major",
     "title": "Workflow update",

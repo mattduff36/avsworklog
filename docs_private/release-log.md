@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.9.1
+
+**GIT COMMIT MESSAGE**
+`fix(timesheets): preserve leave-only bank holiday submits`
+
+**PUSHED AT**
+2026-09-12T02:07:39.533Z
+
+**WHAT CHANGED**
+Update app reliability. Unlock bank-holiday hour entry during the trial. Preserve leave-only bank holiday submits.
+
+**VERSION HISTORY DETAILS**
+- Unlock bank-holiday hour entry during the trial, with changes to app screens, shared logic, automated tests, and data storage.
+- Updated data storage, with changes to data storage.
+
+**COMMITS IN THIS RELEASE**
+- `test(tests): update app reliability`
+- `fix(timesheets): unlock bank-holiday hour entry during the trial`
+- `fix(timesheets): preserve leave-only bank holiday submits`
+
 ## 0926.9.0
 
 **GIT COMMIT MESSAGE**
