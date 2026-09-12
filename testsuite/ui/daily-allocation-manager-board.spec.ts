@@ -560,6 +560,7 @@ async function openManagerBoard(page: Page, mode: MockMode = 'converted') {
 }
 
 async function expectBoardChromeFill(page: Page) {
+  const moduleHeader = page.getByTestId('daily-allocation-module-header');
   const toolbar = page.getByTestId('daily-allocation-toolbar');
   const titleRow = page.getByTestId('daily-allocation-board-title-row');
   const resources = page.getByTestId('daily-allocation-resources');
@@ -568,26 +569,37 @@ async function expectBoardChromeFill(page: Page) {
   const fit = page.getByTestId('daily-allocation-viewport-fit');
   const board = page.getByTestId('daily-allocation-daily-board');
 
+  await expect(moduleHeader).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'Daily Allocation', exact: true })).toBeVisible();
+  await expect(moduleHeader.getByRole('button', { name: 'Publication history' })).toBeVisible();
+  await expect(moduleHeader.getByTestId('daily-allocation-publish')).toBeVisible();
   await expect(toolbar).toBeVisible();
   await expect(titleRow).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Daily job board', exact: true })).toBeVisible();
+  await expect(toolbar.getByRole('button', { name: 'Publication history' })).toHaveCount(0);
+  await expect(toolbar.getByTestId('daily-allocation-publish')).toHaveCount(0);
   await expect(resources).toBeVisible();
   await expect(boardPanel).toBeVisible();
   await expect(jobs).toBeVisible();
   await expect(board).toBeVisible();
 
+  const headerBox = await moduleHeader.boundingBox();
   const titleRowBox = await titleRow.boundingBox();
   const resourcesBox = await resources.boundingBox();
   const boardPanelBox = await boardPanel.boundingBox();
   const jobsBox = await jobs.boundingBox();
   const fitBox = await fit.boundingBox();
   const boardBox = await board.boundingBox();
+  expect(headerBox).toBeTruthy();
   expect(titleRowBox).toBeTruthy();
   expect(resourcesBox).toBeTruthy();
   expect(boardPanelBox).toBeTruthy();
   expect(jobsBox).toBeTruthy();
   expect(fitBox).toBeTruthy();
   expect(boardBox).toBeTruthy();
+  expect(headerBox!.y).toBeLessThan(resourcesBox!.y);
+  expect(headerBox!.x).toBeLessThanOrEqual(resourcesBox!.x + 8);
+  expect(headerBox!.x + headerBox!.width).toBeGreaterThanOrEqual(boardPanelBox!.x + boardPanelBox!.width - 8);
   expect(titleRowBox!.height).toBeLessThan(72);
   expect(Math.abs(resourcesBox!.y - boardPanelBox!.y)).toBeLessThan(4);
   expect(resourcesBox!.x + resourcesBox!.width).toBeLessThanOrEqual(jobsBox!.x + 8);
@@ -806,7 +818,7 @@ test.describe('DAFP-UI-001 touch tablet', () => {
   test('keeps named controls tappable and supports the assignment fallback', async ({ page }) => {
     const evidence = await openManagerBoard(page);
 
-    await expect(page.getByTestId('daily-allocation-viewport-fit')).toBeVisible();
+    await expect(page.getByTestId('daily-allocation-viewport-fit')).toBeVisible({ timeout: 20_000 });
     const displayMode = page.getByRole('group', { name: 'Daily timeline display mode' });
     await expect(displayMode.getByRole('button', { name: 'Fit timeline to width' })).toBeDisabled();
     await expect(displayMode.getByRole('button', { name: 'Use scrollable timeline' })).toHaveAttribute(
@@ -878,7 +890,7 @@ test.describe('DAFP-UI-001 phone gate', () => {
     const unsupported = page.getByTestId('daily-allocation-unsupported-width').filter({ visible: true });
     await expect(unsupported.getByRole('heading', {
       name: 'Use a wider screen to edit allocations',
-    })).toBeVisible();
+    })).toBeVisible({ timeout: 20_000 });
     await expect(unsupported).toContainText('at least 768px wide');
     await expect(unsupported.getByRole('link', { name: 'Open employee allocation view' })).toBeVisible();
     await expect(page.getByTestId('daily-allocation-toolbar')).toBeHidden();

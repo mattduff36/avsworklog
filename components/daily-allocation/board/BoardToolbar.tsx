@@ -24,10 +24,6 @@ interface BoardToolbarProps {
   onViewChange: (view: DailyAllocationBoardView) => void;
   primary?: DailyAllocationBoardPrimary;
   onPrimaryChange?: (primary: DailyAllocationBoardPrimary) => void;
-  onPublish: () => void;
-  publishDisabled?: boolean;
-  publishDisabledReason?: string;
-  publishing?: boolean;
   isLoading?: boolean;
   isFetching?: boolean;
   isStale?: boolean;
@@ -42,8 +38,6 @@ interface BoardToolbarProps {
   timelineMode?: DailyAllocationTimelineMode;
   timelineFitEligible?: boolean;
   onTimelineModeChange?: (mode: DailyAllocationTimelineMode) => void;
-  latestPublicationLabel?: string;
-  onOpenHistory?: () => void;
   onAddVisit?: () => void;
   onAssign?: () => void;
   assignDisabled?: boolean;
@@ -62,10 +56,6 @@ export function BoardToolbar({
   onViewChange,
   primary = DAILY_ALLOCATION_BOARD_PRIMARIES.job,
   onPrimaryChange,
-  onPublish,
-  publishDisabled,
-  publishDisabledReason,
-  publishing,
   isLoading,
   isFetching,
   isStale,
@@ -80,8 +70,6 @@ export function BoardToolbar({
   timelineMode = 'fit',
   timelineFitEligible = true,
   onTimelineModeChange,
-  latestPublicationLabel,
-  onOpenHistory,
   onAddVisit,
   onAssign,
   assignDisabled,
@@ -105,12 +93,12 @@ export function BoardToolbar({
       >
         {title ? (
           <div className="flex shrink-0 items-center gap-2">
-            <h1
+            <h2
               className="shrink-0 whitespace-nowrap text-2xl font-semibold leading-none tracking-tight text-foreground"
               data-testid="daily-allocation-view-heading"
             >
               {title}
-            </h1>
+            </h2>
             {titleMeta}
           </div>
         ) : null}
@@ -248,23 +236,6 @@ export function BoardToolbar({
             </Button>
           ) : null}
 
-          {latestPublicationLabel ? (
-            <p className="max-w-44 truncate text-xs text-muted-foreground" title={latestPublicationLabel}>
-              {latestPublicationLabel}
-            </p>
-          ) : null}
-          {onOpenHistory ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className={cn(boardControlStyles.ghost, 'h-8 shrink-0')}
-              onClick={onOpenHistory}
-            >
-              Publication history
-            </Button>
-          ) : null}
-
           <p
             className={cn(
               'truncate text-xs text-muted-foreground',
@@ -275,26 +246,6 @@ export function BoardToolbar({
           >
             {feedback || 'Board ready'}
           </p>
-          {publishDisabled && publishDisabledReason ? (
-            <p
-              id="daily-allocation-publish-reason"
-              className="max-w-40 truncate text-xs text-muted-foreground"
-              data-testid="daily-allocation-publish-reason"
-              title={publishDisabledReason}
-            >
-              {publishDisabledReason}
-            </p>
-          ) : null}
-          <Button
-            size="sm"
-            className={cn(boardControlStyles.primary, 'h-8')}
-            onClick={onPublish}
-            disabled={publishDisabled || publishing}
-            aria-describedby={publishDisabled && publishDisabledReason ? 'daily-allocation-publish-reason' : undefined}
-            data-testid="daily-allocation-publish"
-          >
-            {publishing ? 'Publishing…' : 'Publish'}
-          </Button>
         </div>
       </div>
     </div>

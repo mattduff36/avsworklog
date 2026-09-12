@@ -14,7 +14,7 @@ import {
   type DailyAllocationViewportFit,
 } from '@/components/daily-allocation/board/daily-allocation-viewport-fit';
 
-function UnsupportedWidthMessage() {
+export function DailyAllocationUnsupportedWidthMessage() {
   return (
     <div
       className="flex min-h-[28rem] items-center justify-center rounded-lg border border-slate-700 bg-slate-900 p-6 text-center"
@@ -38,7 +38,13 @@ function UnsupportedWidthMessage() {
   );
 }
 
-export function DailyAllocationViewportFit({ children }: { children: ReactNode }) {
+export function DailyAllocationViewportFit({
+  header,
+  children,
+}: {
+  header?: ReactNode;
+  children: ReactNode;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState<DailyAllocationViewportFit>({ mode: 'full', scale: 1 });
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
@@ -89,29 +95,29 @@ export function DailyAllocationViewportFit({ children }: { children: ReactNode }
   const scale = fit.mode === 'scaled' ? fit.scale : 1;
   return (
     <>
-      <div className="md:hidden">
-        <UnsupportedWidthMessage />
-      </div>
       <div
         ref={rootRef}
-        className="hidden min-h-0 w-full flex-1 overflow-hidden md:flex md:flex-col"
+        className="hidden min-h-0 w-full flex-1 overflow-hidden md:flex md:flex-col md:gap-4"
         style={availableHeight ? { height: availableHeight } : undefined}
         data-testid="daily-allocation-viewport-fit"
         data-viewport-fit={fit.mode}
         data-viewport-scale={scale.toFixed(3)}
       >
+        {header ? <div className="w-full shrink-0">{header}</div> : null}
         {fit.mode === 'blocked' ? (
-          <UnsupportedWidthMessage />
+          <DailyAllocationUnsupportedWidthMessage />
         ) : (
-          <div
-            className="flex h-full min-h-0 min-w-0 flex-1 flex-col origin-top-left"
-            style={{
-              transform: scale < 1 ? `scale(${scale}, 1)` : undefined,
-              width: scale < 1 ? `${100 / scale}%` : '100%',
-              height: availableHeight || undefined,
-            }}
-          >
-            {children}
+          <div className="relative min-h-0 w-full flex-1">
+            <div
+              className="absolute inset-0 flex min-h-0 min-w-0 flex-col origin-top-left"
+              data-testid="daily-allocation-workspace"
+              style={{
+                transform: scale < 1 ? `scale(${scale}, 1)` : undefined,
+                width: scale < 1 ? `${100 / scale}%` : '100%',
+              }}
+            >
+              {children}
+            </div>
           </div>
         )}
       </div>

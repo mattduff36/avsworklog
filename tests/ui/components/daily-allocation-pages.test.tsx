@@ -1434,7 +1434,13 @@ describe('daily allocation manager board', () => {
     expect(screen.getAllByText(/EX-01/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Add visit' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Assign resources' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Publication history' })).toBeInTheDocument();
+    expect(screen.getByTestId('daily-allocation-module-header')).toHaveTextContent('Daily Allocation');
+    expect(screen.getByTestId('daily-allocation-toolbar')).not.toContainElement(
+      screen.getByRole('button', { name: 'Publication history' })
+    );
+    expect(screen.getByTestId('daily-allocation-module-header')).toContainElement(
+      screen.getByRole('button', { name: 'Publication history' })
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Publication history' }));
     expect(await screen.findByText('Revision 1')).toBeInTheDocument();
     expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);

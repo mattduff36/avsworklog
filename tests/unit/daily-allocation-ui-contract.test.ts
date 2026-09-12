@@ -29,7 +29,7 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(board).toContain('Assign resources');
     expect(board).toContain('grid-cols-[350px_minmax(0,1fr)]');
     expect(board).toContain('grid-rows-[minmax(0,1fr)]');
-    expect(board).toContain('flex h-full min-h-0 flex-col');
+    expect(board).toContain('flex h-full min-h-0 flex-1 flex-col');
     expect(board).toContain('daily-allocation-manager-layout');
     expect(board).toContain('daily-allocation-board-panel');
     expect(board).not.toContain('xl:grid-cols-[350px_minmax(0,1fr)]');
@@ -55,15 +55,27 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(dateRange).toContain('EEE d MMM yyyy');
     expect(dateRange).toContain('date-input-compact');
     expect(dateRange).toContain('date-input-overlay');
-    expect(toolbar).toContain('Publish');
+    expect(toolbar).not.toContain('Publication history');
+    expect(toolbar).not.toContain('daily-allocation-publish');
     expect(toolbar).toContain('Active team');
     expect(toolbar).toContain('flex-nowrap');
     expect(toolbar).toContain('Add visit');
-    expect(toolbar).toContain('Publication history');
     expect(toolbar).toContain('daily-allocation-view-heading');
     expect(toolbar).toContain('daily-allocation-board-title-row');
     expect(toolbar).toContain('daily-allocation-board-instruction-row');
     expect(toolbar).toContain('Search jobs');
+
+    const moduleHeader = readFileSync(
+      resolve(process.cwd(), 'components/daily-allocation/board/DailyAllocationModuleHeader.tsx'),
+      'utf8'
+    );
+    expect(moduleHeader).toContain('AppPageHeader');
+    expect(moduleHeader).toContain('Daily Allocation');
+    expect(moduleHeader).toContain('Place timed visits against catalogue jobs');
+    expect(moduleHeader).toContain('Publication history');
+    expect(moduleHeader).toContain('daily-allocation-publish');
+    expect(board).toContain('DailyAllocationModuleHeader');
+    expect(board).toContain('DailyAllocationViewportFit');
 
     expect(board).toContain('dailyTimelineRangeLeft');
     expect(board).toContain('source.kind === \'visit\'');
@@ -92,7 +104,7 @@ describe('DA2-UI-001 manager board contract', () => {
     );
     expect(viewportFit).toContain('md:flex md:flex-col');
     expect(viewportFit).toContain('paddingBottom');
-    expect(viewportFit).toContain('flex h-full min-h-0 min-w-0 flex-1 flex-col origin-top-left');
+    expect(viewportFit).toContain('absolute inset-0 flex min-h-0 min-w-0 flex-col origin-top-left');
     expect(viewportFit).toContain('scale(${scale}, 1)');
 
     const jobsPanel = readFileSync(

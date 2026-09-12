@@ -15,7 +15,6 @@ describe('BoardToolbar', () => {
         view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
         onDateChange={onDateChange}
         onViewChange={vi.fn()}
-        onPublish={vi.fn()}
       />
     );
 
@@ -34,7 +33,6 @@ describe('BoardToolbar', () => {
         view={DAILY_ALLOCATION_BOARD_VIEWS.weekly}
         onDateChange={onDateChange}
         onViewChange={vi.fn()}
-        onPublish={vi.fn()}
       />
     );
 
@@ -51,13 +49,11 @@ describe('BoardToolbar', () => {
         view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
         onDateChange={vi.fn()}
         onViewChange={vi.fn()}
-        onPublish={vi.fn()}
         jobSearch=""
         onJobSearchChange={vi.fn()}
         onTimelineModeChange={vi.fn()}
         onAddVisit={vi.fn()}
         onAssign={vi.fn()}
-        onOpenHistory={vi.fn()}
         teams={[
           { id: 'team-1', name: 'Team One' },
           { id: 'team-2', name: 'Team Two' },
@@ -74,11 +70,10 @@ describe('BoardToolbar', () => {
     expect(titleRow).toContainElement(screen.getByLabelText('Search jobs'));
     expect(titleRow).toContainElement(screen.getByLabelText('Active team'));
     expect(titleRow).toContainElement(screen.getByLabelText('Selected date'));
-    expect(titleRow).not.toContainElement(screen.getByTestId('daily-allocation-publish'));
     expect(instructionRow).toContainElement(screen.getByRole('button', { name: 'Fit timeline to width' }));
     expect(instructionRow).toContainElement(screen.getByRole('button', { name: 'Add visit' }));
-    expect(instructionRow).toContainElement(screen.getByRole('button', { name: 'Publication history' }));
-    expect(instructionRow).toContainElement(screen.getByTestId('daily-allocation-publish'));
+    expect(screen.queryByRole('button', { name: 'Publication history' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('daily-allocation-publish')).not.toBeInTheDocument();
     expect(screen.getByTestId('daily-allocation-view-heading')).toHaveTextContent('Daily job board');
     expect(screen.getByLabelText('Selected date')).toHaveClass('date-input-compact');
     expect(screen.getByLabelText('Selected date')).toHaveClass('date-input-overlay');
@@ -91,7 +86,6 @@ describe('BoardToolbar', () => {
         view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
         onDateChange={vi.fn()}
         onViewChange={vi.fn()}
-        onPublish={vi.fn()}
         timelineMode="fit"
         timelineFitEligible={false}
         onTimelineModeChange={vi.fn()}
@@ -111,7 +105,6 @@ describe('BoardToolbar', () => {
         view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
         onDateChange={vi.fn()}
         onViewChange={vi.fn()}
-        onPublish={vi.fn()}
         teams={[{ id: 'team-1', name: 'Team One' }]}
         activeTeamId="team-1"
         onTeamChange={onTeamChange}
@@ -125,7 +118,6 @@ describe('BoardToolbar', () => {
         view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
         onDateChange={vi.fn()}
         onViewChange={vi.fn()}
-        onPublish={vi.fn()}
         teams={[
           { id: 'team-1', name: 'Team One' },
           { id: 'team-2', name: 'Team Two' },
@@ -146,7 +138,6 @@ describe('BoardToolbar', () => {
         view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
         onDateChange={vi.fn()}
         onViewChange={vi.fn()}
-        onPublish={vi.fn()}
         legacyReview={{ labourCount: 1, plantCount: 2, onReview }}
       />
     );
@@ -158,26 +149,4 @@ describe('BoardToolbar', () => {
     expect(onReview).toHaveBeenCalledTimes(1);
   });
 
-  it('explains why Publish is disabled on an uninitialized date', () => {
-    render(
-      <BoardToolbar
-        selectedDate="2026-08-13"
-        view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
-        onDateChange={vi.fn()}
-        onViewChange={vi.fn()}
-        onPublish={vi.fn()}
-        publishDisabled
-        publishDisabledReason="Add a timed visit before publishing."
-      />
-    );
-
-    expect(screen.getByTestId('daily-allocation-publish')).toBeDisabled();
-    expect(screen.getByTestId('daily-allocation-publish-reason')).toHaveTextContent(
-      'Add a timed visit before publishing.'
-    );
-    expect(screen.getByTestId('daily-allocation-publish')).toHaveAttribute(
-      'aria-describedby',
-      'daily-allocation-publish-reason'
-    );
-  });
 });

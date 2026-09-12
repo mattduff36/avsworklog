@@ -9,7 +9,7 @@ import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAll
 import { LegacyDailyAllocationManager } from '@/components/daily-allocation/LegacyDailyAllocationManager';
 import { DailyAllocationBoardStateProvider } from '@/components/daily-allocation/board/hooks/use-daily-allocation-board';
 import { DailyAllocationManagerBoard } from '@/components/daily-allocation/board/DailyAllocationManagerBoard';
-import { DailyAllocationViewportFit } from '@/components/daily-allocation/board/DailyAllocationViewportFit';
+import { DailyAllocationUnsupportedWidthMessage } from '@/components/daily-allocation/board/DailyAllocationViewportFit';
 import { fetchDailyAllocationRuntime } from '@/lib/client/daily-allocation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
@@ -83,14 +83,19 @@ export default function DailyAllocationBoardPage() {
   }
 
   return (
-    <DailyAllocationBoardStateProvider
-      startDate={week.start}
-      endDate={week.end}
-      selectedDate={selectedDate}
-    >
-      <DailyAllocationViewportFit>
-        <DailyAllocationManagerBoard onSelectedDateChange={setSelectedDate} />
-      </DailyAllocationViewportFit>
-    </DailyAllocationBoardStateProvider>
+    <>
+      <div className="md:hidden">
+        <DailyAllocationUnsupportedWidthMessage />
+      </div>
+      <div className="hidden min-h-0 md:flex md:flex-1 md:flex-col">
+        <DailyAllocationBoardStateProvider
+          startDate={week.start}
+          endDate={week.end}
+          selectedDate={selectedDate}
+        >
+          <DailyAllocationManagerBoard onSelectedDateChange={setSelectedDate} />
+        </DailyAllocationBoardStateProvider>
+      </div>
+    </>
   );
 }

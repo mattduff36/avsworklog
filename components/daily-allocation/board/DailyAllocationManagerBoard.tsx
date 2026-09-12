@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { BoardToolbar } from '@/components/daily-allocation/board/BoardToolbar';
+import { DailyAllocationModuleHeader } from '@/components/daily-allocation/board/DailyAllocationModuleHeader';
+import { DailyAllocationViewportFit } from '@/components/daily-allocation/board/DailyAllocationViewportFit';
 import { ResourceSidebar, type ResourceSidebarTab } from '@/components/daily-allocation/board/ResourceSidebar';
 import { JobsPanel, type DailyAllocationTimelineMode } from '@/components/daily-allocation/board/JobsPanel';
 import {
@@ -1044,6 +1046,10 @@ export function DailyAllocationManagerBoard({
     );
   }
 
+  const latestPublicationLabel = latestPublication
+    ? `Rev ${latestPublication.revision_no}${latestPublication.published_by_name ? ` · ${latestPublication.published_by_name}` : ''}`
+    : undefined;
+
   return (
     <DragDropProvider
       key={dndSessionEpoch}
@@ -1055,9 +1061,24 @@ export function DailyAllocationManagerBoard({
       }}
       onDragEnd={handleDragEnd}
     >
+      <DailyAllocationViewportFit
+        header={(
+          <DailyAllocationModuleHeader
+            latestPublicationLabel={latestPublicationLabel}
+            onOpenHistory={() => setHistoryOpen(true)}
+            onPublish={() => {
+              setUnallocatedConfirm(false);
+              setPublishOpen(true);
+            }}
+            publishDisabled={!converted}
+            publishDisabledReason={!converted ? 'Add a timed visit before publishing.' : undefined}
+            publishing={mutations.publishV2.isPending}
+          />
+        )}
+      >
       <AppPageShell
         width="full"
-        className="flex h-full min-h-0 flex-col gap-4 space-y-0 overflow-hidden"
+        className="flex h-full min-h-0 flex-1 flex-col space-y-0 overflow-hidden"
         onPointerMoveCapture={(event) => {
           pointerX.current = event.clientX;
         }}
@@ -1102,7 +1123,6 @@ export function DailyAllocationManagerBoard({
               <CardHeader className="shrink-0 gap-3">
                 <BoardToolbar
                   title={`${boardState.view === 'daily' ? 'Daily' : 'Weekly'} ${primaryPreference.primary === 'employee' ? 'employee' : primaryPreference.primary} board`}
-                  titleMeta={dailyAllocationBetaBadge}
                   selectedDate={selectedDate}
                   view={boardState.view}
                   onDateChange={handleDateChange}
@@ -1114,12 +1134,6 @@ export function DailyAllocationManagerBoard({
                   timelineMode={timelineMode}
                   timelineFitEligible={timelineFitEligible}
                   onTimelineModeChange={setTimelineMode}
-                  latestPublicationLabel={
-                    latestPublication
-                      ? `Rev ${latestPublication.revision_no}${latestPublication.published_by_name ? ` · ${latestPublication.published_by_name}` : ''}`
-                      : undefined
-                  }
-                  onOpenHistory={() => setHistoryOpen(true)}
                   onAddVisit={() => openAddVisit(
                     selectedResource?.kind === 'job' ? jobResourceKey(selectedResource.job) : '',
                     selectedDate
@@ -1141,13 +1155,6 @@ export function DailyAllocationManagerBoard({
                       ? 'Assign selected resource'
                       : 'Assign resources'
                   }
-                  onPublish={() => {
-                    setUnallocatedConfirm(false);
-                    setPublishOpen(true);
-                  }}
-                  publishDisabled={!converted}
-                  publishDisabledReason={!converted ? 'Add a timed visit before publishing.' : undefined}
-                  publishing={mutations.publishV2.isPending}
                   isLoading={boardState.isBoardLoading}
                   isFetching={boardState.isBoardFetching}
                   isStale={Boolean(boardState.mutationError)}
@@ -1307,6 +1314,7 @@ export function DailyAllocationManagerBoard({
           saving={mutations.convert.isPending}
         />
       </AppPageShell>
+      </DailyAllocationViewportFit>
     </DragDropProvider>
   );
 }
