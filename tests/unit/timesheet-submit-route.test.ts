@@ -8,6 +8,7 @@ import { validateAppSession } from '@/lib/server/app-auth/session';
 import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
 import { applyTimesheetSubmit } from '@/lib/server/timesheet-submit';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import { getEffectiveRole, type EffectiveRoleInfo } from '@/lib/utils/view-as';
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -40,6 +41,9 @@ vi.mock('@/lib/utils/view-as', () => ({
 }));
 vi.mock('@/lib/utils/server-error-logger', () => ({
   logServerError: vi.fn().mockResolvedValue(undefined),
+}));
+vi.mock('@/lib/server/timesheet-bank-holiday-work-notification', () => ({
+  notifyBankHolidayWorkOnSubmit: vi.fn().mockResolvedValue(undefined),
 }));
 
 const ACTOR_ID = '11111111-1111-4111-8111-111111111111';
@@ -95,19 +99,26 @@ function request(body: unknown): NextRequest {
   });
 }
 
-function mockProfileLookup(profileId: string) {
+function mockProfileLookupResult(
+  data: { id: string; team_id: string | null } | null,
+  error: { code?: string; message?: string } | null = null
+) {
   vi.mocked(createAdminClient).mockReturnValue({
     from: vi.fn(() => ({
       select: vi.fn(() => ({
         eq: vi.fn(() => ({
           maybeSingle: vi.fn().mockResolvedValue({
-            data: { id: profileId, team_id: 'team-ops' },
-            error: null,
+            data,
+            error,
           }),
         })),
       })),
     })),
   } as unknown as ReturnType<typeof createAdminClient>);
+}
+
+function mockProfileLookup(profileId: string) {
+  mockProfileLookupResult({ id: profileId, team_id: 'team-ops' });
 }
 
 describe('timesheet submit route', () => {
@@ -137,7 +148,7 @@ describe('timesheet submit route', () => {
     });
   });
 
-  it('TS-SAVE-006 proves owner, scoped authoriser, denied cross-user, and View As', async () => {
+  it('TS-SAVE-006 TS-SUBMIT-AUTH-001 proves owner, scoped authoriser, denied cross-user, and View As', async () => {
     const owner = await POST(request(validBody()));
     expect(owner.status).toBe(200);
     expect(canCurrentActorAuthoriseTimesheetTarget).not.toHaveBeenCalled();
@@ -183,10 +194,25 @@ describe('timesheet submit route', () => {
     expect(applyTimesheetSubmit).toHaveBeenCalledTimes(2);
   });
 
-  it('returns 400 for unknown fields and malformed JSON', async () => {
-    const invalid = await POST(request({ ...validBody(), actorId: ACTOR_ID }));
+  it('TS-SUBMIT-DIAG-001 distinguishes safe malformed, schema, target, and lookup failures', async () => {
+    const sensitiveKey = 'private_field_do_not_log';
+    const sensitiveValue = 'private_value_do_not_log';
+    const invalid = await POST(request({
+      ...validBody(),
+      [sensitiveKey]: sensitiveValue,
+    }));
     expect(invalid.status).toBe(400);
-    await expect(invalid.json()).resolves.toMatchObject({ code: 'INVALID_INPUT' });
+    const invalidBody = await invalid.json();
+    expect(invalidBody).toMatchObject({
+      code: 'INVALID_INPUT',
+      reason: 'SCHEMA_VALIDATION',
+      issues: [expect.objectContaining({
+        code: 'unrecognized_keys',
+        message: 'Unexpected field',
+      })],
+    });
+    expect(JSON.stringify(invalidBody)).not.toContain(sensitiveKey);
+    expect(JSON.stringify(invalidBody)).not.toContain(sensitiveValue);
 
     const malformed = new NextRequest('http://localhost/api/timesheets/submit', {
       method: 'POST',
@@ -195,7 +221,36 @@ describe('timesheet submit route', () => {
     });
     const response = await POST(malformed);
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toMatchObject({ code: 'INVALID_INPUT' });
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'INVALID_INPUT',
+      reason: 'MALFORMED_JSON',
+    });
+
+    mockProfileLookupResult(null);
+    const missingTarget = await POST(request(validBody()));
+    expect(missingTarget.status).toBe(400);
+    await expect(missingTarget.json()).resolves.toMatchObject({
+      code: 'INVALID_INPUT',
+      reason: 'TARGET_NOT_FOUND',
+    });
+
+    mockProfileLookupResult(null, { code: 'PGRST500', message: 'internal lookup details' });
+    const failedLookup = await POST(request(validBody()));
+    expect(failedLookup.status).toBe(500);
+    await expect(failedLookup.json()).resolves.toMatchObject({
+      code: 'SAVE_FAILED',
+      reason: 'TARGET_LOOKUP_FAILED',
+    });
+    expect(logServerError).toHaveBeenCalledWith(expect.objectContaining({
+      error: expect.objectContaining({ message: 'Timesheet target profile lookup failed' }),
+      additionalData: expect.objectContaining({
+        reason: 'TARGET_LOOKUP_FAILED',
+        databaseCode: 'PGRST500',
+      }),
+    }));
+    expect(JSON.stringify(vi.mocked(logServerError).mock.calls)).not.toContain(
+      'internal lookup details'
+    );
     expect(applyTimesheetSubmit).not.toHaveBeenCalled();
   });
 

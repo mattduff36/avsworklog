@@ -241,6 +241,7 @@ function JobCodeFieldRow({
     <Dialog open={isPickerOpen} onOpenChange={handlePickerOpenChange}>
       <DialogContent
         hideCloseButton
+        aria-describedby={undefined}
         className="left-2 right-2 top-[calc(env(safe-area-inset-top,0px)+0.5rem)] flex max-h-[calc(100dvh-1rem)] w-auto max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-hidden rounded-xl border border-slate-700 bg-slate-950 p-4 text-white sm:left-1/2 sm:right-auto sm:top-4 sm:w-[calc(100vw-2rem)] sm:max-w-xl sm:-translate-x-1/2"
         style={pickerViewportStyle}
       >

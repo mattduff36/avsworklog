@@ -43,7 +43,14 @@ import { useInspectionPhotos } from '@/lib/hooks/useInspectionPhotos';
 import { getInspectionPhotoKey } from '@/lib/inspection-photos';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
-import { getInspectionErrorMessage, isDuplicateInspectionError, isMissingDraftError } from '@/lib/utils/inspection-error-handling';
+import {
+  canSubmitAfterLockedDefectsCheck,
+  getInspectionErrorMessage,
+  isDuplicateInspectionError,
+  isMissingDraftError,
+  reportLockedDefectsLoadFailure,
+  type LockedDefectsLoadState,
+} from '@/lib/utils/inspection-error-handling';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { completeInspectionReminder } from '@/lib/client/complete-inspection-reminder';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
@@ -151,6 +158,9 @@ function NewPlantInspectionContent() {
   const activeDraftLoadIdRef = useRef<string | null>(null);
   const loadedDraftIdRef = useRef<string | null>(null);
   const loadLockedDefectsRef = useRef<((plantId: string, mode?: 'replace' | 'merge') => Promise<void>) | null>(null);
+  const lockedDefectsRequestIdRef = useRef(0);
+  const [lockedDefectsLoadState, setLockedDefectsLoadState] = useState<LockedDefectsLoadState>('idle');
+  const [lockedDefectsPlantId, setLockedDefectsPlantId] = useState<string | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const [showDiscardDraftDialog, setShowDiscardDraftDialog] = useState(false);
   const [discardingDraft, setDiscardingDraft] = useState(false);
@@ -200,6 +210,12 @@ function NewPlantInspectionContent() {
   const [hiredPlantIdSerial, setHiredPlantIdSerial] = useState('');
   const [hiredPlantDescription, setHiredPlantDescription] = useState('');
   const [hiredPlantHiringCompany, setHiredPlantHiringCompany] = useState('');
+  const lockedDefectsCheckReady = canSubmitAfterLockedDefectsCheck({
+    isHiredPlant,
+    state: lockedDefectsLoadState,
+    selectedPlantId,
+    checkedPlantId: lockedDefectsPlantId,
+  });
   const [jobSourceType, setJobSourceType] = useState<'live_quote' | 'legacy_quote' | 'project_number' | null>(null);
   const [jobSourceId, setJobSourceId] = useState<string | null>(null);
   const [jobCode, setJobCode] = useState('');
@@ -937,69 +953,84 @@ function NewPlantInspectionContent() {
   }, [canManageCrossUserInspections, user]);
 
   const loadLockedDefects = async (plantId: string, mode: 'replace' | 'merge' = 'replace') => {
+    const requestId = ++lockedDefectsRequestIdRef.current;
+    setLockedDefectsPlantId(plantId);
+    setLockedDefectsLoadState('loading');
+    setError('');
+    setLoggedDefects(new Map());
+    setRecentlyCompletedDefects(new Map());
+    setConfirmedRepeatDefects(new Set());
+    if (mode === 'replace') {
+      setCheckboxStates({});
+      setComments({});
+    }
+
     try {
       const [lockedResponse, recentCompletedResponse] = await Promise.all([
         fetch(`/api/plant-inspections/locked-defects?plantId=${plantId}`),
         fetch(`/api/plant-inspections/recent-completed-defects?plantId=${plantId}&days=7`),
       ]);
-      
-      if (lockedResponse.ok) {
-        const { lockedItems } = await lockedResponse.json();
-        const recentCompletedItems = recentCompletedResponse.ok
-          ? ((await recentCompletedResponse.json()) as {
-              recentlyCompletedItems: Array<{ signature: string; completedAt: string }>;
-            }).recentlyCompletedItems
-          : [];
-        
-        const loggedMap = new Map<string, { comment: string; actionId: string }>();
-        const recentCompletedMap = new Map<string, RecentCompletedDefect>();
 
-        recentCompletedItems.forEach((item) => {
-          recentCompletedMap.set(item.signature, { completedAt: item.completedAt });
-        });
-        
-        lockedItems.forEach((item: { item_number?: string; status?: string; comment?: string; actionId?: string }) => {
-          const key = `${item.item_number ?? ''}`;
-          const statusLabel = 
-            item.status === 'pending' ? 'pending' :
-            item.status === 'on_hold' ? 'on hold' :
-            item.status === 'logged' ? 'logged' :
-            'in progress';
-          loggedMap.set(key, {
-            comment: item.comment || `Defect ${statusLabel} with workshop`,
-            actionId: item.actionId ?? ''
-          });
-        });
-
-        setRecentlyCompletedDefects(recentCompletedMap);
-        setConfirmedRepeatDefects(new Set());
-        setLoggedDefects(loggedMap);
-        const newCheckboxStates: Record<string, InspectionStatus> = {};
-        const newComments: Record<string, string> = {};
-
-        loggedMap.forEach((loggedInfo, itemNum) => {
-          newCheckboxStates[itemNum] = 'attention';
-          newComments[itemNum] = loggedInfo.comment ?? '';
-        });
-
-        if (mode === 'merge') {
-          setCheckboxStates((prev) => ({ ...prev, ...newCheckboxStates }));
-          setComments((prev) => ({ ...prev, ...newComments }));
-        } else {
-          setCheckboxStates(newCheckboxStates);
-          setComments(newComments);
-        }
-      } else {
-        console.error('Failed to fetch locked defects');
-        setRecentlyCompletedDefects(new Map());
-        setConfirmedRepeatDefects(new Set());
-        setError('Warning: Unable to check for existing defects. Please refresh the page before continuing.');
+      if (!lockedResponse.ok || !recentCompletedResponse.ok) {
+        throw new Error(
+          `Locked defect checks failed (${lockedResponse.status}/${recentCompletedResponse.status})`
+        );
       }
+      if (requestId !== lockedDefectsRequestIdRef.current) return;
+
+      const { lockedItems } = await lockedResponse.json();
+      const recentCompletedItems = ((await recentCompletedResponse.json()) as {
+        recentlyCompletedItems: Array<{ signature: string; completedAt: string }>;
+      }).recentlyCompletedItems;
+        
+      const loggedMap = new Map<string, { comment: string; actionId: string }>();
+      const recentCompletedMap = new Map<string, RecentCompletedDefect>();
+
+      recentCompletedItems.forEach((item) => {
+        recentCompletedMap.set(item.signature, { completedAt: item.completedAt });
+      });
+
+      lockedItems.forEach((item: { item_number?: string; status?: string; comment?: string; actionId?: string }) => {
+        const key = `${item.item_number ?? ''}`;
+        const statusLabel =
+          item.status === 'pending' ? 'pending' :
+          item.status === 'on_hold' ? 'on hold' :
+          item.status === 'logged' ? 'logged' :
+          'in progress';
+        loggedMap.set(key, {
+          comment: item.comment || `Defect ${statusLabel} with workshop`,
+          actionId: item.actionId ?? ''
+        });
+      });
+
+      if (requestId !== lockedDefectsRequestIdRef.current) return;
+
+      setRecentlyCompletedDefects(recentCompletedMap);
+      setConfirmedRepeatDefects(new Set());
+      setLoggedDefects(loggedMap);
+      const newCheckboxStates: Record<string, InspectionStatus> = {};
+      const newComments: Record<string, string> = {};
+
+      loggedMap.forEach((loggedInfo, itemNum) => {
+        newCheckboxStates[itemNum] = 'attention';
+        newComments[itemNum] = loggedInfo.comment ?? '';
+      });
+
+      if (mode === 'merge') {
+        setCheckboxStates((prev) => ({ ...prev, ...newCheckboxStates }));
+        setComments((prev) => ({ ...prev, ...newComments }));
+      } else {
+        setCheckboxStates(newCheckboxStates);
+        setComments(newComments);
+      }
+      setLockedDefectsLoadState('ready');
     } catch (err) {
-      console.error('Error loading locked defects:', err);
+      if (requestId !== lockedDefectsRequestIdRef.current) return;
       setLoggedDefects(new Map());
       setRecentlyCompletedDefects(new Map());
       setConfirmedRepeatDefects(new Set());
+      setLockedDefectsLoadState(reportLockedDefectsLoadFailure(err));
+      setError('Unable to check for existing defects. Retry the check before submitting.');
     }
   };
   loadLockedDefectsRef.current = loadLockedDefects;
@@ -1054,6 +1085,17 @@ function NewPlantInspectionContent() {
   const validateAndSubmit = () => {
     if (!isHiredPlant && !selectedPlantId) {
       setError('Please select a plant');
+      setShowConfirmSubmitDialog(false);
+      scrollToTarget(document.getElementById('plant'));
+      return;
+    }
+
+    if (!lockedDefectsCheckReady) {
+      setError(
+        lockedDefectsLoadState === 'loading'
+          ? 'Please wait while existing defects are checked.'
+          : 'Unable to verify existing defects. Retry the check before submitting.'
+      );
       setShowConfirmSubmitDialog(false);
       scrollToTarget(document.getElementById('plant'));
       return;
@@ -1697,8 +1739,11 @@ function NewPlantInspectionContent() {
                 onValueChange={(value) => {
                   setShowDigitGrowthWarningDialog(false);
                   if (value === HIRED_PLANT_SENTINEL) {
+                    lockedDefectsRequestIdRef.current += 1;
                     setIsHiredPlant(true);
                     setSelectedPlantId('');
+                    setLockedDefectsPlantId(null);
+                    setLockedDefectsLoadState('idle');
                     setLoggedDefects(new Map());
                     setRecentlyCompletedDefects(new Map());
                     setConfirmedRepeatDefects(new Set());
@@ -1720,7 +1765,7 @@ function NewPlantInspectionContent() {
                     setConfirmedRepeatDefects(new Set());
                     setPendingRepeatDefect(null);
                     setShowRepeatDefectDialog(false);
-                    loadLockedDefects(value);
+                    void loadLockedDefects(value);
                   }
                 }}
               >
@@ -1772,6 +1817,22 @@ function NewPlantInspectionContent() {
                   })()}
                 </SelectContent>
               </Select>
+              {!isHiredPlant && selectedPlantId && lockedDefectsLoadState === 'loading' && (
+                <p className="text-sm text-muted-foreground">Checking existing defects...</p>
+              )}
+              {!isHiredPlant && selectedPlantId && lockedDefectsLoadState === 'failed' && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm text-red-300">Existing defects could not be verified.</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void loadLockedDefects(selectedPlantId)}
+                  >
+                    Retry check
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -2184,7 +2245,7 @@ function NewPlantInspectionContent() {
           <div className={tabletModeEnabled ? 'hidden' : 'hidden md:flex flex-row gap-3 justify-end pt-4'}>
             <Button
               onClick={handleSubmit}
-              disabled={loading || (!selectedPlantId && !isHiredPlant)}
+              disabled={loading || (!selectedPlantId && !isHiredPlant) || !lockedDefectsCheckReady}
               className="bg-plant-inspection hover:bg-plant-inspection/90 text-slate-900 font-semibold"
             >
               <Send className="h-4 w-4 mr-2" />
@@ -2199,7 +2260,7 @@ function NewPlantInspectionContent() {
       <div className={`${tabletModeEnabled ? 'fixed bottom-0 left-0 right-0' : 'md:hidden fixed bottom-0 left-0 right-0'} bg-slate-900/95 backdrop-blur-xl border-t border-border/50 p-4 z-20`}>
         <Button
           onClick={handleSubmit}
-          disabled={loading || (!selectedPlantId && !isHiredPlant)}
+          disabled={loading || (!selectedPlantId && !isHiredPlant) || !lockedDefectsCheckReady}
           className="w-full h-14 bg-plant-inspection hover:bg-plant-inspection/90 text-slate-900 font-semibold text-base"
         >
           <Send className="h-5 w-5 mr-2" />

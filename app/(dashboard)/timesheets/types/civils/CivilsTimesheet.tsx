@@ -81,7 +81,10 @@ import {
   type PendingDidNotWorkBookingMap,
 } from '@/lib/utils/timesheet-did-not-work-bookings';
 import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-not-work-bookings';
-import { submitTimesheet } from '@/lib/client/timesheet-submit';
+import {
+  logTimesheetSubmitFailure,
+  submitTimesheet,
+} from '@/lib/client/timesheet-submit';
 import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
 import {
   BANK_HOLIDAY_WORK_ENTRY_HELPER,
@@ -1549,8 +1552,7 @@ export function CivilsTimesheet({
         !isNetworkFetchError(err);
 
       if (shouldLogError) {
-        console.error('Error saving timesheet:', err);
-        console.error('Error details:', JSON.stringify(err, null, 2));
+        logTimesheetSubmitFailure(err);
       }
 
       // Handle errors

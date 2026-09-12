@@ -7,6 +7,17 @@ function read(relativePath: string): string {
 }
 
 describe('timesheet submit contracts', () => {
+  it('TS-SUBMIT-SHARED-001 uses one strict client-safe submit schema', () => {
+    const client = read('lib/client/timesheet-submit.ts');
+    const server = read('lib/server/timesheet-submit.ts');
+    const validation = read('lib/validation/timesheet-submit.ts');
+
+    expect(client).toContain("from '@/lib/validation/timesheet-submit'");
+    expect(server).toContain("from '@/lib/validation/timesheet-submit'");
+    expect(validation).toContain('.strict()');
+    expect(validation).toContain('TimesheetSubmitBodySchema');
+  });
+
   it('TS-SAVE-004 ROLLBACK-001 keeps submitted entry writes RLS-blocked and has no owner-create rollback script', () => {
     const dualGate = read('supabase/migrations/20260903_timesheet_dual_gate_approval.sql');
     expect(dualGate).toContain('Users can insert own timesheet entries');
@@ -32,6 +43,12 @@ describe('timesheet submit contracts', () => {
     expect(plant).toContain("timesheetType: 'plant'");
     expect(civils).toContain("from '@/lib/client/timesheet-submit'");
     expect(civils).toContain('submitTimesheet(');
+  });
+
+  it('TS-SUBMIT-LOG-001 logs Civils submit failures once with sanitized diagnostics', () => {
+    const civils = read('app/(dashboard)/timesheets/types/civils/CivilsTimesheet.tsx');
+    expect(civils).toContain('logTimesheetSubmitFailure(err)');
+    expect(civils).not.toContain("console.error('Error details:'");
   });
 
   it('submit route binds app-session identity and stable 400 JSON errors', () => {

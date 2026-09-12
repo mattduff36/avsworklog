@@ -1,9 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  canSubmitAfterLockedDefectsCheck,
   getInspectionErrorMessage,
+  getLockedDefectsFailureLogMethod,
   isDuplicateInspectionError,
   isMissingDraftError,
   isPostgrestNoRowError,
+  reportLockedDefectsLoadFailure,
 } from '@/lib/utils/inspection-error-handling';
 
 describe('inspection-error-handling', () => {
@@ -73,5 +76,50 @@ describe('inspection-error-handling', () => {
         new Error('Failed to update inspection - no rows returned. You may not have permission to edit this inspection.')
       )
     ).toBe(true);
+  });
+
+  it('PI-LOCK-GATE-001 requires a ready check for the selected registered plant', () => {
+    expect(canSubmitAfterLockedDefectsCheck({
+      isHiredPlant: false,
+      state: 'loading',
+      selectedPlantId: 'plant-1',
+      checkedPlantId: 'plant-1',
+    })).toBe(false);
+    expect(canSubmitAfterLockedDefectsCheck({
+      isHiredPlant: false,
+      state: 'failed',
+      selectedPlantId: 'plant-1',
+      checkedPlantId: 'plant-1',
+    })).toBe(false);
+    expect(canSubmitAfterLockedDefectsCheck({
+      isHiredPlant: false,
+      state: 'ready',
+      selectedPlantId: 'plant-2',
+      checkedPlantId: 'plant-1',
+    })).toBe(false);
+    expect(canSubmitAfterLockedDefectsCheck({
+      isHiredPlant: false,
+      state: 'ready',
+      selectedPlantId: 'plant-1',
+      checkedPlantId: 'plant-1',
+    })).toBe(true);
+    expect(canSubmitAfterLockedDefectsCheck({
+      isHiredPlant: true,
+      state: 'idle',
+    })).toBe(true);
+  });
+
+  it('PI-LOCK-NET-001 classifies Safari Load failed as warning-level only', () => {
+    const logger = {
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+    const networkError = new TypeError('Load failed');
+
+    expect(getLockedDefectsFailureLogMethod(networkError)).toBe('warn');
+    expect(reportLockedDefectsLoadFailure(networkError, logger)).toBe('failed');
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.error).not.toHaveBeenCalled();
+    expect(getLockedDefectsFailureLogMethod(new Error('Locked defect checks failed (500/500)'))).toBe('error');
   });
 });

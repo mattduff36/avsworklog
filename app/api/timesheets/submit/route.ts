@@ -9,11 +9,14 @@ import {
 import { canCurrentActorAuthoriseTimesheetTarget } from '@/lib/server/timesheet-approval-scope';
 import {
   TIMESHEET_SUBMIT_FORBIDDEN,
-  TimesheetSubmitBodySchema,
   TimesheetSubmitError,
   applyTimesheetSubmit,
   authorizeTimesheetSubmit,
 } from '@/lib/server/timesheet-submit';
+import {
+  TimesheetSubmitBodySchema,
+  getTimesheetSubmitValidationIssues,
+} from '@/lib/validation/timesheet-submit';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -56,7 +59,11 @@ export async function POST(request: NextRequest) {
     } catch {
       return jsonWithSession(
         session,
-        { error: 'Invalid timesheet submit payload', code: 'INVALID_INPUT' },
+        {
+          error: 'Invalid timesheet submit payload',
+          code: 'INVALID_INPUT',
+          reason: 'MALFORMED_JSON',
+        },
         400
       );
     }
@@ -64,7 +71,12 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return jsonWithSession(
         session,
-        { error: 'Invalid timesheet submit payload', code: 'INVALID_INPUT' },
+        {
+          error: 'Invalid timesheet submit payload',
+          code: 'INVALID_INPUT',
+          reason: 'SCHEMA_VALIDATION',
+          issues: getTimesheetSubmitValidationIssues(parsed.error),
+        },
         400
       );
     }
@@ -75,10 +87,37 @@ export async function POST(request: NextRequest) {
       .select('id, team_id')
       .eq('id', parsed.data.userId)
       .maybeSingle();
-    if (targetError || !target) {
+    if (targetError) {
+      await logServerError({
+        error: new Error('Timesheet target profile lookup failed'),
+        request,
+        componentName: 'timesheet-submit',
+        additionalData: {
+          route: '/api/timesheets/submit',
+          reason: 'TARGET_LOOKUP_FAILED',
+          databaseCode: targetError.code || null,
+        },
+        userId: actorId,
+        userEmail: session.email || null,
+      });
       return jsonWithSession(
         session,
-        { error: 'Invalid timesheet submit payload', code: 'INVALID_INPUT' },
+        {
+          error: 'Failed to submit timesheet',
+          code: 'SAVE_FAILED',
+          reason: 'TARGET_LOOKUP_FAILED',
+        },
+        500
+      );
+    }
+    if (!target) {
+      return jsonWithSession(
+        session,
+        {
+          error: 'Invalid timesheet submit payload',
+          code: 'INVALID_INPUT',
+          reason: 'TARGET_NOT_FOUND',
+        },
         400
       );
     }

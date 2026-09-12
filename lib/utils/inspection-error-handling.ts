@@ -1,3 +1,5 @@
+import { isNetworkFetchError } from '@/lib/utils/http-error';
+
 function extractInspectionErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -24,6 +26,38 @@ function extractInspectionErrorCode(error: unknown): string {
 
 const INSPECTION_WRITE_MISS_MESSAGE =
   'This draft could not be saved. It may have been submitted, removed, or your session may have expired. Refresh and try again.';
+
+export type LockedDefectsLoadState = 'idle' | 'loading' | 'ready' | 'failed';
+
+export function canSubmitAfterLockedDefectsCheck(input: {
+  isHiredPlant: boolean;
+  state: LockedDefectsLoadState;
+  selectedPlantId?: string | null;
+  checkedPlantId?: string | null;
+}): boolean {
+  if (input.isHiredPlant) return true;
+  return Boolean(
+    input.selectedPlantId &&
+    input.checkedPlantId === input.selectedPlantId &&
+    input.state === 'ready'
+  );
+}
+
+export function getLockedDefectsFailureLogMethod(error: unknown): 'warn' | 'error' {
+  return isNetworkFetchError(error) ? 'warn' : 'error';
+}
+
+export function reportLockedDefectsLoadFailure(
+  error: unknown,
+  logger: Pick<Console, 'warn' | 'error'> = console
+): LockedDefectsLoadState {
+  if (getLockedDefectsFailureLogMethod(error) === 'warn') {
+    logger.warn('Unable to load locked defects (network):', error);
+  } else {
+    logger.error('Error loading locked defects:', error);
+  }
+  return 'failed';
+}
 
 export function isPostgrestNoRowError(error: unknown): boolean {
   const code = extractInspectionErrorCode(error).trim();

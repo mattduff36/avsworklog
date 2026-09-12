@@ -262,4 +262,42 @@ describe('timesheet submit persistence', () => {
     expect(raced.statements.some((sql) => sql.includes('ROLLBACK'))).toBe(true);
     expect(raced.statements.some((sql) => sql.includes('COMMIT'))).toBe(false);
   });
+
+  it('TS-SUBMIT-DNW-001 preserves leave totals but rejects work or subsistence on Did Not Work rows', () => {
+    const annualLeaveEntries = sevenEntries();
+    annualLeaveEntries[6] = {
+      ...annualLeaveEntries[6],
+      daily_total: 9,
+      remarks: 'Annual Leave',
+    };
+
+    expect(
+      TimesheetSubmitBodySchema.safeParse({
+        ...submitBody(),
+        entries: annualLeaveEntries,
+      }).success
+    ).toBe(true);
+
+    const withWorkHours = annualLeaveEntries.map((entry, index) => (
+      index === 6
+        ? { ...entry, time_started: '08:00', time_finished: '17:00' }
+        : entry
+    ));
+    expect(
+      TimesheetSubmitBodySchema.safeParse({
+        ...submitBody(),
+        entries: withWorkHours,
+      }).success
+    ).toBe(false);
+
+    const withSubsistence = annualLeaveEntries.map((entry, index) => (
+      index === 6 ? { ...entry, subsistence_payment_required: true } : entry
+    ));
+    expect(
+      TimesheetSubmitBodySchema.safeParse({
+        ...submitBody(),
+        entries: withSubsistence,
+      }).success
+    ).toBe(false);
+  });
 });
