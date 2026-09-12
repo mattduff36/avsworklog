@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.10.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update Daily Allocation, Navigation, Data storage, Help and FAQ, and Sign in`
+
+**PUSHED AT**
+2026-09-12T05:36:49.818Z
+
+**WHAT CHANGED**
+Update Daily Allocation, Navigation, Data storage, Help and FAQ, and Sign in. Harden timesheet and plant checks.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Allocation, Navigation, Data storage, Help and FAQ, and Sign in, with changes to background routes, app screens, interface components, shared logic, shared typing, automation scripts, automated tests, data storage, and documentation.
+- Updated timesheets, with changes to background routes, app screens, interface components, shared logic, and automated tests.
+- Updated data storage, with changes to data storage.
+- Updated daily tasks, with changes to app screens, shared logic, and automated tests.
+- Updated navigation, with changes to interface components.
+- Updated help and FAQ, with changes to documentation.
+- Updated sign in, with changes to shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update Daily Allocation, Navigation, Data storage, Help and FAQ, and Sign in`
+- `fix(errors): harden timesheet and plant checks`
+
 ## 0926.9.1
 
 **GIT COMMIT MESSAGE**
