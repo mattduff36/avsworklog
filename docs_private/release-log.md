@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.10.1
+
+**GIT COMMIT MESSAGE**
+`fix(daily-allocation): fill the manager board viewport and merge chrome into one title row`
+
+**PUSHED AT**
+2026-09-12T10:35:02.269Z
+
+**WHAT CHANGED**
+Keep timeline header and rows on one scroll container. Fill the manager board viewport and merge chrome into one title row.
+
+**VERSION HISTORY DETAILS**
+- Keep timeline header and rows on one scroll container, with changes to interface components and automated tests.
+- Updated navigation, with changes to interface components and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(daily-allocation): keep timeline header and rows on one scroll container`
+- `fix(daily-allocation): fill the manager board viewport and merge chrome into one title row`
+
 ## 0926.10.0
 
 **GIT COMMIT MESSAGE**

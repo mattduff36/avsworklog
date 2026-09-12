@@ -1,5 +1,26 @@
 [
   {
+    "version": "0926.10.1",
+    "updateKind": "minor",
+    "title": "Daily Allocation improvements",
+    "description": "Keep timeline header and rows on one scroll container. Fill the manager board viewport and merge chrome into one title row.",
+    "summary": "Keep timeline header and rows on one scroll container. Fill the manager board viewport and merge chrome into one title row.",
+    "details": [
+      "Keep timeline header and rows on one scroll container, with changes to interface components and automated tests.",
+      "Updated navigation, with changes to interface components and automated tests."
+    ],
+    "areas": [
+      "Daily Allocation",
+      "Keep timeline header",
+      "Rows on one scroll container. Fill the manager board viewport",
+      "Merge chrome into one title row"
+    ],
+    "areaKeys": [
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-09-12T10:35:02.269Z"
+  },
+  {
     "version": "0926.10.0",
     "updateKind": "major",
     "title": "Daily Allocation update",
