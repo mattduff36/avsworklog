@@ -4,8 +4,8 @@ export const DAILY_TIMELINE_JOB_COLUMN_WIDTH = 240;
 /** Narrowest hour column that still fits `05:00` and a 30-minute drop target. */
 export const DAILY_TIMELINE_MIN_FIT_HOUR_WIDTH = 48;
 
-export function dailyTimelineRangeLeft(headerLeft: number): number {
-  return headerLeft + DAILY_TIMELINE_JOB_COLUMN_WIDTH;
+export function dailyTimelineRangeLeft(headerLeft: number, visualScale = 1): number {
+  return headerLeft + DAILY_TIMELINE_JOB_COLUMN_WIDTH * visualScale;
 }
 
 export function dailyTimelineFitMinContainerWidth(hourCount: number): number {

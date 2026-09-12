@@ -1,24 +1,24 @@
+import { isDailyAllocationStaleOrConflictError } from '@/lib/client/daily-allocation';
 import {
-  DailyAllocationApiError,
-  isDailyAllocationStaleOrConflictError,
-} from '@/lib/client/daily-allocation';
-import {
-  operationsOverlap,
   projectDailyAllocationState,
-  reconcileOptimisticOperations,
-  removeOptimisticOperation,
   type DailyAllocationOptimisticKind,
   type DailyAllocationOptimisticOperation,
   type DailyAllocationProjection,
 } from '@/components/daily-allocation/board/daily-allocation-optimistic-ledger';
+import type { DailyAllocationMutationClaim } from '@/components/daily-allocation/board/daily-allocation-mutation-claims';
+import {
+  DailyAllocationMutationCoordinator,
+  type DailyAllocationPersistContext,
+} from '@/components/daily-allocation/board/daily-allocation-mutation-coordinator';
 
 export interface DailyAllocationBoardQueryAdapter {
   getBoard(): DailyAllocationProjection['board'];
   cancel(): Promise<void> | void;
-  refetch(): Promise<DailyAllocationProjection['board']>;
+  scheduleReconciliation(keys: readonly string[]): void;
 }
 
 export interface DailyAllocationOptimisticLedgerHandle {
+  coordinator: DailyAllocationMutationCoordinator;
   getOperations(): DailyAllocationOptimisticOperation[];
   setOperations(
     next:
@@ -33,100 +33,42 @@ export interface RunDailyAllocationOptimisticMutationInput<T> {
   adapter: DailyAllocationBoardQueryAdapter;
   boardKey: string;
   kind: DailyAllocationOptimisticKind | string;
-  lockKeys: string[];
+  claims: DailyAllocationMutationClaim[];
+  duplicateKey?: string;
+  coalesceGroup?: string;
+  dependsOn?: string[];
+  identityWaitKeys?: string[];
   apply: DailyAllocationOptimisticOperation['apply'];
   proofs?: DailyAllocationOptimisticOperation['proofs'];
-  mutate: () => Promise<T>;
+  mutate: (context: DailyAllocationMutationContext) => Promise<T>;
   acknowledge?: (result: T) => {
     apply?: DailyAllocationOptimisticOperation['apply'];
     proofs?: DailyAllocationOptimisticOperation['proofs'];
+    identityAliases?: Record<string, string>;
   };
   operationId?: string;
 }
 
-function syncOperations(
-  ledger: DailyAllocationOptimisticLedgerHandle,
-  next: DailyAllocationOptimisticOperation[]
-): void {
-  ledger.setOperations(next);
+export interface DailyAllocationMutationContext extends DailyAllocationPersistContext {
+  getPersistenceBoard(): DailyAllocationProjection['board'];
 }
 
-function registerOperation(
-  ledger: DailyAllocationOptimisticLedgerHandle,
-  input: {
-    id?: string;
-    kind: DailyAllocationOptimisticKind | string;
-    lockKeys: string[];
-    queryKeys: string[];
-    proofs?: DailyAllocationOptimisticOperation['proofs'];
-    apply: DailyAllocationOptimisticOperation['apply'];
-  }
-): DailyAllocationOptimisticOperation | null {
-  const current = ledger.getOperations();
-  if (operationsOverlap(input, current)) return null;
-  const operation: DailyAllocationOptimisticOperation = {
-    id: input.id || crypto.randomUUID(),
-    sequence: ledger.nextSequence(),
-    kind: input.kind,
-    status: 'pending',
-    lockKeys: input.lockKeys,
-    queryKeys: input.queryKeys,
-    reconciledKeys: [],
-    proofs: input.proofs || {},
-    apply: input.apply,
-  };
-  syncOperations(ledger, [...current, operation]);
-  return operation;
-}
-
-function settleOperation(
+function getPersistenceBoard(
   ledger: DailyAllocationOptimisticLedgerHandle,
   adapter: DailyAllocationBoardQueryAdapter,
   boardKey: string,
-  operationId: string,
-  outcome: 'success' | 'failure',
-  error?: unknown,
-  acknowledgement?: {
-    proofs?: DailyAllocationOptimisticOperation['proofs'];
-    apply?: DailyAllocationOptimisticOperation['apply'];
-  }
-): void {
-  const operations = ledger.getOperations();
-  const operation = operations.find((current) => current.id === operationId);
-  if (!operation) return;
-
-  const isAmbiguous =
-    outcome === 'failure'
-    && (
-      error instanceof TypeError
-      || (error instanceof DailyAllocationApiError && error.status >= 500)
-    );
-
-  if (outcome === 'failure' && !isAmbiguous) {
-    syncOperations(ledger, removeOptimisticOperation(operations, operationId));
-    return;
-  }
-
-  syncOperations(
-    ledger,
-    operations.map((current) =>
-      current.id === operationId
-        ? {
-            ...current,
-            status: isAmbiguous ? 'uncertain' : 'acknowledged',
-            proofs: acknowledgement?.proofs || current.proofs,
-            apply: acknowledgement?.apply || current.apply,
-          }
-        : current
-    )
-  );
-
-  const eligible = new Set([operationId]);
-  const base: DailyAllocationProjection = { board: adapter.getBoard() };
-  syncOperations(
-    ledger,
-    reconcileOptimisticOperations(ledger.getOperations(), boardKey, base, eligible)
-  );
+  operationId: string
+): DailyAllocationProjection['board'] {
+  const current = ledger.getOperations();
+  const operation = current.find((item) => item.id === operationId);
+  const predecessors = operation
+    ? current.filter((item) => item.sequence < operation.sequence)
+    : current;
+  return projectDailyAllocationState(
+    { board: adapter.getBoard() },
+    predecessors,
+    boardKey
+  ).board;
 }
 
 export function getProjectedDailyAllocationBoard(
@@ -144,85 +86,49 @@ export function getProjectedDailyAllocationBoard(
 export async function runDailyAllocationOptimisticMutation<T>(
   input: RunDailyAllocationOptimisticMutationInput<T>
 ): Promise<T> {
-  const operation = registerOperation(input.ledger, {
+  const inferredDependencies = (input.identityWaitKeys || [])
+    .map((identity) => input.ledger.coordinator.findIdentityProducer(identity)?.id)
+    .filter((id): id is string => Boolean(id));
+  const admission = input.ledger.coordinator.admit({
     id: input.operationId,
     kind: input.kind,
-    lockKeys: input.lockKeys,
+    claims: input.claims,
+    duplicateKey: input.duplicateKey,
+    coalesceGroup: input.coalesceGroup,
+    dependsOn: Array.from(new Set([...(input.dependsOn || []), ...inferredDependencies])),
+    identityWaitKeys: input.identityWaitKeys,
     queryKeys: [input.boardKey],
     proofs: input.proofs,
     apply: input.apply,
-  });
-
-  if (!operation) {
-    throw new DailyAllocationApiError(
-      'Wait for the current daily allocation change to finish saving.',
-      409,
-      { code: 'OPTIMISTIC_LOCK' },
-      'OPTIMISTIC_LOCK'
-    );
-  }
-
-  await input.adapter.cancel();
-
-  try {
-    const result = await input.mutate();
-    const acknowledgement = input.acknowledge?.(result);
-    settleOperation(
-      input.ledger,
-      input.adapter,
-      input.boardKey,
-      operation.id,
-      'success',
-      undefined,
-      acknowledgement
-    );
-    await input.adapter.refetch();
-    const refreshed: DailyAllocationProjection = { board: input.adapter.getBoard() };
-    syncOperations(
-      input.ledger,
-      reconcileOptimisticOperations(
-        input.ledger.getOperations(),
-        input.boardKey,
-        refreshed,
-        new Set([operation.id])
-      )
-    );
-    return result;
-  } catch (error) {
-    const isAmbiguous =
-      error instanceof TypeError
-      || (error instanceof DailyAllocationApiError && error.status >= 500);
-
-    if (isAmbiguous) {
-      try {
-        await input.adapter.refetch();
-        syncOperations(
-          input.ledger,
-          removeOptimisticOperation(input.ledger.getOperations(), operation.id)
-        );
-      } catch {
-        settleOperation(
+    persist: async (context) => {
+      await input.adapter.cancel();
+      const result = await input.mutate({
+        ...context,
+        getPersistenceBoard: () => getPersistenceBoard(
           input.ledger,
           input.adapter,
           input.boardKey,
-          operation.id,
-          'failure',
-          error
-        );
-      }
-      throw error;
-    }
+          context.operationId
+        ),
+      });
+      const acknowledgement = input.acknowledge?.(result);
+      return {
+        result,
+        apply: acknowledgement?.apply,
+        proofs: acknowledgement?.proofs,
+        identityAliases: acknowledgement?.identityAliases,
+      };
+    },
+  });
 
-    settleOperation(
-      input.ledger,
-      input.adapter,
-      input.boardKey,
-      operation.id,
-      'failure',
-      error
-    );
+  try {
+    const result = await admission.completion;
+    input.adapter.scheduleReconciliation([input.boardKey]);
+    return result;
+  } catch (error) {
+    input.adapter.scheduleReconciliation([input.boardKey]);
     if (isDailyAllocationStaleOrConflictError(error)) {
-      await input.adapter.refetch();
+      input.adapter.scheduleReconciliation([input.boardKey]);
     }
     throw error;
   }

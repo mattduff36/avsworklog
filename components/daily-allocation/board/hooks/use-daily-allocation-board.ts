@@ -3,11 +3,12 @@
 import {
   createContext,
   createElement,
+  useEffect,
   useContext,
   useState,
   type ReactNode,
 } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   dailyAllocationBoardOptimisticKey,
   dailyAllocationBoardQueryKey,
@@ -15,13 +16,19 @@ import {
   isDailyAllocationApiError,
 } from '@/lib/client/daily-allocation';
 import { projectDailyAllocationBoardView } from '@/components/daily-allocation/board/daily-allocation-board-cache';
-import { projectDailyAllocationState } from '@/components/daily-allocation/board/daily-allocation-optimistic-ledger';
+import {
+  projectDailyAllocationState,
+  reconcileOptimisticOperations,
+  retireExhaustedOptimisticOperations,
+} from '@/components/daily-allocation/board/daily-allocation-optimistic-ledger';
+import { DailyAllocationBoardReconciler } from '@/components/daily-allocation/board/daily-allocation-board-reconciliation';
 import { useDailyAllocationOptimisticLedger } from '@/components/daily-allocation/board/hooks/use-daily-allocation-optimistic-ledger';
 import { useDailyAllocationViewPreference } from '@/components/daily-allocation/board/hooks/use-daily-allocation-view-preference';
 import type { DailyAllocationBoardView } from '@/lib/config/daily-allocation-view-preference';
 import type { DailyAllocationRangeBoardPayload } from '@/types/daily-allocation';
 import type { DailyAllocationOptimisticLedgerHandle } from '@/components/daily-allocation/board/daily-allocation-optimistic-runner';
 import type { DailyAllocationOptimisticOperation } from '@/components/daily-allocation/board/daily-allocation-optimistic-ledger';
+import type { DailyAllocationCommandOutcome } from '@/components/daily-allocation/board/daily-allocation-mutation-coordinator';
 
 export interface DailyAllocationBoardController {
   startDate: string;
@@ -44,10 +51,60 @@ export interface DailyAllocationBoardController {
   ledger: DailyAllocationOptimisticLedgerHandle;
   selectedDate: string;
   setSelectedDate: (date: string) => void;
+  setPointerInteractionActive: (active: boolean) => void;
+  scheduleReconciliation: (keys?: readonly string[]) => void;
+  getOperationOutcome: (operationId: string) => DailyAllocationCommandOutcome | undefined;
   refetch: () => Promise<unknown>;
 }
 
 const DailyAllocationBoardContext = createContext<DailyAllocationBoardController | null>(null);
+
+class DailyAllocationReconciliationBridge {
+  private runCurrent: (keys: string[]) => Promise<void> = async () => undefined;
+  private cancelCurrent: () => Promise<void> = async () => undefined;
+  private interactionActive = false;
+  private attempts = new Map<string, number>();
+
+  configure(input: {
+    run: (keys: string[]) => Promise<void>;
+    cancel: () => Promise<void>;
+  }): void {
+    this.runCurrent = input.run;
+    this.cancelCurrent = input.cancel;
+  }
+
+  run(keys: string[]): Promise<void> {
+    return this.runCurrent(keys);
+  }
+
+  cancel(): Promise<void> {
+    return this.cancelCurrent();
+  }
+
+  setInteractionActive(active: boolean): void {
+    this.interactionActive = active;
+  }
+
+  isInteractionActive(): boolean {
+    return this.interactionActive;
+  }
+
+  getAttempt(operationId: string): number {
+    return this.attempts.get(operationId) || 0;
+  }
+
+  incrementAttempt(operationId: string): void {
+    this.attempts.set(operationId, this.getAttempt(operationId) + 1);
+  }
+
+  clearAttempt(operationId: string): void {
+    this.attempts.delete(operationId);
+  }
+
+  resetAttempts(): void {
+    this.attempts.clear();
+  }
+}
 
 export function useDailyAllocationBoardQuery(startDate: string, endDate: string) {
   return useQuery({
@@ -63,6 +120,7 @@ export function useDailyAllocationBoardController(options: {
   userId?: string;
   selectedDate?: string;
 }): DailyAllocationBoardController {
+  const queryClient = useQueryClient();
   const query = useDailyAllocationBoardQuery(options.startDate, options.endDate);
   const ledger = useDailyAllocationOptimisticLedger();
   const resolvedUserId = options.userId || query.data?.context.user_id || '';
@@ -75,6 +133,85 @@ export function useDailyAllocationBoardController(options: {
   const [mutationError, setMutationError] = useState<unknown>(null);
   const boardKey = dailyAllocationBoardOptimisticKey(options.startDate, options.endDate);
   const queryKey = dailyAllocationBoardQueryKey(options.startDate, options.endDate);
+  const [reconciliationBridge] = useState(() => new DailyAllocationReconciliationBridge());
+  const [reconciler] = useState(() =>
+    new DailyAllocationBoardReconciler({
+      delayMs: 400,
+      run: (keys) => reconciliationBridge.run(keys),
+      onInteractionStart: () => reconciliationBridge.cancel(),
+    })
+  );
+
+  useEffect(() => {
+    reconciliationBridge.configure({
+      cancel: () => queryClient.cancelQueries({ queryKey, exact: true }),
+      run: async (keys) => {
+      if (!keys.includes(boardKey)) return;
+      const eligible = new Set(
+        ledger.getOperations()
+          .filter((operation) =>
+            operation.queryKeys.includes(boardKey)
+            && operation.status !== 'pending'
+            && reconciliationBridge.getAttempt(operation.id) < 3
+          )
+          .map((operation) => operation.id)
+      );
+      for (const operationId of eligible) {
+        reconciliationBridge.incrementAttempt(operationId);
+      }
+      try {
+        await queryClient.refetchQueries(
+          { queryKey, exact: true, type: 'all' },
+          { throwOnError: true, cancelRefetch: true }
+        );
+        const refreshed = queryClient.getQueryData<DailyAllocationRangeBoardPayload>(queryKey);
+        const reconciled = reconcileOptimisticOperations(
+          ledger.getOperations(),
+          boardKey,
+          { board: refreshed },
+          eligible
+        );
+        const next = retireExhaustedOptimisticOperations(
+          reconciled,
+          boardKey,
+          eligible,
+          (operationId) => reconciliationBridge.getAttempt(operationId),
+          3
+        );
+        const remainingIds = new Set(next.map((operation) => operation.id));
+        for (const operationId of eligible) {
+          if (!remainingIds.has(operationId)) reconciliationBridge.clearAttempt(operationId);
+        }
+        ledger.setOperations(next);
+        if (next.some((operation) =>
+          eligible.has(operation.id)
+          && reconciliationBridge.getAttempt(operation.id) < 3
+        )) {
+          reconciler.schedule([boardKey]);
+        }
+      } catch {
+        if ([...eligible].some((operationId) =>
+          reconciliationBridge.getAttempt(operationId) < 3
+        )) {
+          reconciler.schedule([boardKey]);
+        }
+      }
+      },
+    });
+  }, [
+    boardKey,
+    ledger,
+    options.endDate,
+    options.startDate,
+    queryClient,
+    queryKey,
+    reconciliationBridge,
+    reconciler,
+  ]);
+
+  useEffect(() => () => {
+    reconciler.dispose();
+  }, [reconciler]);
   const projected = projectDailyAllocationState(
     { board: query.data },
     ledger.operations,
@@ -106,7 +243,24 @@ export function useDailyAllocationBoardController(options: {
     ledger,
     selectedDate,
     setSelectedDate,
-    refetch: () => query.refetch(),
+    setPointerInteractionActive: (active) => {
+      reconciliationBridge.setInteractionActive(active);
+      reconciler.setInteractionActive(active);
+    },
+    scheduleReconciliation: (keys = [boardKey]) => {
+      reconciler.schedule(keys.filter((key) => key === boardKey));
+    },
+    getOperationOutcome: (operationId) => ledger.coordinator.getOutcome(operationId),
+    refetch: async () => {
+      if (reconciliationBridge.isInteractionActive()) {
+        reconciler.schedule([boardKey]);
+        return queryClient.getQueryData(queryKey);
+      }
+      reconciliationBridge.resetAttempts();
+      const result = await query.refetch();
+      reconciler.schedule([boardKey]);
+      return result;
+    },
   };
 }
 

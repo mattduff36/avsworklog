@@ -15,7 +15,7 @@ interface DashboardContentProps {
 }
 
 export function DashboardContent({ children, fullWidth = false }: DashboardContentProps) {
-  const { isManager, isActualSuperAdmin } = useAuth();
+  const { isAdmin, isManager, isActualSuperAdmin } = useAuth();
   const { tabletModeEnabled } = useTabletMode();
   const [appWidescreenEnabled, setAppWidescreenEnabled] = useState(false);
 
@@ -42,7 +42,8 @@ export function DashboardContent({ children, fullWidth = false }: DashboardConte
     return () => document.body.classList.remove('app-widescreen-enabled');
   }, [appWidescreenEnabled]);
 
-  const shouldApplySidebarOffset = !tabletModeEnabled && (isManager || isActualSuperAdmin);
+  const shouldApplySidebarOffset =
+    !tabletModeEnabled && (isAdmin || isManager || isActualSuperAdmin);
   const expandToViewport = appWidescreenEnabled || fullWidth;
 
   return (

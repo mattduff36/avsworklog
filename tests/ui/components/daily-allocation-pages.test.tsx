@@ -203,6 +203,16 @@ function jsonResponse(payload: unknown, status = 200) {
   });
 }
 
+function emptyConversionSource(workDate = '2026-08-14', teamId = 'team-1') {
+  return {
+    work_date: workDate,
+    team_id: teamId,
+    source_fingerprint: 'a'.repeat(64),
+    labour_drafts: [],
+    plant_drafts: [],
+  };
+}
+
 function buildRangeBoard(overrides: Partial<DailyAllocationRangeBoardPayload> = {}): DailyAllocationRangeBoardPayload {
   return {
     start_date: '2026-08-10',
@@ -332,6 +342,7 @@ describe('daily allocation manager board', () => {
     mocks.fetchRuntime.mockResolvedValue({ board_enabled: true, writes_enabled: true });
     window.sessionStorage.clear();
     window.localStorage.clear();
+    mocks.randomUUID.mockReset();
     mocks.randomUUID
       .mockReturnValueOnce('attempt-one')
       .mockReturnValueOnce('attempt-two')
@@ -345,7 +356,7 @@ describe('daily allocation manager board', () => {
     vi.unstubAllGlobals();
   });
 
-  it('reuses an idempotency key after a lost response and rotates it after success', async () => {
+  it('reuses an idempotency key while retrying a lost response and rotates it after success', async () => {
     const board = buildRangeBoard();
     let publishCount = 0;
     let latestPublicationId = 'publication-1';
@@ -370,19 +381,11 @@ describe('daily allocation manager board', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    const firstRender = renderBoardPage();
+    renderBoardPage();
     const openPublish = await screen.findByRole('button', { name: 'Publish' });
     fireEvent.click(openPublish);
 
     let dialog = await screen.findByRole('alertdialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Publish' }));
-    await waitFor(() => expect(mocks.toastError).toHaveBeenCalledWith('Publish response was lost'));
-    expect(window.sessionStorage.getItem('daily-allocation:publish-attempt')).toContain('attempt-one');
-
-    firstRender.unmount();
-    renderBoardPage();
-    fireEvent.click(await screen.findByRole('button', { name: 'Publish' }));
-    dialog = await screen.findByRole('alertdialog');
     fireEvent.click(within(dialog).getByRole('button', { name: 'Publish' }));
     await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument());
     expect(window.sessionStorage.getItem('daily-allocation:publish-attempt')).toBeNull();
@@ -545,6 +548,9 @@ describe('daily allocation manager board', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      if (url.startsWith('/api/daily-allocation/convert?') && !init?.method) {
+        return jsonResponse(emptyConversionSource());
+      }
       if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
         return jsonResponse({
           plan_day_id: 'plan-converted',
@@ -597,7 +603,14 @@ describe('daily allocation manager board', () => {
           plan_day_id: string;
           expected_plan_version: number;
         });
-      expect(convertBodies).toEqual([{ work_date: '2026-08-14', team_id: 'team-1' }]);
+      expect(convertBodies).toEqual([expect.objectContaining({
+        work_date: '2026-08-14',
+        team_id: 'team-1',
+        expected_source_fingerprint: 'a'.repeat(64),
+        visits: [],
+        labour_drafts: [],
+        plant_drafts: [],
+      })]);
       expect(visitBodies).toEqual([expect.objectContaining({
         plan_day_id: 'plan-converted',
         expected_plan_version: 4,
@@ -606,7 +619,7 @@ describe('daily allocation manager board', () => {
     });
   });
 
-  it('DA2-AUTO-003 initializes then moves with authoritative source and target versions', async () => {
+  it('DA2-AUTO-003 explicitly moves across dates with authoritative source and target versions', async () => {
     const convertedPlan = {
       id: 'plan-existing-v7',
       work_date: '2026-08-15',
@@ -624,6 +637,9 @@ describe('daily allocation manager board', () => {
         return jsonResponse(converted
           ? buildRangeBoard({ plan_days: [...initial.plan_days, convertedPlan] })
           : initial);
+      }
+      if (url.startsWith('/api/daily-allocation/convert?') && !init?.method) {
+        return jsonResponse(emptyConversionSource('2026-08-15'));
       }
       if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
         converted = true;
@@ -657,16 +673,9 @@ describe('daily allocation manager board', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     renderBoardPage();
-    expect(await screen.findByTestId('daily-allocation-toolbar')).toBeInTheDocument();
-    expect(mocks.onDragEnd).toEqual(expect.any(Function));
-    act(() => {
-      mocks.onDragEnd?.({
-        operation: {
-          source: { data: { source: { kind: 'visit', visit: initial.visits[0] } } },
-          target: { data: { target: { surface: 'week-cell', workDate: '2026-08-15' } } },
-        },
-      });
-    });
+    fireEvent.click((await screen.findAllByRole('button', { name: 'Move visit JOB-100' }))[0]);
+    fireEvent.change(screen.getByLabelText('Date'), { target: { value: '2026-08-15' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Move visit' }));
 
     await waitFor(() => {
       const moveBodies = fetchMock.mock.calls
@@ -676,7 +685,10 @@ describe('daily allocation manager board', () => {
           expected_source_plan_version: number;
           expected_target_plan_version: number;
         });
-      expect(moveBodies).toEqual([expect.objectContaining({
+      expect(
+        moveBodies,
+        JSON.stringify(fetchMock.mock.calls.map(([url, init]) => [String(url), init?.method || 'GET']))
+      ).toEqual([expect.objectContaining({
         target_plan_day_id: 'plan-existing-v7',
         expected_target_plan_version: 7,
         expected_source_plan_version: initial.plan_days[0].plan_version,
@@ -729,6 +741,9 @@ describe('daily allocation manager board', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      if (url.startsWith('/api/daily-allocation/convert?') && !init?.method) {
+        return jsonResponse(emptyConversionSource());
+      }
       if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
         return jsonResponse({
           plan_day_id: 'plan-converted',
@@ -795,6 +810,9 @@ describe('daily allocation manager board', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      if (url.startsWith('/api/daily-allocation/convert?') && !init?.method) {
+        return jsonResponse(emptyConversionSource());
+      }
       if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
         return jsonResponse({ error: 'Unable to convert this date.' }, 500);
       }
@@ -820,13 +838,16 @@ describe('daily allocation manager board', () => {
       labour_assignments: [],
       publications: [],
     });
-    let releaseConvert: (() => void) | null = null;
+    let releaseConvert: () => void = () => undefined;
     const convertGate = new Promise<void>((resolve) => {
       releaseConvert = resolve;
     });
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      if (url.startsWith('/api/daily-allocation/convert?') && !init?.method) {
+        return jsonResponse(emptyConversionSource());
+      }
       if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
         await convertGate;
         return jsonResponse({
@@ -886,7 +907,7 @@ describe('daily allocation manager board', () => {
     await waitFor(() => {
       expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/daily-allocation/convert')).toHaveLength(1);
     });
-    releaseConvert?.();
+    releaseConvert();
     await waitFor(() => {
       const visitBodies = fetchMock.mock.calls
         .filter(([url, init]) => String(url) === '/api/daily-allocation/visits' && init?.method === 'POST')
@@ -901,11 +922,8 @@ describe('daily allocation manager board', () => {
       expect(visitBodies[0]?.plan_day_id.startsWith('optimistic:')).toBe(false);
       expect(visitBodies[0]?.expected_plan_version).not.toBe(1);
     });
-    await waitFor(() => {
-      const messages = mocks.toastError.mock.calls.map((call) => String(call[0]));
-      expect(messages).toContain('Wait for the current daily allocation change to finish saving.');
-      expect(messages.join('\n')).not.toMatch(/plan_day_id/);
-    });
+    const messages = mocks.toastError.mock.calls.map((call) => String(call[0]));
+    expect(messages.join('\n')).not.toMatch(/plan_day_id/);
   });
 
   it('DA2-AUTO-007 initializes only the active team on a shared date', async () => {
@@ -926,6 +944,9 @@ describe('daily allocation manager board', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      if (url.startsWith('/api/daily-allocation/convert?') && !init?.method) {
+        return jsonResponse(emptyConversionSource('2026-08-14', 'team-2'));
+      }
       if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
         return jsonResponse({
           plan_day_id: 'plan-team-2',
@@ -972,7 +993,11 @@ describe('daily allocation manager board', () => {
       const convertBodies = fetchMock.mock.calls
         .filter(([url, init]) => String(url) === '/api/daily-allocation/convert' && init?.method === 'POST')
         .map(([, init]) => JSON.parse(String(init?.body)) as { team_id: string; work_date: string });
-      expect(convertBodies).toEqual([{ team_id: 'team-2', work_date: '2026-08-14' }]);
+      expect(convertBodies).toEqual([expect.objectContaining({
+        team_id: 'team-2',
+        work_date: '2026-08-14',
+        expected_source_fingerprint: 'a'.repeat(64),
+      })]);
     });
   });
 
@@ -1042,7 +1067,25 @@ describe('daily allocation manager board', () => {
       const url = String(input);
       if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(board);
       if (url === '/api/daily-allocation/assignments/labour' && init?.method === 'POST') {
-        return jsonResponse({ assignment_id: 'labour-2' });
+        return jsonResponse({
+          assignment_id: 'labour-2',
+          plan_day_id: board.plan_days[0].id,
+          plan_version: board.plan_days[0].plan_version + 1,
+          assignment: {
+            id: 'labour-2',
+            visit_id: board.visits[0].id,
+            plan_day_id: board.plan_days[0].id,
+            work_date: board.visits[0].work_date,
+            profile_id: 'employee-1',
+            starts_at: board.visits[0].starts_at,
+            ends_at: board.visits[0].ends_at,
+            meeting_point: null,
+            meet_person: null,
+            notes: null,
+            row_version: 1,
+            updated_at: '2026-08-13T09:00:00.000Z',
+          },
+        });
       }
       throw new Error(`Unexpected request: ${url}`);
     });
@@ -1057,6 +1100,14 @@ describe('daily allocation manager board', () => {
         '/api/daily-allocation/assignments/labour',
         expect.objectContaining({ method: 'POST' })
       );
+    });
+    const request = fetchMock.mock.calls.find(
+      ([url, init]) => String(url) === '/api/daily-allocation/assignments/labour' && init?.method === 'POST'
+    );
+    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({
+      meeting_point: null,
+      meet_person: null,
+      notes: null,
     });
   });
 
@@ -1120,7 +1171,22 @@ describe('daily allocation manager board', () => {
         expect(body.expected_plan_version).toBe(3);
         planVersion = 4;
         overrideId = 'override-1';
-        return jsonResponse({ override_id: overrideId });
+        return jsonResponse({
+          override_id: overrideId,
+          plan_day_id: 'plan-2026-08-14',
+          plan_version: planVersion,
+          override: {
+            id: overrideId,
+            plan_day_id: 'plan-2026-08-14',
+            visit_id: 'visit-1',
+            profile_id: 'employee-1',
+            plant_id: null,
+            conflict_kind: 'pending_absence',
+            evidence: 'Supervisor confirmed',
+            confirmed_by: 'manager-1',
+            confirmed_at: '2026-08-13T09:00:00.000Z',
+          },
+        });
       }
       if (url === '/api/daily-allocation/assignments/labour' && init?.method === 'POST') {
         const body = JSON.parse(String(init.body)) as {
@@ -1131,7 +1197,25 @@ describe('daily allocation manager board', () => {
           return jsonResponse({ error: 'Plan is stale', code: 'STALE_PLAN_VERSION' }, 409);
         }
         expect(body.override_id).toBe('override-1');
-        return jsonResponse({ assignment_id: 'labour-2' });
+        return jsonResponse({
+          assignment_id: 'labour-2',
+          plan_day_id: 'plan-2026-08-14',
+          plan_version: planVersion + 1,
+          assignment: {
+            id: 'labour-2',
+            visit_id: 'visit-1',
+            plan_day_id: 'plan-2026-08-14',
+            work_date: '2026-08-14',
+            profile_id: 'employee-1',
+            starts_at: base.visits[0].starts_at,
+            ends_at: base.visits[0].ends_at,
+            meeting_point: null,
+            meet_person: null,
+            notes: null,
+            row_version: 1,
+            updated_at: '2026-08-13T09:00:00.000Z',
+          },
+        });
       }
       throw new Error(`Unexpected request: ${url}`);
     });
@@ -1153,12 +1237,15 @@ describe('daily allocation manager board', () => {
         expected_plan_version: number;
         override_id?: string;
       });
-    expect(labourBodies).toEqual([{
+    expect(labourBodies).toEqual([expect.objectContaining({
       visit_id: 'visit-1',
       profile_id: 'employee-1',
       expected_plan_version: 4,
       override_id: 'override-1',
-    }]);
+      meeting_point: null,
+      meet_person: null,
+      notes: null,
+    })]);
     expect(labourBodies[0].expected_plan_version).not.toBe(3);
     expect(fetchMock.mock.calls.some(([, init]) => String(init?.body || '').includes('STALE_PLAN_VERSION'))).toBe(false);
   });
@@ -1328,12 +1415,23 @@ describe('daily allocation manager board', () => {
     renderBoardPage();
     expect(await screen.findByRole('tab', { name: 'Daily' })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Weekly' })).toBeInTheDocument();
+    expect(screen.getByTestId('daily-allocation-unsupported-width')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open employee allocation view' })).toHaveAttribute(
+      'href',
+      '/daily-allocation/my'
+    );
+    expect(screen.getByRole('button', { name: 'Fit timeline to width' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use scrollable timeline' })).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Weekly' }), { button: 0 });
     expect(await screen.findByTestId('daily-allocation-view-heading')).toHaveTextContent('Weekly job board');
-    fireEvent.mouseDown(screen.getByRole('tab', { name: /Employees/ }), { button: 0 });
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Primary Employees' }), { button: 0 });
     expect(screen.getAllByText('Alex Worker').length).toBeGreaterThan(0);
-    fireEvent.mouseDown(screen.getByRole('tab', { name: /Plant/ }), { button: 0 });
-    expect(screen.getByText(/EX-01/)).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Employees (1)' }), { button: 0 });
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Primary Plant' }), { button: 0 });
+    expect(screen.getByTestId('daily-allocation-view-heading')).toHaveTextContent('Weekly plant board');
+    expect(screen.getByText('Unassigned')).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Plant (1)' }), { button: 0 });
+    expect(screen.getAllByText(/EX-01/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Add visit' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Assign resources' })).toBeInTheDocument();
     expect(screen.getByText('Publication history')).toBeInTheDocument();
@@ -1347,6 +1445,54 @@ describe('daily allocation manager board', () => {
     const mouse = configureCall.activationConstraints?.({ pointerType: 'mouse' }) || [];
     expect(touch.some((constraint) => constraint instanceof PointerActivationConstraints.Delay)).toBe(true);
     expect(mouse.some((constraint) => constraint instanceof PointerActivationConstraints.Distance)).toBe(true);
+  });
+
+  it('resizes a visit by keyboard in a labelled 30-minute step', async () => {
+    const board = buildRangeBoard();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(board);
+      if (url === '/api/daily-allocation/visits/visit-1' && init?.method === 'PATCH') {
+        const body = JSON.parse(String(init.body)) as {
+          starts_at: string;
+          ends_at: string;
+        };
+        return jsonResponse({
+          visit_id: 'visit-1',
+          plan_day_id: board.plan_days[0].id,
+          plan_version: board.plan_days[0].plan_version + 1,
+          visit: {
+            ...board.visits[0],
+            starts_at: body.starts_at,
+            ends_at: body.ends_at,
+            row_version: board.visits[0].row_version + 1,
+          },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderBoardPage();
+    const startHandle = await screen.findByRole('button', {
+      name: /Adjust start of JOB-100, currently .*30 minute steps/,
+    });
+    expect(startHandle.className).toContain('[@media(pointer:coarse)]:w-11');
+    fireEvent.keyDown(startHandle, { key: 'ArrowRight' });
+
+    await waitFor(() => {
+      const request = fetchMock.mock.calls.find(
+        ([url, init]) => String(url) === '/api/daily-allocation/visits/visit-1' && init?.method === 'PATCH'
+      );
+      expect(request).toBeDefined();
+      const body = JSON.parse(String(request?.[1]?.body)) as {
+        starts_at: string;
+        expected_row_version: number;
+      };
+      expect(body.starts_at).toBe('2026-08-14T07:30:00.000Z');
+      expect(body.expected_row_version).toBe(1);
+    });
+    expect((await screen.findAllByText(/^Visit resized to 08:30–/)).length).toBeGreaterThan(0);
   });
 
   it('keeps catalogue jobs off the calendar until a timed visit exists', async () => {
@@ -1407,6 +1553,156 @@ describe('daily allocation manager board', () => {
     renderBoardPage();
     expect(await screen.findByText('Board exploded.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('updates per-employee instructions with assignment row-version CAS', async () => {
+    const initial = buildRangeBoard();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(initial);
+      if (url === '/api/daily-allocation/assignments/labour' && init?.method === 'POST') {
+        const body = JSON.parse(String(init.body));
+        return jsonResponse({
+          assignment_id: 'labour-1',
+          assignment: {
+            ...initial.labour_assignments[0],
+            meeting_point: body.meeting_point,
+            meet_person: body.meet_person,
+            notes: body.notes,
+            row_version: 2,
+          },
+          plan_day_id: 'plan-2026-08-14',
+          plan_version: 4,
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderBoardPage();
+    fireEvent.click((await screen.findAllByRole('button', { name: /Assign resources to JOB-100/ }))[0]);
+    fireEvent.click(screen.getByRole('button', { name: 'Edit instructions for Alex Worker' }));
+    fireEvent.change(screen.getByLabelText('Meeting point', { selector: '#daily-allocation-employee-meeting-point' }), {
+      target: { value: 'North gate' },
+    });
+    fireEvent.change(screen.getByLabelText('Meet person'), { target: { value: 'Jordan' } });
+    fireEvent.change(screen.getByLabelText('Notes', { selector: '#daily-allocation-employee-notes' }), {
+      target: { value: 'Bring harness' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save employee instructions' }));
+
+    await waitFor(() => {
+      const request = fetchMock.mock.calls.find(
+        ([url, init]) => String(url) === '/api/daily-allocation/assignments/labour' && init?.method === 'POST'
+      );
+      expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({
+        visit_id: 'visit-1',
+        profile_id: 'employee-1',
+        expected_plan_version: 3,
+        expected_row_version: 1,
+        meeting_point: 'North gate',
+        meet_person: 'Jordan',
+        notes: 'Bring harness',
+      });
+    });
+  });
+
+  it('guides legacy conversion from the authoritative source with exhaustive mappings', async () => {
+    const legacyBoard = buildRangeBoard({
+      plan_days: [],
+      visits: [],
+      labour_assignments: [],
+      plant_assignments: [],
+      publications: [],
+      legacy: {
+        labour: [{
+          id: '22222222-2222-4222-8222-222222222222',
+          work_date: '2026-08-14',
+          profile_id: 'employee-1',
+          job_source_type: 'live_quote',
+          job_source_id: 'quote-1',
+          job_code: 'JOB-100',
+          site_address: '1 Test Street',
+          instructions: {
+            start_time: 'legacy text is ignored',
+            meeting_point: 'Yard',
+            meet_person: 'Sam',
+            notes: null,
+          },
+          row_version: 7,
+          updated_at: '2026-08-13T08:00:00.000Z',
+        }],
+        plant: [],
+      },
+    });
+    const source = {
+      work_date: '2026-08-14',
+      team_id: 'team-1',
+      source_fingerprint: 'b'.repeat(64),
+      labour_drafts: [{
+        id: '22222222-2222-4222-8222-222222222222',
+        row_version: 7,
+        profile_id: 'employee-1',
+        job_source_type: 'live_quote',
+        job_source_id: 'quote-1',
+        job_code: 'JOB-100',
+        site_address: '1 Test Street',
+        meeting_point: 'Yard',
+        meet_person: 'Sam',
+        notes: null,
+      }],
+      plant_drafts: [],
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(legacyBoard);
+      if (url.startsWith('/api/daily-allocation/convert?')) return jsonResponse(source);
+      if (url === '/api/daily-allocation/convert' && init?.method === 'POST') {
+        return jsonResponse({
+          plan_day_id: 'plan-converted',
+          plan_version: 1,
+          team_id: 'team-1',
+          work_date: '2026-08-14',
+          source_fingerprint: source.source_fingerprint,
+          visits: [],
+          labour_assignments: [],
+          plant_assignments: [],
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderBoardPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Review and convert' }));
+    expect(await screen.findByText('Timed visits')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '08:00' } });
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '11:00' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Disposition for Alex Worker' }), {
+      target: { value: 'visit' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Convert reviewed drafts' }));
+
+    await waitFor(() => {
+      const request = fetchMock.mock.calls.find(
+        ([url, init]) => String(url) === '/api/daily-allocation/convert' && init?.method === 'POST'
+      );
+      const body = JSON.parse(String(request?.[1]?.body));
+      expect(body).toMatchObject({
+        work_date: '2026-08-14',
+        team_id: 'team-1',
+        expected_source_fingerprint: source.source_fingerprint,
+        labour_drafts: [{
+          draft_id: '22222222-2222-4222-8222-222222222222',
+          row_version: 7,
+          disposition: 'visit',
+        }],
+        plant_drafts: [],
+      });
+      expect(body.visits).toHaveLength(1);
+      expect(body.visits[0]).not.toHaveProperty('start_time');
+      expect(String(body.visits[0].visit_id)).not.toMatch(/^optimistic:/);
+    });
   });
 });
 

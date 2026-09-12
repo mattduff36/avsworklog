@@ -16,19 +16,31 @@ config({ path: resolve(process.cwd(), '.env.local') });
 export const DAILY_ALLOCATION_PROJECT_REF = 'lrhufzqfzeutgvudcowy';
 export const DAILY_ALLOCATION_PROJECT_IDENTITY =
   `Supabase project ${DAILY_ALLOCATION_PROJECT_REF}`;
+export const DAILY_ALLOCATION_DEPLOYMENT_IDENTITY_URL =
+  'https://avsworklog.mpdee.uk/api/daily-allocation/deployment-identity';
 export const DAILY_ALLOCATION_V2_MIGRATION =
   'supabase/migrations/20260813_zzz_daily_allocation_v2_visit_model.sql';
 export const DAILY_ALLOCATION_V2_GRANT_MIGRATION =
   'supabase/migrations/20260814155048_daily_allocation_v2_rpc_only_grants.sql';
+export const DAILY_ALLOCATION_V2_DATA_CONTRACT_MIGRATION =
+  'supabase/migrations/20260912_daily_allocation_idempotent_mutations_and_guided_conversion.sql';
+export const DAILY_ALLOCATION_V2_RUNTIME_GRANT_MIGRATION =
+  'supabase/migrations/20260913_daily_allocation_runtime_rpc_grants.sql';
 export const DAILY_ALLOCATION_V2_ACTIVATION =
   'scripts/supabase/activate-daily-allocation-v2.sql';
 export const DAILY_ALLOCATION_V2_DISABLE =
   'supabase/rollback/20260813_zzz_disable_daily_allocation_v2.sql';
 export const DAILY_ALLOCATION_ROLLOUT_ARTIFACTS = [
+  'app/api/daily-allocation/deployment-identity/route.ts',
+  'lib/routes/public-routes.ts',
   'scripts/manage-daily-allocation-v2-rollout.ts',
   DAILY_ALLOCATION_V2_ACTIVATION,
   DAILY_ALLOCATION_V2_DISABLE,
+  DAILY_ALLOCATION_V2_MIGRATION,
   DAILY_ALLOCATION_V2_GRANT_MIGRATION,
+  DAILY_ALLOCATION_V2_DATA_CONTRACT_MIGRATION,
+  DAILY_ALLOCATION_V2_RUNTIME_GRANT_MIGRATION,
+  'docs/guides/DAILY_ALLOCATION_V2_ROLLOUT.md',
 ] as const;
 
 export const REQUIRED_V2_RELATIONS = [
@@ -44,20 +56,45 @@ export const REQUIRED_V2_RELATIONS = [
   'public.daily_allocation_published_plant',
   'public.daily_allocation_published_overrides',
   'public.daily_allocation_publication_notifications',
+  'private.daily_allocation_mutation_requests',
 ] as const;
 
 export const REQUIRED_V2_PROCEDURES = [
   'public.get_daily_allocation_v2_runtime()',
+  'public.get_daily_allocation_conversion_source_v2(date,text)',
+  'public.convert_daily_allocation_plan_day_v2(uuid,date,text,text,jsonb,jsonb,jsonb)',
+  'public.upsert_daily_allocation_visit_v2(uuid,uuid,uuid,integer,integer,text,uuid,text,timestamptz,timestamptz,text,text,text)',
+  'public.delete_daily_allocation_visit_v2(uuid,uuid,integer,integer)',
+  'public.assign_daily_allocation_labour_v2(uuid,uuid,uuid,integer,integer,text,text,text,uuid)',
+  'public.unassign_daily_allocation_labour_v2(uuid,uuid,integer,integer)',
+  'public.assign_daily_allocation_plant_v2(uuid,uuid,integer,integer,text,uuid,text,text,text,text)',
+  'public.unassign_daily_allocation_plant_v2(uuid,uuid,integer,integer)',
+  'public.publish_daily_allocation_plan_v2(uuid,uuid,integer,text,boolean)',
+  'public.move_daily_allocation_visit_v2(uuid,uuid,uuid,integer,integer,integer,timestamptz,timestamptz)',
+  'public.create_daily_allocation_conflict_override_v2(uuid,uuid,integer,text,text,uuid,uuid)',
+] as const;
+
+export const OBSOLETE_V2_PROCEDURES = [
   'public.convert_daily_allocation_plan_day_v2(date,text)',
   'public.upsert_daily_allocation_visit_v2(uuid,uuid,integer,integer,text,uuid,text,timestamptz,timestamptz,text,text,text)',
   'public.delete_daily_allocation_visit_v2(uuid,integer,integer)',
   'public.assign_daily_allocation_labour_v2(uuid,uuid,integer,text,text,text,uuid)',
   'public.unassign_daily_allocation_labour_v2(uuid,integer)',
   'public.assign_daily_allocation_plant_v2(uuid,integer,text,uuid,text,text,text,text)',
+  'public.assign_daily_allocation_plant_v2(uuid,uuid,integer,text,uuid,text,text,text,text)',
   'public.unassign_daily_allocation_plant_v2(uuid,integer)',
   'public.publish_daily_allocation_plan_v2(uuid,integer,text,boolean)',
   'public.move_daily_allocation_visit_v2(uuid,uuid,integer,integer,integer,timestamptz,timestamptz)',
   'public.create_daily_allocation_conflict_override_v2(uuid,integer,text,text,uuid,uuid)',
+] as const;
+
+const PRIVATE_V2_PROCEDURES = [
+  'private.daily_allocation_request_replay(uuid,uuid,text,jsonb)',
+  'private.daily_allocation_request_store(uuid,uuid,text,jsonb,jsonb)',
+  'private.daily_allocation_conversion_source_fingerprint(date,text)',
+  'private.guard_daily_labour_allocation_draft_write()',
+  'private.guard_daily_plant_allocation_draft_write()',
+  'private.prepare_daily_allocation_publication()',
 ] as const;
 
 const SMOKE_TIMEOUT_MS = 30_000;
@@ -76,8 +113,12 @@ export interface RuntimeState {
 export interface RolloutSnapshot {
   runtime: RuntimeState;
   permissionFingerprint: string;
-  v1Fingerprint: string;
+  v1ContentFingerprint: string;
+  v1PublicationFingerprint: string;
   v2ContentFingerprint: string;
+  v2PublicationFingerprint: string;
+  messageFingerprint: string;
+  requestLedgerFingerprint: string;
   v2Counts: Record<string, number>;
 }
 
@@ -98,8 +139,12 @@ interface RuntimeRow {
 
 interface FingerprintRow {
   permission_fingerprint: string;
-  v1_fingerprint: string;
+  v1_content_fingerprint: string;
+  v1_publication_fingerprint: string;
   v2_content_fingerprint: string;
+  v2_publication_fingerprint: string;
+  message_fingerprint: string;
+  request_ledger_fingerprint: string;
   v2_counts: Record<string, number> | string;
 }
 
@@ -127,6 +172,7 @@ interface ProcedureContractRow {
   authenticated_execute: boolean;
   service_role_execute: boolean;
   anon_execute: boolean;
+  definition: string | null;
 }
 
 interface RelationContractRow {
@@ -203,7 +249,9 @@ export function requireDailyAllocationProductionTarget(
 
 export function requireExpectedCommit(expectedCommit: string | undefined): string {
   if (!expectedCommit || !/^[0-9a-f]{40}$/u.test(expectedCommit)) {
-    throw new Error('Activation requires --expected-commit with the exact 40-character deployed SHA.');
+    throw new Error(
+      'Rollout preflight/activation requires --expected-commit with the exact 40-character deployed SHA.'
+    );
   }
   const result = spawnSync('git', ['rev-parse', 'HEAD'], {
     cwd: process.cwd(),
@@ -216,7 +264,7 @@ export function requireExpectedCommit(expectedCommit: string | undefined): strin
   const currentCommit = result.stdout.trim();
   if (currentCommit !== expectedCommit) {
     throw new Error(
-      `Activation refused: current commit ${currentCommit} does not match expected deployed commit.`
+      `Rollout refused: current commit ${currentCommit} does not match expected deployed commit.`
     );
   }
   const tracked = spawnSync(
@@ -235,7 +283,7 @@ export function requireExpectedCommit(expectedCommit: string | undefined): strin
     tracked.status !== 0
     || DAILY_ALLOCATION_ROLLOUT_ARTIFACTS.some((path) => !trackedPaths.has(path))
   ) {
-    throw new Error('Activation refused: rollout artifacts are not present in the expected commit.');
+    throw new Error('Rollout refused: rollout artifacts are not present in the expected commit.');
   }
   const diff = spawnSync(
     'git',
@@ -248,10 +296,31 @@ export function requireExpectedCommit(expectedCommit: string | undefined): strin
   );
   if (diff.status !== 0) {
     throw new Error(
-      'Activation refused: local rollout artifacts do not exactly match the expected commit.'
+      'Rollout refused: local rollout artifacts do not exactly match the expected commit.'
     );
   }
   return currentCommit;
+}
+
+export async function requireDeployedCommit(
+  expectedCommit: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<void> {
+  const response = await fetchImpl(DAILY_ALLOCATION_DEPLOYMENT_IDENTITY_URL, {
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Rollout refused: production deployment identity returned HTTP ${response.status}.`
+    );
+  }
+  const payload = await response.json() as { commit_sha?: unknown };
+  if (payload.commit_sha !== expectedCommit) {
+    throw new Error(
+      'Rollout refused: production deployment does not match the expected commit.'
+    );
+  }
 }
 
 export function snapshotsPreserveProtectedState(
@@ -259,8 +328,12 @@ export function snapshotsPreserveProtectedState(
   after: RolloutSnapshot
 ): boolean {
   return before.permissionFingerprint === after.permissionFingerprint
-    && before.v1Fingerprint === after.v1Fingerprint
-    && before.v2ContentFingerprint === after.v2ContentFingerprint;
+    && before.v1ContentFingerprint === after.v1ContentFingerprint
+    && before.v1PublicationFingerprint === after.v1PublicationFingerprint
+    && before.v2ContentFingerprint === after.v2ContentFingerprint
+    && before.v2PublicationFingerprint === after.v2PublicationFingerprint
+    && before.messageFingerprint === after.messageFingerprint
+    && before.requestLedgerFingerprint === after.requestLedgerFingerprint;
 }
 
 function assertProtectedStatePreserved(
@@ -294,14 +367,15 @@ export async function activateWithAutomaticDisable(
   adapter: ActivationAdapter,
   smokeTimeoutMs = SMOKE_TIMEOUT_MS
 ): Promise<RolloutSnapshot> {
-  const before = await adapter.captureSnapshot();
-  assertRuntimeState(
-    before.runtime,
-    { boardEnabled: false, writesEnabled: false },
-    'pre-activation'
-  );
+  let before: RolloutSnapshot | null = null;
 
   try {
+    before = await adapter.captureSnapshot();
+    assertRuntimeState(
+      before.runtime,
+      { boardEnabled: false, writesEnabled: false },
+      'pre-activation'
+    );
     if (adapter.shouldAbort?.()) {
       throw new Error('Daily Allocation activation was interrupted before runtime enable.');
     }
@@ -338,7 +412,9 @@ export async function activateWithAutomaticDisable(
         { boardEnabled: false, writesEnabled: false },
         'automatic disable'
       );
-      assertProtectedStatePreserved(before, disabled, 'automatic disable');
+      if (before) {
+        assertProtectedStatePreserved(before, disabled, 'automatic disable');
+      }
     } catch (error) {
       disableError = error;
     }
@@ -509,10 +585,15 @@ async function captureSnapshot(client: DatabaseClient): Promise<RolloutSnapshot>
           'plant_drafts', COALESCE((
             SELECT jsonb_agg(to_jsonb(row_data) ORDER BY row_data.id)
             FROM public.daily_plant_allocation_drafts row_data
-          ), '[]'::jsonb),
+          ), '[]'::jsonb)
+        )::text
+      ) AS v1_content_fingerprint,
+      md5(
+        jsonb_build_object(
           'publications', COALESCE((
             SELECT jsonb_agg(to_jsonb(row_data) ORDER BY row_data.id)
             FROM public.daily_allocation_publications row_data
+            WHERE row_data.snapshot_version = 1
           ), '[]'::jsonb),
           'labour_items', COALESCE((
             SELECT jsonb_agg(to_jsonb(row_data) ORDER BY row_data.id)
@@ -523,7 +604,7 @@ async function captureSnapshot(client: DatabaseClient): Promise<RolloutSnapshot>
             FROM public.daily_allocation_plant_items row_data
           ), '[]'::jsonb)
         )::text
-      ) AS v1_fingerprint,
+      ) AS v1_publication_fingerprint,
       md5(
         jsonb_build_object(
           'plan_days', COALESCE((
@@ -549,6 +630,15 @@ async function captureSnapshot(client: DatabaseClient): Promise<RolloutSnapshot>
           'plant_day_jobs', COALESCE((
             SELECT jsonb_agg(to_jsonb(row_data) ORDER BY row_data.id)
             FROM private.daily_allocation_plant_day_jobs row_data
+          ), '[]'::jsonb)
+        )::text
+      ) AS v2_content_fingerprint,
+      md5(
+        jsonb_build_object(
+          'publications', COALESCE((
+            SELECT jsonb_agg(to_jsonb(row_data) ORDER BY row_data.id)
+            FROM public.daily_allocation_publications row_data
+            WHERE row_data.snapshot_version = 2
           ), '[]'::jsonb),
           'published_visits', COALESCE((
             SELECT jsonb_agg(to_jsonb(row_data) ORDER BY row_data.id)
@@ -569,7 +659,11 @@ async function captureSnapshot(client: DatabaseClient): Promise<RolloutSnapshot>
           'publication_notifications', COALESCE((
             SELECT jsonb_agg(to_jsonb(row_data) ORDER BY row_data.id)
             FROM public.daily_allocation_publication_notifications row_data
-          ), '[]'::jsonb),
+          ), '[]'::jsonb)
+        )::text
+      ) AS v2_publication_fingerprint,
+      md5(
+        jsonb_build_object(
           'linked_messages', COALESCE((
             SELECT jsonb_agg(to_jsonb(messages) ORDER BY messages.id)
             FROM public.messages
@@ -600,7 +694,13 @@ async function captureSnapshot(client: DatabaseClient): Promise<RolloutSnapshot>
             )
           ), '[]'::jsonb)
         )::text
-      ) AS v2_content_fingerprint,
+      ) AS message_fingerprint,
+      md5(
+        COALESCE((
+          SELECT jsonb_agg(to_jsonb(row_data) ORDER BY row_data.request_id)
+          FROM private.daily_allocation_mutation_requests row_data
+        ), '[]'::jsonb)::text
+      ) AS request_ledger_fingerprint,
       jsonb_build_object(
         'plan_days', (SELECT COUNT(*) FROM public.daily_allocation_plan_days),
         'visits', (SELECT COUNT(*) FROM public.daily_allocation_visits),
@@ -612,7 +712,8 @@ async function captureSnapshot(client: DatabaseClient): Promise<RolloutSnapshot>
         'published_labour', (SELECT COUNT(*) FROM public.daily_allocation_published_labour),
         'published_plant', (SELECT COUNT(*) FROM public.daily_allocation_published_plant),
         'published_overrides', (SELECT COUNT(*) FROM public.daily_allocation_published_overrides),
-        'publication_notifications', (SELECT COUNT(*) FROM public.daily_allocation_publication_notifications)
+        'publication_notifications', (SELECT COUNT(*) FROM public.daily_allocation_publication_notifications),
+        'mutation_requests', (SELECT COUNT(*) FROM private.daily_allocation_mutation_requests)
       ) AS v2_counts
   `);
   const row = result.rows[0];
@@ -622,8 +723,12 @@ async function captureSnapshot(client: DatabaseClient): Promise<RolloutSnapshot>
   return {
     runtime,
     permissionFingerprint: row.permission_fingerprint,
-    v1Fingerprint: row.v1_fingerprint,
+    v1ContentFingerprint: row.v1_content_fingerprint,
+    v1PublicationFingerprint: row.v1_publication_fingerprint,
     v2ContentFingerprint: row.v2_content_fingerprint,
+    v2PublicationFingerprint: row.v2_publication_fingerprint,
+    messageFingerprint: row.message_fingerprint,
+    requestLedgerFingerprint: row.request_ledger_fingerprint,
     v2Counts,
   };
 }
@@ -632,6 +737,8 @@ async function verifyMigrationLedger(client: DatabaseClient): Promise<void> {
   for (const migrationPath of [
     DAILY_ALLOCATION_V2_MIGRATION,
     DAILY_ALLOCATION_V2_GRANT_MIGRATION,
+    DAILY_ALLOCATION_V2_DATA_CONTRACT_MIGRATION,
+    DAILY_ALLOCATION_V2_RUNTIME_GRANT_MIGRATION,
   ]) {
     const migrationSql = readRepositorySql(migrationPath);
     const expectedChecksum = sha256(migrationSql);
@@ -715,6 +822,8 @@ async function verifyObjectAndGrantContract(client: DatabaseClient): Promise<voi
     `, [relation]);
     const row = result.rows[0];
     const publicRelation = relation.startsWith('public.');
+    const requestLedger =
+      relation === 'private.daily_allocation_mutation_requests';
     const unsafeDml = row?.authenticated_insert
       || row?.authenticated_update
       || row?.authenticated_delete
@@ -741,6 +850,7 @@ async function verifyObjectAndGrantContract(client: DatabaseClient): Promise<voi
       || unsafeDml
       || unsafeAnon
       || (publicRelation && (!row.rls_enabled || !row.authenticated_select))
+      || (requestLedger && !row.rls_enabled)
       || (!publicRelation && (row.authenticated_select || row.authenticated_column_select))
     ) {
       throw new Error(`Daily Allocation v2 relation/ACL contract failed: ${relation}`);
@@ -761,18 +871,81 @@ async function verifyObjectAndGrantContract(client: DatabaseClient): Promise<voi
         COALESCE(has_function_privilege('service_role', to_regprocedure($1), 'EXECUTE'), FALSE)
           AS service_role_execute,
         COALESCE(has_function_privilege('anon', to_regprocedure($1), 'EXECUTE'), FALSE)
-          AS anon_execute
+          AS anon_execute,
+        CASE
+          WHEN to_regprocedure($1) IS NULL THEN NULL
+          ELSE pg_get_functiondef(to_regprocedure($1))
+        END AS definition
     `, [signature]);
     const row = result.rows[0];
     if (
       !row?.exists
       || !row.security_definer
       || !row.authenticated_execute
-      || !row.service_role_execute
+      || row.service_role_execute
       || row.anon_execute
     ) {
       throw new Error(`Daily Allocation v2 procedure contract failed: ${signature}`);
     }
+  }
+
+  for (const signature of OBSOLETE_V2_PROCEDURES) {
+    const result = await client.query<ProcedureContractRow>(`
+      SELECT
+        to_regprocedure($1) IS NOT NULL AS exists,
+        FALSE AS security_definer,
+        COALESCE(has_function_privilege('authenticated', to_regprocedure($1), 'EXECUTE'), FALSE)
+          AS authenticated_execute,
+        COALESCE(has_function_privilege('service_role', to_regprocedure($1), 'EXECUTE'), FALSE)
+          AS service_role_execute,
+        COALESCE(has_function_privilege('anon', to_regprocedure($1), 'EXECUTE'), FALSE)
+          AS anon_execute,
+        NULL::text AS definition
+    `, [signature]);
+    const row = result.rows[0];
+    if (
+      row?.authenticated_execute
+      || row?.service_role_execute
+      || row?.anon_execute
+    ) {
+      throw new Error(
+        `Daily Allocation obsolete procedure remains executable: ${signature}`
+      );
+    }
+  }
+
+  const unexpectedExecutable = await client.query<{ signature: string }>(`
+    SELECT procedures.oid::regprocedure::text AS signature
+    FROM pg_proc procedures
+    JOIN pg_namespace namespaces ON namespaces.oid = procedures.pronamespace
+    WHERE namespaces.nspname = 'public'
+      AND procedures.proname LIKE '%daily_allocation%v2%'
+      AND has_function_privilege('authenticated', procedures.oid, 'EXECUTE')
+      AND procedures.oid <> ALL (
+        SELECT to_regprocedure(required.signature)
+        FROM unnest($1::text[]) AS required(signature)
+      )
+    ORDER BY procedures.oid::regprocedure::text
+  `, [[...REQUIRED_V2_PROCEDURES]]);
+  if (unexpectedExecutable.rowCount) {
+    throw new Error(
+      `Unexpected authenticated Daily Allocation v2 procedure: ${unexpectedExecutable.rows[0].signature}`
+    );
+  }
+
+  const privateBoundary = await client.query<{
+    authenticated_usage: boolean;
+    anon_usage: boolean;
+  }>(`
+    SELECT
+      has_schema_privilege('authenticated', 'private', 'USAGE') AS authenticated_usage,
+      has_schema_privilege('anon', 'private', 'USAGE') AS anon_usage
+  `);
+  if (
+    privateBoundary.rows[0]?.authenticated_usage
+    || privateBoundary.rows[0]?.anon_usage
+  ) {
+    throw new Error('Daily Allocation private-schema boundary is not closed.');
   }
 
   const writerGuard = await client.query<ExistsRow>(
@@ -782,6 +955,181 @@ async function verifyObjectAndGrantContract(client: DatabaseClient): Promise<voi
     throw new Error('Daily Allocation v2 writer guard is missing.');
   }
 
+  await verifySemanticProcedureContract(client);
+}
+
+function normalizedDefinition(value: string): string {
+  return value.toLowerCase().replace(/\s+/gu, ' ');
+}
+
+function assertDefinitionContainsInOrder(
+  signature: string,
+  definition: string,
+  fragments: readonly string[]
+): void {
+  const normalized = normalizedDefinition(definition);
+  let cursor = -1;
+  for (const fragment of fragments) {
+    const next = normalized.indexOf(fragment.toLowerCase(), cursor + 1);
+    if (next < 0) {
+      throw new Error(
+        `Daily Allocation semantic procedure contract failed: ${signature}`
+      );
+    }
+    cursor = next;
+  }
+}
+
+async function loadProcedureDefinition(
+  client: DatabaseClient,
+  signature: string
+): Promise<string> {
+  const result = await client.query<{ definition: string | null }>(
+    `SELECT CASE
+      WHEN to_regprocedure($1) IS NULL THEN NULL
+      ELSE pg_get_functiondef(to_regprocedure($1))
+    END AS definition`,
+    [signature]
+  );
+  const definition = result.rows[0]?.definition;
+  if (!definition) {
+    throw new Error(
+      `Daily Allocation semantic procedure is missing: ${signature}`
+    );
+  }
+  return definition;
+}
+
+async function verifySemanticProcedureContract(
+  client: DatabaseClient
+): Promise<void> {
+  const writerGuardSignature =
+    'private.require_daily_allocation_v2_writer()';
+  assertDefinitionContainsInOrder(
+    writerGuardSignature,
+    await loadProcedureDefinition(client, writerGuardSignature),
+    [
+      'auth.uid()',
+      'private.daily_allocation_v2_writes_allowed()',
+      "public.effective_has_module_level('daily-allocation', 4)",
+    ]
+  );
+
+  const replaySignature =
+    'private.daily_allocation_request_replay(uuid,uuid,text,jsonb)';
+  const replayDefinition = await loadProcedureDefinition(client, replaySignature);
+  assertDefinitionContainsInOrder(replaySignature, replayDefinition, [
+    'existing.actor_id is distinct from p_actor_id',
+    'existing.action is distinct from p_action',
+    'existing.payload_hash is distinct from expected_hash',
+    "raise exception 'request_id_reused'",
+  ]);
+
+  const mutationSignatures = REQUIRED_V2_PROCEDURES.filter(
+    (signature) =>
+      !signature.includes('get_daily_allocation_v2_runtime')
+      && !signature.includes('get_daily_allocation_conversion_source_v2')
+  );
+  for (const signature of mutationSignatures) {
+    const definition = await loadProcedureDefinition(client, signature);
+    assertDefinitionContainsInOrder(signature, definition, [
+      'private.require_daily_allocation_v2_writer()',
+      'private.daily_allocation_request_replay',
+    ]);
+  }
+
+  const conversionSignature =
+    'public.convert_daily_allocation_plan_day_v2(uuid,date,text,text,jsonb,jsonb,jsonb)';
+  const conversionDefinition = await loadProcedureDefinition(
+    client,
+    conversionSignature
+  );
+  assertDefinitionContainsInOrder(conversionSignature, conversionDefinition, [
+    'private.lock_daily_allocation_plan_day',
+    'private.daily_allocation_conversion_source_fingerprint',
+    'source_fingerprint_mismatch',
+    'conversion_duplicate_input',
+    'conversion_labour_source_mismatch',
+    'conversion_plant_source_mismatch',
+    'private.daily_allocation_interval_is_valid',
+    'private.apply_allocation_job_fields',
+    'conversion_disposition_required',
+    'conversion_job_mismatch',
+  ]);
+  if (
+    normalizedDefinition(conversionDefinition).includes('start_time')
+    || /(update|delete from) public\.daily_(labour|plant)_allocation_drafts/iu
+      .test(conversionDefinition)
+  ) {
+    throw new Error(
+      `Daily Allocation semantic procedure contract failed: ${conversionSignature}`
+    );
+  }
+
+  for (const signature of [
+    'private.guard_daily_labour_allocation_draft_write()',
+    'private.guard_daily_plant_allocation_draft_write()',
+    'private.prepare_daily_allocation_publication()',
+  ]) {
+    assertDefinitionContainsInOrder(
+      signature,
+      await loadProcedureDefinition(client, signature),
+      [
+        'private.lock_daily_allocation_plan_day',
+        'private.reject_converted_v1_daily_allocation_write',
+      ]
+    );
+  }
+
+  for (const signature of [
+    'public.assign_daily_allocation_labour_v2(uuid,uuid,uuid,integer,integer,text,text,text,uuid)',
+    'public.unassign_daily_allocation_labour_v2(uuid,uuid,integer,integer)',
+    'public.assign_daily_allocation_plant_v2(uuid,uuid,integer,integer,text,uuid,text,text,text,text)',
+    'public.unassign_daily_allocation_plant_v2(uuid,uuid,integer,integer)',
+  ]) {
+    const definition = normalizedDefinition(
+      await loadProcedureDefinition(client, signature)
+    );
+    if (
+      !definition.includes('p_expected_row_version')
+      || !definition.includes('stale_entity_version')
+    ) {
+      throw new Error(
+        `Daily Allocation row-version CAS contract failed: ${signature}`
+      );
+    }
+  }
+
+  for (const signature of [
+    'public.upsert_daily_allocation_visit_v2(uuid,uuid,integer,integer,text,uuid,text,timestamptz,timestamptz,text,text,text)',
+    'public.move_daily_allocation_visit_v2(uuid,uuid,integer,integer,integer,timestamptz,timestamptz)',
+    'public.delete_daily_allocation_visit_v2(uuid,integer,integer)',
+  ]) {
+    const definition = normalizedDefinition(
+      await loadProcedureDefinition(client, signature)
+    );
+    if (
+      !definition.includes('p_expected_row_version')
+      || !definition.includes('stale_entity_version')
+    ) {
+      throw new Error(
+        `Daily Allocation row-version CAS contract failed: ${signature}`
+      );
+    }
+  }
+
+  const plantClaimSignature =
+    'private.claim_daily_allocation_plant_day_job(date,text,uuid,text,text,text,uuid,text)';
+  const plantClaim = await loadProcedureDefinition(client, plantClaimSignature);
+  assertDefinitionContainsInOrder(plantClaimSignature, plantClaim, [
+    'claim.job_source_type is distinct from p_job_source_type',
+    'claim.job_source_id is distinct from p_job_source_id',
+    "raise exception 'plant_job_conflict'",
+  ]);
+
+  for (const signature of PRIVATE_V2_PROCEDURES) {
+    await loadProcedureDefinition(client, signature);
+  }
 }
 
 async function executeSqlArtifact(client: DatabaseClient, path: string): Promise<void> {
@@ -873,8 +1221,8 @@ async function runSmokeChecks(client: DatabaseClient): Promise<void> {
   try {
     await withAuthenticatedRole(client, managerId, async () => {
       await client.query(
-        'SELECT public.delete_daily_allocation_visit_v2($1::uuid, 1, 1)',
-        [NONEXISTENT_VISIT_ID]
+        'SELECT public.delete_daily_allocation_visit_v2($1::uuid, $2::uuid, 1, 1)',
+        ['00000000-0000-4000-8000-000000000002', NONEXISTENT_VISIT_ID]
       );
     });
   } catch (error) {
@@ -943,14 +1291,14 @@ async function runPreflight(
   client: DatabaseClient,
   rehearseDisable: boolean
 ): Promise<RolloutSnapshot> {
-  await verifyMigrationLedger(client);
-  await verifyObjectAndGrantContract(client);
   const before = await captureSnapshot(client);
   assertRuntimeState(
     before.runtime,
     { boardEnabled: false, writesEnabled: false },
     'preflight'
   );
+  await verifyMigrationLedger(client);
+  await verifyObjectAndGrantContract(client);
 
   if (!rehearseDisable) return before;
 
@@ -968,14 +1316,50 @@ async function runPreflight(
   return after;
 }
 
+async function disableAfterActivationValidationFailure(
+  client: DatabaseClient,
+  activationError: unknown
+): Promise<never> {
+  let disableError: unknown;
+  try {
+    await executeSqlArtifact(client, DAILY_ALLOCATION_V2_DISABLE);
+    const disabled = await captureSnapshot(client);
+    assertRuntimeState(
+      disabled.runtime,
+      { boardEnabled: false, writesEnabled: false },
+      'activation validation automatic disable'
+    );
+  } catch (error) {
+    disableError = error;
+  }
+  const activationMessage = activationError instanceof Error
+    ? activationError.message
+    : String(activationError);
+  if (disableError) {
+    const disableMessage = disableError instanceof Error
+      ? disableError.message
+      : String(disableError);
+    throw new Error(
+      `Daily Allocation activation validation failed (${activationMessage}); automatic disable also failed (${disableMessage}).`
+    );
+  }
+  throw new Error(
+    `Daily Allocation activation validation failed and was automatically disabled: ${activationMessage}`
+  );
+}
+
 function printSnapshot(label: string, snapshot: RolloutSnapshot): void {
   console.log(`${label}:`);
   console.log(
     `- runtime: board=${snapshot.runtime.boardEnabled}, writes=${snapshot.runtime.writesEnabled}, updated=${snapshot.runtime.updatedAt}`
   );
   console.log(`- permission fingerprint: ${snapshot.permissionFingerprint}`);
-  console.log(`- v1 fingerprint: ${snapshot.v1Fingerprint}`);
+  console.log(`- v1 content fingerprint: ${snapshot.v1ContentFingerprint}`);
+  console.log(`- v1 publication fingerprint: ${snapshot.v1PublicationFingerprint}`);
   console.log(`- v2 content fingerprint: ${snapshot.v2ContentFingerprint}`);
+  console.log(`- v2 publication fingerprint: ${snapshot.v2PublicationFingerprint}`);
+  console.log(`- message fingerprint: ${snapshot.messageFingerprint}`);
+  console.log(`- request ledger fingerprint: ${snapshot.requestLedgerFingerprint}`);
   console.log(`- v2 counts: ${JSON.stringify(snapshot.v2Counts)}`);
 }
 
@@ -1059,7 +1443,10 @@ async function main(): Promise<void> {
   const connectionString = requireDailyAllocationProductionTarget(
     process.env.POSTGRES_URL_NON_POOLING
   );
-  if (command === 'activate') {
+  if (command === 'preflight' || command === 'activate') {
+    const currentCommit = requireExpectedCommit(expectedCommit);
+    await requireDeployedCommit(currentCommit);
+  } else if (expectedCommit) {
     requireExpectedCommit(expectedCommit);
   }
 
@@ -1096,7 +1483,12 @@ async function main(): Promise<void> {
       return;
     }
 
-    const preflight = await runPreflight(client, true);
+    let preflight: RolloutSnapshot;
+    try {
+      preflight = await runPreflight(client, true);
+    } catch (error) {
+      return await disableAfterActivationValidationFailure(client, error);
+    }
     printSnapshot('Daily Allocation v2 activation preflight passed', preflight);
     const smokeController = createSmokeController(connectionString, client);
     const result = await runInterruptibleActivation({

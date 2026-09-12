@@ -1,11 +1,20 @@
 import type { DailyAllocationRangeBoardPayload } from '@/types/daily-allocation';
 import { OPTIMISTIC_ENTITY_PREFIX } from '@/lib/client/daily-allocation';
+import {
+  claimsConflict,
+  type DailyAllocationMutationClaim,
+} from '@/components/daily-allocation/board/daily-allocation-mutation-claims';
 
 export interface DailyAllocationProjection {
   board: DailyAllocationRangeBoardPayload | undefined;
 }
 
 export type DailyAllocationOptimisticStatus = 'pending' | 'acknowledged' | 'uncertain';
+export type DailyAllocationExecutionStatus =
+  | 'queued'
+  | 'executing'
+  | 'awaiting-retry'
+  | 'completed';
 
 export type DailyAllocationOptimisticKind =
   | 'convert'
@@ -25,6 +34,14 @@ export interface DailyAllocationOptimisticOperation {
   kind: DailyAllocationOptimisticKind | string;
   status: DailyAllocationOptimisticStatus;
   lockKeys: string[];
+  claims?: DailyAllocationMutationClaim[];
+  requestId?: string;
+  duplicateKey?: string;
+  coalesceGroup?: string;
+  dependsOn?: string[];
+  identityWaitKeys?: string[];
+  executionStatus?: DailyAllocationExecutionStatus;
+  retryCount?: number;
   queryKeys: string[];
   reconciledKeys: string[];
   proofs: Record<string, (base: DailyAllocationProjection) => boolean>;
@@ -60,7 +77,7 @@ export function projectDailyAllocationState(
     }, base);
 }
 
-function splitLockKey(key: string): { kind: string; id: string } {
+export function splitDailyAllocationLockKey(key: string): { kind: string; id: string } {
   const separator = key.indexOf(':');
   return separator === -1
     ? { kind: key, id: '' }
@@ -69,8 +86,8 @@ function splitLockKey(key: string): { kind: string; id: string } {
 
 function lockKeysConflict(left: string, right: string): boolean {
   if (left === right) return true;
-  const a = splitLockKey(left);
-  const b = splitLockKey(right);
+  const a = splitDailyAllocationLockKey(left);
+  const b = splitDailyAllocationLockKey(right);
   if (a.id !== b.id || !a.id) return false;
   const relatedKinds: Record<string, string[]> = {
     plan: ['plan-tree'],
@@ -82,9 +99,14 @@ function lockKeysConflict(left: string, right: string): boolean {
 }
 
 export function operationsOverlap(
-  operation: Pick<DailyAllocationOptimisticOperation, 'lockKeys'>,
+  operation: Pick<DailyAllocationOptimisticOperation, 'lockKeys' | 'claims'>,
   operations: DailyAllocationOptimisticOperation[]
 ): boolean {
+  if (operation.claims) {
+    return operations.some((current) =>
+      Boolean(current.claims && claimsConflict(operation.claims!, current.claims))
+    );
+  }
   const requested = operation.lockKeys;
   return operations.some((current) =>
     current.lockKeys.some((currentKey) =>
@@ -130,6 +152,35 @@ export function reconcileOptimisticOperations(
           }
         : operation
     )
+    .filter((operation) =>
+      operation.status === 'pending'
+      || operation.queryKeys.some((queryKey) => !operation.reconciledKeys.includes(queryKey))
+    );
+}
+
+export function retireExhaustedOptimisticOperations(
+  operations: DailyAllocationOptimisticOperation[],
+  key: string,
+  eligibleOperationIds: ReadonlySet<string>,
+  attemptCount: (operationId: string) => number,
+  maxAttempts: number
+): DailyAllocationOptimisticOperation[] {
+  return operations
+    .map((operation) => {
+      if (
+        operation.status === 'pending'
+        || !eligibleOperationIds.has(operation.id)
+        || attemptCount(operation.id) < maxAttempts
+        || !operation.queryKeys.includes(key)
+        || operation.reconciledKeys.includes(key)
+      ) {
+        return operation;
+      }
+      return {
+        ...operation,
+        reconciledKeys: [...operation.reconciledKeys, key],
+      };
+    })
     .filter((operation) =>
       operation.status === 'pending'
       || operation.queryKeys.some((queryKey) => !operation.reconciledKeys.includes(queryKey))

@@ -11,6 +11,10 @@ import {
   type DailyAllocationBoardView,
 } from '@/lib/config/daily-allocation-view-preference';
 import {
+  DAILY_ALLOCATION_BOARD_PRIMARIES,
+  type DailyAllocationBoardPrimary,
+} from '@/lib/config/daily-allocation-primary-preference';
+import {
   formatDailyAllocationDate,
   getDailyAllocationWeekRange,
 } from '@/lib/utils/daily-allocation-timeline';
@@ -21,6 +25,8 @@ interface BoardToolbarProps {
   view: DailyAllocationBoardView;
   onDateChange: (date: string) => void;
   onViewChange: (view: DailyAllocationBoardView) => void;
+  primary: DailyAllocationBoardPrimary;
+  onPrimaryChange: (primary: DailyAllocationBoardPrimary) => void;
   onPublish: () => void;
   publishDisabled?: boolean;
   publishDisabledReason?: string;
@@ -39,6 +45,8 @@ export function BoardToolbar({
   view,
   onDateChange,
   onViewChange,
+  primary,
+  onPrimaryChange,
   onPublish,
   publishDisabled,
   publishDisabledReason,
@@ -70,6 +78,16 @@ export function BoardToolbar({
     }
   }
 
+  function handlePrimaryChange(value: string) {
+    if (
+      value === DAILY_ALLOCATION_BOARD_PRIMARIES.job
+      || value === DAILY_ALLOCATION_BOARD_PRIMARIES.employee
+      || value === DAILY_ALLOCATION_BOARD_PRIMARIES.plant
+    ) {
+      onPrimaryChange(value);
+    }
+  }
+
   const feedback = [
     isLoading ? 'Loading board' : null,
     !isLoading && isFetching ? 'Refreshing' : null,
@@ -89,6 +107,23 @@ export function BoardToolbar({
           </TabsTrigger>
           <TabsTrigger value={DAILY_ALLOCATION_BOARD_VIEWS.weekly} className="px-3">
             Weekly
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
+      <Tabs value={primary} onValueChange={handlePrimaryChange} className="shrink-0">
+        <TabsList
+          aria-label="Board primary resource"
+          className="grid h-9 w-[13rem] grid-cols-3 gap-0 p-1"
+          data-testid="daily-allocation-primary-tabs"
+        >
+          <TabsTrigger value={DAILY_ALLOCATION_BOARD_PRIMARIES.job} aria-label="Primary Jobs">
+            Jobs
+          </TabsTrigger>
+          <TabsTrigger value={DAILY_ALLOCATION_BOARD_PRIMARIES.employee} aria-label="Primary Employees">
+            Employees
+          </TabsTrigger>
+          <TabsTrigger value={DAILY_ALLOCATION_BOARD_PRIMARIES.plant} aria-label="Primary Plant">
+            Plant
           </TabsTrigger>
         </TabsList>
       </Tabs>

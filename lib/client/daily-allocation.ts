@@ -1,14 +1,21 @@
 import type {
   DailyAllocationAssignmentDeleteInput,
+  DailyAllocationAssignmentDeleteResult,
+  DailyAllocationAssignmentMutationResult,
   DailyAllocationConvertInput,
   DailyAllocationConvertResult,
+  DailyAllocationConversionSource,
   DailyAllocationLabourAssignInput,
+  DailyAllocationLabourAssignment,
   DailyAllocationOverrideInput,
+  DailyAllocationOverrideMutationResult,
   DailyAllocationPlantAssignInput,
+  DailyAllocationPlantAssignment,
   DailyAllocationPublishV2Input,
   DailyAllocationRangeBoardPayload,
   DailyAllocationV2Runtime,
   DailyAllocationVisitDeleteInput,
+  DailyAllocationVisitDeleteResult,
   DailyAllocationVisitMoveInput,
   DailyAllocationVisitMoveResult,
   DailyAllocationVisitMutationResult,
@@ -172,6 +179,17 @@ export async function convertDailyAllocationPlanDay(
   );
 }
 
+export async function fetchDailyAllocationConversionSource(
+  workDate: string,
+  teamId: string
+): Promise<DailyAllocationConversionSource> {
+  return readResponse(
+    await fetch(
+      `/api/daily-allocation/convert?work_date=${encodeURIComponent(workDate)}&team_id=${encodeURIComponent(teamId)}`
+    )
+  );
+}
+
 export async function createDailyAllocationVisit(
   input: DailyAllocationVisitUpsertInput
 ): Promise<DailyAllocationVisitMutationResult> {
@@ -199,6 +217,7 @@ export async function moveDailyAllocationVisit(
     await fetch(
       `/api/daily-allocation/visits/${encodeURIComponent(input.visit_id)}/move`,
       jsonRequest('POST', {
+        request_id: input.request_id,
         target_plan_day_id: input.target_plan_day_id,
         expected_source_plan_version: input.expected_source_plan_version,
         expected_target_plan_version: input.expected_target_plan_version,
@@ -212,13 +231,14 @@ export async function moveDailyAllocationVisit(
 
 export async function deleteDailyAllocationVisit(
   input: DailyAllocationVisitDeleteInput
-): Promise<{ visit_id: string }> {
+): Promise<DailyAllocationVisitDeleteResult> {
   assertNoProvisionalDailyAllocationIds(input);
   return readResponse(
     await fetch(`/api/daily-allocation/visits/${encodeURIComponent(input.visit_id)}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        request_id: input.request_id,
         expected_plan_version: input.expected_plan_version,
         expected_row_version: input.expected_row_version,
       }),
@@ -228,7 +248,7 @@ export async function deleteDailyAllocationVisit(
 
 export async function assignDailyAllocationLabour(
   input: DailyAllocationLabourAssignInput
-): Promise<{ assignment_id: string }> {
+): Promise<DailyAllocationAssignmentMutationResult<DailyAllocationLabourAssignment>> {
   assertNoProvisionalDailyAllocationIds(input);
   return readResponse(
     await fetch('/api/daily-allocation/assignments/labour', jsonRequest('POST', input))
@@ -238,23 +258,29 @@ export async function assignDailyAllocationLabour(
 export async function unassignDailyAllocationLabour(
   assignmentId: string,
   input: DailyAllocationAssignmentDeleteInput
-): Promise<{ assignment_id: string }> {
+): Promise<DailyAllocationAssignmentDeleteResult> {
   assertNoProvisionalDailyAllocationIds({
     assignment_id: assignmentId,
+    request_id: input.request_id,
     expected_plan_version: input.expected_plan_version,
+    expected_row_version: input.expected_row_version,
   });
   return readResponse(
     await fetch(`/api/daily-allocation/assignments/labour/${encodeURIComponent(assignmentId)}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expected_plan_version: input.expected_plan_version }),
+      body: JSON.stringify({
+        request_id: input.request_id,
+        expected_plan_version: input.expected_plan_version,
+        expected_row_version: input.expected_row_version,
+      }),
     })
   );
 }
 
 export async function assignDailyAllocationPlant(
   input: DailyAllocationPlantAssignInput
-): Promise<{ assignment_id: string }> {
+): Promise<DailyAllocationAssignmentMutationResult<DailyAllocationPlantAssignment>> {
   assertNoProvisionalDailyAllocationIds(input);
   return readResponse(
     await fetch('/api/daily-allocation/assignments/plant', jsonRequest('POST', input))
@@ -264,23 +290,29 @@ export async function assignDailyAllocationPlant(
 export async function unassignDailyAllocationPlant(
   assignmentId: string,
   input: DailyAllocationAssignmentDeleteInput
-): Promise<{ assignment_id: string }> {
+): Promise<DailyAllocationAssignmentDeleteResult> {
   assertNoProvisionalDailyAllocationIds({
     assignment_id: assignmentId,
+    request_id: input.request_id,
     expected_plan_version: input.expected_plan_version,
+    expected_row_version: input.expected_row_version,
   });
   return readResponse(
     await fetch(`/api/daily-allocation/assignments/plant/${encodeURIComponent(assignmentId)}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expected_plan_version: input.expected_plan_version }),
+      body: JSON.stringify({
+        request_id: input.request_id,
+        expected_plan_version: input.expected_plan_version,
+        expected_row_version: input.expected_row_version,
+      }),
     })
   );
 }
 
 export async function createDailyAllocationConflictOverride(
   input: DailyAllocationOverrideInput
-): Promise<{ override_id: string }> {
+): Promise<DailyAllocationOverrideMutationResult> {
   assertNoProvisionalDailyAllocationIds(input);
   return readResponse(
     await fetch('/api/daily-allocation/overrides', jsonRequest('POST', input))
@@ -294,6 +326,7 @@ export async function publishDailyAllocationPlanV2(
   return readResponse(
     await fetch('/api/daily-allocation/publish', jsonRequest('POST', {
       snapshot_version: 2,
+      request_id: input.request_id,
       plan_day_id: input.plan_day_id,
       expected_plan_version: input.expected_plan_version,
       idempotency_key: input.idempotency_key,

@@ -68,6 +68,14 @@ describe('DA2-CONC-001 rpc error mapping', () => {
       status: 503,
       code: 'V2_DISABLED',
     });
+    expect(mapDailyAllocationRpcError({ message: 'REQUEST_ID_REUSED' })).toMatchObject({
+      status: 409,
+      code: 'REQUEST_ID_REUSED',
+    });
+    expect(mapDailyAllocationRpcError({ message: 'SOURCE_FINGERPRINT_MISMATCH' })).toMatchObject({
+      status: 409,
+      code: 'SOURCE_FINGERPRINT_MISMATCH',
+    });
   });
 });
 

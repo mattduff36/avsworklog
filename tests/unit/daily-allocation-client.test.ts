@@ -43,6 +43,7 @@ describe('daily allocation client wrappers', () => {
     try {
       await publishDailyAllocationPlanV2({
         snapshot_version: 2,
+        request_id: '11111111-1111-4111-8111-111111111111',
         plan_day_id: 'plan-1',
         expected_plan_version: 3,
         idempotency_key: 'idem-1',
@@ -63,6 +64,7 @@ describe('daily allocation client wrappers', () => {
 
     await expect(
       updateDailyAllocationVisit('optimistic:op:visit', {
+        request_id: '11111111-1111-4111-8111-111111111111',
         plan_day_id: 'plan-1',
         expected_plan_version: 1,
         job_source_type: 'project_number',
@@ -75,6 +77,7 @@ describe('daily allocation client wrappers', () => {
 
     await expect(
       assignDailyAllocationLabour({
+        request_id: '11111111-1111-4111-8111-111111111111',
         visit_id: 'optimistic:op:visit',
         profile_id: 'profile-1',
         expected_plan_version: 1,
@@ -83,6 +86,7 @@ describe('daily allocation client wrappers', () => {
 
     await expect(
       deleteDailyAllocationVisit({
+        request_id: '11111111-1111-4111-8111-111111111111',
         visit_id: 'optimistic:op:visit',
         expected_plan_version: 1,
         expected_row_version: 1,
@@ -91,6 +95,7 @@ describe('daily allocation client wrappers', () => {
 
     await expect(
       createDailyAllocationVisit({
+        request_id: '11111111-1111-4111-8111-111111111111',
         plan_day_id: 'optimistic:op:plan',
         expected_plan_version: 1,
         job_source_type: 'project_number',
@@ -118,7 +123,15 @@ describe('daily allocation client wrappers', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(
-      convertDailyAllocationPlanDay({ work_date: '2026-08-15', team_id: 'team-1' })
+      convertDailyAllocationPlanDay({
+        request_id: '11111111-1111-4111-8111-111111111111',
+        work_date: '2026-08-15',
+        team_id: 'team-1',
+        expected_source_fingerprint: 'a'.repeat(64),
+        visits: [],
+        labour_drafts: [],
+        plant_drafts: [],
+      })
     ).resolves.toEqual(payload);
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/daily-allocation/convert',
@@ -147,6 +160,7 @@ describe('daily allocation client wrappers', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/daily-allocation/runtime');
 
     await expect(moveDailyAllocationVisit({
+      request_id: '11111111-1111-4111-8111-111111111111',
       visit_id: 'visit-1',
       target_plan_day_id: 'plan-2',
       expected_source_plan_version: 2,

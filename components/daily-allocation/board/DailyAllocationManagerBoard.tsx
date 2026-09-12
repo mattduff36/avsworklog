@@ -17,10 +17,12 @@ import { JobsPanel } from '@/components/daily-allocation/board/JobsPanel';
 import {
   AssignResourcesDialog,
   DeleteVisitDialog,
+  MoveVisitDialog,
   OverrideDialog,
   PublishDialog,
   VisitEditorDialog,
   emptyVisitForm,
+  type MoveVisitFormState,
   type VisitFormState,
 } from '@/components/daily-allocation/board/AllocationDialogs';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
@@ -33,7 +35,6 @@ import {
   type DailyAllocationDropTarget,
 } from '@/components/daily-allocation/board/board-dnd';
 import {
-  buildJobRows,
   evaluateEmployeeAssignmentBlock,
   filterDailyAllocationBoardForTeam,
   authoritativePlanDayIdentity,
@@ -45,6 +46,7 @@ import {
   visitLabour,
   visitPlant,
 } from '@/components/daily-allocation/board/board-model';
+import { buildDailyAllocationBoardRows } from '@/components/daily-allocation/board/daily-allocation-board-primary';
 import {
   useDailyAllocationBoard,
 } from '@/components/daily-allocation/board/hooks/use-daily-allocation-board';
@@ -52,9 +54,11 @@ import {
   createOptimisticEntityId,
   useDailyAllocationBoardMutations,
 } from '@/components/daily-allocation/board/hooks/use-daily-allocation-mutations';
+import { useDailyAllocationPrimaryPreference } from '@/components/daily-allocation/board/hooks/use-daily-allocation-primary-preference';
 import {
   isDailyAllocationApiError,
   isDailyAllocationStaleOrConflictError,
+  fetchDailyAllocationConversionSource,
 } from '@/lib/client/daily-allocation';
 import {
   DAILY_ALLOCATION_DEFAULT_END_HOUR,
@@ -70,12 +74,15 @@ import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import type { JobCatalogueOption } from '@/types/job-catalogue';
 import type {
   DailyAllocationConflictKind,
+  DailyAllocationConvertInput,
   DailyAllocationConvertResult,
   DailyAllocationJobProjection,
   DailyAllocationPlanDay,
   DailyAllocationVisit,
 } from '@/types/daily-allocation';
 import { DAILY_TIMELINE_HOUR_WIDTH, dailyTimelineRangeLeft } from '@/components/daily-allocation/board/daily-timeline-layout';
+import { GuidedLegacyConversionDialog } from '@/components/daily-allocation/board/GuidedLegacyConversionDialog';
+import { getDailyAllocationElementVisualScale } from '@/components/daily-allocation/board/daily-allocation-viewport-fit';
 
 const PUBLISH_ATTEMPT_STORAGE_KEY = 'daily-allocation:publish-attempt';
 const dailyAllocationBetaBadge = <DailyAllocationBetaBadge />;
@@ -154,7 +161,9 @@ export function DailyAllocationManagerBoard({
   const rawBoard = boardState.board;
   const rawViewBoard = boardState.viewBoard;
   const selectedDate = boardState.selectedDate;
+  const primaryPreference = useDailyAllocationPrimaryPreference(rawBoard?.context.user_id || '');
   const pointerX = useRef<number | null>(null);
+  const dragActiveRef = useRef(false);
   const publishAttemptRef = useRef<PublishAttempt | null>(null);
   const ensurePlanDayInflight = useRef(new Map<string, Promise<AuthoritativePlanDay | null>>());
 
@@ -166,6 +175,11 @@ export function DailyAllocationManagerBoard({
   const [selectedVisitId, setSelectedVisitId] = useState<string | null>(null);
   const [visitForm, setVisitForm] = useState<VisitFormState>(emptyVisitForm(selectedDate));
   const [visitDialog, setVisitDialog] = useState<'add' | 'edit' | null>(null);
+  const [moveVisitId, setMoveVisitId] = useState<string | null>(null);
+  const [moveForm, setMoveForm] = useState<MoveVisitFormState>({
+    workDate: selectedDate,
+    startTime: '08:00',
+  });
   const [assignOpen, setAssignOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [unallocatedConfirm, setUnallocatedConfirm] = useState(false);
@@ -173,11 +187,18 @@ export function DailyAllocationManagerBoard({
   const [deleteVisit, setDeleteVisit] = useState<DailyAllocationVisit | null>(null);
   const [overrideKind, setOverrideKind] = useState<DailyAllocationConflictKind | null>(null);
   const [pendingAssign, setPendingAssign] = useState<
-    | { type: 'employee'; profileId: string; visit: DailyAllocationVisit }
+    | {
+        type: 'employee';
+        profileId: string;
+        visit: DailyAllocationVisit;
+        instructions: { meeting_point: string | null; meet_person: string | null; notes: string | null };
+      }
     | { type: 'plant'; plantId: string; visit: DailyAllocationVisit }
     | null
   >(null);
   const [statusMessage, setStatusMessage] = useState('');
+  const [dndSessionEpoch, setDndSessionEpoch] = useState(0);
+  const [conversionOpen, setConversionOpen] = useState(false);
 
   const activeTeamId = rawBoard
     ? resolveDailyAllocationActiveTeamId(rawBoard, selectedTeamOverride)
@@ -197,6 +218,26 @@ export function DailyAllocationManagerBoard({
     toast.error(errorMessage(boardState.boardError, 'Unable to load the allocation board.'));
   }, [boardState.boardError]);
 
+  useEffect(() => {
+    function recoverStuckInteraction(event: PointerEvent | KeyboardEvent | Event) {
+      if (event instanceof KeyboardEvent && event.key !== 'Escape') return;
+      boardState.setPointerInteractionActive(false);
+      if (dragActiveRef.current) {
+        dragActiveRef.current = false;
+        setDndSessionEpoch((current) => current + 1);
+        setStatusMessage('Drag cancelled. Board controls restored.');
+      }
+    }
+    window.addEventListener('pointercancel', recoverStuckInteraction);
+    window.addEventListener('blur', recoverStuckInteraction);
+    window.addEventListener('keydown', recoverStuckInteraction);
+    return () => {
+      window.removeEventListener('pointercancel', recoverStuckInteraction);
+      window.removeEventListener('blur', recoverStuckInteraction);
+      window.removeEventListener('keydown', recoverStuckInteraction);
+    };
+  }, [boardState]);
+
   function handleDateChange(date: string) {
     publishAttemptRef.current = null;
     clearStoredPublishAttempt();
@@ -208,17 +249,13 @@ export function DailyAllocationManagerBoard({
 
   const rows = useMemo(() => {
     if (!board) return [];
-    const term = jobSearch.trim().toLowerCase();
-    return buildJobRows(
+    return buildDailyAllocationBoardRows({
+      primary: primaryPreference.primary,
       board,
-      boardState.view === 'daily' ? { workDate: selectedDate } : undefined
-    ).filter((row) => {
-      if (!term) return true;
-      return [row.job.job_code, row.job.customer_name, row.job.title, row.job.site_address]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(term));
+      dates: boardState.view === 'daily' ? [selectedDate] : board.dates,
+      jobSearch,
     });
-  }, [board, boardState.view, jobSearch, selectedDate]);
+  }, [board, boardState.view, jobSearch, primaryPreference.primary, selectedDate]);
 
   function labourNames(visitId: string) {
     if (!fullBoard) return [];
@@ -271,6 +308,18 @@ export function DailyAllocationManagerBoard({
     if (existing) return existing;
 
     const request = (async (): Promise<AuthoritativePlanDay | null> => {
+      let source;
+      try {
+        source = await fetchDailyAllocationConversionSource(workDate, teamId);
+      } catch (error) {
+        showMutationError(error, 'Unable to load the authoritative conversion source.');
+        return null;
+      }
+      if (source.labour_drafts.length > 0 || source.plant_drafts.length > 0) {
+        setConversionOpen(true);
+        setStatusMessage('Review every untimed draft before creating timed visits.');
+        return null;
+      }
       const optimisticPlanDay: DailyAllocationPlanDay = {
         id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'plan'),
         work_date: workDate,
@@ -282,17 +331,24 @@ export function DailyAllocationManagerBoard({
       };
       try {
         const result = await mutations.convert.mutateAsync({
-          request: { work_date: workDate, team_id: teamId },
+          request: {
+            work_date: workDate,
+            team_id: teamId,
+            expected_source_fingerprint: source.source_fingerprint,
+            visits: [],
+            labour_drafts: [],
+            plant_drafts: [],
+          },
           optimisticPlanDay,
         });
         return toAuthoritativePlanDay(result);
       } catch (error) {
         showMutationError(error, 'Unable to create this timed plan.');
         return null;
-      } finally {
-        ensurePlanDayInflight.current.delete(key);
       }
-    })();
+    })().finally(() => {
+      ensurePlanDayInflight.current.delete(key);
+    });
 
     ensurePlanDayInflight.current.set(key, request);
     return request;
@@ -308,6 +364,29 @@ export function DailyAllocationManagerBoard({
     };
     setVisitForm(form);
     setVisitDialog('add');
+  }
+
+  function openMoveVisit(visit: DailyAllocationVisit) {
+    setSelectedVisitId(visit.id);
+    setMoveVisitId(visit.id);
+    setMoveForm({
+      workDate: visit.work_date,
+      startTime: formatDailyAllocationVisitTime(visit.starts_at),
+    });
+  }
+
+  async function submitMoveVisit() {
+    const visit = fullBoard?.visits.find((item) => item.id === moveVisitId);
+    if (!visit) return;
+    const [hours, minutes] = moveForm.startTime.split(':').map(Number);
+    const startMinutes = hours * 60 + minutes;
+    if (!Number.isFinite(startMinutes) || startMinutes % 30 !== 0) {
+      toast.error('Choose a start time on the 30-minute grid.');
+      return;
+    }
+    if (await moveVisit(visit, moveForm.workDate, startMinutes)) {
+      setMoveVisitId(null);
+    }
   }
 
   function openEditVisit(visit: DailyAllocationVisit) {
@@ -351,8 +430,12 @@ export function DailyAllocationManagerBoard({
     }
     const startMinutes = Number(form.startTime.slice(0, 2)) * 60 + Number(form.startTime.slice(3, 5));
     const endMinutes = Number(form.endTime.slice(0, 2)) * 60 + Number(form.endTime.slice(3, 5));
-    if (!(endMinutes > startMinutes)) {
-      toast.error('End time must be after start time.');
+    if (startMinutes % 30 !== 0 || endMinutes % 30 !== 0) {
+      toast.error('Start and end times must use 30-minute steps.');
+      return;
+    }
+    if (endMinutes - startMinutes < 30) {
+      toast.error('Visits must be at least 30 minutes long.');
       return;
     }
     const planDay = authoritativePlanDayIdentity(planDayForDate(fullBoard, form.workDate)) ?? (
@@ -444,10 +527,10 @@ export function DailyAllocationManagerBoard({
     workDate: string,
     startMinutes: number | null
   ) {
-    if (!fullBoard) return;
+    if (!fullBoard) return false;
     const planDay = authoritativePlanDayIdentity(planDayForDate(fullBoard, workDate))
       ?? await ensurePlanDay(workDate);
-    if (!planDay) return;
+    if (!planDay) return false;
     const duration = getDailyAllocationTimeMinutes(visit.ends_at) - getDailyAllocationTimeMinutes(visit.starts_at);
     const start = startMinutes ?? getDailyAllocationTimeMinutes(visit.starts_at);
     const startsAt = toDailyAllocationLondonIsoFromMinutes(workDate, start);
@@ -498,8 +581,10 @@ export function DailyAllocationManagerBoard({
         });
       }
       setStatusMessage('Visit moved.');
+      return true;
     } catch (error) {
       showMutationError(error, 'Unable to move visit.');
+      return false;
     }
   }
 
@@ -531,7 +616,9 @@ export function DailyAllocationManagerBoard({
           row_version: visit.row_version + 1,
         },
       });
-      setStatusMessage('Visit resized.');
+      setStatusMessage(
+        `Visit resized to ${formatDailyAllocationVisitTime(startsAt)}–${formatDailyAllocationVisitTime(endsAt)}.`
+      );
     } catch (error) {
       showMutationError(error, 'Unable to resize visit.');
     }
@@ -548,6 +635,11 @@ export function DailyAllocationManagerBoard({
   async function assignEmployee(
     visit: DailyAllocationVisit,
     profileId: string,
+    instructions: { meeting_point: string | null; meet_person: string | null; notes: string | null } = {
+      meeting_point: null,
+      meet_person: null,
+      notes: null,
+    },
     overrideId?: string,
     expectedPlanVersion?: number
   ) {
@@ -561,35 +653,41 @@ export function DailyAllocationManagerBoard({
       return;
     }
     if (block && 'warning' in block && !overrideId) {
-      setPendingAssign({ type: 'employee', profileId, visit });
+      setPendingAssign({ type: 'employee', profileId, visit, instructions });
       setOverrideKind(block.warning);
       return;
     }
+    const existingAssignment = fullBoard.labour_assignments.find(
+      (assignment) => assignment.visit_id === visit.id && assignment.profile_id === profileId
+    );
     try {
       await mutations.assignLabour.mutateAsync({
         request: {
           visit_id: visit.id,
           profile_id: profileId,
           expected_plan_version: expectedPlanVersion ?? planDay.plan_version,
+          expected_row_version: existingAssignment?.row_version,
+          ...instructions,
           override_id: overrideId,
         },
         optimisticAssignment: {
-          id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'labour'),
+          id: existingAssignment?.id
+            || createOptimisticEntityId(globalThis.crypto.randomUUID(), 'labour'),
           visit_id: visit.id,
           plan_day_id: planDay.id,
           work_date: visit.work_date,
           profile_id: profileId,
           starts_at: visit.starts_at,
           ends_at: visit.ends_at,
-          meeting_point: visit.meeting_point,
-          meet_person: visit.meet_person,
-          notes: visit.notes,
-          row_version: 1,
+          meeting_point: instructions.meeting_point,
+          meet_person: instructions.meet_person,
+          notes: instructions.notes,
+          row_version: (existingAssignment?.row_version || 0) + 1,
           updated_at: new Date().toISOString(),
         },
       });
-      toast.success('Employee assigned.');
-      setStatusMessage('Employee assigned.');
+      toast.success(existingAssignment ? 'Employee instructions updated.' : 'Employee assigned.');
+      setStatusMessage(existingAssignment ? 'Employee instructions updated.' : 'Employee assigned.');
     } catch (error) {
       showMutationError(error, 'Unable to assign employee.');
     }
@@ -606,7 +704,10 @@ export function DailyAllocationManagerBoard({
     ));
     if (otherJob) {
       const otherVisit = fullBoard.visits.find((item) => item.id === otherJob.visit_id);
-      if (otherVisit && (otherVisit.job_source_id !== visit.job_source_id || otherVisit.job_code !== visit.job_code)) {
+      if (otherVisit && (
+        otherVisit.job_source_type !== visit.job_source_type
+        || otherVisit.job_source_id !== visit.job_source_id
+      )) {
         toast.error('This plant is already planned on a different job today.');
         void boardState.refetch();
         return;
@@ -617,16 +718,21 @@ export function DailyAllocationManagerBoard({
         return;
       }
     }
+    const existingAssignment = fullBoard.plant_assignments.find(
+      (assignment) => assignment.visit_id === visit.id && assignment.plant_id === plantId
+    );
     try {
       await mutations.assignPlant.mutateAsync({
         request: {
           visit_id: visit.id,
           expected_plan_version: planDay.plan_version,
+          expected_row_version: existingAssignment?.row_version,
           plant_kind: 'registered',
           plant_id: plantId,
         },
         optimisticAssignment: {
-          id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'plant'),
+          id: existingAssignment?.id
+            || createOptimisticEntityId(globalThis.crypto.randomUUID(), 'plant'),
           visit_id: visit.id,
           plan_day_id: planDay.id,
           work_date: visit.work_date,
@@ -638,12 +744,12 @@ export function DailyAllocationManagerBoard({
           owner_team_id: ownerTeamId || fullBoard.context.team_id,
           starts_at: visit.starts_at,
           ends_at: visit.ends_at,
-          notes: null,
-          row_version: 1,
+          notes: existingAssignment?.notes ?? null,
+          row_version: (existingAssignment?.row_version || 0) + 1,
           updated_at: new Date().toISOString(),
         },
       });
-      toast.success('Plant assigned.');
+      toast.success(existingAssignment ? 'Plant assignment updated.' : 'Plant assigned.');
     } catch (error) {
       showMutationError(error, 'Unable to assign plant.');
     }
@@ -656,16 +762,24 @@ export function DailyAllocationManagerBoard({
     if (!fullBoard) return;
     const planDay = planDayForDate(fullBoard, visit.work_date);
     if (!planDay) return;
+    const existingAssignment = fullBoard.plant_assignments.find(
+      (assignment) =>
+        assignment.visit_id === visit.id
+        && assignment.hired_serial === hired.hired_serial
+        && assignment.hired_company === hired.hired_company
+    );
     try {
       await mutations.assignPlant.mutateAsync({
         request: {
           visit_id: visit.id,
           expected_plan_version: planDay.plan_version,
+          expected_row_version: existingAssignment?.row_version,
           plant_kind: 'hired',
           ...hired,
         },
         optimisticAssignment: {
-          id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'plant'),
+          id: existingAssignment?.id
+            || createOptimisticEntityId(globalThis.crypto.randomUUID(), 'plant'),
           visit_id: visit.id,
           plan_day_id: planDay.id,
           work_date: visit.work_date,
@@ -675,12 +789,12 @@ export function DailyAllocationManagerBoard({
           owner_team_id: ownerTeamId || fullBoard.context.team_id,
           starts_at: visit.starts_at,
           ends_at: visit.ends_at,
-          notes: null,
-          row_version: 1,
+          notes: existingAssignment?.notes ?? null,
+          row_version: (existingAssignment?.row_version || 0) + 1,
           updated_at: new Date().toISOString(),
         },
       });
-      toast.success('Hired plant assigned.');
+      toast.success(existingAssignment ? 'Hired plant assignment updated.' : 'Hired plant assigned.');
     } catch (error) {
       showMutationError(error, 'Unable to assign hired plant.');
     }
@@ -717,6 +831,7 @@ export function DailyAllocationManagerBoard({
         await assignEmployee(
           pendingAssign.visit,
           pendingAssign.profileId,
+          pendingAssign.instructions,
           result.override_id,
           planDay.plan_version + 1
         );
@@ -809,6 +924,31 @@ export function DailyAllocationManagerBoard({
     }
   }
 
+  async function submitGuidedConversion(
+    request: Omit<DailyAllocationConvertInput, 'request_id'>
+  ) {
+    if (!fullBoard) return;
+    const optimisticPlanDay: DailyAllocationPlanDay = {
+      id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'plan'),
+      work_date: request.work_date,
+      team_id: request.team_id,
+      plan_version: 1,
+      converted_at: new Date().toISOString(),
+      converted_by: fullBoard.context.user_id,
+      updated_at: new Date().toISOString(),
+    };
+    try {
+      await mutations.convert.mutateAsync({ request, optimisticPlanDay });
+      setConversionOpen(false);
+      setStatusMessage('Legacy drafts converted to the reviewed timed plan.');
+      toast.success('Legacy drafts converted.');
+      await boardState.refetch();
+    } catch (error) {
+      showMutationError(error, 'Unable to convert these legacy drafts.');
+      throw error;
+    }
+  }
+
   function handleDragEnd(event: {
     canceled?: boolean;
     operation?: {
@@ -816,6 +956,8 @@ export function DailyAllocationManagerBoard({
       target?: { data?: { target?: DailyAllocationDropTarget; hourWidth?: number; startHour?: number; endHour?: number } } | null;
     };
   }) {
+    dragActiveRef.current = false;
+    boardState.setPointerInteractionActive(false);
     if (event.canceled) return;
     const source = event.operation?.source?.data?.source;
     const target = event.operation?.target?.data?.target;
@@ -825,11 +967,13 @@ export function DailyAllocationManagerBoard({
       if (target.surface !== 'timeline' || clientX == null) return null;
       const header = document.querySelector<HTMLElement>('[data-testid="daily-allocation-daily-timeline-header"]');
       if (!header) return null;
-      const rangeLeft = dailyTimelineRangeLeft(header.getBoundingClientRect().left);
+      const visualScale = getDailyAllocationElementVisualScale(header);
+      const rangeLeft = dailyTimelineRangeLeft(header.getBoundingClientRect().left, visualScale);
       return mapDailyAllocationClientXToMinutes({
         clientX,
         rangeLeft,
-        hourWidth: event.operation?.target?.data?.hourWidth || DAILY_TIMELINE_HOUR_WIDTH,
+        hourWidth: (event.operation?.target?.data?.hourWidth || DAILY_TIMELINE_HOUR_WIDTH)
+          * visualScale,
         startHour: event.operation?.target?.data?.startHour || DAILY_ALLOCATION_DEFAULT_START_HOUR,
         endHour: event.operation?.target?.data?.endHour || DAILY_ALLOCATION_DEFAULT_END_HOUR,
       });
@@ -856,6 +1000,13 @@ export function DailyAllocationManagerBoard({
   const latestPublication = fullBoard ? latestPublicationForDate(fullBoard, selectedDate) : null;
   const history = fullBoard ? publicationsForDate(fullBoard, selectedDate) : [];
   const selectedVisit = fullBoard?.visits.find((visit) => visit.id === selectedVisitId) || null;
+  const moveDialogVisit = fullBoard?.visits.find((visit) => visit.id === moveVisitId) || null;
+  const selectedLegacyLabour = fullBoard?.legacy.labour.filter((draft) => draft.work_date === selectedDate) || [];
+  const selectedLegacyPlant = fullBoard?.legacy.plant.filter((draft) => draft.work_date === selectedDate) || [];
+  const employeeNames = useMemo(
+    () => new Map(fullBoard?.resources.employees.map((employee) => [employee.profile_id, employee.full_name]) || []),
+    [fullBoard?.resources.employees]
+  );
 
   if (boardState.isBoardLoading && !fullBoard) {
     return (
@@ -895,8 +1046,13 @@ export function DailyAllocationManagerBoard({
 
   return (
     <DragDropProvider
+      key={dndSessionEpoch}
       sensors={createDailyAllocationDndSensors()}
       plugins={(defaults) => [...defaults, dailyAllocationAccessibilityPlugin()]}
+      onDragStart={() => {
+        dragActiveRef.current = true;
+        boardState.setPointerInteractionActive(true);
+      }}
       onDragEnd={handleDragEnd}
     >
       <AppPageShell
@@ -919,6 +1075,8 @@ export function DailyAllocationManagerBoard({
                 view={boardState.view}
                 onDateChange={handleDateChange}
                 onViewChange={boardState.setView}
+                primary={primaryPreference.primary}
+                onPrimaryChange={primaryPreference.setPrimary}
                 onPublish={() => {
                   setUnallocatedConfirm(false);
                   setPublishOpen(true);
@@ -951,6 +1109,57 @@ export function DailyAllocationManagerBoard({
             {boardState.isBoardFetching ? <Badge variant="outline">Refreshing</Badge> : null}
           </div>
 
+          {!converted && (selectedLegacyLabour.length > 0 || selectedLegacyPlant.length > 0) ? (
+            <div
+              className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/50 bg-amber-950/30 px-4 py-3"
+              data-testid="daily-allocation-legacy-conversion"
+            >
+              <div>
+                <p className="text-sm font-semibold text-amber-100">Untimed legacy drafts need review</p>
+                <p className="text-xs text-amber-200/80">
+                  {selectedLegacyLabour.length} labour and {selectedLegacyPlant.length} plant drafts must each be mapped or given an explicit disposition.
+                </p>
+              </div>
+              <Button
+                type="button"
+                className={boardControlStyles.primary}
+                onClick={() => setConversionOpen(true)}
+              >
+                Review and convert
+              </Button>
+            </div>
+          ) : null}
+
+          {selectedVisit && selectedResource?.kind !== 'job' ? (
+            <div className="relative z-[1] flex shrink-0 flex-wrap gap-2">
+              <Button
+                className={`${boardControlStyles.outline} min-h-11`}
+                onClick={() => {
+                  if (selectedResource?.kind === 'employee') void assignEmployee(selectedVisit, selectedResource.profileId);
+                  else if (selectedResource?.kind === 'plant') void assignRegisteredPlant(selectedVisit, selectedResource.plantId);
+                  else setAssignOpen(true);
+                }}
+              >
+                Assign selected resource
+              </Button>
+              <Button className={`${boardControlStyles.outline} min-h-11`} onClick={() => openAddVisit('', selectedDate)}>
+                Add visit
+              </Button>
+            </div>
+          ) : (
+            <div className="relative z-[1] flex shrink-0 flex-wrap gap-2">
+              <Button className={`${boardControlStyles.outline} min-h-11`} onClick={() => openAddVisit(
+                selectedResource?.kind === 'job' ? jobResourceKey(selectedResource.job) : '',
+                selectedDate
+              )}>
+                Add visit
+              </Button>
+              <Button className={`${boardControlStyles.outline} min-h-11`} disabled={!selectedVisit} onClick={() => setAssignOpen(true)}>
+                Assign resources
+              </Button>
+            </div>
+          )}
+
           <div className="grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
             <ResourceSidebar
               tab={resourceTab}
@@ -961,6 +1170,8 @@ export function DailyAllocationManagerBoard({
               jobs={fullBoard.jobs}
               employees={fullBoard.resources.employees}
               plant={fullBoard.resources.plant}
+              labourAssignments={fullBoard.labour_assignments}
+              plantAssignments={fullBoard.plant_assignments}
               selectedResourceId={
                 selectedResource?.kind === 'job'
                   ? jobResourceKey(selectedResource.job)
@@ -975,6 +1186,7 @@ export function DailyAllocationManagerBoard({
             <JobsPanel
               board={board}
               view={boardState.view}
+              primary={primaryPreference.primary}
               selectedDate={selectedDate}
               dates={board.dates}
               rows={rows}
@@ -985,6 +1197,7 @@ export function DailyAllocationManagerBoard({
               plantLabels={plantLabels}
               onAddVisit={openAddVisit}
               onSelectVisit={(visit) => setSelectedVisitId(visit.id)}
+              onMoveVisit={openMoveVisit}
               onEditVisit={openEditVisit}
               onDeleteVisit={setDeleteVisit}
               onAssignVisit={(visit) => {
@@ -994,38 +1207,9 @@ export function DailyAllocationManagerBoard({
               onResizeVisit={(visit, startsAt, endsAt) => {
                 void resizeVisit(visit, startsAt, endsAt);
               }}
+              onPointerInteractionChange={boardState.setPointerInteractionActive}
             />
           </div>
-
-        {selectedVisit && selectedResource?.kind !== 'job' ? (
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button
-              className={boardControlStyles.outline}
-              onClick={() => {
-                if (selectedResource?.kind === 'employee') void assignEmployee(selectedVisit, selectedResource.profileId);
-                else if (selectedResource?.kind === 'plant') void assignRegisteredPlant(selectedVisit, selectedResource.plantId);
-                else setAssignOpen(true);
-              }}
-            >
-              Assign selected resource
-            </Button>
-            <Button className={boardControlStyles.outline} onClick={() => openAddVisit('', selectedDate)}>
-              Add visit
-            </Button>
-          </div>
-        ) : (
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button className={boardControlStyles.outline} onClick={() => openAddVisit(
-              selectedResource?.kind === 'job' ? jobResourceKey(selectedResource.job) : '',
-              selectedDate
-            )}>
-              Add visit
-            </Button>
-            <Button className={boardControlStyles.outline} disabled={!selectedVisit} onClick={() => setAssignOpen(true)}>
-              Assign resources
-            </Button>
-          </div>
-        )}
 
         {history.length > 0 ? (
           <Card className="min-h-0 shrink-0 overflow-y-auto border-slate-700 bg-slate-900 text-slate-100 xl:max-h-36">
@@ -1059,6 +1243,18 @@ export function DailyAllocationManagerBoard({
           onSubmit={() => void submitVisitForm(visitForm, visitDialog || 'add')}
           saving={mutations.createVisit.isPending || mutations.updateVisit.isPending}
         />
+        <MoveVisitDialog
+          open={Boolean(moveVisitId)}
+          visit={moveDialogVisit}
+          dates={fullBoard.dates}
+          form={moveForm}
+          onFormChange={setMoveForm}
+          onOpenChange={(open) => {
+            if (!open) setMoveVisitId(null);
+          }}
+          onSubmit={() => void submitMoveVisit()}
+          saving={mutations.moveVisit.isPending || mutations.updateVisit.isPending}
+        />
         <AssignResourcesDialog
           key={`${assignOpen}:${selectedVisit?.id || 'none'}`}
           open={assignOpen}
@@ -1070,23 +1266,31 @@ export function DailyAllocationManagerBoard({
           labourNames={selectedVisit ? labourNames(selectedVisit.id) : []}
           plantLabels={selectedVisit ? plantLabels(selectedVisit.id) : []}
           onOpenChange={setAssignOpen}
-          onAssignEmployee={(profileId) => selectedVisit && void assignEmployee(selectedVisit, profileId)}
+          onAssignEmployee={(profileId, instructions) => selectedVisit && void assignEmployee(
+            selectedVisit,
+            profileId,
+            instructions
+          )}
           onAssignPlant={(plantId) => selectedVisit && void assignRegisteredPlant(selectedVisit, plantId)}
           onAssignHiredPlant={(hired) => selectedVisit && void assignHiredPlant(selectedVisit, hired)}
           onRemoveLabour={(assignmentId) => {
             const planDay = selectedVisit ? planDayForDate(fullBoard, selectedVisit.work_date) : null;
             if (!planDay) return;
+            const assignment = fullBoard.labour_assignments.find((item) => item.id === assignmentId);
             void mutations.unassignLabour.mutateAsync({
               assignment_id: assignmentId,
               expected_plan_version: planDay.plan_version,
+              expected_row_version: assignment?.row_version,
             }).catch((error: unknown) => showMutationError(error, 'Unable to remove assignment.'));
           }}
           onRemovePlant={(assignmentId) => {
             const planDay = selectedVisit ? planDayForDate(fullBoard, selectedVisit.work_date) : null;
             if (!planDay) return;
+            const assignment = fullBoard.plant_assignments.find((item) => item.id === assignmentId);
             void mutations.unassignPlant.mutateAsync({
               assignment_id: assignmentId,
               expected_plan_version: planDay.plan_version,
+              expected_row_version: assignment?.row_version,
             }).catch((error: unknown) => showMutationError(error, 'Unable to remove plant.'));
           }}
           saving={mutations.isPending}
@@ -1122,6 +1326,15 @@ export function DailyAllocationManagerBoard({
           }}
           onConfirm={() => void handleDeleteVisit()}
           saving={mutations.removeVisit.isPending}
+        />
+        <GuidedLegacyConversionDialog
+          open={conversionOpen}
+          workDate={selectedDate}
+          teamId={ownerTeamId}
+          employeeNames={employeeNames}
+          onOpenChange={setConversionOpen}
+          onSubmit={submitGuidedConversion}
+          saving={mutations.convert.isPending}
         />
       </AppPageShell>
     </DragDropProvider>

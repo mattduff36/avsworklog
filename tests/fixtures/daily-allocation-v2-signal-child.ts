@@ -19,8 +19,12 @@ function snapshot(): RolloutSnapshot {
       updatedAt: '2026-08-14T16:00:00.000Z',
     },
     permissionFingerprint: 'stable-permissions',
-    v1Fingerprint: 'stable-v1',
-    v2ContentFingerprint: 'stable-v2',
+    v1ContentFingerprint: 'stable-v1-content',
+    v1PublicationFingerprint: 'stable-v1-publication',
+    v2ContentFingerprint: 'stable-v2-content',
+    v2PublicationFingerprint: 'stable-v2-publication',
+    messageFingerprint: 'stable-message',
+    requestLedgerFingerprint: 'stable-request-ledger',
     v2Counts: { plan_days: 0 },
   };
 }

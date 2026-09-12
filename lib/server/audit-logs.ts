@@ -246,7 +246,7 @@ async function findMatchingUserIds(
 ): Promise<string[]> {
   const pattern = `%${escapeIlikePattern(q)}%`;
   const [nameResult, teamResult] = await Promise.all([
-    admin.from('profiles').select('id').ilike('full_name', pattern),
+    admin.from('profiles').select('id').eq('is_system_account', false).ilike('full_name', pattern),
     admin.from('org_teams').select('id').ilike('name', pattern),
   ]);
 
@@ -261,7 +261,11 @@ async function findMatchingUserIds(
   const teamIds = (teamResult.data || []).map((row) => row.id);
 
   if (teamIds.length > 0) {
-    const { data, error } = await admin.from('profiles').select('id').in('team_id', teamIds);
+    const { data, error } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('is_system_account', false)
+      .in('team_id', teamIds);
     if (error) {
       throw new AuditLogQueryError(error.message);
     }
@@ -277,7 +281,7 @@ async function findUserIdsForTeam(
   admin: ReturnType<typeof createAdminClient>,
   teamId: string
 ): Promise<string[]> {
-  let query = admin.from('profiles').select('id');
+  let query = admin.from('profiles').select('id').eq('is_system_account', false);
   query = teamId === 'unassigned' ? query.is('team_id', null) : query.eq('team_id', teamId);
   const { data, error } = await query;
   if (error) {
@@ -292,6 +296,7 @@ export async function listAuditLogFacets(): Promise<AuditLogFacets> {
     .from('profiles')
     .select('id, full_name, team_id')
     .eq('is_placeholder', false)
+    .eq('is_system_account', false)
     .order('full_name', { ascending: true });
 
   if (error) {

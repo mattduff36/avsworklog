@@ -5,8 +5,12 @@ import type { ReactNode } from 'react';
 import { useDroppable } from '@dnd-kit/react';
 import { Button } from '@/components/ui/button';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
-import { DAILY_ALLOCATION_DND } from '@/components/daily-allocation/board/board-dnd';
-import type { DailyAllocationJobRow } from '@/components/daily-allocation/board/board-model';
+import { DAILY_ALLOCATION_DND, jobResourceKey } from '@/components/daily-allocation/board/board-dnd';
+import type { DailyAllocationBoardRow } from '@/components/daily-allocation/board/daily-allocation-board-primary';
+import {
+  getDailyAllocationBoardAxisLabel,
+  getDailyAllocationBoardRowTestId,
+} from '@/components/daily-allocation/board/daily-allocation-board-primary';
 import {
   visitConflicts,
   visitLabour,
@@ -15,16 +19,19 @@ import {
 import { VisitCard } from '@/components/daily-allocation/board/VisitCard';
 import { cn } from '@/lib/utils/cn';
 import type { DailyAllocationRangeBoardPayload, DailyAllocationVisit } from '@/types/daily-allocation';
+import type { DailyAllocationBoardPrimary } from '@/lib/config/daily-allocation-primary-preference';
 
 interface WeeklyGridProps {
   board: DailyAllocationRangeBoardPayload;
   dates: string[];
-  rows: DailyAllocationJobRow[];
+  rows: DailyAllocationBoardRow[];
+  primary: DailyAllocationBoardPrimary;
   selectedVisitId: string | null;
   labourNames: (visitId: string) => string[];
   plantLabels: (visitId: string) => string[];
   onAddVisit: (jobKey: string, date: string) => void;
   onSelectVisit: (visit: DailyAllocationVisit) => void;
+  onMoveVisit: (visit: DailyAllocationVisit) => void;
   onEditVisit: (visit: DailyAllocationVisit) => void;
   onDeleteVisit: (visit: DailyAllocationVisit) => void;
   onAssignVisit: (visit: DailyAllocationVisit) => void;
@@ -66,11 +73,13 @@ export function WeeklyGrid({
   board,
   dates,
   rows,
+  primary,
   selectedVisitId,
   labourNames,
   plantLabels,
   onAddVisit,
   onSelectVisit,
+  onMoveVisit,
   onEditVisit,
   onDeleteVisit,
   onAssignVisit,
@@ -82,7 +91,7 @@ export function WeeklyGrid({
         style={{ gridTemplateColumns: `240px repeat(${dates.length}, minmax(8rem, 1fr))` }}
       >
         <div className="sticky left-0 z-10 border-b border-r border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase text-slate-400">
-          Job
+          {getDailyAllocationBoardAxisLabel(primary)}
         </div>
         {dates.map((date) => (
           <div key={date} className="border-b border-slate-700 bg-slate-900 px-2 py-2 text-center">
@@ -111,20 +120,21 @@ export function WeeklyGrid({
             ))}
           </div>
         ) : rows.map((row) => (
-          <div key={row.key} className="contents">
+          <div key={row.id} className="contents" data-testid={getDailyAllocationBoardRowTestId(row)}>
             <div className="sticky left-0 z-10 space-y-1 border-t border-r border-slate-700 bg-slate-900 p-3">
-              <p className="truncate text-sm font-semibold text-slate-50">{row.job.job_code}</p>
-              <p className="truncate text-xs text-slate-300">{row.job.title || row.job.customer_name || 'Catalogue job'}</p>
+              <p className="truncate text-sm font-semibold text-slate-50">{row.label}</p>
+              <p className="truncate text-xs text-slate-300">{row.subtitle || 'Allocation row'}</p>
             </div>
             {dates.map((date) => {
-              const dayVisits = row.visits.filter((visit) => visit.work_date === date);
+              const dayVisits = row.visitsByDate[date] || [];
               return (
-                <WeekCell key={`${row.key}:${date}`} jobKey={row.key} date={date}>
+                <WeekCell key={`${row.id}:${date}`} jobKey={row.id} date={date}>
                   {dayVisits.map((visit) => (
                     <VisitCard
                       key={visit.id}
                       visit={visit}
-                      title={row.job.title || row.job.job_code}
+                      instanceId={`${row.id}:${date}:${visit.id}`}
+                      title={row.job?.title || visit.job_code}
                       labour={visitLabour(board, visit.id)}
                       plant={visitPlant(board, visit.id)}
                       labourNames={labourNames(visit.id)}
@@ -134,20 +144,23 @@ export function WeeklyGrid({
                       compact
                       style={{ position: 'relative', width: '100%', height: 'auto' }}
                       onSelect={() => onSelectVisit(visit)}
+                      onMove={() => onMoveVisit(visit)}
                       onEdit={() => onEditVisit(visit)}
                       onDelete={() => onDeleteVisit(visit)}
                       onAssign={() => onAssignVisit(visit)}
                     />
                   ))}
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    className={cn(boardControlStyles.ghost, 'h-8 w-full justify-start text-xs')}
-                    onClick={() => onAddVisit(row.key, date)}
-                  >
-                    + Add timed visit
-                  </Button>
+                  {row.job ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={cn(boardControlStyles.ghost, 'h-8 w-full justify-start text-xs')}
+                      onClick={() => onAddVisit(jobResourceKey(row.job!), date)}
+                    >
+                      + Add timed visit
+                    </Button>
+                  ) : null}
                 </WeekCell>
               );
             })}

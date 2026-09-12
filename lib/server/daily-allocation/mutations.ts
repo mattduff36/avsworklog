@@ -8,7 +8,6 @@ import {
   DailyAllocationError,
   blankToNull,
   callDailyAllocationRpc,
-  fromUntyped,
   isWorkDate,
   mapPostgresError,
   parseWithSchema,
@@ -18,16 +17,23 @@ import {
 import { mapLabourDraft, mapPlantDraft } from '@/lib/server/daily-allocation/legacy-adapter';
 import type {
   DailyAllocationAssignmentDeleteInput,
+  DailyAllocationAssignmentDeleteResult,
+  DailyAllocationAssignmentMutationResult,
+  DailyAllocationConversionSource,
   DailyAllocationConvertInput,
   DailyAllocationConvertResult,
   DailyAllocationLabourAssignInput,
+  DailyAllocationLabourAssignment,
   DailyLabourDraft,
   DailyLabourDraftInput,
   DailyAllocationOverrideInput,
+  DailyAllocationOverrideMutationResult,
   DailyAllocationPlantAssignInput,
+  DailyAllocationPlantAssignment,
   DailyPlantDraft,
   DailyPlantDraftInput,
   DailyAllocationVisitDeleteInput,
+  DailyAllocationVisitDeleteResult,
   DailyAllocationVisitMoveInput,
   DailyAllocationVisitMoveResult,
   DailyAllocationVisitMutationResult,
@@ -43,13 +49,90 @@ const plantKindSchema = z.enum(['registered', 'hired']);
 const conflictKindSchema = z.enum(['pending_absence', 'off_shift']);
 const isoDateTimeSchema = z.string().datetime({ offset: true });
 const versionSchema = z.number().int().positive();
+const fingerprintSchema = z.string().regex(/^[0-9a-f]{64}$/, 'A valid source fingerprint is required.');
 
 export const convertPlanDaySchema = z.object({
+  request_id: uuidSchema,
   work_date: workDateSchema,
-  team_id: z.string().trim().min(1).nullable().optional(),
+  team_id: z.string().trim().min(1),
+  expected_source_fingerprint: fingerprintSchema,
+  visits: z.array(z.object({
+    visit_id: uuidSchema,
+    job_source_type: jobSourceSchema,
+    job_source_id: uuidSchema,
+    starts_at: isoDateTimeSchema,
+    ends_at: isoDateTimeSchema,
+    meeting_point: z.string().trim().max(500).nullable().optional(),
+    meet_person: z.string().trim().max(200).nullable().optional(),
+    notes: z.string().trim().max(2000).nullable().optional(),
+  }).strict().superRefine((value, ctx) => {
+    if (!isDailyAllocationTrustedInterval(value.starts_at, value.ends_at)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Visit times must land on 30-minute London boundaries, stay on one day, and last at least 30 minutes.',
+        path: ['starts_at'],
+      });
+    }
+  })),
+  labour_drafts: z.array(z.object({
+    draft_id: uuidSchema,
+    row_version: versionSchema,
+    disposition: z.enum(['visit', 'unallocated', 'absence']),
+    visit_id: optionalUuidSchema,
+  }).strict().superRefine((value, ctx) => {
+    if ((value.disposition === 'visit') !== Boolean(value.visit_id)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: value.disposition === 'visit'
+          ? 'A mapped labour draft requires a visit.'
+          : 'Only mapped labour drafts may include a visit.',
+        path: ['visit_id'],
+      });
+    }
+  })),
+  plant_drafts: z.array(z.object({
+    draft_id: uuidSchema,
+    row_version: versionSchema,
+    disposition: z.enum(['visit', 'unallocated']),
+    visit_id: optionalUuidSchema,
+  }).strict().superRefine((value, ctx) => {
+    if ((value.disposition === 'visit') !== Boolean(value.visit_id)) {
+      ctx.addIssue({
+        code: 'custom',
+        message: value.disposition === 'visit'
+          ? 'A mapped plant draft requires a visit.'
+          : 'Only mapped plant drafts may include a visit.',
+        path: ['visit_id'],
+      });
+    }
+  })),
+}).strict().superRefine((value, ctx) => {
+  const visitIds = new Set<string>();
+  value.visits.forEach((visit, index) => {
+    if (visitIds.has(visit.visit_id)) {
+      ctx.addIssue({ code: 'custom', message: 'Visit IDs must be unique.', path: ['visits', index, 'visit_id'] });
+    }
+    visitIds.add(visit.visit_id);
+  });
+  for (const [key, rows] of [
+    ['labour_drafts', value.labour_drafts],
+    ['plant_drafts', value.plant_drafts],
+  ] as const) {
+    const draftIds = new Set<string>();
+    rows.forEach((row, index) => {
+      if (draftIds.has(row.draft_id)) {
+        ctx.addIssue({ code: 'custom', message: 'Draft IDs must be unique.', path: [key, index, 'draft_id'] });
+      }
+      draftIds.add(row.draft_id);
+      if (row.visit_id && !visitIds.has(row.visit_id)) {
+        ctx.addIssue({ code: 'custom', message: 'Draft mappings must reference a supplied visit.', path: [key, index, 'visit_id'] });
+      }
+    });
+  }
 });
 
 export const visitUpsertSchema = z.object({
+  request_id: uuidSchema,
   visit_id: optionalUuidSchema,
   plan_day_id: uuidSchema,
   expected_plan_version: versionSchema,
@@ -62,7 +145,7 @@ export const visitUpsertSchema = z.object({
   meeting_point: z.string().trim().max(500).nullable().optional(),
   meet_person: z.string().trim().max(200).nullable().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
-}).superRefine((value, ctx) => {
+}).strict().superRefine((value, ctx) => {
   if (new Date(value.ends_at) <= new Date(value.starts_at)) {
     ctx.addIssue({
       code: 'custom',
@@ -80,6 +163,7 @@ export const visitUpsertSchema = z.object({
 });
 
 export const visitMoveSchema = z.object({
+  request_id: uuidSchema,
   visit_id: uuidSchema,
   target_plan_day_id: uuidSchema,
   expected_source_plan_version: versionSchema,
@@ -87,7 +171,7 @@ export const visitMoveSchema = z.object({
   expected_row_version: versionSchema,
   starts_at: isoDateTimeSchema,
   ends_at: isoDateTimeSchema,
-}).superRefine((value, ctx) => {
+}).strict().superRefine((value, ctx) => {
   if (!isDailyAllocationTrustedInterval(value.starts_at, value.ends_at)) {
     ctx.addIssue({
       code: 'custom',
@@ -98,31 +182,36 @@ export const visitMoveSchema = z.object({
 });
 
 export const visitDeleteSchema = z.object({
+  request_id: uuidSchema,
   visit_id: uuidSchema.optional(),
   expected_plan_version: versionSchema,
   expected_row_version: versionSchema,
-});
+}).strict();
 
 export const labourAssignSchema = z.object({
+  request_id: uuidSchema,
   visit_id: uuidSchema,
   profile_id: uuidSchema,
   expected_plan_version: versionSchema,
+  expected_row_version: versionSchema.nullable().optional(),
   meeting_point: z.string().trim().max(500).nullable().optional(),
   meet_person: z.string().trim().max(200).nullable().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
   override_id: optionalUuidSchema,
-});
+}).strict();
 
 export const plantAssignSchema = z.object({
+  request_id: uuidSchema,
   visit_id: uuidSchema,
   expected_plan_version: versionSchema,
+  expected_row_version: versionSchema.nullable().optional(),
   plant_kind: plantKindSchema,
   plant_id: optionalUuidSchema,
   hired_serial: z.string().trim().max(120).nullable().optional(),
   hired_description: z.string().trim().max(500).nullable().optional(),
   hired_company: z.string().trim().max(200).nullable().optional(),
   notes: z.string().trim().max(2000).nullable().optional(),
-}).superRefine((value, ctx) => {
+}).strict().superRefine((value, ctx) => {
   if (value.plant_kind === 'registered' && !value.plant_id) {
     ctx.addIssue({ code: 'custom', message: 'Choose a registered plant asset.', path: ['plant_id'] });
   }
@@ -138,18 +227,21 @@ export const plantAssignSchema = z.object({
 });
 
 export const assignmentDeleteSchema = z.object({
+  request_id: uuidSchema,
   assignment_id: uuidSchema.optional(),
   expected_plan_version: versionSchema,
-});
+  expected_row_version: versionSchema,
+}).strict();
 
 export const conflictOverrideSchema = z.object({
+  request_id: uuidSchema,
   plan_day_id: uuidSchema,
   expected_plan_version: versionSchema,
   conflict_kind: conflictKindSchema,
   evidence: z.string().trim().min(1, 'Override evidence is required.').max(2000),
   visit_id: optionalUuidSchema,
   profile_id: uuidSchema,
-});
+}).strict();
 
 export async function saveLabourDraft(input: DailyLabourDraftInput): Promise<DailyLabourDraft> {
   const { supabase } = await requireDailyAllocationMutation();
@@ -301,12 +393,25 @@ export async function deletePlantDraft(id: string): Promise<void> {
   if (error) throw mapPostgresError(error) || error;
 }
 
-type ConvertedPlanDayRow = {
-  id: string;
-  work_date: string;
-  team_id: string;
-  plan_version: number;
-};
+export async function getDailyAllocationConversionSource(
+  workDate: string,
+  teamId: string
+): Promise<DailyAllocationConversionSource> {
+  const { supabase } = await requireDailyAllocationManagerMutation();
+  const parsed = parseWithSchema(
+    z.object({
+      work_date: workDateSchema,
+      team_id: z.string().trim().min(1),
+    }).strict(),
+    { work_date: workDate, team_id: teamId },
+    'Invalid conversion source request.'
+  );
+  return callDailyAllocationRpc<DailyAllocationConversionSource>(
+    supabase,
+    'get_daily_allocation_conversion_source_v2',
+    { p_work_date: parsed.work_date, p_team_id: parsed.team_id }
+  );
+}
 
 export async function convertDailyAllocationPlanDay(
   input: DailyAllocationConvertInput
@@ -316,49 +421,22 @@ export async function convertDailyAllocationPlanDay(
   if (!isWorkDate(parsed.work_date)) {
     throw new DailyAllocationError('A valid work date is required.', 400, 'VALIDATION');
   }
-  const teamId = blankToNull(parsed.team_id) || effectiveRole.team_id;
-  if (!teamId) {
-    throw new DailyAllocationError('A team is required to convert this date.', 400, 'VALIDATION');
+  if (effectiveRole.team_id !== parsed.team_id
+    && !await canEffectiveRoleUseModuleLevel('daily-allocation', 5)) {
+    throw new DailyAllocationError('Not allowed to convert this daily allocation plan', 403, 'FORBIDDEN');
   }
-  const planDayId = await callDailyAllocationRpc<string>(supabase, 'convert_daily_allocation_plan_day_v2', {
-    p_work_date: parsed.work_date,
-    p_team_id: teamId,
-  });
-  const { data: planDay, error } = await fromUntyped<ConvertedPlanDayRow>(
+  return callDailyAllocationRpc<DailyAllocationConvertResult>(
     supabase,
-    'daily_allocation_plan_days'
-  )
-    .select('id, work_date, team_id, plan_version')
-    .eq('id', planDayId)
-    .maybeSingle();
-  if (error) {
-    throw mapPostgresError(error) || new DailyAllocationError(
-      'Unable to complete daily allocation request.',
-      500
-    );
-  }
-  if (!planDay) {
-    throw new DailyAllocationError('Plan day not found.', 404, 'NOT_FOUND');
-  }
-  if (
-    planDay.id !== planDayId
-    || planDay.work_date !== parsed.work_date
-    || planDay.team_id !== teamId
-    || !Number.isInteger(planDay.plan_version)
-    || planDay.plan_version < 1
-  ) {
-    throw new DailyAllocationError(
-      'This plan was updated by someone else. Reload and try again.',
-      409,
-      'STALE_PLAN_VERSION'
-    );
-  }
-  return {
-    plan_day_id: planDay.id,
-    plan_version: planDay.plan_version,
-    team_id: planDay.team_id,
-    work_date: planDay.work_date,
-  };
+    'convert_daily_allocation_plan_day_v2',
+    {
+    p_request_id: parsed.request_id,
+    p_work_date: parsed.work_date,
+    p_team_id: parsed.team_id,
+    p_expected_source_fingerprint: parsed.expected_source_fingerprint,
+    p_visits: parsed.visits,
+    p_labour_drafts: parsed.labour_drafts,
+    p_plant_drafts: parsed.plant_drafts,
+  });
 }
 
 type VisitMutationRpcRow = {
@@ -403,6 +481,7 @@ export async function upsertDailyAllocationVisit(
   const { supabase } = await requireDailyAllocationManagerMutation();
   const parsed = parseWithSchema(visitUpsertSchema, input, 'Invalid visit.');
   const result = await callDailyAllocationRpc<VisitMutationRpcRow>(supabase, 'upsert_daily_allocation_visit_v2', {
+    p_request_id: parsed.request_id,
     p_visit_id: parsed.visit_id || null,
     p_plan_day_id: parsed.plan_day_id,
     p_expected_plan_version: parsed.expected_plan_version,
@@ -425,6 +504,7 @@ export async function moveDailyAllocationVisit(
   const { supabase } = await requireDailyAllocationManagerMutation();
   const parsed = parseWithSchema(visitMoveSchema, input, 'Invalid visit move.');
   const result = await callDailyAllocationRpc<VisitMutationRpcRow>(supabase, 'move_daily_allocation_visit_v2', {
+    p_request_id: parsed.request_id,
     p_visit_id: parsed.visit_id,
     p_target_plan_day_id: parsed.target_plan_day_id,
     p_expected_source_plan_version: parsed.expected_source_plan_version,
@@ -451,54 +531,67 @@ export async function moveDailyAllocationVisit(
   };
 }
 
-export async function deleteDailyAllocationVisit(input: DailyAllocationVisitDeleteInput): Promise<{ visit_id: string }> {
+export async function deleteDailyAllocationVisit(
+  input: DailyAllocationVisitDeleteInput
+): Promise<DailyAllocationVisitDeleteResult> {
   const { supabase } = await requireDailyAllocationManagerMutation();
   const parsed = parseWithSchema(visitDeleteSchema, input, 'Invalid visit delete.');
   if (!parsed.visit_id) {
     throw new DailyAllocationError('A visit id is required.', 400, 'VALIDATION');
   }
-  const visitId = await callDailyAllocationRpc<string>(supabase, 'delete_daily_allocation_visit_v2', {
+  const result = await callDailyAllocationRpc<DailyAllocationVisitDeleteResult>(supabase, 'delete_daily_allocation_visit_v2', {
+    p_request_id: parsed.request_id,
     p_visit_id: parsed.visit_id,
     p_expected_plan_version: parsed.expected_plan_version,
     p_expected_row_version: parsed.expected_row_version,
   });
-  return { visit_id: visitId };
+  return result;
 }
 
-export async function assignDailyAllocationLabour(input: DailyAllocationLabourAssignInput): Promise<{ assignment_id: string }> {
+export async function assignDailyAllocationLabour(
+  input: DailyAllocationLabourAssignInput
+): Promise<DailyAllocationAssignmentMutationResult<DailyAllocationLabourAssignment>> {
   const { supabase } = await requireDailyAllocationManagerMutation();
   const parsed = parseWithSchema(labourAssignSchema, input, 'Invalid labour assignment.');
-  const assignmentId = await callDailyAllocationRpc<string>(supabase, 'assign_daily_allocation_labour_v2', {
+  return callDailyAllocationRpc(supabase, 'assign_daily_allocation_labour_v2', {
+    p_request_id: parsed.request_id,
     p_visit_id: parsed.visit_id,
     p_profile_id: parsed.profile_id,
     p_expected_plan_version: parsed.expected_plan_version,
+    p_expected_row_version: parsed.expected_row_version ?? null,
     p_meeting_point: blankToNull(parsed.meeting_point),
     p_meet_person: blankToNull(parsed.meet_person),
     p_notes: blankToNull(parsed.notes),
     p_override_id: parsed.override_id || null,
   });
-  return { assignment_id: assignmentId };
 }
 
-export async function unassignDailyAllocationLabour(input: DailyAllocationAssignmentDeleteInput): Promise<{ assignment_id: string }> {
+export async function unassignDailyAllocationLabour(
+  input: DailyAllocationAssignmentDeleteInput
+): Promise<DailyAllocationAssignmentDeleteResult> {
   const { supabase } = await requireDailyAllocationManagerMutation();
   const parsed = parseWithSchema(assignmentDeleteSchema, input, 'Invalid labour unassign.');
   if (!parsed.assignment_id) {
     throw new DailyAllocationError('An assignment id is required.', 400, 'VALIDATION');
   }
-  const assignmentId = await callDailyAllocationRpc<string>(supabase, 'unassign_daily_allocation_labour_v2', {
+  return callDailyAllocationRpc<DailyAllocationAssignmentDeleteResult>(supabase, 'unassign_daily_allocation_labour_v2', {
+    p_request_id: parsed.request_id,
     p_assignment_id: parsed.assignment_id,
     p_expected_plan_version: parsed.expected_plan_version,
+    p_expected_row_version: parsed.expected_row_version,
   });
-  return { assignment_id: assignmentId };
 }
 
-export async function assignDailyAllocationPlant(input: DailyAllocationPlantAssignInput): Promise<{ assignment_id: string }> {
+export async function assignDailyAllocationPlant(
+  input: DailyAllocationPlantAssignInput
+): Promise<DailyAllocationAssignmentMutationResult<DailyAllocationPlantAssignment>> {
   const { supabase } = await requireDailyAllocationManagerMutation();
   const parsed = parseWithSchema(plantAssignSchema, input, 'Invalid plant assignment.');
-  const assignmentId = await callDailyAllocationRpc<string>(supabase, 'assign_daily_allocation_plant_v2', {
+  return callDailyAllocationRpc(supabase, 'assign_daily_allocation_plant_v2', {
+    p_request_id: parsed.request_id,
     p_visit_id: parsed.visit_id,
     p_expected_plan_version: parsed.expected_plan_version,
+    p_expected_row_version: parsed.expected_row_version ?? null,
     p_plant_kind: parsed.plant_kind,
     p_plant_id: parsed.plant_kind === 'registered' ? parsed.plant_id || null : null,
     p_hired_serial: parsed.plant_kind === 'hired' ? blankToNull(parsed.hired_serial) : null,
@@ -506,31 +599,34 @@ export async function assignDailyAllocationPlant(input: DailyAllocationPlantAssi
     p_hired_company: parsed.plant_kind === 'hired' ? blankToNull(parsed.hired_company) : null,
     p_notes: blankToNull(parsed.notes),
   });
-  return { assignment_id: assignmentId };
 }
 
-export async function unassignDailyAllocationPlant(input: DailyAllocationAssignmentDeleteInput): Promise<{ assignment_id: string }> {
+export async function unassignDailyAllocationPlant(
+  input: DailyAllocationAssignmentDeleteInput
+): Promise<DailyAllocationAssignmentDeleteResult> {
   const { supabase } = await requireDailyAllocationManagerMutation();
   const parsed = parseWithSchema(assignmentDeleteSchema, input, 'Invalid plant unassign.');
   if (!parsed.assignment_id) {
     throw new DailyAllocationError('An assignment id is required.', 400, 'VALIDATION');
   }
-  const assignmentId = await callDailyAllocationRpc<string>(supabase, 'unassign_daily_allocation_plant_v2', {
+  return callDailyAllocationRpc<DailyAllocationAssignmentDeleteResult>(supabase, 'unassign_daily_allocation_plant_v2', {
+    p_request_id: parsed.request_id,
     p_assignment_id: parsed.assignment_id,
     p_expected_plan_version: parsed.expected_plan_version,
+    p_expected_row_version: parsed.expected_row_version,
   });
-  return { assignment_id: assignmentId };
 }
 
 export async function createDailyAllocationConflictOverride(
   input: DailyAllocationOverrideInput
-): Promise<{ override_id: string }> {
+): Promise<DailyAllocationOverrideMutationResult> {
   const { supabase } = await requireDailyAllocationManagerMutation();
   const parsed = parseWithSchema(conflictOverrideSchema, input, 'Invalid conflict override.');
-  const overrideId = await callDailyAllocationRpc<string>(
+  return callDailyAllocationRpc(
     supabase,
     'create_daily_allocation_conflict_override_v2',
     {
+      p_request_id: parsed.request_id,
       p_plan_day_id: parsed.plan_day_id,
       p_expected_plan_version: parsed.expected_plan_version,
       p_conflict_kind: parsed.conflict_kind,
@@ -539,5 +635,4 @@ export async function createDailyAllocationConflictOverride(
       p_profile_id: parsed.profile_id,
     }
   );
-  return { override_id: overrideId };
 }

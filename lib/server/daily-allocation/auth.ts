@@ -248,6 +248,16 @@ export function mapDailyAllocationRpcError(
   if (message.includes('V2_DISABLED')) {
     return new DailyAllocationError('Daily allocation v2 writes are disabled.', 503, 'V2_DISABLED');
   }
+  if (message.includes('REQUEST_ID_REUSED')) {
+    return new DailyAllocationError(
+      'This request ID was already used for a different daily allocation change.',
+      409,
+      'REQUEST_ID_REUSED'
+    );
+  }
+  if (message.includes('REQUEST_ID_REQUIRED')) {
+    return new DailyAllocationError('A request ID is required.', 400, 'VALIDATION');
+  }
   if (message.includes('Unauthorized')) {
     return new DailyAllocationError('Unauthorized', 401, 'UNAUTHORIZED');
   }
@@ -312,6 +322,20 @@ export function mapDailyAllocationRpcError(
       'This team/date has been converted. Use the timed board instead.',
       409,
       'V1_WRITES_DISABLED'
+    );
+  }
+  if (message.includes('SOURCE_FINGERPRINT_MISMATCH')) {
+    return new DailyAllocationError(
+      'The legacy drafts changed. Reload the conversion source and review the mapping.',
+      409,
+      'SOURCE_FINGERPRINT_MISMATCH'
+    );
+  }
+  if (message.includes('CONVERSION_')) {
+    return new DailyAllocationError(
+      'The conversion mapping is incomplete or no longer matches the legacy drafts.',
+      409,
+      message.match(/CONVERSION_[A-Z_]+/)?.[0] || 'CONVERSION_INVALID'
     );
   }
   if (code === '23P01' || /exclusion constraint/i.test(message)) {

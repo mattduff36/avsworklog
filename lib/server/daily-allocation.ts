@@ -24,6 +24,7 @@ export {
   deleteLabourDraft,
   savePlantDraft,
   deletePlantDraft,
+  getDailyAllocationConversionSource,
   convertDailyAllocationPlanDay,
   upsertDailyAllocationVisit,
   moveDailyAllocationVisit,

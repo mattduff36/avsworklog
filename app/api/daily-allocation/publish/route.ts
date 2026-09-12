@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
         work_date?: string;
         idempotency_key?: string;
         snapshot_version?: 1 | 2;
+        request_id?: string;
         plan_day_id?: string;
         expected_plan_version?: number;
         confirm_unallocated?: boolean;

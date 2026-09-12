@@ -169,6 +169,82 @@ export function VisitEditorDialog({
   );
 }
 
+export interface MoveVisitFormState {
+  workDate: string;
+  startTime: string;
+}
+
+export function MoveVisitDialog({
+  open,
+  visit,
+  dates,
+  form,
+  onFormChange,
+  onOpenChange,
+  onSubmit,
+  saving,
+}: {
+  open: boolean;
+  visit: DailyAllocationVisit | null;
+  dates: string[];
+  form: MoveVisitFormState;
+  onFormChange: (form: MoveVisitFormState) => void;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: () => void;
+  saving?: boolean;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md border-slate-700 bg-slate-900 text-slate-50">
+        <DialogHeader>
+          <DialogTitle>Move visit</DialogTitle>
+          <DialogDescription>
+            Move {visit?.job_code || 'this visit'} to another board date and 30-minute start time. Its duration is preserved.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-3 py-2 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="daily-allocation-move-date">Date</Label>
+            <select
+              id="daily-allocation-move-date"
+              className="flex h-9 w-full rounded-md border border-slate-600 bg-slate-950 px-3 text-sm"
+              value={form.workDate}
+              onChange={(event) => onFormChange({ ...form, workDate: event.target.value })}
+            >
+              {dates.map((date) => (
+                <option key={date} value={date}>{format(parseISO(date), 'EEE d MMM yyyy')}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="daily-allocation-move-start">Start</Label>
+            <Input
+              id="daily-allocation-move-start"
+              type="time"
+              step={1800}
+              value={form.startTime}
+              onChange={(event) => onFormChange({ ...form, startTime: event.target.value })}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" className={boardControlStyles.outline} onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            className={boardControlStyles.primary}
+            disabled={saving || !visit || !form.workDate || !form.startTime}
+            onClick={onSubmit}
+          >
+            {saving ? 'Moving…' : 'Move visit'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function AssignResourcesDialog({
   open,
   visit,
@@ -195,7 +271,10 @@ export function AssignResourcesDialog({
   labourNames: string[];
   plantLabels: string[];
   onOpenChange: (open: boolean) => void;
-  onAssignEmployee: (profileId: string) => void;
+  onAssignEmployee: (
+    profileId: string,
+    instructions: { meeting_point: string | null; meet_person: string | null; notes: string | null }
+  ) => void;
   onAssignPlant: (plantId: string) => void;
   onAssignHiredPlant: (input: { hired_serial: string; hired_description: string; hired_company: string }) => void;
   onRemoveLabour: (assignmentId: string) => void;
@@ -207,6 +286,24 @@ export function AssignResourcesDialog({
   const [hiredSerial, setHiredSerial] = useState('');
   const [hiredDescription, setHiredDescription] = useState('');
   const [hiredCompany, setHiredCompany] = useState('');
+  const [meetingPoint, setMeetingPoint] = useState('');
+  const [meetPerson, setMeetPerson] = useState('');
+  const [notes, setNotes] = useState('');
+  const selectedAssignment = labour.find((assignment) => assignment.profile_id === profileId) || null;
+
+  function chooseEmployee(nextProfileId: string) {
+    setProfileId(nextProfileId);
+    const assignment = labour.find((item) => item.profile_id === nextProfileId);
+    setMeetingPoint(assignment?.meeting_point ?? '');
+    setMeetPerson(assignment?.meet_person ?? '');
+    setNotes(assignment?.notes ?? '');
+  }
+
+  function inheritVisitDefaults() {
+    setMeetingPoint('');
+    setMeetPerson('');
+    setNotes('');
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -224,7 +321,7 @@ export function AssignResourcesDialog({
               id="daily-allocation-assign-employee"
               className="flex h-9 w-full rounded-md border border-slate-600 bg-slate-950 px-3 text-sm"
               value={profileId}
-              onChange={(event) => setProfileId(event.target.value)}
+              onChange={(event) => chooseEmployee(event.target.value)}
             >
               <option value="">Select employee</option>
               {employees.map((employee) => (
@@ -233,13 +330,65 @@ export function AssignResourcesDialog({
                 </option>
               ))}
             </select>
+            <div className="rounded-md border border-slate-700 bg-slate-950/40 p-3">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div>
+                  <p className="text-sm font-medium">Employee instructions</p>
+                  <p className="text-xs text-slate-400">
+                    These override the visit defaults for the selected employee.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className={boardControlStyles.ghost}
+                  onClick={inheritVisitDefaults}
+                >
+                  Inherit visit defaults
+                </Button>
+              </div>
+              <div className="grid gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="daily-allocation-employee-meeting-point">Meeting point</Label>
+                  <Input
+                    id="daily-allocation-employee-meeting-point"
+                    value={meetingPoint}
+                    placeholder={visit?.meeting_point || 'No visit default'}
+                    onChange={(event) => setMeetingPoint(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="daily-allocation-employee-meet-person">Meet person</Label>
+                  <Input
+                    id="daily-allocation-employee-meet-person"
+                    value={meetPerson}
+                    placeholder={visit?.meet_person || 'No visit default'}
+                    onChange={(event) => setMeetPerson(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="daily-allocation-employee-notes">Notes</Label>
+                  <Textarea
+                    id="daily-allocation-employee-notes"
+                    value={notes}
+                    placeholder={visit?.notes || 'No visit default'}
+                    onChange={(event) => setNotes(event.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
             <Button
               type="button"
               className={cn(boardControlStyles.outline, 'min-h-9')}
               disabled={!profileId || saving}
-              onClick={() => onAssignEmployee(profileId)}
+              onClick={() => onAssignEmployee(profileId, {
+                meeting_point: meetingPoint.trim() || null,
+                meet_person: meetPerson.trim() || null,
+                notes: notes.trim() || null,
+              })}
             >
-              Assign employee
+              {selectedAssignment ? 'Save employee instructions' : 'Assign employee'}
             </Button>
           </div>
           <div className="space-y-2">
@@ -290,18 +439,37 @@ export function AssignResourcesDialog({
               <p className="text-sm text-slate-400">None yet.</p>
             ) : null}
             {labour.map((assignment, index) => (
-              <div key={assignment.id} className="flex items-center justify-between gap-2 text-sm">
-                <span>{labourNames[index] || assignment.profile_id}</span>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className={boardControlStyles.outline}
-                  aria-label={`Remove ${labourNames[index] || 'employee'}`}
-                  onClick={() => onRemoveLabour(assignment.id)}
-                >
-                  Remove
-                </Button>
+              <div key={assignment.id} className="rounded-md border border-slate-700 p-2 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">{labourNames[index] || assignment.profile_id}</span>
+                  <div className="flex gap-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      className={boardControlStyles.ghost}
+                      aria-label={`Edit instructions for ${labourNames[index] || 'employee'}`}
+                      onClick={() => chooseEmployee(assignment.profile_id)}
+                    >
+                      Edit instructions
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className={boardControlStyles.outline}
+                      aria-label={`Remove ${labourNames[index] || 'employee'}`}
+                      onClick={() => onRemoveLabour(assignment.id)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+                <p className="mt-1 text-xs text-slate-400">
+                  Meeting: {assignment.meeting_point ?? visit?.meeting_point ?? 'Not set'}
+                  {' · '}Meet: {assignment.meet_person ?? visit?.meet_person ?? 'Not set'}
+                  {' · '}Notes: {assignment.notes ?? visit?.notes ?? 'None'}
+                </p>
               </div>
             ))}
             {plantAssignments.map((assignment, index) => (

@@ -332,6 +332,39 @@ export interface DailyAllocationLegacyUntimedAllocations {
   plant: DailyPlantDraft[];
 }
 
+export interface DailyAllocationConversionSource {
+  work_date: string;
+  team_id: string;
+  source_fingerprint: string;
+  labour_drafts: Array<{
+    id: string;
+    row_version: number;
+    profile_id: string;
+    job_source_type: JobCatalogueSourceType | null;
+    job_source_id: string | null;
+    job_code: string | null;
+    site_address: string | null;
+    meeting_point: string | null;
+    meet_person: string | null;
+    notes: string | null;
+  }>;
+  plant_drafts: Array<{
+    id: string;
+    row_version: number;
+    plant_kind: DailyPlantKind;
+    plant_id: string | null;
+    hired_serial: string | null;
+    hired_description: string | null;
+    hired_company: string | null;
+    owner_team_id: string | null;
+    job_source_type: JobCatalogueSourceType;
+    job_source_id: string;
+    job_code: string;
+    site_address: string;
+    notes: string | null;
+  }>;
+}
+
 export interface DailyAllocationPublicationMeta {
   id: string;
   work_date: string;
@@ -413,8 +446,38 @@ export interface DailyAllocationRangeBoardPayload {
 }
 
 export interface DailyAllocationConvertInput {
+  request_id: string;
   work_date: string;
-  team_id?: string | null;
+  team_id: string;
+  expected_source_fingerprint: string;
+  visits: DailyAllocationConversionVisitInput[];
+  labour_drafts: DailyAllocationLabourConversionInput[];
+  plant_drafts: DailyAllocationPlantConversionInput[];
+}
+
+export interface DailyAllocationConversionVisitInput {
+  visit_id: string;
+  job_source_type: JobCatalogueSourceType;
+  job_source_id: string;
+  starts_at: string;
+  ends_at: string;
+  meeting_point?: string | null;
+  meet_person?: string | null;
+  notes?: string | null;
+}
+
+export interface DailyAllocationLabourConversionInput {
+  draft_id: string;
+  row_version: number;
+  disposition: 'visit' | 'unallocated' | 'absence';
+  visit_id?: string | null;
+}
+
+export interface DailyAllocationPlantConversionInput {
+  draft_id: string;
+  row_version: number;
+  disposition: 'visit' | 'unallocated';
+  visit_id?: string | null;
 }
 
 export interface DailyAllocationConvertResult {
@@ -422,9 +485,14 @@ export interface DailyAllocationConvertResult {
   plan_version: number;
   team_id: string;
   work_date: string;
+  source_fingerprint: string;
+  visits: DailyAllocationVisit[];
+  labour_assignments: DailyAllocationLabourAssignment[];
+  plant_assignments: DailyAllocationPlantAssignment[];
 }
 
 export interface DailyAllocationVisitUpsertInput {
+  request_id: string;
   visit_id?: string | null;
   plan_day_id: string;
   expected_plan_version: number;
@@ -446,7 +514,34 @@ export interface DailyAllocationVisitMutationResult {
   plan_version: number;
 }
 
+export interface DailyAllocationVisitDeleteResult {
+  visit_id: string;
+  plan_day_id: string;
+  plan_version: number;
+}
+
+export interface DailyAllocationAssignmentMutationResult<TAssignment> {
+  assignment_id: string;
+  assignment: TAssignment;
+  plan_day_id: string;
+  plan_version: number;
+}
+
+export interface DailyAllocationAssignmentDeleteResult {
+  assignment_id: string;
+  plan_day_id: string;
+  plan_version: number;
+}
+
+export interface DailyAllocationOverrideMutationResult {
+  override_id: string;
+  override: DailyAllocationConflictOverride;
+  plan_day_id: string;
+  plan_version: number;
+}
+
 export interface DailyAllocationVisitMoveInput {
+  request_id: string;
   visit_id: string;
   target_plan_day_id: string;
   expected_source_plan_version: number;
@@ -469,15 +564,18 @@ export interface DailyAllocationV2Runtime {
 }
 
 export interface DailyAllocationVisitDeleteInput {
+  request_id: string;
   visit_id: string;
   expected_plan_version: number;
   expected_row_version: number;
 }
 
 export interface DailyAllocationLabourAssignInput {
+  request_id: string;
   visit_id: string;
   profile_id: string;
   expected_plan_version: number;
+  expected_row_version?: number | null;
   meeting_point?: string | null;
   meet_person?: string | null;
   notes?: string | null;
@@ -485,8 +583,10 @@ export interface DailyAllocationLabourAssignInput {
 }
 
 export interface DailyAllocationPlantAssignInput {
+  request_id: string;
   visit_id: string;
   expected_plan_version: number;
+  expected_row_version?: number | null;
   plant_kind: DailyPlantKind;
   plant_id?: string | null;
   hired_serial?: string | null;
@@ -496,11 +596,14 @@ export interface DailyAllocationPlantAssignInput {
 }
 
 export interface DailyAllocationAssignmentDeleteInput {
+  request_id: string;
   assignment_id: string;
   expected_plan_version: number;
+  expected_row_version?: number;
 }
 
 export interface DailyAllocationOverrideInput {
+  request_id: string;
   plan_day_id: string;
   expected_plan_version: number;
   conflict_kind: DailyAllocationConflictKind;
@@ -517,6 +620,7 @@ export interface DailyAllocationPublishV1Input {
 
 export interface DailyAllocationPublishV2Input {
   snapshot_version: 2;
+  request_id: string;
   plan_day_id: string;
   expected_plan_version: number;
   idempotency_key: string;

@@ -13,11 +13,23 @@ import {
   type DailyAllocationDragSource,
 } from '@/components/daily-allocation/board/board-dnd';
 import { employeeDay, employeeLabel } from '@/components/daily-allocation/board/board-model';
+import {
+  buildDailyAllocationEmployeeOccupancy,
+  buildDailyAllocationPlantOccupancy,
+  formatDailyAllocationOccupancySummary,
+  type DailyAllocationOccupancySegment,
+} from '@/components/daily-allocation/board/daily-allocation-occupancy';
+import {
+  ResourceOccupancyLegend,
+  ResourceOccupancyStrip,
+} from '@/components/daily-allocation/board/ResourceOccupancyStrip';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { cn } from '@/lib/utils/cn';
 import type {
   DailyAllocationEmployeeResource,
   DailyAllocationJobProjection,
+  DailyAllocationLabourAssignment,
+  DailyAllocationPlantAssignment,
   DailyAllocationPlantResource,
 } from '@/types/daily-allocation';
 
@@ -32,6 +44,8 @@ interface ResourceSidebarProps {
   jobs: DailyAllocationJobProjection[];
   employees: DailyAllocationEmployeeResource[];
   plant: DailyAllocationPlantResource[];
+  labourAssignments: DailyAllocationLabourAssignment[];
+  plantAssignments: DailyAllocationPlantAssignment[];
   selectedResourceId: string | null;
   onSelectResource: (resource: DailyAllocationDragSource) => void;
 }
@@ -60,9 +74,16 @@ function useDragSafeActivation(isDragging: boolean, onActivate: () => void) {
   return { handleClick, handlePointerDown, handlePointerMove };
 }
 
-function DragHandle({ testId }: { testId: string }) {
+function DragHandle({
+  testId,
+  handleRef,
+}: {
+  testId: string;
+  handleRef: (element: HTMLElement | null) => void;
+}) {
   return (
     <span
+      ref={handleRef}
       data-testid={testId}
       className="inline-flex min-h-11 min-w-11 touch-none items-center justify-center text-slate-400"
       style={{ touchAction: 'none' }}
@@ -81,6 +102,7 @@ function DraggableCard({
   subtitle,
   metadata,
   warning,
+  occupancy,
   tintClassName,
   handleTestId,
   onSelect,
@@ -93,6 +115,7 @@ function DraggableCard({
   subtitle: string;
   metadata?: string;
   warning?: string | null;
+  occupancy?: DailyAllocationOccupancySegment[];
   tintClassName: string;
   handleTestId: string;
   onSelect: () => void;
@@ -106,10 +129,7 @@ function DraggableCard({
 
   return (
     <button
-      ref={(node) => {
-        ref(node);
-        handleRef(node);
-      }}
+      ref={ref}
       type="button"
       onClick={handleClick}
       onPointerDown={handlePointerDown}
@@ -118,12 +138,12 @@ function DraggableCard({
       aria-label={`${selected ? 'Selected' : 'Select'} ${label}. Drag from the handle to assign.`}
       data-testid={`daily-allocation-resource-${source.kind}-${id}`}
       className={cn(
-        'flex w-full items-center gap-1 rounded-lg p-1.5 text-left motion-reduce:transition-none',
+        'relative flex w-full items-center gap-1 rounded-lg p-1.5 pb-2 text-left motion-reduce:transition-none',
         selected ? boardControlStyles.primary : tintClassName,
         isDragging && 'opacity-60'
       )}
     >
-      <DragHandle testId={handleTestId} />
+      <DragHandle testId={handleTestId} handleRef={handleRef} />
       <span className="min-w-0 flex-1 space-y-0.5">
         <span className="block truncate text-sm font-semibold" title={label}>{label}</span>
         <span className={cn('block truncate text-xs', selected ? 'text-white/80' : 'text-slate-300')} title={subtitle}>
@@ -136,6 +156,12 @@ function DraggableCard({
         ) : null}
       </span>
       {warning ? <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" aria-label={warning} /> : null}
+      {occupancy ? (
+        <ResourceOccupancyStrip
+          segments={occupancy}
+          label={formatDailyAllocationOccupancySummary(occupancy)}
+        />
+      ) : null}
     </button>
   );
 }
@@ -149,6 +175,8 @@ export function ResourceSidebar({
   jobs,
   employees,
   plant,
+  labourAssignments,
+  plantAssignments,
   selectedResourceId,
   onSelectResource,
 }: ResourceSidebarProps) {
@@ -178,6 +206,22 @@ export function ResourceSidebar({
     }),
     [plant, term]
   );
+  const labourByEmployee = useMemo(() => {
+    const result = new Map<string, DailyAllocationLabourAssignment[]>();
+    for (const assignment of labourAssignments) {
+      if (assignment.work_date !== selectedDate) continue;
+      result.set(assignment.profile_id, [...(result.get(assignment.profile_id) || []), assignment]);
+    }
+    return result;
+  }, [labourAssignments, selectedDate]);
+  const plantByResource = useMemo(() => {
+    const result = new Map<string, DailyAllocationPlantAssignment[]>();
+    for (const assignment of plantAssignments) {
+      if (assignment.work_date !== selectedDate || assignment.plant_kind !== 'registered' || !assignment.plant_id) continue;
+      result.set(assignment.plant_id, [...(result.get(assignment.plant_id) || []), assignment]);
+    }
+    return result;
+  }, [plantAssignments, selectedDate]);
 
   const placeholders: Record<ResourceSidebarTab, string> = {
     jobs: 'Search jobs',
@@ -205,6 +249,7 @@ export function ResourceSidebar({
           <p className="pt-2 text-xs text-slate-300">
             Drag onto the board, or select then Add visit / Assign.
           </p>
+          {tab !== 'jobs' ? <ResourceOccupancyLegend /> : null}
           <div className="relative pt-2 pb-3">
             <Search className="pointer-events-none absolute left-2.5 top-4 h-4 w-4 text-slate-400" aria-hidden="true" />
             <Input
@@ -257,6 +302,10 @@ export function ResourceSidebar({
                 profileId: employee.profile_id,
                 label: employee.full_name,
               };
+              const occupancy = buildDailyAllocationEmployeeOccupancy({
+                day,
+                assignments: labourByEmployee.get(employee.profile_id) || [],
+              });
               return (
                 <DraggableCard
                   key={employee.profile_id}
@@ -268,6 +317,7 @@ export function ResourceSidebar({
                   subtitle={[employee.employee_id, employee.team_name].filter(Boolean).join(' · ') || 'Employee'}
                   metadata={warning || day?.availability.replaceAll('_', ' ')}
                   warning={warning}
+                  occupancy={occupancy}
                   tintClassName={boardControlStyles.resourceEmployee}
                   handleTestId={`daily-allocation-resource-drag-handle-employee-${employee.profile_id}`}
                   onSelect={() => onSelectResource(source)}
@@ -281,6 +331,9 @@ export function ResourceSidebar({
             ) : filteredPlant.map((item) => {
               const label = formatFleetAssetLabel({ identifier: item.plant_id, nickname: item.nickname });
               const source: DailyAllocationDragSource = { kind: 'plant', plantId: item.id, label };
+              const occupancy = buildDailyAllocationPlantOccupancy(
+                plantByResource.get(item.id) || []
+              );
               return (
                 <DraggableCard
                   key={item.id}
@@ -290,6 +343,7 @@ export function ResourceSidebar({
                   selected={selectedResourceId === item.id}
                   label={label}
                   subtitle="Registered plant"
+                  occupancy={occupancy}
                   tintClassName={boardControlStyles.resourcePlant}
                   handleTestId={`daily-allocation-resource-drag-handle-plant-${item.id}`}
                   onSelect={() => onSelectResource(source)}

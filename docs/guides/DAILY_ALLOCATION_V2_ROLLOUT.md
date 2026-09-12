@@ -21,10 +21,20 @@ matrix. Manager planning still requires Level 4 or higher.
 2. The connection must identify Supabase project `lrhufzqfzeutgvudcowy` and
    use direct/session port `5432`, never transaction-pool port `6543`.
 3. Complete the independent CRITICAL final-diff review.
-4. Run `npm run finalise:full:push`.
-5. Confirm the Vercel production deployment is `READY` and its source commit
-   is the exact deployed SHA returned by `git rev-parse HEAD`.
-6. Keep `scripts/supabase/activate-daily-allocation-v2.sql` and
+4. Apply migrations only through the approved finalise migration ledger path,
+   in this order:
+   - `supabase/migrations/20260813_zzz_daily_allocation_v2_visit_model.sql`;
+   - `supabase/migrations/20260814155048_daily_allocation_v2_rpc_only_grants.sql`;
+   - `supabase/migrations/20260912_daily_allocation_idempotent_mutations_and_guided_conversion.sql`;
+   - `supabase/migrations/20260913_daily_allocation_runtime_rpc_grants.sql`.
+5. Keep both runtime flags `false`. After the additive migration, run status
+   and confirm the singleton remains exactly `false/false` before deployment.
+6. Push/finalise only through the separately authorized release workflow, then
+   confirm the Vercel production deployment is `READY` and its source commit
+   is the exact pushed 40-character SHA. The rollout command independently
+   reads the no-store production deployment identity endpoint and refuses a
+   stale or different commit.
+7. Keep `scripts/supabase/activate-daily-allocation-v2.sql` and
    `supabase/rollback/20260813_zzz_disable_daily_allocation_v2.sql` unchanged
    after review. The operator executes these checked-in artifacts directly.
 
@@ -37,9 +47,9 @@ permission rows.
 # Read current checked state and fingerprints.
 npm run daily-allocation:v2:status
 
-# Verify migration checksum, objects, grants, fingerprints, closed flags, and
-# rehearse the idempotent runtime-only disable path.
-npm run daily-allocation:v2:preflight
+# After the exact pushed SHA is deployed, verify migration checksums, objects,
+# grants, semantics, fingerprints, closed flags, and the disable rehearsal.
+npm run daily-allocation:v2:preflight -- --expected-commit <40-character-sha>
 
 # Activate only after exact deployment confirmation.
 npm run daily-allocation:v2:activate -- --expected-commit <40-character-sha>
@@ -53,22 +63,58 @@ The activation operator verifies:
 - exact production project identity and direct connection mode;
 - the local operator, activation, disable, and grant migration exactly match
   the expected deployed commit;
-- the checked-in v2 migration SHA-256 against the protected migration ledger;
-- every required v2 table type, RLS state, API-used RPC signature, writer
-  guard, table/column grant, and private-table boundary;
-- no direct authenticated v2 writes and no anonymous v2 table access;
+- all four checked-in migration SHA-256 values and `predeploy` phases against
+  the protected migration ledger, including the guided-conversion and runtime
+  grant migrations;
+- every required v2 relation type, request-ledger RLS/ACL, private-schema
+  boundary, complete new RPC signature, SECURITY DEFINER property, and exact
+  authenticated/anonymous execution boundary;
+- removal or full client/service-role revocation of every obsolete executable
+  overload, with no other authenticated public Daily Allocation v2 overload;
+- no direct authenticated v2 table/request-ledger DML and no anonymous access;
 - one closed runtime singleton;
-- stable permission, complete v1/v2 content, linked-message, and row-count
-  fingerprints;
+- shared team/date lock guards for conversion and every v1 writer/publisher;
+- conversion source fingerprint, row/version exhaustiveness, explicit
+  disposition/interval, canonical-job, and no-legacy-time guarantees;
+- actor/action/payload-hash request binding, runtime-before-replay ordering,
+  replay-before-lookup behavior, assignment row-version CAS, and the canonical
+  source-type/source-ID plant job rule;
+- stable permission, v1 content, v1 publication, v2 content, v2 publication,
+  linked-message/recipient, request-ledger, and row-count fingerprints;
+- the local rollout artifacts and current Git HEAD exactly match the commit SHA
+  returned by
+  `https://avsworklog.mpdee.uk/api/daily-allocation/deployment-identity`;
 - an authorized Level 4+ runtime/board read;
 - denial for a Level 0 principal;
-- a guaranteed-nonexistent mutation reaches `Visit not found`, not
+- a request-ID-bearing guaranteed-nonexistent mutation reaches `Visit not found`, not
   `V2_DISABLED`, and creates no rows.
+
+## Required release sequence
+
+1. Keep `board_enabled=false` and `writes_enabled=false`.
+2. Apply the reviewed additive migrations in the order above through the
+   approved finalise/ledger path. Never use dashboard SQL or bypass the ledger.
+3. Run status and stop unless the migration checksums/contracts pass and the
+   runtime singleton is still closed.
+4. Deploy the exact pushed SHA and wait for that exact deployment to be ready.
+5. Run closed-state preflight with that SHA. Preflight must pass without a
+   database mutation other than an idempotent runtime-only disable rehearsal.
+6. Run activation with the same SHA. The checked-in SQL validates and enables
+   both flags atomically from an exactly closed singleton.
+7. Complete the bounded manager-allowed and Level-0-denied smoke checks.
+8. On any activation validation, authorization smoke, fingerprint comparison,
+   interruption, or timeout failure, automatically execute and verify the
+   runtime-only disable. Do not retry or broaden permissions.
+
+Guided conversion is an explicit manager action for one team/date scope. It is
+never an automatic migration or activation side effect. Once a scope is
+converted, emergency disable closes v2 access/writes but must not reopen that
+scope for v1 editing.
 
 ## Automatic disable
 
 Activation and smoke checks are one bounded operator action. If activation
-validation, authorization smoke, content comparison, or the smoke timeout
+preflight, validation, authorization smoke, content comparison, or the smoke timeout
 fails, the operator immediately runs the runtime-only disable artifact and
 verifies both flags are `false`.
 

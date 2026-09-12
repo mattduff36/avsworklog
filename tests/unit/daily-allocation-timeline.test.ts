@@ -82,6 +82,9 @@ describe('DA2-TIME-001 daily allocation timeline', () => {
     const headerLeft = 80;
     const rangeLeft = dailyTimelineRangeLeft(headerLeft);
     expect(rangeLeft).toBe(headerLeft + DAILY_TIMELINE_JOB_COLUMN_WIDTH);
+    expect(dailyTimelineRangeLeft(headerLeft, 0.7)).toBe(
+      headerLeft + DAILY_TIMELINE_JOB_COLUMN_WIDTH * 0.7
+    );
     expect(rangeLeft).not.toBe(headerLeft + DAILY_TIMELINE_HOUR_WIDTH);
 
     expect(mapDailyAllocationClientXToMinutes({

@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { stripOuterMigrationTransaction } from '../../scripts/finalise-migrations';
 import {
   DA2_ACTORS,
+  DA2_DATA_CONTRACT_MIGRATION_PATH,
+  DA2_RUNTIME_GRANT_MIGRATION_PATH,
   DA2_PGLITE_BASE_PATH,
   DA2_V2_MIGRATION_PATH,
   applyDailyAllocationV2Migration,
@@ -88,70 +91,82 @@ describe('DA2 isolated PGlite runtime', () => {
   });
 
   it('executes the reviewed activation and runtime-only disable artifacts without v1 drift', async () => {
-    const before = await hashDailyAllocationV1Content(pg);
-    const grantMigration = readFileSync(
-      'supabase/migrations/20260814155048_daily_allocation_v2_rpc_only_grants.sql',
-      'utf8'
-    );
-    const activation = readFileSync(
-      'scripts/supabase/activate-daily-allocation-v2.sql',
-      'utf8'
-    );
-    const disable = readFileSync(
-      'supabase/rollback/20260813_zzz_disable_daily_allocation_v2.sql',
-      'utf8'
-    );
+    const isolated = await createDailyAllocationV2Pglite();
+    try {
+      await applyDailyAllocationV2Migration(isolated);
+      const before = await hashDailyAllocationV1Content(isolated);
+      const grantMigration = readFileSync(
+        'supabase/migrations/20260814155048_daily_allocation_v2_rpc_only_grants.sql',
+        'utf8'
+      );
+      const activation = readFileSync(
+        'scripts/supabase/activate-daily-allocation-v2.sql',
+        'utf8'
+      );
+      const disable = readFileSync(
+        'supabase/rollback/20260813_zzz_disable_daily_allocation_v2.sql',
+        'utf8'
+      );
 
-    await pg.exec(`
-      GRANT INSERT, UPDATE, DELETE
-        ON TABLE public.daily_allocation_plan_days,
-          public.daily_allocation_visits,
-          public.daily_allocation_visit_labour,
-          public.daily_allocation_visit_plant,
-          public.daily_allocation_conflict_overrides
-        TO authenticated;
-    `);
-    await pg.exec(grantMigration);
-    const grants = await pg.query<{
-      relation_name: string;
-      can_select: boolean;
-      can_write: boolean;
-    }>(`
-      SELECT
-        relation_name,
-        has_table_privilege('authenticated', to_regclass(relation_name), 'SELECT') AS can_select,
-        has_table_privilege('authenticated', to_regclass(relation_name), 'INSERT')
-          OR has_table_privilege('authenticated', to_regclass(relation_name), 'UPDATE')
-          OR has_table_privilege('authenticated', to_regclass(relation_name), 'DELETE')
-          AS can_write
-      FROM unnest(ARRAY[
-        'public.daily_allocation_plan_days',
-        'public.daily_allocation_visits',
-        'public.daily_allocation_visit_labour',
-        'public.daily_allocation_visit_plant',
-        'public.daily_allocation_conflict_overrides'
-      ]) AS relation_name
-    `);
-    expect(grants.rows).toHaveLength(5);
-    expect(grants.rows.every((row) => row.can_select && !row.can_write)).toBe(true);
+      await isolated.exec(
+        stripOuterMigrationTransaction(readFileSync(DA2_DATA_CONTRACT_MIGRATION_PATH, 'utf8'))
+      );
+      await isolated.exec(
+        stripOuterMigrationTransaction(readFileSync(DA2_RUNTIME_GRANT_MIGRATION_PATH, 'utf8'))
+      );
+      await isolated.exec(`
+        GRANT INSERT, UPDATE, DELETE
+          ON TABLE public.daily_allocation_plan_days,
+            public.daily_allocation_visits,
+            public.daily_allocation_visit_labour,
+            public.daily_allocation_visit_plant,
+            public.daily_allocation_conflict_overrides
+          TO authenticated;
+      `);
+      await isolated.exec(grantMigration);
+      const grants = await isolated.query<{
+        relation_name: string;
+        can_select: boolean;
+        can_write: boolean;
+      }>(`
+        SELECT
+          relation_name,
+          has_table_privilege('authenticated', to_regclass(relation_name), 'SELECT') AS can_select,
+          has_table_privilege('authenticated', to_regclass(relation_name), 'INSERT')
+            OR has_table_privilege('authenticated', to_regclass(relation_name), 'UPDATE')
+            OR has_table_privilege('authenticated', to_regclass(relation_name), 'DELETE')
+            AS can_write
+        FROM unnest(ARRAY[
+          'public.daily_allocation_plan_days',
+          'public.daily_allocation_visits',
+          'public.daily_allocation_visit_labour',
+          'public.daily_allocation_visit_plant',
+          'public.daily_allocation_conflict_overrides'
+        ]) AS relation_name
+      `);
+      expect(grants.rows).toHaveLength(5);
+      expect(grants.rows.every((row) => row.can_select && !row.can_write)).toBe(true);
 
-    await pg.exec(activation);
-    const enabled = await withAuthenticatedRole(pg, DA2_ACTORS.manager, async () =>
-      pg.query<{ board_enabled: boolean; writes_enabled: boolean }>(
-        'SELECT * FROM public.get_daily_allocation_v2_runtime()'
-      )
-    );
-    expect(enabled.rows[0]).toEqual({ board_enabled: true, writes_enabled: true });
-    expect(await hashDailyAllocationV1Content(pg)).toEqual(before);
+      await isolated.exec(activation);
+      const enabled = await withAuthenticatedRole(isolated, DA2_ACTORS.manager, async () =>
+        isolated.query<{ board_enabled: boolean; writes_enabled: boolean }>(
+          'SELECT * FROM public.get_daily_allocation_v2_runtime()'
+        )
+      );
+      expect(enabled.rows[0]).toEqual({ board_enabled: true, writes_enabled: true });
+      expect(await hashDailyAllocationV1Content(isolated)).toEqual(before);
 
-    await pg.exec(disable);
-    const disabled = await withAuthenticatedRole(pg, DA2_ACTORS.manager, async () =>
-      pg.query<{ board_enabled: boolean; writes_enabled: boolean }>(
-        'SELECT * FROM public.get_daily_allocation_v2_runtime()'
-      )
-    );
-    expect(disabled.rows[0]).toEqual({ board_enabled: false, writes_enabled: false });
-    expect(await hashDailyAllocationV1Content(pg)).toEqual(before);
+      await isolated.exec(disable);
+      const disabled = await withAuthenticatedRole(isolated, DA2_ACTORS.manager, async () =>
+        isolated.query<{ board_enabled: boolean; writes_enabled: boolean }>(
+          'SELECT * FROM public.get_daily_allocation_v2_runtime()'
+        )
+      );
+      expect(disabled.rows[0]).toEqual({ board_enabled: false, writes_enabled: false });
+      expect(await hashDailyAllocationV1Content(isolated)).toEqual(before);
+    } finally {
+      await isolated.close();
+    }
   });
 
   it('DA2A-GATE-001 keeps v1 drafts working and rejects v2 writes as V2_DISABLED while closed', async () => {

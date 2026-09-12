@@ -1,11 +1,20 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from 'react';
 import { useDroppable } from '@dnd-kit/react';
 import { Button } from '@/components/ui/button';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
-import { DAILY_ALLOCATION_DND } from '@/components/daily-allocation/board/board-dnd';
-import type { DailyAllocationJobRow } from '@/components/daily-allocation/board/board-model';
+import { DAILY_ALLOCATION_DND, jobResourceKey } from '@/components/daily-allocation/board/board-dnd';
+import type { DailyAllocationBoardRow } from '@/components/daily-allocation/board/daily-allocation-board-primary';
+import { getDailyAllocationBoardAxisLabel, getDailyAllocationBoardRowTestId } from '@/components/daily-allocation/board/daily-allocation-board-primary';
 import {
   visitConflicts,
   visitLabour,
@@ -24,39 +33,49 @@ import {
   toDailyAllocationLondonIsoFromMinutes,
 } from '@/lib/utils/daily-allocation-timeline';
 import type { DailyAllocationRangeBoardPayload, DailyAllocationVisit } from '@/types/daily-allocation';
+import type { DailyAllocationBoardPrimary } from '@/lib/config/daily-allocation-primary-preference';
+import type { DailyAllocationTimelineMode } from '@/components/daily-allocation/board/JobsPanel';
 import {
   DAILY_TIMELINE_HOUR_WIDTH,
   DAILY_TIMELINE_JOB_COLUMN_WIDTH,
   dailyTimelineFitsContainer,
   dailyTimelineHourWidth,
 } from '@/components/daily-allocation/board/daily-timeline-layout';
+import { getDailyAllocationElementVisualScale } from '@/components/daily-allocation/board/daily-allocation-viewport-fit';
 
 export { DAILY_TIMELINE_HOUR_WIDTH, DAILY_TIMELINE_JOB_COLUMN_WIDTH };
 
 const LANE_HEIGHT = 112;
 const ROW_MIN_HEIGHT = 144;
+const PAN_THRESHOLD_PX = 4;
 
 interface DailyTimelineProps {
   board: DailyAllocationRangeBoardPayload;
   date: string;
-  rows: DailyAllocationJobRow[];
+  rows: DailyAllocationBoardRow[];
+  primary: DailyAllocationBoardPrimary;
+  mode: DailyAllocationTimelineMode;
   selectedVisitId: string | null;
   labourNames: (visitId: string) => string[];
   plantLabels: (visitId: string) => string[];
   onAddVisit: (jobKey: string, date: string) => void;
   onSelectVisit: (visit: DailyAllocationVisit) => void;
+  onMoveVisit: (visit: DailyAllocationVisit) => void;
   onEditVisit: (visit: DailyAllocationVisit) => void;
   onDeleteVisit: (visit: DailyAllocationVisit) => void;
   onAssignVisit: (visit: DailyAllocationVisit) => void;
   onResizeVisit: (visit: DailyAllocationVisit, startsAt: string, endsAt: string) => void;
+  onPointerInteractionChange?: (active: boolean) => void;
 }
 
 function TimelineHeader({
+  axisLabel,
   startHour,
   endHour,
   hourWidth,
   fill,
 }: {
+  axisLabel: string;
   startHour: number;
   endHour: number;
   hourWidth: number;
@@ -72,7 +91,7 @@ function TimelineHeader({
         className="shrink-0 border-r border-slate-700 px-3 py-2 text-xs font-semibold uppercase text-slate-400"
         style={{ width: DAILY_TIMELINE_JOB_COLUMN_WIDTH }}
       >
-        Job
+        {axisLabel}
       </div>
       <div
         className={cn('relative flex min-w-0', fill && 'flex-1')}
@@ -155,15 +174,19 @@ export function DailyTimeline({
   board,
   date,
   rows,
+  primary,
+  mode,
   selectedVisitId,
   labourNames,
   plantLabels,
   onAddVisit,
   onSelectVisit,
+  onMoveVisit,
   onEditVisit,
   onDeleteVisit,
   onAssignVisit,
   onResizeVisit,
+  onPointerInteractionChange,
 }: DailyTimelineProps) {
   const visits = board.visits.filter((visit) => visit.work_date === date);
   const range = useMemo(
@@ -175,10 +198,21 @@ export function DailyTimeline({
   const hourCount = Math.max(1, endHour - startHour);
   const boardRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
-  const fill = dailyTimelineFitsContainer(containerWidth, hourCount);
-  const hourWidth = dailyTimelineHourWidth(containerWidth, hourCount);
+  const fitEligible = dailyTimelineFitsContainer(containerWidth, hourCount);
+  const fill = mode === 'fit' && fitEligible;
+  const hourWidth = fill
+    ? dailyTimelineHourWidth(containerWidth, hourCount)
+    : DAILY_TIMELINE_HOUR_WIDTH;
   const timelineWidth = hourCount * hourWidth;
   const [draftTimes, setDraftTimes] = useState<Record<string, { starts_at: string; ends_at: string }>>({});
+  const [isPanning, setIsPanning] = useState(false);
+  const panRef = useRef<{
+    pointerId: number;
+    originX: number;
+    originScrollLeft: number;
+    moved: boolean;
+  } | null>(null);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const board = boardRef.current;
@@ -193,6 +227,26 @@ export function DailyTimeline({
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    function recoverPointerInteraction(event: Event) {
+      if (event.type === 'keydown' && (event as KeyboardEvent).key !== 'Escape') return;
+      panRef.current = null;
+      setIsPanning(false);
+      resizeCleanupRef.current?.();
+      resizeCleanupRef.current = null;
+      onPointerInteractionChange?.(false);
+    }
+    window.addEventListener('pointercancel', recoverPointerInteraction);
+    window.addEventListener('blur', recoverPointerInteraction);
+    window.addEventListener('keydown', recoverPointerInteraction);
+    return () => {
+      window.removeEventListener('pointercancel', recoverPointerInteraction);
+      window.removeEventListener('blur', recoverPointerInteraction);
+      window.removeEventListener('keydown', recoverPointerInteraction);
+      resizeCleanupRef.current?.();
+    };
+  }, [onPointerInteractionChange]);
+
   function displayedVisit(visit: DailyAllocationVisit): DailyAllocationVisit {
     const draft = draftTimes[visit.id];
     return draft ? { ...visit, ...draft } : visit;
@@ -205,11 +259,13 @@ export function DailyTimeline({
   ) {
     event.preventDefault();
     event.stopPropagation();
+    onPointerInteractionChange?.(true);
     const originX = event.clientX;
     const startMinutes = getDailyAllocationTimeMinutes(visit.starts_at);
     const endMinutes = getDailyAllocationTimeMinutes(visit.ends_at);
     const pointerId = event.pointerId;
     const target = event.currentTarget;
+    const visualHourWidth = hourWidth * getDailyAllocationElementVisualScale(boardRef.current || target);
     target.setPointerCapture(pointerId);
     let nextStartsAt = visit.starts_at;
     let nextEndsAt = visit.ends_at;
@@ -219,7 +275,7 @@ export function DailyTimeline({
     }
 
     function onMove(moveEvent: PointerEvent) {
-      const deltaHours = (moveEvent.clientX - originX) / hourWidth;
+      const deltaHours = (moveEvent.clientX - originX) / visualHourWidth;
       const deltaMinutes = snap(deltaHours * 60);
       const rangeStart = startHour * 60;
       const rangeEnd = endHour * 60;
@@ -260,6 +316,8 @@ export function DailyTimeline({
         delete next[visit.id];
         return next;
       });
+      onPointerInteractionChange?.(false);
+      resizeCleanupRef.current = null;
       if (commit && (nextStartsAt !== visit.starts_at || nextEndsAt !== visit.ends_at)) {
         onResizeVisit(visit, nextStartsAt, nextEndsAt);
       }
@@ -276,6 +334,78 @@ export function DailyTimeline({
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onCancel);
+    resizeCleanupRef.current = () => finish(false);
+  }
+
+  function resizeByKeyboard(
+    visit: DailyAllocationVisit,
+    edge: 'start' | 'end',
+    event: ReactKeyboardEvent<HTMLButtonElement>
+  ) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    event.stopPropagation();
+    const delta = event.key === 'ArrowLeft' ? -DAILY_ALLOCATION_SNAP_MINUTES : DAILY_ALLOCATION_SNAP_MINUTES;
+    const start = getDailyAllocationTimeMinutes(visit.starts_at);
+    const end = getDailyAllocationTimeMinutes(visit.ends_at);
+    const rangeStart = startHour * 60;
+    const rangeEnd = endHour * 60;
+    const nextStart = edge === 'start'
+      ? Math.min(Math.max(start + delta, rangeStart), end - DAILY_ALLOCATION_MIN_DURATION_MINUTES)
+      : start;
+    const nextEnd = edge === 'end'
+      ? Math.max(Math.min(end + delta, rangeEnd), start + DAILY_ALLOCATION_MIN_DURATION_MINUTES)
+      : end;
+    if (nextStart === start && nextEnd === end) return;
+    onPointerInteractionChange?.(true);
+    onResizeVisit(
+      visit,
+      toDailyAllocationLondonIsoFromMinutes(date, nextStart),
+      toDailyAllocationLondonIsoFromMinutes(date, nextEnd)
+    );
+    queueMicrotask(() => onPointerInteractionChange?.(false));
+  }
+
+  function isPanBlocked(target: EventTarget | null): boolean {
+    return target instanceof Element && Boolean(
+      target.closest('button, a, input, textarea, select, [role="button"], [data-daily-allocation-visit-card]')
+    );
+  }
+
+  function handlePanPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    if (mode !== 'scroll' || event.pointerType === 'touch' || event.button !== 0 || isPanBlocked(event.target)) {
+      return;
+    }
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    panRef.current = {
+      pointerId: event.pointerId,
+      originX: event.clientX,
+      originScrollLeft: event.currentTarget.scrollLeft,
+      moved: false,
+    };
+    onPointerInteractionChange?.(true);
+  }
+
+  function handlePanPointerMove(event: ReactPointerEvent<HTMLDivElement>) {
+    const pan = panRef.current;
+    if (!pan || pan.pointerId !== event.pointerId) return;
+    const delta = event.clientX - pan.originX;
+    if (!pan.moved && Math.abs(delta) < PAN_THRESHOLD_PX) return;
+    pan.moved = true;
+    setIsPanning(true);
+    event.currentTarget.scrollLeft = pan.originScrollLeft
+      - delta / getDailyAllocationElementVisualScale(event.currentTarget);
+  }
+
+  function finishPan(event: ReactPointerEvent<HTMLDivElement>) {
+    if (panRef.current?.pointerId !== event.pointerId) return;
+    panRef.current = null;
+    setIsPanning(false);
+    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    onPointerInteractionChange?.(false);
   }
 
   return (
@@ -283,12 +413,26 @@ export function DailyTimeline({
       ref={boardRef}
       className={cn(
         'w-full min-w-0 rounded-lg border border-slate-700',
-        fill ? 'overflow-x-hidden' : 'overflow-x-auto'
+        fill ? 'overflow-x-hidden' : 'overflow-x-auto',
+        mode === 'scroll' && 'cursor-grab select-none',
+        isPanning && 'cursor-grabbing'
       )}
       data-testid="daily-allocation-daily-board"
       data-timeline-layout={fill ? 'fit' : 'scroll'}
+      data-fit-eligible={String(fitEligible)}
+      onPointerDown={handlePanPointerDown}
+      onPointerMove={handlePanPointerMove}
+      onPointerUp={finishPan}
+      onPointerCancel={finishPan}
+      onLostPointerCapture={finishPan}
     >
-      <TimelineHeader startHour={startHour} endHour={endHour} hourWidth={hourWidth} fill={fill} />
+      <TimelineHeader
+        axisLabel={getDailyAllocationBoardAxisLabel(primary)}
+        startHour={startHour}
+        endHour={endHour}
+        hourWidth={hourWidth}
+        fill={fill}
+      />
       {rows.length === 0 ? (
         <div className={cn('flex border-t border-slate-800', fill && 'w-full')}>
           <div
@@ -323,30 +467,38 @@ export function DailyTimeline({
           </TimelineCell>
         </div>
       ) : rows.map((row) => {
-        const dayVisits = row.visits.filter((visit) => visit.work_date === date);
+        const dayVisits = row.visitsByDate[date] || [];
         const { placements, laneCount } = assignDailyAllocationLanes(dayVisits);
         const height = Math.max(ROW_MIN_HEIGHT, laneCount * LANE_HEIGHT + 16);
         return (
-          <div key={row.key} className={cn('flex border-t border-slate-800', fill && 'w-full')}>
+          <div
+            key={row.id}
+            className={cn('flex border-t border-slate-800', fill && 'w-full')}
+            data-testid={getDailyAllocationBoardRowTestId(row)}
+          >
             <div
               className="shrink-0 space-y-1 border-r border-slate-700 bg-slate-900 p-3"
               style={{ width: DAILY_TIMELINE_JOB_COLUMN_WIDTH }}
             >
-              <p className="truncate text-sm font-semibold text-slate-50">{row.job.job_code}</p>
-              <p className="truncate text-xs text-slate-300">{row.job.title || row.job.customer_name || 'Catalogue job'}</p>
-              <p className="truncate text-[11px] text-slate-400">{row.job.site_address}</p>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className={cn(boardControlStyles.ghost, 'h-8 px-2 text-xs')}
-                onClick={() => onAddVisit(row.key, date)}
-              >
-                + Add timed visit
-              </Button>
+              <p className="truncate text-sm font-semibold text-slate-50">{row.label}</p>
+              <p className="truncate text-xs text-slate-300">{row.subtitle || 'Allocation row'}</p>
+              {row.job?.site_address ? (
+                <p className="truncate text-[11px] text-slate-400">{row.job.site_address}</p>
+              ) : null}
+              {row.job ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className={cn(boardControlStyles.ghost, 'h-8 px-2 text-xs')}
+                  onClick={() => onAddVisit(jobResourceKey(row.job!), date)}
+                >
+                  + Add timed visit
+                </Button>
+              ) : null}
             </div>
             <TimelineCell
-              jobKey={row.key}
+              jobKey={row.id}
               date={date}
               width={timelineWidth}
               height={height}
@@ -368,7 +520,8 @@ export function DailyTimeline({
                   <VisitCard
                     key={visit.id}
                     visit={shown}
-                    title={row.job.title || row.job.job_code}
+                    instanceId={`${row.id}:${date}:${visit.id}`}
+                    title={row.job?.title || visit.job_code}
                     labour={visitLabour(board, visit.id)}
                     plant={visitPlant(board, visit.id)}
                     labourNames={labourNames(visit.id)}
@@ -377,10 +530,12 @@ export function DailyTimeline({
                     selected={selectedVisitId === visit.id}
                     style={{ left, width, top: 8 + lane * LANE_HEIGHT, height: LANE_HEIGHT - 12 }}
                     onSelect={() => onSelectVisit(visit)}
+                    onMove={() => onMoveVisit(visit)}
                     onEdit={() => onEditVisit(visit)}
                     onDelete={() => onDeleteVisit(visit)}
                     onAssign={() => onAssignVisit(visit)}
                     onResizePointerDown={(edge, event) => handleResizePointerDown(visit, edge, event)}
+                    onResizeKeyDown={(edge, event) => resizeByKeyboard(visit, edge, event)}
                   />
                 );
               })}

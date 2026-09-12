@@ -3,7 +3,7 @@
 -- Apply only through scripts/manage-daily-allocation-v2-rollout.ts after the
 -- exact deployed commit, migration checksum, permission fingerprint, and v1
 -- content fingerprint have been verified.
--- Idempotent: re-running leaves both flags TRUE.
+-- Fails closed unless the singleton is exactly FALSE/FALSE at transaction start.
 
 BEGIN;
 
@@ -27,7 +27,8 @@ BEGIN
     'public.daily_allocation_published_labour',
     'public.daily_allocation_published_plant',
     'public.daily_allocation_published_overrides',
-    'public.daily_allocation_publication_notifications'
+    'public.daily_allocation_publication_notifications',
+    'private.daily_allocation_mutation_requests'
   ]
   LOOP
     relation_oid := to_regclass(relation_name);
@@ -42,7 +43,10 @@ BEGIN
     ) THEN
       RAISE EXCEPTION 'Daily allocation v2 activation validation failed: unexpected relation type %', relation_name;
     END IF;
-    IF split_part(relation_name, '.', 1) = 'public'
+    IF (
+      split_part(relation_name, '.', 1) = 'public'
+      OR relation_name = 'private.daily_allocation_mutation_requests'
+    )
       AND (
         NOT EXISTS (
           SELECT 1
@@ -50,7 +54,10 @@ BEGIN
           WHERE oid = relation_oid
             AND relrowsecurity = TRUE
         )
-        OR NOT has_table_privilege('authenticated', relation_oid, 'SELECT')
+        OR (
+          split_part(relation_name, '.', 1) = 'public'
+          AND NOT has_table_privilege('authenticated', relation_oid, 'SELECT')
+        )
       )
     THEN
       RAISE EXCEPTION 'Daily allocation v2 activation validation failed: public read/RLS contract failed %', relation_name;
@@ -90,16 +97,17 @@ BEGIN
 
   FOREACH procedure_signature IN ARRAY ARRAY[
     'public.get_daily_allocation_v2_runtime()',
-    'public.convert_daily_allocation_plan_day_v2(date,text)',
-    'public.upsert_daily_allocation_visit_v2(uuid,uuid,integer,integer,text,uuid,text,timestamptz,timestamptz,text,text,text)',
-    'public.delete_daily_allocation_visit_v2(uuid,integer,integer)',
-    'public.assign_daily_allocation_labour_v2(uuid,uuid,integer,text,text,text,uuid)',
-    'public.unassign_daily_allocation_labour_v2(uuid,integer)',
-    'public.assign_daily_allocation_plant_v2(uuid,integer,text,uuid,text,text,text,text)',
-    'public.unassign_daily_allocation_plant_v2(uuid,integer)',
-    'public.publish_daily_allocation_plan_v2(uuid,integer,text,boolean)',
-    'public.move_daily_allocation_visit_v2(uuid,uuid,integer,integer,integer,timestamptz,timestamptz)',
-    'public.create_daily_allocation_conflict_override_v2(uuid,integer,text,text,uuid,uuid)'
+    'public.get_daily_allocation_conversion_source_v2(date,text)',
+    'public.convert_daily_allocation_plan_day_v2(uuid,date,text,text,jsonb,jsonb,jsonb)',
+    'public.upsert_daily_allocation_visit_v2(uuid,uuid,uuid,integer,integer,text,uuid,text,timestamptz,timestamptz,text,text,text)',
+    'public.delete_daily_allocation_visit_v2(uuid,uuid,integer,integer)',
+    'public.assign_daily_allocation_labour_v2(uuid,uuid,uuid,integer,integer,text,text,text,uuid)',
+    'public.unassign_daily_allocation_labour_v2(uuid,uuid,integer,integer)',
+    'public.assign_daily_allocation_plant_v2(uuid,uuid,integer,integer,text,uuid,text,text,text,text)',
+    'public.unassign_daily_allocation_plant_v2(uuid,uuid,integer,integer)',
+    'public.publish_daily_allocation_plan_v2(uuid,uuid,integer,text,boolean)',
+    'public.move_daily_allocation_visit_v2(uuid,uuid,uuid,integer,integer,integer,timestamptz,timestamptz)',
+    'public.create_daily_allocation_conflict_override_v2(uuid,uuid,integer,text,text,uuid,uuid)'
   ]
   LOOP
     procedure_oid := to_regprocedure(procedure_signature);
@@ -115,12 +123,44 @@ BEGIN
       RAISE EXCEPTION 'Daily allocation v2 activation validation failed: procedure is not SECURITY DEFINER: %', procedure_signature;
     END IF;
     IF NOT has_function_privilege('authenticated', procedure_oid, 'EXECUTE')
-      OR NOT has_function_privilege('service_role', procedure_oid, 'EXECUTE')
+      OR has_function_privilege('service_role', procedure_oid, 'EXECUTE')
       OR has_function_privilege('anon', procedure_oid, 'EXECUTE')
     THEN
       RAISE EXCEPTION 'Daily allocation v2 activation validation failed: unsafe procedure grants: %', procedure_signature;
     END IF;
   END LOOP;
+
+  FOREACH procedure_signature IN ARRAY ARRAY[
+    'public.convert_daily_allocation_plan_day_v2(date,text)',
+    'public.upsert_daily_allocation_visit_v2(uuid,uuid,integer,integer,text,uuid,text,timestamptz,timestamptz,text,text,text)',
+    'public.delete_daily_allocation_visit_v2(uuid,integer,integer)',
+    'public.assign_daily_allocation_labour_v2(uuid,uuid,integer,text,text,text,uuid)',
+    'public.unassign_daily_allocation_labour_v2(uuid,integer)',
+    'public.assign_daily_allocation_plant_v2(uuid,integer,text,uuid,text,text,text,text)',
+    'public.assign_daily_allocation_plant_v2(uuid,uuid,integer,text,uuid,text,text,text,text)',
+    'public.unassign_daily_allocation_plant_v2(uuid,integer)',
+    'public.publish_daily_allocation_plan_v2(uuid,integer,text,boolean)',
+    'public.move_daily_allocation_visit_v2(uuid,uuid,integer,integer,integer,timestamptz,timestamptz)',
+    'public.create_daily_allocation_conflict_override_v2(uuid,integer,text,text,uuid,uuid)'
+  ]
+  LOOP
+    procedure_oid := to_regprocedure(procedure_signature);
+    IF procedure_oid IS NOT NULL
+      AND (
+        has_function_privilege('authenticated', procedure_oid, 'EXECUTE')
+        OR has_function_privilege('service_role', procedure_oid, 'EXECUTE')
+        OR has_function_privilege('anon', procedure_oid, 'EXECUTE')
+      )
+    THEN
+      RAISE EXCEPTION 'Daily allocation v2 activation validation failed: obsolete procedure remains executable: %', procedure_signature;
+    END IF;
+  END LOOP;
+
+  IF has_schema_privilege('authenticated', 'private', 'USAGE')
+    OR has_schema_privilege('anon', 'private', 'USAGE')
+  THEN
+    RAISE EXCEPTION 'Daily allocation v2 activation validation failed: private schema boundary is open';
+  END IF;
 
   IF to_regprocedure('private.require_daily_allocation_v2_writer()') IS NULL THEN
     RAISE EXCEPTION 'Daily allocation v2 activation validation failed: writer guard is missing';
@@ -140,9 +180,11 @@ BEGIN
       SELECT 1
       FROM private.daily_allocation_v2_runtime
       WHERE singleton = TRUE
+        AND board_enabled = FALSE
+        AND writes_enabled = FALSE
     )
   THEN
-    RAISE EXCEPTION 'Daily allocation v2 activation validation failed: expected exactly one runtime singleton';
+    RAISE EXCEPTION 'Daily allocation v2 activation validation failed: expected one closed runtime singleton';
   END IF;
 END;
 $$;

@@ -26,17 +26,21 @@ import {
 } from './automation/workflow-plan-contract';
 import { runVitestJsonAndPersistLedgerAsync } from './automation/workflow-verification-ledger';
 import {
+  buildChildTestEnv,
   createDefaultDependencies,
   createLocalTestPostgresOrchestrator,
+  DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE,
   DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
   deriveCheckoutIdentity,
   formatLocalTestDatabaseUrl,
   buildDatabaseComment,
   getLifecyclePaths,
+  isInheritedDatabaseUrlKey,
   parseLifecycleState,
   PROVENANCE_ENV_KEYS,
   validateLocalTestDatabaseUrl,
 } from './local-test-postgres';
+import { withNativeTestPostgres } from './local-native-test-postgres';
 
 function readFlag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -83,6 +87,20 @@ const EXTRA_REQUIRED_TEST_COMMANDS: Record<
 const LOCAL_POSTGRES_LEDGER_TEST_IDS = {
   'DEL-AL-08': DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
 } as const;
+
+const DAILY_ALLOCATION_SAFETY_REQUIRED_IDS = [
+  'DAFP-FLAG-001',
+  'DAFP-DB-001',
+  'DAFP-DB-002',
+  'DAFP-DB-003',
+  'DAFP-IDEM-001',
+  'DAFP-IDEM-002',
+  'DAFP-CAS-001',
+  'DAFP-LOCK-001',
+  'DAFP-PLANT-001',
+  'DAFP-AUTH-001',
+  'DAFP-PUB-001',
+] as const;
 
 function restoreProcessEnv(previous: Record<string, string | undefined>): void {
   for (const [key, value] of Object.entries(previous)) {
@@ -152,6 +170,131 @@ async function runDisposablePostgresRequiredTestLedger(params: {
     if (started) {
       await orch.stop();
     }
+  }
+}
+
+function isDockerUnavailable(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const code = (error as NodeJS.ErrnoException).code;
+  return (
+    message.includes('Docker is not available') ||
+    /spawn docker(?:\.exe)? ENOENT/iu.test(message) ||
+    (code === 'ENOENT' && /docker/iu.test(message))
+  );
+}
+
+async function persistDailyAllocationSafetyLedger(params: {
+  repoRoot: string;
+  workstreamId: string;
+  requiredIds: string[];
+  assignEnv: (key: string, value: string | undefined) => void;
+  databaseUrl: string;
+  marker: string;
+  projectName: string;
+  hostPort: number;
+}): Promise<{
+  kind: 'vitest';
+  name: string;
+  files: string[];
+  run: Awaited<ReturnType<typeof runVitestJsonAndPersistLedgerAsync>>;
+}> {
+  const childEnv = buildChildTestEnv({
+    parentEnv: process.env,
+    databaseUrl: params.databaseUrl,
+    marker: params.marker,
+    projectName: params.projectName,
+    hostPort: params.hostPort,
+  });
+  for (const key of Object.keys(process.env)) {
+    if (isInheritedDatabaseUrlKey(key) || key === 'TEST_DATABASE_URL') {
+      params.assignEnv(key, undefined);
+    }
+  }
+  for (const [key, value] of Object.entries(childEnv)) {
+    params.assignEnv(key, value);
+  }
+  const run = await runVitestJsonAndPersistLedgerAsync({
+    repoRoot: params.repoRoot,
+    workstreamId: params.workstreamId,
+    commandId: 'required-test-daily-allocation-safety',
+    commandType: 'vitest_case',
+    files: [DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE],
+    requiredIds: params.requiredIds,
+  });
+  return {
+    kind: 'vitest',
+    name: 'required-test-daily-allocation-safety',
+    files: [DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE],
+    run,
+  };
+}
+
+async function runDailyAllocationSafetyRequiredTestLedger(params: {
+  repoRoot: string;
+  workstreamId: string;
+  requiredIds: string[];
+}): Promise<{
+  kind: 'vitest';
+  name: string;
+  files: string[];
+  run: Awaited<ReturnType<typeof runVitestJsonAndPersistLedgerAsync>>;
+}> {
+  const previousEnv: Record<string, string | undefined> = {};
+  const assignEnv = (key: string, value: string | undefined) => {
+    if (!(key in previousEnv)) {
+      previousEnv[key] = process.env[key];
+    }
+    if (value === undefined) {
+      delete process.env[key];
+    } else {
+      process.env[key] = value;
+    }
+  };
+  try {
+    const orch = createLocalTestPostgresOrchestrator(
+      createDefaultDependencies({ repoRoot: params.repoRoot })
+    );
+    orch.setTargetTestFile(DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE);
+    try {
+      await orch.start();
+      const deps = createDefaultDependencies({ repoRoot: params.repoRoot });
+      const identity = deriveCheckoutIdentity(await deps.realpath(params.repoRoot));
+      const paths = getLifecyclePaths(deps.tmpDir, identity.projectName);
+      const state = parseLifecycleState(await deps.readFile(paths.stateFile));
+      const url = validateLocalTestDatabaseUrl(
+        formatLocalTestDatabaseUrl(identity.hostPort),
+        identity.hostPort
+      );
+      return await persistDailyAllocationSafetyLedger({
+        repoRoot: params.repoRoot,
+        workstreamId: params.workstreamId,
+        requiredIds: params.requiredIds,
+        assignEnv,
+        databaseUrl: url,
+        marker: buildDatabaseComment(state.projectId, state.nonce),
+        projectName: identity.projectName,
+        hostPort: identity.hostPort,
+      });
+    } catch (error) {
+      if (!isDockerUnavailable(error)) throw error;
+    } finally {
+      await orch.stop().catch(() => undefined);
+    }
+
+    return await withNativeTestPostgres(params.repoRoot, async (session) =>
+      persistDailyAllocationSafetyLedger({
+        repoRoot: params.repoRoot,
+        workstreamId: params.workstreamId,
+        requiredIds: params.requiredIds,
+        assignEnv,
+        databaseUrl: session.databaseUrl,
+        marker: session.marker,
+        projectName: session.projectName,
+        hostPort: session.hostPort,
+      })
+    );
+  } finally {
+    restoreProcessEnv(previousEnv);
   }
 }
 
@@ -300,6 +443,9 @@ async function main(): Promise<void> {
     (id): id is keyof typeof LOCAL_POSTGRES_LEDGER_TEST_IDS =>
       Object.prototype.hasOwnProperty.call(LOCAL_POSTGRES_LEDGER_TEST_IDS, id)
   );
+  const dailyAllocationSafetyIds = requiredTestIds.filter((id): id is (typeof DAILY_ALLOCATION_SAFETY_REQUIRED_IDS)[number] =>
+    (DAILY_ALLOCATION_SAFETY_REQUIRED_IDS as readonly string[]).includes(id)
+  );
   const extraJobs: NonNullable<Parameters<typeof buildEvidenceManifestAsync>[0]['extraJobs']> =
     [];
   if (!skipChecks) {
@@ -327,6 +473,21 @@ async function main(): Promise<void> {
             repoRoot,
             workstreamId,
             requiredId: id,
+          }),
+      });
+    }
+    if (dailyAllocationSafetyIds.length > 0) {
+      extraJobs.push({
+        id: 'required-test-daily-allocation-safety',
+        label: 'required-test-daily-allocation-safety',
+        kind: 'db',
+        exclusive: true,
+        weight: 3,
+        run: () =>
+          runDailyAllocationSafetyRequiredTestLedger({
+            repoRoot,
+            workstreamId,
+            requiredIds: dailyAllocationSafetyIds,
           }),
       });
     }

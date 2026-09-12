@@ -10,6 +10,7 @@ const PUBLIC_BROWSER_ROUTE_PREFIXES = [
 
 const PUBLIC_API_ROUTE_PREFIXES = [
   '/api/display-board/',
+  '/api/daily-allocation/deployment-identity',
   '/api/inventory/kiosk/pairing',
 ] as const;
 

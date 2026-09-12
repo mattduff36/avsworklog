@@ -34,6 +34,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     async () => {
       const { id } = await params;
       const body = await readOptionalJsonBody(request) as {
+        request_id?: string;
         expected_plan_version?: number;
         expected_row_version?: number;
       };
@@ -42,6 +43,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       const expectedRowVersion = body.expected_row_version
         ?? Number(request.nextUrl.searchParams.get('expected_row_version'));
       const result = await deleteDailyAllocationVisit({
+        request_id: body.request_id || request.nextUrl.searchParams.get('request_id') || '',
         visit_id: id,
         expected_plan_version: expectedPlanVersion,
         expected_row_version: expectedRowVersion,

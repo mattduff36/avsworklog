@@ -3,12 +3,17 @@ import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  DAILY_ALLOCATION_DEPLOYMENT_IDENTITY_URL,
   DAILY_ALLOCATION_PROJECT_REF,
+  DAILY_ALLOCATION_V2_DATA_CONTRACT_MIGRATION,
+  DAILY_ALLOCATION_V2_RUNTIME_GRANT_MIGRATION,
   DAILY_ALLOCATION_V2_GRANT_MIGRATION,
+  OBSOLETE_V2_PROCEDURES,
   REQUIRED_V2_PROCEDURES,
   REQUIRED_V2_RELATIONS,
   activateWithAutomaticDisable,
   requireDailyAllocationProductionTarget,
+  requireDeployedCommit,
   snapshotsPreserveProtectedState,
   type RolloutSnapshot,
 } from '../../scripts/manage-daily-allocation-v2-rollout';
@@ -35,6 +40,14 @@ const grantMigrationPath = resolve(
   process.cwd(),
   DAILY_ALLOCATION_V2_GRANT_MIGRATION
 );
+const dataContractMigrationPath = resolve(
+  process.cwd(),
+  DAILY_ALLOCATION_V2_DATA_CONTRACT_MIGRATION
+);
+const runtimeGrantMigrationPath = resolve(
+  process.cwd(),
+  DAILY_ALLOCATION_V2_RUNTIME_GRANT_MIGRATION
+);
 
 function snapshot(
   boardEnabled: boolean,
@@ -48,8 +61,12 @@ function snapshot(
       updatedAt: '2026-08-14T15:00:00.000Z',
     },
     permissionFingerprint: 'permission-stable',
-    v1Fingerprint: 'v1-stable',
-    v2ContentFingerprint: 'v2-stable',
+    v1ContentFingerprint: 'v1-content-stable',
+    v1PublicationFingerprint: 'v1-publication-stable',
+    v2ContentFingerprint: 'v2-content-stable',
+    v2PublicationFingerprint: 'v2-publication-stable',
+    messageFingerprint: 'message-stable',
+    requestLedgerFingerprint: 'request-ledger-stable',
     v2Counts: {
       plan_days: 0,
       visits: 0,
@@ -99,11 +116,75 @@ describe('Daily Allocation v2 production rollout controls', () => {
     expect(activation).toContain('failed to reach enabled state');
   });
 
+  it('DAFP-ROLL-001 binds the new migration, signatures, private ledger, and obsolete overloads', () => {
+    const activation = readFileSync(activationPath, 'utf8').replace(/\r\n/gu, '\n');
+    const operator = readFileSync(operatorPath, 'utf8').replace(/\r\n/gu, '\n');
+    const migration = readFileSync(dataContractMigrationPath, 'utf8').replace(
+      /\r\n/gu,
+      '\n'
+    );
+
+    expect(operator).toContain('DAILY_ALLOCATION_V2_DATA_CONTRACT_MIGRATION');
+    expect(operator).toContain('DAILY_ALLOCATION_V2_RUNTIME_GRANT_MIGRATION');
+    expect(operator).toContain('private.daily_allocation_mutation_requests');
+    expect(operator).toContain('request_ledger_fingerprint');
+    expect(operator).toContain("has_schema_privilege('authenticated', 'private', 'USAGE')");
+    expect(operator).toContain("procedures.proname LIKE '%daily_allocation%v2%'");
+    expect(operator).toContain('private.daily_allocation_request_replay');
+    expect(operator).toContain('private.lock_daily_allocation_plan_day');
+    expect(operator).toContain('conversion_labour_source_mismatch');
+    expect(operator).toContain('conversion_plant_source_mismatch');
+    expect(operator).toContain('p_expected_row_version');
+    expect(operator).toContain('private.claim_daily_allocation_plant_day_job');
+    expect(operator).not.toContain(
+      'SELECT public.delete_daily_allocation_visit_v2($1::uuid, 1, 1)'
+    );
+
+    for (const procedure of REQUIRED_V2_PROCEDURES) {
+      expect(activation).toContain(`'${procedure}'`);
+    }
+    for (const procedure of OBSOLETE_V2_PROCEDURES) {
+      expect(activation).toContain(`'${procedure}'`);
+    }
+    expect(activation).toContain('private.daily_allocation_mutation_requests');
+    expect(activation).toContain('board_enabled = FALSE');
+    expect(activation).toContain('writes_enabled = FALSE');
+    expect(activation).toContain('expected one closed runtime singleton');
+
+    expect(migration).toContain(
+      'ALTER TABLE private.daily_allocation_mutation_requests ENABLE ROW LEVEL SECURITY'
+    );
+    expect(migration).toContain(
+      'REVOKE ALL ON FUNCTION private.daily_allocation_request_replay(UUID, UUID, TEXT, JSONB)'
+    );
+    expect(migration).toContain(
+      'REVOKE ALL ON FUNCTION private.daily_allocation_request_store(UUID, UUID, TEXT, JSONB, JSONB)'
+    );
+    expect(migration).toContain(
+      'FROM PUBLIC, anon, authenticated, service_role'
+    );
+  });
+
+  it('applies a forward runtime RPC grant correction after the shipped 20260912 checksum', () => {
+    const migration = readFileSync(runtimeGrantMigrationPath, 'utf8').replace(/\r\n/gu, '\n');
+    expect(migration).toContain('-- finalise-phase: predeploy');
+    expect(migration).toContain(
+      'REVOKE ALL ON FUNCTION public.get_daily_allocation_v2_runtime() FROM PUBLIC, anon, service_role'
+    );
+    expect(migration).toContain(
+      'GRANT EXECUTE ON FUNCTION public.get_daily_allocation_v2_runtime() TO authenticated'
+    );
+    expect(migration).not.toContain('board_enabled = TRUE');
+    expect(migration).not.toContain('writes_enabled = TRUE');
+  });
+
   it('DA2A-GRANT-001 applies a forward RPC-only table and column grant correction', () => {
     const migration = readFileSync(grantMigrationPath, 'utf8').replace(/\r\n/gu, '\n');
 
     expect(migration).toContain('-- finalise-phase: predeploy');
-    for (const relation of REQUIRED_V2_RELATIONS) {
+    for (const relation of REQUIRED_V2_RELATIONS.filter(
+      (name) => name !== 'private.daily_allocation_mutation_requests'
+    )) {
       expect(migration).toContain(`'${relation}'`);
     }
     expect(migration).toContain('REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER');
@@ -128,7 +209,31 @@ describe('Daily Allocation v2 production rollout controls', () => {
     expect(
       snapshotsPreserveProtectedState(
         before,
-        snapshot(true, true, { v1Fingerprint: 'changed' })
+        snapshot(true, true, { v1ContentFingerprint: 'changed' })
+      )
+    ).toBe(false);
+    expect(
+      snapshotsPreserveProtectedState(
+        before,
+        snapshot(true, true, { v1PublicationFingerprint: 'changed' })
+      )
+    ).toBe(false);
+    expect(
+      snapshotsPreserveProtectedState(
+        before,
+        snapshot(true, true, { v2PublicationFingerprint: 'changed' })
+      )
+    ).toBe(false);
+    expect(
+      snapshotsPreserveProtectedState(
+        before,
+        snapshot(true, true, { messageFingerprint: 'changed' })
+      )
+    ).toBe(false);
+    expect(
+      snapshotsPreserveProtectedState(
+        before,
+        snapshot(true, true, { requestLedgerFingerprint: 'changed' })
       )
     ).toBe(false);
     expect(
@@ -164,6 +269,35 @@ describe('Daily Allocation v2 production rollout controls', () => {
       boardEnabled: false,
       writesEnabled: false,
     });
+  });
+
+  it('automatically disables when pre-activation validation fails', async () => {
+    const disabled = snapshot(false, false);
+    const disable = vi.fn(async () => undefined);
+    let captures = 0;
+
+    await expect(
+      activateWithAutomaticDisable({
+        captureSnapshot: async () => {
+          captures += 1;
+          if (captures === 1) {
+            throw new Error('induced pre-activation validation failure');
+          }
+          return disabled;
+        },
+        executeActivation: async () => {
+          throw new Error('activation must not run');
+        },
+        executeDisable: disable,
+        runSmokeChecks: async () => undefined,
+        cancelSmoke: async () => undefined,
+      }, 100)
+    ).rejects.toThrow(
+      /automatically disabled.*pre-activation validation failure/iu
+    );
+
+    expect(disable).toHaveBeenCalledOnce();
+    expect(captures).toBe(2);
   });
 
   it('DA2A-AUTO-001 automatically disables after a bounded smoke timeout', async () => {
@@ -268,6 +402,27 @@ describe('Daily Allocation v2 production rollout controls', () => {
     );
   });
 
+  it('proves the production deployment commit before preflight', async () => {
+    const expectedCommit = 'a'.repeat(40);
+    const matchingFetch = vi.fn(async () => new Response(
+      JSON.stringify({ commit_sha: expectedCommit }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    ));
+    await expect(requireDeployedCommit(expectedCommit, matchingFetch)).resolves.toBeUndefined();
+    expect(matchingFetch).toHaveBeenCalledWith(
+      DAILY_ALLOCATION_DEPLOYMENT_IDENTITY_URL,
+      expect.objectContaining({ cache: 'no-store' })
+    );
+
+    const staleFetch = vi.fn(async () => new Response(
+      JSON.stringify({ commit_sha: 'b'.repeat(40) }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    ));
+    await expect(requireDeployedCommit(expectedCommit, staleFetch)).rejects.toThrow(
+      /production deployment does not match/iu
+    );
+  });
+
   it('DA2A-CTRL-001 binds artifacts and handles lock, cancellation, and signals', () => {
     const operator = readFileSync(operatorPath, 'utf8');
     expect(operator).toContain('pg_try_advisory_lock');
@@ -334,5 +489,33 @@ describe('Daily Allocation v2 production rollout controls', () => {
     expect(guide).toContain('existing permissions matrix');
     expect(guide).toContain('automatic disable');
     expect(guide).toContain('disable-and-forward-fix');
+  });
+
+  it('documents the exact closed-state release sequence', () => {
+    const guide = readFileSync(guidePath, 'utf8');
+    const expectedSequence = [
+      'Keep `board_enabled=false` and `writes_enabled=false`.',
+      'Apply the reviewed additive migrations',
+      'Run status and stop unless',
+      'Deploy the exact pushed SHA',
+      'Run closed-state preflight with that SHA.',
+      'Run activation with the same SHA.',
+      'Complete the bounded manager-allowed and Level-0-denied smoke checks.',
+      'automatically execute and verify the',
+    ];
+    let previous = -1;
+    for (const step of expectedSequence) {
+      const index = guide.indexOf(step);
+      expect(index).toBeGreaterThan(previous);
+      previous = index;
+    }
+    expect(guide).toContain(DAILY_ALLOCATION_V2_DATA_CONTRACT_MIGRATION);
+    expect(guide).toContain(DAILY_ALLOCATION_V2_RUNTIME_GRANT_MIGRATION);
+    expect(guide).toContain(
+      'daily-allocation:v2:preflight -- --expected-commit <40-character-sha>'
+    );
+    expect(guide).toContain('Guided conversion is an explicit manager action');
+    expect(guide).toContain('must not reopen that');
+    expect(guide).toContain('runtime-only disable');
   });
 });

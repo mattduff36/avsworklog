@@ -18,16 +18,17 @@ export const publishV1Schema = z.object({
   plan_day_id: z.string().uuid().optional(),
   expected_plan_version: z.number().int().positive().optional(),
   confirm_unallocated: z.boolean().optional(),
-});
+}).strict();
 
 export const publishV2Schema = z.object({
   snapshot_version: z.literal(2),
+  request_id: z.string().uuid('A request ID is required.'),
   plan_day_id: z.string().uuid('A plan day is required.'),
   expected_plan_version: z.number().int().positive(),
   idempotency_key: z.string().trim().min(1, 'Idempotency key is required.'),
   confirm_unallocated: z.boolean().optional().default(false),
   work_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-});
+}).strict();
 
 export function isDailyAllocationV2Publish(body: unknown): boolean {
   if (!body || typeof body !== 'object') return false;
@@ -70,6 +71,7 @@ export async function publishDailyAllocation(workDate: string, idempotencyKey: s
 }
 
 export async function publishDailyAllocationPlanV2(input: {
+  request_id: string;
   plan_day_id: string;
   expected_plan_version: number;
   idempotency_key: string;
@@ -80,13 +82,16 @@ export async function publishDailyAllocationPlanV2(input: {
     snapshot_version: 2,
     ...input,
   }, 'Invalid v2 publish request.');
-  const publicationId = await callDailyAllocationRpc<string>(supabase, 'publish_daily_allocation_plan_v2', {
+  return callDailyAllocationRpc<{ publication_id: string; snapshot_version: 2 }>(
+    supabase,
+    'publish_daily_allocation_plan_v2',
+    {
+    p_request_id: parsed.request_id,
     p_plan_day_id: parsed.plan_day_id,
     p_expected_plan_version: parsed.expected_plan_version,
     p_idempotency_key: parsed.idempotency_key,
     p_confirm_unallocated: parsed.confirm_unallocated,
   });
-  return { publication_id: publicationId, snapshot_version: 2 };
 }
 
 export async function publishDailyAllocationFromBody(body: unknown) {

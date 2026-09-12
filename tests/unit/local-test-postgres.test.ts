@@ -61,6 +61,7 @@ import {
   parseCliInvocation,
   HGV_SAVE_TARGET_TEST_FILE,
   DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
+  DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE,
   parseDockerResourceLines,
   parseLifecycleState,
   parseLockPid,
@@ -673,6 +674,12 @@ describe('local test postgres contracts', () => {
       ).toEqual({
         command: 'one-shot',
         targetFile: DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
+      });
+      expect(
+        parseCliInvocation(['one-shot', '--target', DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE])
+      ).toEqual({
+        command: 'one-shot',
+        targetFile: DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE,
       });
       expect(() => parseCliInvocation(['one-shot', '--target', 'tests/db/not-allowed.test.ts'])).toThrow(
         LocalTestPostgresError

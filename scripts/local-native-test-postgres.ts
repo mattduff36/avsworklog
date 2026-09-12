@@ -256,9 +256,18 @@ async function assertOwnedOrAbsent(root: string, ownerFile: string, projectId: s
   }
 }
 
-async function main(): Promise<number> {
-  const target = parseTarget(process.argv.slice(2));
-  const repoRoot = await fs.realpath(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
+export interface NativeTestPostgresSession {
+  databaseUrl: string;
+  marker: string;
+  projectName: string;
+  hostPort: number;
+  serverVersion: string;
+}
+
+export async function withNativeTestPostgres<T>(
+  repoRoot: string,
+  run: (session: NativeTestPostgresSession) => Promise<T>
+): Promise<T> {
   const identity = deriveCheckoutIdentity(repoRoot);
   const binDir = await resolveNativeBinDir();
   const postgresExe = path.join(binDir, 'postgres.exe');
@@ -411,16 +420,37 @@ async function main(): Promise<number> {
       );
     }
     process.stdout.write(
-      `[LTDB-NATIVE-001] PostgreSQL ${row.server_version}; ${DB_HOST}:${identity.hostPort}; ${DB_NAME}; target=${target}\n`
+      `[LTDB-NATIVE-001] PostgreSQL ${row.server_version}; ${DB_HOST}:${identity.hostPort}; ${DB_NAME}\n`
     );
 
-    const deps = createDefaultDependencies({ repoRoot });
-    const childEnv = buildChildTestEnv({
-      parentEnv: process.env,
+    return await run({
       databaseUrl,
       marker,
       projectName: identity.projectName,
       hostPort: identity.hostPort,
+      serverVersion: row.server_version,
+    });
+  } finally {
+    process.removeListener('SIGINT', onSignal);
+    process.removeListener('SIGTERM', onSignal);
+    await fs.rm(passwordFile, { force: true }).catch(() => undefined);
+    await cleanup();
+    process.stdout.write('[LTDB-NATIVE-001] Native PostgreSQL stopped; owned data directory removed.\n');
+  }
+}
+
+async function main(): Promise<number> {
+  const target = parseTarget(process.argv.slice(2));
+  const repoRoot = await fs.realpath(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
+  return withNativeTestPostgres(repoRoot, async (session) => {
+    process.stdout.write(`target=${target}\n`);
+    const deps = createDefaultDependencies({ repoRoot });
+    const childEnv = buildChildTestEnv({
+      parentEnv: process.env,
+      databaseUrl: session.databaseUrl,
+      marker: session.marker,
+      projectName: session.projectName,
+      hostPort: session.hostPort,
     });
     const tested = await runNativeLifecycleCommand(
       process.execPath,
@@ -430,17 +460,10 @@ async function main(): Promise<number> {
         env: childEnv,
         inherit: true,
         timeoutMs: 30 * 60_000,
-        track: lifecycleChild.track('test'),
       }
     );
     return tested.exitCode;
-  } finally {
-    process.removeListener('SIGINT', onSignal);
-    process.removeListener('SIGTERM', onSignal);
-    await fs.rm(passwordFile, { force: true }).catch(() => undefined);
-    await cleanup();
-    process.stdout.write('[LTDB-NATIVE-001] Native PostgreSQL stopped; owned data directory removed.\n');
-  }
+  });
 }
 
 if (

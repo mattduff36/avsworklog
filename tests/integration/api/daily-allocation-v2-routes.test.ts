@@ -62,6 +62,18 @@ function managerMocks() {
   });
 }
 
+function conversionPayload(teamId = 'team-1') {
+  return {
+    request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    work_date: '2026-08-14',
+    team_id: teamId,
+    expected_source_fingerprint: 'a'.repeat(64),
+    visits: [],
+    labour_drafts: [],
+    plant_drafts: [],
+  };
+}
+
 describe('DA2-AUTH-001 daily allocation v2 API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -95,6 +107,7 @@ describe('DA2-AUTH-001 daily allocation v2 API', () => {
     const visitResponse = await createVisit(new NextRequest('http://localhost/api/daily-allocation/visits', {
       method: 'POST',
       body: JSON.stringify({
+        request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         plan_day_id: '11111111-1111-4111-8111-111111111111',
         expected_plan_version: 1,
         job_source_type: 'live_quote',
@@ -135,107 +148,103 @@ describe('DA2-AUTH-001 daily allocation v2 API', () => {
 
     const forgedResponse = await convert(new NextRequest('http://localhost/api/daily-allocation/convert', {
       method: 'POST',
-      body: JSON.stringify({ work_date: '2026-08-14', team_id: 'forged-team' }),
+      body: JSON.stringify(conversionPayload('forged-team')),
     }));
     expect(forgedResponse.status).toBe(403);
     expect(await forgedResponse.json()).toMatchObject({ code: 'FORBIDDEN' });
     expect(client.rpc).toHaveBeenCalledWith(
       'convert_daily_allocation_plan_day_v2',
-      expect.objectContaining({ p_team_id: 'forged-team', p_work_date: '2026-08-14' })
+      expect.objectContaining({
+        p_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        p_team_id: 'forged-team',
+        p_work_date: '2026-08-14',
+      })
     );
   });
 });
 
-function convertPlanDayClient(
-  row: {
-    id: string;
-    work_date: string;
-    team_id: string;
-    plan_version: number;
-  } | null,
-  rpcId = row?.id ?? 'rpc-id'
-) {
+function convertPlanDayClient(result: Record<string, unknown> | null, error: { message: string } | null = null) {
   const client = authClient();
-  const query = {
-    select: vi.fn(),
-    eq: vi.fn(),
-    maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
-    insert: vi.fn(),
-    update: vi.fn(),
-    delete: vi.fn(),
-  };
-  query.select.mockReturnValue(query);
-  query.eq.mockReturnValue(query);
-  client.rpc = vi.fn().mockResolvedValue({ data: rpcId, error: null });
-  client.from = vi.fn(() => query);
-  return { client, query };
+  client.rpc = vi.fn().mockResolvedValue({ data: result, error });
+  return client;
 }
 
-describe('DA2-7F3C convert returns authoritative plan version', () => {
+describe('guided conversion returns authoritative entities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     managerMocks();
   });
 
-  it('returns an already-converted plan day at version 7 without writing the row', async () => {
-    const existing = {
-      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  it('returns the exact authoritative conversion RPC result', async () => {
+    const result = {
+      plan_day_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       work_date: '2026-08-14',
       team_id: 'team-1',
-      plan_version: 7,
+      plan_version: 1,
+      source_fingerprint: 'a'.repeat(64),
+      visits: [],
+      labour_assignments: [],
+      plant_assignments: [],
     };
-    const { client, query } = convertPlanDayClient(existing);
+    const client = convertPlanDayClient(result);
     mockCreateClient.mockResolvedValue(client);
 
     const { POST: convert } = await import('@/app/api/daily-allocation/convert/route');
     const response = await convert(new NextRequest('http://localhost/api/daily-allocation/convert', {
       method: 'POST',
-      body: JSON.stringify({ work_date: '2026-08-14', team_id: 'team-1' }),
+      body: JSON.stringify(conversionPayload()),
     }));
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      plan_day_id: existing.id,
-      plan_version: 7,
-      team_id: 'team-1',
-      work_date: '2026-08-14',
-    });
+    expect(await response.json()).toEqual(result);
     expect(client.rpc).toHaveBeenCalledWith(
       'convert_daily_allocation_plan_day_v2',
-      { p_work_date: '2026-08-14', p_team_id: 'team-1' }
+      expect.objectContaining({
+        p_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        p_work_date: '2026-08-14',
+        p_team_id: 'team-1',
+        p_expected_source_fingerprint: 'a'.repeat(64),
+        p_visits: [],
+        p_labour_drafts: [],
+        p_plant_drafts: [],
+      })
     );
-    expect(client.from).toHaveBeenCalledWith('daily_allocation_plan_days');
-    expect(query.select).toHaveBeenCalledWith('id, work_date, team_id, plan_version');
-    expect(query.eq).toHaveBeenCalledWith('id', existing.id);
-    expect(query.insert).not.toHaveBeenCalled();
-    expect(query.update).not.toHaveBeenCalled();
-    expect(query.delete).not.toHaveBeenCalled();
   });
 
-  it('maps a missing converted plan day to 404 and a team/date mismatch to 409', async () => {
-    const missing = convertPlanDayClient(null, 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
-    mockCreateClient.mockResolvedValue(missing.client);
-    const { POST: convert } = await import('@/app/api/daily-allocation/convert/route');
-    const missingResponse = await convert(new NextRequest('http://localhost/api/daily-allocation/convert', {
-      method: 'POST',
-      body: JSON.stringify({ work_date: '2026-08-14', team_id: 'team-1' }),
-    }));
-    expect(missingResponse.status).toBe(404);
-    expect(await missingResponse.json()).toMatchObject({ code: 'NOT_FOUND' });
+  it('returns a server-generated conversion source fingerprint and row versions', async () => {
+    const source = {
+      work_date: '2026-08-14',
+      team_id: 'team-1',
+      source_fingerprint: 'a'.repeat(64),
+      labour_drafts: [{ id: 'draft-1', row_version: 3 }],
+      plant_drafts: [],
+    };
+    const client = convertPlanDayClient(source);
+    mockCreateClient.mockResolvedValue(client);
 
-    const mismatched = convertPlanDayClient({
-      id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
-      work_date: '2026-08-15',
-      team_id: 'team-2',
-      plan_version: 7,
-    });
-    mockCreateClient.mockResolvedValue(mismatched.client);
-    const mismatchResponse = await convert(new NextRequest('http://localhost/api/daily-allocation/convert', {
+    const { GET } = await import('@/app/api/daily-allocation/convert/route');
+    const response = await GET(new NextRequest(
+      'http://localhost/api/daily-allocation/convert?work_date=2026-08-14&team_id=team-1'
+    ));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(source);
+    expect(client.rpc).toHaveBeenCalledWith(
+      'get_daily_allocation_conversion_source_v2',
+      { p_work_date: '2026-08-14', p_team_id: 'team-1' }
+    );
+  });
+
+  it('rejects stale source fingerprints with 409', async () => {
+    mockCreateClient.mockResolvedValue(
+      convertPlanDayClient(null, { message: 'SOURCE_FINGERPRINT_MISMATCH' })
+    );
+    const { POST: convert } = await import('@/app/api/daily-allocation/convert/route');
+    const response = await convert(new NextRequest('http://localhost/api/daily-allocation/convert', {
       method: 'POST',
-      body: JSON.stringify({ work_date: '2026-08-14', team_id: 'team-1' }),
+      body: JSON.stringify(conversionPayload()),
     }));
-    expect(mismatchResponse.status).toBe(409);
-    expect(await mismatchResponse.json()).toMatchObject({ code: 'STALE_PLAN_VERSION' });
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ code: 'SOURCE_FINGERPRINT_MISMATCH' });
   });
 });
 
@@ -256,6 +265,7 @@ describe('DA2-CONC-001 API stale and conflict mapping', () => {
     const stalePlan = await createVisit(new NextRequest('http://localhost/api/daily-allocation/visits', {
       method: 'POST',
       body: JSON.stringify({
+        request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         plan_day_id: '11111111-1111-4111-8111-111111111111',
         expected_plan_version: 1,
         job_source_type: 'live_quote',
@@ -279,6 +289,7 @@ describe('DA2-CONC-001 API stale and conflict mapping', () => {
       new NextRequest('http://localhost/api/daily-allocation/visits/33333333-3333-4333-8333-333333333333', {
         method: 'PATCH',
         body: JSON.stringify({
+          request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           plan_day_id: '11111111-1111-4111-8111-111111111111',
           expected_plan_version: 2,
           expected_row_version: 1,
@@ -304,6 +315,7 @@ describe('DA2-CONC-001 API stale and conflict mapping', () => {
     const overlap = await assignLabour(new NextRequest('http://localhost/api/daily-allocation/assignments/labour', {
       method: 'POST',
       body: JSON.stringify({
+        request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         visit_id: '33333333-3333-4333-8333-333333333333',
         profile_id: '44444444-4444-4444-8444-444444444444',
         expected_plan_version: 3,
@@ -322,6 +334,7 @@ describe('DA2-CONC-001 API stale and conflict mapping', () => {
     const plantConflict = await assignPlant(new NextRequest('http://localhost/api/daily-allocation/assignments/plant', {
       method: 'POST',
       body: JSON.stringify({
+        request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         visit_id: '33333333-3333-4333-8333-333333333333',
         expected_plan_version: 3,
         plant_kind: 'registered',
@@ -375,7 +388,10 @@ describe('DA2-PUB-001/002 publish payload, idempotency, and confirmation', () =>
 
   it('calls publish_daily_allocation_plan_v2 with version, idempotency, and confirmation', async () => {
     const client = authClient();
-    client.rpc = vi.fn().mockResolvedValue({ data: 'pub-v2', error: null });
+    client.rpc = vi.fn().mockResolvedValue({
+      data: { publication_id: 'pub-v2', snapshot_version: 2 },
+      error: null,
+    });
     mockCreateClient.mockResolvedValue(client);
 
     const { POST } = await import('@/app/api/daily-allocation/publish/route');
@@ -383,6 +399,7 @@ describe('DA2-PUB-001/002 publish payload, idempotency, and confirmation', () =>
       method: 'POST',
       body: JSON.stringify({
         snapshot_version: 2,
+        request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         plan_day_id: '11111111-1111-4111-8111-111111111111',
         expected_plan_version: 4,
         idempotency_key: 'v2-key',
@@ -397,6 +414,7 @@ describe('DA2-PUB-001/002 publish payload, idempotency, and confirmation', () =>
     expect(client.rpc).toHaveBeenCalledWith(
       'publish_daily_allocation_plan_v2',
       {
+        p_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         p_plan_day_id: '11111111-1111-4111-8111-111111111111',
         p_expected_plan_version: 4,
         p_idempotency_key: 'v2-key',
@@ -417,6 +435,7 @@ describe('DA2-PUB-001/002 publish payload, idempotency, and confirmation', () =>
       method: 'POST',
       body: JSON.stringify({
         snapshot_version: 2,
+        request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         plan_day_id: '11111111-1111-4111-8111-111111111111',
         expected_plan_version: 4,
         idempotency_key: 'v2-key',
@@ -439,6 +458,7 @@ describe('DA2-PUB-001/002 publish payload, idempotency, and confirmation', () =>
       method: 'POST',
       body: JSON.stringify({
         snapshot_version: 2,
+        request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         plan_day_id: '11111111-1111-4111-8111-111111111111',
         expected_plan_version: 4,
         idempotency_key: 'used-key',
@@ -534,6 +554,7 @@ describe('daily allocation v2 runtime and cross-plan move API', () => {
       new NextRequest('http://localhost/api/daily-allocation/visits/33333333-3333-4333-8333-333333333333/move', {
         method: 'POST',
         body: JSON.stringify({
+          request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           target_plan_day_id: '22222222-2222-4222-8222-222222222222',
           expected_source_plan_version: 2,
           expected_target_plan_version: 3,
@@ -553,6 +574,7 @@ describe('daily allocation v2 runtime and cross-plan move API', () => {
     expect(client.rpc).toHaveBeenCalledWith(
       'move_daily_allocation_visit_v2',
       expect.objectContaining({
+        p_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         p_visit_id: '33333333-3333-4333-8333-333333333333',
         p_target_plan_day_id: '22222222-2222-4222-8222-222222222222',
         p_expected_source_plan_version: 2,
@@ -570,6 +592,7 @@ describe('daily allocation v2 runtime and cross-plan move API', () => {
       new NextRequest('http://localhost/api/daily-allocation/visits/33333333-3333-4333-8333-333333333333/move', {
         method: 'POST',
         body: JSON.stringify({
+          request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           target_plan_day_id: '22222222-2222-4222-8222-222222222222',
           expected_source_plan_version: 9,
           expected_target_plan_version: 3,

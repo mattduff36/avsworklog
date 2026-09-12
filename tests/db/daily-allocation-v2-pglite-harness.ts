@@ -8,6 +8,14 @@ export const DA2_V2_MIGRATION_PATH = resolve(
   process.cwd(),
   'supabase/migrations/20260813_zzz_daily_allocation_v2_visit_model.sql'
 );
+export const DA2_DATA_CONTRACT_MIGRATION_PATH = resolve(
+  process.cwd(),
+  'supabase/migrations/20260912_daily_allocation_idempotent_mutations_and_guided_conversion.sql'
+);
+export const DA2_RUNTIME_GRANT_MIGRATION_PATH = resolve(
+  process.cwd(),
+  'supabase/migrations/20260913_daily_allocation_runtime_rpc_grants.sql'
+);
 export const DA2_PGLITE_BASE_PATH = resolve(
   process.cwd(),
   'tests/db/daily-allocation-v2-pglite-base.sql'

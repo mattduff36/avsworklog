@@ -137,18 +137,31 @@ function mockAdmin(options?: {
         return {
           select: vi.fn((columns: string) => {
             if (columns === 'id') {
-              return {
+              const idQuery = {
                 ilike: nameIlike,
                 in: profileIdIn,
-                eq: profileIdEq,
                 is: profileIdIs,
+                eq: vi.fn((column: string) =>
+                  column === 'is_system_account' ? idQuery : profileIdEq(column)
+                ),
               };
+              return idQuery;
             }
             return {
               in: profileByIdIn,
-              eq: vi.fn(() => ({
-                order: vi.fn().mockResolvedValue({ data: [], error: null }),
-              })),
+              eq: vi.fn((column: string) => {
+                if (column === 'is_system_account') {
+                  return {
+                    eq: vi.fn(() => ({
+                      order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                    })),
+                    order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                  };
+                }
+                return {
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                };
+              }),
             };
           }),
         };

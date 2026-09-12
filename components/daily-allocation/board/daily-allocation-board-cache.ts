@@ -1,5 +1,6 @@
 import type {
   DailyAllocationConflictOverride,
+  DailyAllocationConvertResult,
   DailyAllocationLabourAssignment,
   DailyAllocationPlanDay,
   DailyAllocationPlantAssignment,
@@ -62,6 +63,66 @@ export function patchBoardWithPlanDay(
     plan_days: [...planDays, planDay].sort((left, right) =>
       left.work_date.localeCompare(right.work_date) || left.id.localeCompare(right.id)
     ),
+  };
+}
+
+export function patchBoardWithConversionResult(
+  board: DailyAllocationRangeBoardPayload,
+  result: DailyAllocationConvertResult,
+  optimisticPlanDay: DailyAllocationPlanDay
+): DailyAllocationRangeBoardPayload {
+  const convertedVisits = result.visits || [];
+  const convertedLabour = result.labour_assignments || [];
+  const convertedPlant = result.plant_assignments || [];
+  const planDay: DailyAllocationPlanDay = {
+    ...optimisticPlanDay,
+    id: result.plan_day_id,
+    team_id: result.team_id,
+    work_date: result.work_date,
+    plan_version: result.plan_version,
+  };
+  const visitIds = new Set(convertedVisits.map((visit) => visit.id));
+  const labourIds = new Set(convertedLabour.map((assignment) => assignment.id));
+  const plantIds = new Set(convertedPlant.map((assignment) => assignment.id));
+  const teamEmployeeIds = new Set(
+    board.resources.employees
+      .filter((employee) => employee.team_id === result.team_id)
+      .map((employee) => employee.profile_id)
+  );
+  return {
+    ...patchBoardWithPlanDay(board, planDay, optimisticPlanDay.id),
+    visits: sortByStartsAt([
+      ...board.visits.filter((visit) =>
+        visit.plan_day_id !== result.plan_day_id
+        && visit.plan_day_id !== optimisticPlanDay.id
+        && !visitIds.has(visit.id)
+      ),
+      ...convertedVisits,
+    ]),
+    labour_assignments: sortByStartsAt([
+      ...board.labour_assignments.filter((assignment) =>
+        assignment.plan_day_id !== result.plan_day_id
+        && assignment.plan_day_id !== optimisticPlanDay.id
+        && !labourIds.has(assignment.id)
+      ),
+      ...convertedLabour,
+    ]),
+    plant_assignments: sortByStartsAt([
+      ...board.plant_assignments.filter((assignment) =>
+        assignment.plan_day_id !== result.plan_day_id
+        && assignment.plan_day_id !== optimisticPlanDay.id
+        && !plantIds.has(assignment.id)
+      ),
+      ...convertedPlant,
+    ]),
+    legacy: {
+      labour: board.legacy.labour.filter((draft) =>
+        draft.work_date !== result.work_date || !teamEmployeeIds.has(draft.profile_id)
+      ),
+      plant: board.legacy.plant.filter((draft) =>
+        draft.work_date !== result.work_date || draft.owner_team_id !== result.team_id
+      ),
+    },
   };
 }
 
