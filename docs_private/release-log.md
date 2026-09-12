@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.10.2
+
+**GIT COMMIT MESSAGE**
+`fix(daily-allocation): port FFTS scheduling workspace composition`
+
+**PUSHED AT**
+2026-09-12T13:00:41.338Z
+
+**WHAT CHANGED**
+Restore the shared module header for publication actions. Port FFTS scheduling workspace composition.
+
+**VERSION HISTORY DETAILS**
+- Restore the shared module header for publication actions, with changes to app screens, interface components, and automated tests.
+- Updated navigation, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `fix(daily-allocation): restore the shared module header for publication actions`
+- `fix(daily-allocation): port FFTS scheduling workspace composition`
+
 ## 0926.10.1
 
 **GIT COMMIT MESSAGE**

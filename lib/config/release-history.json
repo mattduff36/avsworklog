@@ -1,5 +1,23 @@
 [
   {
+    "version": "0926.10.2",
+    "updateKind": "minor",
+    "title": "Daily Allocation improvements",
+    "description": "Restore the shared module header for publication actions. Port FFTS scheduling workspace composition.",
+    "summary": "Restore the shared module header for publication actions. Port FFTS scheduling workspace composition.",
+    "details": [
+      "Restore the shared module header for publication actions, with changes to app screens, interface components, and automated tests.",
+      "Updated navigation, with changes to interface components."
+    ],
+    "areas": [
+      "Daily Allocation"
+    ],
+    "areaKeys": [
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-09-12T13:00:41.338Z"
+  },
+  {
     "version": "0926.10.1",
     "updateKind": "minor",
     "title": "Daily Allocation improvements",
