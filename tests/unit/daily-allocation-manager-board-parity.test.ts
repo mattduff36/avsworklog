@@ -11,6 +11,7 @@ import {
 } from '@/components/daily-allocation/board/daily-allocation-occupancy';
 import {
   getDailyAllocationElementVisualScale,
+  getDailyAllocationRemainingViewportHeight,
   getDailyAllocationViewportFit,
 } from '@/components/daily-allocation/board/daily-allocation-viewport-fit';
 import {
@@ -231,6 +232,11 @@ describe('manager board parity', () => {
       offsetWidth: 1000,
       getBoundingClientRect: () => ({ width: 700 }),
     } as HTMLElement)).toBe(0.7);
+    expect(getDailyAllocationRemainingViewportHeight({
+      top: 96,
+      viewportHeight: 900,
+      bottomInset: 8,
+    })).toBe(796);
   });
 
   it('paints booked time over off-shift occupancy', () => {

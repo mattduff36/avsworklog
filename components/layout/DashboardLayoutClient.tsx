@@ -314,7 +314,7 @@ function DashboardLayoutShell({
     <div 
       className={cn(
         'relative min-h-dvh bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950',
-        lockViewport && 'xl:flex xl:h-dvh xl:flex-col xl:overflow-hidden',
+        lockViewport && 'md:flex md:h-dvh md:flex-col md:overflow-hidden',
       )}
       data-accent={accent}
       data-tablet-mode={tabletModeEnabled ? 'on' : undefined}

@@ -46,6 +46,12 @@ export function DailyAllocationViewportFit({ children }: { children: ReactNode }
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
+    const main = root.closest('main');
+    const previousPaddingBottom = main?.style.paddingBottom ?? '';
+    if (main) {
+      main.dataset.dailyAllocationBoard = 'true';
+      main.style.paddingBottom = '0.5rem';
+    }
     const update = () => {
       const availableWidth = root.clientWidth;
       const viewportWidth = window.visualViewport?.width || window.innerWidth;
@@ -69,6 +75,11 @@ export function DailyAllocationViewportFit({ children }: { children: ReactNode }
     window.addEventListener('resize', update);
     window.visualViewport?.addEventListener('resize', update);
     return () => {
+      if (main) {
+        delete main.dataset.dailyAllocationBoard;
+        if (previousPaddingBottom) main.style.paddingBottom = previousPaddingBottom;
+        else main.style.removeProperty('padding-bottom');
+      }
       observer?.disconnect();
       window.removeEventListener('resize', update);
       window.visualViewport?.removeEventListener('resize', update);
@@ -83,7 +94,7 @@ export function DailyAllocationViewportFit({ children }: { children: ReactNode }
       </div>
       <div
         ref={rootRef}
-        className="hidden min-h-0 w-full overflow-hidden md:block"
+        className="hidden min-h-0 w-full flex-1 overflow-hidden md:flex md:flex-col"
         style={availableHeight ? { height: availableHeight } : undefined}
         data-testid="daily-allocation-viewport-fit"
         data-viewport-fit={fit.mode}
@@ -93,11 +104,11 @@ export function DailyAllocationViewportFit({ children }: { children: ReactNode }
           <UnsupportedWidthMessage />
         ) : (
           <div
-            className="h-full min-h-0 origin-top-left"
+            className="flex h-full min-h-0 min-w-0 flex-1 flex-col origin-top-left"
             style={{
-              transform: scale < 1 ? `scale(${scale})` : undefined,
+              transform: scale < 1 ? `scale(${scale}, 1)` : undefined,
               width: scale < 1 ? `${100 / scale}%` : '100%',
-              height: scale < 1 ? `${100 / scale}%` : '100%',
+              height: availableHeight || undefined,
             }}
           >
             {children}

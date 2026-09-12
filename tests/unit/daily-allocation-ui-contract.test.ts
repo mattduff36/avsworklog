@@ -26,19 +26,18 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(board).not.toContain('Convert this date to timed visits');
     expect(board).not.toContain('ConvertDialog');
     expect(board).not.toContain('Legacy date');
-    expect(board).toContain('Add visit');
     expect(board).toContain('Assign resources');
-    expect(board).toContain('Publication history');
-    expect(board).toContain('xl:flex-1');
-    expect(board).toContain('xl:overflow-hidden');
-    expect(board).toContain('flex shrink-0 flex-wrap gap-2');
+    expect(board).toContain('md:grid-cols-[350px_minmax(0,1fr)]');
+    expect(board).toContain('flex h-full min-h-0 flex-col');
+    expect(board).not.toContain('xl:grid-cols-[350px_minmax(0,1fr)]');
+    expect(board).not.toContain('xl:max-h-36');
 
     const layout = readFileSync(
       resolve(process.cwd(), 'components/layout/DashboardLayoutClient.tsx'),
       'utf8'
     );
-    expect(layout).toContain('xl:h-dvh');
-    expect(layout).toContain('xl:overflow-hidden');
+    expect(layout).toContain('md:h-dvh');
+    expect(layout).toContain('md:overflow-hidden');
 
     const toolbar = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/BoardToolbar.tsx'),
@@ -50,6 +49,10 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(toolbar).toContain('Active team');
     expect(toolbar).toContain('flex-nowrap');
     expect(toolbar).toContain('date-input-compact');
+    expect(toolbar).toContain('Add visit');
+    expect(toolbar).toContain('Publication history');
+    expect(toolbar).toContain('daily-allocation-view-heading');
+    expect(toolbar).toContain('Search jobs');
 
     expect(board).toContain('dailyTimelineRangeLeft');
     expect(board).toContain('source.kind === \'visit\'');
@@ -65,10 +68,28 @@ describe('DA2-UI-001 manager board contract', () => {
     );
     expect(resources).toContain('daily-allocation-resources-list');
     expect(resources).toContain('overflow-y-auto');
-    expect(resources).toContain('xl:max-h-none');
+    expect(resources).toContain('h-full min-h-0');
+    expect(resources).not.toContain('max-h-[min(36rem,70dvh)]');
     expect(resources).not.toContain('h-fit');
     expect(resources).toContain('Drag onto the board, or select then Add visit / Assign.');
     expect(resources).not.toContain('Touch: press and hold the grip handle');
+
+    const viewportFit = readFileSync(
+      resolve(process.cwd(), 'components/daily-allocation/board/DailyAllocationViewportFit.tsx'),
+      'utf8'
+    );
+    expect(viewportFit).toContain('md:flex md:flex-col');
+    expect(viewportFit).toContain('paddingBottom');
+    expect(viewportFit).toContain('flex h-full min-h-0 min-w-0 flex-1 flex-col origin-top-left');
+    expect(viewportFit).toContain('scale(${scale}, 1)');
+
+    const jobsPanel = readFileSync(
+      resolve(process.cwd(), 'components/daily-allocation/board/JobsPanel.tsx'),
+      'utf8'
+    );
+    expect(jobsPanel).toContain('daily-allocation-jobs-panel');
+    expect(jobsPanel).not.toContain('Search jobs');
+    expect(jobsPanel).not.toContain('daily-allocation-view-heading');
 
     const timeline = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/DailyTimeline.tsx'),

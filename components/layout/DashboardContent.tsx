@@ -51,7 +51,7 @@ export function DashboardContent({ children, fullWidth = false }: DashboardConte
       className={cn(
         'transition-all duration-300',
         shouldApplySidebarOffset && 'md:pl-16',
-        fullWidth && 'xl:flex xl:min-h-0 xl:flex-1 xl:flex-col',
+        fullWidth && 'md:flex md:min-h-0 md:flex-1 md:flex-col',
       )}
     >
       <main
@@ -62,7 +62,7 @@ export function DashboardContent({ children, fullWidth = false }: DashboardConte
             : fullWidth
               ? 'mx-0 max-w-none px-4 sm:px-6 lg:px-8'
               : 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8',
-          fullWidth && 'xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:overflow-hidden',
+          fullWidth && 'md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-hidden',
         )}
         data-content-width={expandToViewport ? 'full' : 'default'}
         style={

@@ -1,11 +1,13 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Minimize2, MoveHorizontal, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
+import type { DailyAllocationTimelineMode } from '@/components/daily-allocation/board/JobsPanel';
 import {
   DAILY_ALLOCATION_BOARD_VIEWS,
   type DailyAllocationBoardView,
@@ -25,8 +27,8 @@ interface BoardToolbarProps {
   view: DailyAllocationBoardView;
   onDateChange: (date: string) => void;
   onViewChange: (view: DailyAllocationBoardView) => void;
-  primary: DailyAllocationBoardPrimary;
-  onPrimaryChange: (primary: DailyAllocationBoardPrimary) => void;
+  primary?: DailyAllocationBoardPrimary;
+  onPrimaryChange?: (primary: DailyAllocationBoardPrimary) => void;
   onPublish: () => void;
   publishDisabled?: boolean;
   publishDisabledReason?: string;
@@ -38,6 +40,18 @@ interface BoardToolbarProps {
   teams?: Array<{ id: string; name: string }>;
   activeTeamId?: string | null;
   onTeamChange?: (teamId: string) => void;
+  title?: string;
+  titleMeta?: ReactNode;
+  jobSearch?: string;
+  onJobSearchChange?: (value: string) => void;
+  timelineMode?: DailyAllocationTimelineMode;
+  onTimelineModeChange?: (mode: DailyAllocationTimelineMode) => void;
+  latestPublicationLabel?: string;
+  onOpenHistory?: () => void;
+  onAddVisit?: () => void;
+  onAssign?: () => void;
+  assignDisabled?: boolean;
+  assignLabel?: string;
 }
 
 export function BoardToolbar({
@@ -45,7 +59,7 @@ export function BoardToolbar({
   view,
   onDateChange,
   onViewChange,
-  primary,
+  primary = DAILY_ALLOCATION_BOARD_PRIMARIES.job,
   onPrimaryChange,
   onPublish,
   publishDisabled,
@@ -58,6 +72,18 @@ export function BoardToolbar({
   teams = [],
   activeTeamId,
   onTeamChange,
+  title,
+  titleMeta,
+  jobSearch,
+  onJobSearchChange,
+  timelineMode = 'fit',
+  onTimelineModeChange,
+  latestPublicationLabel,
+  onOpenHistory,
+  onAddVisit,
+  onAssign,
+  assignDisabled,
+  assignLabel = 'Assign resources',
 }: BoardToolbarProps) {
   const selected = parseISO(selectedDate);
   const week = getDailyAllocationWeekRange(selectedDate);
@@ -84,7 +110,7 @@ export function BoardToolbar({
       || value === DAILY_ALLOCATION_BOARD_PRIMARIES.employee
       || value === DAILY_ALLOCATION_BOARD_PRIMARIES.plant
     ) {
-      onPrimaryChange(value);
+      onPrimaryChange?.(value);
     }
   }
 
@@ -100,6 +126,18 @@ export function BoardToolbar({
       className="flex w-full min-w-0 flex-nowrap items-center gap-2 overflow-x-auto sm:gap-3"
       data-testid="daily-allocation-toolbar"
     >
+      {title ? (
+        <div className="flex shrink-0 items-center gap-2">
+          <h1
+            className="whitespace-nowrap text-sm font-semibold text-slate-100"
+            data-testid="daily-allocation-view-heading"
+          >
+            {title}
+          </h1>
+          {titleMeta}
+        </div>
+      ) : null}
+
       <Tabs value={view} onValueChange={handleViewChange} className="shrink-0">
         <TabsList aria-label="Allocation date range" className="grid h-9 w-[8.5rem] grid-cols-2 gap-0 p-1">
           <TabsTrigger value={DAILY_ALLOCATION_BOARD_VIEWS.daily} className="px-3">
@@ -185,6 +223,90 @@ export function BoardToolbar({
             </option>
           ))}
         </select>
+      ) : null}
+
+      {onJobSearchChange ? (
+        <div className="relative w-36 max-w-72 shrink-0">
+          <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" aria-hidden="true" />
+          <Input
+            value={jobSearch || ''}
+            onChange={(event) => onJobSearchChange(event.target.value)}
+            placeholder="Search jobs"
+            aria-label="Search jobs"
+            className="h-9 border-slate-600 bg-slate-950 pl-8 text-slate-100"
+          />
+        </div>
+      ) : null}
+
+      {view === DAILY_ALLOCATION_BOARD_VIEWS.daily && onTimelineModeChange ? (
+        <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Daily timeline display mode">
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className={cn(
+              'h-9 px-2',
+              timelineMode === 'fit' ? boardControlStyles.primary : boardControlStyles.ghost
+            )}
+            aria-label="Fit timeline to width"
+            aria-pressed={timelineMode === 'fit'}
+            onClick={() => onTimelineModeChange('fit')}
+          >
+            <Minimize2 className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+            Fit
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className={cn(
+              'h-9 px-2',
+              timelineMode === 'scroll' ? boardControlStyles.primary : boardControlStyles.ghost
+            )}
+            aria-label="Use scrollable timeline"
+            aria-pressed={timelineMode === 'scroll'}
+            onClick={() => onTimelineModeChange('scroll')}
+          >
+            <MoveHorizontal className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+            Scroll
+          </Button>
+        </div>
+      ) : null}
+
+      {onAddVisit ? (
+        <Button
+          type="button"
+          className={cn(boardControlStyles.outline, 'min-h-9 shrink-0')}
+          onClick={onAddVisit}
+        >
+          Add visit
+        </Button>
+      ) : null}
+      {onAssign ? (
+        <Button
+          type="button"
+          className={cn(boardControlStyles.outline, 'min-h-9 shrink-0')}
+          disabled={assignDisabled}
+          onClick={onAssign}
+        >
+          {assignLabel}
+        </Button>
+      ) : null}
+
+      {latestPublicationLabel ? (
+        <p className="max-w-52 shrink-0 truncate whitespace-nowrap text-xs text-slate-300" title={latestPublicationLabel}>
+          {latestPublicationLabel}
+        </p>
+      ) : null}
+      {onOpenHistory ? (
+        <Button
+          type="button"
+          variant="ghost"
+          className={cn(boardControlStyles.ghost, 'min-h-9 shrink-0')}
+          onClick={onOpenHistory}
+        >
+          Publication history
+        </Button>
       ) : null}
 
       <div className="ml-auto flex shrink-0 items-center gap-2">

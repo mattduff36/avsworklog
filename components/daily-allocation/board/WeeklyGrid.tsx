@@ -85,7 +85,7 @@ export function WeeklyGrid({
   onAssignVisit,
 }: WeeklyGridProps) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-700" data-testid="daily-allocation-weekly-board">
+    <div className="h-full min-h-0 overflow-auto rounded-lg border border-slate-700" data-testid="daily-allocation-weekly-board">
       <div
         className="grid min-w-[64rem]"
         style={{ gridTemplateColumns: `240px repeat(${dates.length}, minmax(8rem, 1fr))` }}

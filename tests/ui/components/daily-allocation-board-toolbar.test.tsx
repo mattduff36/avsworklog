@@ -43,14 +43,21 @@ describe('BoardToolbar', () => {
     expect(onDateChange).toHaveBeenCalledWith('2026-08-20');
   });
 
-  it('keeps view, date, team, and publish controls on one row', () => {
+  it('keeps title, view, date, team, search, and publish controls on one row', () => {
     render(
       <BoardToolbar
+        title="Daily job board"
         selectedDate="2026-08-13"
         view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
         onDateChange={vi.fn()}
         onViewChange={vi.fn()}
         onPublish={vi.fn()}
+        jobSearch=""
+        onJobSearchChange={vi.fn()}
+        onTimelineModeChange={vi.fn()}
+        onAddVisit={vi.fn()}
+        onAssign={vi.fn()}
+        onOpenHistory={vi.fn()}
         teams={[
           { id: 'team-1', name: 'Team One' },
           { id: 'team-2', name: 'Team Two' },
@@ -62,6 +69,11 @@ describe('BoardToolbar', () => {
     const toolbar = screen.getByTestId('daily-allocation-toolbar');
     expect(toolbar).toHaveClass('flex-nowrap');
     expect(toolbar.className.split(/\s+/)).not.toContain('flex-col');
+    expect(screen.getByTestId('daily-allocation-view-heading')).toHaveTextContent('Daily job board');
+    expect(screen.getByLabelText('Search jobs')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fit timeline to width' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add visit' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publication history' })).toBeInTheDocument();
     expect(screen.getByLabelText('Selected date')).toHaveClass('date-input-compact');
     expect(screen.getByLabelText('Active team')).toBeInTheDocument();
     expect(screen.getByTestId('daily-allocation-publish')).toBeInTheDocument();

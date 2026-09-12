@@ -559,11 +559,39 @@ async function openManagerBoard(page: Page, mode: MockMode = 'converted') {
   return evidence;
 }
 
+async function expectBoardChromeFill(page: Page) {
+  const toolbar = page.getByTestId('daily-allocation-toolbar');
+  const resources = page.getByTestId('daily-allocation-resources');
+  const jobs = page.getByTestId('daily-allocation-jobs-panel');
+  const fit = page.getByTestId('daily-allocation-viewport-fit');
+  const board = page.getByTestId('daily-allocation-daily-board');
+
+  await expect(toolbar).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Daily job board', exact: true })).toBeVisible();
+  await expect(resources).toBeVisible();
+  await expect(jobs).toBeVisible();
+  await expect(board).toBeVisible();
+
+  const toolbarBox = await toolbar.boundingBox();
+  const resourcesBox = await resources.boundingBox();
+  const jobsBox = await jobs.boundingBox();
+  const fitBox = await fit.boundingBox();
+  const boardBox = await board.boundingBox();
+  expect(toolbarBox).toBeTruthy();
+  expect(resourcesBox).toBeTruthy();
+  expect(jobsBox).toBeTruthy();
+  expect(fitBox).toBeTruthy();
+  expect(boardBox).toBeTruthy();
+  expect(toolbarBox!.height).toBeLessThan(72);
+  expect(resourcesBox!.x + resourcesBox!.width).toBeLessThanOrEqual(jobsBox!.x + 8);
+  expect(fitBox!.y + fitBox!.height - (boardBox!.y + boardBox!.height)).toBeLessThan(48);
+}
+
 test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
   test('desktop keeps the same visits across daily, weekly, and all primary projections', async ({ page }) => {
     await openManagerBoard(page);
 
-    await expect(page.getByRole('heading', { name: 'Daily Allocation', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Daily job board', exact: true })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'Allocation date range' })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'Board primary resource' })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'Resource type' })).toBeVisible();
@@ -750,6 +778,24 @@ test.describe('DAFP-UI-001 touch tablet', () => {
     await assign.tap();
     await expect.poll(() => evidence.labourRequests.length).toBe(1);
     expect(evidence.labourRequests[0].profile_id).toBe('employee-bob');
+  });
+});
+
+test.describe('DAFP-UI-001 board chrome 1100', () => {
+  test.use({ viewport: { width: 1100, height: 900 } });
+
+  test('keeps one title row, a side Resources column, and a viewport-filling board', async ({ page }) => {
+    await openManagerBoard(page);
+    await expectBoardChromeFill(page);
+  });
+});
+
+test.describe('DAFP-UI-001 board chrome 1440', () => {
+  test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('keeps one title row, a side Resources column, and a viewport-filling board', async ({ page }) => {
+    await openManagerBoard(page);
+    await expectBoardChromeFill(page);
   });
 });
 

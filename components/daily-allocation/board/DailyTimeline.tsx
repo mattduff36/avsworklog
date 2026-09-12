@@ -84,7 +84,7 @@ function TimelineHeader({
   const hours = Array.from({ length: endHour - startHour }, (_, index) => startHour + index);
   return (
     <div
-      className={cn('sticky top-0 z-10 flex border-b border-slate-700 bg-slate-950', fill && 'w-full')}
+      className={cn('sticky top-0 z-10 flex shrink-0 border-b border-slate-700 bg-slate-950', fill && 'w-full')}
       data-testid="daily-allocation-daily-timeline-header"
     >
       <div
@@ -412,7 +412,7 @@ export function DailyTimeline({
     <div
       ref={boardRef}
       className={cn(
-        'w-full min-w-0 rounded-lg border border-slate-700',
+        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border border-slate-700',
         fill ? 'overflow-x-hidden' : 'overflow-x-auto',
         mode === 'scroll' && 'cursor-grab select-none',
         isPanning && 'cursor-grabbing'
@@ -433,6 +433,7 @@ export function DailyTimeline({
         hourWidth={hourWidth}
         fill={fill}
       />
+      <div className="min-h-0 flex-1 overflow-y-auto">
       {rows.length === 0 ? (
         <div className={cn('flex border-t border-slate-800', fill && 'w-full')}>
           <div
@@ -543,6 +544,7 @@ export function DailyTimeline({
           </div>
         );
       })}
+      </div>
     </div>
   );
 }

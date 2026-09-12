@@ -231,7 +231,7 @@ export function ResourceSidebar({
 
   return (
     <Card
-      className="flex h-full min-h-0 max-h-[min(36rem,70dvh)] flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-100 xl:max-h-none"
+      className="flex h-full min-h-0 flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-100"
       data-testid="daily-allocation-resources"
     >
       <Tabs

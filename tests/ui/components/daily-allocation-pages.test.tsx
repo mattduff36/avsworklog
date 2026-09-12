@@ -1434,8 +1434,9 @@ describe('daily allocation manager board', () => {
     expect(screen.getAllByText(/EX-01/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Add visit' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Assign resources' })).toBeInTheDocument();
-    expect(screen.getByText('Publication history')).toBeInTheDocument();
-    expect(screen.getByText('Revision 1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publication history' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Publication history' }));
+    expect(await screen.findByText('Revision 1')).toBeInTheDocument();
     expect(screen.getAllByText('Beta').length).toBeGreaterThan(0);
     expect(PointerSensor.configure).toHaveBeenCalled();
     const configureCall = vi.mocked(PointerSensor.configure).mock.calls.at(-1)?.[0] as {

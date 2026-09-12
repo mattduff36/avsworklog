@@ -1,24 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { DragDropProvider } from '@dnd-kit/react';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { BoardToolbar } from '@/components/daily-allocation/board/BoardToolbar';
 import { ResourceSidebar, type ResourceSidebarTab } from '@/components/daily-allocation/board/ResourceSidebar';
-import { JobsPanel } from '@/components/daily-allocation/board/JobsPanel';
+import { JobsPanel, type DailyAllocationTimelineMode } from '@/components/daily-allocation/board/JobsPanel';
 import {
   AssignResourcesDialog,
   DeleteVisitDialog,
   MoveVisitDialog,
   OverrideDialog,
+  PublicationHistoryDialog,
   PublishDialog,
   VisitEditorDialog,
   emptyVisitForm,
@@ -199,6 +197,8 @@ export function DailyAllocationManagerBoard({
   const [statusMessage, setStatusMessage] = useState('');
   const [dndSessionEpoch, setDndSessionEpoch] = useState(0);
   const [conversionOpen, setConversionOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [timelineMode, setTimelineMode] = useState<DailyAllocationTimelineMode>('fit');
 
   const activeTeamId = rawBoard
     ? resolveDailyAllocationActiveTeamId(rawBoard, selectedTeamOverride)
@@ -1057,57 +1057,12 @@ export function DailyAllocationManagerBoard({
     >
       <AppPageShell
         width="full"
-        className="flex min-h-0 flex-col gap-4 space-y-0 xl:min-h-0 xl:flex-1 xl:overflow-hidden"
+        className="flex h-full min-h-0 flex-col gap-2 space-y-0 overflow-hidden"
         onPointerMoveCapture={(event) => {
           pointerX.current = event.clientX;
         }}
       >
-        <AppPageHeader
-          className="shrink-0 border-slate-700 bg-slate-900 p-4 text-slate-50 dark:bg-slate-950"
-            title="Daily Allocation"
-            titleMeta={dailyAllocationBetaBadge}
-            description="Place timed visits against catalogue jobs, assign people and plant, then publish an immutable allocation."
-            icon={<CalendarDays className="h-5 w-5" />}
-            iconContainerClassName="bg-[hsl(var(--daily-allocation-primary)/0.15)] text-[hsl(var(--daily-allocation-primary))]"
-            footer={
-              <BoardToolbar
-                selectedDate={selectedDate}
-                view={boardState.view}
-                onDateChange={handleDateChange}
-                onViewChange={boardState.setView}
-                primary={primaryPreference.primary}
-                onPrimaryChange={primaryPreference.setPrimary}
-                onPublish={() => {
-                  setUnallocatedConfirm(false);
-                  setPublishOpen(true);
-                }}
-                publishDisabled={!converted}
-                publishDisabledReason={!converted ? 'Add a timed visit before publishing.' : undefined}
-                publishing={mutations.publishV2.isPending}
-                isLoading={boardState.isBoardLoading}
-                isFetching={boardState.isBoardFetching}
-                isStale={Boolean(boardState.mutationError)}
-                statusMessage={statusMessage}
-                teams={rawBoard?.resources.teams || []}
-                activeTeamId={activeTeamId}
-                onTeamChange={setSelectedTeamOverride}
-              />
-            }
-          />
-
-          <div className="sr-only" aria-live="polite">{statusMessage}</div>
-
-          <div className="flex shrink-0 flex-wrap items-center gap-3 text-sm text-slate-300">
-            {latestPublication ? (
-              <span>
-                Latest published revision {latestPublication.revision_no}
-                {latestPublication.published_by_name ? ` by ${latestPublication.published_by_name}` : ''}
-              </span>
-            ) : (
-              <span>No published revision for this date yet.</span>
-            )}
-            {boardState.isBoardFetching ? <Badge variant="outline">Refreshing</Badge> : null}
-          </div>
+        <div className="sr-only" aria-live="polite">{statusMessage}</div>
 
           {!converted && (selectedLegacyLabour.length > 0 || selectedLegacyPlant.length > 0) ? (
             <div
@@ -1130,37 +1085,7 @@ export function DailyAllocationManagerBoard({
             </div>
           ) : null}
 
-          {selectedVisit && selectedResource?.kind !== 'job' ? (
-            <div className="relative z-[1] flex shrink-0 flex-wrap gap-2">
-              <Button
-                className={`${boardControlStyles.outline} min-h-11`}
-                onClick={() => {
-                  if (selectedResource?.kind === 'employee') void assignEmployee(selectedVisit, selectedResource.profileId);
-                  else if (selectedResource?.kind === 'plant') void assignRegisteredPlant(selectedVisit, selectedResource.plantId);
-                  else setAssignOpen(true);
-                }}
-              >
-                Assign selected resource
-              </Button>
-              <Button className={`${boardControlStyles.outline} min-h-11`} onClick={() => openAddVisit('', selectedDate)}>
-                Add visit
-              </Button>
-            </div>
-          ) : (
-            <div className="relative z-[1] flex shrink-0 flex-wrap gap-2">
-              <Button className={`${boardControlStyles.outline} min-h-11`} onClick={() => openAddVisit(
-                selectedResource?.kind === 'job' ? jobResourceKey(selectedResource.job) : '',
-                selectedDate
-              )}>
-                Add visit
-              </Button>
-              <Button className={`${boardControlStyles.outline} min-h-11`} disabled={!selectedVisit} onClick={() => setAssignOpen(true)}>
-                Assign resources
-              </Button>
-            </div>
-          )}
-
-          <div className="grid min-h-0 min-w-0 flex-1 gap-4 xl:grid-cols-[350px_minmax(0,1fr)]">
+          <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[350px_minmax(0,1fr)]">
             <ResourceSidebar
               tab={resourceTab}
               onTabChange={setResourceTab}
@@ -1183,55 +1108,99 @@ export function DailyAllocationManagerBoard({
               }
               onSelectResource={setSelectedResource}
             />
-            <JobsPanel
-              board={board}
-              view={boardState.view}
-              primary={primaryPreference.primary}
-              selectedDate={selectedDate}
-              dates={board.dates}
-              rows={rows}
-              jobSearch={jobSearch}
-              onJobSearchChange={setJobSearch}
-              selectedVisitId={selectedVisitId}
-              labourNames={labourNames}
-              plantLabels={plantLabels}
-              onAddVisit={openAddVisit}
-              onSelectVisit={(visit) => setSelectedVisitId(visit.id)}
-              onMoveVisit={openMoveVisit}
-              onEditVisit={openEditVisit}
-              onDeleteVisit={setDeleteVisit}
-              onAssignVisit={(visit) => {
-                setSelectedVisitId(visit.id);
-                setAssignOpen(true);
-              }}
-              onResizeVisit={(visit, startsAt, endsAt) => {
-                void resizeVisit(visit, startsAt, endsAt);
-              }}
-              onPointerInteractionChange={boardState.setPointerInteractionActive}
-            />
+            <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-100">
+              <div className="shrink-0 border-b border-slate-800 px-3 py-2">
+                <BoardToolbar
+                  title={`${boardState.view === 'daily' ? 'Daily' : 'Weekly'} ${primaryPreference.primary === 'employee' ? 'employee' : primaryPreference.primary} board`}
+                  titleMeta={dailyAllocationBetaBadge}
+                  selectedDate={selectedDate}
+                  view={boardState.view}
+                  onDateChange={handleDateChange}
+                  onViewChange={boardState.setView}
+                  primary={primaryPreference.primary}
+                  onPrimaryChange={primaryPreference.setPrimary}
+                  jobSearch={jobSearch}
+                  onJobSearchChange={setJobSearch}
+                  timelineMode={timelineMode}
+                  onTimelineModeChange={setTimelineMode}
+                  latestPublicationLabel={
+                    latestPublication
+                      ? `Latest published revision ${latestPublication.revision_no}${latestPublication.published_by_name ? ` by ${latestPublication.published_by_name}` : ''}`
+                      : 'No published revision for this date yet.'
+                  }
+                  onOpenHistory={() => setHistoryOpen(true)}
+                  onAddVisit={() => openAddVisit(
+                    selectedResource?.kind === 'job' ? jobResourceKey(selectedResource.job) : '',
+                    selectedDate
+                  )}
+                  onAssign={() => {
+                    if (selectedVisit && selectedResource?.kind === 'employee') {
+                      void assignEmployee(selectedVisit, selectedResource.profileId);
+                      return;
+                    }
+                    if (selectedVisit && selectedResource?.kind === 'plant') {
+                      void assignRegisteredPlant(selectedVisit, selectedResource.plantId);
+                      return;
+                    }
+                    setAssignOpen(true);
+                  }}
+                  assignDisabled={!selectedVisit}
+                  assignLabel={
+                    selectedVisit && selectedResource?.kind !== 'job'
+                      ? 'Assign selected resource'
+                      : 'Assign resources'
+                  }
+                  onPublish={() => {
+                    setUnallocatedConfirm(false);
+                    setPublishOpen(true);
+                  }}
+                  publishDisabled={!converted}
+                  publishDisabledReason={!converted ? 'Add a timed visit before publishing.' : undefined}
+                  publishing={mutations.publishV2.isPending}
+                  isLoading={boardState.isBoardLoading}
+                  isFetching={boardState.isBoardFetching}
+                  isStale={Boolean(boardState.mutationError)}
+                  statusMessage={statusMessage}
+                  teams={rawBoard?.resources.teams || []}
+                  activeTeamId={activeTeamId}
+                  onTeamChange={setSelectedTeamOverride}
+                />
+              </div>
+              <div className="min-h-0 flex-1 overflow-hidden p-2">
+                <JobsPanel
+                  board={board}
+                  view={boardState.view}
+                  primary={primaryPreference.primary}
+                  selectedDate={selectedDate}
+                  dates={board.dates}
+                  rows={rows}
+                  timelineMode={timelineMode}
+                  selectedVisitId={selectedVisitId}
+                  labourNames={labourNames}
+                  plantLabels={plantLabels}
+                  onAddVisit={openAddVisit}
+                  onSelectVisit={(visit) => setSelectedVisitId(visit.id)}
+                  onMoveVisit={openMoveVisit}
+                  onEditVisit={openEditVisit}
+                  onDeleteVisit={setDeleteVisit}
+                  onAssignVisit={(visit) => {
+                    setSelectedVisitId(visit.id);
+                    setAssignOpen(true);
+                  }}
+                  onResizeVisit={(visit, startsAt, endsAt) => {
+                    void resizeVisit(visit, startsAt, endsAt);
+                  }}
+                  onPointerInteractionChange={boardState.setPointerInteractionActive}
+                />
+              </div>
+            </Card>
           </div>
 
-        {history.length > 0 ? (
-          <Card className="min-h-0 shrink-0 overflow-y-auto border-slate-700 bg-slate-900 text-slate-100 xl:max-h-36">
-            <CardHeader>
-              <CardTitle>Publication history</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="divide-y divide-slate-800">
-                {history.map((publication) => (
-                  <li key={publication.id} className="flex flex-col gap-1 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                    <span className="font-medium">Revision {publication.revision_no}</span>
-                    <span className="text-slate-400">
-                      {publication.published_by_name ? `${publication.published_by_name} · ` : ''}
-                      {format(parseISO(publication.published_at), 'dd MMM yyyy HH:mm')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        ) : null}
-
+        <PublicationHistoryDialog
+          open={historyOpen}
+          publications={history}
+          onOpenChange={setHistoryOpen}
+        />
         <VisitEditorDialog
           open={visitDialog !== null}
           mode={visitDialog || 'add'}

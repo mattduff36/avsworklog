@@ -34,6 +34,7 @@ import type {
   DailyAllocationLabourAssignment,
   DailyAllocationPlantAssignment,
   DailyAllocationPlantResource,
+  DailyAllocationPublicationMeta,
   DailyAllocationVisit,
 } from '@/types/daily-allocation';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
@@ -638,5 +639,43 @@ export function DeleteVisitDialog({
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+export function PublicationHistoryDialog({
+  open,
+  publications,
+  onOpenChange,
+}: {
+  open: boolean;
+  publications: DailyAllocationPublicationMeta[];
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="border-slate-700 bg-slate-900 text-slate-100">
+        <DialogHeader>
+          <DialogTitle>Publication history</DialogTitle>
+          <DialogDescription className="text-slate-400">
+            Earlier immutable revisions for this date. The latest published line stays on the board header.
+          </DialogDescription>
+        </DialogHeader>
+        {publications.length === 0 ? (
+          <p className="text-sm text-slate-400">No published revision for this date yet.</p>
+        ) : (
+          <ul className="divide-y divide-slate-800">
+            {publications.map((publication) => (
+              <li key={publication.id} className="flex flex-col gap-1 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+                <span className="font-medium">Revision {publication.revision_no}</span>
+                <span className="text-slate-400">
+                  {publication.published_by_name ? `${publication.published_by_name} · ` : ''}
+                  {format(parseISO(publication.published_at), 'dd MMM yyyy HH:mm')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
