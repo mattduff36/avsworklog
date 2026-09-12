@@ -6,10 +6,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
 import {
-  DAILY_ALLOCATION_BOARD_MIN_CONTENT_WIDTH_PX,
   DAILY_ALLOCATION_MOBILE_MAX_WIDTH_PX,
   getDailyAllocationRemainingViewportHeight,
   getDailyAllocationViewportFit,
+  measureDailyAllocationMinContentWidth,
   readDailyAllocationMainBottomInset,
   type DailyAllocationViewportFit,
 } from '@/components/daily-allocation/board/daily-allocation-viewport-fit';
@@ -59,7 +59,7 @@ export function DailyAllocationViewportFit({ children }: { children: ReactNode }
       const isCoarsePointer = window.matchMedia?.('(pointer: coarse)').matches ?? false;
       setFit(getDailyAllocationViewportFit({
         availableWidth,
-        minContentWidth: DAILY_ALLOCATION_BOARD_MIN_CONTENT_WIDTH_PX,
+        minContentWidth: measureDailyAllocationMinContentWidth(root),
         isMobile: viewportWidth <= DAILY_ALLOCATION_MOBILE_MAX_WIDTH_PX,
         isCoarsePointer,
       }));

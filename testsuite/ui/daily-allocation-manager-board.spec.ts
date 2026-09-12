@@ -561,28 +561,35 @@ async function openManagerBoard(page: Page, mode: MockMode = 'converted') {
 
 async function expectBoardChromeFill(page: Page) {
   const toolbar = page.getByTestId('daily-allocation-toolbar');
+  const titleRow = page.getByTestId('daily-allocation-board-title-row');
   const resources = page.getByTestId('daily-allocation-resources');
+  const boardPanel = page.getByTestId('daily-allocation-board-panel');
   const jobs = page.getByTestId('daily-allocation-jobs-panel');
   const fit = page.getByTestId('daily-allocation-viewport-fit');
   const board = page.getByTestId('daily-allocation-daily-board');
 
   await expect(toolbar).toBeVisible();
+  await expect(titleRow).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Daily job board', exact: true })).toBeVisible();
   await expect(resources).toBeVisible();
+  await expect(boardPanel).toBeVisible();
   await expect(jobs).toBeVisible();
   await expect(board).toBeVisible();
 
-  const toolbarBox = await toolbar.boundingBox();
+  const titleRowBox = await titleRow.boundingBox();
   const resourcesBox = await resources.boundingBox();
+  const boardPanelBox = await boardPanel.boundingBox();
   const jobsBox = await jobs.boundingBox();
   const fitBox = await fit.boundingBox();
   const boardBox = await board.boundingBox();
-  expect(toolbarBox).toBeTruthy();
+  expect(titleRowBox).toBeTruthy();
   expect(resourcesBox).toBeTruthy();
+  expect(boardPanelBox).toBeTruthy();
   expect(jobsBox).toBeTruthy();
   expect(fitBox).toBeTruthy();
   expect(boardBox).toBeTruthy();
-  expect(toolbarBox!.height).toBeLessThan(72);
+  expect(titleRowBox!.height).toBeLessThan(72);
+  expect(Math.abs(resourcesBox!.y - boardPanelBox!.y)).toBeLessThan(4);
   expect(resourcesBox!.x + resourcesBox!.width).toBeLessThanOrEqual(jobsBox!.x + 8);
   expect(fitBox!.y + fitBox!.height - (boardBox!.y + boardBox!.height)).toBeLessThan(48);
 }
@@ -592,6 +599,11 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     await openManagerBoard(page);
 
     await expect(page.getByRole('heading', { name: 'Daily job board', exact: true })).toBeVisible();
+    await expect(page.getByTestId('daily-allocation-period-label')).toHaveText('Sun 13 Sep 2026');
+    await page.getByRole('button', { name: 'Next day' }).click();
+    await expect(page.getByTestId('daily-allocation-period-label')).toHaveText('Mon 14 Sep 2026');
+    await page.getByRole('button', { name: 'Previous day' }).click();
+    await expect(page.getByTestId('daily-allocation-period-label')).toHaveText('Sun 13 Sep 2026');
     await expect(page.getByRole('tablist', { name: 'Allocation date range' })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'Board primary resource' })).toBeVisible();
     await expect(page.getByRole('tablist', { name: 'Resource type' })).toBeVisible();
@@ -652,10 +664,14 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     );
     const timelineBoard = page.getByTestId('daily-allocation-daily-board');
     const header = page.getByTestId('daily-allocation-daily-timeline-header');
+    const axis = page.getByTestId('daily-allocation-daily-job-header');
     const firstRow = page.getByTestId('daily-allocation-daily-board').locator(':scope > div').nth(1);
+    const firstRail = page.getByTestId('daily-allocation-board-row-job-live_quote:quote-100-rail');
     const alignmentBefore = await Promise.all([
       header.evaluate((element) => element.getBoundingClientRect().x),
       firstRow.evaluate((element) => element.getBoundingClientRect().x),
+      axis.evaluate((element) => element.getBoundingClientRect().x),
+      firstRail.evaluate((element) => element.getBoundingClientRect().x),
     ]);
     await timelineBoard.evaluate((element) => {
       element.scrollLeft = 120;
@@ -663,11 +679,15 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     const alignmentAfter = await Promise.all([
       header.evaluate((element) => element.getBoundingClientRect().x),
       firstRow.evaluate((element) => element.getBoundingClientRect().x),
+      axis.evaluate((element) => element.getBoundingClientRect().x),
+      firstRail.evaluate((element) => element.getBoundingClientRect().x),
     ]);
     expect(alignmentAfter[0] - alignmentAfter[1]).toBeCloseTo(
       alignmentBefore[0] - alignmentBefore[1],
       1
     );
+    expect(alignmentAfter[2]).toBeCloseTo(alignmentBefore[2], 1);
+    expect(alignmentAfter[3]).toBeCloseTo(alignmentBefore[3], 1);
     await fit.click();
     await expect(fit).toHaveAttribute('aria-pressed', 'true');
 
@@ -787,6 +807,16 @@ test.describe('DAFP-UI-001 touch tablet', () => {
     const evidence = await openManagerBoard(page);
 
     await expect(page.getByTestId('daily-allocation-viewport-fit')).toBeVisible();
+    const displayMode = page.getByRole('group', { name: 'Daily timeline display mode' });
+    await expect(displayMode.getByRole('button', { name: 'Fit timeline to width' })).toBeDisabled();
+    await expect(displayMode.getByRole('button', { name: 'Use scrollable timeline' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await expect(page.getByTestId('daily-allocation-daily-board')).toHaveAttribute(
+      'data-timeline-layout',
+      'scroll',
+    );
     await page.getByRole('tab', { name: /Employees \(3\)/ }).tap();
     await page.getByRole('button', { name: /Select Bob Brown\. Drag from the handle to assign\./ }).tap();
     await page.getByRole('button', { name: 'Select JOB-200 13:00–15:00' }).tap();
@@ -810,6 +840,24 @@ test.describe('DAFP-UI-001 board chrome 1100', () => {
 
 test.describe('DAFP-UI-001 board chrome 1440', () => {
   test.use({ viewport: { width: 1440, height: 900 } });
+
+  test('keeps one title row, a side Resources column, and a viewport-filling board', async ({ page }) => {
+    await openManagerBoard(page);
+    await expectBoardChromeFill(page);
+  });
+});
+
+test.describe('DAFP-UI-001 board chrome 1650', () => {
+  test.use({ viewport: { width: 1650, height: 900 } });
+
+  test('keeps one title row, a side Resources column, and a viewport-filling board', async ({ page }) => {
+    await openManagerBoard(page);
+    await expectBoardChromeFill(page);
+  });
+});
+
+test.describe('DAFP-UI-001 board chrome 1920', () => {
+  test.use({ viewport: { width: 1920, height: 1080 } });
 
   test('keeps one title row, a side Resources column, and a viewport-filling board', async ({ page }) => {
     await openManagerBoard(page);

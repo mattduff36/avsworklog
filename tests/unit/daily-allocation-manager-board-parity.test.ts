@@ -10,9 +10,11 @@ import {
   buildDailyAllocationEmployeeOccupancy,
 } from '@/components/daily-allocation/board/daily-allocation-occupancy';
 import {
+  DAILY_ALLOCATION_BOARD_MIN_CONTENT_WIDTH_PX,
   getDailyAllocationElementVisualScale,
   getDailyAllocationRemainingViewportHeight,
   getDailyAllocationViewportFit,
+  measureDailyAllocationMinContentWidth,
 } from '@/components/daily-allocation/board/daily-allocation-viewport-fit';
 import {
   getDailyAllocationPrimaryStorageKey,
@@ -237,6 +239,19 @@ describe('manager board parity', () => {
       viewportHeight: 900,
       bottomInset: 8,
     })).toBe(796);
+    const titleRow = {
+      children: [
+        { offsetWidth: 220 },
+        { offsetWidth: 360 },
+        { offsetWidth: 280 },
+        { offsetWidth: 144 },
+      ],
+    };
+    expect(measureDailyAllocationMinContentWidth({
+      querySelector: (selector: string) => (selector === '[data-testid="daily-allocation-board-title-row"]' ? titleRow : null),
+    } as unknown as HTMLElement)).toBe(
+      Math.max(DAILY_ALLOCATION_BOARD_MIN_CONTENT_WIDTH_PX, 220 + 360 + 280 + 144 + 36 + 48 + 350 + 16)
+    );
   });
 
   it('paints booked time over off-shift occupancy', () => {

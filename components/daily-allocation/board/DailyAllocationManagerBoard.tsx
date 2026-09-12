@@ -6,7 +6,7 @@ import { DragDropProvider } from '@dnd-kit/react';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { BoardToolbar } from '@/components/daily-allocation/board/BoardToolbar';
 import { ResourceSidebar, type ResourceSidebarTab } from '@/components/daily-allocation/board/ResourceSidebar';
@@ -23,7 +23,6 @@ import {
   type MoveVisitFormState,
   type VisitFormState,
 } from '@/components/daily-allocation/board/AllocationDialogs';
-import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
 import {
   createDailyAllocationDndSensors,
   dailyAllocationAccessibilityPlugin,
@@ -199,6 +198,7 @@ export function DailyAllocationManagerBoard({
   const [conversionOpen, setConversionOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [timelineMode, setTimelineMode] = useState<DailyAllocationTimelineMode>('fit');
+  const [timelineFitEligible, setTimelineFitEligible] = useState(true);
 
   const activeTeamId = rawBoard
     ? resolveDailyAllocationActiveTeamId(rawBoard, selectedTeamOverride)
@@ -1057,35 +1057,17 @@ export function DailyAllocationManagerBoard({
     >
       <AppPageShell
         width="full"
-        className="flex h-full min-h-0 flex-col gap-2 space-y-0 overflow-hidden"
+        className="flex h-full min-h-0 flex-col gap-4 space-y-0 overflow-hidden"
         onPointerMoveCapture={(event) => {
           pointerX.current = event.clientX;
         }}
       >
         <div className="sr-only" aria-live="polite">{statusMessage}</div>
 
-          {!converted && (selectedLegacyLabour.length > 0 || selectedLegacyPlant.length > 0) ? (
-            <div
-              className="flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/50 bg-amber-950/30 px-4 py-3"
-              data-testid="daily-allocation-legacy-conversion"
-            >
-              <div>
-                <p className="text-sm font-semibold text-amber-100">Untimed legacy drafts need review</p>
-                <p className="text-xs text-amber-200/80">
-                  {selectedLegacyLabour.length} labour and {selectedLegacyPlant.length} plant drafts must each be mapped or given an explicit disposition.
-                </p>
-              </div>
-              <Button
-                type="button"
-                className={boardControlStyles.primary}
-                onClick={() => setConversionOpen(true)}
-              >
-                Review and convert
-              </Button>
-            </div>
-          ) : null}
-
-          <div className="grid min-h-0 min-w-0 flex-1 grid-cols-1 gap-4 md:grid-cols-[350px_minmax(0,1fr)]">
+          <div
+            className="grid min-h-0 min-w-0 flex-1 grid-cols-[350px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-4"
+            data-testid="daily-allocation-manager-layout"
+          >
             <ResourceSidebar
               tab={resourceTab}
               onTabChange={setResourceTab}
@@ -1107,9 +1089,17 @@ export function DailyAllocationManagerBoard({
                       : null
               }
               onSelectResource={setSelectedResource}
+              selectedVisit={selectedVisit ? {
+                label: selectedVisit.job_code,
+                detail: `${formatDailyAllocationVisitTime(selectedVisit.starts_at)}–${formatDailyAllocationVisitTime(selectedVisit.ends_at)}`,
+              } : null}
+              onClearSelectedVisit={() => setSelectedVisitId(null)}
             />
-            <Card className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-slate-700 bg-slate-900 text-slate-100">
-              <div className="shrink-0 border-b border-slate-800 px-3 py-2">
+            <Card
+              className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-border"
+              data-testid="daily-allocation-board-panel"
+            >
+              <CardHeader className="shrink-0 gap-3">
                 <BoardToolbar
                   title={`${boardState.view === 'daily' ? 'Daily' : 'Weekly'} ${primaryPreference.primary === 'employee' ? 'employee' : primaryPreference.primary} board`}
                   titleMeta={dailyAllocationBetaBadge}
@@ -1122,11 +1112,12 @@ export function DailyAllocationManagerBoard({
                   jobSearch={jobSearch}
                   onJobSearchChange={setJobSearch}
                   timelineMode={timelineMode}
+                  timelineFitEligible={timelineFitEligible}
                   onTimelineModeChange={setTimelineMode}
                   latestPublicationLabel={
                     latestPublication
-                      ? `Latest published revision ${latestPublication.revision_no}${latestPublication.published_by_name ? ` by ${latestPublication.published_by_name}` : ''}`
-                      : 'No published revision for this date yet.'
+                      ? `Rev ${latestPublication.revision_no}${latestPublication.published_by_name ? ` · ${latestPublication.published_by_name}` : ''}`
+                      : undefined
                   }
                   onOpenHistory={() => setHistoryOpen(true)}
                   onAddVisit={() => openAddVisit(
@@ -1164,9 +1155,18 @@ export function DailyAllocationManagerBoard({
                   teams={rawBoard?.resources.teams || []}
                   activeTeamId={activeTeamId}
                   onTeamChange={setSelectedTeamOverride}
+                  legacyReview={
+                    !converted && (selectedLegacyLabour.length > 0 || selectedLegacyPlant.length > 0)
+                      ? {
+                          labourCount: selectedLegacyLabour.length,
+                          plantCount: selectedLegacyPlant.length,
+                          onReview: () => setConversionOpen(true),
+                        }
+                      : null
+                  }
                 />
-              </div>
-              <div className="min-h-0 flex-1 overflow-hidden p-2">
+              </CardHeader>
+              <CardContent className="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <JobsPanel
                   board={board}
                   view={boardState.view}
@@ -1191,8 +1191,9 @@ export function DailyAllocationManagerBoard({
                     void resizeVisit(visit, startsAt, endsAt);
                   }}
                   onPointerInteractionChange={boardState.setPointerInteractionActive}
+                  onFitEligibleChange={setTimelineFitEligible}
                 />
-              </div>
+              </CardContent>
             </Card>
           </div>
 

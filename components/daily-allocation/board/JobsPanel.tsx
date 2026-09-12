@@ -28,6 +28,7 @@ interface JobsPanelProps {
   onAssignVisit: (visit: DailyAllocationVisit) => void;
   onResizeVisit: (visit: DailyAllocationVisit, startsAt: string, endsAt: string) => void;
   onPointerInteractionChange?: (active: boolean) => void;
+  onFitEligibleChange?: (eligible: boolean) => void;
 }
 
 export function JobsPanel({
@@ -49,6 +50,7 @@ export function JobsPanel({
   onAssignVisit,
   onResizeVisit,
   onPointerInteractionChange,
+  onFitEligibleChange,
 }: JobsPanelProps) {
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden" data-testid="daily-allocation-jobs-panel">
@@ -71,6 +73,7 @@ export function JobsPanel({
             onAssignVisit={onAssignVisit}
             onResizeVisit={onResizeVisit}
             onPointerInteractionChange={onPointerInteractionChange}
+            onFitEligibleChange={onFitEligibleChange}
           />
         ) : (
           <WeeklyGrid

@@ -66,6 +66,7 @@ interface DailyTimelineProps {
   onAssignVisit: (visit: DailyAllocationVisit) => void;
   onResizeVisit: (visit: DailyAllocationVisit, startsAt: string, endsAt: string) => void;
   onPointerInteractionChange?: (active: boolean) => void;
+  onFitEligibleChange?: (eligible: boolean) => void;
 }
 
 function TimelineHeader({
@@ -84,11 +85,12 @@ function TimelineHeader({
   const hours = Array.from({ length: endHour - startHour }, (_, index) => startHour + index);
   return (
     <div
-      className={cn('sticky top-0 z-10 flex shrink-0 border-b border-slate-700 bg-slate-950', fill && 'w-full')}
+      className={cn('sticky top-0 z-10 flex shrink-0 border-b border-border bg-slate-950', fill && 'w-full')}
       data-testid="daily-allocation-daily-timeline-header"
     >
       <div
-        className="shrink-0 border-r border-slate-700 px-3 py-2 text-xs font-semibold uppercase text-slate-400"
+        className="sticky left-0 z-30 shrink-0 border-r border-border bg-slate-950 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+        data-testid="daily-allocation-daily-job-header"
         style={{ width: DAILY_TIMELINE_JOB_COLUMN_WIDTH }}
       >
         {axisLabel}
@@ -101,7 +103,7 @@ function TimelineHeader({
           <div
             key={hour}
             className={cn(
-              'border-l border-slate-800 px-1 py-2 text-[11px] tabular-nums text-slate-400',
+              'border-l border-border/80 px-1 py-2 text-[11px] tabular-nums text-muted-foreground',
               fill && 'min-w-0 flex-1'
             )}
             style={fill ? undefined : { width: hourWidth }}
@@ -154,7 +156,7 @@ function TimelineCell({
       data-timeline-start={`${String(startHour).padStart(2, '0')}:00`}
       data-timeline-end={`${String(endHour).padStart(2, '0')}:00`}
       className={cn(
-        'relative border-l border-slate-800 bg-slate-950/60',
+        'relative border-l border-border bg-slate-950/60',
         fill && 'min-w-0 flex-1',
         isDropTarget && 'bg-[hsl(var(--daily-allocation-primary)/0.12)]'
       )}
@@ -187,6 +189,7 @@ export function DailyTimeline({
   onAssignVisit,
   onResizeVisit,
   onPointerInteractionChange,
+  onFitEligibleChange,
 }: DailyTimelineProps) {
   const visits = board.visits.filter((visit) => visit.work_date === date);
   const range = useMemo(
@@ -226,6 +229,11 @@ export function DailyTimeline({
     observer.observe(board);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (containerWidth <= 0) return;
+    onFitEligibleChange?.(dailyTimelineFitsContainer(containerWidth, hourCount));
+  }, [containerWidth, hourCount, onFitEligibleChange]);
 
   useEffect(() => {
     function recoverPointerInteraction(event: Event) {
@@ -412,7 +420,7 @@ export function DailyTimeline({
     <div
       ref={boardRef}
       className={cn(
-        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border border-slate-700',
+        'flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border border-border',
         fill ? 'overflow-x-hidden overflow-y-auto' : 'overflow-auto',
         mode === 'scroll' && 'cursor-grab select-none',
         isPanning && 'cursor-grabbing'
@@ -434,13 +442,13 @@ export function DailyTimeline({
         fill={fill}
       />
       {rows.length === 0 ? (
-        <div className={cn('flex border-t border-slate-800', fill && 'w-full')}>
+        <div className={cn('flex border-t border-border', fill && 'w-full')}>
           <div
-            className="shrink-0 space-y-1 border-r border-slate-700 bg-slate-900 p-3"
+            className="sticky left-0 z-20 shrink-0 space-y-1 border-r border-border bg-slate-900 p-3"
             style={{ width: DAILY_TIMELINE_JOB_COLUMN_WIDTH }}
           >
-            <p className="text-sm font-semibold text-slate-50">No timed visits</p>
-            <p className="text-xs text-slate-400">
+            <p className="truncate font-semibold text-foreground">No timed visits</p>
+            <p className="mt-1 truncate text-sm text-muted-foreground">
               Drag a job from Resources or use Add visit.
             </p>
             <Button
@@ -473,17 +481,18 @@ export function DailyTimeline({
         return (
           <div
             key={row.id}
-            className={cn('flex border-t border-slate-800', fill && 'w-full')}
+            className={cn('flex border-t border-border', fill && 'w-full')}
             data-testid={getDailyAllocationBoardRowTestId(row)}
           >
             <div
-              className="shrink-0 space-y-1 border-r border-slate-700 bg-slate-900 p-3"
+              className="sticky left-0 z-20 shrink-0 space-y-1 border-r border-border bg-slate-900 p-3"
+              data-testid={`${getDailyAllocationBoardRowTestId(row)}-rail`}
               style={{ width: DAILY_TIMELINE_JOB_COLUMN_WIDTH }}
             >
-              <p className="truncate text-sm font-semibold text-slate-50">{row.label}</p>
-              <p className="truncate text-xs text-slate-300">{row.subtitle || 'Allocation row'}</p>
+              <p className="truncate font-semibold text-foreground">{row.label}</p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">{row.subtitle || 'Allocation row'}</p>
               {row.job?.site_address ? (
-                <p className="truncate text-[11px] text-slate-400">{row.job.site_address}</p>
+                <p className="truncate text-xs text-muted-foreground">{row.job.site_address}</p>
               ) : null}
               {row.job ? (
                 <Button

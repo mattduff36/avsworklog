@@ -60,7 +60,7 @@ function WeekCell({
       ref={ref}
       data-testid={`daily-allocation-week-cell-${jobKey}-${date}`}
       className={cn(
-        'min-h-36 space-y-2 border-l border-t border-slate-800 bg-slate-950/50 p-2',
+        'min-h-36 space-y-2 border-l border-t border-border bg-slate-950/50 p-2',
         isDropTarget && 'bg-[hsl(var(--daily-allocation-primary)/0.12)]'
       )}
     >
@@ -85,25 +85,25 @@ export function WeeklyGrid({
   onAssignVisit,
 }: WeeklyGridProps) {
   return (
-    <div className="h-full min-h-0 overflow-auto rounded-lg border border-slate-700" data-testid="daily-allocation-weekly-board">
+    <div className="h-full min-h-0 overflow-auto rounded-lg border border-border" data-testid="daily-allocation-weekly-board">
       <div
         className="grid min-w-[64rem]"
         style={{ gridTemplateColumns: `240px repeat(${dates.length}, minmax(8rem, 1fr))` }}
       >
-        <div className="sticky left-0 z-10 border-b border-r border-slate-700 bg-slate-900 px-3 py-2 text-xs font-semibold uppercase text-slate-400">
+        <div className="sticky left-0 z-10 border-b border-r border-border bg-slate-900 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           {getDailyAllocationBoardAxisLabel(primary)}
         </div>
         {dates.map((date) => (
-          <div key={date} className="border-b border-slate-700 bg-slate-900 px-2 py-2 text-center">
-            <p className="text-xs font-semibold text-slate-100">{format(parseISO(date), 'EEE')}</p>
-            <p className="text-[11px] text-slate-400">{format(parseISO(date), 'd MMM')}</p>
+          <div key={date} className="border-b border-border bg-slate-900 px-2 py-2 text-center">
+            <p className="text-xs font-semibold text-foreground">{format(parseISO(date), 'EEE')}</p>
+            <p className="text-[11px] text-muted-foreground">{format(parseISO(date), 'd MMM')}</p>
           </div>
         ))}
         {rows.length === 0 ? (
           <div className="contents">
-            <div className="sticky left-0 z-10 space-y-1 border-t border-r border-slate-700 bg-slate-900 p-3">
-              <p className="text-sm font-semibold text-slate-50">No timed visits</p>
-              <p className="text-xs text-slate-400">Drag a job from Resources or use Add visit.</p>
+            <div className="sticky left-0 z-10 space-y-1 border-t border-r border-border bg-slate-900 p-3">
+              <p className="truncate font-semibold text-foreground">No timed visits</p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">Drag a job from Resources or use Add visit.</p>
             </div>
             {dates.map((date) => (
               <WeekCell key={`empty:${date}`} jobKey="" date={date}>
@@ -121,9 +121,9 @@ export function WeeklyGrid({
           </div>
         ) : rows.map((row) => (
           <div key={row.id} className="contents" data-testid={getDailyAllocationBoardRowTestId(row)}>
-            <div className="sticky left-0 z-10 space-y-1 border-t border-r border-slate-700 bg-slate-900 p-3">
-              <p className="truncate text-sm font-semibold text-slate-50">{row.label}</p>
-              <p className="truncate text-xs text-slate-300">{row.subtitle || 'Allocation row'}</p>
+            <div className="sticky left-0 z-10 space-y-1 border-t border-r border-border bg-slate-900 p-3">
+              <p className="truncate font-semibold text-foreground">{row.label}</p>
+              <p className="mt-1 truncate text-sm text-muted-foreground">{row.subtitle || 'Allocation row'}</p>
             </div>
             {dates.map((date) => {
               const dayVisits = row.visitsByDate[date] || [];

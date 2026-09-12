@@ -632,6 +632,12 @@ input[type="date"].date-input-compact {
   max-width: 10.5rem !important;
 }
 
+input[type="date"].date-input-compact.date-input-overlay {
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
 input[type="time"]::-webkit-datetime-edit,
 input[type="date"]::-webkit-datetime-edit {
   max-width: 100% !important;

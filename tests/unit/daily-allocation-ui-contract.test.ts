@@ -27,8 +27,11 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(board).not.toContain('ConvertDialog');
     expect(board).not.toContain('Legacy date');
     expect(board).toContain('Assign resources');
-    expect(board).toContain('md:grid-cols-[350px_minmax(0,1fr)]');
+    expect(board).toContain('grid-cols-[350px_minmax(0,1fr)]');
+    expect(board).toContain('grid-rows-[minmax(0,1fr)]');
     expect(board).toContain('flex h-full min-h-0 flex-col');
+    expect(board).toContain('daily-allocation-manager-layout');
+    expect(board).toContain('daily-allocation-board-panel');
     expect(board).not.toContain('xl:grid-cols-[350px_minmax(0,1fr)]');
     expect(board).not.toContain('xl:max-h-36');
 
@@ -43,15 +46,23 @@ describe('DA2-UI-001 manager board contract', () => {
       resolve(process.cwd(), 'components/daily-allocation/board/BoardToolbar.tsx'),
       'utf8'
     );
-    expect(toolbar).toContain('Daily');
-    expect(toolbar).toContain('Weekly');
+    const dateRange = readFileSync(
+      resolve(process.cwd(), 'components/daily-allocation/board/BoardDateRangeControls.tsx'),
+      'utf8'
+    );
+    expect(dateRange).toContain('Daily');
+    expect(dateRange).toContain('Weekly');
+    expect(dateRange).toContain('EEE d MMM yyyy');
+    expect(dateRange).toContain('date-input-compact');
+    expect(dateRange).toContain('date-input-overlay');
     expect(toolbar).toContain('Publish');
     expect(toolbar).toContain('Active team');
     expect(toolbar).toContain('flex-nowrap');
-    expect(toolbar).toContain('date-input-compact');
     expect(toolbar).toContain('Add visit');
     expect(toolbar).toContain('Publication history');
     expect(toolbar).toContain('daily-allocation-view-heading');
+    expect(toolbar).toContain('daily-allocation-board-title-row');
+    expect(toolbar).toContain('daily-allocation-board-instruction-row');
     expect(toolbar).toContain('Search jobs');
 
     expect(board).toContain('dailyTimelineRangeLeft');
@@ -71,7 +82,8 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(resources).toContain('h-full min-h-0');
     expect(resources).not.toContain('max-h-[min(36rem,70dvh)]');
     expect(resources).not.toContain('h-fit');
-    expect(resources).toContain('Drag onto the board, or select then Add visit / Assign.');
+    expect(resources).toContain('Drag a job onto the board, or select a job then Add visit.');
+    expect(resources).toContain('RESOURCE_GUIDANCE_CLASS');
     expect(resources).not.toContain('Touch: press and hold the grip handle');
 
     const viewportFit = readFileSync(
