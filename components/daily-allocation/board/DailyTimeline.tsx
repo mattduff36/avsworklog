@@ -413,7 +413,7 @@ export function DailyTimeline({
       ref={boardRef}
       className={cn(
         'flex h-full min-h-0 w-full min-w-0 flex-col rounded-lg border border-slate-700',
-        fill ? 'overflow-x-hidden' : 'overflow-x-auto',
+        fill ? 'overflow-x-hidden overflow-y-auto' : 'overflow-auto',
         mode === 'scroll' && 'cursor-grab select-none',
         isPanning && 'cursor-grabbing'
       )}
@@ -433,7 +433,6 @@ export function DailyTimeline({
         hourWidth={hourWidth}
         fill={fill}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto">
       {rows.length === 0 ? (
         <div className={cn('flex border-t border-slate-800', fill && 'w-full')}>
           <div
@@ -544,7 +543,6 @@ export function DailyTimeline({
           </div>
         );
       })}
-      </div>
     </div>
   );
 }

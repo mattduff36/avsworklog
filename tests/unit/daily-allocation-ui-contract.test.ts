@@ -97,6 +97,8 @@ describe('DA2-UI-001 manager board contract', () => {
     );
     expect(timeline).toContain('pointercancel');
     expect(timeline).toContain('finish(false)');
+    expect(timeline).toContain("fill ? 'overflow-x-hidden overflow-y-auto' : 'overflow-auto'");
+    expect(timeline).not.toContain('min-h-0 flex-1 overflow-y-auto');
 
     const publish = readFileSync(
       resolve(process.cwd(), 'app/api/daily-allocation/publish/route.ts'),

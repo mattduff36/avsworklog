@@ -650,6 +650,24 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
       'data-timeline-layout',
       'scroll',
     );
+    const timelineBoard = page.getByTestId('daily-allocation-daily-board');
+    const header = page.getByTestId('daily-allocation-daily-timeline-header');
+    const firstRow = page.getByTestId('daily-allocation-daily-board').locator(':scope > div').nth(1);
+    const alignmentBefore = await Promise.all([
+      header.evaluate((element) => element.getBoundingClientRect().x),
+      firstRow.evaluate((element) => element.getBoundingClientRect().x),
+    ]);
+    await timelineBoard.evaluate((element) => {
+      element.scrollLeft = 120;
+    });
+    const alignmentAfter = await Promise.all([
+      header.evaluate((element) => element.getBoundingClientRect().x),
+      firstRow.evaluate((element) => element.getBoundingClientRect().x),
+    ]);
+    expect(alignmentAfter[0] - alignmentAfter[1]).toBeCloseTo(
+      alignmentBefore[0] - alignmentBefore[1],
+      1
+    );
     await fit.click();
     await expect(fit).toHaveAttribute('aria-pressed', 'true');
 
