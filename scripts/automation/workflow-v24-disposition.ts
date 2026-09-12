@@ -1792,6 +1792,7 @@ export function buildRouteDisposition(params: {
   predecessorHead?: string;
   originMainCommit?: string;
   git?: GitCommandRunner;
+  allowMissingSuccessorWorktree?: boolean;
   nowIso: string;
 }): { ok: true; disposition: WorkflowRouteDisposition } | { ok: false; message: string } {
   if (
@@ -1986,15 +1987,36 @@ export function buildRouteDisposition(params: {
     if (!params.successorRepo || !params.successorBranch) {
       return { ok: false, message: 'rehome route requires successor repo, branch, and baseline' };
     }
+    const recordedSuccessorRepo = params.successorRepo.replace(/\\/g, '/');
     const successorRepo = resolveCanonicalExistingPath(params.successorRepo);
-    if (!successorRepo.ok) return successorRepo;
+    let successorValidationRepo: string;
+    let successorHead: string | null;
+    let successorBranch: string | null;
+    if (successorRepo.ok) {
+      successorValidationRepo = successorRepo.canonical;
+      successorHead = gitHeadCommit(successorValidationRepo);
+      successorBranch = gitBranchName(successorValidationRepo);
+    } else if (params.allowMissingSuccessorWorktree) {
+      const branch = resolveBranchCommit(params.repoRoot, params.successorBranch);
+      if (!branch.ok) {
+        return {
+          ok: false,
+          message: `${successorRepo.message}; successor branch fallback failed: ${branch.message}`,
+        };
+      }
+      successorValidationRepo = params.repoRoot;
+      successorHead = branch.sha;
+      successorBranch = params.successorBranch;
+    } else {
+      return successorRepo;
+    }
     const predecessorHead = requireResolvedCommit(
       params.repoRoot,
       params.predecessorHead,
       'predecessorHead'
     );
     const successorBaseline = requireResolvedCommit(
-      successorRepo.canonical,
+      successorValidationRepo,
       params.successorBaseline,
       'successorBaseline'
     );
@@ -2003,8 +2025,6 @@ export function buildRouteDisposition(params: {
     if (!BRANCH_RE.test(params.successorBranch)) {
       return { ok: false, message: 'successor branch name is invalid' };
     }
-    const successorHead = gitHeadCommit(successorRepo.canonical);
-    const successorBranch = gitBranchName(successorRepo.canonical);
     if (!successorHead || !successorBranch) {
       return { ok: false, message: 'unable to read successor HEAD/branch' };
     }
@@ -2015,20 +2035,20 @@ export function buildRouteDisposition(params: {
       };
     }
     const successorOwned = requireCommitAncestor(
-      successorRepo.canonical,
+      successorValidationRepo,
       successorBaseline,
       successorHead,
       'successor baseline is not an ancestor of successor HEAD'
     );
     if (!successorOwned.ok) return successorOwned;
     const importedPredecessor = importCommitObjectForIsolation({
-      repoRoot: successorRepo.canonical,
+      repoRoot: successorValidationRepo,
       sha: predecessorHead,
       sourceRepoRoot: params.repoRoot,
     });
     if (!importedPredecessor.ok) return importedPredecessor;
     const successorIsolated = requireCommitNotAncestor(
-      successorRepo.canonical,
+      successorValidationRepo,
       importedPredecessor.sha,
       successorHead,
       'successor ancestry contains the blocked predecessor HEAD'
@@ -2041,7 +2061,9 @@ export function buildRouteDisposition(params: {
       implementationCommits,
       successorBranch: params.successorBranch,
       successorBaseline,
-      successorRepoCanonicalPath: successorRepo.canonical,
+      successorRepoCanonicalPath: successorRepo.ok
+        ? successorRepo.canonical
+        : recordedSuccessorRepo,
       predecessorHead: importedPredecessor.sha,
       predecessorHeadIsAncestor: false,
       latestLegalReviewCandidateHead: candidate.headCommit,
@@ -2052,7 +2074,7 @@ export function buildRouteDisposition(params: {
         releaseHead,
         implementationCommits,
         latestLegalReviewCandidateHead: candidate.headCommit,
-        successorRepo: successorRepo.canonical,
+        successorRepo: successorRepo.ok ? successorRepo.canonical : recordedSuccessorRepo,
         successorBranch: params.successorBranch,
         successorBaseline,
         predecessorHead: importedPredecessor.sha,
@@ -2192,6 +2214,7 @@ export function revalidateRouteDisposition(params: {
     successorBaseline: disposition.gitEvidence.successorBaseline,
     predecessorHead: disposition.gitEvidence.predecessorHead,
     git: params.git,
+    allowMissingSuccessorWorktree: disposition.target === 'rehomed',
     nowIso: disposition.recordedAt,
   });
   if (!rebuilt.ok) {

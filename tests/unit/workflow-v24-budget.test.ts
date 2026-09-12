@@ -493,7 +493,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 120_000 }, () => 
     expect(verifyPreflight.ok).toBe(false);
   });
 
-  it('T-FD-GIT-003-BINDS-COMMITS / T-FD-GIT-003-CHANGE-COMMIT / T-FD-GIT-003-ADD-COMMIT / T-FD-GIT-003-REMOVE-COMMIT / T-FD-GIT-003-REORDER-COMMITS / T-FD-GIT-003-OMIT-LIST / T-FD-GIT-003-NONOBJECT-COMMIT / T-FD-GIT-003-OMIT-RANGE / T-FD-GIT-003-DUPLICATE-COMMITS / T-FD-GIT-003-FRESH-HASH-TAMPER', { timeout: 60_000 }, () => {
+  it('T-FD-GIT-003-BINDS-COMMITS / T-FD-GIT-003-CHANGE-COMMIT / T-FD-GIT-003-ADD-COMMIT / T-FD-GIT-003-REMOVE-COMMIT / T-FD-GIT-003-REORDER-COMMITS / T-FD-GIT-003-OMIT-LIST / T-FD-GIT-003-NONOBJECT-COMMIT / T-FD-GIT-003-OMIT-RANGE / T-FD-GIT-003-DUPLICATE-COMMITS / T-FD-GIT-003-FRESH-HASH-TAMPER / T-REHOME-NO-WORKTREE', { timeout: 60_000 }, () => {
     const repoRoot = makeTempRoot('fd-git-003');
     const baseline = initGitRepo(repoRoot);
     const first = commitFile(repoRoot, 'one.ts', 'one');
@@ -593,6 +593,34 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 120_000 }, () => 
     expect(original.routeDisposition?.gitEvidence.implementationCommits).toEqual([first, second]);
     expect(original.routeDisposition?.gitEvidence.latestLegalReviewCandidateHead).toBe(second);
     expect(revalidateRouteDisposition({ repoRoot, record: original }).ok).toBe(true);
+
+    const missingWorktreePath = path.join(repoRoot, 'removed-successor-worktree');
+    const missingWorktreeEvidence = {
+      ...original.routeDisposition!.gitEvidence,
+      successorRepoCanonicalPath: missingWorktreePath.replace(/\\/g, '/'),
+    };
+    const missingWorktreeRecord = {
+      ...original,
+      routeDisposition: {
+        ...original.routeDisposition!,
+        gitEvidence: {
+          ...missingWorktreeEvidence,
+          evidenceHash: computeRouteEvidenceHash({
+            target: 'rehomed',
+            baseline: missingWorktreeEvidence.baselineCommit,
+            releaseHead: missingWorktreeEvidence.releaseHeadCommit,
+            implementationCommits: missingWorktreeEvidence.implementationCommits,
+            latestLegalReviewCandidateHead:
+              missingWorktreeEvidence.latestLegalReviewCandidateHead,
+            successorRepo: missingWorktreeEvidence.successorRepoCanonicalPath,
+            successorBranch: missingWorktreeEvidence.successorBranch,
+            successorBaseline: missingWorktreeEvidence.successorBaseline,
+            predecessorHead: missingWorktreeEvidence.predecessorHead,
+          }),
+        },
+      },
+    };
+    expect(revalidateRouteDisposition({ repoRoot, record: missingWorktreeRecord }).ok).toBe(true);
 
     const tamper = (mutator: (commits: string[]) => string[] | undefined) => {
       const record = readProtocolRecord(repoRoot, 'ws_fd_git')!;
