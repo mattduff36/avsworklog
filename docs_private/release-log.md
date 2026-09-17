@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.10.4
+
+**GIT COMMIT MESSAGE**
+`test(types): repair stale test type contracts`
+
+**PUSHED AT**
+2026-09-17T19:41:48.693Z
+
+**WHAT CHANGED**
+Repair stale test type contracts.
+
+**VERSION HISTORY DETAILS**
+- Updated timesheets, with changes to automated tests.
+- Updated quotes, with changes to automated tests.
+- Updated absence and leave, with changes to automated tests.
+- Updated workshop tasks, with changes to automated tests.
+- Updated fleet, with changes to shared logic and automated tests.
+- Updated notifications, with changes to automated tests.
+- Updated projects, with changes to automated tests.
+- Updated sign in, with changes to shared logic and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `test(types): repair stale test type contracts`
+
 ## 0926.10.3
 
 **GIT COMMIT MESSAGE**

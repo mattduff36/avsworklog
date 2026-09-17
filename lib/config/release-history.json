@@ -1,5 +1,25 @@
 [
   {
+    "version": "0926.10.4",
+    "updateKind": "minor",
+    "title": "App reliability update",
+    "description": "Repair stale test type contracts.",
+    "summary": "Repair stale test type contracts.",
+    "details": [
+      "Updated timesheets, with changes to automated tests.",
+      "Updated quotes, with changes to automated tests.",
+      "Updated absence and leave, with changes to automated tests.",
+      "Updated workshop tasks, with changes to automated tests.",
+      "Updated fleet, with changes to shared logic and automated tests.",
+      "Updated notifications, with changes to automated tests.",
+      "Updated projects, with changes to automated tests.",
+      "Updated sign in, with changes to shared logic and automated tests."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-09-17T19:41:48.693Z"
+  },
+  {
     "version": "0926.10.3",
     "updateKind": "minor",
     "title": "Daily Allocation improvements",
