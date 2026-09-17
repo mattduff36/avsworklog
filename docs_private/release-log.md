@@ -2,6 +2,29 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.10.3
+
+**GIT COMMIT MESSAGE**
+`fix(daily-allocation): keep resource tabs on one line and hide the search scrollbar`
+
+**PUSHED AT**
+2026-09-17T19:19:48.808Z
+
+**WHAT CHANGED**
+Handle remaining fixerrors clusters as fail-closed validation. Skip server logging for expected service-completion validation. Keep resource tabs on one line and hide the search scrollbar.
+
+**VERSION HISTORY DETAILS**
+- Skip server logging for expected service-completion validation, with changes to background routes, interface components, and automated tests.
+- Keep resource tabs on one line and hide the search scrollbar, with changes to interface components and automated tests.
+- Updated user management, with changes to background routes, app screens, and automated tests.
+- Updated daily tasks, with changes to app screens, shared logic, and automated tests.
+- Updated navigation, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `fix(ops): handle remaining fixerrors clusters as fail-closed validation`
+- `fix(workshop-tasks): skip server logging for expected service-completion validation`
+- `fix(daily-allocation): keep resource tabs on one line and hide the search scrollbar`
+
 ## 0926.10.2
 
 **GIT COMMIT MESSAGE**

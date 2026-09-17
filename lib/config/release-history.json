@@ -1,5 +1,29 @@
 [
   {
+    "version": "0926.10.3",
+    "updateKind": "minor",
+    "title": "Daily Allocation improvements",
+    "description": "Handled remaining fixerrors clusters as fail-closed validation. Skip server logging for expected service-completion validation. Keep resource tabs on one line and hide the search scrollbar.",
+    "summary": "Handled remaining fixerrors clusters as fail-closed validation. Skip server logging for expected service-completion validation. Keep resource tabs on one line and hide the search scrollbar.",
+    "details": [
+      "Skip server logging for expected service-completion validation, with changes to background routes, interface components, and automated tests.",
+      "Keep resource tabs on one line and hide the search scrollbar, with changes to interface components and automated tests.",
+      "Updated user management, with changes to background routes, app screens, and automated tests.",
+      "Updated daily tasks, with changes to app screens, shared logic, and automated tests.",
+      "Updated navigation, with changes to interface components."
+    ],
+    "areas": [
+      "Workshop Tasks",
+      "Daily Allocation",
+      "Hide the search scrollbar"
+    ],
+    "areaKeys": [
+      "workshop-tasks",
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-09-17T19:19:48.808Z"
+  },
+  {
     "version": "0926.10.2",
     "updateKind": "minor",
     "title": "Daily Allocation improvements",
