@@ -1,5 +1,22 @@
 [
   {
+    "version": "0926.10.5",
+    "updateKind": "minor",
+    "title": "App reliability update",
+    "description": "Restore mileage after mutation check.",
+    "summary": "Restore mileage after mutation check.",
+    "details": [
+      "Restore mileage after mutation check, with changes to automated tests."
+    ],
+    "areas": [
+      "Fleet"
+    ],
+    "areaKeys": [
+      "fleet"
+    ],
+    "pushedAt": "2026-09-17T19:54:22.157Z"
+  },
+  {
     "version": "0926.10.4",
     "updateKind": "minor",
     "title": "App reliability update",

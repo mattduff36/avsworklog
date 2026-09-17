@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.10.5
+
+**GIT COMMIT MESSAGE**
+`test(fleet): restore mileage after mutation check`
+
+**PUSHED AT**
+2026-09-17T19:54:22.157Z
+
+**WHAT CHANGED**
+Restore mileage after mutation check.
+
+**VERSION HISTORY DETAILS**
+- Restore mileage after mutation check, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `test(fleet): restore mileage after mutation check`
+
 ## 0926.10.4
 
 **GIT COMMIT MESSAGE**
