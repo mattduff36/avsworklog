@@ -27,6 +27,17 @@ const MANAGER_ID = '55555555-5555-4555-8555-555555555555';
 
 type QueryResult = { data: unknown; error: unknown };
 
+interface QueryChain {
+  select(columns?: string): QueryChain;
+  eq(column: string, value: unknown): QueryChain;
+  in(column: string, value: unknown): QueryChain;
+  neq(column: string, value: unknown): QueryChain;
+  single(): Promise<QueryResult>;
+  delete(): QueryChain;
+  upsert(rows: unknown): QueryChain;
+  then: Promise<QueryResult>['then'];
+}
+
 function createThenable(result: QueryResult) {
   const state: {
     type: 'select' | 'delete' | 'upsert';
@@ -42,7 +53,7 @@ function createThenable(result: QueryResult) {
     neq: {},
   };
 
-  const chain: Record<string, unknown> = {};
+  const chain = {} as QueryChain;
   chain.select = (columns?: string) => {
     state.select = columns;
     return chain;
@@ -69,10 +80,10 @@ function createThenable(result: QueryResult) {
     state.upsertRows = rows;
     return chain;
   };
-  chain.then = (
+  chain.then = ((
     onFulfilled?: (value: QueryResult) => unknown,
     onRejected?: (reason: unknown) => unknown
-  ) => Promise.resolve(result).then(onFulfilled, onRejected);
+  ) => Promise.resolve(result).then(onFulfilled, onRejected)) as QueryChain['then'];
 
   return { chain, state };
 }

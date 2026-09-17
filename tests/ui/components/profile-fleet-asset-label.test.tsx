@@ -40,6 +40,7 @@ describe('ProfileOverviewTab fleet asset label', () => {
           },
         }}
         managers={[]}
+        teamSummary={null}
         annualLeaveSummary={{
           allowance: 28,
           approved_taken: 2,
@@ -47,7 +48,10 @@ describe('ProfileOverviewTab fleet asset label', () => {
           remaining: 25,
         }}
         permissionModules={[]}
-        helpShortcuts={[]}
+        helpShortcuts={{
+          has_unresolved_suggestions: false,
+          has_unresolved_error_reports: false,
+        }}
         currentFleetAssignment={{
           id: 'assignment-1',
           user_id: 'user-1',

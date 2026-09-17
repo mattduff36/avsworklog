@@ -14,7 +14,12 @@ import {
   resolveModulesForRoleRank,
 } from '@/lib/server/team-permissions';
 import { isPermissionLevelAllowedForModule } from '@/lib/config/permission-access-rules';
-import { ALL_MODULES, type PermissionModuleMatrixColumn, type PermissionTierRole } from '@/types/roles';
+import {
+  ALL_MODULES,
+  type ModuleName,
+  type PermissionModuleMatrixColumn,
+  type PermissionTierRole,
+} from '@/types/roles';
 
 const roles: PermissionTierRole[] = [
   {
@@ -150,7 +155,7 @@ describe('team permission helpers', () => {
   });
 
   it('resolves inherited access by hierarchy rank', () => {
-    const enabledByModule = new Map([
+    const enabledByModule = new Map<ModuleName, boolean>([
       ['inspections', true],
       ['timesheets', true],
       ['approvals', true],
@@ -160,7 +165,12 @@ describe('team permission helpers', () => {
     expect(
       Array.from(
         resolveModulesForRoleRank({
-          role: { name: 'contractor', is_super_admin: false, hierarchy_rank: 1 },
+          role: {
+            name: 'contractor',
+            role_class: 'employee',
+            is_super_admin: false,
+            hierarchy_rank: 1,
+          },
           modules,
           enabledByModule,
         })
@@ -170,7 +180,12 @@ describe('team permission helpers', () => {
     expect(
       Array.from(
         resolveModulesForRoleRank({
-          role: { name: 'employee', is_super_admin: false, hierarchy_rank: 2 },
+          role: {
+            name: 'employee',
+            role_class: 'employee',
+            is_super_admin: false,
+            hierarchy_rank: 2,
+          },
           modules,
           enabledByModule,
         })
@@ -180,7 +195,12 @@ describe('team permission helpers', () => {
     expect(
       Array.from(
         resolveModulesForRoleRank({
-          role: { name: 'manager', is_super_admin: false, hierarchy_rank: 4 },
+          role: {
+            name: 'manager',
+            role_class: 'manager',
+            is_super_admin: false,
+            hierarchy_rank: 4,
+          },
           modules,
           enabledByModule,
         })
@@ -189,10 +209,15 @@ describe('team permission helpers', () => {
   });
 
   it('treats admins as full access', () => {
-    expect(isFullAccessRole({ name: 'admin', is_super_admin: false })).toBe(true);
+    expect(isFullAccessRole({ name: 'admin', role_class: 'admin', is_super_admin: false })).toBe(true);
     expect(
       resolveModulesForRoleRank({
-        role: { name: 'admin', is_super_admin: false, hierarchy_rank: 999 },
+        role: {
+          name: 'admin',
+          role_class: 'admin',
+          is_super_admin: false,
+          hierarchy_rank: 999,
+        },
         modules,
         enabledByModule: new Map(),
       }).size
@@ -331,7 +356,11 @@ describe('team permission helpers', () => {
       },
     };
 
-    const permissionSet = await getPermissionSetForUser('admin-1', null, supabaseAdmin);
+    const permissionSet = await getPermissionSetForUser(
+      'admin-1',
+      null,
+      supabaseAdmin as never
+    );
 
     expect(permissionSet).toEqual(new Set(ALL_MODULES));
   });

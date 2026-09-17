@@ -142,6 +142,7 @@ describe('quotes overview merged project aliases', () => {
       manager_profile_id: 'manager-1',
       requester_initials: 'MD',
       title: `${reference} works`,
+      site_address: null,
       description: null,
       status: mergedIntoProjectNumberId ? 'merged' : 'converted',
       linked_quote_id: null,
@@ -389,8 +390,8 @@ describe('quotes overview PostgREST .in() chunking', () => {
     ));
     const { admin, inCalls } = createInTrackingAdmin();
 
-    await loadInvoices(admin, quoteIds, []);
-    await loadLabourRowsByReference(admin, jobNumbers);
+    await loadInvoices(admin as never, quoteIds, []);
+    await loadLabourRowsByReference(admin as never, jobNumbers);
 
     expect(inCalls.length).toBeGreaterThan(0);
     expect(inCalls.every(call => call.ids.length > 0 && call.ids.length <= OVERVIEW_IN_FILTER_CHUNK_SIZE)).toBe(true);

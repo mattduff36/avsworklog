@@ -16,10 +16,10 @@ function createMockPayrollAdminClient(input: {
 }) {
   const queries: string[] = [];
   let inserted = false;
-  const client: PayrollAdminSqlClient = {
+  const client = {
     async connect() {},
     async end() {},
-    async query(sql) {
+    async query(sql: string) {
       const normalized = sql.replace(/\s+/g, ' ').trim();
       queries.push(normalized);
       if (normalized.includes('FROM public.profiles')) {
@@ -37,7 +37,7 @@ function createMockPayrollAdminClient(input: {
       }
       return { rows: [] };
     },
-  };
+  } as unknown as PayrollAdminSqlClient;
   return {
     client,
     queries,

@@ -331,7 +331,7 @@ describe('POST /api/timesheets/[id]/reject', () => {
       });
 
       const response = await POST(request as NextRequest, { params: Promise.resolve({ id: 'test-id' }) });
-      const data = await response.json();
+      await response.json();
 
       expect(response.status).toBe(200);
       const { applyTimesheetReject } = await import('@/lib/server/timesheet-gate-mutations');

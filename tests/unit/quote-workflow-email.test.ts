@@ -88,6 +88,15 @@ function buildQuoteBundle(overrides: Partial<QuoteBundle['quote']> = {}): QuoteB
     ramsDocuments: [],
     invoices: [],
     invoiceRequests: [],
+    purchaseOrders: [],
+    poCoverage: {
+      quoteTotal: 0,
+      poTotal: 0,
+      remaining: 0,
+      coveredLineCount: 0,
+      totalLineCount: 0,
+      purchaseOrderCount: 0,
+    },
     versions: [],
     timeline: [],
     selectedSecondaryContacts: [],
@@ -122,6 +131,9 @@ function buildQuoteBundle(overrides: Partial<QuoteBundle['quote']> = {}): QuoteB
       reconciliation_status: 'balanced',
       invoice_status: 'not_invoiced',
     },
+    mergeInfo: null,
+    mergeSourceQuotes: [],
+    mergeSourceFinancialSummaries: {},
   };
 }
 

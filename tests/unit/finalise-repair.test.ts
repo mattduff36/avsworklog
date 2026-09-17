@@ -131,11 +131,11 @@ describe('targeted finalise repair', () => {
 
   it('preserves case-sensitive environment names on POSIX', () => {
     const upperCase = getRepairSafetyEnvironmentEntries(
-      { TEST_DATABASE_URL: 'postgresql://test' },
+      { TEST_DATABASE_URL: 'postgresql://test' } as unknown as NodeJS.ProcessEnv,
       'linux'
     );
     const lowerCase = getRepairSafetyEnvironmentEntries(
-      { test_database_url: 'postgresql://test' },
+      { test_database_url: 'postgresql://test' } as unknown as NodeJS.ProcessEnv,
       'linux'
     );
 

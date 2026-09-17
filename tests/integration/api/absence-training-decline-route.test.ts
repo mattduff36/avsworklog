@@ -57,6 +57,7 @@ describe('POST /api/absence/training-decline', () => {
 
     vi.mocked(declineTrainingBookings).mockResolvedValue({
       deletedAbsenceIds: ['absence-1'],
+      returnedTimesheetIds: [],
       employeeName: 'Alice Employee',
       trainingDate: 'Wednesday 15 April 2026',
       notifiedProfileIds: ['manager-1', 'sarah-profile'],

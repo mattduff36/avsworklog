@@ -66,6 +66,7 @@ describe('/api/timesheets/[id]/delete', () => {
       new NextRequest('http://localhost/api/timesheets/timesheet-1/delete'),
       { params: Promise.resolve({ id: 'timesheet-1' }) }
     );
+    if (!response) throw new Error('Expected a route response');
     const payload = await response.json();
 
     expect(response.status).toBe(200);
@@ -91,6 +92,7 @@ describe('/api/timesheets/[id]/delete', () => {
       }),
       { params: Promise.resolve({ id: 'timesheet-1' }) }
     );
+    if (!response) throw new Error('Expected a route response');
     const payload = await response.json();
 
     expect(response.status).toBe(200);

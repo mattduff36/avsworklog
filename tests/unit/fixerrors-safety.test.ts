@@ -110,7 +110,7 @@ class ExportClient implements PgClientLike {
       return result([]) as { rows: T[]; rowCount: number };
     }
     if (text.includes('fixerrors:transaction-time')) {
-      return result([{ transaction_started_at: EXPORT_TIME }]) as {
+      return result([{ transaction_started_at: EXPORT_TIME }]) as unknown as {
         rows: T[];
         rowCount: number;
       };
@@ -129,7 +129,7 @@ class ExportClient implements PgClientLike {
               },
             ]
           : []
-      ) as {
+      ) as unknown as {
         rows: T[];
         rowCount: number;
       };
@@ -144,7 +144,7 @@ class ExportClient implements PgClientLike {
       ).length;
       return result([
         { count: String(this.countOverride ?? counted) },
-      ]) as {
+      ]) as unknown as {
         rows: T[];
         rowCount: number;
       };
@@ -270,7 +270,7 @@ class CleanupClient implements PgClientLike {
       return result([]) as { rows: T[]; rowCount: number };
     }
     if (text.includes('fixerrors:archive-schema')) {
-      return result(this.schemaColumns.map((column_name) => ({ column_name }))) as {
+      return result(this.schemaColumns.map((column_name) => ({ column_name }))) as unknown as {
         rows: T[];
         rowCount: number;
       };
@@ -297,7 +297,7 @@ class CleanupClient implements PgClientLike {
       const ids = values[0] as string[];
       const rows = ids
         .map((id) => this.workingRows.get(id))
-        .filter((row): row is CleanupRow => Boolean(row) && row.status === 'active')
+        .filter((row): row is CleanupRow => Boolean(row) && row?.status === 'active')
         .map((row) => {
           this.workingRows.set(row.id, { ...row, status: 'archived' });
           return { id: row.id };
@@ -308,7 +308,7 @@ class CleanupClient implements PgClientLike {
       const activeCount = [...this.workingRows.values()].filter(
         (row) => row.status === 'active'
       ).length;
-      return result([{ count: String(activeCount) }]) as {
+      return result([{ count: String(activeCount) }]) as unknown as {
         rows: T[];
         rowCount: number;
       };
@@ -664,7 +664,7 @@ describe('fixerrors exact transactional archive', () => {
       ...foreignKey,
       child_columns: `{${foreignKey.child_columns.join(',')}}`,
       parent_columns: `{${foreignKey.parent_columns.join(',')}}`,
-    }));
+    })) as never;
 
     const cleanup = await executeVerifiedSnapshotCleanup({
       client,
@@ -1496,7 +1496,7 @@ class RetentionClient implements PgClientLike {
       return result([]) as { rows: T[]; rowCount: number };
     }
     if (text.includes('fixerrors:archive-schema')) {
-      return result(this.schemaColumns.map((column_name) => ({ column_name }))) as {
+      return result(this.schemaColumns.map((column_name) => ({ column_name }))) as unknown as {
         rows: T[];
         rowCount: number;
       };
@@ -1509,7 +1509,7 @@ class RetentionClient implements PgClientLike {
     }
     if (text.includes('fixerrors:retention-cutoff')) {
       expect(values[0]).toBe(ERROR_LOG_RETENTION_MONTHS);
-      return result([{ cutoff: this.cutoff }]) as { rows: T[]; rowCount: number };
+      return result([{ cutoff: this.cutoff }]) as unknown as { rows: T[]; rowCount: number };
     }
     if (text.includes('fixerrors:retention-eligible')) {
       const cutoff = String(values[0]);
@@ -1529,7 +1529,7 @@ class RetentionClient implements PgClientLike {
     }
     if (text.includes('fixerrors:retention-active-before') || text.includes('fixerrors:retention-active-after')) {
       const count = [...this.workingRows.values()].filter((row) => row.status === 'active').length;
-      return result([{ count: String(count) }]) as { rows: T[]; rowCount: number };
+      return result([{ count: String(count) }]) as unknown as { rows: T[]; rowCount: number };
     }
     if (text.includes('fixerrors:retention-delete-batch')) {
       if (this.failDelete) throw new Error('forced retention delete failure');
@@ -1558,7 +1558,7 @@ class RetentionClient implements PgClientLike {
     }
     if (text.includes('fixerrors:retention-remaining-expired')) {
       if (this.remainingExpiredOverride !== null) {
-        return result([{ count: String(this.remainingExpiredOverride) }]) as {
+        return result([{ count: String(this.remainingExpiredOverride) }]) as unknown as {
           rows: T[];
           rowCount: number;
         };
@@ -1570,7 +1570,7 @@ class RetentionClient implements PgClientLike {
           row.archived_at !== null &&
           row.archived_at < cutoff
       ).length;
-      return result([{ count: String(count) }]) as { rows: T[]; rowCount: number };
+      return result([{ count: String(count) }]) as unknown as { rows: T[]; rowCount: number };
     }
     if (text.includes('fixerrors:retention-rollback')) {
       this.workingRows = new Map(this.errorRows);

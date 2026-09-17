@@ -82,7 +82,10 @@ export function parseFleetInspectionWorkflowConfig(
 
 export function mergeFleetInspectionWorkflowConfig(
   current: FleetInspectionWorkflowConfig,
-  patch: Partial<FleetInspectionWorkflowConfig>,
+  patch: {
+    overdue_days_threshold?: number;
+    asset_types?: Partial<FleetInspectionWorkflowConfig['asset_types']>;
+  },
 ): FleetInspectionWorkflowConfig {
   return fleetInspectionWorkflowConfigSchema.parse({
     overdue_days_threshold: patch.overdue_days_threshold ?? current.overdue_days_threshold,

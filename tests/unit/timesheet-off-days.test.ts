@@ -897,6 +897,8 @@ describe('timesheet off-day normalization', () => {
         hasPmLeave: false,
         workWindow: { start: '17:00', end: '05:00' },
         paidLeaveHours: 0,
+        paidLeaveUnits: 0,
+        unpaidLeaveUnits: 0,
         leaveLabels: [],
         trainingLabels: [],
         pendingTrainingLabels: [],

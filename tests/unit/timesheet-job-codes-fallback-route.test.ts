@@ -69,10 +69,10 @@ function createQuoteQuery(allRows: QuoteRow[]) {
                   if (row.customer.status !== value) return false;
                   continue;
                 }
-                if ((row as Record<string, unknown>)[column] !== value) return false;
+                if ((row as unknown as Record<string, unknown>)[column] !== value) return false;
               }
               for (const [column, values] of Object.entries(ins)) {
-                if (!values.includes((row as Record<string, unknown>)[column] as never)) return false;
+                if (!values.includes((row as unknown as Record<string, unknown>)[column] as never)) return false;
               }
               return true;
             });

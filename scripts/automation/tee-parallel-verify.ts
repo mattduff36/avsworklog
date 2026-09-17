@@ -21,6 +21,8 @@ import {
   resolveInteractiveProgress,
   shouldUseAlternateScreen,
   TEE_PROGRESS_DEFAULT_HEARTBEAT_MS,
+  type TeeProgressEnvironment,
+  type TeeProgressOutputStream,
   type TeeProgressReporter,
   type TeeProgressStatus,
 } from './tee-progress';
@@ -99,7 +101,7 @@ type JobRuntime<T> = TeeVerifyJob<T> & {
   status: 'pending' | 'running' | 'passed' | 'failed' | 'skipped';
 };
 
-export function resolveTeeVerifyJobs(env: NodeJS.ProcessEnv = process.env): number {
+export function resolveTeeVerifyJobs(env: TeeProgressEnvironment = process.env): number {
   const raw = env[TEE_VERIFY_JOBS_ENV];
   if (raw === undefined || raw === '') return DEFAULT_TEE_VERIFY_JOBS;
   const parsed = Number.parseInt(String(raw), 10);
@@ -215,7 +217,7 @@ function quoteWindowsArg(value: string): string {
   return `"${value.replace(/"/g, '\\"')}"`;
 }
 
-export function sanitizeSpawnEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+export function sanitizeSpawnEnv(env: TeeProgressEnvironment = process.env): NodeJS.ProcessEnv {
   const clean: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (typeof value === 'string') clean[key] = value;
@@ -710,11 +712,11 @@ export function formatVerifyBatchFailures(batch: TeeVerifyBatchResult): string {
 function createGuardedProgressReporter(params: {
   title: string;
   stages: Array<{ id: string; label: string; weight: number }>;
-  stream?: NodeJS.WritableStream;
+  stream?: TeeProgressOutputStream;
   isTTY?: boolean;
   stdoutIsTty?: boolean;
   stderrIsTty?: boolean;
-  env?: NodeJS.ProcessEnv;
+  env?: TeeProgressEnvironment;
 }): TeeProgressReporter {
   const env = params.env ?? process.env;
   const streamTty = Boolean(params.stream && 'isTTY' in params.stream && params.stream.isTTY);
@@ -741,10 +743,10 @@ export function createHumanTeeProgress(params: {
   title: string;
   stages: Array<{ id: string; label: string; weight: number }>;
   subtitle?: string;
-  env?: NodeJS.ProcessEnv;
+  env?: TeeProgressEnvironment;
   stdoutIsTty?: boolean;
   stderrIsTty?: boolean;
-  stream?: NodeJS.WritableStream;
+  stream?: TeeProgressOutputStream;
 }): TeeProgressReporter | undefined {
   const env = params.env ?? process.env;
   if (env.TEE_VERIFY_PROGRESS === 'off') return undefined;
@@ -764,11 +766,11 @@ export function createVerifyProgressReporter(params: {
   title: string;
   workstreamId?: string | null;
   candidate?: FrozenVerifyCandidate | null;
-  stream?: NodeJS.WritableStream;
+  stream?: TeeProgressOutputStream;
   isTTY?: boolean;
   stdoutIsTty?: boolean;
   stderrIsTty?: boolean;
-  env?: NodeJS.ProcessEnv;
+  env?: TeeProgressEnvironment;
 }): TeeProgressReporter {
   const reporter = createGuardedProgressReporter({
     title: params.title,
@@ -795,11 +797,11 @@ export function createVerifyProgressReporter(params: {
 
 export function createFinaliseProgressReporter(params: {
   title?: string;
-  stream?: NodeJS.WritableStream;
+  stream?: TeeProgressOutputStream;
   isTTY?: boolean;
   stdoutIsTty?: boolean;
   stderrIsTty?: boolean;
-  env?: NodeJS.ProcessEnv;
+  env?: TeeProgressEnvironment;
 }): TeeProgressReporter {
   const reporter = createGuardedProgressReporter({
     title: params.title ?? 'TEE finalise',

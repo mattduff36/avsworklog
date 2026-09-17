@@ -174,10 +174,10 @@ function createCatalogueAdmin(quotes: CatalogueQuoteFixture[]) {
         if (row.customer.status !== value) return false;
         continue;
       }
-      if ((row as Record<string, unknown>)[column] !== value) return false;
+      if ((row as unknown as Record<string, unknown>)[column] !== value) return false;
     }
     for (const [column, values] of Object.entries(ins)) {
-      const actual = (row as Record<string, unknown>)[column];
+      const actual = (row as unknown as Record<string, unknown>)[column];
       if (!values.includes(actual as never)) return false;
     }
     return true;

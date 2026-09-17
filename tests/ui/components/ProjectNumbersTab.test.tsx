@@ -12,6 +12,7 @@ function buildProjectNumber(overrides: Partial<QuoteProjectNumber> = {}): QuoteP
     manager_profile_id: 'manager-1',
     requester_initials: 'MD',
     title: 'Emergency enabling works',
+    site_address: null,
     description: 'Track costs before customer confirmation',
     status: 'open',
     linked_quote_id: null,

@@ -148,7 +148,10 @@ describe('supabase browser client', () => {
 
     await client.options.global.fetch('https://example.supabase.co/rest/v1/profiles', {});
 
-    const [, init] = fetchSpy.mock.calls[0] as [RequestInfo | URL, RequestInit | undefined];
+    const [, init] = fetchSpy.mock.calls[0] as unknown as [
+      RequestInfo | URL,
+      RequestInit | undefined,
+    ];
     const headers = new Headers(init?.headers);
     expect(headers.get('x-view-as-role-id')).toBe('role-123');
     expect(headers.get('x-view-as-team-id')).toBe('team-456');

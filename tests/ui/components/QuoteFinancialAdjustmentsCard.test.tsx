@@ -227,7 +227,7 @@ describe('QuoteFinancialAdjustmentsCard', () => {
 
     const closeButton = screen.getByRole('button', { name: 'Close financial adjustments' });
     expect(closeButton).toHaveClass('border', 'border-slate-500', 'bg-slate-800', 'text-white');
-    expect(screen.getByRole('button', { name: 'Close', exact: true })).toHaveClass(
+    expect(screen.getByRole('button', { name: /^Close$/ })).toHaveClass(
       'border',
       'border-slate-500',
       'bg-slate-800',

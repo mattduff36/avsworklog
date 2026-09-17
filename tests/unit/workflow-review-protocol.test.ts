@@ -581,7 +581,7 @@ it('WF-EXTRA-001 behavioral', () => {});
       },
     };
     saveWorkflowReviewState(paths.statePath, state);
-    writeProtocolRecord(repoRoot, state.protocolRecords.ws_explicit_1);
+    writeProtocolRecord(repoRoot, state.protocolRecords!.ws_explicit_1);
 
     const matched = resolveFinaliseWorkstreamMatches({
       state,

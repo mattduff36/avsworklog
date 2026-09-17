@@ -33,7 +33,7 @@ function buildClient(
   teams: MockTeam[] = [],
   reportingLines: MockReportingLine[] = [],
   error: unknown = null
-) {
+): Parameters<typeof runHierarchyValidation>[0] {
   return {
     from: (table: string) => {
       if (table === 'profiles') {
@@ -62,7 +62,7 @@ function buildClient(
         }),
       };
     },
-  };
+  } as unknown as Parameters<typeof runHierarchyValidation>[0];
 }
 
 describe('runHierarchyValidation', () => {

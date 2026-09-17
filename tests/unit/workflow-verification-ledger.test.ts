@@ -89,7 +89,7 @@ function expectOk<T extends { ok: true } | { ok: false; message: string }>(
   result: T
 ): Extract<T, { ok: true }> {
   if (!result.ok) throw new Error(result.message);
-  return result;
+  return result as Extract<T, { ok: true }>;
 }
 
 function writeVitestConfig(repoRoot: string): string {

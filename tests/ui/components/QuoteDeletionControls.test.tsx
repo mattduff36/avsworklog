@@ -116,7 +116,7 @@ function buildQuote(overrides: Partial<Quote> = {}): Quote {
 function renderDetails(quote: Quote) {
   const onClose = vi.fn();
   const onRefresh = vi.fn();
-  const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+  const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
     if (init?.method === 'DELETE') {
       return Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }));
     }

@@ -111,7 +111,7 @@ describe('workshop task completion date confirmation', () => {
       resumingTask: null,
       resumeComment: '',
       completingTask: task,
-      setUpdatingStatus,
+      setUpdatingStatus: setUpdatingStatus as never,
       setShowStatusModal: vi.fn(),
       setSelectedTask: vi.fn(),
       setLoggedComment: vi.fn(),
@@ -212,7 +212,9 @@ describe('workshop task completion date confirmation', () => {
       resumingTask: null,
       resumeComment: '',
       completingTask: task,
-      setUpdatingStatus: vi.fn((updater: (previous: Set<string>) => Set<string>) => updater(new Set())),
+      setUpdatingStatus: vi.fn(
+        (updater: (previous: Set<string>) => Set<string>) => updater(new Set())
+      ) as never,
       setShowStatusModal: vi.fn(),
       setSelectedTask: vi.fn(),
       setLoggedComment: vi.fn(),

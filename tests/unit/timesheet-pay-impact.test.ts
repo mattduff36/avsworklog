@@ -23,11 +23,12 @@ const monday = {
 describe('timesheet pay impact hash', () => {
   it('TS-EDIT-001 treats job-number-only changes as costing', () => {
     const current = [canonicalPayDayFromEntry(monday)];
-    const proposed = [canonicalPayDayFromEntry({ ...monday, job_number: 'D9999', remarks: 'Corrected' })];
+    const proposedEntry = { ...monday, job_number: 'D9999', remarks: 'Corrected' };
+    const proposed = [canonicalPayDayFromEntry(proposedEntry)];
     expect(classifyTimesheetPayImpact({
       currentDays: current,
       proposedDays: proposed,
-      proposedEntries: [{ ...monday, job_number: 'D9999', remarks: 'Corrected' }],
+      proposedEntries: [proposedEntry],
     }).payImpact).toBe(false);
   });
 

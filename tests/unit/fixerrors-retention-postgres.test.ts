@@ -30,7 +30,7 @@ class PgliteClient implements PgClientLike {
       .map((statement) => statement.trim())
       .filter(Boolean);
     if (statements.length > 1 && values.length === 0) {
-      let last = { rows: [] as T[], rowCount: 0 };
+      let last: { rows: T[]; rowCount: number | null } = { rows: [], rowCount: 0 };
       for (const statement of statements) {
         last = await this.run(statement);
       }

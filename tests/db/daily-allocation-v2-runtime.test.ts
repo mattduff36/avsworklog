@@ -960,8 +960,12 @@ describeConcurrency('DA2A-DB-001 disposable PostgreSQL suite [LTDB-CONC-001]', (
         updatedAt: new Date(row.updated_at).toISOString(),
       },
       permissionFingerprint: 'fixture-permissions',
-      v1Fingerprint: row.v1_fingerprint,
+      v1ContentFingerprint: row.v1_fingerprint,
+      v1PublicationFingerprint: 'fixture-v1-publications',
       v2ContentFingerprint: JSON.stringify(counts),
+      v2PublicationFingerprint: 'fixture-v2-publications',
+      messageFingerprint: 'fixture-messages',
+      requestLedgerFingerprint: 'fixture-requests',
       v2Counts: counts,
     };
   }

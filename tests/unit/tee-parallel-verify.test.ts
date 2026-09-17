@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { spawn, spawnSync } from 'child_process';
+import { spawn, spawnSync, type SpawnOptions } from 'child_process';
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import {
@@ -493,17 +493,28 @@ describe('TEE parallel verification runner', () => {
         command: process.execPath,
         args: ['-e', 'process.stdout.write("einval-recovered")'],
         windowsHide: true,
-        spawnImpl: ((command, argsOrOptions, options) => {
+        spawnImpl: ((
+          command: string,
+          argsOrOptions?: readonly string[] | SpawnOptions,
+          options?: SpawnOptions
+        ) => {
           recoverAttempts += 1;
           if (recoverAttempts === 1) {
             throw Object.assign(new Error('spawn EINVAL'), { code: 'EINVAL' });
           }
-          return typeof argsOrOptions === 'object' &&
+          if (
+            typeof argsOrOptions === 'object' &&
             argsOrOptions !== null &&
             !Array.isArray(argsOrOptions)
-            ? spawn(command, argsOrOptions)
-            : spawn(command, argsOrOptions ?? [], options ?? {});
-        }) as typeof spawn,
+          ) {
+            return spawn(command, argsOrOptions as SpawnOptions);
+          }
+          return spawn(
+            command,
+            [...((argsOrOptions as readonly string[] | undefined) ?? [])],
+            options ?? {}
+          );
+        }) as unknown as NonNullable<Parameters<typeof runProcessJob>[0]['spawnImpl']>,
       });
       expect(recoverFromEinval.status).toBe('passed');
       expect(recoverFromEinval.exitCode).toBe(0);
@@ -516,17 +527,28 @@ describe('TEE parallel verification runner', () => {
         command: process.execPath,
         args: ['-e', 'process.stderr.write("einval-still-fail"); process.exit(4)'],
         windowsHide: true,
-        spawnImpl: ((command, argsOrOptions, options) => {
+        spawnImpl: ((
+          command: string,
+          argsOrOptions?: readonly string[] | SpawnOptions,
+          options?: SpawnOptions
+        ) => {
           failAttempts += 1;
           if (failAttempts === 1) {
             throw Object.assign(new Error('spawn EINVAL'), { code: 'EINVAL' });
           }
-          return typeof argsOrOptions === 'object' &&
+          if (
+            typeof argsOrOptions === 'object' &&
             argsOrOptions !== null &&
             !Array.isArray(argsOrOptions)
-            ? spawn(command, argsOrOptions)
-            : spawn(command, argsOrOptions ?? [], options ?? {});
-        }) as typeof spawn,
+          ) {
+            return spawn(command, argsOrOptions as SpawnOptions);
+          }
+          return spawn(
+            command,
+            [...((argsOrOptions as readonly string[] | undefined) ?? [])],
+            options ?? {}
+          );
+        }) as unknown as NonNullable<Parameters<typeof runProcessJob>[0]['spawnImpl']>,
       });
       expect(fallbackStillFails.status).toBe('failed');
       expect(fallbackStillFails.exitCode).toBe(4);
@@ -549,7 +571,7 @@ describe('TEE progress reporter', () => {
         { id: 'verify-batch', label: 'Verification batch', weight: 80 },
         { id: 'done', label: 'Preflight', weight: 10 },
       ],
-      stream: { write: (chunk: string) => chunks.push(String(chunk)) } as NodeJS.WritableStream,
+      stream: { write: (chunk: string) => chunks.push(String(chunk)) },
     });
     reporter.start('ws_demo');
     reporter.stageStart('candidate');
@@ -683,7 +705,7 @@ describe('TEE progress reporter', () => {
       stages: [
         { id: 'verify-batch', label: 'Verification batch', weight: 100 },
       ],
-      stream: { write: (chunk: string) => chunks.push(String(chunk)) } as NodeJS.WritableStream,
+      stream: { write: (chunk: string) => chunks.push(String(chunk)) },
     });
     reporter.start();
     reporter.stageStart('verify-batch');
@@ -800,7 +822,7 @@ describe('TEE progress reporter', () => {
       isTTY: true,
       ci: false,
       stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
-      stream: { write: (chunk: string) => chunks.push(String(chunk)) } as NodeJS.WritableStream,
+      stream: { write: (chunk: string) => chunks.push(String(chunk)) },
     });
     const result = { exitCode: 0, ok: true };
     reporter.start();
@@ -822,7 +844,7 @@ describe('TEE progress reporter', () => {
       isTTY: true,
       ci: false,
       stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
-      stream: { write: (chunk: string) => passChunks.push(String(chunk)) } as NodeJS.WritableStream,
+      stream: { write: (chunk: string) => passChunks.push(String(chunk)) },
     });
     pass.start();
     pass.complete('passed');
@@ -840,7 +862,7 @@ describe('TEE progress reporter', () => {
       isTTY: true,
       ci: false,
       stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
-      stream: { write: (chunk: string) => failChunks.push(String(chunk)) } as NodeJS.WritableStream,
+      stream: { write: (chunk: string) => failChunks.push(String(chunk)) },
     });
     fail.start();
     fail.complete('failed');
@@ -879,7 +901,7 @@ describe('TEE progress reporter', () => {
       stdoutIsTty: false,
       stderrIsTty: false,
       stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
-      stream: { write: (chunk: string) => liveChunks.push(String(chunk)) } as NodeJS.WritableStream,
+      stream: { write: (chunk: string) => liveChunks.push(String(chunk)) },
     });
     expect(live).toBeDefined();
     expect(liveChunks.join('')).toContain(ttyLiveStartSequence(true));
@@ -890,7 +912,7 @@ describe('TEE progress reporter', () => {
       isTTY: true,
       ci: true,
       stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
-      stream: { write: (chunk: string) => chunks.push(String(chunk)) } as NodeJS.WritableStream,
+      stream: { write: (chunk: string) => chunks.push(String(chunk)) },
     });
     reporter.start();
     reporter.complete('failed');
@@ -905,7 +927,7 @@ describe('TEE progress reporter', () => {
       isTTY: true,
       ci: false,
       stages: [{ id: 'verify-batch', label: 'Verification batch', weight: 100 }],
-      stream: { write: (chunk: string) => chunks.push(String(chunk)) } as NodeJS.WritableStream,
+      stream: { write: (chunk: string) => chunks.push(String(chunk)) },
     });
     const result = { exitCode: 0, ok: true };
     reporter.start();

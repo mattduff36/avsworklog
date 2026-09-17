@@ -35,7 +35,7 @@ const baseEffectiveRole = {
   role_id: 'role-admin',
   role_name: 'admin',
   display_name: 'Admin',
-  role_class: 'admin',
+  role_class: 'admin' as const,
   is_manager_admin: true,
   is_super_admin: false,
   is_viewing_as: false,

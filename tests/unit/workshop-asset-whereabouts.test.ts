@@ -286,7 +286,11 @@ describe('workshop asset whereabouts helpers', () => {
   });
 
   it('WL-INSP-001 keeps a newer null submitted_at inspection ahead of ten older dated rows', () => {
-    const older = Array.from({ length: 11 }, (_, index) => ({
+    const older: Array<{
+      id: string;
+      submitted_at: string | null;
+      inspection_date: string;
+    }> = Array.from({ length: 11 }, (_, index) => ({
       id: `old-${index}`,
       submitted_at: `2026-08-${String(index + 1).padStart(2, '0')}T10:00:00.000Z`,
       inspection_date: `2026-08-${String(index + 1).padStart(2, '0')}`,

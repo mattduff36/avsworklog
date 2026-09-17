@@ -14,6 +14,7 @@ function buildLegacyQuote(overrides: Partial<LegacyQuote>): LegacyQuote {
     source_row: overrides.source_row || 2,
     quote_reference: overrides.quote_reference || '4000-GH',
     customer_name: overrides.customer_name || 'Default Customer',
+    site_address: overrides.site_address ?? null,
     title: overrides.title || 'Legacy Works',
     quote_date: overrides.quote_date || '2026-01-01',
     quote_date_raw: overrides.quote_date_raw ?? null,

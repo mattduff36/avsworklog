@@ -93,9 +93,9 @@ describe('Admin Settings delegated role assignment', () => {
       userId: 'user-1',
       roleId: 'employee',
       actorHasFullAccess: true,
-    }, () => client)).rejects.toMatchObject<Partial<AdminSettingsRoleAssignmentError>>({
+    }, () => client)).rejects.toMatchObject({
       status: 409,
-    });
+    } satisfies Partial<AdminSettingsRoleAssignmentError>);
 
     expect(client.calls.some((call) => (
       call.startsWith('DELETE FROM public.user_module_permissions')

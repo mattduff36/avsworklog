@@ -3,7 +3,6 @@ import {
   applyApprovedAbsenceTimesheetEffects,
   applyAbsenceToTimesheetRows,
   assertNoLockedAbsenceTimesheetImpacts,
-  buildAbsenceTimesheetImpactMessage,
   getAbsenceImpactDayOfWeek,
   getAbsenceImpactWeekEnding,
   removeAbsenceFromTimesheetRows,

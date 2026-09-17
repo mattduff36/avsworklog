@@ -353,7 +353,7 @@ describe('HGV inspection save coordination', () => {
       byKey?: { id: string; user_id: string; status: 'draft' | 'submitted' } | null;
       byHint?: { id: string; user_id: string; status: 'draft' | 'submitted' } | null;
     }) {
-      const rpcMock = vi.fn(async () => ({
+      const rpcMock = vi.fn(async (_name: string, _params?: Record<string, unknown>) => ({
         data: { id: HGV_SAVE_FIXTURE.hgv, status: 'draft' as const, items: [] },
         error: null,
       }));

@@ -85,6 +85,13 @@ export interface TeeProgressReporter {
   snapshot(): TeeProgressSnapshot;
 }
 
+export type TeeProgressEnvironment = Readonly<Record<string, string | undefined>>;
+
+export type TeeProgressOutputStream = {
+  write(chunk: string): unknown;
+  isTTY?: boolean;
+};
+
 const DEFAULT_HEARTBEAT_MS = 15_000;
 const ETA_MIN_ELAPSED_MS = 20_000;
 const ETA_MIN_FRACTION = 0.15;
@@ -106,7 +113,7 @@ export function notifyDisplayProgress(fn: () => void): void {
   }
 }
 
-export function isCursorInteractiveProgressHost(env: NodeJS.ProcessEnv = process.env): boolean {
+export function isCursorInteractiveProgressHost(env: TeeProgressEnvironment = process.env): boolean {
   if (env.CI === 'true' || env.CI === '1') return false;
   if (env.TEE_VERIFY_PROGRESS === 'off' || env.TEE_VERIFY_PROGRESS === 'plain') return false;
   if (env.TEE_VERIFY_PROGRESS === 'live') return true;
@@ -116,7 +123,7 @@ export function isCursorInteractiveProgressHost(env: NodeJS.ProcessEnv = process
 }
 
 export function resolveProgressIsTty(params: {
-  env?: NodeJS.ProcessEnv;
+  env?: TeeProgressEnvironment;
   stdoutIsTty?: boolean;
   stderrIsTty?: boolean;
 }): boolean {
@@ -126,7 +133,7 @@ export function resolveProgressIsTty(params: {
 }
 
 export function resolveInteractiveProgress(params?: {
-  env?: NodeJS.ProcessEnv;
+  env?: TeeProgressEnvironment;
   stdoutIsTty?: boolean;
   stderrIsTty?: boolean;
 }): { interactive: boolean; machine: boolean } {
@@ -140,13 +147,13 @@ export function resolveInteractiveProgress(params?: {
   return { interactive: !machine, machine };
 }
 
-export function shouldUseAlternateScreen(env: NodeJS.ProcessEnv = process.env): boolean {
+export function shouldUseAlternateScreen(env: TeeProgressEnvironment = process.env): boolean {
   if (env.TEE_VERIFY_PROGRESS_ALT === '0' || env.TEE_VERIFY_PROGRESS_ALT === 'off') return false;
   if (env.TERM === 'dumb' && !isCursorInteractiveProgressHost(env)) return false;
   return true;
 }
 
-export function shouldUseMachineProgress(env: NodeJS.ProcessEnv, isTty: boolean | undefined): boolean {
+export function shouldUseMachineProgress(env: TeeProgressEnvironment, isTty: boolean | undefined): boolean {
   if (env.TEE_VERIFY_PROGRESS === 'off' || env.TEE_VERIFY_PROGRESS === 'plain') return true;
   if (env.CI === 'true' || env.CI === '1') return true;
   if (env.TEE_VERIFY_PROGRESS === 'live') return false;
@@ -351,7 +358,7 @@ export function renderTeeProgressLines(snapshot: TeeProgressSnapshot): string[] 
 export function createTeeProgressReporter(options: {
   title: string;
   stages: TeeProgressStageSpec[];
-  stream?: NodeJS.WritableStream;
+  stream?: TeeProgressOutputStream;
   isTTY?: boolean;
   now?: () => number;
   heartbeatMs?: number;

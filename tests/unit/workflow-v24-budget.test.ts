@@ -20,6 +20,7 @@ import {
   REHOME_EVIDENCE_CANON_VERSION,
   revalidateRouteDisposition,
 } from '@/scripts/automation/workflow-v24-disposition';
+import type { WorkflowProtocolRecord } from '@/scripts/automation/types';
 import {
   cleanupWorkflowV24Fixtures,
   commitFile,
@@ -379,7 +380,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 120_000 }, () => 
       workstreamId: 'ws_v24_fix',
       disposition: 'rehomed',
       reason: 'empty implementation list',
-      predecessorHead: impl,
+      predecessorHeadCommit: impl,
       successorRepo: repoRoot,
       successorBranch: 'main',
       successorBaseline: baseline,
@@ -657,8 +658,10 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 120_000 }, () => 
       },
     };
     writeProtocolRecord(repoRoot, omittedStored);
-    expect(revalidateRouteDisposition({ repoRoot, record: omittedStored }).ok).toBe(false);
-    expect(revalidateRouteDisposition({ repoRoot, record: omittedStored }).message).toMatch(
+    const omittedResult = revalidateRouteDisposition({ repoRoot, record: omittedStored });
+    expect(omittedResult.ok).toBe(false);
+    if (omittedResult.ok) throw new Error('Expected omitted evidence to fail');
+    expect(omittedResult.message).toMatch(
       /omits implementation commit|incomplete|not match/i
     );
 
@@ -687,6 +690,7 @@ describe('TEE V2.4 lineage budget and disposition', { timeout: 120_000 }, () => 
     writeProtocolRecord(repoRoot, freshHashTamper);
     const freshResult = revalidateRouteDisposition({ repoRoot, record: freshHashTamper });
     expect(freshResult.ok).toBe(false);
+    if (freshResult.ok) throw new Error('Expected fresh-hash tampering to fail');
     expect(freshResult.message).toMatch(/git-derived|no longer holds|not match/i);
   });
 });
