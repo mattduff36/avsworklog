@@ -45,14 +45,17 @@ export async function POST(
 
     return NextResponse.json({ success: true, result });
   } catch (error) {
-    await logServerError({
-      error: error instanceof Error ? error : new Error(String(error)),
-      request,
-      componentName: '/api/workshop-tasks/tasks/[taskId]/complete-service',
-      additionalData: {
-        endpoint: 'POST /api/workshop-tasks/tasks/[taskId]/complete-service',
-      },
-    });
+    const expectedClientError = error instanceof AssetServiceError && error.status < 500;
+    if (!expectedClientError) {
+      await logServerError({
+        error: error instanceof Error ? error : new Error(String(error)),
+        request,
+        componentName: '/api/workshop-tasks/tasks/[taskId]/complete-service',
+        additionalData: {
+          endpoint: 'POST /api/workshop-tasks/tasks/[taskId]/complete-service',
+        },
+      });
+    }
     if (error instanceof AssetServiceError) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
