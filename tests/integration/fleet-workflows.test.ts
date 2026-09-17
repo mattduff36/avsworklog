@@ -13,6 +13,18 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const targetHostname = (() => {
+  try {
+    return supabaseUrl ? new URL(supabaseUrl).hostname.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+})();
+const isLoopbackTarget =
+  targetHostname === 'localhost' ||
+  targetHostname === '127.0.0.1' ||
+  targetHostname === '[::1]';
+const TEST_MILEAGE_SENTINEL = 999997;
 
 // SAFETY CHECK: Skip when not running against localhost or staging
 const shouldSkip = !supabaseUrl || !supabaseKey || (!supabaseUrl.includes('localhost') && !supabaseUrl.includes('127.0.0.1') && !supabaseUrl.includes('staging'));
@@ -116,38 +128,53 @@ describeOrSkip('Fleet Module Workflows', () => {
     });
 
     it('should update vehicle maintenance data', async () => {
+      if (!isLoopbackTarget) {
+        console.warn('⏭️  Skipping mutating mileage test outside a loopback database');
+        return;
+      }
       if (!testVehicleId) {
         console.log('No test vehicle, skipping test');
         return;
       }
 
       // First, get the vehicle_maintenance record ID
-      const { data: vmRecord } = await supabase
+      const { data: vmRecord, error: readError } = await supabase
         .from('vehicle_maintenance')
-        .select('id')
+        .select('id, current_mileage')
         .eq('van_id', testVehicleId)
         .single();
 
+      expect(readError).toBeNull();
       if (!vmRecord) {
         console.log('No vehicle_maintenance record found, skipping test');
         return;
       }
+      if (vmRecord.current_mileage === TEST_MILEAGE_SENTINEL) {
+        throw new Error('Test mileage sentinel was already present before the update');
+      }
 
-      // SAFETY: Using obviously invalid mileage (999997) so corruption is immediately visible
-      const updates = {
-        current_mileage: 999997,
-      };
+      try {
+        const { data: updated, error } = await supabase
+          .from('vehicle_maintenance')
+          .update({ current_mileage: TEST_MILEAGE_SENTINEL })
+          .eq('id', vmRecord.id)
+          .select()
+          .single();
 
-      const { data: updated, error } = await supabase
-        .from('vehicle_maintenance')
-        .update(updates)
-        .eq('id', vmRecord.id)
-        .select()
-        .single();
+        expect(error).toBeNull();
+        expect(updated).toBeDefined();
+        expect(updated?.current_mileage).toBe(TEST_MILEAGE_SENTINEL);
+      } finally {
+        const { error: restoreError } = await supabase
+          .from('vehicle_maintenance')
+          .update({ current_mileage: vmRecord.current_mileage })
+          .eq('id', vmRecord.id)
+          .eq('current_mileage', TEST_MILEAGE_SENTINEL);
 
-      expect(error).toBeNull();
-      expect(updated).toBeDefined();
-      expect(updated?.current_mileage).toBe(999997);
+        if (restoreError) {
+          throw new Error(`Failed to restore test vehicle mileage: ${restoreError.message}`);
+        }
+      }
     });
   });
 
