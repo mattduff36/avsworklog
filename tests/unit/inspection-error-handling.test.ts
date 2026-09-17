@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   canSubmitAfterLockedDefectsCheck,
+  createLockedDefectsCheckError,
   getInspectionErrorMessage,
   getLockedDefectsFailureLogMethod,
   isDuplicateInspectionError,
@@ -121,5 +122,22 @@ describe('inspection-error-handling', () => {
     expect(logger.warn).toHaveBeenCalledTimes(1);
     expect(logger.error).not.toHaveBeenCalled();
     expect(getLockedDefectsFailureLogMethod(new Error('Locked defect checks failed (500/500)'))).toBe('error');
+  });
+
+  it('PI-LOCK-401-001 classifies pure 401 as warning and mixed 401/5xx as error', () => {
+    const logger = {
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+    const unauthorized = createLockedDefectsCheckError(401, 200);
+    const mixed = createLockedDefectsCheckError(401, 500);
+
+    expect(getLockedDefectsFailureLogMethod(unauthorized)).toBe('warn');
+    expect(reportLockedDefectsLoadFailure(unauthorized, logger)).toBe('failed');
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.error).not.toHaveBeenCalled();
+
+    expect(getLockedDefectsFailureLogMethod(mixed)).toBe('error');
+    expect(getLockedDefectsFailureLogMethod(createLockedDefectsCheckError(500, 200))).toBe('error');
   });
 });

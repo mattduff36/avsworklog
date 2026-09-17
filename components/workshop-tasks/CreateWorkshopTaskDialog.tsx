@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { FileText } from 'lucide-react';
 import { getTaskContent, type AlertType } from '@/lib/utils/serviceTaskCreation';
 import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
-import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
+import { useAttachmentTemplates, type AttachmentTemplate } from '@/lib/hooks/useAttachmentTemplates';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
@@ -91,6 +91,7 @@ export function CreateWorkshopTaskDialog({
   const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
   const contentRef = useRef<HTMLDivElement>(null);
+  const appliedOpenPrefillKeyRef = useRef<string | null>(null);
   
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [recentVehicleIds, setRecentVehicleIds] = useState<string[]>([]);
@@ -106,6 +107,8 @@ export function CreateWorkshopTaskDialog({
   const [meterReadingType, setMeterReadingType] = useState<'mileage' | 'hours'>('mileage');
   const [submitting, setSubmitting] = useState(false);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
+  const [linkedCategoryTemplateIds, setLinkedCategoryTemplateIds] = useState<string[] | null>(null);
+  const [categoryLinksState, setCategoryLinksState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
   
   // Fetch available attachment templates
   const { templates: attachmentTemplates } = useAttachmentTemplates();
@@ -195,7 +198,16 @@ export function CreateWorkshopTaskDialog({
 
   // Load initial data and set prefilled values
   useEffect(() => {
-    if (open) {
+    if (!open) {
+      appliedOpenPrefillKeyRef.current = null;
+      return;
+    }
+    {
+      const prefillKey = `${initialVehicleId || ''}:${initialCategoryId || ''}`;
+      const shouldApplyPrefill = appliedOpenPrefillKeyRef.current !== prefillKey;
+      if (shouldApplyPrefill) {
+        appliedOpenPrefillKeyRef.current = prefillKey;
+      }
       async function fetchVehicles() {
         try {
           // Fetch vans
@@ -316,11 +328,11 @@ export function CreateWorkshopTaskDialog({
       }
       
       // Set initial values if provided
-      if (initialVehicleId) {
+      if (shouldApplyPrefill && initialVehicleId) {
         setSelectedVehicleId(initialVehicleId);
         fetchCurrentMeterReading(initialVehicleId);
       }
-      if (initialCategoryId) {
+      if (shouldApplyPrefill && initialCategoryId) {
         setSelectedCategoryId(initialCategoryId);
       }
     }
@@ -329,20 +341,33 @@ export function CreateWorkshopTaskDialog({
   // Get selected vehicle's asset type
   const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
   const selectedAssetType = selectedVehicle?.asset_type || 'van';
-  const filteredAttachmentTemplates = useMemo(() => (
+  const assetCompatibleTemplates = useMemo(() => (
     attachmentTemplates.filter((template) =>
       normalizeTemplateAppliesTo(template.applies_to).includes(selectedAssetType),
     )
   ), [attachmentTemplates, selectedAssetType]);
+  const filteredAttachmentTemplates = useMemo(() => {
+    if (!selectedCategoryId || categoryLinksState !== 'ready' || linkedCategoryTemplateIds == null) {
+      return [] as AttachmentTemplate[];
+    }
+    if (linkedCategoryTemplateIds.length === 0) {
+      return [] as AttachmentTemplate[];
+    }
+    return linkedCategoryTemplateIds
+      .map((templateId) => assetCompatibleTemplates.find((template) => template.id === templateId))
+      .filter((template): template is AttachmentTemplate => Boolean(template));
+  }, [assetCompatibleTemplates, categoryLinksState, linkedCategoryTemplateIds, selectedCategoryId]);
   const isSelectedHgv = selectedAssetType === 'hgv';
   const meterFieldLabel = meterReadingType === 'hours' ? 'Current Hours' : isSelectedHgv ? 'Current KM' : 'Current Mileage';
   const meterInputDescriptor = meterReadingType === 'hours' ? 'hours' : isSelectedHgv ? 'KM' : 'mileage';
   const meterUnit = meterReadingType === 'hours' ? 'hours' : isSelectedHgv ? 'km' : 'miles';
 
   // Filter categories by selected vehicle's asset type
-  const filteredCategories = categories.filter((cat) =>
-    normalizeTemplateAppliesTo(cat.applies_to).includes(selectedAssetType),
-  );
+  const filteredCategories = useMemo(() => (
+    categories.filter((cat) =>
+      normalizeTemplateAppliesTo(cat.applies_to).includes(selectedAssetType),
+    )
+  ), [categories, selectedAssetType]);
 
   // Filter subcategories by selected category and asset type
   const filteredSubcategories = selectedCategoryId
@@ -361,7 +386,56 @@ export function CreateWorkshopTaskDialog({
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategoryId(categoryId);
     setSelectedSubcategoryId('');
+    setSelectedTemplateIds([]);
   };
+
+  useEffect(() => {
+    if (!selectedCategoryId) {
+      setLinkedCategoryTemplateIds(null);
+      setCategoryLinksState('idle');
+      return;
+    }
+    let cancelled = false;
+    setCategoryLinksState('loading');
+    (async () => {
+      try {
+        const response = await fetch(
+          `/api/workshop-tasks/category-attachments?categoryId=${encodeURIComponent(selectedCategoryId)}`,
+        );
+        const data = await response.json().catch(() => ({}));
+        if (cancelled) return;
+        if (!response.ok) {
+          setLinkedCategoryTemplateIds([]);
+          setCategoryLinksState('failed');
+          return;
+        }
+        const ids = ((data.templates || []) as Array<{ templateId?: string }>)
+          .map((template) => template.templateId)
+          .filter((templateId): templateId is string => Boolean(templateId));
+        setLinkedCategoryTemplateIds(ids);
+        setCategoryLinksState('ready');
+      } catch {
+        if (!cancelled) {
+          setLinkedCategoryTemplateIds([]);
+          setCategoryLinksState('failed');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCategoryId]);
+
+  useEffect(() => {
+    if (!selectedCategoryId || !selectedVehicleId || vehicles.length === 0 || categories.length === 0) {
+      return;
+    }
+    if (!filteredCategories.some((category) => category.id === selectedCategoryId)) {
+      setSelectedCategoryId('');
+      setSelectedSubcategoryId('');
+      setSelectedTemplateIds([]);
+    }
+  }, [categories.length, filteredCategories, selectedCategoryId, selectedVehicleId, vehicles.length]);
 
   const handleAddTask = async () => {
     if (!user?.id) {
@@ -371,8 +445,23 @@ export function CreateWorkshopTaskDialog({
     }
 
     const needsSubcategory = categoryHasSubcategories;
+    const hasConfiguredLinks = (linkedCategoryTemplateIds?.length ?? 0) > 0;
+    const requiresExactOneAttachment = hasConfiguredLinks && filteredAttachmentTemplates.length > 0;
+    const invalidLinkConfiguration = hasConfiguredLinks && filteredAttachmentTemplates.length === 0;
+    const linksBusy = Boolean(selectedCategoryId) && categoryLinksState !== 'ready';
     if (!selectedVehicleId || !selectedCategoryId || (needsSubcategory && !selectedSubcategoryId) || !workshopComments.trim() || !newMeterReading.trim()) {
       toast.error('Please fill in all required fields');
+      return;
+    }
+    if (linksBusy || categoryLinksState === 'failed' || invalidLinkConfiguration) {
+      toast.error('Attachment templates for this workshop category are not ready');
+      return;
+    }
+    const validSelectedTemplateIds = selectedTemplateIds.filter((templateId) =>
+      filteredAttachmentTemplates.some((template) => template.id === templateId),
+    );
+    if (requiresExactOneAttachment && validSelectedTemplateIds.length !== 1) {
+      toast.error('Select the required attachment for this workshop category');
       return;
     }
 
@@ -450,31 +539,42 @@ export function CreateWorkshopTaskDialog({
       }
 
       const newTask = createTaskPayload.task;
+      if (!newTask?.id) {
+        throw new Error('Failed to create task');
+      }
 
-      // Create attachments for selected templates
-      if (newTask && selectedTemplateIds.length > 0) {
-        const attachmentErrors: string[] = [];
-        
-        for (const templateId of selectedTemplateIds) {
-          const attachmentResponse = await fetch(`/api/workshop-tasks/attachments/task/${newTask.id}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ template_id: templateId }),
-          });
+      const templatesToAttach = requiresExactOneAttachment ? validSelectedTemplateIds : [];
 
-          if (!attachmentResponse.ok) {
-            const attachmentError = await attachmentResponse.json().catch(() => ({}));
-            console.error('Error creating attachment with V2 snapshot:', attachmentError);
+      const attachmentErrors: string[] = [];
+      if (templatesToAttach.length > 0) {
+        for (const templateId of templatesToAttach) {
+          try {
+            const attachmentResponse = await fetch(`/api/workshop-tasks/attachments/task/${newTask.id}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ template_id: templateId }),
+            });
+
+            if (!attachmentResponse.ok) {
+              const attachmentError = await attachmentResponse.json().catch(() => ({})) as { error?: string };
+              const isExpectedLinkError =
+                attachmentResponse.status === 400 &&
+                attachmentError.error === 'Selected attachment is not linked to this workshop category';
+              if (!isExpectedLinkError) {
+                console.error('Error creating attachment with V2 snapshot:', attachmentError);
+              }
+              attachmentErrors.push(templateId);
+            }
+          } catch (attachmentErr) {
+            console.error('Error creating attachment with V2 snapshot:', attachmentErr);
             attachmentErrors.push(templateId);
           }
         }
-
-        if (attachmentErrors.length > 0) {
-          toast.error(`Task created but ${attachmentErrors.length} attachment(s) failed to link`);
-        }
       }
 
-      if (createTaskPayload.meter_reading_updated === false) {
+      if (attachmentErrors.length > 0) {
+        toast.error(`Task created but ${attachmentErrors.length} attachment(s) failed to link`);
+      } else if (createTaskPayload.meter_reading_updated === false) {
         toast.error(`Task created but failed to update ${meterReadingType === 'hours' ? 'hours' : (isHgv ? 'KM' : 'mileage')}`);
       } else {
         toast.success('Workshop task created successfully');
@@ -525,13 +625,24 @@ export function CreateWorkshopTaskDialog({
   );
 
   useEffect(() => {
-    if (selectedTemplateIds.length === 0) return;
-    const visibleTemplateIds = new Set(filteredAttachmentTemplates.map((template) => template.id));
-    const nextSelectedTemplateIds = selectedTemplateIds.filter((id) => visibleTemplateIds.has(id));
-    if (nextSelectedTemplateIds.length !== selectedTemplateIds.length) {
-      setSelectedTemplateIds(nextSelectedTemplateIds);
+    if (categoryLinksState !== 'ready' || linkedCategoryTemplateIds == null) return;
+    if (linkedCategoryTemplateIds.length === 0 || filteredAttachmentTemplates.length === 0) {
+      if (selectedTemplateIds.length > 0) {
+        setSelectedTemplateIds([]);
+      }
+      return;
     }
-  }, [filteredAttachmentTemplates, selectedTemplateIds]);
+    const validSelected = selectedTemplateIds.filter((id) =>
+      filteredAttachmentTemplates.some((template) => template.id === id),
+    );
+    if (validSelected.length !== 1) {
+      setSelectedTemplateIds([filteredAttachmentTemplates[0].id]);
+      return;
+    }
+    if (validSelected.length !== selectedTemplateIds.length) {
+      setSelectedTemplateIds(validSelected);
+    }
+  }, [categoryLinksState, filteredAttachmentTemplates, linkedCategoryTemplateIds, selectedTemplateIds]);
 
   return (
     <Dialog
@@ -585,6 +696,7 @@ export function CreateWorkshopTaskDialog({
                 // (different asset types have different categories)
                 setSelectedCategoryId('');
                 setSelectedSubcategoryId('');
+                setSelectedTemplateIds([]);
               } else {
                 setCurrentMeterReading(null);
               }
@@ -726,10 +838,23 @@ export function CreateWorkshopTaskDialog({
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Attachments (Optional)
+                {(linkedCategoryTemplateIds?.length ?? 0) > 0 && filteredAttachmentTemplates.length > 0
+                  ? 'Attachments'
+                  : 'Attachments (Optional)'}
+                {(linkedCategoryTemplateIds?.length ?? 0) > 0 && filteredAttachmentTemplates.length > 0 ? (
+                  <span className="text-red-500">*</span>
+                ) : null}
               </Label>
               <p className="text-xs text-muted-foreground mb-2">
-                Add service checklists or documentation to complete later
+                {categoryLinksState === 'loading'
+                  ? 'Loading attachments for this workshop category...'
+                  : categoryLinksState === 'failed'
+                    ? 'Unable to load category attachments. Retry by changing category.'
+                    : (linkedCategoryTemplateIds?.length ?? 0) > 0 && filteredAttachmentTemplates.length === 0
+                      ? 'This category has no active attachments compatible with the selected asset.'
+                      : (linkedCategoryTemplateIds?.length ?? 0) > 0
+                        ? 'Select the required checklist for this workshop category'
+                        : 'Add service checklists or documentation to complete later'}
               </p>
               <div className="space-y-2 max-h-32 overflow-y-auto p-2 border rounded-md bg-muted/30">
                 {filteredAttachmentTemplates.length === 0 && (
@@ -778,7 +903,22 @@ export function CreateWorkshopTaskDialog({
           </Button>
           <Button
             onClick={handleAddTask}
-            disabled={submitting || !selectedVehicleId || !selectedCategoryId || (categoryHasSubcategories && !selectedSubcategoryId) || workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH || !newMeterReading.trim()}
+            disabled={
+              submitting ||
+              !selectedVehicleId ||
+              !selectedCategoryId ||
+              (categoryHasSubcategories && !selectedSubcategoryId) ||
+              workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH ||
+              !newMeterReading.trim() ||
+              (Boolean(selectedCategoryId) && categoryLinksState !== 'ready') ||
+              categoryLinksState === 'failed' ||
+              ((linkedCategoryTemplateIds?.length ?? 0) > 0 && filteredAttachmentTemplates.length === 0) ||
+              ((linkedCategoryTemplateIds?.length ?? 0) > 0 &&
+                filteredAttachmentTemplates.length > 0 &&
+                selectedTemplateIds.filter((templateId) =>
+                  filteredAttachmentTemplates.some((template) => template.id === templateId),
+                ).length !== 1)
+            }
               className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
           >
             {submitting ? 'Creating...' : 'Create Task'}

@@ -12,6 +12,11 @@ import { toDeletedUserName } from '@/lib/users/deleted-user';
 import { revokeAllAppSessionsForProfile } from '@/lib/server/app-auth/session';
 import { revokeWebAuthnCredentialsForProfile } from '@/lib/server/webauthn/credentials';
 import { removeOpenYearAnnualLeaveBookingsForProfile } from '@/lib/server/delete-user-annual-leave';
+import {
+  duplicateEmployeeIdPayload,
+  findEmployeeIdOwner,
+  parseEmployeeId,
+} from '@/lib/server/admin-user-employee-id';
 
 function isMissingHierarchySchemaError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -129,6 +134,11 @@ export async function PUT(
     const userId = (await params).id;
     const body = await request.json();
     const { email, full_name, phone_number, employee_id, role_id, line_manager_id, team_id } = body;
+    const parsedEmployeeId = parseEmployeeId(employee_id);
+    if (!parsedEmployeeId.ok) {
+      return NextResponse.json({ error: 'Employee ID must be a string or empty' }, { status: 400 });
+    }
+    const normalizedEmployeeId = parsedEmployeeId.value;
 
     // Validate required fields
     if (!full_name) {
@@ -190,6 +200,18 @@ export async function PUT(
       );
     }
 
+    const existingEmployeeId = parseEmployeeId(existingUser.employee_id);
+    const currentEmployeeId = existingEmployeeId.ok ? existingEmployeeId.value : existingUser.employee_id || null;
+    if (normalizedEmployeeId !== currentEmployeeId && normalizedEmployeeId) {
+      const ownerLookup = await findEmployeeIdOwner(supabaseAdmin, normalizedEmployeeId, userId);
+      if (!ownerLookup.ok) {
+        return NextResponse.json({ error: 'Failed to validate employee ID' }, { status: 500 });
+      }
+      if (ownerLookup.ownerId) {
+        return NextResponse.json(duplicateEmployeeIdPayload(), { status: 409 });
+      }
+    }
+
     // Track changes for email notification
     const changes: ProfileChanges = {};
     const notificationEmail = email || null;
@@ -206,8 +228,8 @@ export async function PUT(
     if (phone_number !== existingUser.phone_number) {
       changes.phone_number = { old: existingUser.phone_number || '', new: phone_number || '' };
     }
-    if (employee_id !== existingUser.employee_id) {
-      changes.employee_id = { old: existingUser.employee_id || '', new: employee_id || '' };
+    if (normalizedEmployeeId !== currentEmployeeId) {
+      changes.employee_id = { old: currentEmployeeId || '', new: normalizedEmployeeId || '' };
     }
     if ((line_manager_id || null) !== ((existingUser as { line_manager_id?: string | null }).line_manager_id || null)) {
       changes.line_manager = {
@@ -268,7 +290,7 @@ export async function PUT(
     const baseUpdatePayload = {
       full_name,
       phone_number: phone_number || null,
-      employee_id: employee_id || null,
+      employee_id: normalizedEmployeeId,
       role_id,
     };
 

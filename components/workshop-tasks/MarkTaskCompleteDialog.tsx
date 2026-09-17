@@ -24,6 +24,11 @@ import {
   resolveStepForTemplateFirst,
   type ServiceRotationStep,
 } from '@/lib/utils/assetServiceRotation';
+import { isServiceWorkshopTask } from '@/lib/workshop-tasks/is-service-task';
+
+type ServiceAttachmentCheck =
+  | { status: 'idle' | 'loading' | 'ready' | 'failed' }
+  | { status: 'blocked'; reason: 'count' | 'incomplete' | 'unlinked' | 'not-in-rotation' };
 
 export interface TaskForCompletion {
   id: string;
@@ -35,9 +40,14 @@ export interface TaskForCompletion {
   hgv_id?: string | null;
   plant_id?: string | null;
   workshop_task_categories?: {
-    id: string;
-    name: string;
+    id?: string;
+    name?: string | null;
     completion_updates?: CompletionUpdateConfig[] | null;
+  } | null;
+  workshop_task_subcategories?: {
+    id?: string;
+    name?: string | null;
+    workshop_task_categories?: { name?: string | null } | null;
   } | null;
 }
 
@@ -74,6 +84,28 @@ function parseLocalDateTimeInput(value: string): Date | null {
   if (!value) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getServiceAttachmentGuidance(check: ServiceAttachmentCheck): string {
+  switch (check.status) {
+    case 'idle':
+    case 'loading':
+    case 'ready':
+      return 'Checking the linked service attachment before completion can be enabled.';
+    case 'failed':
+      return 'Unable to verify the linked service attachment. Retry the check before completing.';
+    case 'blocked':
+      if (check.reason === 'incomplete') {
+        return 'Complete the linked service checklist before marking this task complete.';
+      }
+      if (check.reason === 'count') {
+        return 'Service tasks need exactly one linked attachment before completion.';
+      }
+      if (check.reason === 'unlinked') {
+        return 'The task attachment is not linked to this service category.';
+      }
+      return 'The completed attachment is not part of the active service rotation.';
+  }
 }
 
 function parseIsoDate(value: string | null | undefined): Date | null {
@@ -133,16 +165,15 @@ export function MarkTaskCompleteDialog({
   const [confirmedNextTemplateId, setConfirmedNextTemplateId] = useState('');
   const [serviceTemplates, setServiceTemplates] = useState<Array<{ templateId: string; templateName: string; compactLabel: string | null }>>([]);
   const [suggestedNextTemplateId, setSuggestedNextTemplateId] = useState('');
+  const [serviceAttachmentCheck, setServiceAttachmentCheck] = useState<ServiceAttachmentCheck>({ status: 'idle' });
+  const [serviceAttachmentRetryToken, setServiceAttachmentRetryToken] = useState(0);
 
   const requiresIntermediateStep = task?.status === 'pending' || task?.status === 'on_hold';
   const completionUpdates = task?.workshop_task_categories?.completion_updates || [];
   const hasMaintenanceUpdates = completionUpdates.length > 0;
   const requiresCompletionSignature = task?.action_type === 'inspection_defect' && Boolean(task.hgv_id);
   const isHgvTask = Boolean(task?.hgv_id);
-  const isServiceTask = Boolean(
-    task?.workshop_task_categories?.name &&
-      /^service(\s|\(|$)/i.test(task.workshop_task_categories.name),
-  );
+  const isServiceTask = Boolean(task && isServiceWorkshopTask(task));
   const serviceAssetType = task?.hgv_id ? 'hgv' : task?.plant_id ? 'plant' : 'van';
   const formatDistanceCopy = (value: string) =>
     isHgvTask
@@ -175,26 +206,56 @@ export function MarkTaskCompleteDialog({
         setConfirmedNextTemplateId('');
         setSuggestedNextTemplateId('');
         setServiceTemplates([]);
+        setServiceAttachmentCheck({ status: 'idle' });
       });
     }
   }, [open, task]);
 
   useEffect(() => {
-    if (!open || !task || !isServiceTask) return;
+    if (!open || !task || !isServiceTask) {
+      return;
+    }
     let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) {
+        setServiceAttachmentCheck({ status: 'loading' });
+      }
+    });
     (async () => {
       try {
         const assetId = task.hgv_id || task.plant_id || task.van_id;
-        const [typesResponse, attachmentsResponse] = await Promise.all([
+        const categoryId = task.workshop_task_categories?.id;
+        const [typesResponse, attachmentsResponse, linksResponse] = await Promise.all([
           fetch(
             `/api/fleet/service-types?assetType=${serviceAssetType}${
               assetId ? `&assetId=${encodeURIComponent(assetId)}` : ''
             }`,
           ),
           fetch(`/api/workshop-tasks/attachments/task/${task.id}`),
+          categoryId
+            ? fetch(`/api/workshop-tasks/category-attachments?categoryId=${encodeURIComponent(categoryId)}`)
+            : Promise.resolve(null),
         ]);
+        if (cancelled) return;
+        if (!typesResponse.ok || !attachmentsResponse.ok || (linksResponse && !linksResponse.ok)) {
+          setServiceAttachmentCheck({ status: 'failed' });
+          return;
+        }
+
         const data = await typesResponse.json();
-        if (!typesResponse.ok || cancelled) return;
+        const attachmentPayload = await attachmentsResponse.json();
+        const attachments = (attachmentPayload.attachments ?? attachmentPayload.data) as unknown;
+        const linkedIds = linksResponse
+          ? (((await linksResponse.json()).templates || []) as Array<{ templateId?: string }>)
+              .map((template) => template.templateId)
+              .filter((templateId): templateId is string => Boolean(templateId))
+          : [];
+
+        if (!Array.isArray(attachments)) {
+          setServiceAttachmentCheck({ status: 'failed' });
+          return;
+        }
+
         const templates = (data.templates || []) as Array<{
           templateId: string;
           templateName: string;
@@ -209,18 +270,6 @@ export function MarkTaskCompleteDialog({
         }>;
         setServiceTemplates(templates);
 
-        let completedTemplateId = '';
-        if (attachmentsResponse.ok) {
-          const attachmentPayload = await attachmentsResponse.json();
-          const attachments = (attachmentPayload.attachments || attachmentPayload.data || []) as Array<{
-            template_id?: string;
-            status?: string;
-          }>;
-          const completed =
-            attachments.find((attachment) => attachment.status === 'completed') || attachments[0];
-          completedTemplateId = completed?.template_id || '';
-        }
-
         const steps: ServiceRotationStep[] = rotation.map((step) => ({
           id: step.id,
           position: step.position,
@@ -228,6 +277,27 @@ export function MarkTaskCompleteDialog({
           compactLabel: step.compactLabel,
           templateName: step.templateName,
         }));
+
+        if (attachments.length !== 1) {
+          setServiceAttachmentCheck({ status: 'blocked', reason: 'count' });
+          return;
+        }
+
+        const attachment = attachments[0] as { template_id?: string; status?: string };
+        if (attachment.status !== 'completed') {
+          setServiceAttachmentCheck({ status: 'blocked', reason: 'incomplete' });
+          return;
+        }
+        if (!attachment.template_id || !linkedIds.includes(attachment.template_id)) {
+          setServiceAttachmentCheck({ status: 'blocked', reason: 'unlinked' });
+          return;
+        }
+        if (!steps.some((step) => step.attachmentTemplateId === attachment.template_id)) {
+          setServiceAttachmentCheck({ status: 'blocked', reason: 'not-in-rotation' });
+          return;
+        }
+
+        const completedTemplateId = attachment.template_id;
         const cursorStep =
           completedTemplateId && data.currentNextServiceRotationStepId
             ? steps.find(
@@ -237,10 +307,7 @@ export function MarkTaskCompleteDialog({
               ) ?? null
             : null;
         const completedStep =
-          cursorStep ||
-          (completedTemplateId
-            ? resolveStepForTemplateFirst(steps, completedTemplateId)
-            : null);
+          cursorStep || resolveStepForTemplateFirst(steps, completedTemplateId);
         const successor = getSuccessorStep(steps, completedStep?.id);
         const suggested =
           successor?.attachmentTemplateId ||
@@ -249,14 +316,15 @@ export function MarkTaskCompleteDialog({
           '';
         setSuggestedNextTemplateId(suggested);
         setConfirmedNextTemplateId(suggested);
+        setServiceAttachmentCheck({ status: 'ready' });
       } catch {
-        // optional UI enrichment
+        if (!cancelled) setServiceAttachmentCheck({ status: 'failed' });
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [open, task, isServiceTask, serviceAssetType]);
+  }, [open, task, isServiceTask, serviceAssetType, serviceAttachmentRetryToken]);
 
   const handleMaintenanceFieldChange = (fieldName: string, value: string) => {
     setMaintenanceFields((prev) => ({
@@ -407,7 +475,8 @@ export function MarkTaskCompleteDialog({
     (!requiresCompletionSignature || Boolean(completedSignatureData)) &&
     validateMaintenanceFields() &&
     isServiceMeterValid &&
-    (!isServiceTask || Boolean(confirmedNextTemplateId));
+    (!isServiceTask || Boolean(confirmedNextTemplateId)) &&
+    (!isServiceTask || serviceAttachmentCheck.status === 'ready');
   const isDirty = useMemo(
     () =>
       intermediateComment.trim().length > 0 ||
@@ -552,6 +621,25 @@ export function MarkTaskCompleteDialog({
               Confirm the real completion date. This date is used for future maintenance due dates.
             </p>
           </div>
+
+          {isServiceTask && serviceAttachmentCheck.status !== 'ready' && (
+            <div className="space-y-2 rounded-md border border-amber-700/60 bg-amber-950/30 p-3">
+              <p className="text-sm text-amber-100">
+                {getServiceAttachmentGuidance(serviceAttachmentCheck)}
+              </p>
+              {(serviceAttachmentCheck.status === 'failed' || serviceAttachmentCheck.status === 'blocked') && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setServiceAttachmentRetryToken((token) => token + 1)}
+                  disabled={isSubmitting}
+                >
+                  Retry attachment check
+                </Button>
+              )}
+            </div>
+          )}
 
           {isServiceTask && (
             <div className="space-y-3 border rounded-md p-3 bg-muted/30">

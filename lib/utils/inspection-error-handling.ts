@@ -1,4 +1,9 @@
-import { isNetworkFetchError } from '@/lib/utils/http-error';
+import { createStatusError, getErrorStatus, isNetworkFetchError, type StatusError } from '@/lib/utils/http-error';
+
+export type LockedDefectCheckStatuses = {
+  lockedStatus: number;
+  recentStatus: number;
+};
 
 function extractInspectionErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -43,8 +48,62 @@ export function canSubmitAfterLockedDefectsCheck(input: {
   );
 }
 
+export function createLockedDefectsCheckError(
+  lockedStatus: number,
+  recentStatus: number,
+): StatusError {
+  const preferredStatus = [lockedStatus, recentStatus].find((status) => status >= 500)
+    ?? ([lockedStatus, recentStatus].find((status) => status === 401) ?? lockedStatus);
+  return createStatusError(
+    `Locked defect checks failed (${lockedStatus}/${recentStatus})`,
+    preferredStatus,
+    { lockedStatus, recentStatus } satisfies LockedDefectCheckStatuses,
+  );
+}
+
+export function getLockedDefectCheckStatuses(error: unknown): LockedDefectCheckStatuses | null {
+  if (!error || typeof error !== 'object') return null;
+  const cause = 'cause' in error ? (error as { cause?: unknown }).cause : error;
+  if (!cause || typeof cause !== 'object') return null;
+  if (!('lockedStatus' in cause) || !('recentStatus' in cause)) return null;
+  const lockedStatus = Number((cause as { lockedStatus?: unknown }).lockedStatus);
+  const recentStatus = Number((cause as { recentStatus?: unknown }).recentStatus);
+  if (!Number.isFinite(lockedStatus) || !Number.isFinite(recentStatus)) return null;
+  return { lockedStatus, recentStatus };
+}
+
+export function lockedDefectsFailureIncludesUnauthorized(error: unknown): boolean {
+  const statuses = getLockedDefectCheckStatuses(error);
+  if (statuses) {
+    return statuses.lockedStatus === 401 || statuses.recentStatus === 401;
+  }
+  return getErrorStatus(error) === 401 || extractInspectionErrorMessage(error).includes('401');
+}
+
 export function getLockedDefectsFailureLogMethod(error: unknown): 'warn' | 'error' {
-  return isNetworkFetchError(error) ? 'warn' : 'error';
+  if (isNetworkFetchError(error)) return 'warn';
+
+  const statuses = getLockedDefectCheckStatuses(error);
+  if (statuses) {
+    if (statuses.lockedStatus >= 500 || statuses.recentStatus >= 500) return 'error';
+    if (statuses.lockedStatus === 401 || statuses.recentStatus === 401) return 'warn';
+    return 'error';
+  }
+
+  const status = getErrorStatus(error);
+  if (status === 401) return 'warn';
+  if (typeof status === 'number' && status >= 500) return 'error';
+
+  const message = extractInspectionErrorMessage(error);
+  const match = message.match(/Locked defect checks failed \((\d+)\/(\d+)\)/);
+  if (match) {
+    const lockedStatus = Number(match[1]);
+    const recentStatus = Number(match[2]);
+    if (lockedStatus >= 500 || recentStatus >= 500) return 'error';
+    if (lockedStatus === 401 || recentStatus === 401) return 'warn';
+  }
+
+  return 'error';
 }
 
 export function reportLockedDefectsLoadFailure(

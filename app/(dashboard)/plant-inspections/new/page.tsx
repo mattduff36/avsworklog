@@ -45,9 +45,11 @@ import { getRecentVehicleIds, recordRecentVehicleId, splitVehiclesByRecent } fro
 import { getReadingDigitGrowthWarning } from '@/lib/utils/readingDigitGrowthWarning';
 import {
   canSubmitAfterLockedDefectsCheck,
+  createLockedDefectsCheckError,
   getInspectionErrorMessage,
   isDuplicateInspectionError,
   isMissingDraftError,
+  lockedDefectsFailureIncludesUnauthorized,
   reportLockedDefectsLoadFailure,
   type LockedDefectsLoadState,
 } from '@/lib/utils/inspection-error-handling';
@@ -160,6 +162,7 @@ function NewPlantInspectionContent() {
   const loadLockedDefectsRef = useRef<((plantId: string, mode?: 'replace' | 'merge') => Promise<void>) | null>(null);
   const lockedDefectsRequestIdRef = useRef(0);
   const [lockedDefectsLoadState, setLockedDefectsLoadState] = useState<LockedDefectsLoadState>('idle');
+  const [lockedDefectsAuthFailed, setLockedDefectsAuthFailed] = useState(false);
   const [lockedDefectsPlantId, setLockedDefectsPlantId] = useState<string | null>(null);
   const [pendingNavigation, setPendingNavigation] = useState<PendingNavigation | null>(null);
   const [showDiscardDraftDialog, setShowDiscardDraftDialog] = useState(false);
@@ -956,6 +959,7 @@ function NewPlantInspectionContent() {
     const requestId = ++lockedDefectsRequestIdRef.current;
     setLockedDefectsPlantId(plantId);
     setLockedDefectsLoadState('loading');
+    setLockedDefectsAuthFailed(false);
     setError('');
     setLoggedDefects(new Map());
     setRecentlyCompletedDefects(new Map());
@@ -967,14 +971,12 @@ function NewPlantInspectionContent() {
 
     try {
       const [lockedResponse, recentCompletedResponse] = await Promise.all([
-        fetch(`/api/plant-inspections/locked-defects?plantId=${plantId}`),
-        fetch(`/api/plant-inspections/recent-completed-defects?plantId=${plantId}&days=7`),
+        fetch(`/api/plant-inspections/locked-defects?plantId=${plantId}`, { cache: 'no-store' }),
+        fetch(`/api/plant-inspections/recent-completed-defects?plantId=${plantId}&days=7`, { cache: 'no-store' }),
       ]);
 
       if (!lockedResponse.ok || !recentCompletedResponse.ok) {
-        throw new Error(
-          `Locked defect checks failed (${lockedResponse.status}/${recentCompletedResponse.status})`
-        );
+        throw createLockedDefectsCheckError(lockedResponse.status, recentCompletedResponse.status);
       }
       if (requestId !== lockedDefectsRequestIdRef.current) return;
 
@@ -1029,8 +1031,14 @@ function NewPlantInspectionContent() {
       setLoggedDefects(new Map());
       setRecentlyCompletedDefects(new Map());
       setConfirmedRepeatDefects(new Set());
+      const authFailed = lockedDefectsFailureIncludesUnauthorized(err);
+      setLockedDefectsAuthFailed(authFailed);
       setLockedDefectsLoadState(reportLockedDefectsLoadFailure(err));
-      setError('Unable to check for existing defects. Retry the check before submitting.');
+      setError(
+        authFailed
+          ? 'Your session has expired. Reload the page and sign in again, then retry the defect check.'
+          : 'Unable to check for existing defects. Retry the check before submitting.'
+      );
     }
   };
   loadLockedDefectsRef.current = loadLockedDefects;
@@ -1094,7 +1102,9 @@ function NewPlantInspectionContent() {
       setError(
         lockedDefectsLoadState === 'loading'
           ? 'Please wait while existing defects are checked.'
-          : 'Unable to verify existing defects. Retry the check before submitting.'
+          : lockedDefectsAuthFailed
+            ? 'Your session has expired. Reload the page and sign in again, then retry the defect check.'
+            : 'Unable to verify existing defects. Retry the check before submitting.'
       );
       setShowConfirmSubmitDialog(false);
       scrollToTarget(document.getElementById('plant'));
@@ -1822,7 +1832,11 @@ function NewPlantInspectionContent() {
               )}
               {!isHiredPlant && selectedPlantId && lockedDefectsLoadState === 'failed' && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm text-red-300">Existing defects could not be verified.</p>
+                  <p className="text-sm text-red-300">
+                    {lockedDefectsAuthFailed
+                      ? 'Your session has expired. Reload the page and sign in again, then retry the defect check.'
+                      : 'Existing defects could not be verified.'}
+                  </p>
                   <Button
                     type="button"
                     variant="outline"

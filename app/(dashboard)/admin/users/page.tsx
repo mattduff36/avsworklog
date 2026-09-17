@@ -282,7 +282,10 @@ function UserTableAvatar({ user }: { user: ProfileWithEmail }) {
 
 function isExpectedUserAdminError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  return error.message.includes('Forbidden:');
+  return (
+    error.message.includes('Forbidden:') ||
+    error.message === 'Employee ID is already in use'
+  );
 }
 
 function formatAdminActivityTimestamp(value?: string | null): string {
@@ -1128,7 +1131,9 @@ export default function UsersAdminPage() {
       setFormData(createInitialFormData());
       setAddDialogOpen(false);
     } catch (error) {
-      console.error('Error creating user:', error);
+      if (!isExpectedUserAdminError(error)) {
+        console.error('Error creating user:', error);
+      }
       setFormError(error instanceof Error ? error.message : 'Failed to create user');
     } finally {
       setFormLoading(false);

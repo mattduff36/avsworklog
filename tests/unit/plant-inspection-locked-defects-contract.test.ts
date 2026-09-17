@@ -17,6 +17,7 @@ describe('Plant inspection locked-defect page contract', () => {
     const catchBlock = page.slice(catchStart, catchEnd);
 
     expect(startBlock).toContain("setLockedDefectsLoadState('loading')");
+    expect(startBlock).toContain('setLockedDefectsAuthFailed(false)');
     expect(startBlock).toContain('setLoggedDefects(new Map())');
     expect(startBlock).toContain('setRecentlyCompletedDefects(new Map())');
     expect(startBlock).toContain("if (mode === 'replace')");
@@ -31,5 +32,14 @@ describe('Plant inspection locked-defect page contract', () => {
     expect(page).toContain("setLockedDefectsLoadState('ready')");
     expect(page).toContain("setLockedDefectsLoadState('idle')");
     expect(page).toContain('lockedDefectsRequestIdRef.current += 1');
+  });
+
+  it('PI-LOCK-GATE-002 uses no-store fetches and keeps registered-plant submit fail-closed', () => {
+    expect(page).toContain("fetch(`/api/plant-inspections/locked-defects?plantId=${plantId}`, { cache: 'no-store' })");
+    expect(page).toContain("fetch(`/api/plant-inspections/recent-completed-defects?plantId=${plantId}&days=7`, { cache: 'no-store' })");
+    expect(page).toContain('createLockedDefectsCheckError(lockedResponse.status, recentCompletedResponse.status)');
+    expect(page).toContain('lockedDefectsFailureIncludesUnauthorized(err)');
+    expect(page).toContain("setLockedDefectsAuthFailed(authFailed)");
+    expect(page.match(/disabled=\{loading \|\| \(!selectedPlantId && !isHiredPlant\) \|\| !lockedDefectsCheckReady\}/g)).toHaveLength(2);
   });
 });

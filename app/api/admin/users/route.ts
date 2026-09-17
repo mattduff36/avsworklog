@@ -15,6 +15,12 @@ import {
   seedRemainingFinancialYearBankHolidaysForProfiles,
 } from '@/lib/services/absence-bank-holiday-sync';
 import { roundToNearestHalfDay } from '@/lib/utils/absence-onboarding';
+import {
+  duplicateEmployeeIdPayload,
+  findEmployeeIdOwner,
+  isEmployeeIdUniqueViolation,
+  parseEmployeeId,
+} from '@/lib/server/admin-user-employee-id';
 
 function isMissingHierarchySchemaError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -193,6 +199,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const parsedEmployeeId = parseEmployeeId(employee_id);
+    if (!parsedEmployeeId.ok) {
+      return NextResponse.json({ error: 'Employee ID must be a string or empty' }, { status: 400 });
+    }
+    const normalizedEmployeeId = parsedEmployeeId.value;
+
     const normalizedAnnualAllowanceDays = Number(annual_allowance_days);
     const normalizedRemainingLeaveDays = roundToNearestHalfDay(Number(remaining_leave_days));
 
@@ -303,6 +315,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (normalizedEmployeeId) {
+      const ownerLookup = await findEmployeeIdOwner(supabaseAdmin, normalizedEmployeeId);
+      if (!ownerLookup.ok) {
+        return NextResponse.json({ error: 'Failed to validate employee ID' }, { status: 500 });
+      }
+      if (ownerLookup.ownerId) {
+        return NextResponse.json(duplicateEmployeeIdPayload(), { status: 409 });
+      }
+    }
+
     // Generate secure random password
     const temporaryPassword = generateSecurePassword();
     console.log('Generated temporary password for', email);
@@ -315,11 +337,14 @@ export async function POST(request: NextRequest) {
       user_metadata: {
         full_name,
         role_id: role_id, // Pass role_id as string to trigger function
-        employee_id: employee_id || null,
+        employee_id: normalizedEmployeeId,
       },
     });
 
     if (authError) {
+      if (isEmployeeIdUniqueViolation(authError)) {
+        return NextResponse.json(duplicateEmployeeIdPayload(), { status: 409 });
+      }
       console.error('Auth error:', authError);
       console.error('Auth error details:', JSON.stringify(authError, null, 2));
       return NextResponse.json({ 
@@ -355,7 +380,7 @@ export async function POST(request: NextRequest) {
       id: authData.user.id,
       full_name,
       phone_number: phone_number || null,
-      employee_id: employee_id || null,
+      employee_id: normalizedEmployeeId,
       role_id,
       annual_holiday_allowance_days: normalizedAnnualAllowanceDays,
       must_change_password: true,
@@ -386,10 +411,19 @@ export async function POST(request: NextRequest) {
     }
 
     if (profileError) {
+      const { error: rollbackError } = await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      if (isEmployeeIdUniqueViolation(profileError)) {
+        if (rollbackError) {
+          console.error('Failed to roll back auth user after employee ID conflict:', rollbackError);
+          return NextResponse.json(
+            { error: 'Failed to create user after employee ID conflict' },
+            { status: 500 }
+          );
+        }
+        return NextResponse.json(duplicateEmployeeIdPayload(), { status: 409 });
+      }
       console.error('Profile error:', profileError);
       console.error('Profile error details:', JSON.stringify(profileError, null, 2));
-      // Try to delete the auth user if profile update fails
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
       return NextResponse.json({ 
         error: profileError.message || 'Database error creating new user',
         details: profileError.details || 'Failed to create user profile',
@@ -475,7 +509,7 @@ export async function POST(request: NextRequest) {
           id: authData.user.id,
           email: authData.user.email,
           full_name,
-          employee_id,
+          employee_id: normalizedEmployeeId,
           role_id,
           team_id: normalizedTeamId,
           work_shift_template_id: normalizedTemplateId,

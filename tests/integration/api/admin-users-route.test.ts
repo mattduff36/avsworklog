@@ -43,15 +43,30 @@ vi.mock('@/lib/utils/server-error-logger', () => ({
   logServerError: vi.fn(),
 }));
 
-function createMockSupabaseAdmin() {
+type AdminRouteOptions = {
+  employeeIdOwner?: { id: string } | null;
+  employeeIdLookupError?: { message: string } | null;
+  profileUpsertError?: { code?: string; message: string; details?: string } | null;
+  createUserError?: { code?: string; message: string } | null;
+  deleteUserError?: { message: string } | null;
+};
+
+function createMockSupabaseAdmin(options: AdminRouteOptions = {}) {
+  const createUser = vi.fn().mockResolvedValue(
+    options.createUserError
+      ? { data: { user: null }, error: options.createUserError }
+      : {
+          data: { user: { id: 'new-user-1', email: 'new.user@example.com' } },
+          error: null,
+        }
+  );
+  const deleteUser = vi.fn().mockResolvedValue({ error: options.deleteUserError ?? null });
+
   return {
     auth: {
       admin: {
-        createUser: vi.fn().mockResolvedValue({
-          data: { user: { id: 'new-user-1', email: 'new.user@example.com' } },
-          error: null,
-        }),
-        deleteUser: vi.fn().mockResolvedValue({ error: null }),
+        createUser,
+        deleteUser,
       },
     },
     from(table: string) {
@@ -112,8 +127,39 @@ function createMockSupabaseAdmin() {
 
       if (table === 'profiles') {
         return {
+          select() {
+            return {
+              eq(column: string) {
+                if (column === 'employee_id') {
+                  return {
+                    async maybeSingle() {
+                      return {
+                        data: options.employeeIdOwner ?? null,
+                        error: options.employeeIdLookupError ?? null,
+                      };
+                    },
+                    neq() {
+                      return {
+                        async maybeSingle() {
+                          return {
+                            data: options.employeeIdOwner ?? null,
+                            error: options.employeeIdLookupError ?? null,
+                          };
+                        },
+                      };
+                    },
+                  };
+                }
+                return {
+                  async single() {
+                    return { data: { id: 'manager-1', role: { role_class: 'manager' } }, error: null };
+                  },
+                };
+              },
+            };
+          },
           async upsert() {
-            return { error: null };
+            return { error: options.profileUpsertError ?? null };
           },
         };
       }
@@ -140,6 +186,24 @@ function createMockSupabaseAdmin() {
 
       throw new Error(`Unexpected table ${table}`);
     },
+  };
+}
+
+function validCreateBody(overrides: Record<string, unknown> = {}) {
+  return {
+    email: 'new.user@example.com',
+    full_name: 'New User',
+    phone_number: '07000 000000',
+    employee_id: 'E123',
+    role_id: 'role-employee',
+    team_id: 'team-civils',
+    work_shift_template_id: 'template-standard',
+    annual_allowance_days: 28,
+    remaining_leave_days: 10,
+    auto_book_bank_holidays: true,
+    auto_apply_bulk_bookings: false,
+    selected_bulk_batch_ids: [],
+    ...overrides,
   };
 }
 
@@ -264,5 +328,84 @@ describe('POST /api/admin/users', () => {
     expect(payload.user.team_id).toBe('team-civils');
     expect(payload.user.work_shift_template_id).toBe('template-standard');
     expect(seedRemainingFinancialYearBankHolidaysForProfiles).toHaveBeenCalled();
+  });
+
+  it('EMP-AUTH-001 keeps unauthenticated and forbidden create paths fail-closed', async () => {
+    const { getEffectiveRole } = await import('@/lib/utils/view-as');
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      user_id: null,
+    } as never);
+
+    const unauthorized = await POST(new Request('http://localhost/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(validCreateBody()),
+    }) as NextRequest);
+    expect(unauthorized.status).toBe(401);
+
+    vi.mocked(getEffectiveRole).mockResolvedValue({
+      user_id: 'admin-1',
+      role_name: 'admin',
+      is_super_admin: true,
+    } as never);
+    const { canEffectiveRoleAssignRole } = await import('@/lib/utils/rbac');
+    vi.mocked(canEffectiveRoleAssignRole).mockResolvedValue(false);
+
+    const forbidden = await POST(new Request('http://localhost/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(validCreateBody()),
+    }) as NextRequest);
+    expect(forbidden.status).toBe(403);
+  });
+
+  it('EMP-ID-001 rejects active and soft-deleted owners before Auth creation', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const admin = createMockSupabaseAdmin({ employeeIdOwner: { id: 'deleted-owner' } });
+    vi.mocked(createClient).mockReturnValue(admin as never);
+
+    const response = await POST(new Request('http://localhost/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(validCreateBody({ employee_id: ' E123 ' })),
+    }) as NextRequest);
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload.code).toBe('DUPLICATE_EMPLOYEE_ID');
+    expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
+  });
+
+  it('EMP-ID-002 maps Auth-trigger and profile-write employee-ID races to 409 after rollback', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const authConflict = createMockSupabaseAdmin({
+      createUserError: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "profiles_employee_id_key"',
+      },
+    });
+    vi.mocked(createClient).mockReturnValue(authConflict as never);
+
+    const authResponse = await POST(new Request('http://localhost/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(validCreateBody()),
+    }) as NextRequest);
+    expect(authResponse.status).toBe(409);
+    expect((await authResponse.json()).code).toBe('DUPLICATE_EMPLOYEE_ID');
+
+    const profileConflict = createMockSupabaseAdmin({
+      profileUpsertError: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "profiles_employee_id_key"',
+      },
+    });
+    vi.mocked(createClient).mockReturnValue(profileConflict as never);
+
+    const profileResponse = await POST(new Request('http://localhost/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(validCreateBody()),
+    }) as NextRequest);
+    const profilePayload = await profileResponse.json();
+
+    expect(profileResponse.status).toBe(409);
+    expect(profilePayload.code).toBe('DUPLICATE_EMPLOYEE_ID');
+    expect(profileConflict.auth.admin.deleteUser).toHaveBeenCalledWith('new-user-1');
   });
 });
