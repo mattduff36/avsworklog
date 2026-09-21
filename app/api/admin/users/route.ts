@@ -14,7 +14,11 @@ import {
   replayBulkAbsenceBatchesForProfile,
   seedRemainingFinancialYearBankHolidaysForProfiles,
 } from '@/lib/services/absence-bank-holiday-sync';
-import { roundToNearestHalfDay } from '@/lib/utils/absence-onboarding';
+import {
+  getContractorOnboardingViolation,
+  isContractorOnboardingRole,
+  roundToNearestHalfDay,
+} from '@/lib/utils/absence-onboarding';
 import {
   duplicateEmployeeIdPayload,
   findEmployeeIdOwner,
@@ -212,7 +216,7 @@ export async function POST(request: NextRequest) {
     const supabaseAdmin = getSupabaseAdmin();
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from('roles')
-      .select('id, name')
+      .select('id, name, display_name')
       .eq('id', role_id)
       .single();
 
@@ -222,6 +226,19 @@ export async function POST(request: NextRequest) {
         error: 'Invalid role selected. Please select a valid role.',
         details: roleError?.message || 'Role not found'
       }, { status: 400 });
+    }
+
+    if (isContractorOnboardingRole(roleData)) {
+      const contractorViolation = getContractorOnboardingViolation({
+        annualAllowanceDays: normalizedAnnualAllowanceDays,
+        remainingLeaveDays: normalizedRemainingLeaveDays,
+        autoBookBankHolidays: auto_book_bank_holidays,
+        autoApplyBulkBookings: auto_apply_bulk_bookings,
+        selectedBulkBatchIds: normalizedBulkBatchIds,
+      });
+      if (contractorViolation) {
+        return NextResponse.json({ error: contractorViolation }, { status: 400 });
+      }
     }
 
     const canAssignRequestedRole = await canEffectiveRoleAssignRole(role_id);

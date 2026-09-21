@@ -72,7 +72,13 @@ import type { Database } from '@/types/database';
 import type { WorkShiftPattern, WorkShiftTemplate } from '@/types/work-shifts';
 import { WORK_SHIFT_DAY_LABELS, WORK_SHIFT_DAY_ORDER } from '@/types/work-shifts';
 import { getRoleSortPriority } from '@/lib/config/roles-core';
-import { calculateNewUserRemainingLeaveDefault, roundToNearestHalfDay } from '@/lib/utils/absence-onboarding';
+import {
+  calculateNewUserRemainingLeaveDefault,
+  CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS,
+  DEFAULT_ANNUAL_LEAVE_ALLOWANCE_DAYS,
+  isContractorOnboardingRole,
+  roundToNearestHalfDay,
+} from '@/lib/utils/absence-onboarding';
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { formatDateTime } from '@/lib/utils/date';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
@@ -229,7 +235,7 @@ function createInitialFormData(): AddUserFormData {
     line_manager_id: '',
     team_id: '',
     work_shift_template_id: '',
-    annual_allowance_days: '28',
+    annual_allowance_days: String(DEFAULT_ANNUAL_LEAVE_ALLOWANCE_DAYS),
     remaining_leave_days: '',
     auto_book_bank_holidays: '',
     auto_apply_bulk_bookings: '',
@@ -310,7 +316,7 @@ function isSupervisorRole(role?: { name?: string | null; display_name?: string |
 }
 
 function isContractorRole(role?: { name?: string | null; display_name?: string | null } | null): boolean {
-  return matchesNamedRole(role, 'contractor');
+  return isContractorOnboardingRole(role);
 }
 
 export default function UsersAdminPage() {
@@ -547,6 +553,11 @@ export default function UsersAdminPage() {
     () => workShiftTemplates.find((template) => template.id === formData.work_shift_template_id) || null,
     [workShiftTemplates, formData.work_shift_template_id]
   );
+  const selectedAddRole = useMemo(
+    () => availableRoles.find((role) => role.id === formData.role_id) || null,
+    [availableRoles, formData.role_id]
+  );
+  const isAddContractorRole = isContractorOnboardingRole(selectedAddRole);
 
   const getDefaultRemainingLeaveDays = useCallback((totalAllowanceRaw: string): string => {
     const parsedAllowance = Number(totalAllowanceRaw);
@@ -556,6 +567,40 @@ export default function UsersAdminPage() {
     });
     return String(result.defaultRemainingLeaveDays);
   }, []);
+
+  const applyAddUserRoleDefaults = useCallback((
+    previous: AddUserFormData,
+    nextRoleId: string
+  ): AddUserFormData => {
+    const nextRole = availableRoles.find((role) => role.id === nextRoleId) || null;
+    if (isContractorOnboardingRole(nextRole)) {
+      return {
+        ...previous,
+        role_id: nextRoleId,
+        annual_allowance_days: String(CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS.annualAllowanceDays),
+        remaining_leave_days: String(CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS.remainingLeaveDays),
+        auto_book_bank_holidays: 'no',
+        auto_apply_bulk_bookings: 'no',
+        selected_bulk_batch_ids: [],
+      };
+    }
+
+    const previousRole = availableRoles.find((role) => role.id === previous.role_id) || null;
+    if (!isContractorOnboardingRole(previousRole)) {
+      return { ...previous, role_id: nextRoleId };
+    }
+
+    const restoredAllowance = String(DEFAULT_ANNUAL_LEAVE_ALLOWANCE_DAYS);
+    return {
+      ...previous,
+      role_id: nextRoleId,
+      annual_allowance_days: restoredAllowance,
+      remaining_leave_days: getDefaultRemainingLeaveDays(restoredAllowance),
+      auto_book_bank_holidays: '',
+      auto_apply_bulk_bookings: '',
+      selected_bulk_batch_ids: [],
+    };
+  }, [availableRoles, getDefaultRemainingLeaveDays]);
 
   // Helper function to fetch users with emails
   async function fetchUsersWithEmails() {
@@ -741,12 +786,23 @@ export default function UsersAdminPage() {
   useEffect(() => {
     if (!addDialogOpen) return;
     setFormData((prev) => {
+      const selectedRole = availableRoles.find((role) => role.id === prev.role_id) || null;
+      if (isContractorOnboardingRole(selectedRole)) {
+        return {
+          ...prev,
+          annual_allowance_days: String(CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS.annualAllowanceDays),
+          remaining_leave_days: String(CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS.remainingLeaveDays),
+          auto_book_bank_holidays: 'no',
+          auto_apply_bulk_bookings: 'no',
+          selected_bulk_batch_ids: [],
+        };
+      }
       if (prev.remaining_leave_days) return prev;
       const nextRemaining = getDefaultRemainingLeaveDays(prev.annual_allowance_days);
       if (nextRemaining === prev.remaining_leave_days) return prev;
       return { ...prev, remaining_leave_days: nextRemaining };
     });
-  }, [addDialogOpen, getDefaultRemainingLeaveDays]);
+  }, [addDialogOpen, availableRoles, getDefaultRemainingLeaveDays]);
 
   useEffect(function () {
     async function fetchOnboardingContext() {
@@ -1081,6 +1137,19 @@ export default function UsersAdminPage() {
     if (formData.auto_apply_bulk_bookings === 'yes' && formData.selected_bulk_batch_ids.length === 0) {
       setFormError('Please select at least one bulk absence booking to auto-apply');
       return;
+    }
+
+    if (isAddContractorRole) {
+      if (
+        annualAllowance !== CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS.annualAllowanceDays ||
+        remainingLeave !== CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS.remainingLeaveDays ||
+        formData.auto_book_bank_holidays !== 'no' ||
+        formData.auto_apply_bulk_bookings !== 'no' ||
+        formData.selected_bulk_batch_ids.length > 0
+      ) {
+        setFormError('Contractor accounts must be created with 0 allowance, 0 remaining leave, and no automatic bookings.');
+        return;
+      }
     }
 
     try {
@@ -2007,7 +2076,10 @@ export default function UsersAdminPage() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="add-role">Role *</Label>
-                      <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
+                      <Select
+                        value={formData.role_id}
+                        onValueChange={(value) => setFormData((prev) => applyAddUserRoleDefaults(prev, value))}
+                      >
                         <SelectTrigger className="bg-slate-950 border-border text-white data-[placeholder]:[&>span]:!text-muted-foreground">
                           <SelectValue placeholder="Select a role" />
                         </SelectTrigger>
@@ -2091,6 +2163,7 @@ export default function UsersAdminPage() {
                         type="number"
                         step="0.01"
                         value={formData.annual_allowance_days}
+                        disabled={isAddContractorRole}
                         onChange={(e) => {
                           const nextAnnualAllowance = e.target.value;
                           setFormData((prev) => ({
@@ -2109,6 +2182,7 @@ export default function UsersAdminPage() {
                         type="number"
                         step="0.5"
                         value={formData.remaining_leave_days}
+                        disabled={isAddContractorRole}
                         onChange={(e) => setFormData({ ...formData, remaining_leave_days: e.target.value })}
                         onBlur={(e) =>
                           setFormData((prev) => ({
@@ -2119,7 +2193,9 @@ export default function UsersAdminPage() {
                         className="bg-slate-950 border-border text-white"
                       />
                       <p className="text-xs text-muted-foreground">
-                        Auto-calculated from prorated allowance based on start date, rounded to the nearest 0.5 day.
+                        {isAddContractorRole
+                          ? 'Contractor accounts are created with no holiday allowance.'
+                          : 'Auto-calculated from prorated allowance based on start date, rounded to the nearest 0.5 day.'}
                       </p>
                     </div>
                   </div>
@@ -2134,13 +2210,14 @@ export default function UsersAdminPage() {
                           setFormData({ ...formData, auto_book_bank_holidays: value as BinaryChoice })
                         }
                         className="grid grid-cols-2 gap-3"
+                        disabled={isAddContractorRole}
                       >
                         <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
-                          <RadioGroupItem id="add-bank-holiday-yes" value="yes" />
+                          <RadioGroupItem id="add-bank-holiday-yes" value="yes" disabled={isAddContractorRole} />
                           <Label htmlFor="add-bank-holiday-yes" className="text-sm font-normal">Yes</Label>
                         </div>
                         <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
-                          <RadioGroupItem id="add-bank-holiday-no" value="no" />
+                          <RadioGroupItem id="add-bank-holiday-no" value="no" disabled={isAddContractorRole} />
                           <Label htmlFor="add-bank-holiday-no" className="text-sm font-normal">No</Label>
                         </div>
                       </RadioGroup>
@@ -2158,13 +2235,14 @@ export default function UsersAdminPage() {
                           }))
                         }
                         className="grid grid-cols-2 gap-3"
+                        disabled={isAddContractorRole}
                       >
                         <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
-                          <RadioGroupItem id="add-bulk-yes" value="yes" />
+                          <RadioGroupItem id="add-bulk-yes" value="yes" disabled={isAddContractorRole} />
                           <Label htmlFor="add-bulk-yes" className="text-sm font-normal">Yes</Label>
                         </div>
                         <div className="flex items-center gap-2 rounded-md border border-border bg-slate-950 px-3 py-2">
-                          <RadioGroupItem id="add-bulk-no" value="no" />
+                          <RadioGroupItem id="add-bulk-no" value="no" disabled={isAddContractorRole} />
                           <Label htmlFor="add-bulk-no" className="text-sm font-normal">No</Label>
                         </div>
                       </RadioGroup>

@@ -49,6 +49,9 @@ type AdminRouteOptions = {
   profileUpsertError?: { code?: string; message: string; details?: string } | null;
   createUserError?: { code?: string; message: string } | null;
   deleteUserError?: { message: string } | null;
+  roleId?: string;
+  roleName?: string;
+  roleDisplayName?: string;
 };
 
 function createMockSupabaseAdmin(options: AdminRouteOptions = {}) {
@@ -77,7 +80,14 @@ function createMockSupabaseAdmin(options: AdminRouteOptions = {}) {
               eq() {
                 return {
                   async single() {
-                    return { data: { id: 'role-employee', name: 'employee' }, error: null };
+                    return {
+                      data: {
+                        id: options.roleId || 'role-employee',
+                        name: options.roleName || 'employee',
+                        display_name: options.roleDisplayName || 'Employee',
+                      },
+                      error: null,
+                    };
                   },
                 };
               },
@@ -407,5 +417,60 @@ describe('POST /api/admin/users', () => {
     expect(profileResponse.status).toBe(409);
     expect(profilePayload.code).toBe('DUPLICATE_EMPLOYEE_ID');
     expect(profileConflict.auth.admin.deleteUser).toHaveBeenCalledWith('new-user-1');
+  });
+
+  it('rejects contractor onboarding unless allowance and automation are zeroed', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const admin = createMockSupabaseAdmin({
+      roleId: 'role-contractor',
+      roleName: 'contractor',
+      roleDisplayName: 'Contractor',
+    });
+    vi.mocked(createClient).mockReturnValue(admin as never);
+
+    const denied = await POST(new Request('http://localhost/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(validCreateBody({
+        role_id: 'role-contractor',
+        annual_allowance_days: 28,
+        remaining_leave_days: 15,
+        auto_book_bank_holidays: true,
+      })),
+    }) as NextRequest);
+    const deniedPayload = await denied.json();
+
+    expect(denied.status).toBe(400);
+    expect(deniedPayload.error).toContain('Contractor accounts');
+    expect(admin.auth.admin.createUser).not.toHaveBeenCalled();
+  });
+
+  it('creates a contractor with 0/0/no/no and does not seed bank holidays', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const admin = createMockSupabaseAdmin({
+      roleId: 'role-contractor',
+      roleName: 'contractor',
+      roleDisplayName: 'Contractor',
+    });
+    vi.mocked(createClient).mockReturnValue(admin as never);
+
+    const response = await POST(new Request('http://localhost/api/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(validCreateBody({
+        role_id: 'role-contractor',
+        annual_allowance_days: 0,
+        remaining_leave_days: 0,
+        auto_book_bank_holidays: false,
+        auto_apply_bulk_bookings: false,
+        selected_bulk_batch_ids: [],
+      })),
+    }) as NextRequest);
+    const payload = await response.json();
+    const { seedRemainingFinancialYearBankHolidaysForProfiles } = await import(
+      '@/lib/services/absence-bank-holiday-sync'
+    );
+
+    expect(response.status).toBe(200);
+    expect(payload.success).toBe(true);
+    expect(seedRemainingFinancialYearBankHolidaysForProfiles).not.toHaveBeenCalled();
   });
 });

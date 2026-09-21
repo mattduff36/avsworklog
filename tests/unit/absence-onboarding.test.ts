@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   calculateNewUserRemainingLeaveDefault,
   calculateProratedAllowanceDays,
+  CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS,
+  getContractorOnboardingViolation,
+  isContractorOnboardingRole,
   roundToNearestHalfDay,
 } from '@/lib/utils/absence-onboarding';
 
@@ -42,5 +45,43 @@ describe('absence onboarding calculations', () => {
     expect(roundToNearestHalfDay(0.15)).toBe(0);
     expect(roundToNearestHalfDay(13.74)).toBe(13.5);
     expect(roundToNearestHalfDay(13.76)).toBe(14);
+  });
+
+  it('identifies contractor roles by name or display name', () => {
+    expect(isContractorOnboardingRole({ name: 'contractor' })).toBe(true);
+    expect(isContractorOnboardingRole({ display_name: 'Contractor' })).toBe(true);
+    expect(isContractorOnboardingRole({ name: 'employee' })).toBe(false);
+  });
+
+  it('accepts only 0/0/no/no contractor onboarding payloads', () => {
+    expect(getContractorOnboardingViolation({
+      annualAllowanceDays: CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS.annualAllowanceDays,
+      remainingLeaveDays: CONTRACTOR_ONBOARDING_LEAVE_DEFAULTS.remainingLeaveDays,
+      autoBookBankHolidays: false,
+      autoApplyBulkBookings: false,
+      selectedBulkBatchIds: [],
+    })).toBeNull();
+
+    expect(getContractorOnboardingViolation({
+      annualAllowanceDays: 28,
+      remainingLeaveDays: 0,
+      autoBookBankHolidays: false,
+      autoApplyBulkBookings: false,
+    })).toContain('0 annual leave allowance');
+
+    expect(getContractorOnboardingViolation({
+      annualAllowanceDays: 0,
+      remainingLeaveDays: 0,
+      autoBookBankHolidays: true,
+      autoApplyBulkBookings: false,
+    })).toContain('cannot auto-book bank holidays');
+
+    expect(getContractorOnboardingViolation({
+      annualAllowanceDays: 0,
+      remainingLeaveDays: 0,
+      autoBookBankHolidays: false,
+      autoApplyBulkBookings: false,
+      selectedBulkBatchIds: ['batch-1'],
+    })).toContain('cannot receive bulk absence bookings');
   });
 });
