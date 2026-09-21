@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.10.6
+
+**GIT COMMIT MESSAGE**
+`fix(admin-users): enforce zero leave for contractor onboarding`
+
+**PUSHED AT**
+2026-09-21T12:01:45.882Z
+
+**WHAT CHANGED**
+Enforce zero leave for contractor onboarding.
+
+**VERSION HISTORY DETAILS**
+- Updated absence and leave, with changes to shared logic, automation scripts, and automated tests.
+- Enforce zero leave for contractor onboarding, with changes to background routes, app screens, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(admin-users): enforce zero leave for contractor onboarding`
+
 ## 0926.10.5
 
 **GIT COMMIT MESSAGE**

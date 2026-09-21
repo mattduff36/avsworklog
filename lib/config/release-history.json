@@ -1,5 +1,23 @@
 [
   {
+    "version": "0926.10.6",
+    "updateKind": "minor",
+    "title": "User Management improvements",
+    "description": "Enforce zero leave for contractor onboarding.",
+    "summary": "Enforce zero leave for contractor onboarding.",
+    "details": [
+      "Updated absence and leave, with changes to shared logic, automation scripts, and automated tests.",
+      "Enforce zero leave for contractor onboarding, with changes to background routes, app screens, and automated tests."
+    ],
+    "areas": [
+      "User Management"
+    ],
+    "areaKeys": [
+      "user-management"
+    ],
+    "pushedAt": "2026-09-21T12:01:45.882Z"
+  },
+  {
     "version": "0926.10.5",
     "updateKind": "minor",
     "title": "App reliability update",
