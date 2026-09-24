@@ -21,6 +21,15 @@ import * as fs from 'fs';
 import pg from 'pg';
 import { AutomationRun } from './automation/logger';
 import { TRUSTED_OPERATIONAL_ACTIONS } from './automation/trusted-operational-actions';
+import { captureCandidateFingerprint } from './fixerrors-decision';
+import {
+  loadKnowledgeStore,
+  rejectSensitiveText,
+  retrieveIncidents,
+  sanitizeKnowledgeText,
+  summarizeKnowledgeOutcomes,
+  type IncidentQuery,
+} from './fixerrors-knowledge';
 import {
   ERROR_ANALYSIS_PATH,
   ERROR_SNAPSHOT_PATH,
@@ -56,6 +65,7 @@ export {
 dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
 const ERROR_FIX_LOG_PATH = resolve(process.cwd(), 'docs_private', 'error-fix-log.md');
+const ERROR_RETRIEVAL_PATH = resolve(process.cwd(), 'docs_private', 'error-analysis-retrieval.json');
 
 // Admin email to filter out (matches /debug page default)
 const ADMIN_EMAIL = 'admin@mpdee.co.uk';
@@ -721,7 +731,7 @@ function generateReport(patterns: ErrorPattern[], totalFetched: number, totalFil
   }
 
   lines.push(
-    'Mechanical clusters and TEE lanes below are advisory input for the premium analysis step, which writes `docs_private/error-analysis-decision.md`.'
+    'Mechanical clusters and TEE lanes below are advisory input for the premium analysis step, which writes `docs_private/error-analysis-decision.json`.'
   );
   lines.push('');
 
@@ -1010,11 +1020,9 @@ function createLegacySignature(error: ErrorLogEntry): string {
 
 function updateFixLog(errors: ErrorLogEntry[]): FixLogStats {
   const fixLog = loadFixLog();
-  const seenSignatures = new Set<string>();
 
   for (const error of errors) {
     const signature = createLegacySignature(error);
-    seenSignatures.add(signature);
 
     const existing = fixLog.entries.find((e) => e.signature === signature);
 
@@ -1035,18 +1043,6 @@ function updateFixLog(errors: ErrorLogEntry[]): FixLogStats {
         plan: 'Needs investigation',
         notes: `Error Type: ${error.error_type}\nComponent: ${error.component_name || 'N/A'}\nPage: ${error.page_url}`,
       });
-    }
-  }
-
-  // Mark entries not seen this run as stale (unless resolved)
-  for (const entry of fixLog.entries) {
-    if (
-      !seenSignatures.has(entry.signature) &&
-      entry.status !== 'resolved' &&
-      entry.status !== 'wontfix' &&
-      entry.status !== 'stale'
-    ) {
-      entry.status = 'stale';
     }
   }
 
@@ -1359,6 +1355,59 @@ async function main() {
       `  Found ${patterns.length} pattern(s) across ${clusters.length} independent cluster(s)`
     );
 
+    const knowledge = loadKnowledgeStore();
+    const knowledgeOutcomes = summarizeKnowledgeOutcomes(knowledge);
+    const candidate = captureCandidateFingerprint();
+    const retrieval = {
+      schemaVersion: 1,
+      snapshotId: snapshot.snapshotId,
+      baseHead: candidate.baseHead,
+      treeFingerprint: candidate.treeFingerprint,
+      archiveMeansResolved: false,
+      clusters: clusters.map((cluster) => {
+        const pattern = cluster.patterns[0];
+        const occurrence = pattern?.occurrences[0];
+        const additional = occurrence?.additional_data;
+        const contextId = typeof additional?.errorContextId === 'string' ? additional.errorContextId : null;
+        const status = typeof additional?.status === 'number' ? additional.status : null;
+        let route = 'NoPage';
+        try {
+          route = occurrence?.page_url ? new URL(occurrence.page_url).pathname : 'NoPage';
+        } catch {
+          route = 'NoPage';
+        }
+        const safeText = (value: string): string => {
+          const sanitized = sanitizeKnowledgeText(value);
+          try {
+            rejectSensitiveText(sanitized, 'retrieval');
+            return sanitized;
+          } catch {
+            return '[redacted]';
+          }
+        };
+        const incidentQuery: IncidentQuery = {
+          errorContextId: contextId ? safeText(contextId) : null,
+          httpStatus: status,
+          route: safeText(route),
+          component: safeText(pattern?.component ?? 'NoComponent'),
+          sourceFile: pattern?.sourceFiles[0]?.file ?? null,
+          normalizedMessage: safeText(pattern?.normalizedMessage ?? ''),
+          rootCauseFamily: safeText(cluster.rootCauseFamily),
+        };
+        return {
+          id: cluster.id,
+          rootCauseFamily: cluster.rootCauseFamily,
+          advisoryLane: cluster.lane,
+          advisoryAction: cluster.action,
+          query: incidentQuery,
+          priorResolutions: retrieveIncidents(knowledge, incidentQuery),
+        };
+      }),
+    };
+    rejectSensitiveText(JSON.stringify(retrieval), 'retrieval');
+    writeAndVerifyTextArtifactAtomic(ERROR_RETRIEVAL_PATH, `${JSON.stringify(retrieval, null, 2)}\n`);
+    console.log('  Written and verified: docs_private/error-analysis-retrieval.json');
+
     console.log('Generating and validating analysis report...');
     const report = generateReport(patterns, rawErrors.length, errors.length);
     await run.step(
@@ -1373,6 +1422,8 @@ async function main() {
         patternsFound: patterns.length,
         clusterCount: clusters.length,
         clusterLanes,
+        verifiedOutcomeCount: knowledgeOutcomes.verifiedOutcomeCount,
+        recurrenceCount: knowledgeOutcomes.recurrenceCount,
         ...patternReviewMetadata,
       }
     );

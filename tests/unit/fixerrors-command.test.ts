@@ -12,12 +12,19 @@ describe('fixerrors command orchestration', () => {
     expect(command).toContain('safetyContract":"fixerrors-exact-snapshot-v4"');
     expect(command).toContain('npm run fixerrors');
     expect(command).toContain('npm run fixerrors -- --cleanup');
+    expect(command).toContain('Automatically implement FAST, STANDARD, and GUARDED clusters.');
+    expect(command).toContain('Pause for explicit owner approval before any CRITICAL implementation');
+    expect(command).toContain('final-diff-reviewer');
+    expect(command).toContain('Never push.');
+    expect(command).toContain('npm run fixerrors:validate-decision');
+    expect(command).toContain('Never stage `docs_private`');
+    expect(command).toContain('suppress-logging');
   });
 
   it('FIXERR-CMD-002 requires premium generalPurpose analysis and forbids architecture-gate for that step', () => {
     expect(command).toContain('subagent_type: "generalPurpose"');
     expect(command).toContain('gpt-5.6-sol-high');
-    expect(command).toContain('docs_private/error-analysis-decision.md');
+    expect(command).toContain('docs_private/error-analysis-decision.json');
     expect(command).toMatch(/Do \*\*not\*\* use `architecture-gate` for analysis/u);
     expect(command).toContain('Stop here: no analysis Task, no reviewer');
   });
@@ -35,7 +42,7 @@ describe('fixerrors command orchestration', () => {
 
   it('FIXERR-CMD-004 marks mechanical report clusters as advisory input for the decision file', () => {
     expect(analysisScript).toContain(
-      'Mechanical clusters and TEE lanes below are advisory input for the premium analysis step, which writes `docs_private/error-analysis-decision.md`.'
+      'Mechanical clusters and TEE lanes below are advisory input for the premium analysis step, which writes `docs_private/error-analysis-decision.json`.'
     );
   });
 });

@@ -232,10 +232,49 @@ describe('automation logging helpers', () => {
       expect(finaliseSummary.monthlyReview?.suggestions.map((suggestion) => suggestion.id))
         .toContain('finalise-record-commit-outcome-metadata');
       expect(fixerrorsSummary.monthlyReview?.suggestions.map((suggestion) => suggestion.id))
-        .toContain('fixerrors-paginate-fetch-limit');
+        .not.toContain('fixerrors-paginate-fetch-limit');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('FIXERR-ADV-001 reports current report steps and verified recurrences without a fetch-limit warning', () => {
+    const review = renderAutomationAdvisorReview({
+      advisorDirectory: '/tmp/not-used',
+      scriptName: 'fixerrors',
+      generatedAt: '2026-09-24T00:00:00.000Z',
+      monthKey: '2026-09',
+      logs: [
+        createRunLog({
+          id: 'fixerrors-current',
+          scriptName: 'fixerrors',
+          mode: 'analysis',
+          startedAt: '2026-09-24T00:00:00.000Z',
+          steps: [
+            {
+              name: 'Write and read-verify error analysis report',
+              status: 'passed',
+              startedAt: '2026-09-24T00:00:00.000Z',
+              endedAt: '2026-09-24T00:00:01.000Z',
+              durationMs: 1000,
+              metadata: {
+                totalFetched: 200,
+                afterFiltering: 2,
+                patternsFound: 2,
+                verifiedOutcomeCount: 1,
+                recurrenceCount: 1,
+                topPatterns: [],
+              },
+            },
+          ],
+        }),
+      ],
+    });
+
+    expect(review).toContain('Verified local fixes: 1');
+    expect(review).toContain('Verified fix recurrences: 1');
+    expect(review).not.toContain('200-log fetch limit');
+    expect(review).toContain('Review verified fixes that recurred in production');
   });
 
   it('renders finalise advisor sections with mode and slow step guidance', () => {
@@ -411,7 +450,8 @@ describe('automation logging helpers', () => {
     });
 
     expect(review).toContain('Total fetched: 200');
-    expect(review).toContain('The 200-log fetch limit was hit');
+    expect(review).toContain('Verified local fixes: 0');
+    expect(review).not.toContain('200-log fetch limit');
     expect(review).toContain('filtered more than 75%');
     expect(review).toContain('untriaged');
     expect(review).toContain('## Copy/Paste Cursor Prompt');

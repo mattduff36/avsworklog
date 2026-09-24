@@ -316,7 +316,7 @@ Potential improvements:
 - Email notifications to reporter when status changes
 - Priority levels for error reports
 - Duplicate error detection/merging
-- Integration with fixerrors tool
+- fixerrors remains a separate production `error_logs` workflow; it does not consume user-submitted `error_reports`
 - Screenshot upload support
 - Error report categories/tags
 

@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 #
-# fixerrors - Automated error analysis and fixing
+# fixerrors - Trusted production error capture
 #
 # Usage: ./fixerrors
 #
-# This script analyzes errors from the /debug page's Application Error Log,
-# matches them against known patterns, and auto-applies fixes where possible.
-#
-# The error fix log is maintained at: docs_private/error-fix-log.md
+# This launcher runs the capture engine. The /fixerrors chat command performs
+# diagnosis, non-critical repair, verification, review, and local commit.
+# It does not auto-apply an executable fixer registry.
 #
 
 set -e

@@ -29,6 +29,7 @@
     "review:preflight": "tsx scripts/review-preflight.ts",
     "fix:contrast": "tsx scripts/fix-input-contrast.ts",
     "fixerrors": "tsx scripts/fixerrors.ts",
+    "fixerrors:validate-decision": "tsx scripts/fixerrors-decision.ts",
     "version:bump": "tsx scripts/bump-release-version.ts",
     "db:validate": "tsx scripts/db-validate.ts",
     "daily-allocation:expand": "tsx scripts/run-daily-allocation-module-migration.ts",

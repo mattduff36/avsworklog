@@ -144,6 +144,8 @@ export interface AutomationMonthlyMetrics {
     totalFiltered: number;
     totalGrouped: number;
     fetchLimitHitCount: number;
+    verifiedOutcomeCount: number;
+    recurrenceCount: number;
     highFilteredRuns: number;
     untriagedCount: number;
     staleCount: number;

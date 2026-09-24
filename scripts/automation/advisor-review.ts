@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'fs';
 import path from 'path';
+import { loadKnowledgeStore, summarizeKnowledgeOutcomes } from '../fixerrors-knowledge';
 import type {
   AutomationMemory,
   AutomationMemorySuggestion,
@@ -65,6 +66,8 @@ interface FixErrorsMetrics {
   totalFiltered: number;
   totalGrouped: number;
   fetchLimitHitCount: number;
+  verifiedOutcomeCount: number;
+  recurrenceCount: number;
   highFilteredRuns: number;
   repeatedPatterns: Array<{ key: string; runs: number; occurrences: number }>;
   repeatedSourceFiles: Array<{ file: string; count: number }>;
@@ -208,12 +211,14 @@ function collectFixErrorsMetrics(logs: AutomationRunLog[], monthKey: string): Fi
   let totalFetched = 0;
   let totalFiltered = 0;
   let totalGrouped = 0;
-  let fetchLimitHitCount = 0;
+  let verifiedOutcomeCount = 0;
+  let recurrenceCount = 0;
   let highFilteredRuns = 0;
   let noSourcePatternCount = 0;
 
   for (const log of reviewedLogs) {
-    const reportStep = log.steps.find((step) => step.name === 'Write error analysis report')
+    const reportStep = log.steps.find((step) => step.name === 'Write and read-verify error analysis report')
+      ?? log.steps.find((step) => step.name === 'Write error analysis report')
       ?? log.steps.find((step) => step.name === 'Group errors into patterns');
     const fixLogStep = log.steps.find((step) => step.name === 'Summarise historical error fix log')
       ?? log.steps.find((step) => step.name === 'Update historical error fix log');
@@ -223,7 +228,8 @@ function collectFixErrorsMetrics(logs: AutomationRunLog[], monthKey: string): Fi
     totalFetched += fetched;
     totalFiltered += Math.max(fetched - afterFiltering, 0);
     totalGrouped += patternsFound;
-    if (fetched >= 200) fetchLimitHitCount += 1;
+    verifiedOutcomeCount += getMetadataNumber(reportStep, 'verifiedOutcomeCount');
+    recurrenceCount += getMetadataNumber(reportStep, 'recurrenceCount');
     if (fetched > 0 && (fetched - afterFiltering) / fetched > 0.75) highFilteredRuns += 1;
     noSourcePatternCount += getMetadataNumber(reportStep, 'patternsWithoutSourceFiles');
 
@@ -248,7 +254,9 @@ function collectFixErrorsMetrics(logs: AutomationRunLog[], monthKey: string): Fi
     totalFetched,
     totalFiltered,
     totalGrouped,
-    fetchLimitHitCount,
+    fetchLimitHitCount: 0,
+    verifiedOutcomeCount,
+    recurrenceCount,
     highFilteredRuns,
     repeatedPatterns: Array.from(patternRuns.entries())
       .map(([key, runs]) => ({ key, runs, occurrences: patternOccurrences.get(key) ?? 0 }))
@@ -358,7 +366,9 @@ function buildFixErrorsMetrics(options: AdvisorPackageOptions, metrics: FixError
       totalFetched: metrics.totalFetched,
       totalFiltered: metrics.totalFiltered,
       totalGrouped: metrics.totalGrouped,
-      fetchLimitHitCount: metrics.fetchLimitHitCount,
+      fetchLimitHitCount: 0,
+      verifiedOutcomeCount: metrics.verifiedOutcomeCount,
+      recurrenceCount: metrics.recurrenceCount,
       highFilteredRuns: metrics.highFilteredRuns,
       untriagedCount,
       staleCount,
@@ -618,14 +628,14 @@ function buildFixErrorsSuggestions(options: AdvisorPackageOptions, metrics: FixE
   const filteredRatio = metrics.totalFetched > 0 ? metrics.totalFiltered / metrics.totalFetched : 0;
   const suggestions: AutomationMemorySuggestion[] = [];
 
-  if (metrics.fetchLimitHitCount > 0) {
+  if (metrics.recurrenceCount > 0) {
     suggestions.push(createSuggestion({
       scriptName: options.scriptName,
       monthKey: options.monthKey,
-      id: 'paginate-fetch-limit',
-      title: 'Paginate error log fetching or make the limit configurable',
-      reason: 'The 200-log fetch limit was reached in reviewed logs.',
-      evidence: [`Fetch limit hit count: ${metrics.fetchLimitHitCount}`],
+      id: 'review-verified-fix-recurrences',
+      title: 'Review verified fixes that recurred in production',
+      reason: 'A previously verified local fix matched a new production incident.',
+      evidence: [`Recurrence count: ${metrics.recurrenceCount}`],
     }));
   }
 
@@ -667,13 +677,20 @@ function buildFixErrorsSuggestions(options: AdvisorPackageOptions, metrics: FixE
 
 function buildFixErrorsPackage(options: AdvisorPackageOptions): AutomationAdvisorPackage {
   const metrics = collectFixErrorsMetrics(options.logs, options.monthKey);
+  try {
+    const knowledge = summarizeKnowledgeOutcomes(loadKnowledgeStore());
+    metrics.verifiedOutcomeCount = Math.max(metrics.verifiedOutcomeCount, knowledge.verifiedOutcomeCount);
+    metrics.recurrenceCount = Math.max(metrics.recurrenceCount, knowledge.recurrenceCount);
+  } catch {
+    // Advisor metrics remain based on run logs when knowledge is unavailable.
+  }
   const monthlyMetrics = buildFixErrorsMetrics(options, metrics);
   const suggestions = buildFixErrorsSuggestions(options, metrics);
   const filteredRatio = metrics.totalFetched > 0 ? metrics.totalFiltered / metrics.totalFetched : 0;
   const untriagedCount = metrics.fixLogStatusCounts.untriaged ?? 0;
   const staleCount = metrics.fixLogStatusCounts.stale ?? 0;
   const risks = [
-    ...(metrics.fetchLimitHitCount > 0 ? [`The 200-log fetch limit was hit ${metrics.fetchLimitHitCount} time(s); increase or paginate before trusting monthly totals.`] : []),
+    ...(metrics.recurrenceCount > 0 ? [`${metrics.recurrenceCount} verified fix recurrence(s) need review.`] : []),
     ...(metrics.highFilteredRuns > 0 ? [`${metrics.highFilteredRuns} run(s) filtered more than 75% of fetched errors; review localhost/admin filtering periodically.`] : []),
     ...(metrics.repeatedPatterns.length > 0 ? [`${metrics.repeatedPatterns.length} repeated pattern(s) appeared across reviewed logs.`] : []),
     ...(untriagedCount > 0 ? [`Fix log contains ${untriagedCount} untriaged entr${untriagedCount === 1 ? 'y' : 'ies'}.`] : []),
@@ -685,7 +702,7 @@ function buildFixErrorsPackage(options: AdvisorPackageOptions): AutomationAdviso
     ...(metrics.repeatedPatterns.length > 0 ? ['Treat repeated production patterns as test backlog candidates, not only one-off fixes.'] : []),
   ];
   const doNothingReasons = [
-    ...(metrics.fetchLimitHitCount === 0 ? ['The 200-log fetch limit was not hit in reviewed logs.'] : []),
+    ...(metrics.verifiedOutcomeCount > 0 ? [`${metrics.verifiedOutcomeCount} verified local fix outcome(s) are recorded.`] : []),
     ...(metrics.repeatedPatterns.length === 0 ? ['No repeated high-frequency patterns were visible in logged metadata.'] : []),
     ...(untriagedCount === 0 ? ['No untriaged fix-log entries were reported in logged metadata.'] : []),
   ];
@@ -697,7 +714,7 @@ function buildFixErrorsPackage(options: AdvisorPackageOptions): AutomationAdviso
       .map((suggestion) => suggestion.title)),
   ]));
   const deprioritizedAreas = [
-    ...(metrics.fetchLimitHitCount === 0 ? ['Fetch-limit changes until the limit is hit'] : []),
+    ...(metrics.recurrenceCount === 0 ? ['Recurrence review until a verified fix returns'] : []),
     ...(metrics.repeatedPatterns.length === 0 ? ['Repeated-pattern test work until recurrence is visible'] : []),
   ];
   const prompt = buildPrompt({
@@ -726,7 +743,8 @@ function buildFixErrorsPackage(options: AdvisorPackageOptions): AutomationAdviso
     `- Total fetched: ${metrics.totalFetched}`,
     `- Total filtered: ${metrics.totalFiltered}`,
     `- Total grouped patterns: ${metrics.totalGrouped}`,
-    `- Fetch limit hit count: ${metrics.fetchLimitHitCount}`,
+    `- Verified local fixes: ${metrics.verifiedOutcomeCount}`,
+    `- Verified fix recurrences: ${metrics.recurrenceCount}`,
     `- Fix-log statuses: ${Object.entries(metrics.fixLogStatusCounts).map(([status, count]) => `${status}=${count}`).join(', ') || 'none captured'}`,
     '',
     '## Risks Or Repeated Friction',
