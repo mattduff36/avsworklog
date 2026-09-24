@@ -42,7 +42,11 @@ import type {
   InventoryLocation,
 } from '../types';
 import { INVENTORY_HARDWARE_ADJUSTMENT_REASONS } from '../types';
-import { getInventoryLocationTypePresentation, isInventoryYardLocation } from '../utils';
+import {
+  getInventoryLocationTypePresentation,
+  getInventoryLocationsWithYardFirst,
+  isInventoryYardLocation,
+} from '../utils';
 import {
   HardwareStockQuantityDialog,
   type HardwareStockQuantityDialogCopy,
@@ -185,9 +189,13 @@ export function HardwareStockPanel({
     if (adjustmentOperation === 'remove') {
       return (positiveBalancesByItem.get(adjustmentItem.id) || []).map((entry) => entry.location);
     }
-    return [...locationById.values()]
+    const activeLocations = [...locationById.values()]
       .filter((location) => location.is_active)
       .toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    if (adjustmentOperation === 'recount') {
+      return getInventoryLocationsWithYardFirst(activeLocations);
+    }
+    return activeLocations;
   }, [adjustmentItem, adjustmentOperation, locationById, positiveBalancesByItem]);
 
   const selectedAdjustmentBalance = adjustmentItem
@@ -212,15 +220,18 @@ export function HardwareStockPanel({
     const filteredLocation = locationFilter === ALL_LOCATIONS
       ? null
       : locationById.get(locationFilter) || null;
+    const activeLocations = [...locationById.values()]
+      .filter((location) => location.is_active)
+      .toSorted((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const yardLocation = getInventoryLocationsWithYardFirst(activeLocations)
+      .find((location) => isInventoryYardLocation(location));
     const defaultLocation = operation === 'remove'
       ? itemBalances.find((entry) => entry.location.id === filteredLocation?.id)?.location
         || itemBalances[0]?.location
-      : filteredLocation
+      : yardLocation
+        || filteredLocation
         || itemBalances[0]?.location
-        || [...locationById.values()].find((location) => (
-          location.is_active && isInventoryYardLocation(location)
-        ))
-        || [...locationById.values()].find((location) => location.is_active);
+        || activeLocations[0];
 
     setAdjustmentItem(item);
     setAdjustmentOperation(operation);

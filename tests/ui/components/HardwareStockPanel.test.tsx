@@ -21,7 +21,11 @@ vi.mock('@/app/(dashboard)/inventory/components/InventoryLocationSelect', () => 
     locations,
     value,
   }: MockInventoryLocationSelectProps) => (
-    <button type="button" aria-label={ariaLabel}>
+    <button
+      type="button"
+      aria-label={ariaLabel}
+      data-location-order={locations.map((location) => location.name).join('|')}
+    >
       {locations.find((location) => location.id === value)?.name || 'No destination'}
     </button>
   ),
@@ -254,6 +258,32 @@ describe('HardwareStockPanel', () => {
         }],
       });
     });
+  });
+
+  it('defaults a recount to Yard even when stock exists elsewhere', () => {
+    const item = makeHardwareItem('plates', 'Road Plates');
+    render(
+      <HardwareStockPanel
+        items={[item]}
+        balances={[{
+          id: 'plates-van',
+          hardware_item_id: item.id,
+          location_id: van.id,
+          quantity: 5,
+          location: van,
+        }]}
+        locations={[van, site, yard]}
+        onAdjust={vi.fn()}
+      />,
+    );
+
+    const matrix = screen.getByRole('table', { name: 'All active Hardware items' });
+    fireEvent.click(within(matrix).getByRole('button', { name: 'Recount Road Plates stock' }));
+    const locationPicker = within(screen.getByRole('dialog')).getByRole('button', {
+      name: 'Adjustment location',
+    });
+    expect(locationPicker).toHaveTextContent('Yard');
+    expect(locationPicker).toHaveAttribute('data-location-order', 'Yard|Empty Site|Van - TE57 VAN');
   });
 
   it('recounts a zero-stock item directly from its item action', async () => {
