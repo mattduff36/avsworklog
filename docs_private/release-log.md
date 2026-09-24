@@ -2,6 +2,29 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.10.7
+
+**GIT COMMIT MESSAGE**
+`fix(inventory): default hardware recounts to Yard`
+
+**PUSHED AT**
+2026-09-24T21:15:27.208Z
+
+**WHAT CHANGED**
+Secure contractor role transitions. Preserve tablet pairing. Default hardware recounts to Yard.
+
+**VERSION HISTORY DETAILS**
+- Updated workshop tasks, with changes to app screens and automated tests.
+- Updated data storage, with changes to shared typing, automated tests, and data storage.
+- Updated user management, with changes to background routes and app screens.
+- Updated absence and leave, with changes to shared logic and automated tests.
+- Default hardware recounts to Yard, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(admin): secure contractor role transitions`
+- `fix(display-board): preserve tablet pairing`
+- `fix(inventory): default hardware recounts to Yard`
+
 ## 0926.10.6
 
 **GIT COMMIT MESSAGE**
