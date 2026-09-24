@@ -55,6 +55,8 @@ function parseDisplayBoardTextSizeStep(value: unknown): MobileTextSizeStep | nul
 type BoardState = 'loading' | 'unauthorised' | 'pairing' | 'ready' | 'error';
 type AutoScrollScrollerKey = 'maintenance' | 'pending' | 'inProgress' | 'onHold';
 const SECTION_TITLE_BASE_CLASS = 'text-sm font-bold uppercase tracking-[0.3em]';
+const DISPLAY_BOARD_RETRY_INTERVAL_MS = 15_000;
+const DISPLAY_BOARD_RETRY_MESSAGE = 'Connection interrupted. Pairing kept; retrying…';
 
 interface AutoScrollScroller {
   key: AutoScrollScrollerKey;
@@ -216,6 +218,8 @@ export default function WorkshopDisplayBoardPage() {
   const [message, setMessage] = useState('Loading display board...');
   const [now, setNow] = useState(new Date());
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const refreshRequestedRef = useRef(false);
   const maintenanceScrollRef = useRef<HTMLDivElement | null>(null);
   const pendingScrollRef = useRef<HTMLDivElement | null>(null);
   const inProgressScrollRef = useRef<HTMLDivElement | null>(null);
@@ -243,39 +247,90 @@ export default function WorkshopDisplayBoardPage() {
     return window.localStorage.getItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY) || '';
   }, []);
 
-  const fetchBoard = useCallback(async () => {
-    const deviceToken = getDeviceToken();
-    if (!deviceToken) {
-      setPayload(null);
-      setState(current => current === 'pairing' ? current : 'unauthorised');
-      setMessage('This display board is not authorised.');
-      return;
+  const fetchBoard = useCallback((): Promise<void> => {
+    refreshRequestedRef.current = true;
+    if (refreshInFlightRef.current) {
+      return refreshInFlightRef.current;
     }
 
-    const response = await fetch('/api/display-board/workshop/data', {
-      cache: 'no-store',
-      headers: {
-        'x-display-board-token': deviceToken,
+    const request = (async () => {
+      while (refreshRequestedRef.current) {
+        refreshRequestedRef.current = false;
+        const deviceToken = getDeviceToken();
+        if (!deviceToken) {
+          setPayload(null);
+          setState(current => current === 'pairing' ? current : 'unauthorised');
+          setMessage('This display board is not authorised.');
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/display-board/workshop/data', {
+            cache: 'no-store',
+            headers: {
+              'x-display-board-token': deviceToken,
+            },
+          });
+
+          if (response.status === 401) {
+            let errorMessage = 'This display board is not authorised.';
+            try {
+              const body = await response.json() as { error?: string };
+              errorMessage = body.error || errorMessage;
+            } catch {
+              // A definite 401 still invalidates the credential when its body is unreadable.
+            }
+
+            // A delayed response for an old token queues validation of its replacement.
+            if (getDeviceToken() !== deviceToken) {
+              refreshRequestedRef.current = true;
+              continue;
+            }
+
+            refreshRequestedRef.current = false;
+            window.localStorage.removeItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY);
+            setPayload(null);
+            setState('unauthorised');
+            setMessage(errorMessage);
+            return;
+          }
+
+          const body = await response.json() as {
+            status: string;
+            payload?: DisplayBoardPayload;
+            error?: string;
+          };
+
+          if (!response.ok || !body.payload) {
+            throw new Error(body.error || 'Unable to load display board data');
+          }
+
+          setPayload(body.payload);
+          setState('ready');
+          setMessage('Live');
+        } catch (error) {
+          // A command that arrived during the failed request still requires a fresh validation.
+          if (!refreshRequestedRef.current) throw error;
+        }
+      }
+    })();
+
+    refreshInFlightRef.current = request;
+    void request.then(
+      () => {
+        if (refreshInFlightRef.current === request) refreshInFlightRef.current = null;
       },
-    });
-    const body = await response.json() as { status: string; payload?: DisplayBoardPayload; error?: string };
-
-    if (response.status === 401) {
-      window.localStorage.removeItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY);
-      setPayload(null);
-      setState('unauthorised');
-      setMessage(body.error || 'This display board is not authorised.');
-      return;
-    }
-
-    if (!response.ok || !body.payload) {
-      throw new Error(body.error || 'Unable to load display board data');
-    }
-
-    setPayload(body.payload);
-    setState('ready');
-    setMessage('Live');
+      () => {
+        if (refreshInFlightRef.current === request) refreshInFlightRef.current = null;
+      }
+    );
+    return request;
   }, [getDeviceToken]);
+
+  const handleRefreshError = useCallback(() => {
+    setState('error');
+    setMessage(DISPLAY_BOARD_RETRY_MESSAGE);
+  }, []);
 
   const tryJoinPairing = useCallback(async () => {
     if (getDeviceToken()) return;
@@ -344,13 +399,10 @@ export default function WorkshopDisplayBoardPage() {
 
     refreshTimerRef.current = setTimeout(() => {
       if (document.visibilityState === 'visible') {
-        void fetchBoard().catch(error => {
-          setState('error');
-          setMessage(error instanceof Error ? error.message : 'Unable to refresh display board.');
-        });
+        void fetchBoard().catch(handleRefreshError);
       }
     }, realtimeDebounceMs);
-  }, [fetchBoard, realtimeDebounceMs]);
+  }, [fetchBoard, handleRefreshError, realtimeDebounceMs]);
 
   const handleDeviceCommand = useCallback((command: DisplayBoardDeviceCommandPayload) => {
     if (command.kind === 'text_size') {
@@ -368,37 +420,18 @@ export default function WorkshopDisplayBoardPage() {
       return;
     }
 
-    void fetchBoard().catch(error => {
-      if (typeof window !== 'undefined') {
-        window.localStorage.removeItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY);
-      }
-      setPayload(null);
-      setState('unauthorised');
-      setMessage(error instanceof Error ? error.message : 'This display board is not authorised.');
-    });
-  }, [fetchBoard]);
+    void fetchBoard().catch(handleRefreshError);
+  }, [fetchBoard, handleRefreshError]);
 
   useDisplayBoardDeviceBroadcast(
     WORKSHOP_DISPLAY_BOARD_KEY,
     payload?.device.id,
     handleDeviceCommand,
-    state === 'ready'
+    state === 'ready' || (state === 'error' && Boolean(payload))
   );
 
-  useWorkshopDisplayBoardRealtime((realtimePayload) => {
+  useWorkshopDisplayBoardRealtime(() => {
     if (state === 'ready') {
-      if (realtimePayload.table === 'display_board_devices') {
-        void fetchBoard().catch(error => {
-          if (typeof window !== 'undefined') {
-            window.localStorage.removeItem(WORKSHOP_DISPLAY_BOARD_DEVICE_TOKEN_STORAGE_KEY);
-          }
-          setPayload(null);
-          setState('unauthorised');
-          setMessage(error instanceof Error ? error.message : 'This display board is not authorised.');
-        });
-        return;
-      }
-
       scheduleRefresh();
     }
   }, state === 'ready');
@@ -535,12 +568,10 @@ export default function WorkshopDisplayBoardPage() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      void fetchBoard().catch(() => {
-        void tryJoinPairing();
-      });
+      void fetchBoard().catch(handleRefreshError);
     }, 0);
     return () => clearTimeout(timer);
-  }, [fetchBoard, tryJoinPairing]);
+  }, [fetchBoard, handleRefreshError]);
 
   useEffect(() => {
     if (state !== 'unauthorised' && state !== 'pairing') return;
@@ -556,24 +587,31 @@ export default function WorkshopDisplayBoardPage() {
     if (state !== 'ready') return;
     const interval = setInterval(() => {
       if (document.visibilityState === 'visible') {
-        void fetchBoard().catch(error => {
-          setState('error');
-          setMessage(error instanceof Error ? error.message : 'Unable to refresh display board.');
-        });
+        void fetchBoard().catch(handleRefreshError);
       }
     }, fallbackPollMs);
     return () => clearInterval(interval);
-  }, [fallbackPollMs, fetchBoard, state]);
+  }, [fallbackPollMs, fetchBoard, handleRefreshError, state]);
+
+  useEffect(() => {
+    if (state !== 'error' || !getDeviceToken()) return;
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        void fetchBoard().catch(handleRefreshError);
+      }
+    }, DISPLAY_BOARD_RETRY_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, [fetchBoard, getDeviceToken, handleRefreshError, state]);
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible' && state === 'ready') {
-        void fetchBoard();
+      if (document.visibilityState === 'visible' && (state === 'ready' || state === 'error')) {
+        void fetchBoard().catch(handleRefreshError);
       }
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, [fetchBoard, state]);
+  }, [fetchBoard, handleRefreshError, state]);
 
   const topMaintenance = useMemo(
     () => [
@@ -583,7 +621,7 @@ export default function WorkshopDisplayBoardPage() {
     [payload]
   );
 
-  if (state !== 'ready' || !payload) {
+  if ((state !== 'ready' && state !== 'error') || !payload) {
     return (
       <main className="flex h-dvh w-screen items-center justify-center overflow-hidden bg-slate-950 text-white">
         <section className="w-full max-w-3xl rounded-3xl border border-white/10 bg-white/[0.04] p-12 text-center shadow-2xl">
@@ -603,7 +641,9 @@ export default function WorkshopDisplayBoardPage() {
             <div className="mt-8 space-y-4">
               <p className="text-2xl font-semibold text-white/80">{message}</p>
               <p className="text-white/55">
-                Start “Search for display board” from Workshop Tasks Settings, then reload or leave this screen open.
+                {state === 'error'
+                  ? 'The board will retry automatically. No re-pairing is needed.'
+                  : 'Start “Search for display board” from Workshop Tasks Settings, then reload or leave this screen open.'}
               </p>
             </div>
           )}
@@ -635,7 +675,11 @@ export default function WorkshopDisplayBoardPage() {
                 <p className="text-sm uppercase tracking-[0.22em] text-white/50">Now</p>
                 <p className="text-3xl font-black">{formatTime(now.toISOString())}</p>
               </div>
-              <Badge className="gap-2 border-green-400/30 bg-green-500/15 px-4 py-2 text-green-100">
+              <Badge className={`gap-2 px-4 py-2 ${
+                state === 'error'
+                  ? 'border-amber-400/30 bg-amber-500/15 text-amber-100'
+                  : 'border-green-400/30 bg-green-500/15 text-green-100'
+              }`}>
                 <Radio className="h-4 w-4" />
                 {message}
               </Badge>

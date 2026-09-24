@@ -129,7 +129,6 @@ export function useWorkshopDisplayBoardRealtime(callback: RealtimeCallback, enab
   usePublicRealtimeSubscription('actions', callback, enabled);
   usePublicRealtimeSubscription('vehicle_maintenance', callback, enabled);
   usePublicRealtimeSubscription('asset_maintenance_category_values', callback, enabled);
-  usePublicRealtimeSubscription('display_board_devices', callback, enabled);
 }
 
 export function useDisplayBoardDeviceBroadcast(
