@@ -28,9 +28,16 @@ vi.mock('@/lib/utils/server-error-logger', () => ({
 
 type PutRouteOptions = {
   existingUser?: Record<string, unknown>;
+  roleRow?: {
+    name: string;
+    display_name: string;
+    role_class?: 'admin' | 'manager' | 'employee';
+    is_super_admin?: boolean;
+  };
   employeeIdOwner?: { id: string } | null;
   employeeIdLookupError?: { message: string } | null;
   profileUpdateError?: { code?: string; message: string } | null;
+  profileUpdateData?: { id: string } | null;
 };
 
 function createMockSupabaseAdmin(options: PutRouteOptions = {}) {
@@ -39,7 +46,10 @@ function createMockSupabaseAdmin(options: PutRouteOptions = {}) {
     data: { user: { email: 'existing@example.com' } },
     error: null,
   });
-  const profileUpdate = vi.fn().mockResolvedValue({ error: options.profileUpdateError ?? null });
+  const profileUpdate = vi.fn().mockResolvedValue({
+    data: options.profileUpdateData === undefined ? { id: 'user-1' } : options.profileUpdateData,
+    error: options.profileUpdateError ?? null,
+  });
   const permissionDelete = vi.fn().mockResolvedValue({ error: null });
 
   return {
@@ -61,7 +71,7 @@ function createMockSupabaseAdmin(options: PutRouteOptions = {}) {
                 return {
                   async maybeSingle() {
                     return {
-                      data: {
+                      data: options.roleRow ?? {
                         name: 'employee',
                         display_name: 'Employee',
                         role_class: 'employee',
@@ -157,7 +167,19 @@ function createMockSupabaseAdmin(options: PutRouteOptions = {}) {
           },
           update() {
             return {
-              eq: profileUpdate,
+              eq() {
+                return {
+                  eq() {
+                    return {
+                      select() {
+                        return {
+                          maybeSingle: profileUpdate,
+                        };
+                      },
+                    };
+                  },
+                };
+              },
             };
           },
         };
@@ -310,5 +332,77 @@ describe('PUT /api/admin/users/[id]', () => {
     expect(response.status).toBe(500);
     expect(payload.code).toBeUndefined();
     expect(payload.error).toBe('Failed to update user profile');
+  });
+
+  it('requires the dedicated transition route before assigning Contractor', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const admin = createMockSupabaseAdmin({
+      roleRow: {
+        name: 'contractor',
+        display_name: 'Contractor',
+        role_class: 'employee',
+        is_super_admin: false,
+      },
+    });
+    vi.mocked(createClient).mockReturnValue(admin as never);
+
+    const response = await invokePut(validPutBody({ role_id: 'role-contractor' }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload.code).toBe('CONTRACTOR_TRANSITION_REQUIRED');
+    expect(admin.updateUserById).not.toHaveBeenCalled();
+    expect(admin.permissionDelete).not.toHaveBeenCalled();
+    expect(admin.profileUpdate).not.toHaveBeenCalled();
+  });
+
+  it('checks authority over the existing role as well as the requested role', async () => {
+    const { canEffectiveRoleAssignRole } = await import('@/lib/utils/rbac');
+    vi.mocked(canEffectiveRoleAssignRole).mockImplementation(
+      async (roleId) => roleId !== 'role-employee'
+    );
+
+    const response = await invokePut(validPutBody({ role_id: 'role-manager' }));
+
+    expect(response.status).toBe(403);
+    expect(canEffectiveRoleAssignRole).toHaveBeenCalledWith('role-manager');
+    expect(canEffectiveRoleAssignRole).toHaveBeenCalledWith('role-employee');
+  });
+
+  it('fails closed for roleless accounts', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const admin = createMockSupabaseAdmin({
+      existingUser: {
+        id: 'user-1',
+        full_name: 'Roleless User',
+        phone_number: null,
+        employee_id: 'E100',
+        role_id: null,
+        line_manager_id: null,
+        team_id: 'team-civils',
+        is_system_account: false,
+      },
+    });
+    vi.mocked(createClient).mockReturnValue(admin as never);
+
+    const response = await invokePut(validPutBody());
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload.code).toBe('CURRENT_ROLE_REQUIRED');
+    expect(admin.profileUpdate).not.toHaveBeenCalled();
+  });
+
+  it('does not update Auth when the expected-role profile guard detects a race', async () => {
+    const { createClient } = await import('@supabase/supabase-js');
+    const admin = createMockSupabaseAdmin({ profileUpdateData: null });
+    vi.mocked(createClient).mockReturnValue(admin as never);
+
+    const response = await invokePut(validPutBody({ email: 'changed@example.com' }));
+    const payload = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(payload.code).toBe('STALE_ROLE');
+    expect(admin.updateUserById).not.toHaveBeenCalled();
   });
 });

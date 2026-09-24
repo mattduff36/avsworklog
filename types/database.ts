@@ -11271,6 +11271,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      transition_profile_to_contractor: {
+        Args: {
+          p_profile_id: string
+          p_expected_role_id: string
+          p_contractor_role_id: string
+        }
+        Returns: Json
+      }
       delete_profile_open_year_annual_leave_bookings: {
         Args: {
           p_profile_id: string

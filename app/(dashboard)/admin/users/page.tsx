@@ -84,6 +84,7 @@ import { formatDateTime } from '@/lib/utils/date';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
 import { getDisplayedTeamName, isSystemAccountProfile, SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
 import { isDeletedUserName } from '@/lib/users/deleted-user';
+import { ContractorTransitionConfirmationDialog } from '@/components/admin/ContractorTransitionConfirmationDialog';
 import {
   computeQuickEditFloatingPosition,
   type FloatingPositionResult,
@@ -184,6 +185,12 @@ interface QuickEditTarget {
   userId: string;
   field: 'role' | 'team';
   triggerElement: HTMLElement;
+}
+
+interface PendingContractorTransition {
+  source: 'edit' | 'quick-edit';
+  user: ProfileWithEmail;
+  contractorRoleId: string;
 }
 
 function summarizeWorkShiftPattern(pattern: WorkShiftPattern): string {
@@ -414,6 +421,10 @@ export default function UsersAdminPage() {
   const [quickEditSaving, setQuickEditSaving] = useState(false);
   const [quickEditPosition, setQuickEditPosition] = useState<FloatingPositionResult | null>(null);
   const [quickEditPanelReady, setQuickEditPanelReady] = useState(false);
+  const [pendingContractorTransition, setPendingContractorTransition] =
+    useState<PendingContractorTransition | null>(null);
+  const [contractorTransitionSaving, setContractorTransitionSaving] = useState(false);
+  const [contractorTransitionError, setContractorTransitionError] = useState('');
   const [isMounted, setIsMounted] = useState(false);
   const quickEditPanelRef = useRef<HTMLDivElement | null>(null);
 
@@ -1048,6 +1059,23 @@ export default function UsersAdminPage() {
 
     const nextRoleId = quickEditTarget.field === 'role' ? quickEditValue || null : (user.role_id || null);
     const nextTeamId = quickEditTarget.field === 'team' ? quickEditValue || null : (user.team_id || null);
+    const nextRole = availableRoles.find((role) => role.id === nextRoleId) || null;
+
+    if (
+      quickEditTarget.field === 'role'
+      && nextRoleId
+      && !isContractorRole(user.role)
+      && isContractorRole(nextRole)
+    ) {
+      setContractorTransitionError('');
+      setPendingContractorTransition({
+        source: 'quick-edit',
+        user,
+        contractorRoleId: nextRoleId,
+      });
+      closeQuickEdit();
+      return;
+    }
 
     try {
       setQuickEditSaving(true);
@@ -1216,6 +1244,17 @@ export default function UsersAdminPage() {
       return;
     }
 
+    const requestedRole = availableRoles.find((role) => role.id === formData.role_id) || null;
+    if (!isContractorRole(selectedUser.role) && isContractorRole(requestedRole)) {
+      setContractorTransitionError('');
+      setPendingContractorTransition({
+        source: 'edit',
+        user: selectedUser,
+        contractorRoleId: formData.role_id,
+      });
+      return;
+    }
+
     try {
       setFormLoading(true);
       setFormError('');
@@ -1255,6 +1294,84 @@ export default function UsersAdminPage() {
       setFormError(error instanceof Error ? error.message : 'Failed to update user');
     } finally {
       setFormLoading(false);
+    }
+  }
+
+  async function handleConfirmContractorTransition() {
+    if (!pendingContractorTransition) return;
+
+    const { source, user, contractorRoleId } = pendingContractorTransition;
+    if (!user.role_id) {
+      setContractorTransitionError('The current role is missing. Refresh the page and try again.');
+      return;
+    }
+
+    let transitionCompleted = false;
+    try {
+      setContractorTransitionSaving(true);
+      setContractorTransitionError('');
+
+      const transitionResponse = await fetch(
+        `/api/admin/users/${user.id}/contractor-transition`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            expected_role_id: user.role_id,
+            contractor_role_id: contractorRoleId,
+          }),
+        }
+      );
+      const transitionResult = await transitionResponse.json();
+      if (!transitionResponse.ok) {
+        throw new Error(transitionResult.error || 'Failed to convert user to Contractor');
+      }
+      transitionCompleted = true;
+
+      if (source === 'edit') {
+        const profileResponse = await fetch(`/api/admin/users/${user.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            full_name: formData.full_name,
+            phone_number: formData.phone_number,
+            employee_id: formData.employee_id,
+            role_id: contractorRoleId,
+            line_manager_id: formData.line_manager_id || null,
+            team_id: formData.team_id || null,
+          }),
+        });
+        const profileResult = await profileResponse.json();
+        if (!profileResponse.ok) {
+          throw new Error(profileResult.error || 'Failed to save the other profile changes');
+        }
+      }
+
+      const usersWithEmails = await fetchUsersWithEmails();
+      setUsers(usersWithEmails);
+      setFilteredUsers(usersWithEmails);
+      setPendingContractorTransition(null);
+      if (source === 'edit') {
+        setEditDialogOpen(false);
+        setSelectedUser(null);
+      }
+      toast.success(`${user.full_name || user.email || 'User'} converted to Contractor`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to convert user to Contractor';
+      if (transitionCompleted) {
+        const usersWithEmails = await fetchUsersWithEmails();
+        setUsers(usersWithEmails);
+        setFilteredUsers(usersWithEmails);
+        setPendingContractorTransition(null);
+        setEditDialogOpen(false);
+        setSelectedUser(null);
+        toast.error(`Contractor conversion completed, but other profile changes failed: ${message}`);
+      } else {
+        setContractorTransitionError(message);
+      }
+    } finally {
+      setContractorTransitionSaving(false);
     }
   }
 
@@ -2006,6 +2123,24 @@ export default function UsersAdminPage() {
         </div>,
         document.body
       )}
+
+      <ContractorTransitionConfirmationDialog
+        open={Boolean(pendingContractorTransition)}
+        userName={
+          pendingContractorTransition?.user.full_name
+          || pendingContractorTransition?.user.email
+          || ''
+        }
+        saving={contractorTransitionSaving}
+        error={contractorTransitionError}
+        onCancel={() => {
+          if (!contractorTransitionSaving) {
+            setPendingContractorTransition(null);
+            setContractorTransitionError('');
+          }
+        }}
+        onConfirm={handleConfirmContractorTransition}
+      />
 
       {/* Add User Dialog */}
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>

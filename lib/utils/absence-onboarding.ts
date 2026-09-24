@@ -87,8 +87,7 @@ export function isContractorOnboardingRole(
   role?: { name?: string | null; display_name?: string | null } | null
 ): boolean {
   const roleName = role?.name?.trim().toLowerCase();
-  const roleDisplayName = role?.display_name?.trim().toLowerCase();
-  return roleName === 'contractor' || roleDisplayName === 'contractor';
+  return roleName === 'contractor';
 }
 
 export function getContractorOnboardingViolation(

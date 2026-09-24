@@ -118,7 +118,7 @@ export async function PATCH(
     // Check if role exists and is not super admin
     const { data: existingRole, error: fetchError } = await supabase
       .from('roles')
-      .select('is_super_admin, role_class, name, hierarchy_rank')
+      .select('is_super_admin, role_class, name, display_name, hierarchy_rank')
       .eq('id', id)
       .single();
 
@@ -137,6 +137,22 @@ export async function PATCH(
 
     const nextRoleClass = body.role_class ?? existingRole.role_class;
     const nextRoleName = body.name ? normalizeRoleInternalName(body.name) : existingRole.name;
+    const nextDisplayName = body.display_name?.trim() ?? existingRole.display_name;
+    if (
+      (existingRole.name.trim().toLowerCase() === 'contractor')
+      !== (nextRoleName.trim().toLowerCase() === 'contractor')
+    ) {
+      return NextResponse.json(
+        { error: 'The canonical Contractor role identity cannot be renamed or reassigned.' },
+        { status: 409 }
+      );
+    }
+    if (nextDisplayName.toLowerCase() === 'contractor' && nextRoleName !== 'contractor') {
+      return NextResponse.json(
+        { error: 'The Contractor display name is reserved for the canonical Contractor role.' },
+        { status: 400 }
+      );
+    }
     const nextHierarchyRank =
       body.hierarchy_rank !== undefined
         ? normalizeHierarchyRankInput(body.hierarchy_rank)

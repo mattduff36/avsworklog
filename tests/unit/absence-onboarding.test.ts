@@ -47,9 +47,9 @@ describe('absence onboarding calculations', () => {
     expect(roundToNearestHalfDay(13.76)).toBe(14);
   });
 
-  it('identifies contractor roles by name or display name', () => {
+  it('uses only the stable internal role name for Contractor identity', () => {
     expect(isContractorOnboardingRole({ name: 'contractor' })).toBe(true);
-    expect(isContractorOnboardingRole({ display_name: 'Contractor' })).toBe(true);
+    expect(isContractorOnboardingRole({ name: 'employee', display_name: 'Contractor' })).toBe(false);
     expect(isContractorOnboardingRole({ name: 'employee' })).toBe(false);
   });
 

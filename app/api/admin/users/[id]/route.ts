@@ -17,6 +17,7 @@ import {
   findEmployeeIdOwner,
   parseEmployeeId,
 } from '@/lib/server/admin-user-employee-id';
+import { isContractorOnboardingRole } from '@/lib/utils/absence-onboarding';
 
 function isMissingHierarchySchemaError(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
@@ -200,6 +201,46 @@ export async function PUT(
       );
     }
 
+    if (!existingUser.role_id) {
+      return NextResponse.json(
+        {
+          error: 'This account has no current role and cannot be edited safely.',
+          code: 'CURRENT_ROLE_REQUIRED',
+        },
+        { status: 409 }
+      );
+    }
+
+    const canManageExistingRole = await canEffectiveRoleAssignRole(existingUser.role_id);
+    if (!canManageExistingRole) {
+      return NextResponse.json(
+        { error: 'Forbidden: you cannot manage this user role' },
+        { status: 403 }
+      );
+    }
+
+    if (role_id !== existingUser.role_id) {
+      const { data: requestedRole, error: requestedRoleError } = await supabaseAdmin
+        .from('roles')
+        .select('name, display_name')
+        .eq('id', role_id)
+        .maybeSingle();
+
+      if (requestedRoleError || !requestedRole) {
+        return NextResponse.json({ error: 'Selected role does not exist' }, { status: 400 });
+      }
+
+      if (isContractorOnboardingRole(requestedRole)) {
+        return NextResponse.json(
+          {
+            error: 'Use the confirmed Contractor transition to assign this role.',
+            code: 'CONTRACTOR_TRANSITION_REQUIRED',
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const existingEmployeeId = parseEmployeeId(existingUser.employee_id);
     const currentEmployeeId = existingEmployeeId.ok ? existingEmployeeId.value : existingUser.employee_id || null;
     if (normalizedEmployeeId !== currentEmployeeId && normalizedEmployeeId) {
@@ -269,24 +310,8 @@ export async function PUT(
       };
     }
 
-    // Update email in auth if it changed
-    if (email) {
-      const { error: emailError } = await supabaseAdmin.auth.admin.updateUserById(
-        userId,
-        { email }
-      );
-
-      if (emailError) {
-        console.error('Email update error:', emailError);
-        return NextResponse.json(
-          { error: `Failed to update email: ${emailError.message}` },
-          { status: 400 }
-        );
-      }
-    }
-
-    // Update profile data (email is only in auth, not in profiles table)
-    // Use admin client to bypass RLS policies
+    // Update profile data with an expected-role guard to prevent stale
+    // authorization from overwriting a concurrently changed role.
     const baseUpdatePayload = {
       full_name,
       phone_number: phone_number || null,
@@ -318,10 +343,16 @@ export async function PUT(
       }
     }
 
-    let { error: profileError } = await supabaseAdmin
+    let {
+      data: updatedProfile,
+      error: profileError,
+    } = await supabaseAdmin
       .from('profiles')
       .update(hierarchyUpdatePayload)
-      .eq('id', userId);
+      .eq('id', userId)
+      .eq('role_id', existingUser.role_id)
+      .select('id')
+      .maybeSingle();
 
     if (profileError && isMissingHierarchySchemaError(profileError)) {
       hierarchyFieldsPersisted = false;
@@ -329,8 +360,12 @@ export async function PUT(
       const fallbackResult = await supabaseAdmin
         .from('profiles')
         .update(baseUpdatePayload)
-        .eq('id', userId);
+        .eq('id', userId)
+        .eq('role_id', existingUser.role_id)
+        .select('id')
+        .maybeSingle();
       profileError = fallbackResult.error;
+      updatedProfile = fallbackResult.data;
     }
 
     if (profileError) {
@@ -339,6 +374,32 @@ export async function PUT(
         { error: 'Failed to update user profile' },
         { status: 500 }
       );
+    }
+
+    if (!updatedProfile) {
+      return NextResponse.json(
+        {
+          error: 'The user role changed. Refresh the page and try again.',
+          code: 'STALE_ROLE',
+        },
+        { status: 409 }
+      );
+    }
+
+    // Update Auth only after the expected-role profile guard succeeds.
+    if (email) {
+      const { error: emailError } = await supabaseAdmin.auth.admin.updateUserById(
+        userId,
+        { email }
+      );
+
+      if (emailError) {
+        console.error('Email update error:', emailError);
+        return NextResponse.json(
+          { error: `Failed to update email: ${emailError.message}` },
+          { status: 400 }
+        );
+      }
     }
 
     if (hierarchyFieldsPersisted) {

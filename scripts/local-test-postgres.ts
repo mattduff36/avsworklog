@@ -45,6 +45,8 @@ export const TARGET_TEST_FILE = 'tests/db/daily-allocation-v2-runtime.test.ts';
 export const HGV_SAVE_TARGET_TEST_FILE = 'tests/db/hgv-inspection-save-rpc.test.ts';
 export const DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE =
   'tests/db/delete-user-annual-leave-lock.test.ts';
+export const CONTRACTOR_TRANSITION_LOCK_TARGET_TEST_FILE =
+  'tests/db/contractor-role-transition-lock.test.ts';
 export const BANK_HOLIDAY_RUNTIME_TARGET_TEST_FILE =
   'tests/db/timesheet-bank-holiday-runtime.test.ts';
 export const DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE =
@@ -53,6 +55,7 @@ export const ALLOWED_TARGET_TEST_FILES = [
   TARGET_TEST_FILE,
   HGV_SAVE_TARGET_TEST_FILE,
   DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
+  CONTRACTOR_TRANSITION_LOCK_TARGET_TEST_FILE,
   BANK_HOLIDAY_RUNTIME_TARGET_TEST_FILE,
   DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE,
 ] as const;

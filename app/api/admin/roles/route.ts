@@ -156,6 +156,15 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedName = normalizeRoleInternalName(body.name);
+    if (
+      body.display_name.trim().toLowerCase() === 'contractor'
+      && normalizedName !== 'contractor'
+    ) {
+      return NextResponse.json(
+        { error: 'The Contractor display name is reserved for the canonical Contractor role.' },
+        { status: 400 }
+      );
+    }
     if (isRetiredRoleName(normalizedName)) {
       return NextResponse.json(
         { error: 'This retired role name cannot be reused. Use Employee, Manager, Admin, or a new custom role name.' },
