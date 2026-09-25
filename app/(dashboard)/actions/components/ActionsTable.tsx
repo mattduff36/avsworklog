@@ -332,7 +332,7 @@ function IgnoreActionPopover({
 }
 
 function getLegacyJobCode(action: ReminderActionWithAsset): string {
-  return getMetadataString(action, 'job_code') || action.title.replace(/^Add a site address for legacy job\s+/i, '') || 'Unknown job';
+  return getMetadataString(action, 'job_code') || action.title.replace(/^Add a site address for (?:legacy )?job\s+/i, '') || 'Unknown job';
 }
 
 function getLegacyJobDetails(action: ReminderActionWithAsset): string {

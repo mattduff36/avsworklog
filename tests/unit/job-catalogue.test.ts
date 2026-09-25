@@ -131,19 +131,27 @@ describe('PLC plant daily-check catalogue selection', () => {
     })).toBe(true);
   });
 
-  it('PLC-002 keeps blocked live and project options unselectable', () => {
+  it('PLC-002 allows weak-address and exact ambiguous live and project options', () => {
     expect(isPlantDailyCheckCatalogueOptionSelectable({
       source: 'live_quote',
       blockReason: 'missing_site_address',
-    })).toBe(false);
+    })).toBe(true);
     expect(isPlantDailyCheckCatalogueOptionSelectable({
       source: 'project_number',
       blockReason: 'ambiguous_sources',
-    })).toBe(false);
+    })).toBe(true);
     expect(isPlantDailyCheckCatalogueOptionSelectable({
       source: 'live_quote',
       blockReason: null,
     })).toBe(true);
+    expect(isPlantDailyCheckCatalogueOptionSelectable({
+      source: 'live_quote',
+      blockReason: 'inactive_source',
+    })).toBe(false);
+    expect(isPlantDailyCheckCatalogueOptionSelectable({
+      source: 'project_number',
+      blockReason: 'not_found',
+    })).toBe(false);
   });
 });
 

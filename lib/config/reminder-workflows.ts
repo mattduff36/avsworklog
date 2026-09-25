@@ -50,7 +50,7 @@ export const REMINDER_DAILY_CHECK_TABS: ReminderOverviewTabConfig[] = [
 export const REMINDER_CATEGORY_TABS: ReminderOverviewTabConfig[] = [
   {
     id: 'legacy-job-addresses',
-    label: 'Legacy job addresses',
+    label: 'Plant job addresses',
     icon: MapPin,
     workflowKey: PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY,
   },

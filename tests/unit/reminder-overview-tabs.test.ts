@@ -13,7 +13,11 @@ describe('reminder overview tab hierarchy', () => {
     expect(REMINDER_DAILY_CHECK_TABS.some((tab) => isReminderCategoryTabId(tab.id))).toBe(false);
   });
 
-  it('treats legacy job addresses and yard transfers as main categories', () => {
+  it('treats plant job addresses and yard transfers as main categories', () => {
+    expect(REMINDER_CATEGORY_TABS.map((tab) => tab.label)).toEqual([
+      'Plant job addresses',
+      'Yard transfers',
+    ]);
     expect(REMINDER_CATEGORY_TABS.map((tab) => tab.id)).toEqual([
       'legacy-job-addresses',
       'yard-transfers',

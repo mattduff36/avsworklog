@@ -211,28 +211,41 @@ describe('JobCataloguePicker', () => {
     expect(onSelect).toHaveBeenCalledWith(ambiguousLegacy);
   });
 
-  it('PLC-002 keeps blocked live and project options unselectable in plant mode', async () => {
-    const blockedLive: JobCatalogueOption = {
+  it('PLC-002 selects weak-address live quotes and ambiguous projects, and hides inactive sources', async () => {
+    const weakLive: JobCatalogueOption = {
       ...selectableOption,
       value: '50001-LC',
       label: '50001-LC',
       source: 'live_quote',
-      sourceId: 'quote-blocked',
+      sourceId: 'quote-weak',
+      customerName: 'Example Customer',
+      quoteTitle: 'Cable works',
       siteAddress: null,
       addressValid: false,
       blockReason: 'missing_site_address',
     };
-    const blockedProject: JobCatalogueOption = {
+    const ambiguousProject: JobCatalogueOption = {
       ...selectableOption,
       value: '60010-MD',
       label: '60010-MD',
       source: 'project_number',
-      sourceId: 'project-blocked',
+      sourceId: 'project-ambiguous',
+      customerName: 'Project number',
+      quoteTitle: 'Open project',
+      blockReason: 'ambiguous_sources',
+      isAmbiguous: true,
+    };
+    const inactiveProject: JobCatalogueOption = {
+      ...ambiguousProject,
+      value: '60011-MD',
+      label: '60011-MD',
+      sourceId: 'project-inactive',
       blockReason: 'inactive_source',
+      isAmbiguous: false,
     };
     const onSelect = vi.fn();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      jsonResponse({ job_codes: [blockedLive, blockedProject] })
+      jsonResponse({ job_codes: [weakLive, ambiguousProject, inactiveProject] })
     ));
 
     render(
@@ -247,13 +260,20 @@ describe('JobCataloguePicker', () => {
     fireEvent.change(screen.getByPlaceholderText('Search code, customer, or name'), {
       target: { value: '500' },
     });
+    fireEvent.click(await screen.findByRole('button', { name: /50001-LC/ }));
+    expect(onSelect).toHaveBeenCalledWith(weakLive);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select job code' }));
+    fireEvent.change(screen.getByPlaceholderText('Search code, customer, or name'), {
+      target: { value: '60011' },
+    });
     expect(await screen.findByText('No matching job codes found.')).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('Search code, customer, or name'), {
-      target: { value: '600' },
+      target: { value: '60010' },
     });
-    expect(await screen.findByText('No matching job codes found.')).toBeInTheDocument();
-    expect(onSelect).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: /60010-MD/ }));
+    expect(onSelect).toHaveBeenCalledWith(ambiguousProject);
   });
 
   it('PDC-JOB-006 keeps blocked catalogue entries visible and unselectable', async () => {

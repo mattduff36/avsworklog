@@ -91,6 +91,7 @@ describe('plant legacy missing-site actions', () => {
     expect(canIgnoreReminderAction('fleet_inspection_overdue')).toBe(true);
     expect(ignoreRoute).toContain('canIgnoreReminderAction(action.workflow_key)');
     expect(workflows).toContain("id: 'legacy-job-addresses'");
+    expect(workflows).toContain("label: 'Plant job addresses'");
     expect(workflows).toContain(PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY);
     expect(actionsPage).toContain('PLANT_LEGACY_MISSING_SITE_WORKFLOW_KEY');
     expect(migration).toContain('SECURITY DEFINER');
@@ -104,5 +105,32 @@ describe('plant legacy missing-site actions', () => {
     const upcoming = getReminderActionDueState('2026-08-19T12:00:00.000Z', new Date('2026-08-19T11:00:00.000Z'));
     expect(upcoming.overdue).toBe(false);
     expect(upcoming.label).toContain('Due');
+  });
+});
+
+describe('plant active job-code migration', () => {
+  const activeJobMigration = readSql('supabase/migrations/20260925_plant_inspection_active_job_codes.sql');
+
+  it('resolves an exact plant identity without relaxing daily allocation', () => {
+    expect(activeJobMigration).toContain('CREATE OR REPLACE FUNCTION private.apply_plant_inspection_job_fields(');
+    expect(activeJobMigration).toContain('private.resolve_allocation_job(p_source_type, p_source_id, NULL)');
+    expect(activeJobMigration).toContain("p_source_type NOT IN ('live_quote', 'legacy_quote', 'project_number')");
+    expect(activeJobMigration).toContain("RAISE EXCEPTION 'JOB_NOT_FOUND'");
+    expect(activeJobMigration).not.toContain('CREATE OR REPLACE FUNCTION private.apply_allocation_job_fields(');
+    expect(activeJobMigration).not.toContain("RAISE EXCEPTION 'JOB_MISSING_SITE'");
+    expect(activeJobMigration).not.toContain("RAISE EXCEPTION 'JOB_AMBIGUOUS'");
+    expect(allocationModule).toContain("RAISE EXCEPTION 'JOB_MISSING_SITE'");
+    expect(allocationModule).toContain("RAISE EXCEPTION 'JOB_AMBIGUOUS'");
+  });
+
+  it('keeps legacy action keys and adds source identity for other active jobs', () => {
+    expect(activeJobMigration).toContain("'plant_legacy_missing_site:' || p_source_id::TEXT || ':' || v_compact");
+    expect(activeJobMigration).toContain("'plant_legacy_missing_site:' || p_source_type || ':' || p_source_id::TEXT || ':' || v_compact");
+    expect(activeJobMigration).toContain('job_source_type');
+    expect(activeJobMigration).toContain('legacy_source_id');
+    expect(activeJobMigration).toContain("inspections.job_source_type IN ('live_quote', 'project_number')");
+    expect(activeJobMigration).toContain('ON CONFLICT (dedupe_key) WHERE status = \'open\' DO UPDATE');
+    expect(activeJobMigration).not.toContain('due_at =');
+    expect(activeJobMigration).not.toContain('DELETE FROM public.reminder_actions');
   });
 });

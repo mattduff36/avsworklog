@@ -50,11 +50,15 @@ export function canAllocateJobCatalogueRecord(record: JobCatalogueRecord | null)
 export function isPlantDailyCheckCatalogueOptionSelectable(
   option: Pick<JobCatalogueOption, 'source' | 'blockReason'>
 ): boolean {
-  if (option.source === 'legacy_quote') {
-    return option.blockReason === null
-      || option.blockReason === 'missing_site_address'
-      || option.blockReason === 'ambiguous_sources';
+  if (
+    option.source !== 'live_quote'
+    && option.source !== 'legacy_quote'
+    && option.source !== 'project_number'
+  ) {
+    return false;
   }
 
-  return option.blockReason === null;
+  return option.blockReason === null
+    || option.blockReason === 'missing_site_address'
+    || option.blockReason === 'ambiguous_sources';
 }
