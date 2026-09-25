@@ -2,6 +2,29 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.12.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-tasks): update Daily Tasks, Actions, Reminders, and Data storage`
+
+**PUSHED AT**
+2026-09-25T10:46:06.378Z
+
+**WHAT CHANGED**
+Update Daily Tasks, Actions, Reminders, and Data storage. Simplify context routing and preserve release safeguards. Allow operational snapshot ids through privacy checks.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Tasks, Actions, Reminders, and Data storage, with changes to automated tests and data storage.
+- Updated data storage, with changes to data storage.
+- Updated help and FAQ, with changes to documentation.
+- Updated actions, with changes to app screens and automated tests.
+- Updated reminders, with changes to shared logic and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-tasks): update Daily Tasks, Actions, Reminders, and Data storage`
+- `chore(workflow): simplify context routing and preserve release safeguards`
+- `fix(errors): allow operational snapshot ids through privacy checks`
+
 ## 0926.11.0
 
 **GIT COMMIT MESSAGE**

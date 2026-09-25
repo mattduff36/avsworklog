@@ -1,5 +1,33 @@
 [
   {
+    "version": "0926.12.0",
+    "updateKind": "major",
+    "title": "Daily Tasks update",
+    "description": "Updated Daily Tasks, Actions, Reminders, and Data storage. Simplify context routing and preserve release safeguards. Allow operational snapshot ids through privacy checks.",
+    "summary": "Updated Daily Tasks, Actions, Reminders, and Data storage. Simplify context routing and preserve release safeguards. Allow operational snapshot ids through privacy checks.",
+    "details": [
+      "Updated Daily Tasks, Actions, Reminders, and Data storage, with changes to automated tests and data storage.",
+      "Updated data storage, with changes to data storage.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated actions, with changes to app screens and automated tests.",
+      "Updated reminders, with changes to shared logic and automated tests."
+    ],
+    "areas": [
+      "Daily Tasks",
+      "Error reporting",
+      "Actions",
+      "Reminders",
+      "Data storage. Simplify context routing"
+    ],
+    "areaKeys": [
+      "daily-tasks",
+      "error-reporting",
+      "actions",
+      "reminders"
+    ],
+    "pushedAt": "2026-09-25T10:46:06.378Z"
+  },
+  {
     "version": "0926.11.0",
     "updateKind": "major",
     "title": "Error reporting update",
