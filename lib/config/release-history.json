@@ -1,5 +1,25 @@
 [
   {
+    "version": "0926.11.0",
+    "updateKind": "major",
+    "title": "Error reporting update",
+    "description": "Generalize private phone detection. Reject punctuated phone data. Restore fixerrors learning and automatic repair.",
+    "summary": "Generalize private phone detection. Reject punctuated phone data. Restore fixerrors learning and automatic repair.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated reports, with changes to documentation.",
+      "Generalize private phone detection, with changes to documentation."
+    ],
+    "areas": [
+      "Error reporting",
+      "Automatic repair"
+    ],
+    "areaKeys": [
+      "error-reporting"
+    ],
+    "pushedAt": "2026-09-25T00:38:49.481Z"
+  },
+  {
     "version": "0926.10.7",
     "updateKind": "minor",
     "title": "Inventory improvements",

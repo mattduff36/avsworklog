@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.11.0
+
+**GIT COMMIT MESSAGE**
+`feat(errors): restore fixerrors learning and automatic repair`
+
+**PUSHED AT**
+2026-09-25T00:38:49.481Z
+
+**WHAT CHANGED**
+Generalize private phone detection. Reject punctuated phone data. Restore fixerrors learning and automatic repair.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+- Updated reports, with changes to documentation.
+- Generalize private phone detection, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(errors): generalize private phone detection`
+- `fix(errors): reject punctuated phone data`
+- `feat(errors): restore fixerrors learning and automatic repair`
+
 ## 0926.10.7
 
 **GIT COMMIT MESSAGE**
