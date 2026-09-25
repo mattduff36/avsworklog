@@ -9,7 +9,7 @@ This alias is an authorized push phrase for the current explicit invocation only
 Local commit is not release-ready, and release-ready is not a push. This alias authorizes `npm run finalise:full:push`.
 
 1. Before pushing, state the branch and a short summary of the commits and changed files that will be pushed.
-2. Check for an active Agent Review or finalise terminal and wait if one is running.
+2. Load `docs/WORKFLOW.md`. Check for an active Agent Review or finalise terminal and wait if one is running.
 3. Run `npm run workflow-protocol -- status --blocking` first. Do not hand-edit protocol JSON.
 4. `ffap` may run `npx tsx scripts/workflow-protocol.ts finalise-start --workstream <id>` only when exactly one active CRITICAL leaf is `review_closed`, no competing blocker exists, and the reviewed HEAD matches current HEAD. If HEAD or the working tree has drifted, run `review-start --pass delta` and a fresh final-diff review first. If the state is ambiguous, stop with the full diagnostic.
 5. Then run `npm run finalise:full:push`.

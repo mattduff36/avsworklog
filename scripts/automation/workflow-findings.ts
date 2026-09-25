@@ -106,7 +106,7 @@ export function buildWorkflowFindings(params: {
         'action',
         'failed',
         'Premium review budget exhausted',
-        'Second failed premium review requires premium-fix-routing or an explicit workstream split. Further review-start transitions are rejected.',
+        'This generation is exhausted. An explicit owner-authorized successor may continue in the same checkout and branch with inherited blockers. Further review-start transitions in this generation are rejected; splitting does not reset its budget.',
         [
           `protocolPhase:${protocolPhase ?? 'unknown'}`,
           `failedPremiumReviewCount:${failedPremiumReviewCount ?? 'unknown'}`,

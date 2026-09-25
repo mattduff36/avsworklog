@@ -1,6 +1,6 @@
 # Development (current)
 
-Working guide for Squires. Commands come from root `package.json`. TEE V2.5 owns model-aware workflow selection, lane scaffolding, and completion markers — do not copy that procedure here. Only explicitly registered TEE-autonomous models self-select DIRECT, TEE-LIGHT, or TEE-FULL. GPT-5.6 Sol is autonomous; Cursor Grok 4.6 and unknown models remain TEE-managed and use the lightest-safe normal lane. CRITICAL risk alone does not force autonomous TEE-FULL ceremony.
+Working guide for Squires. Commands come from root `package.json`. The global Token-Efficient Engineering skill owns proportional safety, model policy and mode selection. Use its registry rather than repeating model versions here; repository protocol details live in `docs/WORKFLOW.md`.
 
 ## Working method
 
@@ -97,21 +97,7 @@ npm run review:preflight
 
 Launch `review:preflight`, full tests, health, build, and `finalise` in a dedicated Cursor integrated Terminal (`block_until_ms: 0` or the current equivalent). Do not attach those long commands to the chat command card when a real Terminal is available.
 
-Local commit is not release-ready, and release-ready is not a push. `fap` / `/fap` and `ffap` / `/ffap` implement the global COMPLETE_AND_RELEASE contract and authorize `npm run finalise:push` / `npm run finalise:full:push`. The long phrases `finalise and push`, `finalise full and push`, `finalise:push`, and `push to GitHub` also authorize those scripts. `finalise` / `finalise-full` stay local.
-
-CRITICAL protocol notes (runtime is in `scripts/automation`, not hand-edited JSON):
-
-- TEE-FULL review uses two automatic premium passes per generation: first, one consolidated fix, then closure. An exhausted generation enters `awaiting_owner_successor_authorisation`.
-- `workflow-protocol successor-authorize` records an explicit owner-authorized successor. It may continue in the same repository, checkout, branch, and ancestry; no worktree or re-home proof is required.
-- Ordinary split/new IDs still inherit exhausted review budget. Owner successor generations are a separate relation, receive a fresh two-pass counter, and inherit unresolved blocker IDs/families.
-- Existing V2.4 `routing_required` records remain readable historical evidence. An explicitly authorized DIRECT/TEE-LIGHT continuation may proceed without claiming the old review passed. It must close inherited blocker IDs with fix evidence before `finalise-start`; normal finalise verification then closes the successor lifecycle.
-- Split ancestors and exhausted successor predecessors are parked history while their active continuation owns remaining work.
-- Orphan, cyclic, or malformed split lineage blocks as protocol corruption.
-- Review evidence is bound to the reviewed Git HEAD and working-tree fingerprint. After drift, run `review-start --pass delta` and a fresh final-diff review; do not silently rebind metadata.
-- Unresolved CRITICAL implementation already on the release branch still owns mutating finalise. An independent unstarted sibling does not deadlock a different matching `finalise_ready` lineage.
-- `npm run finalise -- --dry-run` is non-mutating. Run `npm run workflow-protocol -- status --blocking` before mutating finalise.
-- Do not launch another premium review in an exhausted generation. A fresh generation requires a new explicit owner authorization.
-- Historical leftover records may be closed only through `workflow-protocol reconcile-legacy`, which writes a separate evidence-backed `legacy-closure.json` and does not rewrite protocol lifecycle fields. It cannot authorise finalise or skip review for current work.
+Finalise command mapping and the COMPLETE_AND_RELEASE contract live in `.cursor/rules/finalise-commands.mdc`. That rule owns the `npm run finalise:push` adapter. Review generations, continuation and protocol evidence live in `docs/WORKFLOW.md`; do not duplicate those rules here.
 
 Do not run `npm run build` unless the user authorises a test build.
 
@@ -150,7 +136,7 @@ When a behaviour change has a stable test id already in the suite (permission al
 
 - Stay on the current branch unless asked to switch.
 - Commit message style: `type(scope): summary`.
-- Never push unless the user explicitly authorises it (see `AGENTS.md`).
+- Never push unless the user explicitly authorises it (see `.cursor/rules/finalise-commands.mdc`).
 - Never amend a commit you did not just create, and never skip hooks.
 
 ## Documentation hygiene

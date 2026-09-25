@@ -695,8 +695,8 @@ export async function processWorkflowStopEvent(
       ? [
           'Premium review budget exhausted for this workstream (two failed rounds).',
           'Do not launch another final-diff-reviewer.',
-          'Run one premium-fix-routing pass or split the workstream via:',
-          `npx tsx scripts/workflow-protocol.ts split --workstream ${event.workstreamId ?? '<id>'} --new-workstream <new-id> --narrower-partition`,
+          'An explicit owner-authorized successor can continue in this checkout and branch. Preserve failed history and inherited blockers; do not infer authorization from this message.',
+          'See docs/WORKFLOW.md for the supported successor-authorize path. Ordinary splits do not reset review budget.',
         ].join('\n')
       : undefined;
 

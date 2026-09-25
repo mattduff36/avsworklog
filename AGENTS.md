@@ -1,55 +1,24 @@
 # Squires agent router
 
-AVS Worklog (Squires) is the internal operations PWA for A&V Squires Plant Co. Ltd. Live product: [avsworklog.mpdee.uk](https://avsworklog.mpdee.uk).
+AVS Worklog (Squires) is the A&V Squires internal operations PWA. Select context by task; do not read this table as a reading list.
 
-This file routes agents. It is not a second engineering workflow.
-
-## Current truth (read these)
-
-| Need | Document |
+| Task | Load only what applies |
 | --- | --- |
-| What the product is, Daily Allocation invariants, brand/permissions intent | [`PRODUCT.md`](PRODUCT.md) |
-| How the live UI looks and how to build a new page | [`DESIGN.md`](DESIGN.md) |
-| Where code belongs, auth/session, data, modules | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
-| How to work, test, and commit | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) |
-| Auth, permissions, RLS, secrets, production data | [`docs/SECURITY.md`](docs/SECURITY.md) |
+| Tiny copy/style fix or ordinary bug | Affected code and targeted tests; attached scoped rules. `docs/DEVELOPMENT.md` for commands/commit policy. |
+| Substantial UI, page chrome or responsive work | `DESIGN.md` relevant sections and `.cursor/rules/ui-design.mdc`; shell/tabs rules when in scope. |
+| Daily Allocation behaviour | `PRODUCT.md` allocation invariants, live board and transactional RPCs; security/database routes below when affected. |
+| New route, provider, service, shared state or module boundary | `ARCHITECTURE.md` and `.cursor/rules/architecture.mdc`. |
+| Auth, permissions, APIs, RLS, money or sensitive data | `docs/SECURITY.md` and `.cursor/rules/security-data.mdc`. |
+| Database, persistence, schema or backfill intent | `.cursor/rules/database-migrations.mdc` and its named migration guides before acting. |
+| Finalise, finalise full, `fap` / `/fap`, `ffap` / `/ffap` | `.cursor/rules/finalise-commands.mdc`; invoke the matching command adapter. |
+| Existing TEE-FULL workstream or exhausted review | `docs/WORKFLOW.md`; inspect only its identified protocol/evidence. |
 
-Token-Efficient Engineering V2.5 is the active engineering workflow (global Skill). Only models explicitly registered as TEE-autonomous may self-select DIRECT, TEE-LIGHT, or TEE-FULL; GPT-5.6 Sol is autonomous, while Cursor Grok 4.6 and unknown models remain TEE-managed. CRITICAL risk does not by itself force TEE-FULL, and TEE-managed models retain lightest-safe FAST/STANDARD/GUARDED/CRITICAL routing. Do not duplicate TEE lanes, markers, or finalise procedure here. Genuine project data/security/destructive safeguards remain stricter where stated.
+`PRODUCT.md` owns product/domain truth, `DESIGN.md` visual truth, and the named engineering documents their respective contracts. Live code/migrations are implementation evidence: investigate discrepancies rather than silently choosing one. Module PRDs/runbooks apply only to their module. Preserve mixed-generation domain behaviour and data-access patterns; generic new UI follows DESIGN's canonical references.
 
-## Documentation precedence
+TEE's global skill owns proportional safety/quality and its model registry. This router does not redefine them. The always-attached core supplies the project entry constraints.
 
-1. **Live code and migrations** are current implementation evidence. Inspect them before changing behaviour. If they conflict with a current-truth document, investigate the discrepancy; do not assume either side is automatically correct.
-2. **`PRODUCT.md`** is current product/domain authority for confirmed Daily Allocation and platform facts.
-3. **`DESIGN.md`** is current visual authority for generic page chrome, layout, styling, and reusable patterns.
-4. **`ARCHITECTURE.md` / `docs/DEVELOPMENT.md` / `docs/SECURITY.md`** are current engineering authority.
-5. **Current module PRDs and operational guides** (for example `docs/PRD_*.md`, `docs/guides/ADDING_A_NEW_MODULE_WITH_PERMISSIONS.md`, migration guides, Daily Allocation rollout) apply only to that module or process.
-6. **Dated reports, session summaries, bug-fix logs, old audits, old status docs, and past plans are historical evidence.** Do not treat them as current standards unless the task explicitly targets that file.
+## Do NOT load
 
-`docs/README.md` is an index, not a standards document. Do not create another summary document for a small task.
+Do not load the whole documentation tree, historical reports/plans, unrelated module PRDs, release machinery for ordinary edits, or protocol artifacts for a DIRECT/FAST task. `docs/README.md` is a discovery index, not another standard. Never load secrets or customer/personnel data as AI context. No new summary or stage artifacts for trivial work.
 
-## Hard project rules
-
-- Never expose environment values, tokens, cookies, or secrets.
-- Never push unless the user writes `push to GitHub`, or explicitly requests `finalise and push` / `fap` / `/fap` / `finalise full and push` / `ffap` / `/ffap` / `finalise:push`.
-- Stay on the current branch unless the user says otherwise.
-- Do not change production data or schema without explicit permission. Persistence, auth, permissions/RLS, money, and concurrency are CRITICAL under TEE.
-- For database/persistence intent, load `.cursor/rules/database-migrations.mdc` and the migration guides before acting.
-- Application builds run only when the user authorizes a test build.
-- Workflow topology defaults to this checkout and branch. Do not create another branch or worktree merely to reset review state; optional topology changes require explicit user approval.
-
-## What to load for a task
-
-- **Substantial UI / Tailwind / layout / cards / tabs / filters / mobile:** `DESIGN.md` and `.cursor/rules/ui-design.mdc`. Keep using `.cursor/rules/app-page-shell.mdc` and `.cursor/rules/tabs-styling.mdc` when those files are in scope. Trivial copy, one-property styling, or logic-only TSX may follow the attached UI rule plus the local canonical implementation without loading all of `DESIGN.md`.
-- **New routes, providers, services, data/state, cross-module structure:** `ARCHITECTURE.md` and `.cursor/rules/architecture.mdc`.
-- **Auth, permissions, APIs, Supabase, RLS, service role, financial or destructive work:** `docs/SECURITY.md` and `.cursor/rules/security-data.mdc`.
-- **A named module PRD or runbook:** read that file after the current-truth layer, then inspect live code.
-
-Do not require chat phrases such as “Rule active”.
-
-## Mixed generations
-
-This repository contains several generations of data access, server/client architecture, state management, module workflows, and module-specific interactions. Preserve the current module’s domain behaviour, data-access architecture, workflow, and intentional module-specific interaction patterns. Do not start a broad migration because a neighbouring page looks newer.
-
-For new generic page chrome, layout, styling, and reusable visual patterns, follow `DESIGN.md` and its named canonical references. Do not reproduce a documented legacy or non-canonical visual pattern merely because it already exists in the module. Intentional specialised UI (for example a manager board or kiosk) can remain specialised.
-
-Daily Allocation product invariants stay in `PRODUCT.md`. Do not copy that PRD into architecture notes or invent a second allocation model. Inspect the live board and transactional RPCs before changing schedule behaviour.
+Use deliberate stages only where a handoff helps: record scope, selected inputs, evidence needed and next action in the existing task/plan. Reuse existing protocol artifacts for TEE-FULL; do not create a second state engine or a CONTEXT.md wrapper.
