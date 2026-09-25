@@ -61,7 +61,7 @@ const INCIDENT_KEYS = [
 ] as const;
 
 const SENSITIVE_TEXT =
-  /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|https?:\/\/|postgres(?:ql)?:\/\/|bearer\s+|service_role|password\s*[:=]|secret\s*[:=]|api[_-]?key\s*[:=]|user_id\s*[:=]|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\+\d[\d\s().-]{8,}\d|\b\d{10,}\b|\b0\d[\d\s]{8,}\d\b/iu;
+  /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|https?:\/\/|postgres(?:ql)?:\/\/|bearer\s+|service_role|password\s*[:=]|secret\s*[:=]|api[_-]?key\s*[:=]|user_id\s*[:=]|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\+\d[\d\s().-]{8,}\d|\b\d{10,}\b|\b0\d[\d\s]{8,}\d\b|\(?0\d{2,4}\)?[\s.-]\d{3,4}[\s.-]\d{3,4}\b/iu;
 
 export type IncidentOutcome = (typeof INCIDENT_OUTCOMES)[number];
 export type IncidentLane = (typeof INCIDENT_LANES)[number];

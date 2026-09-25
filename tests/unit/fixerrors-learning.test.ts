@@ -77,6 +77,12 @@ describe('fixerrors learning knowledge', () => {
     expect(() =>
       recordIncidentOutcome({ version: 1, incidents: [] }, input({ diagnosis: 'call 07700 900123' }))
     ).toThrow(/Sensitive knowledge/u);
+    expect(() =>
+      recordIncidentOutcome({ version: 1, incidents: [] }, input({ diagnosis: 'call 020-7946-0958' }))
+    ).toThrow(/Sensitive knowledge/u);
+    expect(() =>
+      recordIncidentOutcome({ version: 1, incidents: [] }, input({ diagnosis: 'call (020) 7946 0958' }))
+    ).toThrow(/Sensitive knowledge/u);
     expect(() => parseKnowledgeStore({ version: 2, incidents: [] })).toThrow(/version/u);
   });
 
