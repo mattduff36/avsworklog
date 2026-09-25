@@ -63,6 +63,8 @@ const INCIDENT_KEYS = [
 const SENSITIVE_TEXT =
   /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}|https?:\/\/|postgres(?:ql)?:\/\/|bearer\s+|service_role|password\s*[:=]|secret\s*[:=]|api[_-]?key\s*[:=]|user_id\s*[:=]|[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|\b\d{10,}\b/iu;
 const PHONE_CANDIDATE = /(?:\+44|\(?0)[\d\s().-]{7,}\d/giu;
+const OPERATIONAL_SNAPSHOT_ID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 export type IncidentOutcome = (typeof INCIDENT_OUTCOMES)[number];
 export type IncidentLane = (typeof INCIDENT_LANES)[number];
@@ -145,6 +147,18 @@ export function rejectSensitiveText(value: string, field: string): void {
   if (SENSITIVE_TEXT.test(value) || containsPhone) {
     throw new Error(`Sensitive knowledge rejected in ${field}`);
   }
+}
+
+export function isOperationalSnapshotId(value: string): boolean {
+  return OPERATIONAL_SNAPSHOT_ID.test(value);
+}
+
+export function rejectSensitiveDocument(value: unknown, field: string): void {
+  const scan = JSON.parse(JSON.stringify(value)) as { snapshotId?: unknown };
+  if (scan && typeof scan === 'object' && typeof scan.snapshotId === 'string' && isOperationalSnapshotId(scan.snapshotId)) {
+    scan.snapshotId = 'snapshot-id';
+  }
+  rejectSensitiveText(JSON.stringify(scan), field);
 }
 
 function assertSafeText(value: string, field: string): void {

@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { rejectSensitiveText } from './fixerrors-knowledge';
+import { isOperationalSnapshotId, rejectSensitiveDocument, rejectSensitiveText } from './fixerrors-knowledge';
 import { verifyErrorSnapshot } from './fixerrors-safety';
 
 export const FIXERRORS_DECISION_VERSION = 1;
@@ -146,6 +146,7 @@ export function parseDecision(value: unknown): FixerrorsDecision {
   if (value.schemaVersion !== FIXERRORS_DECISION_VERSION) throw new Error('Unsupported decision version');
   for (const field of ['snapshotId', 'analyst', 'baseHead', 'treeFingerprint'] as const) {
     if (typeof value[field] !== 'string' || !value[field]) throw new Error(`Invalid ${field}`);
+    if (field === 'snapshotId' && isOperationalSnapshotId(value[field])) continue;
     rejectSensitiveText(value[field], field);
   }
   if (!Array.isArray(value.clusters) || value.clusters.length === 0) {
@@ -174,7 +175,7 @@ export function partitionFixClusters(decision: FixerrorsDecision): {
 
 export function validateDecision(input: DecisionValidationInput): FixerrorsDecision {
   const decision = parseDecision(input.decision);
-  rejectSensitiveText(JSON.stringify(decision), 'decision');
+  rejectSensitiveDocument(decision, 'decision');
   if (!/^[a-f0-9]{64}$/u.test(input.snapshotChecksum)) throw new Error('Snapshot checksum mismatch');
   if (decision.snapshotId !== input.snapshotId || input.retrieval.snapshotId !== input.snapshotId) {
     throw new Error('Decision snapshot mismatch');

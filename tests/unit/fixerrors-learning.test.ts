@@ -7,9 +7,11 @@ import { captureCandidateFingerprint, validateDecision } from '@/scripts/fixerro
 import {
   applySnapshotAbsence,
   fingerprintIncident,
+  isOperationalSnapshotId,
   loadKnowledgeStore,
   parseKnowledgeStore,
   recordIncidentOutcome,
+  rejectSensitiveDocument,
   retrieveIncidents,
   saveKnowledgeAtomic,
   type IncidentQuery,
@@ -90,6 +92,23 @@ describe('fixerrors learning knowledge', () => {
       recordIncidentOutcome({ version: 1, incidents: [] }, input({ diagnosis: 'call 020.7946.0958' }))
     ).toThrow(/Sensitive knowledge/u);
     expect(() => parseKnowledgeStore({ version: 2, incidents: [] })).toThrow(/version/u);
+  });
+
+  it('FIXERR-KNOW-004 allows an operational snapshot id without allowing personal data', () => {
+    const snapshotId = 'ff912f11-3927-45d4-bf15-8bb467b06697';
+    expect(isOperationalSnapshotId(snapshotId)).toBe(true);
+    expect(() => rejectSensitiveDocument({
+      snapshotId,
+      clusters: [{ query: { normalizedMessage: 'Failed to load dashboard summary' } }],
+    }, 'retrieval')).not.toThrow();
+    expect(() => rejectSensitiveDocument({
+      snapshotId,
+      clusters: [{ query: { normalizedMessage: 'profile ff912f11-3927-45d4-bf15-8bb467b06697 failed' } }],
+    }, 'retrieval')).toThrow(/Sensitive knowledge/u);
+    expect(() => rejectSensitiveDocument({
+      snapshotId: 'person@example.com',
+      clusters: [],
+    }, 'retrieval')).toThrow(/Sensitive knowledge/u);
   });
 
   it('FIXERR-KNOW-002 ranks exact matches before related matches and lets a later failure win', () => {
@@ -249,6 +268,30 @@ describe('fixerrors learning decisions', () => {
       retrieval,
       candidate,
     })).toThrow(/requires files and tests/u);
+  });
+
+  it('FIXERR-DEC-002 accepts the operational snapshot id and still rejects personal data', () => {
+    const snapshotId = 'ff912f11-3927-45d4-bf15-8bb467b06697';
+    expect(validateDecision({
+      decision: decision({ snapshotId }),
+      snapshotId,
+      snapshotChecksum: checksum,
+      retrieval: { ...retrieval, snapshotId },
+      candidate,
+    }).snapshotId).toBe(snapshotId);
+    expect(() => validateDecision({
+      decision: decision({
+        snapshotId,
+        clusters: [{
+          ...(decision().clusters[0] as object),
+          rationale: 'profile ff912f11-3927-45d4-bf15-8bb467b06697 failed',
+        }],
+      }),
+      snapshotId,
+      snapshotChecksum: checksum,
+      retrieval: { ...retrieval, snapshotId },
+      candidate,
+    })).toThrow(/Sensitive knowledge/u);
   });
 
   it('changes the candidate fingerprint when untracked file contents change', () => {

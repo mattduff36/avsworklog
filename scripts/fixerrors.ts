@@ -24,6 +24,7 @@ import { TRUSTED_OPERATIONAL_ACTIONS } from './automation/trusted-operational-ac
 import { captureCandidateFingerprint } from './fixerrors-decision';
 import {
   loadKnowledgeStore,
+  rejectSensitiveDocument,
   rejectSensitiveText,
   retrieveIncidents,
   sanitizeKnowledgeText,
@@ -1404,7 +1405,7 @@ async function main() {
         };
       }),
     };
-    rejectSensitiveText(JSON.stringify(retrieval), 'retrieval');
+    rejectSensitiveDocument(retrieval, 'retrieval');
     writeAndVerifyTextArtifactAtomic(ERROR_RETRIEVAL_PATH, `${JSON.stringify(retrieval, null, 2)}\n`);
     console.log('  Written and verified: docs_private/error-analysis-retrieval.json');
 
