@@ -2,28 +2,50 @@ import { NextRequest, NextResponse } from 'next/server';
 import { applyValidationCookieIfNeeded } from '@/lib/server/app-auth/response';
 import { InventoryKioskDeviceError } from '@/lib/server/inventory-kiosk-devices';
 import {
+  InventoryKioskHardwareError,
+  verifyInventoryKioskRequestProof,
+} from '@/lib/server/inventory-kiosk-device-auth';
+import {
   acknowledgeInventoryKioskDeviceCommand,
   recordInventoryKioskDeviceEvent,
   recordInventoryKioskDeviceHeartbeat,
 } from '@/lib/server/inventory-kiosk-remote';
 import type { YardKioskHeartbeatInput } from '@/lib/inventory/kiosk-remote-types';
 
-function errorResponse(error: unknown) {
-  const status = error instanceof InventoryKioskDeviceError ? error.status : 500;
-  return NextResponse.json(
+function errorResponse(
+  error: unknown,
+  proof: Awaited<ReturnType<typeof verifyInventoryKioskRequestProof>> | null,
+) {
+  const status = error instanceof InventoryKioskDeviceError
+    || error instanceof InventoryKioskHardwareError
+    ? error.status
+    : 500;
+  const response = NextResponse.json(
     {
       error: error instanceof Error ? error.message : 'Heartbeat failed',
-      code: status === 401 ? 'SESSION_EXPIRED' : 'SERVICE_UNAVAILABLE',
-      revoked: false,
-      sessionExpired: status === 401,
+      code: error instanceof InventoryKioskHardwareError
+        ? error.code
+        : status === 401
+          ? 'SESSION_EXPIRED'
+          : 'SERVICE_UNAVAILABLE',
+      revoked: error instanceof InventoryKioskHardwareError
+        && error.code === 'DEVICE_REVOKED',
+      sessionExpired: status === 401
+        && !(error instanceof InventoryKioskHardwareError
+          && error.code === 'DEVICE_REVOKED'),
     },
     { status, headers: { 'Cache-Control': 'no-store' } },
   );
+  if (proof) applyValidationCookieIfNeeded(response, proof.sessionValidation);
+  return response;
 }
 
 export async function POST(request: NextRequest) {
+  let proof: Awaited<ReturnType<typeof verifyInventoryKioskRequestProof>> | null = null;
   try {
-    const body = await request.json() as YardKioskHeartbeatInput & {
+    const bodyText = await request.text();
+    proof = await verifyInventoryKioskRequestProof(request, bodyText);
+    const body = JSON.parse(bodyText) as YardKioskHeartbeatInput & {
       ack?: {
         command_id?: string;
         status?: 'accepted' | 'completed' | 'failed';
@@ -38,18 +60,21 @@ export async function POST(request: NextRequest) {
       };
     };
 
-    const heartbeat = await recordInventoryKioskDeviceHeartbeat({
-      phase: body.phase,
-      offline: body.offline,
-      app_version: body.app_version,
-      deployment_id: body.deployment_id,
-      last_error_code: body.last_error_code,
-      diagnostic_id: body.diagnostic_id,
-      workflow_snapshot: body.workflow_snapshot,
-    });
+    const heartbeat = await recordInventoryKioskDeviceHeartbeat(
+      {
+        phase: body.phase,
+        offline: body.offline,
+        app_version: body.app_version,
+        deployment_id: body.deployment_id,
+        last_error_code: body.last_error_code,
+        diagnostic_id: body.diagnostic_id,
+        workflow_snapshot: body.workflow_snapshot,
+      },
+      { sessionValidation: proof.sessionValidation },
+    );
 
     if (heartbeat.revoked) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         {
           revoked: true,
           sessionExpired: false,
@@ -59,10 +84,12 @@ export async function POST(request: NextRequest) {
         },
         { status: 401, headers: { 'Cache-Control': 'no-store' } },
       );
+      applyValidationCookieIfNeeded(response, proof.sessionValidation);
+      return response;
     }
 
     if (heartbeat.sessionExpired) {
-      return NextResponse.json(
+      const response = NextResponse.json(
         {
           revoked: false,
           sessionExpired: true,
@@ -72,6 +99,8 @@ export async function POST(request: NextRequest) {
         },
         { status: 401, headers: { 'Cache-Control': 'no-store' } },
       );
+      applyValidationCookieIfNeeded(response, proof.sessionValidation);
+      return response;
     }
 
     if (body.ack?.command_id && body.ack.status) {
@@ -112,6 +141,6 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    return errorResponse(error);
+    return errorResponse(error, proof);
   }
 }

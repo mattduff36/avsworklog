@@ -26,6 +26,8 @@ function toPublicPayload(
   return {
     status: result.status,
     pairing: result.pairing || null,
+    device_id: result.deviceId || null,
+    hardware_bound: result.hardwareBound === true,
     message: result.message,
     code: code || undefined,
     diagnostic_id: diagnosticId,
@@ -69,7 +71,6 @@ export async function POST(request: NextRequest) {
       setKioskPairingCookie(
         response,
         result.deviceToken,
-        new Date(result.pairing.expires_at),
       );
     } else if (result.status === 'unavailable' || result.status === 'expired') {
       // Drop stale pairing cookies so the next Try again can claim cleanly
@@ -92,7 +93,11 @@ export async function GET(request: NextRequest) {
       headers: { 'Cache-Control': 'no-store' },
     });
 
-    if (result.status === 'paired' && result.deviceToken) {
+    if (
+      result.status === 'paired'
+      && result.deviceToken
+      && !result.hardwareBound
+    ) {
       setKioskDeviceCookie(response, result.deviceToken);
       expireKioskPairingCookie(response);
     } else if (result.status === 'expired' || result.status === 'unavailable') {

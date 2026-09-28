@@ -6,11 +6,13 @@ const {
   acknowledgeInventoryKioskDeviceCommand,
   recordInventoryKioskDeviceEvent,
   applyValidationCookieIfNeeded,
+  verifyInventoryKioskRequestProof,
 } = vi.hoisted(() => ({
   recordInventoryKioskDeviceHeartbeat: vi.fn(),
   acknowledgeInventoryKioskDeviceCommand: vi.fn(),
   recordInventoryKioskDeviceEvent: vi.fn(),
   applyValidationCookieIfNeeded: vi.fn(),
+  verifyInventoryKioskRequestProof: vi.fn(),
 }));
 
 vi.mock('@/lib/server/inventory-kiosk-remote', () => ({
@@ -23,11 +25,29 @@ vi.mock('@/lib/server/app-auth/response', () => ({
   applyValidationCookieIfNeeded,
 }));
 
+vi.mock('@/lib/server/inventory-kiosk-device-auth', () => ({
+  InventoryKioskHardwareError: class InventoryKioskHardwareError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+      readonly code: string,
+    ) {
+      super(message);
+    }
+  },
+  verifyInventoryKioskRequestProof,
+}));
+
 import { POST as heartbeatPost } from '@/app/api/inventory/kiosk/heartbeat/route';
 
 describe('Yard kiosk heartbeat route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    verifyInventoryKioskRequestProof.mockResolvedValue({
+      sessionValidation: { status: 'active' },
+      device: { id: 'device-1' },
+      hardwareProofRequired: true,
+    });
   });
 
   it('returns mutually exclusive DEVICE_REVOKED payload', async () => {

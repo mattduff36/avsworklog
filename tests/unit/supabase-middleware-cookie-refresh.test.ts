@@ -214,6 +214,39 @@ describe('supabase middleware cookie refresh', () => {
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
   });
 
+  it('confines signed kiosk sessions to Yard Inventory routes', async () => {
+    mockSupabaseMiddlewareAuth({ user: null });
+    verifyJwtHS256Mock.mockResolvedValue({
+      sid: 'session-1',
+      secret: 'secret-1',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      v: 1,
+      source: 'kiosk_device',
+    });
+    const cookie = `${APP_SESSION_COOKIE_NAME}=valid-kiosk-session`;
+
+    const pageResponse = await updateSession(
+      createRequest('http://localhost/dashboard', cookie),
+    );
+    const apiResponse = await updateSession(
+      createRequest('http://localhost/api/auth/data-token', cookie),
+    );
+    const kioskResponse = await updateSession(
+      createRequest('http://localhost/api/inventory/kiosk/stock', cookie),
+    );
+
+    expect(pageResponse.status).toBe(307);
+    expect(pageResponse.headers.get('location')).toBe(
+      'http://localhost/yard-kiosk/native',
+    );
+    expect(apiResponse.status).toBe(403);
+    await expect(apiResponse.json()).resolves.toMatchObject({
+      code: 'KIOSK_SESSION_RESTRICTED',
+    });
+    expect(kioskResponse.status).toBe(200);
+    expect(kioskResponse.headers.get('x-middleware-next')).toBe('1');
+  });
+
   it('does not loop an unpaired Yard kiosk login redirect back to the public shell', async () => {
     mockSupabaseMiddlewareAuth({
       user: null,

@@ -34,7 +34,7 @@ function redirectWithClearedAuth(
 
 export async function GET(request: NextRequest) {
   const rawDeviceToken = getKioskDeviceCookie(request);
-  const currentSession = await validateAppSession();
+  const currentSession = await validateAppSession({ allowKioskDevice: true });
   if (currentSession.status === 'active') {
     const response = redirectTo(request, '/yard-kiosk');
     // Deliver a rotated app-session cookie before returning to the kiosk shell.

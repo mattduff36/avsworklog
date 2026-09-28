@@ -21,6 +21,23 @@ PostgREST calls use a server-minted **data token** (`lib/server/app-auth/supabas
 
 Kiosk sessions (`session_source: 'kiosk_device'`) die when the kiosk device is revoked.
 
+The permanent Yard Inventory Android kiosk is hardware-bound:
+
+- Android wrapper: `android/yard-kiosk/`
+- Enrollment/authentication: `app/api/inventory/kiosk/device-auth/*`
+- Attestation and request proof verification:
+  `lib/server/inventory-kiosk-device-auth.ts`
+- Device identity: non-exportable ECDSA P-256 Android Keystore key, accepted
+  only when the certificate chain, challenge, TEE/StrongBox level, verified
+  boot, package id, and release-signing certificate match server configuration
+- Data plane: bootstrap, stock, submit, and heartbeat require a fresh signature
+  bound to method, path, body digest, timestamp, and single-use request id for
+  hardware-bound kiosk sessions
+
+An app-session or device cookie copied to another client is not sufficient for
+hardware-bound kiosk access. Do not add a cookie-only fallback for an
+`android_keystore` device. Manager revocation remains authoritative.
+
 Session signing currently falls back to `SUPABASE_SERVICE_ROLE_KEY` if `APP_SESSION_SECRET` is unset (`getAppSessionSigningSecret`). That is live fallback behaviour, not a pattern to copy. New work should assume `APP_SESSION_SECRET` is required.
 
 ## Sensitive PIN
@@ -90,6 +107,13 @@ Scripts that use the service role are production-capable. Treat them as CRITICAL
 Assume `.env.local` exists. Never print it. Never paste connection strings, cookies, or keys into docs, chats, or tickets.
 
 Names you may mention without values: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET`, `APP_SESSION_SECRET`, `APP_SESSION_HASH_SECRET`, `POSTGRES_URL_NON_POOLING`, `CRON_SECRET`.
+
+Yard Android trust configuration names are
+`YARD_KIOSK_ANDROID_PACKAGE`,
+`YARD_KIOSK_ANDROID_SIGNING_CERT_SHA256`, and
+`YARD_KIOSK_ANDROID_ATTESTATION_ROOT_SHA256`. Certificate fingerprints are
+configuration, not private keys; release keystores and passwords must never be
+stored in the repository or browser environment.
 
 Public keys (`NEXT_PUBLIC_*`) are still not an excuse to log them in full.
 

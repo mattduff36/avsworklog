@@ -7,12 +7,14 @@ export interface AppSessionCookiePayload extends Record<string, unknown> {
   secret: string;
   exp: number;
   v: number;
+  source?: 'password_login' | 'session_bootstrap' | 'biometric_login' | 'kiosk_device';
 }
 
 export interface AppSessionCookieOptions {
   sid: string;
   secret: string;
   expiresAt: Date;
+  source?: AppSessionCookiePayload['source'];
 }
 
 type CookieResponse = {
@@ -47,6 +49,7 @@ export async function buildAppSessionCookieValue(
     {
       sid: options.sid,
       secret: options.secret,
+      source: options.source,
       exp: Math.floor(options.expiresAt.getTime() / 1000),
       v: 1,
     },

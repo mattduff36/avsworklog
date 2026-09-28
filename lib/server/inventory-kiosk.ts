@@ -20,6 +20,7 @@ import {
   type InventoryMoveCheckWarningItem,
 } from '@/lib/inventory/move-check-warning';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { logger } from '@/lib/utils/logger';
 import { requireInventoryAccess } from './inventory-auth';
 
@@ -202,8 +203,27 @@ async function loadKioskLocations(
   return locations;
 }
 
-export async function requireInventoryKioskAccess(): Promise<InventoryKioskAccessResult> {
-  const access = await requireInventoryAccess();
+export async function requireInventoryKioskAccess(
+  hardwareVerifiedProfileId?: string,
+): Promise<InventoryKioskAccessResult> {
+  const hardwareProfileHasInventoryAccess = hardwareVerifiedProfileId
+    ? await canEffectiveRoleAccessModule('inventory', {
+        userId: hardwareVerifiedProfileId,
+      })
+    : false;
+  const access = hardwareVerifiedProfileId
+    ? hardwareProfileHasInventoryAccess
+      ? {
+          allowed: true as const,
+          status: 200 as const,
+          userId: hardwareVerifiedProfileId,
+        }
+      : {
+          allowed: false as const,
+          status: 403 as const,
+          error: 'Inventory access is required',
+        }
+    : await requireInventoryAccess();
   if (!access.allowed || !access.userId) {
     return {
       allowed: false,
@@ -614,6 +634,7 @@ async function getCheckWarningItems(
 export async function submitYardKioskBasket(
   access: InventoryKioskAccessResult,
   input: unknown,
+  options: { hardwareKioskDeviceId?: string } = {},
 ): Promise<YardKioskReceipt> {
   assertKioskAccess(access);
   const payload = validateYardKioskSubmitPayload(input);
@@ -664,25 +685,44 @@ export async function submitYardKioskBasket(
     }
   }
 
-  const { data, error } = isUnallocated
-    ? await admin.rpc('inventory_kiosk_execute_unallocated_take', {
+  const { data, error } = options.hardwareKioskDeviceId
+    ? await admin.rpc('inventory_kiosk_execute_hardware_bound_basket', {
+      p_actor: access.userId,
+      p_kiosk_device_id: options.hardwareKioskDeviceId,
+      p_unallocated: isUnallocated,
+      p_direction: isUnallocated ? null : payload.direction,
+      p_counterpart_location_id: isUnallocated
+        ? null
+        : payload.counterpart_location_id,
+      p_serialized_item_ids: payload.serialized_item_ids,
+      p_hardware_lines: payload.hardware_lines as unknown as Json,
+      p_location_details: isUnallocated
+        ? payload.unallocated_location_details
+        : null,
+      p_note: payload.note || null,
+    })
+    : isUnallocated
+      ? await admin.rpc('inventory_kiosk_execute_unallocated_take', {
       p_actor: access.userId,
       p_serialized_item_ids: payload.serialized_item_ids,
       p_hardware_lines: payload.hardware_lines as unknown as Json,
       p_location_details: payload.unallocated_location_details,
       p_note: payload.note || null,
     })
-    : await admin.rpc('inventory_kiosk_execute_transfer_basket', {
-      p_actor: access.userId,
-      p_direction: payload.direction,
-      p_counterpart_location_id: payload.counterpart_location_id,
-      p_serialized_item_ids: payload.serialized_item_ids,
-      p_hardware_lines: payload.hardware_lines as unknown as Json,
-      p_note: payload.note || null,
-    });
+      : await admin.rpc('inventory_kiosk_execute_transfer_basket', {
+        p_actor: access.userId,
+        p_direction: payload.direction,
+        p_counterpart_location_id: payload.counterpart_location_id,
+        p_serialized_item_ids: payload.serialized_item_ids,
+        p_hardware_lines: payload.hardware_lines as unknown as Json,
+        p_note: payload.note || null,
+      });
 
   if (error) {
-    if (error.message?.includes('Yard kiosk access denied')) {
+    if (
+      error.message?.includes('Yard kiosk access denied')
+      || error.message?.includes('Yard kiosk hardware device is inactive')
+    ) {
       throw new InventoryKioskError('Yard kiosk access denied', 403);
     }
     if (

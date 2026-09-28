@@ -13,6 +13,11 @@ import type {
   YardKioskRemoteCommandView,
   YardKioskWorkflowSnapshot,
 } from '@/lib/inventory/kiosk-remote-types';
+import {
+  callNativeKiosk,
+  hasNativeKioskBridge,
+  kioskFetch,
+} from '@/lib/inventory/kiosk-native';
 import { forceAppRefresh } from '@/lib/client/force-app-refresh';
 
 interface UseYardKioskRemoteControlOptions {
@@ -35,7 +40,7 @@ async function ackCommand(
   resultCode?: string,
   errorMessage?: string,
 ): Promise<void> {
-  await fetch('/api/inventory/kiosk/heartbeat', {
+  await kioskFetch('/api/inventory/kiosk/heartbeat', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
@@ -104,7 +109,7 @@ export function useYardKioskRemoteControl({
           ? document.querySelector('meta[name="avs-deployment-id"]')?.getAttribute('content')
           : null;
 
-        const response = await fetch('/api/inventory/kiosk/heartbeat', {
+        const response = await kioskFetch('/api/inventory/kiosk/heartbeat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           cache: 'no-store',
@@ -128,8 +133,15 @@ export function useYardKioskRemoteControl({
           const code = payload.code === 'DEVICE_REVOKED' || payload.revoked === true
             ? 'DEVICE_REVOKED'
             : 'SESSION_EXPIRED';
+          if (code === 'DEVICE_REVOKED' && hasNativeKioskBridge()) {
+            await callNativeKiosk('identity.clear').catch(() => undefined);
+          }
           window.location.replace(
-            buildYardKioskRecoverPath(code, payload.diagnostic_id),
+            code === 'SESSION_EXPIRED'
+              ? (hasNativeKioskBridge() ? '/yard-kiosk/native' : '/yard-kiosk/activate')
+              : hasNativeKioskBridge()
+                ? '/yard-kiosk/pair'
+                : buildYardKioskRecoverPath(code, payload.diagnostic_id),
           );
           return;
         }
@@ -144,14 +156,19 @@ export function useYardKioskRemoteControl({
         };
 
         if (payload.revoked) {
+          if (hasNativeKioskBridge()) {
+            await callNativeKiosk('identity.clear').catch(() => undefined);
+          }
           window.location.replace(
-            buildYardKioskRecoverPath('DEVICE_REVOKED', payload.diagnostic_id),
+            hasNativeKioskBridge()
+              ? '/yard-kiosk/pair'
+              : buildYardKioskRecoverPath('DEVICE_REVOKED', payload.diagnostic_id),
           );
           return;
         }
         if (payload.sessionExpired) {
           window.location.replace(
-            buildYardKioskRecoverPath('SESSION_EXPIRED', payload.diagnostic_id),
+            hasNativeKioskBridge() ? '/yard-kiosk/native' : '/yard-kiosk/activate',
           );
           return;
         }
@@ -209,7 +226,12 @@ export function useYardKioskRemoteControl({
                   method: 'POST',
                   cache: 'no-store',
                 }).catch(() => undefined);
-                window.location.replace('/yard-kiosk/recover?code=REMOTE_REPAIR');
+                if (hasNativeKioskBridge()) {
+                  await callNativeKiosk('identity.clear').catch(() => undefined);
+                  window.location.replace('/yard-kiosk/pair');
+                } else {
+                  window.location.replace('/yard-kiosk/recover?code=REMOTE_REPAIR');
+                }
                 break;
               case 'control_action': {
                 const controlSessionId = command.payload.control_session_id;

@@ -6,6 +6,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useYardKioskRemoteControl } from '@/lib/hooks/useYardKioskRemoteControl';
 import type { YardKioskWorkflowSnapshot } from '@/lib/inventory/kiosk-remote-types';
 
+const nativeBridge = vi.hoisted(() => ({
+  available: false,
+  call: vi.fn(),
+}));
+
+vi.mock('@/lib/inventory/kiosk-native', () => ({
+  callNativeKiosk: nativeBridge.call,
+  hasNativeKioskBridge: () => nativeBridge.available,
+  kioskFetch: (input: string | URL, init?: RequestInit) => fetch(input, init),
+}));
+
 const snapshot = {
   schema_version: 1 as const,
   revision: 1,
@@ -67,6 +78,9 @@ describe('useYardKioskRemoteControl diagnostics', () => {
       configurable: true,
       value: { replace: vi.fn() },
     });
+    nativeBridge.available = false;
+    nativeBridge.call.mockReset();
+    nativeBridge.call.mockResolvedValue({});
   });
 
   afterEach(() => {
@@ -95,5 +109,26 @@ describe('useYardKioskRemoteControl diagnostics', () => {
     expect(window.location.replace).toHaveBeenCalledWith(
       '/yard-kiosk/recover?code=DEVICE_REVOKED&ref=YK-CLIENT-REF-1',
     );
+  });
+
+  it('deletes the hardware identity before a revoked native kiosk re-pairs', async () => {
+    nativeBridge.available = true;
+    vi.mocked(fetch).mockResolvedValue({
+      status: 401,
+      ok: false,
+      json: async () => ({
+        code: 'DEVICE_REVOKED',
+        revoked: true,
+        sessionExpired: false,
+      }),
+    } as Response);
+
+    render(<HookHost />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(nativeBridge.call).toHaveBeenCalledWith('identity.clear');
+    expect(window.location.replace).toHaveBeenCalledWith('/yard-kiosk/pair');
   });
 });

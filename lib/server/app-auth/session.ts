@@ -52,6 +52,7 @@ export type AppSessionFailureReason =
   | 'session_expired'
   | 'secret_mismatch'
   | 'kiosk_device_inactive'
+  | 'kiosk_session_restricted'
   | 'rotation_conflict'
   | 'account_deleted';
 
@@ -349,6 +350,7 @@ async function updateSessionActivity(
       sid: nextRow.id,
       secret: rawSecret,
       expiresAt: nextIdleExpiry,
+      source: nextRow.session_source,
     }),
     cookieExpiresAt: nextIdleExpiry,
     secretRotated: true,
@@ -410,6 +412,7 @@ export async function issueAppSession(
       sid: data.id,
       secret,
       expiresAt: cookieExpiresAt,
+      source: data.session_source,
     }),
     cookieExpiresAt,
   };
@@ -466,7 +469,11 @@ export async function revokeAllAppSessionsForProfile(
 }
 
 export async function validateAppSession(
-  options: { includeEmail?: boolean } = {}
+  options: {
+    includeEmail?: boolean;
+    allowKioskDevice?: boolean;
+    refresh?: boolean;
+  } = {}
 ): Promise<AppSessionValidationResult> {
   const cookiePayload = await getCurrentAppSessionCookiePayload();
   if (!cookiePayload || cookiePayload.v !== APP_SESSION_COOKIE_VERSION) {
@@ -498,6 +505,11 @@ export async function validateAppSession(
       kioskDeviceIdHint: row.kiosk_device_id,
     });
   }
+  if (row.session_source === 'kiosk_device' && options.allowKioskDevice !== true) {
+    return inactiveSessionResult('invalid', 'kiosk_session_restricted', {
+      kioskDeviceIdHint: row.kiosk_device_id,
+    });
+  }
 
   const profileState = await getProfileDeletedState(row.profile_id);
   if (isDeletedProfile(profileState)) {
@@ -513,7 +525,7 @@ export async function validateAppSession(
   const needsRotation = shouldRotateSession(currentRow, now);
   const needsSeenUpdate = now.getTime() - new Date(currentRow.last_seen_at).getTime() >= 60 * 1000;
 
-  if (needsRotation || needsSeenUpdate) {
+  if (options.refresh !== false && (needsRotation || needsSeenUpdate)) {
     const refreshed = await updateSessionActivity(currentRow, {
       rotate: needsRotation,
       now,
@@ -531,6 +543,7 @@ export async function validateAppSession(
         sid: currentRow.id,
         secret: cookiePayload.secret,
         expiresAt: nextCookieExpiresAt,
+        source: currentRow.session_source,
       }));
   }
 
@@ -548,7 +561,7 @@ export async function validateAppSession(
 }
 
 export async function getCurrentAuthenticatedProfile(
-  options: { includeEmail?: boolean } = {}
+  options: { includeEmail?: boolean; allowKioskDevice?: boolean } = {}
 ) {
   const validation = await validateAppSession(options);
   if (

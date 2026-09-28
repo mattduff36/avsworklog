@@ -84,6 +84,13 @@ For PostgREST/Realtime, the server mints a **short-lived Supabase data token** (
 `createClient()` on the server (`lib/supabase/server.ts`) uses the data token when an app session is valid; otherwise it falls back to `@supabase/ssr` cookie client. `getCurrentAuthenticatedProfile` likewise prefers the app session and **can fall back** to `supabase.auth.getUser()`. Middleware treats the app-session cookie as the only accepted browser auth and clears leftover `sb-*-auth-token` cookies.
 
 Kiosk devices use `session_source: 'kiosk_device'` and are invalid when the kiosk row is revoked.
+The permanent Yard tablet is launched by the signed Kotlin wrapper in
+`android/yard-kiosk/`. Its Android Keystore key is the device identity;
+`app/api/inventory/kiosk/device-auth/*` converts a signed one-time challenge
+into the normal kiosk app session. Hardware-bound kiosk API requests also carry
+a method/path/body/timestamp/request-id signature verified by
+`lib/server/inventory-kiosk-device-auth.ts`, so the app-session cookie remains
+transport rather than proof of the physical tablet.
 
 ## Permissions
 
@@ -147,7 +154,9 @@ Management: approvals, actions, reports, workshop-tasks, maintenance, fleet (`ad
 
 Special device/PWA surfaces (own auth or chrome constraints):
 
-- Inventory yard kiosk (`app/(dashboard)/inventory/kiosk-control`, `lib/server/inventory-kiosk.ts`, kiosk device sessions)
+- Inventory yard kiosk (`android/yard-kiosk`, `app/yard-kiosk`,
+  `app/(dashboard)/inventory/kiosk-control`,
+  `lib/server/inventory-kiosk-device-auth.ts`, kiosk device sessions)
 - Display board (legacy TV path in middleware; device commands via realtime)
 - Inspection/photo capture and `app/(dashboard)/pdf-viewer`
 - WebAuthn / biometric login (`app/api/auth/webauthn/*`)

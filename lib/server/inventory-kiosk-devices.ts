@@ -35,6 +35,10 @@ export interface InventoryKioskDeviceView {
   device_label: string;
   last_seen_at: string | null;
   last_authenticated_at: string | null;
+  hardware_identity_kind: 'browser_cookie' | 'android_keystore';
+  hardware_bound_at: string | null;
+  hardware_key_fingerprint: string | null;
+  last_device_proof_at: string | null;
   revoked_at: string | null;
   created_at: string;
 }
@@ -48,6 +52,8 @@ export interface InventoryKioskPairingResult {
   status: 'pairing' | 'paired' | 'expired' | 'unavailable';
   pairing?: InventoryKioskPairingView;
   deviceToken?: string;
+  deviceId?: string;
+  hardwareBound?: boolean;
   message?: string;
 }
 
@@ -85,6 +91,10 @@ function toDeviceView(row: DeviceRow): InventoryKioskDeviceView {
     device_label: row.device_label,
     last_seen_at: row.last_seen_at,
     last_authenticated_at: row.last_authenticated_at,
+    hardware_identity_kind: row.hardware_identity_kind,
+    hardware_bound_at: row.hardware_bound_at,
+    hardware_key_fingerprint: row.hardware_key_fingerprint,
+    last_device_proof_at: row.last_device_proof_at,
     revoked_at: row.revoked_at,
     created_at: row.created_at,
   };
@@ -134,7 +144,7 @@ async function expireStalePairings(): Promise<void> {
   const { error } = await createAdminClient()
     .from('inventory_kiosk_pairing_sessions')
     .update({ status: 'expired' })
-    .in('status', ['active', 'confirmed'])
+    .eq('status', 'active')
     .lt('expires_at', new Date().toISOString());
 
   if (error) throw new InventoryKioskDeviceError(error.message, 500);
@@ -164,7 +174,7 @@ Promise<InventoryKioskDeviceAdminState> {
         .from('inventory_kiosk_pairing_sessions')
         .select('*')
         .eq('kiosk_user_id', config.kiosk_user_id)
-        .in('status', ['active', 'confirmed'])
+        .eq('status', 'active')
         .gt('expires_at', new Date().toISOString())
         .order('created_at', { ascending: false })
         .limit(1),
@@ -216,7 +226,7 @@ export async function startInventoryKioskPairing(
     .from('inventory_kiosk_pairing_sessions')
     .update({ status: 'cancelled' })
     .eq('kiosk_user_id', config.kiosk_user_id)
-    .in('status', ['active', 'confirmed']);
+    .eq('status', 'active');
   if (cancelError) throw new InventoryKioskDeviceError(cancelError.message, 500);
 
   const { error } = await admin
@@ -240,7 +250,7 @@ export async function cancelInventoryKioskPairing(): Promise<void> {
     .from('inventory_kiosk_pairing_sessions')
     .update({ status: 'cancelled' })
     .eq('kiosk_user_id', config.kiosk_user_id)
-    .in('status', ['active', 'confirmed']);
+    .eq('status', 'active');
   if (error) throw new InventoryKioskDeviceError(error.message, 500);
 }
 
@@ -344,7 +354,9 @@ export async function getInventoryKioskPairingStatus(
   if (deviceError) throw new InventoryKioskDeviceError(deviceError.message, 500);
   if (!device) return { status: 'expired' };
 
-  if (pairing.status === 'confirmed') {
+  const pairedDevice = device as DeviceRow;
+  const hardwareBound = pairedDevice.hardware_identity_kind === 'android_keystore';
+  if (pairing.status === 'confirmed' && !hardwareBound) {
     const { error: consumeError } = await admin
       .from('inventory_kiosk_pairing_sessions')
       .update({
@@ -361,7 +373,12 @@ export async function getInventoryKioskPairingStatus(
     .update({ last_seen_at: new Date().toISOString() })
     .eq('id', (device as DeviceRow).id);
 
-  return { status: 'paired', deviceToken: pairingToken };
+  return {
+    status: 'paired',
+    deviceToken: pairingToken,
+    deviceId: pairedDevice.id,
+    hardwareBound,
+  };
 }
 
 export async function confirmInventoryKioskPairing(
@@ -396,6 +413,12 @@ export async function confirmInventoryKioskPairing(
   if (error.message.includes('KIOSK_REPLACEMENT_CONFIRMATION_REQUIRED')) {
     throw new InventoryKioskDeviceError(
       'The linked Yard kiosk changed. Start replacement again and reconfirm it.',
+      409,
+    );
+  }
+  if (error.message.includes('KIOSK_HARDWARE_IDENTITY_INCOMPLETE')) {
+    throw new InventoryKioskDeviceError(
+      'The Android wall tablet has not completed hardware enrollment.',
       409,
     );
   }
@@ -465,7 +488,12 @@ export async function activateInventoryKioskDevice(
   if (error) throw new InventoryKioskDeviceError(error.message, 500);
   if (!data) return null;
 
-  const device = data as DeviceRow;
+  const device = data as DeviceRow & {
+    hardware_identity_kind?: 'browser_cookie' | 'android_keystore';
+  };
+  if (device.hardware_identity_kind === 'android_keystore') {
+    return null;
+  }
   const appSession = await issueAppSession({
     profileId: device.kiosk_user_id,
     source: 'kiosk_device',

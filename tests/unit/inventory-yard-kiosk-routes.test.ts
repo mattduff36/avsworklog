@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
+const {
+  verifyInventoryKioskRequestProof,
+  applyValidationCookieIfNeeded,
+} = vi.hoisted(() => ({
+  verifyInventoryKioskRequestProof: vi.fn(),
+  applyValidationCookieIfNeeded: vi.fn(),
+}));
+
 vi.mock('@/lib/server/inventory-kiosk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/server/inventory-kiosk')>();
   return {
@@ -12,6 +20,23 @@ vi.mock('@/lib/server/inventory-kiosk', async (importOriginal) => {
   };
 });
 
+vi.mock('@/lib/server/inventory-kiosk-device-auth', () => ({
+  InventoryKioskHardwareError: class InventoryKioskHardwareError extends Error {
+    constructor(
+      message: string,
+      readonly status: number,
+      readonly code: string,
+    ) {
+      super(message);
+    }
+  },
+  verifyInventoryKioskRequestProof,
+}));
+
+vi.mock('@/lib/server/app-auth/response', () => ({
+  applyValidationCookieIfNeeded,
+}));
+
 import { GET as getBootstrap } from '@/app/api/inventory/kiosk/bootstrap/route';
 import { GET as getStock } from '@/app/api/inventory/kiosk/stock/route';
 import { POST as submitBasket } from '@/app/api/inventory/kiosk/submit/route';
@@ -21,6 +46,7 @@ import {
   requireInventoryKioskAccess,
   submitYardKioskBasket,
 } from '@/lib/server/inventory-kiosk';
+import { InventoryKioskHardwareError } from '@/lib/server/inventory-kiosk-device-auth';
 
 const allowedAccess = {
   allowed: true as const,
@@ -42,6 +68,11 @@ const allowedAccess = {
 describe('Inventory Yard kiosk routes', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    verifyInventoryKioskRequestProof.mockResolvedValue({
+      sessionValidation: { status: 'active' },
+      device: { id: 'device-1' },
+      hardwareProofRequired: true,
+    });
   });
 
   it.each([
@@ -54,10 +85,31 @@ describe('Inventory Yard kiosk routes', () => {
       error,
     });
 
-    const response = await getBootstrap();
+    const response = await getBootstrap(new NextRequest(
+      'http://localhost/api/inventory/kiosk/bootstrap',
+    ));
 
     expect(response.status).toBe(status);
     expect(getYardKioskBootstrap).not.toHaveBeenCalled();
+  });
+
+  it('rejects a copied kiosk session without hardware request proof', async () => {
+    verifyInventoryKioskRequestProof.mockRejectedValueOnce(
+      new InventoryKioskHardwareError(
+        'A fresh hardware proof is required',
+        401,
+        'DEVICE_PROOF_REQUIRED',
+      ),
+    );
+
+    const response = await getBootstrap(new NextRequest(
+      'http://localhost/api/inventory/kiosk/bootstrap',
+    ));
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload.code).toBe('DEVICE_PROOF_REQUIRED');
+    expect(requireInventoryKioskAccess).not.toHaveBeenCalled();
   });
 
   it('derives stock scope through the authorised kiosk context', async () => {
@@ -134,6 +186,10 @@ describe('Inventory Yard kiosk routes', () => {
     const response = await submitBasket(request);
 
     expect(response.status).toBe(200);
-    expect(submitYardKioskBasket).toHaveBeenCalledWith(allowedAccess, body);
+    expect(submitYardKioskBasket).toHaveBeenCalledWith(
+      allowedAccess,
+      body,
+      { hardwareKioskDeviceId: 'device-1' },
+    );
   });
 });

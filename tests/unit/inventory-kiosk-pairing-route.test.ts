@@ -25,6 +25,7 @@ vi.mock('@/lib/server/inventory-kiosk-devices', () => ({
 import {
   KIOSK_DEVICE_COOKIE_MAX_AGE_SECONDS,
   KIOSK_DEVICE_COOKIE_NAME,
+  KIOSK_PAIRING_COOKIE_MAX_AGE_SECONDS,
   KIOSK_PAIRING_COOKIE_NAME,
 } from '@/lib/server/inventory-kiosk-device-cookies';
 import {
@@ -71,12 +72,14 @@ describe('Inventory kiosk public pairing route', () => {
     expect(pairingCookie?.httpOnly).toBe(true);
     expect(pairingCookie?.sameSite).toBe('strict');
     expect(pairingCookie?.path).toBe('/');
+    expect(pairingCookie?.maxAge).toBe(KIOSK_PAIRING_COOKIE_MAX_AGE_SECONDS);
   });
 
   it('exchanges a confirmed pairing cookie for a persistent device cookie', async () => {
     getInventoryKioskPairingStatus.mockResolvedValue({
       status: 'paired',
       deviceToken: 'raw-pairing-secret',
+      deviceId: '11111111-1111-4111-8111-111111111111',
     });
     const request = new NextRequest(
       'http://localhost/api/inventory/kiosk/pairing',
@@ -98,6 +101,7 @@ describe('Inventory kiosk public pairing route', () => {
     expect(payload).toMatchObject({
       status: 'paired',
       pairing: null,
+      device_id: '11111111-1111-4111-8111-111111111111',
     });
     expect(payload.diagnostic_id).toEqual(expect.any(String));
     expect(deviceCookie?.value).toBe('raw-pairing-secret');
@@ -106,5 +110,28 @@ describe('Inventory kiosk public pairing route', () => {
     expect(deviceCookie?.maxAge).toBe(KIOSK_DEVICE_COOKIE_MAX_AGE_SECONDS);
     expect(expiredPairingCookie?.value).toBe('');
     expect(expiredPairingCookie?.maxAge).toBe(0);
+  });
+
+  it('keeps confirmed hardware pairing recoverable until native enrollment commits', async () => {
+    getInventoryKioskPairingStatus.mockResolvedValue({
+      status: 'paired',
+      deviceToken: 'raw-pairing-secret',
+      deviceId: '11111111-1111-4111-8111-111111111111',
+      hardwareBound: true,
+    });
+    const response = await getPairingStatus(
+      new NextRequest('http://localhost/api/inventory/kiosk/pairing', {
+        headers: {
+          Cookie: `${KIOSK_PAIRING_COOKIE_NAME}=raw-pairing-secret`,
+        },
+      }),
+    );
+
+    await expect(response.json()).resolves.toMatchObject({
+      status: 'paired',
+      hardware_bound: true,
+    });
+    expect(response.cookies.get(KIOSK_DEVICE_COOKIE_NAME)).toBeUndefined();
+    expect(response.cookies.get(KIOSK_PAIRING_COOKIE_NAME)).toBeUndefined();
   });
 });

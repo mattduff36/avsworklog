@@ -18,6 +18,10 @@ vi.mock('next/navigation', () => ({
   redirect,
 }));
 
+vi.mock('next/headers', () => ({
+  headers: vi.fn(async () => new Headers()),
+}));
+
 vi.mock('@/lib/server/app-auth/session', () => ({
   validateAppSession,
 }));
@@ -67,6 +71,7 @@ describe('Yard kiosk page session gate', () => {
     validateAppSession.mockResolvedValue({
       status: 'active',
       secretRotated: false,
+      profileId: 'kiosk-user-1',
     });
     requireInventoryKioskAccess.mockResolvedValue({
       allowed: false,
@@ -75,7 +80,7 @@ describe('Yard kiosk page session gate', () => {
     });
 
     const result = await YardKioskPage();
-    expect(requireInventoryKioskAccess).toHaveBeenCalled();
+    expect(requireInventoryKioskAccess).toHaveBeenCalledWith('kiosk-user-1');
     expect(result).toBeTruthy();
   });
 });

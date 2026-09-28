@@ -12,6 +12,7 @@ const PUBLIC_API_ROUTE_PREFIXES = [
   '/api/display-board/',
   '/api/daily-allocation/deployment-identity',
   '/api/inventory/kiosk/pairing',
+  '/api/inventory/kiosk/device-auth/',
 ] as const;
 
 function getPathname(value: string): string {

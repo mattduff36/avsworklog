@@ -2824,6 +2824,12 @@ export type Database = {
           control_session_id: string | null
           control_acquired_at: string | null
           control_lease_expires_at: string | null
+          hardware_identity_kind: 'browser_cookie' | 'android_keystore'
+          hardware_public_key_spki: string | null
+          hardware_key_fingerprint: string | null
+          hardware_attestation: Record<string, unknown>
+          hardware_bound_at: string | null
+          last_device_proof_at: string | null
           revoked_at: string | null
           revoked_by: string | null
           created_at: string
@@ -2855,6 +2861,12 @@ export type Database = {
           control_session_id?: string | null
           control_acquired_at?: string | null
           control_lease_expires_at?: string | null
+          hardware_identity_kind?: 'browser_cookie' | 'android_keystore'
+          hardware_public_key_spki?: string | null
+          hardware_key_fingerprint?: string | null
+          hardware_attestation?: Record<string, unknown>
+          hardware_bound_at?: string | null
+          last_device_proof_at?: string | null
           revoked_at?: string | null
           revoked_by?: string | null
           created_at?: string
@@ -2886,6 +2898,12 @@ export type Database = {
           control_session_id?: string | null
           control_acquired_at?: string | null
           control_lease_expires_at?: string | null
+          hardware_identity_kind?: 'browser_cookie' | 'android_keystore'
+          hardware_public_key_spki?: string | null
+          hardware_key_fingerprint?: string | null
+          hardware_attestation?: Record<string, unknown>
+          hardware_bound_at?: string | null
+          last_device_proof_at?: string | null
           revoked_at?: string | null
           revoked_by?: string | null
           created_at?: string
@@ -2939,6 +2957,54 @@ export type Database = {
             columns: ['supersedes_device_id']
             isOneToOne: false
             referencedRelation: 'inventory_kiosk_devices'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      inventory_kiosk_device_challenges: {
+        Row: {
+          id: string
+          purpose: 'android_enrollment' | 'android_authentication'
+          pairing_session_id: string | null
+          device_id: string | null
+          challenge_hash: string
+          expires_at: string
+          consumed_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          purpose: 'android_enrollment' | 'android_authentication'
+          pairing_session_id?: string | null
+          device_id?: string | null
+          challenge_hash: string
+          expires_at: string
+          consumed_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          purpose?: 'android_enrollment' | 'android_authentication'
+          pairing_session_id?: string | null
+          device_id?: string | null
+          challenge_hash?: string
+          expires_at?: string
+          consumed_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_kiosk_device_challenges_device_id_fkey'
+            columns: ['device_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_kiosk_devices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'inventory_kiosk_device_challenges_pairing_session_id_fkey'
+            columns: ['pairing_session_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_kiosk_pairing_sessions'
             referencedColumns: ['id']
           },
         ]
@@ -3098,6 +3164,38 @@ export type Database = {
           },
         ]
       }
+      inventory_kiosk_device_request_proofs: {
+        Row: {
+          request_id: string
+          device_id: string
+          issued_at: string
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          request_id: string
+          device_id: string
+          issued_at: string
+          expires_at: string
+          created_at?: string
+        }
+        Update: {
+          request_id?: string
+          device_id?: string
+          issued_at?: string
+          expires_at?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'inventory_kiosk_device_request_proofs_device_id_fkey'
+            columns: ['device_id']
+            isOneToOne: false
+            referencedRelation: 'inventory_kiosk_devices'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       inventory_kiosk_pairing_sessions: {
         Row: {
           id: string
@@ -3108,6 +3206,11 @@ export type Database = {
           status: 'active' | 'confirmed' | 'consumed' | 'cancelled' | 'expired'
           started_by: string
           candidate_seen_at: string | null
+          candidate_identity_kind: 'android_keystore' | null
+          candidate_hardware_public_key_spki: string | null
+          candidate_hardware_key_fingerprint: string | null
+          candidate_hardware_attestation: Record<string, unknown>
+          candidate_hardware_seen_at: string | null
           confirmed_by: string | null
           confirmed_at: string | null
           consumed_at: string | null
@@ -3125,6 +3228,11 @@ export type Database = {
           status?: 'active' | 'confirmed' | 'consumed' | 'cancelled' | 'expired'
           started_by: string
           candidate_seen_at?: string | null
+          candidate_identity_kind?: 'android_keystore' | null
+          candidate_hardware_public_key_spki?: string | null
+          candidate_hardware_key_fingerprint?: string | null
+          candidate_hardware_attestation?: Record<string, unknown>
+          candidate_hardware_seen_at?: string | null
           confirmed_by?: string | null
           confirmed_at?: string | null
           consumed_at?: string | null
@@ -3142,6 +3250,11 @@ export type Database = {
           status?: 'active' | 'confirmed' | 'consumed' | 'cancelled' | 'expired'
           started_by?: string
           candidate_seen_at?: string | null
+          candidate_identity_kind?: 'android_keystore' | null
+          candidate_hardware_public_key_spki?: string | null
+          candidate_hardware_key_fingerprint?: string | null
+          candidate_hardware_attestation?: Record<string, unknown>
+          candidate_hardware_seen_at?: string | null
           confirmed_by?: string | null
           confirmed_at?: string | null
           consumed_at?: string | null
@@ -11407,6 +11520,27 @@ export type Database = {
           checklist_items: Json | null
           overall_status: string | null
           submission_id: string | null
+        }[]
+      }
+      inventory_kiosk_execute_hardware_bound_basket: {
+        Args: {
+          p_actor: string
+          p_kiosk_device_id: string
+          p_unallocated: boolean
+          p_direction: string | null
+          p_counterpart_location_id: string | null
+          p_serialized_item_ids: string[]
+          p_hardware_lines: Json
+          p_location_details: string | null
+          p_note: string | null
+        }
+        Returns: {
+          kiosk_batch_id: string
+          movement_batch_id: string | null
+          hardware_batch_id: string | null
+          reminder_action_id: string | null
+          serialized_count: number
+          hardware_line_count: number
         }[]
       }
       inventory_kiosk_execute_transfer_basket: {

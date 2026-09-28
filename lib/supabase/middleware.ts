@@ -22,6 +22,7 @@ interface MiddlewareSessionPayload extends Record<string, unknown> {
   secret: string
   exp: number
   v: number
+  source?: 'password_login' | 'session_bootstrap' | 'biometric_login' | 'kiosk_device'
 }
 
 const CRON_ROUTE_PATHS = new Set([
@@ -118,6 +119,15 @@ function isAuthorizedCronRequest(request: NextRequest): boolean {
   return request.headers.get('authorization') === `Bearer ${cronSecret}`
 }
 
+function isKioskSessionPathAllowed(pathname: string): boolean {
+  return (
+    pathname === '/yard-kiosk'
+    || pathname.startsWith('/yard-kiosk/')
+    || pathname.startsWith('/api/inventory/kiosk/')
+    || pathname === '/api/auth/logout'
+  )
+}
+
 function withMiddlewareCookies(target: NextResponse, source: NextResponse): NextResponse {
   source.cookies.getAll().forEach((cookie) => {
     target.cookies.set(cookie)
@@ -196,6 +206,26 @@ export async function updateSession(request: NextRequest) {
 
   if (isAuthorizedCronRequest(request)) {
     return response
+  }
+
+  if (
+    session?.source === 'kiosk_device'
+    && !isKioskSessionPathAllowed(request.nextUrl.pathname)
+  ) {
+    if (isApiRoute) {
+      return jsonWithMiddlewareCookies(
+        response,
+        {
+          error: 'Yard kiosk sessions are restricted to Yard Inventory',
+          code: 'KIOSK_SESSION_RESTRICTED',
+        },
+        { status: 403 }
+      )
+    }
+    const url = request.nextUrl.clone()
+    url.pathname = '/yard-kiosk/native'
+    url.search = ''
+    return redirectWithMiddlewareCookies(response, url, 307)
   }
 
   // The app-session cookie is now the only accepted browser auth state.

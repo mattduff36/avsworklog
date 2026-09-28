@@ -16,6 +16,7 @@ export const KIOSK_PAIRING_COOKIE_NAME =
 // Chromium caps persistent cookies at 400 days. Activation refreshes this
 // sliding expiry without replacing the stable, revocable device credential.
 export const KIOSK_DEVICE_COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60;
+export const KIOSK_PAIRING_COOKIE_MAX_AGE_SECONDS = 400 * 24 * 60 * 60;
 
 type CookieResponse = Pick<NextResponse, 'cookies'>;
 
@@ -76,12 +77,15 @@ export function setKioskDeviceCookie(
 export function setKioskPairingCookie(
   response: CookieResponse,
   value: string,
-  expiresAt: Date,
 ): void {
+  const expiresAt = new Date(Date.now() + KIOSK_PAIRING_COOKIE_MAX_AGE_SECONDS * 1000);
   response.cookies.set(
     KIOSK_PAIRING_COOKIE_NAME,
     value,
-    getCookieAttributes(expiresAt),
+    {
+      ...getCookieAttributes(expiresAt),
+      maxAge: KIOSK_PAIRING_COOKIE_MAX_AGE_SECONDS,
+    },
   );
 }
 

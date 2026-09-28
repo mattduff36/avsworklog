@@ -295,7 +295,7 @@ async function expireStaleControlLeases(deviceId?: string): Promise<void> {
 }
 
 export async function resolveActiveKioskDeviceFromSession(): Promise<DeviceRow | null> {
-  const session = await validateAppSession();
+  const session = await validateAppSession({ allowKioskDevice: true });
   if (session.status !== 'active' || !session.session?.kiosk_device_id) {
     return null;
   }
@@ -357,9 +357,13 @@ async function persistHeartbeatAuthFailure(input: {
 
 export async function recordInventoryKioskDeviceHeartbeat(
   input: YardKioskHeartbeatInput,
+  options: {
+    sessionValidation?: Awaited<ReturnType<typeof validateAppSession>>;
+  } = {},
 ): Promise<InventoryKioskHeartbeatResult> {
   const diagnosticId = createYardKioskDiagnosticId();
-  const validation = await validateAppSession();
+  const validation = options.sessionValidation
+    || await validateAppSession({ allowKioskDevice: true });
 
   const failSession = async (
     deviceId: string | null,

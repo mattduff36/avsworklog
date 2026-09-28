@@ -41,6 +41,7 @@ import {
   yardKioskErrorFromApiPayload,
   yardKioskOfflineError,
 } from '@/lib/inventory/kiosk-client-diagnostics';
+import { kioskFetch } from '@/lib/inventory/kiosk-native';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useYardKioskRemoteControl } from '@/lib/hooks/useYardKioskRemoteControl';
 import { YardKioskBasket } from './YardKioskBasket';
@@ -161,7 +162,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
           ? { unallocated: 'true' }
           : { counterpart_location_id: counterpart?.id || '' }),
       });
-      const response = await fetch(`/api/inventory/kiosk/stock?${params}`, {
+      const response = await kioskFetch(`/api/inventory/kiosk/stock?${params}`, {
         cache: 'no-store',
       });
       const payload = await response.json() as ApiErrorPayload & { items?: YardKioskStockItem[] };
@@ -244,7 +245,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
   async function handleLegacyQuoteLocationOptIn(includeLegacyQuotes: boolean) {
     const requestId = legacyLocationRequestIdRef.current + 1;
     legacyLocationRequestIdRef.current = requestId;
-    const response = await fetch(
+    const response = await kioskFetch(
       `/api/inventory/kiosk/bootstrap${includeLegacyQuotes ? '?includeLegacyQuotes=true' : ''}`,
       { cache: 'no-store' },
     );
@@ -276,7 +277,7 @@ export function YardKioskApp({ bootstrap }: YardKioskAppProps) {
     submittingRef.current = true;
     dispatch({ type: 'SUBMIT_START' });
     try {
-      const response = await fetch('/api/inventory/kiosk/submit', {
+      const response = await kioskFetch('/api/inventory/kiosk/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestPayload),

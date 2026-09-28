@@ -16,6 +16,10 @@ import {
   mapPairingStatusToYardKioskErrorCode,
   type YardKioskUserError,
 } from '@/lib/inventory/kiosk-errors';
+import {
+  callNativeKiosk,
+  hasNativeKioskBridge,
+} from '@/lib/inventory/kiosk-native';
 
 interface PairingView {
   id: string;
@@ -29,6 +33,7 @@ interface PairingView {
 interface PairingPayload {
   status: 'pairing' | 'paired' | 'expired' | 'unavailable';
   pairing?: PairingView | null;
+  device_id?: string | null;
   message?: string;
   error?: string;
   code?: string;
@@ -41,6 +46,7 @@ export default function YardKioskPairPage() {
   const [phase, setPhase] = useState<PairUiPhase>('loading');
   const [userError, setUserError] = useState<YardKioskUserError | null>(null);
   const navigatingRef = useRef(false);
+  const enrollmentInFlightRef = useRef(false);
   const diagnosticIdRef = useRef(createYardKioskDiagnosticId());
 
   const showError = useCallback((next: PairingPayload) => {
@@ -56,38 +62,115 @@ export default function YardKioskPairPage() {
     setPhase('error');
   }, []);
 
+  const completeNativePairing = useCallback(async (deviceId: string | null | undefined) => {
+    if (!hasNativeKioskBridge()) return;
+    if (!deviceId) throw new Error('The paired hardware identity is missing its device id.');
+    await callNativeKiosk('enroll.commit', { device_id: deviceId });
+  }, []);
+
+  const enrollNativeHardware = useCallback(async () => {
+    if (!hasNativeKioskBridge() || enrollmentInFlightRef.current) return;
+    enrollmentInFlightRef.current = true;
+    setPhase('loading');
+    try {
+      const challengeResponse = await fetch(
+        '/api/inventory/kiosk/device-auth/enrollment-challenge',
+        { method: 'POST', cache: 'no-store' },
+      );
+      const challenge = await challengeResponse.json() as {
+        enrolled?: boolean;
+        challenge_id?: string;
+        challenge?: string;
+        expires_at?: string;
+        error?: string;
+      };
+      if (challengeResponse.ok && challenge.enrolled) return;
+      if (
+        !challengeResponse.ok
+        || !challenge.challenge_id
+        || !challenge.challenge
+      ) {
+        throw new Error(challenge.error || 'Unable to create the hardware enrollment challenge');
+      }
+
+      const attestation = await callNativeKiosk('enroll.attest', {
+        challenge: challenge.challenge,
+      });
+      const enrollmentResponse = await fetch(
+        '/api/inventory/kiosk/device-auth/enroll',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          cache: 'no-store',
+          body: JSON.stringify({
+            challenge_id: challenge.challenge_id,
+            challenge: challenge.challenge,
+            public_key_spki: attestation.public_key_spki,
+            certificate_chain: attestation.certificate_chain,
+          }),
+        },
+      );
+      const enrollment = await enrollmentResponse.json() as {
+        enrolled?: boolean;
+        error?: string;
+      };
+      if (!enrollmentResponse.ok || !enrollment.enrolled) {
+        throw new Error(enrollment.error || 'The wall tablet hardware could not be enrolled');
+      }
+    } finally {
+      enrollmentInFlightRef.current = false;
+    }
+  }, []);
+
   const requestPairing = useCallback(async () => {
     if (navigatingRef.current) return;
     try {
-      const response = await fetch('/api/inventory/kiosk/pairing', {
-        method: 'POST',
+      let response = await fetch('/api/inventory/kiosk/pairing', {
         cache: 'no-store',
         headers: {
           'X-Yard-Kiosk-Diagnostic-Id': diagnosticIdRef.current,
         },
       });
-      const result = await response.json() as PairingPayload;
+      let result = await response.json() as PairingPayload;
+      if (result.status === 'unavailable' || result.status === 'expired') {
+        response = await fetch('/api/inventory/kiosk/pairing', {
+          method: 'POST',
+          cache: 'no-store',
+          headers: {
+            'X-Yard-Kiosk-Diagnostic-Id': diagnosticIdRef.current,
+          },
+        });
+        result = await response.json() as PairingPayload;
+      }
       setPayload(result);
 
       if (result.status === 'pairing') {
+        if (hasNativeKioskBridge()) {
+          await enrollNativeHardware();
+        }
         setPhase(result.pairing?.confirmation_code ? 'code' : 'waiting');
         return;
       }
       if (result.status === 'paired') {
         setPhase('success');
         navigatingRef.current = true;
-        window.location.replace('/yard-kiosk/activate');
+        await completeNativePairing(result.device_id);
+        window.location.replace(
+          hasNativeKioskBridge() ? '/yard-kiosk/native' : '/yard-kiosk/activate',
+        );
         return;
       }
       showError(result);
-    } catch {
+    } catch (error) {
       showError({
         status: 'unavailable',
-        error: 'This device could not reach the pairing service.',
+        error: error instanceof Error
+          ? error.message
+          : 'This device could not reach the pairing service.',
         code: 'FLAKY_CONNECTION',
       });
     }
-  }, [showError]);
+  }, [completeNativePairing, enrollNativeHardware, showError]);
 
   const startPairing = useCallback(() => {
     if (navigatingRef.current) return;
@@ -119,7 +202,20 @@ export default function YardKioskPairPage() {
           setPayload(result);
           setPhase('success');
           window.clearInterval(interval);
-          window.location.replace('/yard-kiosk/activate');
+          try {
+            await completeNativePairing(result.device_id);
+            window.location.replace(
+              hasNativeKioskBridge() ? '/yard-kiosk/native' : '/yard-kiosk/activate',
+            );
+          } catch (error) {
+            navigatingRef.current = false;
+            showError({
+              status: 'unavailable',
+              error: error instanceof Error
+                ? error.message
+                : 'The wall tablet identity could not be saved.',
+            });
+          }
           return;
         }
 
@@ -135,7 +231,7 @@ export default function YardKioskPairPage() {
     }, 2_000);
 
     return () => window.clearInterval(interval);
-  }, [payload?.status, showError]);
+  }, [completeNativePairing, payload?.status, showError]);
 
   const pairing = payload?.pairing || null;
 

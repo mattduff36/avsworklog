@@ -67,6 +67,10 @@ interface KioskDevice {
   last_app_version?: string | null;
   last_error_code?: string | null;
   last_diagnostic_id?: string | null;
+  hardware_identity_kind?: 'browser_cookie' | 'android_keystore';
+  hardware_bound_at?: string | null;
+  hardware_key_fingerprint?: string | null;
+  last_device_proof_at?: string | null;
   presence?: 'online' | 'stale' | 'offline' | 'revoked';
   pending_commands?: KioskPendingCommand[];
   revoked_at: string | null;
@@ -433,6 +437,14 @@ export function InventoryKioskDevicesPanel() {
                       >
                         {presenceLabel(device)}
                       </Badge>
+                      {device.hardware_identity_kind === 'android_keystore' ? (
+                        <Badge
+                          variant="outline"
+                          className="border-sky-400/40 bg-sky-500/10 text-[10px] text-sky-200"
+                        >
+                          Hardware-bound
+                        </Badge>
+                      ) : null}
                     </div>
                     <p className="mt-1 break-words text-xs text-muted-foreground">
                       Paired {formatDateTime(device.created_at)} · Last automatic login {formatDateTime(device.last_authenticated_at)}
@@ -441,6 +453,11 @@ export function InventoryKioskDevicesPanel() {
                       Last contact {formatDateTime(device.last_heartbeat_at || null)}
                       {device.last_phase ? ` · ${device.last_phase}` : ''}
                     </p>
+                    {device.hardware_identity_kind === 'android_keystore' ? (
+                      <p className="break-words text-xs text-muted-foreground">
+                        Last hardware proof {formatDateTime(device.last_device_proof_at || null)}
+                      </p>
+                    ) : null}
                     {device.last_error_code ? (
                       <p className="mt-1 break-words text-xs text-amber-200">
                         Last issue {device.last_error_code}

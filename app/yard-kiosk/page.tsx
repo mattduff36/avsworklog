@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import {
-  getYardKioskBootstrap,
   requireInventoryKioskAccess,
 } from '@/lib/server/inventory-kiosk';
 import { validateAppSession } from '@/lib/server/app-auth/session';
@@ -8,7 +8,7 @@ import {
   buildYardKioskUserError,
   createYardKioskDiagnosticId,
 } from '@/lib/inventory/kiosk-errors';
-import { YardKioskApp } from './components/YardKioskApp';
+import { YardKioskBootstrapLoader } from './components/YardKioskBootstrapLoader';
 import { YardKioskRecoveryScreen } from './components/YardKioskRecoveryScreen';
 
 export const dynamic = 'force-dynamic';
@@ -16,14 +16,24 @@ export const dynamic = 'force-dynamic';
 export default async function YardKioskPage() {
   // Detect secret rotation / inactive session before other access work so a
   // rotated DB secret is never left without a browser cookie write-back.
-  const session = await validateAppSession();
+  const session = await validateAppSession({ allowKioskDevice: true });
   if (session.status !== 'active' || session.secretRotated) {
-    redirect('/yard-kiosk/activate');
+    const userAgent = (await headers()).get('user-agent') || '';
+    redirect(
+      userAgent.includes('AVSYardKiosk/')
+        ? '/yard-kiosk/native'
+        : '/yard-kiosk/activate',
+    );
   }
 
-  const access = await requireInventoryKioskAccess();
+  const access = await requireInventoryKioskAccess(session.profileId || undefined);
   if (!access.allowed && access.status === 401) {
-    redirect('/yard-kiosk/activate');
+    const userAgent = (await headers()).get('user-agent') || '';
+    redirect(
+      userAgent.includes('AVSYardKiosk/')
+        ? '/yard-kiosk/native'
+        : '/yard-kiosk/activate',
+    );
   }
 
   if (!access.allowed) {
@@ -42,23 +52,5 @@ export default async function YardKioskPage() {
     );
   }
 
-  let bootstrap: Awaited<ReturnType<typeof getYardKioskBootstrap>> | null = null;
-  try {
-    bootstrap = await getYardKioskBootstrap(access);
-  } catch (error) {
-    console.error('Error rendering Yard kiosk:', error);
-  }
-
-  if (!bootstrap) {
-    return (
-      <YardKioskRecoveryScreen
-        error={buildYardKioskUserError('SERVICE_UNAVAILABLE', {
-          diagnosticId: createYardKioskDiagnosticId(),
-          whatHappened: 'Live Inventory data could not be loaded for Yard Inventory.',
-        })}
-      />
-    );
-  }
-
-  return <YardKioskApp bootstrap={bootstrap} />;
+  return <YardKioskBootstrapLoader />;
 }

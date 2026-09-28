@@ -27,6 +27,12 @@ active Inventory location.
   response cannot leave the tablet holding an invalid previous credential.
   Its browser cookie uses Chromium's 400-day maximum lifetime and refreshes on
   each trusted activation; server-side revocation remains immediate.
+- The permanent wall tablet uses the signed Yard Inventory Android wrapper.
+  Pairing generates a non-exportable ECDSA P-256 key in Android Keystore,
+  requires TEE or StrongBox key attestation, and binds the active kiosk row to
+  the attested app package and release-signing certificate. Browser cookies are
+  session transport only for that device and are not sufficient to authenticate
+  or call kiosk APIs without a fresh request-bound hardware signature.
 - A paired, active device visiting `/yard-kiosk` authenticates as the configured
   kiosk profile without entering that profile's password. An unpaired device
   continues through the normal password or biometric login.
@@ -158,12 +164,13 @@ active Inventory location.
 
 ### YK-008: Kiosk lifecycle
 
-- The tablet relies on operating-system kiosk mode. Its browser may use the
-  normal application login or a manager-approved trusted-device credential.
-  Trusted-device credentials are stored only in secure HTTP-only cookies,
-  remain bound to the configured kiosk profile, and can be revoked from
-  Inventory Settings. Revocation invalidates sessions issued to that device.
-  There is no in-app dashboard exit.
+- The tablet relies on operating-system kiosk mode. The permanent wall tablet
+  runs the signed Yard Inventory Android wrapper; legacy browser installations
+  may still use a manager-approved HTTP-only trusted-device cookie during
+  transition. Android device identity is a non-exportable hardware-backed key.
+  It remains bound to the configured kiosk profile and can be revoked from
+  Inventory Settings. Revocation invalidates sessions and rejects future
+  hardware signatures from that device. There is no in-app dashboard exit.
 - The dedicated kiosk PWA is an online-only launcher and does not register a
   service worker or cache an offline application shell. Inventory data and
   transfers always require the live application. If a device outside the PWA
@@ -185,6 +192,13 @@ active Inventory location.
   device revocation, clearing browser site data, uninstalling with site-data
   removal, or changing origin still requires pairing because browsers expose
   no durable MAC-address identity to web applications.
+- For the Android wrapper, hard refresh, process termination, ordinary app/OS
+  update, power loss, and tablet restart preserve pairing and silently mint a
+  new app session from the hardware key. Uninstall or app-data deletion,
+  factory reset/reimage, storage or hardware failure, application-id or release
+  signing-key change, and tablet replacement require pairing again. The release
+  APK signing key stays outside the repository and every in-place update uses
+  that same key.
 - Pairing shows explicit states for waiting, code confirmation, success, and
   failure. A successful pair only shows that pairing completed and the kiosk is
   starting. Failure copy uses plain English with a reference code.

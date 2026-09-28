@@ -229,6 +229,16 @@ describe('app auth session helpers', () => {
     expect(getAppAuthProfileMock).toHaveBeenCalledWith('user-1', null);
   });
 
+  it('can validate without refreshing activity before a request proof is accepted', async () => {
+    vi.setSystemTime(new Date('2026-04-04T12:02:00.000Z'));
+
+    const validation = await validateAppSession({ refresh: false });
+
+    expect(validation.status).toBe('active');
+    expect(validation.cookieValue).toBeNull();
+    expect(updateEqMock).not.toHaveBeenCalled();
+  });
+
   it('returns the refreshed session row after activity updates without secret rotation', async () => {
     maybeSingleMock.mockResolvedValueOnce({
       data: {
@@ -458,6 +468,38 @@ describe('app auth session helpers', () => {
     expect(validation.session).toBeNull();
     expect(validation.failureReason).toBe('kiosk_device_inactive');
     expect(validation.kioskDeviceIdHint).toBe('kiosk-device-1');
+  });
+
+  it('rejects an active kiosk session outside explicitly allowed kiosk routes', async () => {
+    maybeSingleMock.mockResolvedValueOnce({
+      data: {
+        id: 'session-1',
+        profile_id: 'user-1',
+        device_id: null,
+        kiosk_device_id: 'kiosk-device-1',
+        session_secret_hash: 'hashed-secret',
+        session_source: 'kiosk_device',
+        remember_me: true,
+        last_seen_at: '2026-04-04T12:00:00.000Z',
+        idle_expires_at: '2026-04-05T12:00:00.000Z',
+        absolute_expires_at: '2026-04-30T12:00:00.000Z',
+        revoked_at: null,
+        revoked_reason: null,
+        replaced_by_session_id: null,
+        user_agent: null,
+        ip_hash: null,
+        created_at: '2026-04-04T10:00:00.000Z',
+        updated_at: '2026-04-04T12:00:00.000Z',
+      },
+      error: null,
+    });
+
+    const validation = await validateAppSession();
+
+    expect(validation.status).toBe('invalid');
+    expect(validation.failureReason).toBe('kiosk_session_restricted');
+    expect(validation.kioskDeviceIdHint).toBe('kiosk-device-1');
+    expect(updateEqMock).not.toHaveBeenCalled();
   });
 
   it('falls back to the Supabase SSR user when no app-session cookie exists', async () => {
