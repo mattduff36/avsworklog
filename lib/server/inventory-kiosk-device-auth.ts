@@ -12,6 +12,7 @@ import { issueAppSession, validateAppSession } from '@/lib/server/app-auth/sessi
 import { fromBase64Url, randomToken, sha256Hex } from '@/lib/server/app-auth/jwt';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hashInventoryKioskDeviceToken } from '@/lib/server/inventory-kiosk-devices';
+import { logger } from '@/lib/utils/logger';
 
 const CHALLENGE_TTL_MS = 2 * 60 * 1000;
 const REQUEST_CLOCK_SKEW_MS = 2 * 60 * 1000;
@@ -326,6 +327,11 @@ function assertCertificateChain(chain: X509Certificate[]): string {
     );
   }
   if (!trustedRoots.includes(rootFingerprint)) {
+    logger.warn('Untrusted Android attestation root observed', {
+      rootFingerprint,
+      subject: root.subject,
+      issuer: root.issuer,
+    });
     throw new InventoryKioskHardwareError(
       'Android key attestation root is not trusted',
       403,
