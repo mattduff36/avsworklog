@@ -155,15 +155,21 @@ describe('fixerrors learning knowledge', () => {
     expect(original.incidents[0]?.outcome).toBe('fix_verified_local');
   });
 
-  it('records an exact recurrence only after a verified local fix', () => {
-    const verified = storeWith(input());
-    const recurred = recordIncidentOutcome(verified, input({
+  it('records an exact recurrence only after a live-verified fix', () => {
+    const localFix = storeWith(input());
+    const stillLocal = recordIncidentOutcome(localFix, input({
+      outcome: 'report_only',
+      observedAt: '2026-09-27T00:00:00.000Z',
+    }));
+    expect(stillLocal.incidents[0]?.outcome).toBe('report_only');
+    const liveFix = storeWith(input({ outcome: 'fix_verified_live' }));
+    const recurred = recordIncidentOutcome(liveFix, input({
       outcome: 'report_only',
       observedAt: '2026-09-27T00:00:00.000Z',
     }));
     expect(recurred.incidents[0]).toMatchObject({ outcome: 'recurred', recurrenceCount: 1 });
     expect(() => recordIncidentOutcome({ version: 1, incidents: [] }, input({ outcome: 'recurred' }))).toThrow(
-      /previously verified/u
+      /live-verified/u
     );
   });
 });
@@ -194,6 +200,8 @@ describe('fixerrors learning decisions', () => {
           id: 'cluster-1',
           lane: 'fast',
           action: 'fix',
+          disposition: 'outstanding',
+          nextStep: 'Deploy the route fix and verify it live.',
           evidencePaths: ['app/(dashboard)/dashboard/page.tsx'],
           files: ['app/api/dashboard/summary/route.ts'],
           requiredTestIds: ['tests/integration/api/dashboard-summary-route.test.ts'],

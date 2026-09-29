@@ -19,7 +19,7 @@ export interface ErrorLogAccessResult {
 
 const ERROR_LOG_FETCH_LIMIT_MAX = 500;
 const ERROR_LOG_LIST_COLUMNS =
-  'id, timestamp, error_message, error_stack, error_type, user_id, user_email, page_url, user_agent, component_name, additional_data, created_at, status, archived_at';
+  'id, timestamp, error_message, error_stack, error_type, user_id, user_email, page_url, user_agent, component_name, additional_data, created_at, status, archived_at, triage_state, triaged_at, triage_incident_id, triage_summary, triage_next_step, triage_local_commit, triage_live_verified_at, triage_live_evidence';
 
 function clampLimit(limit: number): number {
   return Math.min(Math.max(Number.isFinite(limit) ? Math.trunc(limit) : 200, 1), ERROR_LOG_FETCH_LIMIT_MAX);
@@ -72,18 +72,7 @@ export async function listErrorLogs(
 }
 
 export async function archiveActiveErrorLogs(): Promise<void> {
-  const admin = createAdminClient();
-  const { error } = await admin
-    .from('error_logs')
-    .update({
-      status: 'archived',
-      archived_at: new Date().toISOString(),
-    })
-    .eq('status', 'active');
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  throw new Error('Bulk error-log archive is disabled. Untriaged and outstanding rows stay active until fixerrors finalizes an exact disposition.');
 }
 
 export async function clearAllErrorLogs(): Promise<void> {

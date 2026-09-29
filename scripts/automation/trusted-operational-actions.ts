@@ -5,7 +5,11 @@ export type OperationalMutation = {
   table: string;
   operation: 'delete' | 'update';
   identityColumn: string;
-  purpose: 'primary-diagnostic' | 'dependent-diagnostic' | 'expired-archived-retention';
+  purpose:
+    | 'primary-diagnostic'
+    | 'triage-outstanding'
+    | 'dependent-diagnostic'
+    | 'expired-archived-retention';
   updatedColumns?: readonly string[];
   targetPredicate?: string;
 };
@@ -23,7 +27,7 @@ export const ERROR_LOG_RETENTION_PREDICATE =
 export const TRUSTED_OPERATIONAL_ACTIONS = {
   fixerrors: {
     commandId: 'fixerrors',
-    safetyContract: 'fixerrors-exact-snapshot-v4',
+    safetyContract: 'fixerrors-exact-snapshot-v5',
     trustedOperationalAction: true,
     allowedMutations: [
       {
@@ -31,9 +35,36 @@ export const TRUSTED_OPERATIONAL_ACTIONS = {
         table: 'error_logs',
         operation: 'update',
         identityColumn: 'id',
+        purpose: 'triage-outstanding',
+        updatedColumns: [
+          'triage_state',
+          'triaged_at',
+          'triage_incident_id',
+          'triage_summary',
+          'triage_next_step',
+          'triage_local_commit',
+        ],
+        targetPredicate: "status = 'active' AND triage_state IS NULL",
+      },
+      {
+        schema: 'public',
+        table: 'error_logs',
+        operation: 'update',
+        identityColumn: 'id',
         purpose: 'primary-diagnostic',
-        updatedColumns: ['status', 'archived_at'],
-        targetPredicate: "status = 'active'",
+        updatedColumns: [
+          'status',
+          'archived_at',
+          'triage_state',
+          'triaged_at',
+          'triage_incident_id',
+          'triage_summary',
+          'triage_next_step',
+          'triage_local_commit',
+          'triage_live_verified_at',
+          'triage_live_evidence',
+        ],
+        targetPredicate: "status = 'active' AND triage_state IS NULL",
       },
       {
         schema: 'public',

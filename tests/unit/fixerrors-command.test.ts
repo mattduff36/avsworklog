@@ -9,7 +9,13 @@ const analysisScript = readFileSync(path.join(root, 'scripts', 'fixerrors.ts'), 
 
 describe('fixerrors command orchestration', () => {
   it('FIXERR-CMD-001 keeps the v4 snapshot/archive safety contract', () => {
-    expect(command).toContain('safetyContract":"fixerrors-exact-snapshot-v4"');
+    expect(command).toContain('safetyContract":"fixerrors-exact-snapshot-v5"');
+    expect(command).toContain('Errors found');
+    expect(command).toContain('Errors fixed live');
+    expect(command).toContain('Errors still outstanding');
+    expect(command).toContain('Outstanding work remains: YES');
+    expect(command).toContain('Final recommendation');
+    expect(command).toContain('Say "fix" to proceed with this recommendation now.');
     expect(command).toContain('npm run fixerrors');
     expect(command).toContain('npm run fixerrors -- --cleanup');
     expect(command).toContain('Automatically implement FAST, STANDARD, and GUARDED clusters.');

@@ -326,12 +326,8 @@ describe('debug error logs route', () => {
     const response = await DELETE(new NextRequest('http://localhost/api/debug/error-logs', { method: 'DELETE' }));
     const payload = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(payload.success).toBe(true);
-    expect(updateLogs).toHaveBeenCalledWith({
-      status: 'archived',
-      archived_at: expect.any(String),
-    });
-    expect(eq).toHaveBeenCalledWith('status', 'active');
+    expect(response.status).toBe(409);
+    expect(payload.error).toMatch(/disabled/u);
+    expect(updateLogs).not.toHaveBeenCalled();
   });
 });

@@ -15,6 +15,8 @@ const CLUSTER_KEYS = [
   'id',
   'lane',
   'action',
+  'disposition',
+  'nextStep',
   'evidencePaths',
   'files',
   'requiredTestIds',
@@ -23,6 +25,7 @@ const CLUSTER_KEYS = [
   'priorIncidentIds',
   'evidenceEnrichmentAttempted',
 ] as const;
+const DISPOSITIONS = ['outstanding', 'no_fix_required', 'fixed_live'] as const;
 
 export type DecisionAction = (typeof DECISION_ACTIONS)[number];
 export type DecisionLane = (typeof DECISION_LANES)[number];
@@ -31,6 +34,8 @@ export interface DecisionCluster {
   id: string;
   lane: DecisionLane;
   action: DecisionAction;
+  disposition: (typeof DISPOSITIONS)[number];
+  nextStep: string | null;
   evidencePaths: string[];
   files: string[];
   requiredTestIds: string[];
@@ -107,6 +112,26 @@ function parseCluster(value: unknown): DecisionCluster {
   if (!/^cluster-[1-9][0-9]*$/u.test(cluster.id)) throw new Error('Invalid cluster id');
   if (!DECISION_LANES.includes(cluster.lane)) throw new Error('Invalid decision lane');
   if (!DECISION_ACTIONS.includes(cluster.action)) throw new Error('Invalid decision action');
+  if (!DISPOSITIONS.includes(cluster.disposition)) throw new Error('Invalid decision disposition');
+  if (cluster.nextStep !== null && (typeof cluster.nextStep !== 'string' || !cluster.nextStep.trim())) {
+    throw new Error('Invalid next step');
+  }
+  if (cluster.nextStep) rejectSensitiveText(cluster.nextStep, 'nextStep');
+  if (cluster.action === 'report-only' && (cluster.disposition !== 'no_fix_required' || cluster.nextStep !== null)) {
+    throw new Error(`Cluster ${cluster.id} report-only disposition is invalid`);
+  }
+  if (cluster.action === 'manual-investigation' && (cluster.disposition !== 'outstanding' || !cluster.nextStep)) {
+    throw new Error(`Cluster ${cluster.id} manual investigation stays outstanding`);
+  }
+  if (cluster.action === 'fix' && cluster.disposition === 'no_fix_required') {
+    throw new Error(`Cluster ${cluster.id} cannot close a code fix as no-fix`);
+  }
+  if (cluster.action === 'fix' && cluster.disposition === 'outstanding' && !cluster.nextStep) {
+    throw new Error(`Cluster ${cluster.id} outstanding fix requires a next step`);
+  }
+  if (cluster.action === 'fix' && cluster.disposition === 'fixed_live' && cluster.nextStep !== null) {
+    throw new Error(`Cluster ${cluster.id} live fix cannot stay outstanding`);
+  }
   cluster.evidencePaths = assertStringList(cluster.evidencePaths, 'evidencePaths', true);
   cluster.files = assertStringList(cluster.files, 'files', true);
   cluster.requiredTestIds = assertStringList(cluster.requiredTestIds, 'requiredTestIds', true);

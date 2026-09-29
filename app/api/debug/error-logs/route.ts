@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  clearAllErrorLogs,
   listErrorLogs,
   requireErrorLogAdminAccess,
 } from '@/lib/server/error-logs';
@@ -61,8 +60,10 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    await clearAllErrorLogs();
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      { error: 'Bulk error-log archive is disabled. Triaged outstanding rows stay in the log until they are live-fixed or marked no-fix.' },
+      { status: 409 }
+    );
   } catch (error) {
     await logServerError({
       error: error as Error,

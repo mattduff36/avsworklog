@@ -7,8 +7,14 @@ import {
 } from '@/scripts/automation/trusted-operational-actions';
 import { describe, expect, it } from 'vitest';
 
-const ARCHIVE_MUTATION = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.find(
+const DISPOSITION_MUTATIONS = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.filter(
   (mutation) => mutation.operation === 'update'
+);
+const OUTSTANDING_MUTATION = DISPOSITION_MUTATIONS.find(
+  (mutation) => mutation.purpose === 'triage-outstanding'
+)!;
+const ARCHIVE_MUTATION = DISPOSITION_MUTATIONS.find(
+  (mutation) => mutation.purpose === 'primary-diagnostic'
 )!;
 const RETENTION_MUTATION = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.find(
   (mutation) => mutation.purpose === 'expired-archived-retention'
@@ -19,7 +25,7 @@ function trustedExecution(
 ): OperationalClassificationInput {
   return {
     commandId: 'fixerrors',
-    safetyContract: 'fixerrors-exact-snapshot-v4',
+    safetyContract: 'fixerrors-exact-snapshot-v5',
     intent: 'execute',
     explicitlyRequested: true,
     confirmationBoundToSnapshot: true,
@@ -32,22 +38,28 @@ function trustedExecution(
 describe('TEE V2.2 trusted operational action policy', () => {
   it('FE-TRUST-001 treats registered snapshot-bound archive execution as operational', () => {
     expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract).toBe(
-      'fixerrors-exact-snapshot-v4'
+      'fixerrors-exact-snapshot-v5'
+    );
+    expect(OUTSTANDING_MUTATION.targetPredicate).toBe(
+      "status = 'active' AND triage_state IS NULL"
     );
     expect(ARCHIVE_MUTATION).toMatchObject({
       operation: 'update',
-      updatedColumns: ['status', 'archived_at'],
-      targetPredicate: "status = 'active'",
+      targetPredicate: "status = 'active' AND triage_state IS NULL",
     });
+    expect(ARCHIVE_MUTATION.updatedColumns).toEqual(
+      expect.arrayContaining(['status', 'archived_at', 'triage_state', 'triage_live_evidence'])
+    );
     expect(classifyOperationalAction(trustedExecution())).toMatchObject({
       kind: 'operational_execution',
       trusted: true,
-      safetyContract: 'fixerrors-exact-snapshot-v4',
+      safetyContract: 'fixerrors-exact-snapshot-v5',
     });
   });
 
-  it('FE-TRUST-002 registers exact v4 update plus 12-month retention delete', () => {
+  it('FE-TRUST-002 registers exact v5 disposition updates plus 12-month retention delete', () => {
     expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations).toEqual([
+      OUTSTANDING_MUTATION,
       ARCHIVE_MUTATION,
       RETENTION_MUTATION,
     ]);
@@ -128,7 +140,7 @@ describe('TEE V2.2 trusted operational action policy', () => {
   it('FE-TRUST-002 suspends trust for v3, delete-all, extra tables, and predicate changes', () => {
     expect(
       classifyOperationalAction(
-        trustedExecution({ safetyContract: 'fixerrors-exact-snapshot-v3' })
+        trustedExecution({ safetyContract: 'fixerrors-exact-snapshot-v4' })
       )
     ).toMatchObject({
       trustSuspended: true,

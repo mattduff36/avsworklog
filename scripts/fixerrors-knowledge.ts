@@ -22,6 +22,8 @@ export const INCIDENT_OUTCOMES = [
   'report_only',
   'manual_evidence_gap',
   'fix_verified_local',
+  'fix_verified_live',
+  'no_fix_required',
   'fix_failed',
   'recurred',
 ] as const;
@@ -322,16 +324,16 @@ export function recordIncidentOutcome(
   const existing = latestExact(validated, fingerprint);
   let outcome = input.outcome;
   let recurrenceCount = existing?.recurrenceCount ?? 0;
-  if (existing?.outcome === 'fix_verified_local' && outcome !== 'fix_failed') {
+  if (existing?.outcome === 'fix_verified_live' && outcome !== 'fix_failed') {
     outcome = 'recurred';
     recurrenceCount += 1;
   }
   if (
     outcome === 'recurred' &&
-    existing?.outcome !== 'fix_verified_local' &&
+    existing?.outcome !== 'fix_verified_live' &&
     existing?.outcome !== 'recurred'
   ) {
-    throw new Error('Recurrence requires an exact previously verified local fix');
+    throw new Error('Recurrence requires an exact previously live-verified fix');
   }
   const incident: KnowledgeIncident = {
     id: incidentId(fingerprint, input.observedAt),
@@ -385,7 +387,11 @@ export function retrieveIncidents(
   const contradictsEarlierSuccess = Boolean(
     latest &&
       (latest.outcome === 'fix_failed' || latest.outcome === 'recurred') &&
-      exact.some((incident) => incident.outcome === 'fix_verified_local' && incident.updatedAt < latest.updatedAt)
+      exact.some(
+        (incident) =>
+          (incident.outcome === 'fix_verified_local' || incident.outcome === 'fix_verified_live') &&
+          incident.updatedAt < latest.updatedAt
+      )
   );
   const exactMatches: RetrievalMatch[] = exact.slice(0, MAX_RETRIEVAL_MATCHES).map((incident) => ({
     incidentId: incident.id,

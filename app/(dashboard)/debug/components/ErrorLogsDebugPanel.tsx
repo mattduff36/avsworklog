@@ -17,12 +17,10 @@ import {
   Copy,
   Filter,
   Flame,
-  Loader2,
   Monitor,
   RefreshCw,
   Search,
   Smartphone,
-  Trash,
   Users,
   XCircle,
 } from 'lucide-react';
@@ -34,6 +32,7 @@ import {
   isVisibleWithDefaultErrorLogFilters,
 } from '@/lib/utils/error-log-filters';
 import { ErrorLogEntry } from '../types';
+import { errorLogCardClass, errorLogMessageClass, getErrorLogTone } from '@/lib/utils/error-log-triage';
 
 type ErrorSeverity = 'urgent' | 'important' | 'medium' | 'low';
 type ErrorSummaryTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
@@ -236,14 +235,11 @@ function getErrorBadgeMeta(severity: ErrorSeverity): {
 export function ErrorLogsDebugPanel() {
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [loadingErrorLogs, setLoadingErrorLogs] = useState(true);
-  const [clearingErrors, setClearingErrors] = useState(false);
-  const [confirmClearAll, setConfirmClearAll] = useState(false);
   const [expandedErrors, setExpandedErrors] = useState<string[]>([]);
   const [viewedErrors, setViewedErrors] = useState<Set<string>>(new Set());
   const [lastCheckedErrorId, setLastCheckedErrorId] = useState<string | null>(null);
   const notifyingNewErrorsRef = useRef(false);
   const lastNotifiedErrorIdRef = useRef<string | null>(null);
-  const clearAllConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [filterLocalhost, setFilterLocalhost] = useState<boolean>(DEFAULT_ERROR_LOG_FILTERS.hideLocalhost);
   const [filterAdminAccount, setFilterAdminAccount] = useState<boolean>(DEFAULT_ERROR_LOG_FILTERS.hideAdminAccount);
@@ -271,14 +267,6 @@ export function ErrorLogsDebugPanel() {
     void fetchErrorLogs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showArchived]);
-
-  useEffect(() => {
-    return () => {
-      if (clearAllConfirmTimerRef.current) {
-        clearTimeout(clearAllConfirmTimerRef.current);
-      }
-    };
-  }, []);
 
   const fetchErrorLogs = async () => {
     setLoadingErrorLogs(true);
@@ -364,46 +352,6 @@ export function ErrorLogsDebugPanel() {
       toast.error('Error loading error logs');
     } finally {
       setLoadingErrorLogs(false);
-    }
-  };
-
-  const clearAllErrorLogs = async () => {
-    if (!confirmClearAll) {
-      setConfirmClearAll(true);
-      if (clearAllConfirmTimerRef.current) {
-        clearTimeout(clearAllConfirmTimerRef.current);
-      }
-      clearAllConfirmTimerRef.current = setTimeout(() => {
-        setConfirmClearAll(false);
-        clearAllConfirmTimerRef.current = null;
-      }, 3000);
-      return;
-    }
-
-    if (clearAllConfirmTimerRef.current) {
-      clearTimeout(clearAllConfirmTimerRef.current);
-      clearAllConfirmTimerRef.current = null;
-    }
-    setConfirmClearAll(false);
-    setClearingErrors(true);
-    try {
-      const response = await fetch('/api/debug/error-logs', {
-        method: 'DELETE',
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(payload?.error || 'Failed to archive error logs');
-      }
-
-      toast.success('Active error logs archived successfully');
-      setLastCheckedErrorId(null);
-      lastNotifiedErrorIdRef.current = null;
-      fetchErrorLogs();
-    } catch (error) {
-      console.error('Error clearing error logs:', error);
-      toast.error('Failed to archive error logs');
-    } finally {
-      setClearingErrors(false);
     }
   };
 
@@ -592,23 +540,6 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
             <Button onClick={fetchErrorLogs} variant="outline" size="sm">
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
-            </Button>
-            <Button
-              onClick={clearAllErrorLogs}
-              variant={confirmClearAll ? 'outline' : 'destructive'}
-              size="sm"
-              disabled={
-                clearingErrors ||
-                errorLogs.filter((log) => log.status !== 'archived').length === 0
-              }
-              className={
-                confirmClearAll
-                  ? 'border-red-500 text-red-300 bg-red-500/10 hover:bg-red-500/20'
-                  : 'bg-red-600 hover:bg-red-700 text-white border-red-600'
-              }
-            >
-              {clearingErrors ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Trash className="h-4 w-4 mr-2" />}
-              {clearingErrors ? 'Archiving...' : confirmClearAll ? 'Confirm?' : 'Clear All'}
             </Button>
           </div>
         </div>
@@ -899,11 +830,12 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                           const classification = getErrorClassification(log);
                           const userAction = getUserAction(log);
                           const userFacingMessage = getUserFacingMessage(log);
+                          const tone = getErrorLogTone(log);
 
                           return (
                             <div
                               key={log.id}
-                              className="overflow-hidden rounded-lg border border-red-500/30 bg-red-500/5 transition-colors hover:border-red-500/60"
+                              className={errorLogCardClass(tone)}
                             >
                               <div
                                 className="cursor-pointer p-4 transition-colors hover:bg-red-500/10"
@@ -937,7 +869,15 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                                         </Badge>
                                       )}
                                     </div>
-                                    <p className="font-semibold text-red-700 dark:text-red-400 mb-2">{log.error_message}</p>
+                                    {log.triage_state === 'outstanding' && (
+                                      <Badge className="border-orange-400/40 bg-orange-500/20 font-mono text-xs text-orange-100">
+                                        Triaged — outstanding
+                                      </Badge>
+                                    )}
+                                    <p className={errorLogMessageClass(tone)}>{log.error_message}</p>
+                                    {log.triage_state === 'outstanding' && log.triage_next_step && (
+                                      <p className="mb-2 text-xs text-orange-200">Next step: {log.triage_next_step}</p>
+                                    )}
                                     <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                                       <div className="flex items-center gap-1">
                                         <Clock className="h-3 w-3" />
@@ -1066,11 +1006,12 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                           const classification = getErrorClassification(log);
                           const userAction = getUserAction(log);
                           const userFacingMessage = getUserFacingMessage(log);
+                          const tone = getErrorLogTone(log);
 
                           return (
                             <div
                               key={log.id}
-                              className="overflow-hidden rounded-lg border border-slate-700/70 bg-slate-950/30 transition-colors hover:border-orange-500/50"
+                              className={errorLogCardClass(tone)}
                             >
                               <div
                                 className="cursor-pointer p-4 transition-colors hover:bg-orange-500/5"
@@ -1104,7 +1045,15 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                                         </Badge>
                                       )}
                                     </div>
-                                    <p className="font-semibold text-red-700 dark:text-red-400 mb-2">{log.error_message}</p>
+                                    {log.triage_state === 'outstanding' && (
+                                      <Badge className="border-orange-400/40 bg-orange-500/20 font-mono text-xs text-orange-100">
+                                        Triaged — outstanding
+                                      </Badge>
+                                    )}
+                                    <p className={errorLogMessageClass(tone)}>{log.error_message}</p>
+                                    {log.triage_state === 'outstanding' && log.triage_next_step && (
+                                      <p className="mb-2 text-xs text-orange-200">Next step: {log.triage_next_step}</p>
+                                    )}
                                     <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                                       <div className="flex items-center gap-1">
                                         <Clock className="h-3 w-3" />

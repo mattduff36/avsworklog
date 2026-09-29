@@ -67,6 +67,9 @@ export interface ErrorLogEntry {
   additional_data: ErrorAdditionalData | null;
   status?: 'active' | 'archived';
   archived_at?: string | null;
+  triage_state?: 'outstanding' | 'no_fix_required' | 'fixed_live' | null;
+  triage_summary?: string | null;
+  triage_next_step?: string | null;
 }
 
 export interface UsageAnalyticsSummary {

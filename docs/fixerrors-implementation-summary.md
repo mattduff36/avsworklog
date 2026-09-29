@@ -6,4 +6,4 @@ The `/fixerrors` command then diagnoses those clusters, uses the sanitized knowl
 
 Raw snapshots, user identities, and review evidence stay in gitignored `docs_private`. The committed knowledge store contains only sanitized fingerprints, diagnoses, outcomes, and file or test references. Legacy `docs_private/error-fix-log.md` is historical tracking, not executable authority.
 
-The safety contract remains `fixerrors-exact-snapshot-v4`.
+The safety contract is `fixerrors-exact-snapshot-v5`. Capture does not archive untriaged rows. Finalization archives only no-fix or live-verified rows and leaves diagnosed outstanding rows active.

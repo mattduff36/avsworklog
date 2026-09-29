@@ -2176,6 +2176,14 @@ export type Database = {
           created_at: string
           status: 'active' | 'archived'
           archived_at: string | null
+          triage_state: 'outstanding' | 'no_fix_required' | 'fixed_live' | null
+          triaged_at: string | null
+          triage_incident_id: string | null
+          triage_summary: string | null
+          triage_next_step: string | null
+          triage_local_commit: string | null
+          triage_live_verified_at: string | null
+          triage_live_evidence: Json | null
         }
         Insert: {
           id?: string
@@ -2192,6 +2200,14 @@ export type Database = {
           created_at?: string
           status?: 'active' | 'archived'
           archived_at?: string | null
+          triage_state?: 'outstanding' | 'no_fix_required' | 'fixed_live' | null
+          triaged_at?: string | null
+          triage_incident_id?: string | null
+          triage_summary?: string | null
+          triage_next_step?: string | null
+          triage_local_commit?: string | null
+          triage_live_verified_at?: string | null
+          triage_live_evidence?: Json | null
         }
         Update: {
           id?: string
@@ -2208,6 +2224,14 @@ export type Database = {
           created_at?: string
           status?: 'active' | 'archived'
           archived_at?: string | null
+          triage_state?: 'outstanding' | 'no_fix_required' | 'fixed_live' | null
+          triaged_at?: string | null
+          triage_incident_id?: string | null
+          triage_summary?: string | null
+          triage_next_step?: string | null
+          triage_local_commit?: string | null
+          triage_live_verified_at?: string | null
+          triage_live_evidence?: Json | null
         }
         Relationships: [
         ]

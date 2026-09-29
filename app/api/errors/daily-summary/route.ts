@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
       .from('error_logs')
       .select('*')
       .eq('status', 'active')
+      .is('triage_state', null)
       .gte('timestamp', yesterday.toISOString())
       .lte('timestamp', yesterdayEnd.toISOString())
       .order('timestamp', { ascending: false });

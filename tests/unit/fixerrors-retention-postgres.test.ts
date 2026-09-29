@@ -74,6 +74,14 @@ describe('fixerrors 12-month retention on PostgreSQL', () => {
         status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
         archived_at timestamptz,
         created_at timestamptz NOT NULL DEFAULT now(),
+        triage_state text,
+        triaged_at timestamptz,
+        triage_incident_id text,
+        triage_summary text,
+        triage_next_step text,
+        triage_local_commit text,
+        triage_live_verified_at timestamptz,
+        triage_live_evidence jsonb,
         CHECK (
           (status = 'active' AND archived_at IS NULL) OR
           (status = 'archived' AND archived_at IS NOT NULL)

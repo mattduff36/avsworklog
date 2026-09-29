@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('id', error_log_id)
       .eq('status', 'active')
+      .is('triage_state', null)
       .single();
 
     if (errorLogError || !errorLog) {

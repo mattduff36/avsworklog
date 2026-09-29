@@ -2,13 +2,18 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
   ERROR_LOG_RETENTION_MONTHS,
-  __testOnlyExecuteVerifiedSnapshotCleanup as executeVerifiedSnapshotCleanup,
+  ERROR_SNAPSHOT_PATH,
+  bindErrorSnapshotDispositionArtifacts,
+  bindNoFixDisposition,
+  getErrorSnapshotArtifactPath,
+  readAndVerifyErrorSnapshot,
+  verifyErrorSnapshot,
+  __testOnlyExecuteVerifiedSnapshotCleanup as executeVerifiedSnapshotCleanupRaw,
   executeVerifiedSnapshotCleanup as executeProductionSnapshotCleanup,
   fetchProductionErrorSnapshot,
   markSnapshotAnalysisCompleted,
   purgeExpiredArchivedErrorLogs,
   runRetentionAfterArchivePhase,
-  readAndVerifyErrorSnapshot,
   writeAndVerifyErrorSnapshot,
   writeAndVerifyTextArtifactAtomic,
   type ErrorSnapshotExport,
@@ -228,7 +233,18 @@ class CleanupClient implements PgClientLike {
   foreignKeys = [...EXPECTED_FOREIGN_KEYS];
   triggerRows: Array<{ trigger_name: string }> = [];
   failArchiveBatch: number | null = null;
-  schemaColumns = ['archived_at', 'status'];
+  schemaColumns = [
+    'archived_at',
+    'status',
+    'triage_incident_id',
+    'triage_live_evidence',
+    'triage_live_verified_at',
+    'triage_local_commit',
+    'triage_next_step',
+    'triage_state',
+    'triage_summary',
+    'triaged_at',
+  ];
   commitThenThrow = false;
   private workingRows = new Map<string, CleanupRow>();
   private workingAlerts = new Set<string>();
@@ -393,6 +409,30 @@ async function analyzedSnapshot(
   return { snapshot, io, report };
 }
 
+async function executeVerifiedSnapshotCleanup(
+  options: Parameters<typeof executeVerifiedSnapshotCleanupRaw>[0]
+) {
+  if (options.io && options.snapshotPath) {
+    try {
+      const snapshot = readAndVerifyErrorSnapshot(options.snapshotPath, options.io);
+      if (!snapshot.disposition && snapshot.rowCount > 0) {
+        writeAndVerifyErrorSnapshot(
+          bindNoFixDisposition(snapshot),
+          options.snapshotPath,
+          options.io
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('artifact write failure') || message.includes('artifact read failure')) {
+        throw error;
+      }
+      // Invalid artifacts must fail closed inside the real finalizer.
+    }
+  }
+  return executeVerifiedSnapshotCleanupRaw(options);
+}
+
 function confirmation(snapshot: ErrorSnapshotExport) {
   return {
     snapshotId: snapshot.snapshotId,
@@ -433,7 +473,8 @@ describe('fixerrors transaction-consistent snapshot export', () => {
       client.queryLog.some(
         (query) =>
           query.includes('fixerrors:snapshot-count') &&
-          query.includes("error_logs.status = 'active'")
+          query.includes("error_logs.status = 'active'") &&
+          query.includes('error_logs.triage_state IS NULL')
       )
     ).toBe(true);
   });
@@ -973,6 +1014,61 @@ describe('fixerrors artifact and confirmation gate', () => {
     expect(corruptedClient.queryLog).toHaveLength(0);
   });
 
+  it('FXERR-V5-DISPOSITION-003 finalizes the immutable snapshot and the latest alias together', async () => {
+    const rows = [makeError(1)];
+    const prepared = await analyzedSnapshot(rows);
+    const immutablePath = getErrorSnapshotArtifactPath(prepared.snapshot.snapshotId);
+    writeAndVerifyErrorSnapshot(prepared.snapshot, immutablePath, prepared.io);
+    writeAndVerifyErrorSnapshot(prepared.snapshot, ERROR_SNAPSHOT_PATH, prepared.io);
+    const bound = bindErrorSnapshotDispositionArtifacts({
+      snapshot: bindNoFixDisposition(prepared.snapshot),
+      io: prepared.io,
+    });
+    expect(readAndVerifyErrorSnapshot(immutablePath, prepared.io).disposition?.rows).toHaveLength(1);
+    expect(readAndVerifyErrorSnapshot(ERROR_SNAPSHOT_PATH, prepared.io).disposition?.rows).toHaveLength(1);
+
+    const client = new CleanupClient({ rows });
+    const result = await executeVerifiedSnapshotCleanupRaw({
+      client,
+      confirmation: confirmation(bound),
+      databaseTargetFingerprint: TARGET_FINGERPRINT,
+      analysisPath: ANALYSIS_PATH,
+      io: prepared.io,
+      lock: new MemoryLock(),
+      now: EXPORT_TIME,
+    });
+
+    expect(result.reconciliationState).toBe('archived');
+    expect(readAndVerifyErrorSnapshot(immutablePath, prepared.io).cleanup.status).toBe('completed');
+    expect(client.queryLog.some((query) => query.includes('fixerrors:archive-error-batch'))).toBe(true);
+  });
+
+  it('FXERR-V5-DISPOSITION-003 does no database work when snapshot cleanup states diverge', async () => {
+    const rows = [makeError(1)];
+    const prepared = await analyzedSnapshot(rows);
+    const immutablePath = getErrorSnapshotArtifactPath(prepared.snapshot.snapshotId);
+    const bound = bindNoFixDisposition(prepared.snapshot);
+    const inProgress = verifyErrorSnapshot({
+      ...bound,
+      cleanup: {
+        ...bound.cleanup,
+        status: 'in_progress',
+        attemptedAt: '2026-08-11T06:00:00.000Z',
+        reconciliationState: 'not_started',
+      },
+    });
+    writeAndVerifyErrorSnapshot(inProgress, immutablePath, prepared.io);
+    writeAndVerifyErrorSnapshot(bound, ERROR_SNAPSHOT_PATH, prepared.io);
+    const client = new CleanupClient({ rows });
+
+    expect(() => bindErrorSnapshotDispositionArtifacts({
+      snapshot: bound,
+      io: prepared.io,
+    })).toThrow(/diverged before disposition binding/u);
+    expect(readAndVerifyErrorSnapshot(immutablePath, prepared.io).cleanup.status).toBe('in_progress');
+    expect(client.queryLog).toHaveLength(0);
+  });
+
   it('FE-SAFE-001 rejects a stale v2 delete artifact before any database work', async () => {
     const io = new MemoryIo();
     const client = new CleanupClient({ rows: [makeError(1)] });
@@ -1461,7 +1557,18 @@ class RetentionClient implements PgClientLike {
   readonly usageReferences: Set<string>;
   foreignKeys = [...EXPECTED_FOREIGN_KEYS];
   triggerRows: Array<{ trigger_name: string }> = [];
-  schemaColumns = ['archived_at', 'status'];
+  schemaColumns = [
+    'archived_at',
+    'status',
+    'triage_incident_id',
+    'triage_live_evidence',
+    'triage_live_verified_at',
+    'triage_local_commit',
+    'triage_next_step',
+    'triage_state',
+    'triage_summary',
+    'triaged_at',
+  ];
   cutoff = '2025-08-20T12:00:00.000000Z';
   failDelete = false;
   deleteFewerThanRequested = false;

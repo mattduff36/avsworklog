@@ -69,3 +69,7 @@ Open (not invented here): visual world, palette, typography, and exact FFTS boar
 3. Plant truth stays reconcilable with a single actual job per asset/day.
 4. Permissions follow current effective module access, not JWT user metadata.
 5. Adapt proven schedule-board interactions without importing another product's data model.
+
+## Error log triage
+
+Application error logs on `/debug` stay visible until their outcome is closed. Untriaged active rows are red. Diagnosed rows that are not yet deployed and verified live stay active and are orange, with one next step. Only no-fix-required rows and deployed live-verified fixes are archived. A local commit is not a live fix. Bulk archive is not a product action.

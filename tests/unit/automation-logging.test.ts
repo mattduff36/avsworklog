@@ -4,6 +4,7 @@ import path from 'path';
 import { Readable, Writable } from 'stream';
 import { describe, expect, it } from 'vitest';
 import { renderAutomationAdvisorReview } from '@/scripts/automation/advisor-review';
+import { loadKnowledgeStore, summarizeKnowledgeOutcomes } from '@/scripts/fixerrors-knowledge';
 import { redactSensitiveText } from '@/scripts/automation/logger';
 import { runMonthlyAutomationFollowUp, writeMonthlyAutomationPendingFollowUp } from '@/scripts/automation/monthly-follow-up';
 import { updateAutomationMemory } from '@/scripts/automation/memory';
@@ -450,7 +451,9 @@ describe('automation logging helpers', () => {
     });
 
     expect(review).toContain('Total fetched: 200');
-    expect(review).toContain('Verified local fixes: 0');
+    expect(review).toContain(
+      `Verified local fixes: ${summarizeKnowledgeOutcomes(loadKnowledgeStore()).verifiedOutcomeCount}`
+    );
     expect(review).not.toContain('200-log fetch limit');
     expect(review).toContain('filtered more than 75%');
     expect(review).toContain('untriaged');

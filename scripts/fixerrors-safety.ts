@@ -92,6 +92,8 @@ export type ErrorSnapshotExport = {
     clusterCount: number;
     clusterLanes: Record<string, number>;
   };
+  coverage?: ErrorSnapshotCoverage | null;
+  disposition?: ErrorSnapshotDisposition | null;
   cleanup: ErrorSnapshotCleanup;
 };
 
@@ -112,6 +114,37 @@ export type CleanupConfirmation = {
   expiresAt: string;
   safetyContract: string;
   manifestChecksum: string;
+};
+
+export type ErrorLogLiveEvidence = {
+  deployedCommit: string;
+  deploymentId: string;
+  check: string;
+  result: 'passed';
+  verifiedAt: string;
+};
+
+export type ErrorLogDispositionAction = 'outstanding' | 'no_fix_required' | 'fixed_live';
+
+export type ErrorLogDispositionRow = {
+  id: string;
+  clusterId: string;
+  action: ErrorLogDispositionAction;
+  incidentId: string;
+  summary: string;
+  nextStep: string | null;
+  localCommit: string | null;
+  liveEvidence: ErrorLogLiveEvidence | null;
+};
+
+export type ErrorSnapshotDisposition = {
+  decisionChecksum: string;
+  rows: ErrorLogDispositionRow[];
+};
+
+export type ErrorSnapshotCoverage = {
+  clusters: Array<{ id: string; errorLogIds: string[] }>;
+  suppressedIds: string[];
 };
 
 export type ErrorLogClearResult = {
@@ -394,7 +427,19 @@ function emptyCleanup(): ErrorSnapshotCleanup {
   };
 }
 
-const ACTIVE_ERROR_LOG_PREDICATE = `error_logs.status = 'active'`;
+const ACTIVE_ERROR_LOG_PREDICATE = `error_logs.status = 'active' AND error_logs.triage_state IS NULL`;
+const REQUIRED_ERROR_LOG_COLUMNS = [
+  'archived_at',
+  'status',
+  'triage_incident_id',
+  'triage_live_evidence',
+  'triage_live_verified_at',
+  'triage_local_commit',
+  'triage_next_step',
+  'triage_state',
+  'triage_summary',
+  'triaged_at',
+] as const;
 
 export function createDatabaseTargetFingerprint(connectionString: string): string {
   const url = new URL(connectionString);
@@ -570,6 +615,8 @@ export async function fetchProductionErrorSnapshot(
         clusterCount: 0,
         clusterLanes: {},
       },
+      coverage: null,
+      disposition: null,
       cleanup: emptyCleanup(),
     };
     return {
@@ -677,8 +724,10 @@ export function verifyErrorSnapshot(
         (cleanup.remainingActiveCount ?? -1) >= 0 &&
         cleanup.attemptedErrorLogIds.length === ids.length &&
         cleanup.attemptedErrorLogIds.every((id, index) => id === ids[index]) &&
-        cleanup.archivedErrorLogIds.length === ids.length &&
-        cleanup.archivedErrorLogIds.every((id, index) => id === ids[index])) ||
+        cleanup.archivedErrorLogIds.length === expectedArchivedIds(verified as ErrorSnapshotExport).length &&
+        cleanup.archivedErrorLogIds.every(
+          (id, index) => id === expectedArchivedIds(verified as ErrorSnapshotExport)[index]
+        )) ||
       ((cleanup.status === 'failed' || cleanup.status === 'indeterminate') &&
         isValidIsoTimestamp(cleanup.attemptedAt) &&
         cleanup.completedAt === null &&
@@ -719,6 +768,9 @@ export function verifyErrorSnapshot(
 
   if (!structurallyValid) {
     throw new Error('Production error snapshot verification failed; cleanup blocked');
+  }
+  if (verified.disposition != null) {
+    assertDisposition({ ...(verified as ErrorSnapshotExport), errors: normalizedErrors });
   }
   const result = {
     ...verified,
@@ -904,13 +956,186 @@ async function assertArchiveSchemaContract(client: PgClientLike): Promise<void> 
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'error_logs'
-      AND column_name IN ('status', 'archived_at')
+      AND column_name = ANY($1::text[])
     ORDER BY column_name
-  `);
+  `, [[...REQUIRED_ERROR_LOG_COLUMNS]]);
   const names = columns.rows.map((row) => String(row.column_name)).sort();
-  if (names.length !== 2 || names[0] !== 'archived_at' || names[1] !== 'status') {
+  if (
+    names.length !== REQUIRED_ERROR_LOG_COLUMNS.length ||
+    REQUIRED_ERROR_LOG_COLUMNS.some((column, index) => names[index] !== column)
+  ) {
     throw new Error('error_logs archive schema contract changed; cleanup blocked');
   }
+}
+
+function expectedArchivedIds(snapshot: {
+  exactIds: string[];
+  disposition?: ErrorSnapshotDisposition | null;
+}): string[] {
+  if (!snapshot.disposition) return [...snapshot.exactIds];
+  const archived = new Set(
+    snapshot.disposition.rows
+      .filter((row) => row.action !== 'outstanding')
+      .map((row) => row.id)
+  );
+  return snapshot.exactIds.filter((id) => archived.has(id));
+}
+
+function assertDisposition(snapshot: ErrorSnapshotExport): ErrorSnapshotDisposition {
+  const disposition = snapshot.disposition;
+  if (!disposition || !Array.isArray(disposition.rows)) {
+    throw new Error('Snapshot disposition is required before finalization; cleanup blocked');
+  }
+  if (!/^[a-f0-9]{64}$/u.test(disposition.decisionChecksum)) {
+    throw new Error('Snapshot disposition checksum is invalid; cleanup blocked');
+  }
+  const seen = new Set<string>();
+  for (const row of disposition.rows) {
+    if (!isUuid(row.id) || seen.has(row.id)) {
+      throw new Error('Snapshot disposition row identity is invalid; cleanup blocked');
+    }
+    seen.add(row.id);
+    if (!row.clusterId || !row.incidentId.trim() || !row.summary.trim()) {
+      throw new Error('Snapshot disposition row is incomplete; cleanup blocked');
+    }
+    if (row.action === 'outstanding') {
+      if (!row.nextStep?.trim() || row.liveEvidence) {
+        throw new Error('Outstanding disposition requires a next step and no live evidence');
+      }
+    } else if (row.action === 'no_fix_required') {
+      if (row.nextStep || row.localCommit || row.liveEvidence) {
+        throw new Error('No-fix disposition cannot carry a next step or live evidence');
+      }
+    } else if (row.action === 'fixed_live') {
+      const evidence = row.liveEvidence;
+      if (
+        row.nextStep ||
+        !evidence ||
+        evidence.result !== 'passed' ||
+        !evidence.deployedCommit.trim() ||
+        !evidence.deploymentId.trim() ||
+        !evidence.check.trim() ||
+        !isValidIsoTimestamp(evidence.verifiedAt)
+      ) {
+        throw new Error('Fixed-live disposition requires structured deployment evidence');
+      }
+    } else {
+      throw new Error('Snapshot disposition action is invalid; cleanup blocked');
+    }
+  }
+  if (
+    seen.size !== snapshot.exactIds.length ||
+    snapshot.exactIds.some((id) => !seen.has(id))
+  ) {
+    throw new Error('Snapshot disposition does not partition the exact snapshot IDs; cleanup blocked');
+  }
+  return disposition;
+}
+
+export function bindSnapshotDisposition(
+  snapshot: ErrorSnapshotExport,
+  disposition: ErrorSnapshotDisposition
+): ErrorSnapshotExport {
+  return verifyErrorSnapshot({ ...snapshot, disposition });
+}
+
+export async function fetchOutstandingErrorLogSummaries(
+  client: PgClientLike
+): Promise<Array<{ id: string; summary: string; nextStep: string }>> {
+  const result = await client.query<{
+    id: unknown;
+    triage_summary: unknown;
+    triage_next_step: unknown;
+  }>(`
+    /* fixerrors:outstanding-summary */
+    SELECT id::text AS id, triage_summary, triage_next_step
+    FROM public.error_logs
+    WHERE status = 'active'
+      AND triage_state = 'outstanding'
+    ORDER BY triaged_at ASC, id ASC
+  `);
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    summary: String(row.triage_summary ?? 'Triaged error'),
+    nextStep: String(row.triage_next_step ?? 'Review the triaged error'),
+  }));
+}
+
+function sameDisposition(
+  left: ErrorSnapshotDisposition | null | undefined,
+  right: ErrorSnapshotDisposition
+): boolean {
+  return JSON.stringify(left ?? null) === JSON.stringify(right);
+}
+
+export function bindErrorSnapshotDispositionArtifacts(options: {
+  snapshot: ErrorSnapshotExport;
+  io?: SnapshotIo;
+}): ErrorSnapshotExport {
+  const io = options.io ?? DEFAULT_SNAPSHOT_IO;
+  const bound = verifyErrorSnapshot(options.snapshot);
+  if (!bound.disposition) {
+    throw new Error('Snapshot disposition is required before finalization; cleanup blocked');
+  }
+  const immutablePath = getErrorSnapshotArtifactPath(bound.snapshotId);
+  const immutable = readAndVerifyErrorSnapshot(immutablePath, io);
+  const latest = readAndVerifyErrorSnapshot(ERROR_SNAPSHOT_PATH, io);
+  for (const current of [immutable, latest]) {
+    if (
+      current.snapshotId !== bound.snapshotId ||
+      current.checksum !== bound.checksum ||
+      current.manifestChecksum !== bound.manifestChecksum ||
+      current.rowCount !== bound.rowCount ||
+      current.safetyContract !== bound.safetyContract
+    ) {
+      throw new Error('Snapshot artifacts diverged before disposition binding; finalization blocked');
+    }
+    if (current.disposition && !sameDisposition(current.disposition, bound.disposition)) {
+      throw new Error('Snapshot disposition does not match the sealed artifact; finalization blocked');
+    }
+  }
+  if (immutable.cleanup.status !== latest.cleanup.status) {
+    throw new Error('Snapshot artifacts diverged before disposition binding; finalization blocked');
+  }
+  if (immutable.cleanup.status !== 'not_started') {
+    if (!immutable.disposition || !latest.disposition) {
+      throw new Error('Snapshot disposition artifacts diverged; finalization blocked');
+    }
+  } else {
+    if (!immutable.disposition) {
+      writeAndVerifyErrorSnapshot(bound, immutablePath, io);
+    }
+    if (!latest.disposition) {
+      writeAndVerifyErrorSnapshot(bound, ERROR_SNAPSHOT_PATH, io);
+    }
+  }
+  const sealedImmutable = readAndVerifyErrorSnapshot(immutablePath, io);
+  const sealedLatest = readAndVerifyErrorSnapshot(ERROR_SNAPSHOT_PATH, io);
+  if (
+    !sealedImmutable.disposition ||
+    !sealedLatest.disposition ||
+    !sameDisposition(sealedImmutable.disposition, bound.disposition) ||
+    !sameDisposition(sealedLatest.disposition, bound.disposition)
+  ) {
+    throw new Error('Snapshot disposition was not sealed on both artifacts; finalization blocked');
+  }
+  return sealedImmutable;
+}
+
+export function bindNoFixDisposition(snapshot: ErrorSnapshotExport): ErrorSnapshotExport {
+  return bindSnapshotDisposition(snapshot, {
+    decisionChecksum: 'e'.repeat(64),
+    rows: snapshot.exactIds.map((id) => ({
+      id,
+      clusterId: 'cluster-suppressed',
+      action: 'no_fix_required' as const,
+      incidentId: 'suppressed-telemetry',
+      summary: 'No code fix required',
+      nextStep: null,
+      localCommit: null,
+      liveEvidence: null,
+    })),
+  });
 }
 
 async function clearProductionErrorLogs(
@@ -1030,6 +1255,9 @@ async function clearProductionErrorLogs(
     }
     const currentRows = currentRowsResult.rows.map(normalizeErrorRow);
     const statuses = currentRowsResult.rows.map((row) => String(row.status ?? ''));
+    const triageStates = currentRowsResult.rows.map((row) =>
+      row.triage_state == null || row.triage_state === '' ? null : String(row.triage_state)
+    );
     const allActive = statuses.every((status) => status === 'active');
     const allArchived = statuses.every((status) => status === 'archived');
     if (!allActive && !allArchived) {
@@ -1038,40 +1266,117 @@ async function clearProductionErrorLogs(
     if (snapshotChecksum(currentRows) !== verified.checksum) {
       throw new Error('Verified snapshot rows changed or are missing; cleanup blocked');
     }
+    const disposition = assertDisposition(verified);
+    const outstandingRows = disposition.rows.filter((row) => row.action === 'outstanding');
+    const archiveRows = disposition.rows.filter((row) => row.action !== 'outstanding');
+    if (allActive && triageStates.some((state) => state !== null)) {
+      throw new Error('Verified snapshot rows are already triaged; cleanup blocked');
+    }
 
     if (allArchived) {
+      if (outstandingRows.length > 0) {
+        throw new Error('Archived snapshot rows do not match an outstanding disposition; cleanup blocked');
+      }
       const remainingCount = await countRemainingActiveRows(client);
       commitAttempted = true;
       await client.query('/* fixerrors:cleanup-commit */ COMMIT');
       return {
         clearedCount: targetIds.length,
         remainingCount,
-        archivedErrorLogIds: [...targetIds],
+        archivedErrorLogIds: expectedArchivedIds(verified),
         reconciliationState: 'already_archived',
       };
     }
 
     const archivedErrorLogIds: string[] = [];
+    for (const row of outstandingRows) {
+      attemptedErrorLogIds.push(row.id);
+      const triaged = await client.query<{ id: unknown }>(
+        `
+          /* fixerrors:triage-outstanding-batch */
+          UPDATE public.error_logs
+          SET triage_state = 'outstanding',
+              triaged_at = NOW(),
+              triage_incident_id = $2,
+              triage_summary = $3,
+              triage_next_step = $4,
+              triage_local_commit = $5
+          WHERE id = ANY($1::uuid[])
+            AND status = 'active'
+            AND triage_state IS NULL
+            AND archived_at IS NULL
+          RETURNING id
+        `,
+        [[row.id], row.incidentId, row.summary, row.nextStep, row.localCommit]
+      );
+      if (triaged.rows.length !== 1 || String(triaged.rows[0]?.id) !== row.id) {
+        throw new Error('Outstanding triage did not update the exact row; cleanup rolled back');
+      }
+    }
     for (
       let index = 0;
-      index < targetIds.length;
+      index < archiveRows.length;
       index += ERROR_ARCHIVE_BATCH_SIZE
     ) {
-      const batchIds = targetIds.slice(index, index + ERROR_ARCHIVE_BATCH_SIZE);
+      const batch = archiveRows.slice(index, index + ERROR_ARCHIVE_BATCH_SIZE);
+      const batchIds = batch.map((row) => row.id);
       attemptedErrorLogIds.push(...batchIds);
       const archived = await client.query<{ id: unknown }>(
         `
           /* fixerrors:archive-error-batch */
-          UPDATE public.error_logs
+          UPDATE public.error_logs AS error_log
           SET status = 'archived',
-              archived_at = NOW()
-          WHERE id = ANY($1::uuid[])
-            AND status = 'active'
-          RETURNING id
+              archived_at = NOW(),
+              triage_state = disposition_row.action,
+              triaged_at = NOW(),
+              triage_incident_id = disposition_row.incident_id,
+              triage_summary = disposition_row.summary,
+              triage_next_step = NULL,
+              triage_local_commit = disposition_row.local_commit,
+              triage_live_verified_at = disposition_row.verified_at,
+              triage_live_evidence = CASE
+                WHEN evidence.item = 'null'::jsonb THEN NULL
+                ELSE evidence.item
+              END
+          FROM (
+            SELECT *
+            FROM unnest(
+              $1::uuid[],
+              $2::text[],
+              $3::text[],
+              $4::text[],
+              $5::text[],
+              $6::timestamptz[]
+            ) WITH ORDINALITY AS disposition_row(
+              id,
+              action,
+              incident_id,
+              summary,
+              local_commit,
+              verified_at,
+              ordinality
+            )
+          ) AS disposition_row
+          CROSS JOIN LATERAL (
+            SELECT ($7::jsonb)->(disposition_row.ordinality::int - 1) AS item
+          ) AS evidence
+          WHERE error_log.id = disposition_row.id
+            AND error_log.id = ANY($1::uuid[])
+            AND error_log.status = 'active'
+            AND error_log.triage_state IS NULL
+          RETURNING error_log.id
         `,
-        [batchIds]
+        [
+          batchIds,
+          batch.map((row) => row.action),
+          batch.map((row) => row.incidentId),
+          batch.map((row) => row.summary),
+          batch.map((row) => row.localCommit),
+          batch.map((row) => row.liveEvidence?.verifiedAt ?? null),
+          JSON.stringify(batch.map((row) => row.liveEvidence)),
+        ]
       );
-      const archivedIds = archived.rows.map((row) => String(row.id));
+      const archivedIds = archived.rows.map((entry) => String(entry.id));
       const archivedIdSet = new Set(archivedIds);
       if (
         archivedIds.length !== batchIds.length ||
@@ -1086,13 +1391,16 @@ async function clearProductionErrorLogs(
     }
 
     const remainingCount = await countRemainingActiveRows(client);
+    const orderedArchivedIds = verified.exactIds.filter((id) =>
+      new Set(archivedErrorLogIds).has(id)
+    );
 
     commitAttempted = true;
     await client.query('/* fixerrors:cleanup-commit */ COMMIT');
     return {
-      clearedCount: archivedErrorLogIds.length,
+      clearedCount: orderedArchivedIds.length,
       remainingCount,
-      archivedErrorLogIds,
+      archivedErrorLogIds: orderedArchivedIds,
       reconciliationState: 'archived',
     };
   } catch (error) {
@@ -1235,7 +1543,7 @@ async function executeVerifiedSnapshotCleanupCore(
         attemptedAt,
         completedAt: new Date().toISOString(),
         archivedErrorLogIds: result.archivedErrorLogIds,
-        attemptedErrorLogIds: result.archivedErrorLogIds,
+        attemptedErrorLogIds: inProgress.exactIds,
         reconciliationState: result.reconciliationState,
         remainingActiveCount: result.remainingCount,
         error: null,

@@ -8,8 +8,8 @@
  * 4. Groups errors into patterns (by type + normalized message + component)
  * 5. Writes a structured markdown report to docs_private/error-analysis.md
  * 6. Updates the JSON tracking data in docs_private/error-fix-log.md
- * 7. Archives the exact exported active error_logs rows after successful analysis
- * 8. Prints a concise terminal summary
+ * 7. Leaves captured rows unchanged until a validated disposition is finalized
+ * 8. Prints the found / fixed-live / outstanding summary
  *
  * Usage: npm run fixerrors
  */
@@ -22,6 +22,7 @@ import pg from 'pg';
 import { AutomationRun } from './automation/logger';
 import { TRUSTED_OPERATIONAL_ACTIONS } from './automation/trusted-operational-actions';
 import { captureCandidateFingerprint } from './fixerrors-decision';
+import { renderFixerrorsRunSummary } from './fixerrors-summary';
 import {
   loadKnowledgeStore,
   rejectSensitiveDocument,
@@ -37,6 +38,7 @@ import {
   acquireErrorSnapshotArtifactLock,
   createDatabaseTargetFingerprint,
   executeVerifiedSnapshotCleanup,
+  fetchOutstandingErrorLogSummaries,
   fetchProductionErrorSnapshot,
   getErrorSnapshotArtifactPath,
   markSnapshotAnalysisCompleted,
@@ -1144,7 +1146,7 @@ function parseCleanupConfirmation(args: string[]): CleanupConfirmation | null {
   };
 }
 
-const ARCHIVE_MUTATION = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.find(
+const DISPOSITION_MUTATIONS = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.filter(
   (mutation) => mutation.operation === 'update'
 );
 const RETENTION_MUTATION = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.find(
@@ -1218,7 +1220,7 @@ async function main() {
               TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract,
             operationalExecutionCandidate: true,
             confirmationBoundToSnapshot: true,
-            requestedMutations: ARCHIVE_MUTATION ? [ARCHIVE_MUTATION] : [],
+            requestedMutations: DISPOSITION_MUTATIONS,
           }
         );
         run.recordStep({
@@ -1448,6 +1450,23 @@ async function main() {
       console.log('  Updated: docs_private/error-fix-log.md');
     }
 
+    const coveredIds = new Set<string>();
+    const coverageClusters = clusters.map((cluster) => {
+      const errorLogIds = cluster.patterns.flatMap((pattern) =>
+        pattern.occurrences.map((occurrence) => occurrence.id)
+      );
+      for (const id of errorLogIds) coveredIds.add(id);
+      return { id: cluster.id, errorLogIds };
+    });
+    snapshot = {
+      ...snapshot,
+      coverage: {
+        clusters: coverageClusters,
+        suppressedIds: rawErrors
+          .map((error) => error.id)
+          .filter((id) => !coveredIds.has(id)),
+      },
+    };
     snapshot = markSnapshotAnalysisCompleted(
       snapshot,
       report,
@@ -1475,41 +1494,36 @@ async function main() {
       }
     );
 
-    let archiveResult: {
-      clearedCount: number;
-      remainingCount: number;
-      reconciliationState: string;
-    } | null = null;
-    if (snapshot.rowCount > 0) {
-      archiveResult = await run.step(
-        'Archive verified snapshot rows',
-        () =>
-          executeVerifiedSnapshotCleanup({
-            client: databaseClient,
-            confirmation: {
-              snapshotId: snapshot.snapshotId,
-              checksum: snapshot.checksum,
-              rowCount: snapshot.rowCount,
-              databaseTargetFingerprint: snapshot.databaseTargetFingerprint,
-              expiresAt: snapshot.expiresAt,
-              safetyContract: snapshot.safetyContract,
-              manifestChecksum: snapshot.manifestChecksum,
-            },
-            databaseTargetFingerprint,
-            lockAlreadyHeld: true,
-          }),
-        {
-          operationalCommand: TRUSTED_OPERATIONAL_ACTIONS.fixerrors.commandId,
-          operationalSafetyContract:
-            TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract,
-          operationalExecutionCandidate: true,
-          confirmationBoundToSnapshot: true,
-          requestedMutations: ARCHIVE_MUTATION ? [ARCHIVE_MUTATION] : [],
-          snapshotId: snapshot.snapshotId,
-          rowCount: snapshot.rowCount,
-        }
-      );
-    }
+    const existingOutstanding = await fetchOutstandingErrorLogSummaries(databaseClient);
+    const pendingFound = clusters.map((cluster) => ({
+      id: cluster.id,
+      title: cluster.rootCauseFamily,
+      count: cluster.patterns.reduce((total, pattern) => total + pattern.occurrences.length, 0),
+      nextStep: null,
+    }));
+    const pendingOutstanding = [
+      ...clusters.map((cluster) => ({
+        id: cluster.id,
+        title: cluster.rootCauseFamily,
+        count: cluster.patterns.reduce((total, pattern) => total + pattern.occurrences.length, 0),
+        nextStep: 'Record a validated disposition, then run npm run fixerrors:finalize.',
+      })),
+      ...existingOutstanding.map((row) => ({
+        id: row.id,
+        title: row.summary,
+        count: 1,
+        nextStep: row.nextStep,
+      })),
+    ];
+    const runSummary = renderFixerrorsRunSummary({
+      found: pendingFound,
+      fixedLive: [],
+      outstanding: pendingOutstanding,
+    });
+    writeAndVerifyTextArtifactAtomic(
+      resolve(process.cwd(), 'docs_private', 'error-run-summary.txt'),
+      runSummary
+    );
 
     console.log('\n=============================================');
     console.log('EXPORT SUMMARY');
@@ -1518,14 +1532,8 @@ async function main() {
     console.log(`  After filtering:     ${errors.length}`);
     console.log(`  Patterns found:      ${patterns.length}`);
     console.log(`  Root-cause clusters: ${clusters.length}`);
-    if (archiveResult) {
-      console.log(
-        `  Production rows archived: ${archiveResult.clearedCount} (${archiveResult.reconciliationState})`
-      );
-      console.log(`  Remaining active:    ${archiveResult.remainingCount}`);
-    } else {
-      console.log('  Production rows archived: 0 (no active rows)');
-    }
+    console.log('  Captured rows were not mutated. Finalization is a separate exact-ID step.');
+    console.log(runSummary.trimEnd());
 
     try {
       const retention = await run.step(
