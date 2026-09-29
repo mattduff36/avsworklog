@@ -164,8 +164,7 @@ export default function TimesheetsPage() {
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         const normalizedMessage = message.toLowerCase();
-        const isNetworkFailure =
-          message.includes('Failed to fetch') || message.includes('NetworkError') || normalizedMessage.includes('network');
+        const isNetworkFailure = isNetworkFetchError(err);
         const isUnauthorized =
           normalizedMessage.includes('unauthorized') ||
           (normalizedMessage.includes('jwt') && normalizedMessage.includes('expired'));
