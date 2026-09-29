@@ -2,6 +2,35 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.13.0
+
+**GIT COMMIT MESSAGE**
+`feat(error-reports): update Error reporting, Debug tools, Actions, Data storage, Maintenance, and Help and FAQ`
+
+**PUSHED AT**
+2026-09-29T23:45:50.348Z
+
+**WHAT CHANGED**
+Update Error reporting, Debug tools, Actions, Data storage, Maintenance, and Help and FAQ. Classify employee directory Load failed as a non-fatal warning. Normalize kiosk challenge expiry. Log kiosk attestation root. Surface kiosk enrollment rejection. Bind yard kiosk to Android hardware.
+
+**VERSION HISTORY DETAILS**
+- Normalized kiosk challenge expiry, with changes to background routes, app screens, shared logic, automated tests, data storage, and documentation.
+- Updated sign in, with changes to background routes, shared logic, and automated tests.
+- Updated Error reporting, Debug tools, Actions, Data storage, Maintenance, and Help and FAQ, with changes to background routes, shared logic, automation scripts, automated tests, and data storage.
+- Updated data storage, with changes to shared typing, automated tests, and data storage.
+- Updated debug tools, with changes to background routes, app screens, and automated tests.
+- Updated actions, with changes to automation scripts and automated tests.
+- Updated help and FAQ, with changes to documentation.
+- Updated maintenance, with changes to automation scripts.
+
+**COMMITS IN THIS RELEASE**
+- `feat(error-reports): update Error reporting, Debug tools, Actions, Data storage, Maintenance, and Help and FAQ`
+- `fix(timesheets): classify employee directory Load failed as a non-fatal warning`
+- `fix(inventory): normalize kiosk challenge expiry`
+- `chore(inventory): log kiosk attestation root`
+- `fix(inventory): surface kiosk enrollment rejection`
+- `feat(inventory): bind yard kiosk to Android hardware`
+
 ## 0926.12.0
 
 **GIT COMMIT MESSAGE**
