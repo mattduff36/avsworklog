@@ -5,6 +5,7 @@ import {
   enrollInventoryKioskHardware,
   InventoryKioskHardwareError,
 } from '@/lib/server/inventory-kiosk-device-auth';
+import { logger } from '@/lib/utils/logger';
 
 const enrollmentSchema = z.object({
   challenge_id: z.string().uuid(),
@@ -37,6 +38,14 @@ export async function POST(request: NextRequest) {
       : error instanceof z.ZodError
         ? 400
         : 500;
+    logger.warn('Yard kiosk hardware enrollment rejected', {
+      code: error instanceof InventoryKioskHardwareError
+        ? error.code
+        : error instanceof z.ZodError
+          ? 'ANDROID_ENROLLMENT_INPUT_INVALID'
+          : 'ANDROID_ENROLLMENT_FAILED',
+      status,
+    });
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : 'Unable to enroll kiosk hardware',

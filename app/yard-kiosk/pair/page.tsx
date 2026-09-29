@@ -142,16 +142,19 @@ export default function YardKioskPairPage() {
         });
         result = await response.json() as PairingPayload;
       }
-      setPayload(result);
-
       if (result.status === 'pairing') {
         if (hasNativeKioskBridge()) {
+          // Do not start polling until hardware enrollment succeeds. Otherwise
+          // the poll can replace an enrollment error with the pairing code.
+          setPayload(null);
           await enrollNativeHardware();
         }
+        setPayload(result);
         setPhase(result.pairing?.confirmation_code ? 'code' : 'waiting');
         return;
       }
       if (result.status === 'paired') {
+        setPayload(result);
         setPhase('success');
         navigatingRef.current = true;
         await completeNativePairing(result.device_id);
@@ -160,6 +163,7 @@ export default function YardKioskPairPage() {
         );
         return;
       }
+      setPayload(result);
       showError(result);
     } catch (error) {
       showError({
@@ -175,6 +179,7 @@ export default function YardKioskPairPage() {
   const startPairing = useCallback(() => {
     if (navigatingRef.current) return;
     setPhase('loading');
+    setPayload(null);
     setUserError(null);
     diagnosticIdRef.current = createYardKioskDiagnosticId();
     void requestPairing();
