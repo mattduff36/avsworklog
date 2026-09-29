@@ -10,6 +10,7 @@ import { toBase64Url } from '@/lib/server/app-auth/jwt';
 import {
   buildInventoryKioskAuthenticationCanonical,
   buildInventoryKioskRequestCanonical,
+  inventoryKioskChallengeExpiryMatches,
   validateAndroidKeyAttestation,
   verifyInventoryKioskHardwareSignature,
 } from '@/lib/server/inventory-kiosk-device-auth';
@@ -80,6 +81,21 @@ describe('Inventory kiosk hardware signatures', () => {
       publicKeySpki,
       canonical.replace('1790619000000', '1790619000001'),
       signature,
+    )).toBe(false);
+  });
+
+  it('compares signed challenge expiry by instant across PostgreSQL timestamp formats', () => {
+    expect(inventoryKioskChallengeExpiryMatches(
+      '2026-09-29T01:20:00.000+00:00',
+      '2026-09-29T01:20:00.000Z',
+    )).toBe(true);
+    expect(inventoryKioskChallengeExpiryMatches(
+      '2026-09-29T01:20:00.001+00:00',
+      '2026-09-29T01:20:00.000Z',
+    )).toBe(false);
+    expect(inventoryKioskChallengeExpiryMatches(
+      'not-a-date',
+      '2026-09-29T01:20:00.000Z',
     )).toBe(false);
   });
 

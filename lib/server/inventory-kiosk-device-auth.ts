@@ -837,6 +837,17 @@ export function buildInventoryKioskRequestCanonical(input: {
   ].join('\n');
 }
 
+export function inventoryKioskChallengeExpiryMatches(
+  storedExpiry: string,
+  signedExpiry: string,
+): boolean {
+  const storedTime = Date.parse(storedExpiry);
+  const signedTime = Date.parse(signedExpiry);
+  return Number.isFinite(storedTime)
+    && Number.isFinite(signedTime)
+    && storedTime === signedTime;
+}
+
 export function verifyInventoryKioskHardwareSignature(
   publicKeySpki: string,
   canonical: string,
@@ -889,7 +900,10 @@ export async function authenticateInventoryKioskHardware(input: {
     purpose: 'android_authentication',
     deviceId: device.id,
   });
-  if (challenge.expires_at !== input.expiresAt) {
+  if (!inventoryKioskChallengeExpiryMatches(
+    challenge.expires_at,
+    input.expiresAt,
+  )) {
     throw new InventoryKioskHardwareError(
       'The signed kiosk challenge expiry does not match',
       401,
