@@ -394,12 +394,13 @@ describeDb('inventory_record_check database integrity', () => {
           $1::uuid, '2026-06-01'::date, $2::uuid, NULL, NULL, NULL, NULL, FALSE, $3::uuid
         )
       `, [itemId, actorId, randomUUID()]);
+      const checkRejected = expect(checkPromise).rejects.toThrow(/Retired inventory items cannot be checked/);
 
       await new Promise((resolve) => setTimeout(resolve, 150));
       await locker.query(`UPDATE public.inventory_items SET status = 'retired' WHERE id = $1`, [itemId]);
       await locker.query('COMMIT');
 
-      await expect(checkPromise).rejects.toThrow(/Retired inventory items cannot be checked/);
+      await checkRejected;
     } finally {
       await locker.query('ROLLBACK').catch(() => undefined);
       await locker.end();

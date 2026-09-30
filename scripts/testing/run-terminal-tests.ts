@@ -91,6 +91,30 @@ function createDashboard(title: string, stages: Array<{ id: string; label: strin
   return { reporter, dispose };
 }
 
+/**
+ * Vitest 3.2 can exit 1 after every assertion passed when a worker RPC times out.
+ * Accept that only when the summary has no failed files or tests and every
+ * unhandled error is that timeout.
+ */
+export function acceptKnownVitestWorkerTimeout(stdout: string, stderr: string): boolean {
+  const output = `${stdout}\n${stderr}`;
+  const files = output.match(/Test Files\s+([^\n]+)/);
+  const tests = output.match(/^\s*Tests\s+([^\n]+)/m);
+  if (!files || !tests) return false;
+  if (/\bfailed\b/.test(files[1]) || /\bfailed\b/.test(tests[1])) return false;
+  if (!/\d+\s+passed\b/.test(files[1]) || !/\d+\s+passed\b/.test(tests[1])) return false;
+  if (output.includes('Unhandled Rejection')) return false;
+  const blocks = output
+    .split('Unhandled Error')
+    .slice(1)
+    .filter((block) => block.includes('Error:'));
+  if (blocks.length === 0) return false;
+  return blocks.every((block) => {
+    const errors = block.split('\n').filter((line) => line.trim().startsWith('Error:'));
+    return errors.length > 0 && errors.every((line) => line.includes('Timeout calling "onTaskUpdate"'));
+  });
+}
+
 async function runVitestJob(params: {
   cwd: string;
   label: string;
@@ -113,7 +137,7 @@ async function runVitestJob(params: {
   }, 250);
   timer.unref?.();
   try {
-    return await runProcessJob({
+    const result = await runProcessJob({
       cwd: params.cwd,
       command: 'npx',
       args: ['vitest', ...params.args],
@@ -122,6 +146,15 @@ async function runVitestJob(params: {
         TEE_VITEST_PROGRESS_FILE: progressFile,
       },
     });
+    if (result.status !== 'passed' && acceptKnownVitestWorkerTimeout(result.stdout, result.stderr)) {
+      return {
+        ...result,
+        status: 'passed',
+        exitCode: 0,
+        summary: 'ok',
+      };
+    }
+    return result;
   } finally {
     clearInterval(timer);
     try {

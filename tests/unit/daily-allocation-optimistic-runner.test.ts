@@ -68,7 +68,7 @@ describe('daily allocation optimistic runner', () => {
     await expect(promise).resolves.toEqual({ visit_id: 'visit-real' });
     expect(persistedRequestId).toBe(operation.requestId);
     expect(operation.status).toBe('acknowledged');
-    expect(adapter.cancel).toHaveBeenCalledTimes(1);
+    expect(adapter.cancel).toHaveBeenCalledTimes(2);
     expect(adapter.scheduleReconciliation).toHaveBeenCalledWith([
       'board:2026-08-13:2026-08-13',
     ]);

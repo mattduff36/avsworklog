@@ -258,7 +258,7 @@ function createConversionSource(): DailyAllocationConversionSource {
   return {
     work_date: WORK_DATE,
     team_id: TEAM_ID,
-    source_fingerprint: 'acceptance-source-fingerprint',
+    source_fingerprint: 'a'.repeat(64),
     labour_drafts: [{
       id: 'legacy-labour-1',
       row_version: 7,
@@ -650,7 +650,7 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     await page.getByRole('button', { name: 'Assign resources to JOB-200' }).click();
     const bobDialog = page.getByRole('dialog', { name: 'Assign resources' });
     await bobDialog.getByLabel('Employee').selectOption('employee-bob');
-    await bobDialog.getByRole('button', { name: 'Save employee instructions' }).click();
+    await bobDialog.getByRole('button', { name: 'Assign employee' }).click();
     await expect.poll(() => evidence.labourRequests.length).toBe(1);
     expect(evidence.labourRequests[0]).toMatchObject({
       visit_id: 'visit-2',
@@ -711,7 +711,7 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
 
     await expect.poll(() => evidence.conversionRequests.length).toBe(1);
     const request = evidence.conversionRequests[0];
-    expect(request.expected_source_fingerprint).toBe('acceptance-source-fingerprint');
+    expect(request.expected_source_fingerprint).toBe('a'.repeat(64));
     expect(request.request_id).toBeTruthy();
     expect(request.visits).toHaveLength(1);
     expect(request.visits[0]).toMatchObject({
@@ -751,7 +751,7 @@ test.describe('DAFP-UI-001 touch tablet', () => {
     await page.getByRole('button', { name: 'Assign resources to JOB-200' }).tap();
     const dialog = page.getByRole('dialog', { name: 'Assign resources' });
     await dialog.getByLabel('Employee').selectOption('employee-bob');
-    const assign = dialog.getByRole('button', { name: 'Save employee instructions' });
+    const assign = dialog.getByRole('button', { name: 'Assign employee' });
     await expect(assign).toBeVisible();
     await expect(assign).toBeEnabled();
     await assign.tap();
