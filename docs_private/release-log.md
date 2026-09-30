@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.14.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update daily allocation`
+
+**PUSHED AT**
+2026-09-30T04:07:30.457Z
+
+**WHAT CHANGED**
+Update daily allocation. Add quote groups, session planning, and plant usage.
+
+**VERSION HISTORY DETAILS**
+- Updated daily allocation, with changes to background routes, interface components, shared logic, shared typing, automated tests, and data storage.
+- Updated quotes, with changes to app screens, shared logic, and automated tests.
+- Updated data storage, with changes to automated tests and data storage.
+- Updated reports, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated navigation, with changes to interface components.
+- Updated absence and leave, with changes to app screens.
+- Updated sign in, with changes to shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update daily allocation`
+- `feat(allocation): add quote groups, session planning, and plant usage`
+
 ## 0926.13.0
 
 **GIT COMMIT MESSAGE**

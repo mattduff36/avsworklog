@@ -1,5 +1,30 @@
 [
   {
+    "version": "0926.14.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated daily allocation. Add quote groups, session planning, and plant usage.",
+    "summary": "Updated daily allocation. Add quote groups, session planning, and plant usage.",
+    "details": [
+      "Updated daily allocation, with changes to background routes, interface components, shared logic, shared typing, automated tests, and data storage.",
+      "Updated quotes, with changes to app screens, shared logic, and automated tests.",
+      "Updated data storage, with changes to automated tests and data storage.",
+      "Updated reports, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated navigation, with changes to interface components.",
+      "Updated absence and leave, with changes to app screens.",
+      "Updated sign in, with changes to shared logic."
+    ],
+    "areas": [
+      "Daily allocation. Add quote groups",
+      "Session planning",
+      "Plant usage"
+    ],
+    "areaKeys": [
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-09-30T04:07:30.457Z"
+  },
+  {
     "version": "0926.13.0",
     "updateKind": "major",
     "title": "Error reporting update",
