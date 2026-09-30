@@ -45,6 +45,7 @@ export interface VisitCardProps {
   onDelete: () => void;
   onAssign: () => void;
   onSetSession?: (session: DailyAllocationSession) => void;
+  sourceProfileId?: string | null;
   persistenceLabel?: string | null;
   onResizePointerDown?: (edge: 'start' | 'end', event: ReactPointerEvent<HTMLButtonElement>) => void;
   onResizeKeyDown?: (edge: 'start' | 'end', event: ReactKeyboardEvent<HTMLButtonElement>) => void;
@@ -68,6 +69,7 @@ export function VisitCard({
   onDelete,
   onAssign,
   onSetSession,
+  sourceProfileId = null,
   persistenceLabel,
   onResizePointerDown,
   onResizeKeyDown,
@@ -83,7 +85,7 @@ export function VisitCard({
   const { ref: dragRef, handleRef, isDragging } = useDraggable({
     id: `visit:${instanceId || visit.id}`,
     type: DAILY_ALLOCATION_DND.visit,
-    data: { source: { kind: 'visit', visit } },
+    data: { source: { kind: 'visit', visit, profileId: sourceProfileId } },
   });
   const hard = conflicts.filter((conflict) => conflict.severity === 'hard');
   const warnings = conflicts.filter((conflict) => conflict.severity === 'warning');

@@ -3,6 +3,18 @@ import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
 import { filterSystemTeams, isSystemAccountProfile } from '@/lib/utils/system-accounts';
 import { loadJobCatalogueRecords } from '@/lib/server/job-catalogue';
+
+const CATALOGUE_CACHE_MS = 60_000;
+let catalogueCache: { at: number; records: Awaited<ReturnType<typeof loadJobCatalogueRecords>> } | null = null;
+
+async function loadCachedJobCatalogue(admin: ReturnType<typeof createAdminClient>) {
+  if (catalogueCache && Date.now() - catalogueCache.at < CATALOGUE_CACHE_MS) {
+    return catalogueCache.records;
+  }
+  const records = await loadJobCatalogueRecords(admin);
+  catalogueCache = { at: Date.now(), records };
+  return records;
+}
 import { getJobCatalogueBlockReason } from '@/lib/utils/job-catalogue';
 import {
   DailyAllocationError,
@@ -345,8 +357,8 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
       .order('revision_no', { ascending: false }),
     admin
       .from('plant')
-      .select('id, plant_id, nickname, status')
-      .eq('status', 'active'),
+      .select('id, plant_id, nickname, status, loler_due_date')
+      .in('status', ['active', 'inactive', 'maintenance']),
     admin
       .from('org_teams')
       .select('id, name, is_system'),
@@ -587,6 +599,38 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
   };
 }
 
+async function loadPlantConflictsForRange(
+  supabase: AuthedClient,
+  start: string,
+  end: string,
+  dates: string[]
+) {
+  const rangeResult = await (supabase as unknown as {
+    rpc: (name: string, args: Record<string, string>) => Promise<{
+      data: Array<PlantConflictRow & { work_date: string }> | null;
+      error: { message?: string } | null;
+    }>;
+  }).rpc('list_daily_allocation_plant_conflicts_range', {
+    p_start_date: start,
+    p_end_date: end,
+  });
+  const message = rangeResult.error?.message || '';
+  const missing = Boolean(rangeResult.error) && /does not exist|PGRST202|schema cache/i.test(message);
+  if (!rangeResult.error) {
+    const rows = (rangeResult.data || []) as Array<PlantConflictRow & { work_date: string }>;
+    return dates.map((workDate) => ({
+      data: rows.filter((row) => row.work_date === workDate),
+      error: null,
+    }));
+  }
+  if (!missing) {
+    return dates.map(() => ({ data: null, error: rangeResult.error }));
+  }
+  return Promise.all(dates.map((workDate) => (
+    supabase.rpc('list_daily_allocation_plant_conflicts', { p_work_date: workDate })
+  )));
+}
+
 export async function loadDailyAllocationBoardRange(
   start: string,
   end: string
@@ -642,8 +686,8 @@ export async function loadDailyAllocationBoardRange(
       .in('profile_id', scopeIds),
     admin
       .from('plant')
-      .select('id, plant_id, nickname, status')
-      .eq('status', 'active'),
+      .select('id, plant_id, nickname, status, loler_due_date')
+      .in('status', ['active', 'inactive', 'maintenance']),
     admin
       .from('org_teams')
       .select('id, name, is_system'),
@@ -681,10 +725,8 @@ export async function loadDailyAllocationBoardRange(
       .gte('work_date', range.start)
       .lte('work_date', range.end)
       .order('revision_no', { ascending: false }),
-    loadJobCatalogueRecords(admin),
-    Promise.all(range.dates.map((workDate) => (
-      supabase.rpc('list_daily_allocation_plant_conflicts', { p_work_date: workDate })
-    ))),
+    loadCachedJobCatalogue(admin),
+    loadPlantConflictsForRange(supabase, range.start, range.end, range.dates),
   ]);
 
   if (profilesResult.error) throw profilesResult.error;
@@ -836,6 +878,8 @@ export async function loadDailyAllocationBoardRange(
         id: row.id,
         plant_id: row.plant_id,
         nickname: row.nickname,
+        status: row.status,
+        loler_due_date: row.loler_due_date,
       })),
       teams: filterSystemTeams(teamsResult.data || [])
         .filter((team) => context.is_admin || team.id === context.team_id)

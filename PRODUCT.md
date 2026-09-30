@@ -18,7 +18,7 @@ Primary users are A&V Squires staff working inside an authenticated operations a
 
 AVS Worklog is the internal digital operations system for A&V Squires Plant Co. Ltd. It exists so field and office staff can complete regulated daily work (timesheets, inspections, RAMS, absence, quotes, fleet, inventory, and daily allocation) with a durable audit trail.
 
-Success for Daily Allocation means every scoped employee receives exactly one allocation or absence itinerary message per publication, historical publications remain immutable, and managers can plan timed visits without inventing a second job catalogue.
+Success for Daily Allocation means every scoped employee receives exactly one allocation or absence itinerary message per publication, historical publications remain immutable, and managers can plan Full, AM, and PM sessions without inventing a second job catalogue.
 
 ## Positioning
 
@@ -36,10 +36,10 @@ Daily Allocation is an AVS publishing and compliance workflow, not a generic sch
 
 Confirmed Daily Allocation facts (workstream `DA2-7F3C`):
 
-- Deliver Daily and Weekly manager views with Jobs / Employees / Plant resources, timed visits, move/resize, availability warnings, and keyboard-accessible alternatives. Touch support is required.
+- Deliver Daily and Weekly manager views with employee rows and Full, AM, and PM session targets. Jobs and Plant stay sidebar resources. Availability warnings and keyboard-accessible alternatives are required. Touch support is required. There is no Jobs/Employees/Plant board-axis switch, minute timeline, resize handle, or arbitrary start/end editor.
 - Preserve immutable publish/revision history, per-visit defaults plus per-employee instruction overrides, employee self-view, exactly one allocation or absence itinerary message per scoped employee per publication, plant reconciliation, job sheets, and current job-catalogue identity.
 - Canonical jobs must not be duplicated into a Daily Allocation job table.
-- Timed intervals are `TIMESTAMPTZ`, same London date, half-open `[start,end)`, `end > start`. 30-minute minimum and snap are application rules on top of those schema bounds. The planning workspace is 07:00–16:30. The timeline viewport uses 07:00–17:00 so 16:30 stays visible. That range is configuration, not a schema constant.
+- Visit storage stays `starts_at`/`ends_at` `TIMESTAMPTZ`, same London date, half-open `[start,end)`, `end > start`. New and moved draft visits use only Full `07:00–16:30`, AM `07:00–12:00`, or PM `12:00–16:30` Europe/London. Do not add a session enum column. Published custom intervals stay readable as exact times. Editable custom intervals are normalized only through an explicit preview.
 - The default planning axis is employees. New visits use fixed London sessions: Full 07:00–16:30, AM 07:00–12:00, and PM 12:00–16:30. Jobs and plant are assigned onto those employee visits.
 - Copy to the next calendar day is preview-first and insert-only. It keeps request-id idempotency and plan-version checks, adds required parent visits for selected jobs or plant, and skips conflicts or duplicates. It never updates or deletes the target day. Approved absence on the target day is a warning, not an overwrite.
 - Plant Usage is a manager report for manual Sage entry. The latest published Daily Allocation revision is the planned source, and submitted plant checks supply validation. It does not calculate rates, post to Sage, or treat tracker last-known location as historical billing evidence.
@@ -47,7 +47,7 @@ Confirmed Daily Allocation facts (workstream `DA2-7F3C`):
 - Publishing may include unallocated available employees only with explicit confirmation; that unallocated state must be snapshotted.
 - v1 untimed drafts and historical publications must not receive inferred end times. Conversion is per team/date; after conversion, v1 writes for that scope are rejected. Never dual-write v1 and v2.
 - v1 publication rows and hashes remain untouched. Rollback after v2 data exists is disable-and-forward-fix, never a destructive downgrade.
-- All create/move/resize/assign/delete/publish operations must go through transactional RPCs with deterministic locks, expected plan/entity versions, authorization and availability revalidation, audited conflict overrides, idempotency, and atomic snapshots/messages.
+- All create/move/assign/delete/publish operations must go through transactional RPCs with deterministic locks, expected plan/entity versions, authorization and availability revalidation, audited conflict overrides, idempotency, and atomic snapshots/messages. Drag and drop admits the board projection in the same turn and persists in the background.
 
 Open (not invented here): visual world, palette, typography, and exact FFTS board chrome. Those belong to later UI work inside the existing AVS shell.
 

@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
+import type { DailyAllocationCopyProjectionResult } from '@/components/daily-allocation/board/daily-allocation-copy-projection';
 
 type CopyCategory = 'employees' | 'jobs' | 'plant';
 
@@ -29,7 +30,7 @@ interface CopyAllocationDialogProps {
   sourcePlanVersion: number | null;
   targetPlanVersion: number | null;
   onOpenChange: (open: boolean) => void;
-  onApplied: () => void;
+  onApplied: (result: DailyAllocationCopyProjectionResult) => void;
 }
 
 export function CopyAllocationDialog({
@@ -82,7 +83,7 @@ export function CopyAllocationDialog({
           expected_target_plan_version: apply ? preview?.target_plan_version ?? targetPlanVersion : targetPlanVersion,
         }),
       });
-      const payload = await response.json() as CopyPreview & {
+      const payload = await response.json() as CopyPreview & DailyAllocationCopyProjectionResult & {
         error?: string;
         target_plan_version: number | null;
       };
@@ -90,7 +91,11 @@ export function CopyAllocationDialog({
       setPreview(payload);
       if (apply) {
         toast.success(`Copied non-conflicting allocation to ${targetDate}.`);
-        onApplied();
+        onApplied({
+          source_date: payload.source_date || sourceDate,
+          target_date: payload.target_date || targetDate,
+          additions: payload.additions || [],
+        });
         onOpenChange(false);
       }
     } catch (error) {

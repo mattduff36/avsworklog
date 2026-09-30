@@ -39,10 +39,16 @@ import type {
 } from '@/types/daily-allocation';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { employeeLabel } from '@/components/daily-allocation/board/board-model';
+import {
+  dailyAllocationSessionClock,
+  dailyAllocationSessionLabel,
+  type DailyAllocationSession,
+} from '@/lib/utils/daily-allocation-sessions';
 
 export interface VisitFormState {
   job: JobCatalogueOption | null;
   workDate: string;
+  session: DailyAllocationSession;
   startTime: string;
   endTime: string;
   meetingPoint: string;
@@ -54,8 +60,8 @@ export function emptyVisitForm(workDate: string): VisitFormState {
   return {
     job: null,
     workDate,
-    startTime: '08:00',
-    endTime: '11:00',
+    session: 'full',
+    ...dailyAllocationSessionClock('full'),
     meetingPoint: '',
     meetPerson: '',
     notes: '',
@@ -85,7 +91,7 @@ export function VisitEditorDialog({
         <DialogHeader>
           <DialogTitle>{mode === 'add' ? 'Add visit' : 'Edit visit'}</DialogTitle>
           <DialogDescription>
-            Timed visits use London wall time on a 30-minute grid. End must be after start.
+            Visits use a full day, morning, or afternoon. Times stay fixed to those sessions.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 py-2">
@@ -111,25 +117,21 @@ export function VisitEditorDialog({
                 }}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="daily-allocation-visit-start">Start</Label>
-              <Input
-                id="daily-allocation-visit-start"
-                type="time"
-                step={1800}
-                value={form.startTime}
-                onChange={(event) => onFormChange({ ...form, startTime: event.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="daily-allocation-visit-end">End</Label>
-              <Input
-                id="daily-allocation-visit-end"
-                type="time"
-                step={1800}
-                value={form.endTime}
-                onChange={(event) => onFormChange({ ...form, endTime: event.target.value })}
-              />
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="daily-allocation-visit-session">Session</Label>
+              <select
+                id="daily-allocation-visit-session"
+                className="flex h-9 w-full rounded-md border border-slate-600 bg-slate-950 px-3 text-sm"
+                value={form.session}
+                onChange={(event) => {
+                  const session = event.target.value as DailyAllocationSession;
+                  onFormChange({ ...form, session, ...dailyAllocationSessionClock(session) });
+                }}
+              >
+                {(['full', 'am', 'pm'] as const).map((session) => (
+                  <option key={session} value={session}>{dailyAllocationSessionLabel(session)}</option>
+                ))}
+              </select>
             </div>
           </div>
           <div className="space-y-2">
@@ -172,6 +174,7 @@ export function VisitEditorDialog({
 
 export interface MoveVisitFormState {
   workDate: string;
+  session: DailyAllocationSession;
   startTime: string;
 }
 
@@ -200,7 +203,7 @@ export function MoveVisitDialog({
         <DialogHeader>
           <DialogTitle>Move visit</DialogTitle>
           <DialogDescription>
-            Move {visit?.job_code || 'this visit'} to another board date and 30-minute start time. Its duration is preserved.
+            Move {visit?.job_code || 'this visit'} to another date and session.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 py-2 sm:grid-cols-2">
@@ -218,14 +221,20 @@ export function MoveVisitDialog({
             </select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="daily-allocation-move-start">Start</Label>
-            <Input
-              id="daily-allocation-move-start"
-              type="time"
-              step={1800}
-              value={form.startTime}
-              onChange={(event) => onFormChange({ ...form, startTime: event.target.value })}
-            />
+            <Label htmlFor="daily-allocation-move-session">Session</Label>
+            <select
+              id="daily-allocation-move-session"
+              className="flex h-9 w-full rounded-md border border-slate-600 bg-slate-950 px-3 text-sm"
+              value={form.session}
+              onChange={(event) => {
+                const session = event.target.value as DailyAllocationSession;
+                onFormChange({ ...form, session, startTime: dailyAllocationSessionClock(session).startTime });
+              }}
+            >
+              {(['full', 'am', 'pm'] as const).map((session) => (
+                <option key={session} value={session}>{dailyAllocationSessionLabel(session)}</option>
+              ))}
+            </select>
           </div>
         </div>
         <DialogFooter>

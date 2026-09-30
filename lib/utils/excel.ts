@@ -10,6 +10,7 @@ export interface ExcelColumn {
   header: string;
   key: string;
   width?: number;
+  hyperlink?: boolean;
 }
 
 export interface ExcelWorksheetData {
@@ -35,6 +36,19 @@ export async function generateExcelFile(worksheets: ExcelWorksheetData[]): Promi
 
     if (worksheet.data && worksheet.data.length > 0) {
       sheet.addRows(worksheet.data);
+      const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || '';
+      worksheet.columns.forEach((column, columnIndex) => {
+        if (!column.hyperlink) return;
+        sheet.eachRow((excelRow, rowNumber) => {
+          if (rowNumber === 1) return;
+          const cell = excelRow.getCell(columnIndex + 1);
+          const value = cell.value;
+          if (typeof value !== 'string' || !value.startsWith('/')) return;
+          cell.value = origin
+            ? { text: value, hyperlink: `${origin}${value}` }
+            : value;
+        });
+      });
     }
   });
 

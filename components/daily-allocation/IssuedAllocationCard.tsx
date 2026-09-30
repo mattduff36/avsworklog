@@ -37,6 +37,9 @@ function VisitRow({ visit }: { visit: DailyAllocationIssuedVisit }) {
       {visit.instructions.meeting_point ? <p><span className="text-muted-foreground">Meeting point:</span> {visit.instructions.meeting_point}</p> : null}
       {visit.instructions.meet_person ? <p><span className="text-muted-foreground">Meet:</span> {visit.instructions.meet_person}</p> : null}
       {visit.instructions.notes ? <p><span className="text-muted-foreground">Notes:</span> {visit.instructions.notes}</p> : null}
+      {visit.plant && visit.plant.length > 0 ? (
+        <p><span className="text-muted-foreground">Plant:</span> {visit.plant.map((item) => item.label).join(', ')}</p>
+      ) : null}
     </li>
   );
 }

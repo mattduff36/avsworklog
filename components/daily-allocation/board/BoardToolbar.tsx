@@ -1,20 +1,12 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Minimize2, MoveHorizontal, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { BoardDateRangeControls } from '@/components/daily-allocation/board/BoardDateRangeControls';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
-import type { DailyAllocationTimelineMode } from '@/components/daily-allocation/board/JobsPanel';
-import {
-  DAILY_ALLOCATION_BOARD_VIEWS,
-  type DailyAllocationBoardView,
-} from '@/lib/config/daily-allocation-view-preference';
-import {
-  DAILY_ALLOCATION_BOARD_PRIMARIES,
-  type DailyAllocationBoardPrimary,
-} from '@/lib/config/daily-allocation-primary-preference';
+import type { DailyAllocationBoardView } from '@/lib/config/daily-allocation-view-preference';
 import { cn } from '@/lib/utils/cn';
 
 interface BoardToolbarProps {
@@ -22,8 +14,6 @@ interface BoardToolbarProps {
   view: DailyAllocationBoardView;
   onDateChange: (date: string) => void;
   onViewChange: (view: DailyAllocationBoardView) => void;
-  primary?: DailyAllocationBoardPrimary;
-  onPrimaryChange?: (primary: DailyAllocationBoardPrimary) => void;
   isLoading?: boolean;
   isFetching?: boolean;
   isStale?: boolean;
@@ -35,9 +25,6 @@ interface BoardToolbarProps {
   titleMeta?: ReactNode;
   jobSearch?: string;
   onJobSearchChange?: (value: string) => void;
-  timelineMode?: DailyAllocationTimelineMode;
-  timelineFitEligible?: boolean;
-  onTimelineModeChange?: (mode: DailyAllocationTimelineMode) => void;
   onAddVisit?: () => void;
   onAssign?: () => void;
   assignDisabled?: boolean;
@@ -54,8 +41,6 @@ export function BoardToolbar({
   view,
   onDateChange,
   onViewChange,
-  primary = DAILY_ALLOCATION_BOARD_PRIMARIES.employee,
-  onPrimaryChange,
   isLoading,
   isFetching,
   isStale,
@@ -67,17 +52,12 @@ export function BoardToolbar({
   titleMeta,
   jobSearch,
   onJobSearchChange,
-  timelineMode = 'fit',
-  timelineFitEligible = true,
-  onTimelineModeChange,
   onAddVisit,
   onAssign,
   assignDisabled,
   assignLabel = 'Assign resources',
   legacyReview,
 }: BoardToolbarProps) {
-  const effectiveTimelineMode =
-    timelineMode === 'fit' && timelineFitEligible ? 'fit' : 'scroll';
   const feedback = [
     isLoading ? 'Loading board' : null,
     !isLoading && isFetching ? 'Refreshing' : null,
@@ -108,8 +88,6 @@ export function BoardToolbar({
           view={view}
           onDateChange={onDateChange}
           onViewChange={onViewChange}
-          primary={primary}
-          onPrimaryChange={onPrimaryChange}
         />
 
         {teams.length > 1 ? (
@@ -148,10 +126,10 @@ export function BoardToolbar({
       >
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground xl:hidden">
-            Drop a job on an employee for a full day, then switch it to AM or PM.
+            Drop a job on Full, AM, or PM. Plant drops onto that visit.
           </p>
           <p className="hidden text-sm text-muted-foreground xl:block">
-            Drop a job on an employee for a full day. Plant is assigned to that employee visit.
+            Drop a job onto an employee session. Plant is assigned to that visit.
           </p>
         </div>
 
@@ -174,42 +152,6 @@ export function BoardToolbar({
                 onClick={legacyReview.onReview}
               >
                 Review and convert
-              </Button>
-            </div>
-          ) : null}
-
-          {view === DAILY_ALLOCATION_BOARD_VIEWS.daily && onTimelineModeChange ? (
-            <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Daily timeline display mode">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className={cn(
-                  'h-7 w-7 p-0',
-                  effectiveTimelineMode === 'fit' ? boardControlStyles.primary : boardControlStyles.ghost
-                )}
-                aria-label="Fit timeline to width"
-                aria-pressed={effectiveTimelineMode === 'fit'}
-                disabled={!timelineFitEligible}
-                title="Shrink to fit width"
-                onClick={() => onTimelineModeChange('fit')}
-              >
-                <Minimize2 className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                className={cn(
-                  'h-7 w-7 p-0',
-                  effectiveTimelineMode === 'scroll' ? boardControlStyles.primary : boardControlStyles.ghost
-                )}
-                aria-label="Use scrollable timeline"
-                aria-pressed={effectiveTimelineMode === 'scroll'}
-                title="Scroll"
-                onClick={() => onTimelineModeChange('scroll')}
-              >
-                <MoveHorizontal className="h-3.5 w-3.5" />
               </Button>
             </div>
           ) : null}

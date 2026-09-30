@@ -129,9 +129,15 @@ export function useDailyAllocationBoardController(options: {
     const span = differenceInCalendarDays(parseISO(options.endDate), parseISO(options.startDate));
     const nextStart = format(addDays(parseISO(options.endDate), 1), 'yyyy-MM-dd');
     const nextEnd = format(addDays(parseISO(nextStart), span), 'yyyy-MM-dd');
+    const previousEnd = format(addDays(parseISO(options.startDate), -1), 'yyyy-MM-dd');
+    const previousStart = format(addDays(parseISO(previousEnd), -span), 'yyyy-MM-dd');
     void queryClient.prefetchQuery({
       queryKey: dailyAllocationBoardQueryKey(nextStart, nextEnd),
       queryFn: () => fetchDailyAllocationBoardRange(nextStart, nextEnd),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: dailyAllocationBoardQueryKey(previousStart, previousEnd),
+      queryFn: () => fetchDailyAllocationBoardRange(previousStart, previousEnd),
     });
   }, [options.endDate, options.startDate, queryClient]);
   const ledger = useDailyAllocationOptimisticLedger();

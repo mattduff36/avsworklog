@@ -117,8 +117,32 @@ export function buildDailyAllocationPlantOccupancy(
   return overlayAssignments(availableDay(), assignments);
 }
 
+export function dailyAllocationEmployeeUnavailableReason(
+  day: DailyAllocationEmployeeDayAvailability | null
+): string | null {
+  if (!day) return null;
+  if (day.availability === 'full_day_absence' || day.availability === 'half_day_absence') {
+    return day.blocking_absence?.reason_name || 'Absent';
+  }
+  if (day.pending_absence) return day.pending_absence.reason_name || 'Pending absence';
+  if (!day.am_working || !day.pm_working) return 'Off shift';
+  return null;
+}
+
+export function dailyAllocationPlantUnavailableReason(input: {
+  status?: string | null;
+  lolerDueDate?: string | null;
+  workDate: string;
+}): string | null {
+  if (input.status === 'maintenance') return 'Maintenance';
+  if (input.status === 'inactive' || input.status === 'retired') return 'Inactive';
+  if (input.lolerDueDate && input.lolerDueDate <= input.workDate) return 'Inspection due';
+  return null;
+}
+
 export function formatDailyAllocationOccupancySummary(
-  segments: DailyAllocationOccupancySegment[]
+  segments: DailyAllocationOccupancySegment[],
+  reason?: string | null
 ): string {
   const clock = (minutes: number) =>
     `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
@@ -128,7 +152,8 @@ export function formatDailyAllocationOccupancySummary(
   }
   const unavailable = segments.filter((segment) => segment.state === 'unavailable');
   if (unavailable.length > 0) {
-    return `Unavailable ${unavailable.map((segment) => `${clock(segment.startMinutes)}–${clock(segment.endMinutes)}`).join(', ')}`;
+    const windows = unavailable.map((segment) => `${clock(segment.startMinutes)}–${clock(segment.endMinutes)}`).join(', ');
+    return reason ? `${reason} ${windows}` : `Unavailable ${windows}`;
   }
   return 'Available 07:00–16:30';
 }

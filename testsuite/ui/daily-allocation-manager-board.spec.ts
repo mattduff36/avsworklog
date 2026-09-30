@@ -617,114 +617,40 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     await page.getByRole('button', { name: 'Previous day' }).click();
     await expect(page.getByTestId('daily-allocation-period-label')).toHaveText('Sun 13 Sep 2026');
     await expect(page.getByRole('tablist', { name: 'Allocation date range' })).toBeVisible();
-    await expect(page.getByRole('tablist', { name: 'Board primary resource' })).toBeVisible();
+    await expect(page.getByRole('tablist', { name: 'Board primary resource' })).toHaveCount(0);
     await expect(page.getByRole('tablist', { name: 'Resource type' })).toBeVisible();
 
     const visitOne = page.getByTestId('daily-allocation-visit-visit-1');
     const visitTwo = page.getByTestId('daily-allocation-visit-visit-2');
     await expect(visitOne).toBeVisible();
     await expect(visitTwo).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Jobs' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /Plant/ })).toBeVisible();
 
-    await page.getByRole('tab', { name: 'Primary Employees' }).click();
-    await expect(page.getByRole('heading', { name: 'Daily employee board' })).toBeVisible();
-    await expect(visitOne).toBeVisible();
-    await expect(visitTwo).toBeVisible();
-    await expect(page.getByTestId('daily-allocation-board-row-unassigned')).toContainText(
-      'Visits with no employees yet',
-    );
-
-    await page.getByRole('tab', { name: 'Primary Plant' }).click();
-    await expect(page.getByRole('heading', { name: 'Daily plant board' })).toBeVisible();
-    await expect(visitOne).toBeVisible();
-    await expect(visitTwo).toBeVisible();
-    await expect(page.getByTestId('daily-allocation-board-row-unassigned')).toContainText(
-      'Visits with no plant yet',
-    );
-
-    await page.getByRole('tab', { name: 'Primary Jobs' }).click();
     await page.getByRole('tab', { name: /^Weekly$/ }).click();
-    await expect(page.getByRole('heading', { name: 'Weekly job board' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Weekly employee board' })).toBeVisible();
     await expect(page.getByTestId('daily-allocation-weekly-board')).toBeVisible();
     await expect(visitOne).toBeVisible();
     await expect(visitTwo).toBeVisible();
-
-    await page.getByRole('tab', { name: 'Primary Employees' }).click();
-    await expect(page.getByRole('heading', { name: 'Weekly employee board' })).toBeVisible();
-    await expect(visitOne).toBeVisible();
-    await expect(visitTwo).toBeVisible();
-    await expect(page.getByTestId('daily-allocation-board-row-unassigned')).toBeVisible();
-
-    await page.getByRole('tab', { name: 'Primary Plant' }).click();
-    await expect(page.getByRole('heading', { name: 'Weekly plant board' })).toBeVisible();
-    await expect(visitOne).toBeVisible();
-    await expect(visitTwo).toBeVisible();
-    await expect(page.getByTestId('daily-allocation-board-row-unassigned')).toBeVisible();
   });
 
-  test('offers fit/scroll controls and resizes a visit by one keyboard grid step', async ({ page }) => {
+  test('moves a visit to the morning session from the card', async ({ page }) => {
     const evidence = await openManagerBoard(page);
-    await page.getByRole('tab', { name: 'Primary Jobs' }).click();
-    await expect(page.getByRole('heading', { name: 'Daily job board', exact: true })).toBeVisible();
-
-    const displayMode = page.getByRole('group', { name: 'Daily timeline display mode' });
-    const fit = displayMode.getByRole('button', { name: 'Fit timeline to width' });
-    const scroll = displayMode.getByRole('button', { name: 'Use scrollable timeline' });
-    await expect(fit).toHaveAttribute('aria-pressed', 'true');
-    await scroll.click();
-    await expect(scroll).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId('daily-allocation-daily-board')).toHaveAttribute(
-      'data-timeline-layout',
-      'scroll',
-    );
-    const timelineBoard = page.getByTestId('daily-allocation-daily-board');
-    const header = page.getByTestId('daily-allocation-daily-timeline-header');
-    const axis = page.getByTestId('daily-allocation-daily-job-header');
-    const firstRow = page.getByTestId('daily-allocation-daily-board').locator(':scope > div').nth(1);
-    const firstRail = page.getByTestId('daily-allocation-board-row-job-live_quote:quote-100-rail');
-    const alignmentBefore = await Promise.all([
-      header.evaluate((element) => element.getBoundingClientRect().x),
-      firstRow.evaluate((element) => element.getBoundingClientRect().x),
-      axis.evaluate((element) => element.getBoundingClientRect().x),
-      firstRail.evaluate((element) => element.getBoundingClientRect().x),
-    ]);
-    await timelineBoard.evaluate((element) => {
-      element.scrollLeft = 120;
-    });
-    const alignmentAfter = await Promise.all([
-      header.evaluate((element) => element.getBoundingClientRect().x),
-      firstRow.evaluate((element) => element.getBoundingClientRect().x),
-      axis.evaluate((element) => element.getBoundingClientRect().x),
-      firstRail.evaluate((element) => element.getBoundingClientRect().x),
-    ]);
-    expect(alignmentAfter[0] - alignmentAfter[1]).toBeCloseTo(
-      alignmentBefore[0] - alignmentBefore[1],
-      1
-    );
-    expect(alignmentAfter[2]).toBeCloseTo(alignmentBefore[2], 1);
-    expect(alignmentAfter[3]).toBeCloseTo(alignmentBefore[3], 1);
-    await fit.click();
-    await expect(fit).toHaveAttribute('aria-pressed', 'true');
-
-    const endHandle = page.getByRole('button', {
-      name: /Adjust end of JOB-100, currently 11:00.*30 minute steps/,
-    });
-    await endHandle.focus();
-    await endHandle.press('ArrowRight');
+    await expect(page.getByRole('heading', { name: 'Daily employee board', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'AM' }).first().click();
     await expect.poll(() => evidence.visitUpdates.length).toBe(1);
-    expect(evidence.visitUpdates[0].starts_at).toBe(londonIso(8 * 60));
-    expect(evidence.visitUpdates[0].ends_at).toBe(londonIso(11 * 60 + 30));
-    await expect(page.getByTestId('daily-allocation-board-status')).toHaveText(
-      'Visit resized to 08:00–11:30.',
-    );
+    expect(evidence.visitUpdates[0].starts_at).toBe(londonIso(7 * 60));
+    expect(evidence.visitUpdates[0].ends_at).toBe(londonIso(12 * 60));
+    await expect(page.getByTestId('daily-allocation-board-status')).toHaveText('Visit moved.');
   });
 
   test('supports select-to-assign fallback, employee instruction overrides, and publication confirmation', async ({ page }) => {
     const evidence = await openManagerBoard(page);
 
-    await page.getByRole('tab', { name: /Employees \(3\)/ }).click();
-    await page.getByRole('button', { name: /Select Bob Brown\. Drag from the handle to assign\./ }).click();
-    await page.getByRole('button', { name: 'Select JOB-200 13:00–15:00' }).click();
-    await page.getByRole('button', { name: 'Assign selected resource' }).click();
+    await page.getByRole('button', { name: 'Assign resources to JOB-200' }).click();
+    const bobDialog = page.getByRole('dialog', { name: 'Assign resources' });
+    await bobDialog.getByLabel('Employee').selectOption('employee-bob');
+    await bobDialog.getByRole('button', { name: 'Save employee instructions' }).click();
     await expect.poll(() => evidence.labourRequests.length).toBe(1);
     expect(evidence.labourRequests[0]).toMatchObject({
       visit_id: 'visit-2',
@@ -734,6 +660,7 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
       notes: null,
     });
 
+    await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'Assign resources to JOB-100' }).click();
     const dialog = page.getByRole('dialog', { name: 'Assign resources' });
     await dialog.getByLabel('Employee').selectOption('employee-alice');
@@ -775,8 +702,7 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     });
     await expect(dialog.getByText('Labour drafts (1)')).toBeVisible();
     await expect(dialog.getByText('Plant drafts (1)')).toBeVisible();
-    await dialog.getByLabel('Start').fill('07:30');
-    await dialog.getByLabel('End').fill('12:00');
+    await dialog.getByLabel('Session').selectOption('am');
     await dialog.getByRole('combobox', { name: 'Disposition for Alice Adams' })
       .selectOption('visit');
     await dialog.getByRole('combobox', { name: 'Disposition for plant-resource-1' })
@@ -791,7 +717,7 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     expect(request.visits[0]).toMatchObject({
       job_source_type: jobOne.source_type,
       job_source_id: jobOne.source_id,
-      starts_at: londonIso(7 * 60 + 30),
+      starts_at: londonIso(7 * 60),
       ends_at: londonIso(12 * 60),
     });
     expect(request.labour_drafts).toEqual([{
@@ -821,20 +747,11 @@ test.describe('DAFP-UI-001 touch tablet', () => {
     const evidence = await openManagerBoard(page);
 
     await expect(page.getByTestId('daily-allocation-viewport-fit')).toBeVisible({ timeout: 20_000 });
-    const displayMode = page.getByRole('group', { name: 'Daily timeline display mode' });
-    await expect(displayMode.getByRole('button', { name: 'Fit timeline to width' })).toBeDisabled();
-    await expect(displayMode.getByRole('button', { name: 'Use scrollable timeline' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    await expect(page.getByTestId('daily-allocation-daily-board')).toHaveAttribute(
-      'data-timeline-layout',
-      'scroll',
-    );
-    await page.getByRole('tab', { name: /Employees \(3\)/ }).tap();
-    await page.getByRole('button', { name: /Select Bob Brown\. Drag from the handle to assign\./ }).tap();
-    await page.getByRole('button', { name: 'Select JOB-200 13:00–15:00' }).tap();
-    const assign = page.getByRole('button', { name: 'Assign selected resource' });
+    await expect(page.getByTestId('daily-allocation-daily-board')).toBeVisible();
+    await page.getByRole('button', { name: 'Assign resources to JOB-200' }).tap();
+    const dialog = page.getByRole('dialog', { name: 'Assign resources' });
+    await dialog.getByLabel('Employee').selectOption('employee-bob');
+    const assign = dialog.getByRole('button', { name: 'Save employee instructions' });
     await expect(assign).toBeVisible();
     await expect(assign).toBeEnabled();
     await assign.tap();

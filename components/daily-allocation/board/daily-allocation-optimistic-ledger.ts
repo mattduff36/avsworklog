@@ -26,7 +26,8 @@ export type DailyAllocationOptimisticKind =
   | 'assign-plant'
   | 'unassign-plant'
   | 'create-override'
-  | 'publish-v2';
+  | 'publish-v2'
+  | 'plan-copy';
 
 export interface DailyAllocationOptimisticOperation {
   id: string;

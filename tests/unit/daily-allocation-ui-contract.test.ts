@@ -21,7 +21,7 @@ describe('DA2-UI-001 manager board contract', () => {
     );
     expect(board).toContain('confirm_unallocated');
     expect(board).toContain('CONFIRM_UNALLOCATED_REQUIRED');
-    expect(board).toContain('ensurePlanDay');
+    expect(board).toContain('admitPlanDay');
     expect(board).toContain('Add a timed visit before publishing.');
     expect(board).not.toContain('Convert this date to timed visits');
     expect(board).not.toContain('ConvertDialog');
@@ -77,7 +77,7 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(board).toContain('DailyAllocationModuleHeader');
     expect(board).toContain('DailyAllocationViewportFit');
 
-    expect(board).toContain('dailyTimelineRangeLeft');
+    expect(board).toContain("surface === 'session'");
     expect(board).toContain('source.kind === \'visit\'');
     expect(board).toContain('mutations.moveVisit.mutateAsync');
     expect(board).toContain('expected_source_plan_version');
@@ -94,7 +94,7 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(resources).toContain('h-full min-h-0');
     expect(resources).not.toContain('max-h-[min(36rem,70dvh)]');
     expect(resources).not.toContain('h-fit');
-    expect(resources).toContain('Drag a job onto the board, or select a job then Add visit.');
+    expect(resources).toContain('Drag a job onto an employee session.');
     expect(resources).toContain('RESOURCE_GUIDANCE_CLASS');
     expect(resources).toContain('whitespace-nowrap');
     expect(resources).toContain('fitSingleLineFontSize');

@@ -1,6 +1,7 @@
 'use client';
 
 import { useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
+import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { AlertTriangle, GripVertical, Search, X } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/react';
 import { Button } from '@/components/ui/button';
@@ -16,10 +17,9 @@ import {
   jobResourceKey,
   type DailyAllocationDragSource,
 } from '@/components/daily-allocation/board/board-dnd';
-import { employeeDay, employeeLabel } from '@/components/daily-allocation/board/board-model';
 import {
-  buildDailyAllocationEmployeeOccupancy,
   buildDailyAllocationPlantOccupancy,
+  dailyAllocationPlantUnavailableReason,
   formatDailyAllocationOccupancySummary,
   type DailyAllocationOccupancySegment,
 } from '@/components/daily-allocation/board/daily-allocation-occupancy';
@@ -33,16 +33,15 @@ import {
 } from '@/components/daily-allocation/board/fit-single-line-font';
 import Link from 'next/link';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import { dailyAllocationJobSheetHref, fleetPlantHistoryHref } from '@/lib/navigation/canonical-links';
 import { cn } from '@/lib/utils/cn';
 import type {
-  DailyAllocationEmployeeResource,
   DailyAllocationJobProjection,
-  DailyAllocationLabourAssignment,
   DailyAllocationPlantAssignment,
   DailyAllocationPlantResource,
 } from '@/types/daily-allocation';
 
-export type ResourceSidebarTab = 'jobs' | 'employees' | 'plant';
+export type ResourceSidebarTab = 'jobs' | 'plant';
 
 export interface ResourceSidebarSelectedVisit {
   label: string;
@@ -56,9 +55,7 @@ interface ResourceSidebarProps {
   onSearchChange: (value: string) => void;
   selectedDate: string;
   jobs: DailyAllocationJobProjection[];
-  employees: DailyAllocationEmployeeResource[];
   plant: DailyAllocationPlantResource[];
-  labourAssignments: DailyAllocationLabourAssignment[];
   plantAssignments: DailyAllocationPlantAssignment[];
   selectedResourceId: string | null;
   onSelectResource: (resource: DailyAllocationDragSource) => void;
@@ -236,15 +233,17 @@ export function ResourceSidebar({
   onSearchChange,
   selectedDate,
   jobs,
-  employees,
   plant,
-  labourAssignments,
   plantAssignments,
   selectedResourceId,
   onSelectResource,
   selectedVisit,
   onClearSelectedVisit,
 }: ResourceSidebarProps) {
+  const quotesAccess = usePermissionCheck('quotes', false);
+  const fleetAccess = usePermissionCheck('admin-vans', false);
+  const canOpenQuotes = quotesAccess.hasPermission && !quotesAccess.loading;
+  const canOpenFleet = fleetAccess.hasPermission && !fleetAccess.loading;
   const term = search.trim().toLowerCase();
   const filteredJobs = useMemo(
     () => jobs.filter((job) => {
@@ -255,13 +254,6 @@ export function ResourceSidebar({
     }),
     [jobs, term]
   );
-  const filteredEmployees = useMemo(
-    () => employees.filter((employee) => {
-      if (!term) return true;
-      return employeeLabel(employee).toLowerCase().includes(term);
-    }),
-    [employees, term]
-  );
   const filteredPlant = useMemo(
     () => plant.filter((item) => {
       if (!term) return true;
@@ -271,14 +263,6 @@ export function ResourceSidebar({
     }),
     [plant, term]
   );
-  const labourByEmployee = useMemo(() => {
-    const result = new Map<string, DailyAllocationLabourAssignment[]>();
-    for (const assignment of labourAssignments) {
-      if (assignment.work_date !== selectedDate) continue;
-      result.set(assignment.profile_id, [...(result.get(assignment.profile_id) || []), assignment]);
-    }
-    return result;
-  }, [labourAssignments, selectedDate]);
   const plantByResource = useMemo(() => {
     const result = new Map<string, DailyAllocationPlantAssignment[]>();
     for (const assignment of plantAssignments) {
@@ -290,7 +274,6 @@ export function ResourceSidebar({
 
   const placeholders: Record<ResourceSidebarTab, string> = {
     jobs: 'Search jobs',
-    employees: 'Search employees',
     plant: 'Search plant',
   };
 
@@ -310,11 +293,10 @@ export function ResourceSidebar({
         >
           <TabsList
             aria-label="Resource type"
-            className="grid w-full grid-cols-3 flex-nowrap"
+            className="grid w-full grid-cols-2 flex-nowrap"
             data-testid="daily-allocation-resource-tabs"
           >
             <ResourceTabTrigger value="jobs" label="Jobs" count={filteredJobs.length} />
-            <ResourceTabTrigger value="employees" label="Employees" count={filteredEmployees.length} />
             <ResourceTabTrigger value="plant" label="Plant" count={filteredPlant.length} />
           </TabsList>
         </Tabs>
@@ -347,8 +329,8 @@ export function ResourceSidebar({
           ) : (
             <p className={RESOURCE_GUIDANCE_CLASS}>
               {tab === 'jobs'
-                ? 'Drag a job onto the board, or select a job then Add visit.'
-                : 'Drag from the grip handle onto a timed visit, or select the visit and tap a resource.'}
+                ? 'Drag a job onto an employee session.'
+                : 'Drag plant onto a visit in that session.'}
             </p>
           )}
           {tab !== 'jobs' ? <ResourceOccupancyLegend /> : null}
@@ -391,54 +373,8 @@ export function ResourceSidebar({
                     onSelect={() => onSelectResource(source)}
                   />
                   <div className="flex flex-wrap gap-2 px-1 text-[11px]">
-                    <Link className="text-sky-300 underline-offset-2 hover:underline" href={`/daily-allocation/jobs/${encodeURIComponent(job.job_code)}`}>Job sheet</Link>
-                    {job.source_href ? <Link className="text-sky-300 underline-offset-2 hover:underline" href={job.source_href}>Source</Link> : null}
-                  </div>
-                  </div>
-                );
-              })
-            ) : null}
-            {tab === 'employees' ? (
-              filteredEmployees.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground">
-                  No employees match this search.
-                </div>
-              ) : filteredEmployees.map((employee) => {
-                const day = employeeDay(employee, selectedDate);
-                const warning = day?.availability === 'full_day_absence'
-                  ? day.blocking_absence?.reason_name || 'Absent'
-                  : day?.pending_absence
-                    ? 'Pending absence'
-                    : null;
-                const source: DailyAllocationDragSource = {
-                  kind: 'employee',
-                  profileId: employee.profile_id,
-                  label: employee.full_name,
-                };
-                const occupancy = buildDailyAllocationEmployeeOccupancy({
-                  day,
-                  assignments: labourByEmployee.get(employee.profile_id) || [],
-                });
-                return (
-                  <div key={employee.profile_id} className="space-y-1">
-                  <DraggableCard
-                    id={`employee:${employee.profile_id}`}
-                    type={DAILY_ALLOCATION_DND.employee}
-                    source={source}
-                    selected={selectedResourceId === employee.profile_id}
-                    label={employee.full_name}
-                    subtitle={[employee.employee_id, employee.team_name].filter(Boolean).join(' · ') || 'Employee'}
-                    metadata={warning || day?.availability.replaceAll('_', ' ')}
-                    warning={warning}
-                    occupancy={occupancy}
-                    tintClassName={boardControlStyles.resourceEmployee}
-                    handleTestId={`daily-allocation-resource-drag-handle-employee-${employee.profile_id}`}
-                    onSelect={() => onSelectResource(source)}
-                  />
-                  <div className="px-1 text-[11px]">
-                    <Link className="text-sky-300 underline-offset-2 hover:underline" href={`/absence/manage?tab=calendar&profile_id=${encodeURIComponent(employee.profile_id)}`}>
-                      Absence and shifts
-                    </Link>
+                    <Link className="text-sky-300 underline-offset-2 hover:underline" href={dailyAllocationJobSheetHref(job.job_code)}>Job sheet</Link>
+                    {canOpenQuotes && job.source_href ? <Link className="text-sky-300 underline-offset-2 hover:underline" href={job.source_href}>Source</Link> : null}
                   </div>
                   </div>
                 );
@@ -452,9 +388,19 @@ export function ResourceSidebar({
               ) : filteredPlant.map((item) => {
                 const label = formatFleetAssetLabel({ identifier: item.plant_id, nickname: item.nickname });
                 const source: DailyAllocationDragSource = { kind: 'plant', plantId: item.id, label };
-                const occupancy = buildDailyAllocationPlantOccupancy(
+                const reason = dailyAllocationPlantUnavailableReason({
+                  status: item.status,
+                  lolerDueDate: item.loler_due_date,
+                  workDate: selectedDate,
+                });
+                const booked = buildDailyAllocationPlantOccupancy(
                   plantByResource.get(item.id) || []
                 );
+                const occupancy = reason
+                  ? buildDailyAllocationPlantOccupancy(plantByResource.get(item.id) || []).map((segment) => (
+                    segment.state === 'booked' ? segment : { ...segment, state: 'unavailable' as const }
+                  ))
+                  : booked;
                 return (
                   <div key={item.id} className="space-y-1">
                   <DraggableCard
@@ -463,17 +409,19 @@ export function ResourceSidebar({
                     source={source}
                     selected={selectedResourceId === item.id}
                     label={label}
-                    subtitle="Registered plant"
+                    subtitle={reason || 'Registered plant'}
                     occupancy={occupancy}
                     tintClassName={boardControlStyles.resourcePlant}
                     handleTestId={`daily-allocation-resource-drag-handle-plant-${item.id}`}
                     onSelect={() => onSelectResource(source)}
                   />
-                  <div className="px-1 text-[11px]">
-                    <Link className="text-sky-300 underline-offset-2 hover:underline" href={`/fleet/plant/${item.id}/history`}>
-                      Fleet history
-                    </Link>
-                  </div>
+                  {canOpenFleet ? (
+                    <div className="px-1 text-[11px]">
+                      <Link className="text-sky-300 underline-offset-2 hover:underline" href={fleetPlantHistoryHref(item.id)}>
+                        Fleet history
+                      </Link>
+                    </div>
+                  ) : null}
                   </div>
                 );
               })

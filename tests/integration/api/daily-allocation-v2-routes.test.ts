@@ -607,3 +607,68 @@ describe('daily allocation v2 runtime and cross-plan move API', () => {
     expect(await staleResponse.json()).toMatchObject({ code: 'STALE_PLAN_VERSION' });
   });
 });
+
+describe('session normalization route', () => {
+  const payload = {
+    request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    team_id: 'team-1',
+    work_date: '2026-08-14',
+    expected_plan_version: 3,
+    apply: false,
+    adjustments: [],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects employees who cannot manage the allocation', async () => {
+    mockGetEffectiveModuleAccessLevel.mockResolvedValue(2);
+    mockCanEffectiveRoleUseModuleLevel.mockResolvedValue(false);
+    const client = authClient();
+    mockCreateClient.mockResolvedValue(client);
+
+    const { POST } = await import('@/app/api/daily-allocation/normalize/route');
+    const response = await POST(new NextRequest('http://localhost/api/daily-allocation/normalize', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }));
+
+    expect(response.status).toBe(403);
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it('previews normalization through the manager RPC', async () => {
+    managerMocks();
+    const result = {
+      applied: false,
+      work_date: '2026-08-14',
+      team_id: 'team-1',
+      plan_version: 3,
+      visits: [],
+      conflicts: [],
+    };
+    const client = authClient();
+    client.rpc = vi.fn().mockResolvedValue({ data: result, error: null });
+    mockCreateClient.mockResolvedValue(client);
+
+    const { POST } = await import('@/app/api/daily-allocation/normalize/route');
+    const response = await POST(new NextRequest('http://localhost/api/daily-allocation/normalize', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual(result);
+    expect(client.rpc).toHaveBeenCalledWith(
+      'normalize_daily_allocation_sessions_v2',
+      expect.objectContaining({
+        p_request_id: payload.request_id,
+        p_team_id: 'team-1',
+        p_work_date: '2026-08-14',
+        p_expected_plan_version: 3,
+        p_apply: false,
+      })
+    );
+  });
+});

@@ -44,14 +44,13 @@ describe('BoardToolbar', () => {
   it('keeps the FFTS title row compact and parks Squires actions on the instruction row', () => {
     render(
       <BoardToolbar
-        title="Daily job board"
+        title="Daily employee board"
         selectedDate="2026-08-13"
         view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
         onDateChange={vi.fn()}
         onViewChange={vi.fn()}
         jobSearch=""
         onJobSearchChange={vi.fn()}
-        onTimelineModeChange={vi.fn()}
         onAddVisit={vi.fn()}
         onAssign={vi.fn()}
         teams={[
@@ -72,31 +71,13 @@ describe('BoardToolbar', () => {
     expect(titleRow).toContainElement(screen.getByLabelText('Search jobs'));
     expect(titleRow).toContainElement(screen.getByLabelText('Active team'));
     expect(titleRow).toContainElement(screen.getByLabelText('Selected date'));
-    expect(instructionRow).toContainElement(screen.getByRole('button', { name: 'Fit timeline to width' }));
     expect(instructionRow).toContainElement(screen.getByRole('button', { name: 'Add visit' }));
+    expect(screen.queryByRole('button', { name: 'Fit timeline to width' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Publication history' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('daily-allocation-publish')).not.toBeInTheDocument();
-    expect(screen.getByTestId('daily-allocation-view-heading')).toHaveTextContent('Daily job board');
+    expect(screen.getByTestId('daily-allocation-view-heading')).toHaveTextContent('Daily employee board');
     expect(screen.getByLabelText('Selected date')).toHaveClass('date-input-compact');
     expect(screen.getByLabelText('Selected date')).toHaveClass('date-input-overlay');
-  });
-
-  it('disables Fit and marks Scroll pressed when the timeline cannot fit', () => {
-    render(
-      <BoardToolbar
-        selectedDate="2026-08-13"
-        view={DAILY_ALLOCATION_BOARD_VIEWS.daily}
-        onDateChange={vi.fn()}
-        onViewChange={vi.fn()}
-        timelineMode="fit"
-        timelineFitEligible={false}
-        onTimelineModeChange={vi.fn()}
-      />
-    );
-
-    expect(screen.getByRole('button', { name: 'Fit timeline to width' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Fit timeline to width' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByRole('button', { name: 'Use scrollable timeline' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('shows a compact team selector only when more than one team is available', () => {

@@ -147,8 +147,8 @@ export function GuidedLegacyConversionDialog({
           <div className="space-y-5 py-2">
             <section className="space-y-3">
               <div>
-                <h3 className="font-semibold">Timed visits</h3>
-                <p className="text-xs text-slate-400">Times apply to every draft mapped to that catalogue job.</p>
+                <h3 className="font-semibold">Session visits</h3>
+                <p className="text-xs text-slate-400">Choose Full, AM, or PM for every draft mapped to that catalogue job.</p>
               </div>
               {review.visits.map((visit) => (
                 <div key={visit.key} className="grid gap-3 rounded-md border border-slate-700 p-3 lg:grid-cols-[minmax(10rem,1fr)_8rem_8rem]">
@@ -157,24 +157,29 @@ export function GuidedLegacyConversionDialog({
                     <p className="text-xs text-slate-400">{visit.siteAddress || 'Catalogue site address'}</p>
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor={`conversion-start-${visit.id}`}>Start</Label>
-                    <Input
-                      id={`conversion-start-${visit.id}`}
-                      type="time"
-                      step={1800}
-                      value={visit.startTime}
-                      onChange={(event) => setReview(updateVisit(review, visit.key, { startTime: event.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor={`conversion-end-${visit.id}`}>End</Label>
-                    <Input
-                      id={`conversion-end-${visit.id}`}
-                      type="time"
-                      step={1800}
-                      value={visit.endTime}
-                      onChange={(event) => setReview(updateVisit(review, visit.key, { endTime: event.target.value }))}
-                    />
+                    <Label htmlFor={`conversion-session-${visit.id}`}>Session</Label>
+                    <select
+                      id={`conversion-session-${visit.id}`}
+                      className="flex h-9 w-full rounded-md border border-slate-600 bg-slate-950 px-3 text-sm"
+                      value={visit.startTime === '07:00' && visit.endTime === '12:00'
+                        ? 'am'
+                        : visit.startTime === '12:00' && visit.endTime === '16:30'
+                          ? 'pm'
+                          : 'full'}
+                      onChange={(event) => {
+                        const session = event.target.value as 'full' | 'am' | 'pm';
+                        const clock = session === 'am'
+                          ? { startTime: '07:00', endTime: '12:00' }
+                          : session === 'pm'
+                            ? { startTime: '12:00', endTime: '16:30' }
+                            : { startTime: '07:00', endTime: '16:30' };
+                        setReview(updateVisit(review, visit.key, clock));
+                      }}
+                    >
+                      <option value="full">Full day</option>
+                      <option value="am">AM</option>
+                      <option value="pm">PM</option>
+                    </select>
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor={`conversion-meeting-${visit.id}`}>Meeting point</Label>

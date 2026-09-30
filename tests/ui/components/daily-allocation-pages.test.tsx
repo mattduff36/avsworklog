@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   randomUUID: vi.fn(),
   accessLevel: 5,
   onDragEnd: null as ((event: unknown) => void) | null,
+  onDragStart: null as (() => void) | null,
   searchParams: '',
   fetchRuntime: vi.fn(async () => ({ board_enabled: true, writes_enabled: true })),
 }));
@@ -177,11 +178,14 @@ vi.mock('@dnd-kit/react', () => ({
   DragDropProvider: ({
     children,
     onDragEnd,
+    onDragStart,
   }: {
     children: ReactNode;
     onDragEnd?: (event: unknown) => void;
+    onDragStart?: () => void;
   }) => {
     mocks.onDragEnd = onDragEnd ?? null;
+    mocks.onDragStart = onDragStart ?? null;
     return <div>{children}</div>;
   },
   DragOverlay: ({ children }: { children?: ReactNode }) => <>{children}</>,
@@ -339,14 +343,18 @@ describe('daily allocation manager board', () => {
     mocks.accessLevel = 5;
     mocks.searchParams = '';
     mocks.onDragEnd = null;
+    mocks.onDragStart = null;
     mocks.fetchRuntime.mockResolvedValue({ board_enabled: true, writes_enabled: true });
     window.sessionStorage.clear();
     window.localStorage.clear();
     mocks.randomUUID.mockReset();
-    mocks.randomUUID
-      .mockReturnValueOnce('attempt-one')
-      .mockReturnValueOnce('attempt-two')
-      .mockReturnValue('attempt-later');
+    let uuidCount = 0;
+    mocks.randomUUID.mockImplementation(() => {
+      uuidCount += 1;
+      if (uuidCount === 1) return 'attempt-one';
+      if (uuidCount === 2) return 'attempt-two';
+      return `attempt-${uuidCount}`;
+    });
     vi.stubGlobal('crypto', { randomUUID: mocks.randomUUID });
   });
 
@@ -752,6 +760,27 @@ describe('daily allocation manager board', () => {
           work_date: '2026-08-14',
         });
       }
+      if (url === '/api/daily-allocation/assignments/labour' && init?.method === 'POST') {
+        return jsonResponse({
+          assignment_id: 'labour-2',
+          plan_day_id: 'plan-converted',
+          plan_version: 6,
+          assignment: {
+            id: 'labour-2',
+            visit_id: 'visit-2',
+            plan_day_id: 'plan-converted',
+            work_date: '2026-08-14',
+            profile_id: 'employee-1',
+            starts_at: '2026-08-14T06:00:00.000Z',
+            ends_at: '2026-08-14T15:30:00.000Z',
+            meeting_point: null,
+            meet_person: null,
+            notes: null,
+            row_version: 1,
+            updated_at: '2026-08-14T08:00:00.000Z',
+          },
+        });
+      }
       if (url === '/api/daily-allocation/visits' && init?.method === 'POST') {
         return jsonResponse({
           visit_id: 'visit-2',
@@ -787,7 +816,7 @@ describe('daily allocation manager board', () => {
       mocks.onDragEnd?.({
         operation: {
           source: { data: { source: { kind: 'job', job: unconverted.jobs[0] } } },
-          target: { data: { target: { surface: 'week-cell', workDate: '2026-08-14' } } },
+          target: { data: { target: { surface: 'session', workDate: '2026-08-14', profileId: 'employee-1', session: 'full' } } },
         },
       });
     });
@@ -797,6 +826,213 @@ describe('daily allocation manager board', () => {
       expect(fetchMock.mock.calls.some(([url, init]) =>
         String(url) === '/api/daily-allocation/visits' && init?.method === 'POST'
       )).toBe(true);
+    });
+  });
+
+  it('shows a dropped job in the session before the network resolves', async () => {
+    const unconverted = buildRangeBoard({
+      plan_days: [],
+      visits: [],
+      labour_assignments: [],
+      publications: [],
+    });
+    let releaseNetwork: () => void = () => undefined;
+    const networkGate = new Promise<void>((resolve) => {
+      releaseNetwork = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(unconverted);
+      await networkGate;
+      if (url.startsWith('/api/daily-allocation/convert')) return jsonResponse(emptyConversionSource());
+      return jsonResponse({
+        plan_day_id: 'plan-converted',
+        plan_version: 2,
+        visit_id: 'visit-2',
+        assignment_id: 'labour-2',
+        visit: {
+          id: 'visit-2',
+          plan_day_id: 'plan-converted',
+          work_date: '2026-08-14',
+          owner_team_id: 'team-1',
+          job_source_type: 'live_quote',
+          job_source_id: 'quote-1',
+          job_code: 'JOB-100',
+          site_address: '1 Test Street',
+          starts_at: '2026-08-14T06:00:00.000Z',
+          ends_at: '2026-08-14T15:30:00.000Z',
+          meeting_point: null,
+          meet_person: null,
+          notes: null,
+          row_version: 1,
+          updated_at: '2026-08-14T08:00:00.000Z',
+        },
+        assignment: {
+          id: 'labour-2',
+          visit_id: 'visit-2',
+          plan_day_id: 'plan-converted',
+          work_date: '2026-08-14',
+          profile_id: 'employee-1',
+          starts_at: '2026-08-14T06:00:00.000Z',
+          ends_at: '2026-08-14T15:30:00.000Z',
+          meeting_point: null,
+          meet_person: null,
+          notes: null,
+          row_version: 1,
+          updated_at: '2026-08-14T08:00:00.000Z',
+        },
+      });
+    }));
+
+    renderBoardPage();
+    expect(await screen.findByText('Alex Worker')).toBeInTheDocument();
+    act(() => {
+      mocks.onDragEnd?.({
+        operation: {
+          source: { data: { source: { kind: 'job', job: unconverted.jobs[0] } } },
+          target: { data: { target: { surface: 'session', workDate: '2026-08-14', profileId: 'employee-1', session: 'full' } } },
+        },
+      });
+    });
+    expect(screen.getByTestId('daily-allocation-daily-board').textContent || '').toContain('JOB-100');
+    expect(screen.getByTestId('daily-allocation-daily-board').textContent || '').toContain('Saving');
+    await act(async () => {
+      releaseNetwork();
+    });
+    expect(screen.getByTestId('daily-allocation-daily-board').textContent || '').toContain('JOB-100');
+  });
+
+  it('does not refetch the board during an active drag', async () => {
+    const board = buildRangeBoard();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(board);
+      if (url === '/api/daily-allocation/visits' && init?.method === 'POST') {
+        return jsonResponse({
+          plan_day_id: board.plan_days[0].id,
+          plan_version: board.plan_days[0].plan_version + 1,
+          visit: { ...board.visits[0], id: 'visit-2', job_code: 'JOB-100' },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderBoardPage();
+    expect((await screen.findAllByText('Alex Worker')).length).toBeGreaterThan(0);
+    await act(async () => {
+      mocks.onDragEnd?.({
+        operation: {
+          source: { data: { source: { kind: 'job', job: board.jobs[0] } } },
+          target: { data: { target: { surface: 'session', workDate: '2026-08-14', profileId: 'employee-1', session: 'am' } } },
+        },
+      });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const before = fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/daily-allocation/board')).length;
+    act(() => {
+      mocks.onDragStart?.();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    const after = fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/daily-allocation/board')).length;
+    expect(after).toBe(before);
+  });
+
+  it('coalesces five rapid session moves into the latest one', async () => {
+    const board = buildRangeBoard();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(board);
+      if (url === '/api/daily-allocation/visits/visit-1' && init?.method === 'PATCH') {
+        const body = JSON.parse(String(init.body)) as { starts_at: string; ends_at: string };
+        return jsonResponse({
+          visit_id: 'visit-1',
+          plan_day_id: board.plan_days[0].id,
+          plan_version: board.plan_days[0].plan_version + 1,
+          visit: { ...board.visits[0], starts_at: body.starts_at, ends_at: body.ends_at, row_version: 2 },
+        });
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    renderBoardPage();
+    expect((await screen.findAllByText('Alex Worker')).length).toBeGreaterThan(0);
+    const sessions = ['am', 'pm', 'full', 'am', 'pm'] as const;
+    act(() => {
+      for (const session of sessions) {
+        mocks.onDragEnd?.({
+          operation: {
+            source: { data: { source: { kind: 'visit', visit: board.visits[0], profileId: 'employee-1' } } },
+            target: { data: { target: { surface: 'session', workDate: '2026-08-14', profileId: 'employee-1', session } } },
+          },
+        });
+      }
+    });
+    expect(screen.getByTestId('daily-allocation-daily-board').textContent || '').toContain('12:00');
+    await waitFor(() => {
+      const patches = fetchMock.mock.calls.filter(
+        ([url, init]) => String(url) === '/api/daily-allocation/visits/visit-1' && init?.method === 'PATCH'
+      );
+      expect(patches).toHaveLength(1);
+      const body = JSON.parse(String(patches[0]?.[1]?.body)) as { starts_at: string; ends_at: string };
+      expect(body.starts_at).toBe('2026-08-14T11:00:00.000Z');
+      expect(body.ends_at).toBe('2026-08-14T15:30:00.000Z');
+    });
+  });
+
+  it('rolls back only the failed session move', async () => {
+    const base = buildRangeBoard();
+    const board = buildRangeBoard({
+      visits: [
+        ...base.visits,
+        {
+          ...base.visits[0],
+          id: 'visit-2',
+          job_source_id: 'quote-2',
+          job_code: 'JOB-200',
+          starts_at: '2026-08-14T06:00:00.000Z',
+          ends_at: '2026-08-14T15:30:00.000Z',
+        },
+      ],
+      labour_assignments: [
+        ...base.labour_assignments,
+        {
+          ...base.labour_assignments[0],
+          id: 'labour-2',
+          visit_id: 'visit-2',
+        },
+      ],
+    });
+    let releaseNetwork: () => void = () => undefined;
+    const networkGate = new Promise<void>((resolve) => {
+      releaseNetwork = resolve;
+    });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(board);
+      await networkGate;
+      return jsonResponse({ error: 'Visit is stale.' }, 409);
+    }));
+    renderBoardPage();
+    expect((await screen.findAllByText('Alex Worker')).length).toBeGreaterThan(0);
+    act(() => {
+      mocks.onDragEnd?.({
+        operation: {
+          source: { data: { source: { kind: 'visit', visit: board.visits[0], profileId: 'employee-1' } } },
+          target: { data: { target: { surface: 'session', workDate: '2026-08-14', profileId: 'employee-1', session: 'am' } } },
+        },
+      });
+    });
+    const during = screen.getByTestId('daily-allocation-daily-board').textContent || '';
+    expect(during).toContain('JOB-200');
+    expect(during).toContain('07:00–12:00');
+    await act(async () => {
+      releaseNetwork();
+    });
+    await waitFor(() => {
+      const after = screen.getByTestId('daily-allocation-daily-board').textContent || '';
+      expect(after).toContain('JOB-200');
+      expect(after).toContain('08:00–11:00');
+      expect(after).not.toContain('07:00–12:00');
     });
   });
 
@@ -881,6 +1117,27 @@ describe('daily allocation manager board', () => {
           },
         });
       }
+      if (url === '/api/daily-allocation/assignments/labour' && init?.method === 'POST') {
+        return jsonResponse({
+          assignment_id: 'labour-2',
+          plan_day_id: 'plan-converted',
+          plan_version: 6,
+          assignment: {
+            id: 'labour-2',
+            visit_id: 'visit-2',
+            plan_day_id: 'plan-converted',
+            work_date: '2026-08-14',
+            profile_id: 'employee-1',
+            starts_at: '2026-08-14T06:00:00.000Z',
+            ends_at: '2026-08-14T15:30:00.000Z',
+            meeting_point: null,
+            meet_person: null,
+            notes: null,
+            row_version: 1,
+            updated_at: '2026-08-14T08:00:00.000Z',
+          },
+        });
+      }
       throw new Error(`Unexpected request: ${url}`);
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -889,7 +1146,7 @@ describe('daily allocation manager board', () => {
       mocks.onDragEnd?.({
         operation: {
           source: { data: { source: { kind: 'job', job: unconverted.jobs[0] } } },
-          target: { data: { target: { surface: 'week-cell', workDate: '2026-08-14' } } },
+          target: { data: { target: { surface: 'session', workDate: '2026-08-14', profileId: 'employee-1', session: 'full' } } },
         },
       });
     };
@@ -1420,19 +1677,12 @@ describe('daily allocation manager board', () => {
       'href',
       '/daily-allocation/my'
     );
-    expect(screen.getByRole('button', { name: 'Fit timeline to width' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use scrollable timeline' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Fit timeline to width' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Primary Jobs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Employees (1)' })).not.toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Weekly' }), { button: 0 });
     expect(await screen.findByTestId('daily-allocation-view-heading')).toHaveTextContent('Weekly employee board');
     expect(screen.getAllByText('Alex Worker').length).toBeGreaterThan(0);
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Primary Jobs' }), { button: 0 });
-    expect(screen.getByTestId('daily-allocation-view-heading')).toHaveTextContent('Weekly job board');
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Primary Employees' }), { button: 0 });
-    expect(screen.getAllByText('Alex Worker').length).toBeGreaterThan(0);
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Employees (1)' }), { button: 0 });
-    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Primary Plant' }), { button: 0 });
-    expect(screen.getByTestId('daily-allocation-view-heading')).toHaveTextContent('Weekly plant board');
-    expect(screen.getByText('Unassigned')).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Plant (1)' }), { button: 0 });
     expect(screen.getAllByText(/EX-01/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Add visit' })).toBeInTheDocument();
@@ -1457,7 +1707,7 @@ describe('daily allocation manager board', () => {
     expect(mouse.some((constraint) => constraint instanceof PointerActivationConstraints.Distance)).toBe(true);
   });
 
-  it('resizes a visit by keyboard in a labelled 30-minute step', async () => {
+  it('moves a visit to the morning session from the card', async () => {
     const board = buildRangeBoard();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -1484,11 +1734,7 @@ describe('daily allocation manager board', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     renderBoardPage();
-    const startHandle = await screen.findByRole('button', {
-      name: /Adjust start of JOB-100, currently .*30 minute steps/,
-    });
-    expect(startHandle.className).toContain('[@media(pointer:coarse)]:w-11');
-    fireEvent.keyDown(startHandle, { key: 'ArrowRight' });
+    fireEvent.click((await screen.findAllByRole('button', { name: 'AM' }))[0]);
 
     await waitFor(() => {
       const request = fetchMock.mock.calls.find(
@@ -1497,12 +1743,14 @@ describe('daily allocation manager board', () => {
       expect(request).toBeDefined();
       const body = JSON.parse(String(request?.[1]?.body)) as {
         starts_at: string;
+        ends_at: string;
         expected_row_version: number;
       };
-      expect(body.starts_at).toBe('2026-08-14T07:30:00.000Z');
+      expect(body.starts_at).toBe('2026-08-14T06:00:00.000Z');
+      expect(body.ends_at).toBe('2026-08-14T11:00:00.000Z');
       expect(body.expected_row_version).toBe(1);
     });
-    expect((await screen.findAllByText(/^Visit resized to 08:30–/)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('Visit moved.')).length).toBeGreaterThan(0);
   });
 
   it('keeps catalogue jobs off the calendar until a timed visit exists', async () => {
@@ -1686,9 +1934,8 @@ describe('daily allocation manager board', () => {
 
     renderBoardPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Review and convert' }));
-    expect(await screen.findByText('Timed visits')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Start'), { target: { value: '08:00' } });
-    fireEvent.change(screen.getByLabelText('End'), { target: { value: '11:00' } });
+    expect(await screen.findByText('Session visits')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Session'), { target: { value: 'am' } });
     fireEvent.change(screen.getByRole('combobox', { name: 'Disposition for Alex Worker' }), {
       target: { value: 'visit' },
     });

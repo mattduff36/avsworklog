@@ -658,6 +658,35 @@ export interface DailyAllocationCopyResult {
   warnings: Array<{ label: string; detail: string }>;
 }
 
+const normalizeSessionsSchema = z.object({
+  request_id: z.string().uuid(),
+  team_id: z.string().min(1),
+  work_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  expected_plan_version: z.number().int().positive(),
+  apply: z.boolean(),
+  adjustments: z.array(z.object({
+    visit_id: z.string().uuid(),
+    session: z.enum(['full', 'am', 'pm']),
+  })).default([]),
+}).strict();
+
+export async function normalizeDailyAllocationSessions(input: unknown) {
+  const { supabase } = await requireDailyAllocationManagerMutation();
+  const parsed = parseWithSchema(normalizeSessionsSchema, input, 'Invalid session normalization.');
+  return callDailyAllocationRpc<Record<string, unknown>>(
+    supabase,
+    'normalize_daily_allocation_sessions_v2',
+    {
+      p_request_id: parsed.request_id,
+      p_team_id: parsed.team_id,
+      p_work_date: parsed.work_date,
+      p_expected_plan_version: parsed.expected_plan_version,
+      p_apply: parsed.apply,
+      p_adjustments: parsed.adjustments,
+    }
+  );
+}
+
 export async function copyDailyAllocationPlan(
   input: unknown,
 ): Promise<DailyAllocationCopyResult> {

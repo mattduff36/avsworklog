@@ -53,6 +53,8 @@ export const DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE =
   'tests/db/daily-allocation-safety-runtime.test.ts';
 export const INVENTORY_KIOSK_HARDWARE_TARGET_TEST_FILE =
   'tests/db/inventory-kiosk-hardware-identity-runtime.test.ts';
+export const DAILY_ALLOCATION_SESSION_TARGET_TEST_FILE =
+  'tests/db/daily-allocation-session-runtime.test.ts';
 export const ALLOWED_TARGET_TEST_FILES = [
   TARGET_TEST_FILE,
   HGV_SAVE_TARGET_TEST_FILE,
@@ -61,6 +63,7 @@ export const ALLOWED_TARGET_TEST_FILES = [
   BANK_HOLIDAY_RUNTIME_TARGET_TEST_FILE,
   DAILY_ALLOCATION_SAFETY_TARGET_TEST_FILE,
   INVENTORY_KIOSK_HARDWARE_TARGET_TEST_FILE,
+  DAILY_ALLOCATION_SESSION_TARGET_TEST_FILE,
 ] as const;
 export const HOST_PORT_MIN = 20_000;
 export const HOST_PORT_COUNT = 10_000;

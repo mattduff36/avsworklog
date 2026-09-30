@@ -7,10 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
 import {
-  DAILY_ALLOCATION_BOARD_PRIMARIES,
-  type DailyAllocationBoardPrimary,
-} from '@/lib/config/daily-allocation-primary-preference';
-import {
   DAILY_ALLOCATION_BOARD_VIEWS,
   type DailyAllocationBoardView,
 } from '@/lib/config/daily-allocation-view-preference';
@@ -24,8 +20,6 @@ interface BoardDateRangeControlsProps {
   view: DailyAllocationBoardView;
   onDateChange: (date: string) => void;
   onViewChange: (view: DailyAllocationBoardView) => void;
-  primary: DailyAllocationBoardPrimary;
-  onPrimaryChange?: (primary: DailyAllocationBoardPrimary) => void;
 }
 
 export function BoardDateRangeControls({
@@ -33,8 +27,6 @@ export function BoardDateRangeControls({
   view,
   onDateChange,
   onViewChange,
-  primary,
-  onPrimaryChange,
 }: BoardDateRangeControlsProps) {
   const selected = parseISO(selectedDate);
   const week = getDailyAllocationWeekRange(selectedDate);
@@ -55,16 +47,6 @@ export function BoardDateRangeControls({
     }
   }
 
-  function handlePrimaryChange(value: string) {
-    if (
-      value === DAILY_ALLOCATION_BOARD_PRIMARIES.job
-      || value === DAILY_ALLOCATION_BOARD_PRIMARIES.employee
-      || value === DAILY_ALLOCATION_BOARD_PRIMARIES.plant
-    ) {
-      onPrimaryChange?.(value);
-    }
-  }
-
   return (
     <div className="flex shrink-0 flex-nowrap items-center gap-2">
       <Tabs value={view} onValueChange={handleViewChange}>
@@ -74,35 +56,6 @@ export function BoardDateRangeControls({
           </TabsTrigger>
           <TabsTrigger value={DAILY_ALLOCATION_BOARD_VIEWS.weekly} className="px-3">
             Weekly
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-      <Tabs value={primary} onValueChange={handlePrimaryChange}>
-        <TabsList
-          aria-label="Board primary resource"
-          className="grid h-9 grid-cols-3"
-          data-testid="daily-allocation-primary-tabs"
-        >
-          <TabsTrigger
-            value={DAILY_ALLOCATION_BOARD_PRIMARIES.job}
-            className="px-3"
-            aria-label="Primary Jobs"
-          >
-            Jobs
-          </TabsTrigger>
-          <TabsTrigger
-            value={DAILY_ALLOCATION_BOARD_PRIMARIES.employee}
-            className="px-3"
-            aria-label="Primary Employees"
-          >
-            Employees
-          </TabsTrigger>
-          <TabsTrigger
-            value={DAILY_ALLOCATION_BOARD_PRIMARIES.plant}
-            className="px-3"
-            aria-label="Primary Plant"
-          >
-            Plant
           </TabsTrigger>
         </TabsList>
       </Tabs>

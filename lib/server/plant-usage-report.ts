@@ -1,5 +1,10 @@
 import { loadJobCatalogueRecords } from '@/lib/server/job-catalogue';
 import {
+  dailyAllocationJobSheetHref,
+  fleetPlantHistoryHref,
+  plantInspectionHref,
+} from '@/lib/navigation/canonical-links';
+import {
   enumerateInclusiveIsoDates,
   fromUntyped,
   requireDailyAllocationManagerContext,
@@ -155,6 +160,7 @@ function matchingContext(row: DailyPlantReconciliationRow, contexts: PublishedUs
 }
 
 function rowFromReconciliation(
+  links: { fleet: boolean; inspections: boolean },
   row: DailyPlantReconciliationRow,
   jobs: Map<string, { customer_name: string | null; title: string | null; site_address: string | null }>,
   contexts: PublishedUsageContext[],
@@ -176,15 +182,18 @@ function rowFromReconciliation(
     check_evidence: row.inspection_id ? 'submitted plant check' : '',
     actual_job_code: row.actual_job_code || '',
     status: STATUS_LABELS[row.status],
-    plant_history_url: row.plant_kind === 'registered' && row.plant_id
-      ? `/fleet/plant/${row.plant_id}/history`
+    plant_history_url: links.fleet && row.plant_kind === 'registered' && row.plant_id
+      ? fleetPlantHistoryHref(row.plant_id)
       : '',
-    job_sheet_url: jobCode ? `/daily-allocation/jobs/${encodeURIComponent(jobCode)}` : '',
-    inspection_url: row.inspection_id ? `/plant-inspections/${row.inspection_id}` : '',
+    job_sheet_url: jobCode ? dailyAllocationJobSheetHref(jobCode) : '',
+    inspection_url: links.inspections && row.inspection_id ? plantInspectionHref(row.inspection_id) : '',
   };
 }
 
-export async function buildPlantUsageRows(range: ReportDateRange): Promise<PlantUsageRow[]> {
+export async function buildPlantUsageRows(
+  range: ReportDateRange,
+  links: { fleet: boolean; inspections: boolean } = { fleet: false, inspections: false },
+): Promise<PlantUsageRow[]> {
   if (!range.dateFrom || !range.dateTo) return [];
   const catalogue = await loadJobCatalogueRecords();
   const jobs = new Map(catalogue.map((record) => [record.job_code, record]));
@@ -193,7 +202,7 @@ export async function buildPlantUsageRows(range: ReportDateRange): Promise<Plant
   for (const date of enumerateInclusiveIsoDates(range.dateFrom, range.dateTo)) {
     const day = await loadPlantReconciliation(date);
     for (const row of day.plant) {
-      rows.push(rowFromReconciliation(row, jobs, contexts));
+      rows.push(rowFromReconciliation(links, row, jobs, contexts));
     }
   }
   return rows;

@@ -4,6 +4,7 @@ import {
   PointerActivationConstraints,
   PointerSensor,
 } from '@dnd-kit/dom';
+import type { DailyAllocationSession } from '@/lib/utils/daily-allocation-sessions';
 import type { DailyAllocationJobProjection, DailyAllocationVisit } from '@/types/daily-allocation';
 
 export const DAILY_ALLOCATION_DND = {
@@ -37,6 +38,7 @@ export interface DailyAllocationDragPlant {
 export interface DailyAllocationDragVisit {
   kind: 'visit';
   visit: DailyAllocationVisit;
+  profileId?: string | null;
 }
 
 export type DailyAllocationDragSource =
@@ -49,7 +51,9 @@ export interface DailyAllocationDropTarget {
   workDate?: string;
   visitId?: string;
   jobKey?: string;
-  surface: 'timeline' | 'week-cell' | 'visit';
+  profileId?: string | null;
+  session?: DailyAllocationSession;
+  surface: 'timeline' | 'week-cell' | 'visit' | 'session';
 }
 
 export function jobResourceKey(job: Pick<DailyAllocationJobProjection, 'source_type' | 'source_id'>): string {

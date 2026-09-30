@@ -144,6 +144,7 @@ export interface DailyAllocationIssuedVisit {
   starts_at: string;
   ends_at: string;
   instructions: DailyLabourInstructions;
+  plant?: Array<{ label: string; kind: 'registered' | 'hired' }>;
 }
 
 export interface DailyAllocationIssuedItem {
@@ -412,6 +413,8 @@ export interface DailyAllocationPlantResource {
   id: string;
   plant_id: string;
   nickname: string | null;
+  status?: 'active' | 'inactive' | 'maintenance' | 'retired' | null;
+  loler_due_date?: string | null;
 }
 
 export interface DailyAllocationBoardConflict {

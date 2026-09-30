@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   assignDailyAllocationLabour,
   assignDailyAllocationPlant,
@@ -8,6 +8,7 @@ import {
   createDailyAllocationConflictOverride,
   createDailyAllocationVisit,
   DailyAllocationApiError,
+  fetchDailyAllocationConversionSource,
   dailyAllocationBoardOptimisticKey,
   dailyAllocationBoardQueryKey,
   deleteDailyAllocationVisit,
@@ -18,6 +19,12 @@ import {
   updateDailyAllocationVisit,
 } from '@/lib/client/daily-allocation';
 import { createOptimisticEntityId } from '@/components/daily-allocation/board/daily-allocation-optimistic-ledger';
+import {
+  applyCopiedAllocationProjection,
+  buildCopiedAllocationProjection,
+  copiedAllocationProjectionProven,
+  type DailyAllocationCopyProjectionResult,
+} from '@/components/daily-allocation/board/daily-allocation-copy-projection';
 import {
   patchBoardPlanVersion,
   patchBoardRemoveLabourAssignment,
@@ -77,6 +84,9 @@ function useBoardQueryAdapter(
   return {
     getBoard: () => queryClient.getQueryData(queryKey),
     cancel: () => queryClient.cancelQueries({ queryKey, exact: true }),
+    patchAuthoritative: (board) => {
+      if (board) queryClient.setQueryData(queryKey, board);
+    },
     scheduleReconciliation,
   };
 }
@@ -116,6 +126,32 @@ function useOptimisticMutationRunner() {
   }
 
   return { boardState, boardKey, runMutation };
+}
+
+function useCoordinatedMutation<TInput, TResult>(
+  kind: string,
+  mutationFn: (input: TInput) => Promise<TResult>
+) {
+  const boardState = useDailyAllocationBoard();
+  return {
+    isPending: boardState.openOperations.some((operation) => operation.kind === kind),
+    error: boardState.mutationError,
+    mutate(
+      input: TInput,
+      options?: {
+        onError?: (error: unknown) => void;
+        onSuccess?: (result: TResult) => void;
+      }
+    ) {
+      void mutationFn(input).then(
+        (result) => options?.onSuccess?.(result),
+        (error: unknown) => options?.onError?.(error)
+      );
+    },
+    mutateAsync(input: TInput) {
+      return mutationFn(input);
+    },
+  };
 }
 
 function requirePlanDayId(
@@ -181,8 +217,7 @@ function currentPlantAssignmentRowVersion(
 
 export function useConvertDailyAllocationPlanDay() {
   const { boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: {
+  return useCoordinatedMutation('convert', async (input: {
       request: CoordinatedRequest<DailyAllocationConvertInput>;
       optimisticPlanDay: DailyAllocationPlanDay;
     }) => runMutation({
@@ -195,10 +230,29 @@ export function useConvertDailyAllocationPlanDay() {
       apply: (state) => applyIfBoard(state.board, (board) =>
         patchBoardWithPlanDay(board, input.optimisticPlanDay)
       ),
-      mutate: ({ requestId }) => convertDailyAllocationPlanDay({
-        ...input.request,
-        request_id: requestId,
-      }),
+      mutate: async ({ requestId }) => {
+        let fingerprint = input.request.expected_source_fingerprint;
+        if (!/^[0-9a-f]{64}$/.test(fingerprint)) {
+          const source = await fetchDailyAllocationConversionSource(
+            input.request.work_date,
+            input.request.team_id
+          );
+          if (source.labour_drafts.length > 0 || source.plant_drafts.length > 0) {
+            throw new DailyAllocationApiError(
+              'Review every untimed draft before creating visits.',
+              409,
+              { code: 'TARGET_NEEDS_CONVERSION' },
+              'TARGET_NEEDS_CONVERSION'
+            );
+          }
+          fingerprint = source.source_fingerprint;
+        }
+        return convertDailyAllocationPlanDay({
+          ...input.request,
+          request_id: requestId,
+          expected_source_fingerprint: fingerprint,
+        });
+      },
       acknowledge: (result) => ({
         apply: (state) => applyIfBoard(state.board, (board) =>
           patchBoardWithConversionResult(board, result, input.optimisticPlanDay)
@@ -210,13 +264,12 @@ export function useConvertDailyAllocationPlanDay() {
         },
       }),
     }),
-  });
+  );
 }
 
 export function useCreateDailyAllocationVisit() {
   const { boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: {
+  return useCoordinatedMutation('create-visit', async (input: {
       request: CoordinatedRequest<DailyAllocationVisitUpsertInput>;
       optimisticVisit: DailyAllocationVisit;
     }) => runMutation({
@@ -270,13 +323,12 @@ export function useCreateDailyAllocationVisit() {
         identityAliases: { [input.optimisticVisit.id]: result.visit.id },
       }),
     }),
-  });
+  );
 }
 
 export function useUpdateDailyAllocationVisit() {
   const { boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: {
+  return useCoordinatedMutation('update-visit', async (input: {
       visitId: string;
       request: CoordinatedRequest<DailyAllocationVisitUpsertInput>;
       optimisticVisit: DailyAllocationVisit;
@@ -335,13 +387,12 @@ export function useUpdateDailyAllocationVisit() {
         },
       }),
     }),
-  });
+  );
 }
 
 export function useMoveDailyAllocationVisit() {
   const { boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: {
+  return useCoordinatedMutation('move-visit', async (input: {
       request: CoordinatedRequest<DailyAllocationVisitMoveInput>;
       optimisticVisit: DailyAllocationVisit;
       sourcePlanDayId: string;
@@ -424,13 +475,12 @@ export function useMoveDailyAllocationVisit() {
         },
       }),
     }),
-  });
+  );
 }
 
 export function useDeleteDailyAllocationVisit() {
   const { boardState, boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: CoordinatedRequest<DailyAllocationVisitDeleteInput>) => {
+  return useCoordinatedMutation('delete-visit', async (input: CoordinatedRequest<DailyAllocationVisitDeleteInput>) => {
       const planDayId = requirePlanDayId(boardState.board, input.visit_id, 'visit');
       return runMutation({
         kind: 'delete-visit',
@@ -479,13 +529,12 @@ export function useDeleteDailyAllocationVisit() {
         }),
       });
     },
-  });
+  );
 }
 
 export function useAssignDailyAllocationLabour() {
   const { boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: {
+  return useCoordinatedMutation('assign-labour', async (input: {
       request: CoordinatedRequest<DailyAllocationLabourAssignInput>;
       optimisticAssignment: DailyAllocationLabourAssignment;
     }) => runMutation({
@@ -559,13 +608,12 @@ export function useAssignDailyAllocationLabour() {
         identityAliases: { [input.optimisticAssignment.id]: result.assignment_id },
       }),
     }),
-  });
+  );
 }
 
 export function useUnassignDailyAllocationLabour() {
   const { boardState, boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: CoordinatedRequest<DailyAllocationAssignmentDeleteInput>) => {
+  return useCoordinatedMutation('unassign-labour', async (input: CoordinatedRequest<DailyAllocationAssignmentDeleteInput>) => {
       const planDayId = requirePlanDayId(boardState.board, input.assignment_id, 'labour');
       return runMutation({
         kind: 'unassign-labour',
@@ -613,13 +661,12 @@ export function useUnassignDailyAllocationLabour() {
         }),
       });
     },
-  });
+  );
 }
 
 export function useAssignDailyAllocationPlant() {
   const { boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: {
+  return useCoordinatedMutation('assign-plant', async (input: {
       request: CoordinatedRequest<DailyAllocationPlantAssignInput>;
       optimisticAssignment: DailyAllocationPlantAssignment;
     }) => runMutation({
@@ -692,13 +739,12 @@ export function useAssignDailyAllocationPlant() {
         identityAliases: { [input.optimisticAssignment.id]: result.assignment_id },
       }),
     }),
-  });
+  );
 }
 
 export function useUnassignDailyAllocationPlant() {
   const { boardState, boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: CoordinatedRequest<DailyAllocationAssignmentDeleteInput>) => {
+  return useCoordinatedMutation('unassign-plant', async (input: CoordinatedRequest<DailyAllocationAssignmentDeleteInput>) => {
       const planDayId = requirePlanDayId(boardState.board, input.assignment_id, 'plant');
       return runMutation({
         kind: 'unassign-plant',
@@ -744,13 +790,12 @@ export function useUnassignDailyAllocationPlant() {
         }),
       });
     },
-  });
+  );
 }
 
 export function useCreateDailyAllocationConflictOverride() {
   const { boardState, boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: {
+  return useCoordinatedMutation('create-override', async (input: {
       request: CoordinatedRequest<DailyAllocationOverrideInput>;
       optimisticOverride: DailyAllocationConflictOverride;
     }) => runMutation({
@@ -811,13 +856,12 @@ export function useCreateDailyAllocationConflictOverride() {
         identityAliases: { [input.optimisticOverride.id]: result.override_id },
       }),
     }),
-  });
+  );
 }
 
 export function usePublishDailyAllocationPlanV2() {
   const { boardState, boardKey, runMutation } = useOptimisticMutationRunner();
-  return useMutation({
-    mutationFn: async (input: {
+  return useCoordinatedMutation('publish-v2', async (input: {
       request: CoordinatedRequest<DailyAllocationPublishV2Input>;
       optimisticPublication: DailyAllocationPublicationMeta;
     }) => runMutation({
@@ -863,6 +907,50 @@ export function usePublishDailyAllocationPlanV2() {
         identityAliases: { [input.optimisticPublication.id]: result.publication_id },
       }),
     }),
+  );
+}
+
+export function useProjectCopiedAllocation() {
+  const { boardKey, runMutation } = useOptimisticMutationRunner();
+  return useCoordinatedMutation('plan-copy', (input: {
+    board: DailyAllocationRangeBoardPayload;
+    result: DailyAllocationCopyProjectionResult;
+  }) => {
+    const projection = buildCopiedAllocationProjection({
+      board: input.board,
+      result: input.result,
+      createId: () => createOptimisticEntityId(globalThis.crypto.randomUUID(), 'copy'),
+    });
+    if (projection.visits.length === 0) return Promise.resolve(input.result);
+    const planDayId = projection.planDay?.id || projection.visits[0]?.plan_day_id;
+    return runMutation({
+      kind: 'plan-copy',
+      claims: [
+        ...(planDayId ? [planDayClaim(planDayId)] : []),
+        ...projection.visits.map((visit) => visitClaim(visit.id)),
+      ],
+      duplicateKey: [
+        'plan-copy',
+        input.result.target_date,
+        projection.planDay?.team_id || projection.visits[0]?.owner_team_id || 'none',
+      ].join(':'),
+      apply: (state) => applyIfBoard(state.board, (board) =>
+        applyCopiedAllocationProjection(board, projection)
+      ),
+      mutate: async () => input.result,
+      acknowledge: () => ({
+        apply: (state) => applyIfBoard(state.board, (board) =>
+          applyCopiedAllocationProjection(board, projection)
+        ),
+        proofs: {
+          [boardKey]: (base) => copiedAllocationProjectionProven(
+            base.board,
+            input.result,
+            projection.sourceVisits
+          ),
+        },
+      }),
+    });
   });
 }
 
@@ -879,6 +967,7 @@ export function useDailyAllocationBoardMutations() {
   const unassignPlant = useUnassignDailyAllocationPlant();
   const createOverride = useCreateDailyAllocationConflictOverride();
   const publishV2 = usePublishDailyAllocationPlanV2();
+  const projectCopy = useProjectCopiedAllocation();
   const mutations = [
     convert,
     createVisit,
@@ -891,6 +980,7 @@ export function useDailyAllocationBoardMutations() {
     unassignPlant,
     createOverride,
     publishV2,
+    projectCopy,
   ];
 
   return {
@@ -905,6 +995,7 @@ export function useDailyAllocationBoardMutations() {
     unassignPlant,
     createOverride,
     publishV2,
+    projectCopy,
     isPending: mutations.some((mutation) => mutation.isPending) || boardState.isMutationPending,
     error: boardState.mutationError ?? mutations.find((mutation) => mutation.error)?.error ?? null,
   };

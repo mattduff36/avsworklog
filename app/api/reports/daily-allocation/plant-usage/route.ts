@@ -23,6 +23,10 @@ export async function GET(request: NextRequest) {
     if (!await canEffectiveRoleUseModuleLevel('daily-allocation', 4)) {
       return NextResponse.json({ error: 'Daily Allocation manager access is required.' }, { status: 403 });
     }
+    const [canOpenFleet, canOpenInspections] = await Promise.all([
+      canEffectiveRoleAccessModule('admin-vans'),
+      canEffectiveRoleAccessModule('plant-inspections'),
+    ]);
 
     const parsed = parseReportDateRange(request.nextUrl.searchParams);
     const rangeError = validateRequiredReportDateRange(parsed.range, 62);
@@ -30,7 +34,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: rangeError || parsed.error }, { status: 400 });
     }
 
-    const rows = await buildPlantUsageRows(parsed.range);
+    const rows = await buildPlantUsageRows(parsed.range, {
+      fleet: canOpenFleet,
+      inspections: canOpenInspections,
+    });
     const buffer = await generateExcelFile([
       {
         sheetName: 'Daily evidence',
@@ -48,9 +55,9 @@ export async function GET(request: NextRequest) {
           { header: 'Check evidence', key: 'check_evidence', width: 24 },
           { header: 'Actual job', key: 'actual_job_code', width: 16 },
           { header: 'Status', key: 'status', width: 20 },
-          { header: 'Plant history', key: 'plant_history_url', width: 42 },
-          { header: 'Job sheet', key: 'job_sheet_url', width: 42 },
-          { header: 'Inspection', key: 'inspection_url', width: 42 },
+          { header: 'Plant history', key: 'plant_history_url', width: 42, hyperlink: true },
+          { header: 'Job sheet', key: 'job_sheet_url', width: 42, hyperlink: true },
+          { header: 'Inspection', key: 'inspection_url', width: 42, hyperlink: true },
         ],
         data: rows.map((row) => ({ ...row })),
       },

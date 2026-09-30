@@ -248,7 +248,8 @@ function visitInstructions(
 export function mapV2IssuedItinerary(
   publication: Pick<PublicationReadRow, 'id' | 'work_date' | 'revision_no' | 'published_at'>,
   labourRows: PublishedLabourRow[],
-  visitsById: Map<string, PublishedVisitRow>
+  visitsById: Map<string, PublishedVisitRow>,
+  plantByVisit: Map<string, Array<{ label: string; kind: 'registered' | 'hired' }>> = new Map()
 ): DailyAllocationIssuedItem {
   const dayState = labourRows.find((row) => row.published_visit_id == null) || null;
   const visitRows = labourRows
@@ -266,6 +267,7 @@ export function mapV2IssuedItinerary(
         starts_at: row.starts_at || visit.starts_at,
         ends_at: row.ends_at || visit.ends_at,
         instructions: visitInstructions(row, visit),
+        plant: plantByVisit.get(visit.id) || [],
       };
       return { row, visit: mapped };
     })
@@ -419,6 +421,29 @@ export async function loadMyAllocation(
     : { data: [] as PublishedVisitRow[], error: null };
   if (visitError) throw visitError;
   const visitsById = new Map((visitRows || []).map((row) => [row.id, row]));
+  const plantByVisit = new Map<string, Array<{ label: string; kind: 'registered' | 'hired' }>>();
+  const plantResult = await (supabase as unknown as {
+    rpc: (name: string) => Promise<{
+      data: Array<{
+        published_visit_id: string;
+        plant_kind: 'registered' | 'hired';
+        label: string;
+      }> | null;
+      error: { message?: string } | null;
+    }>;
+  }).rpc('list_my_daily_allocation_issued_plant');
+  const plantMissing = Boolean(plantResult.error)
+    && /does not exist|PGRST202|schema cache/i.test(plantResult.error?.message || '');
+  if (plantResult.error && !plantMissing) throw plantResult.error;
+  for (const row of (plantResult.data || []) as Array<{
+    published_visit_id: string;
+    plant_kind: 'registered' | 'hired';
+    label: string;
+  }>) {
+    const current = plantByVisit.get(row.published_visit_id) || [];
+    current.push({ label: row.label, kind: row.plant_kind });
+    plantByVisit.set(row.published_visit_id, current);
+  }
 
   const missingV2PublicationIds = Array.from(new Set(
     v2Rows
@@ -468,7 +493,7 @@ export async function loadMyAllocation(
       messageByPublication.get(publicationId) || null
     );
     if (query.workDate && publication.work_date !== query.workDate) continue;
-    v2History.push(mapV2IssuedItinerary(publication, labourRows, visitsById));
+    v2History.push(mapV2IssuedItinerary(publication, labourRows, visitsById, plantByVisit));
   }
 
   const history = [...v1History, ...v2History].sort(sortIssuedHistory);

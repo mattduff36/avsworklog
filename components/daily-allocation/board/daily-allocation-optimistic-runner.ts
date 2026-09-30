@@ -17,6 +17,7 @@ export interface DailyAllocationBoardQueryAdapter {
   getBoard(): DailyAllocationProjection['board'];
   cancel(): Promise<void> | void;
   scheduleReconciliation(keys: readonly string[]): void;
+  patchAuthoritative?(board: DailyAllocationProjection['board']): void;
 }
 
 export interface DailyAllocationOptimisticLedgerHandle {
@@ -122,11 +123,16 @@ export async function runDailyAllocationOptimisticMutation<T>(
       };
     },
   });
+  void input.adapter.cancel();
 
   try {
     const result = await admission.completion;
-    const authoritative = { board: input.adapter.getBoard() };
     const settled = input.ledger.getOperations().find((operation) => operation.id === admission.operation.id);
+    if (settled && input.adapter.patchAuthoritative) {
+      const patched = settled.apply({ board: input.adapter.getBoard() }).board;
+      if (patched) input.adapter.patchAuthoritative(patched);
+    }
+    const authoritative = { board: input.adapter.getBoard() };
     if (settled && dailyAllocationProofsSatisfied(settled, authoritative)) {
       input.ledger.setOperations((current) => reconcileOptimisticOperations(
         current,

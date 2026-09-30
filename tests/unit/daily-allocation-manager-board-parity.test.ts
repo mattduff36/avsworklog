@@ -8,6 +8,9 @@ import {
 } from '@/components/daily-allocation/board/daily-allocation-conversion';
 import {
   buildDailyAllocationEmployeeOccupancy,
+  dailyAllocationEmployeeUnavailableReason,
+  dailyAllocationPlantUnavailableReason,
+  formatDailyAllocationOccupancySummary,
 } from '@/components/daily-allocation/board/daily-allocation-occupancy';
 import {
   DAILY_ALLOCATION_BOARD_MIN_CONTENT_WIDTH_PX,
@@ -263,6 +266,32 @@ describe('manager board parity', () => {
     expect(segments).toContainEqual({ startMinutes: 8 * 60, endMinutes: 11 * 60, state: 'booked' });
     expect(segments.some((segment) => segment.state === 'unavailable' && segment.startMinutes === 12 * 60)).toBe(true);
   });
+
+  it('names absence, off-shift, maintenance, and inspection occupancy', () => {
+    const input = board();
+    const day = {
+      ...input.resources.employees[0].days[0],
+      availability: 'full_day_absence' as const,
+      blocking_absence: {
+        ...input.resources.employees[0].days[0].blocking_absence,
+        reason_name: 'Training',
+      },
+    };
+    expect(dailyAllocationEmployeeUnavailableReason(day)).toBe('Training');
+    expect(formatDailyAllocationOccupancySummary(
+      buildDailyAllocationEmployeeOccupancy({ day, assignments: [] }),
+      'Training'
+    )).toContain('Training');
+    expect(dailyAllocationPlantUnavailableReason({
+      status: 'maintenance',
+      workDate: '2026-08-14',
+    })).toBe('Maintenance');
+    expect(dailyAllocationPlantUnavailableReason({
+      status: 'active',
+      lolerDueDate: '2026-08-01',
+      workDate: '2026-08-14',
+    })).toBe('Inspection due');
+  });
 });
 
 describe('guided legacy conversion and instruction inputs', () => {
@@ -313,10 +342,12 @@ describe('guided legacy conversion and instruction inputs', () => {
       disposition: 'visit',
       visitKey: review.visits[0].key,
     };
+    review.visits[0].startTime = '';
+    review.visits[0].endTime = '';
     expect(() => buildDailyAllocationConversionRequest({ source, review }))
       .toThrow('Choose valid times');
-    review.visits[0].startTime = '07:30';
-    review.visits[0].endTime = '10:30';
+    review.visits[0].startTime = '07:00';
+    review.visits[0].endTime = '12:00';
     const request = buildDailyAllocationConversionRequest({ source, review });
     expect(request.expected_source_fingerprint).toBe(source.source_fingerprint);
     expect(request.labour_drafts).toEqual([{
