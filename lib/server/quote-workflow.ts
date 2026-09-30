@@ -5,6 +5,7 @@ import { loadSquiresLogoDataUrl } from '@/lib/pdf/squires-logo';
 import { getQuoteResendEmailConfig } from '@/lib/server/resend-email-config';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
 import { getSystemAccountIds } from '@/lib/server/system-accounts';
 import { buildQuoteDisplayName, buildQuotePdfFilename } from '@/lib/quotes/quote-display-name';
@@ -35,6 +36,7 @@ import {
   buildQuotePoCoverageSummary,
   listQuotePurchaseOrders,
 } from '@/lib/server/quote-purchase-orders';
+import { buildQuoteMergeGroupMembers } from '@/lib/server/quote-merge-group';
 import {
   loadQuoteMergeContexts,
   serializeMergeContext,
@@ -162,6 +164,7 @@ export interface QuoteBundle {
   financialAdjustments: QuoteFinancialAdjustment[];
   financialSummary: QuoteThreadFinancialSummary;
   mergeInfo: ReturnType<typeof serializeMergeContext> | null;
+  mergeGroupMembers: ReturnType<typeof buildQuoteMergeGroupMembers>;
   mergeSourceQuotes: QuoteRow[];
   mergeSourceFinancialSummaries: Record<string, QuoteThreadFinancialSummary>;
 }
@@ -195,6 +198,7 @@ export function serializeQuoteBundle(
     financial_summary: bundle.financialSummary,
     financial_adjustments: bundle.financialAdjustments,
     merge_info: bundle.mergeInfo,
+    merge_group_members: bundle.mergeGroupMembers,
     merge_source_quotes: bundle.mergeSourceQuotes,
     merge_source_financial_summaries: bundle.mergeSourceFinancialSummaries,
   };
@@ -833,6 +837,55 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     }),
   );
 
+  const latestQuoteByThread = new Map(
+    versions.filter(version => version.is_latest_version).map(version => [version.quote_thread_id, version.id]),
+  );
+  const memberQuoteIds = mergeContext
+    ? mergeContext.members.map(member => (
+      latestQuoteByThread.get(member.quote_thread_id) || member.source_latest_quote_id
+    ))
+    : [];
+  const memberLineItemsResult = memberQuoteIds.length > 0
+    ? await supabase
+      .from('quote_line_items')
+      .select('*')
+      .in('quote_id', memberQuoteIds)
+      .order('sort_order', { ascending: true })
+    : { data: [], error: null };
+  if (memberLineItemsResult.error) throw memberLineItemsResult.error;
+  const mergeInfo = mergeContext ? serializeMergeContext(mergeContext) : null;
+  const customerRecord = typedQuote.customer;
+  const invoiceSourceThreadIds: Record<string, string[]> = {};
+  for (const allocation of invoiceSourceAllocationResult.data || []) {
+    const threads = invoiceSourceThreadIds[allocation.quote_invoice_id] || [];
+    if (!threads.includes(allocation.source_quote_thread_id)) {
+      threads.push(allocation.source_quote_thread_id);
+    }
+    invoiceSourceThreadIds[allocation.quote_invoice_id] = threads;
+  }
+  const [canViewCustomers, canViewQuoteFinancials] = await Promise.all([
+    canEffectiveRoleAccessModule('customers'),
+    canEffectiveRoleAccessModule('quotes'),
+  ]);
+  const mergeGroupMembers = mergeContext && mergeInfo
+    ? buildQuoteMergeGroupMembers({
+      mergeMode: mergeContext.group.merge_mode,
+      openedThreadId: typedQuote.quote_thread_id,
+      customerName: customerRecord?.company_name || null,
+      members: mergeContext.members,
+      versions,
+      survivorLineItems: lineItems,
+      memberLineItems: (memberLineItemsResult.data || []) as QuoteLineItemRow[],
+      financialSummaries: mergeSourceFinancialSummaries,
+      invoices: displayInvoices,
+      invoiceSourceThreadIds,
+      purchaseOrders,
+      pdfSnapshots: mergeInfo.pdf_snapshots,
+      canViewCustomers,
+      canViewQuoteFinancials,
+    })
+    : [];
+
   return {
     quote: {
       ...typedQuote,
@@ -855,7 +908,8 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     invoiceSummary,
     financialAdjustments: financialCalculation.adjustments,
     financialSummary: financialCalculation.threadSummary,
-    mergeInfo: mergeContext ? serializeMergeContext(mergeContext) : null,
+    mergeInfo,
+    mergeGroupMembers,
     mergeSourceQuotes: mergeContext
       ? versions.filter(version => version.is_latest_version)
       : [],

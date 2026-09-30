@@ -1,5 +1,6 @@
 export interface QuoteLineItem {
   id?: string;
+  quote_id?: string;
   description: string;
   quantity: number;
   unit: string;
@@ -243,6 +244,24 @@ export interface QuoteMergeInfo {
   members: QuoteMergeMember[];
   aliases: string[];
   pdf_snapshots?: QuotePdfSnapshot[];
+}
+
+export interface QuoteMergeGroupMember {
+  quote_thread_id: string;
+  quote_id: string;
+  reference: string;
+  is_survivor: boolean;
+  subject_line: string | null;
+  project_description: string | null;
+  customer_id: string | null;
+  customer_name: string | null;
+  show_financial_link: boolean;
+  sage_posted: boolean;
+  line_items: QuoteLineItem[];
+  financial_summary: QuoteThreadFinancialSummary | null;
+  invoices: Array<Pick<QuoteInvoice, 'id' | 'invoice_number' | 'invoice_date' | 'amount' | 'merge_billing_scope'>>;
+  purchase_orders: Array<Pick<QuotePurchaseOrder, 'id' | 'po_number' | 'po_value'>>;
+  pdf_snapshots: QuotePdfSnapshot[];
 }
 
 export interface QuoteManagerOption {
@@ -510,6 +529,7 @@ export interface Quote {
   };
   financial_summary?: QuoteThreadFinancialSummary;
   merge_info?: QuoteMergeInfo | null;
+  merge_group_members?: QuoteMergeGroupMember[];
   merge_source_quotes?: Quote[];
   merge_source_financial_summaries?: Record<string, QuoteThreadFinancialSummary>;
   is_merged_source?: boolean;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -237,6 +238,8 @@ function getOldestOpenFinancialYearStartYear(
 }
 
 export function AbsenceCalendarAdmin() {
+  const searchParams = useSearchParams();
+  const requestedProfileId = searchParams.get('profile_id');
   const { profile, isAdmin, isSuperAdmin } = useAuth();
   const {
     data: absenceSecondarySnapshot,
@@ -247,7 +250,13 @@ export function AbsenceCalendarAdmin() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loadingEmployees, setLoadingEmployees] = useState(true);
   const [carryoverByProfile, setCarryoverByProfile] = useState<Map<string, number>>(new Map());
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('all');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState(requestedProfileId || 'all');
+  useEffect(() => {
+    if (!requestedProfileId || employees.length === 0) return;
+    if (employees.some((employee) => employee.id === requestedProfileId)) {
+      setSelectedEmployeeId(requestedProfileId);
+    }
+  }, [employees, requestedProfileId]);
   const [selectedTeamId, setSelectedTeamId] = useState('all');
   const [selectedReasonId, setSelectedReasonId] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');

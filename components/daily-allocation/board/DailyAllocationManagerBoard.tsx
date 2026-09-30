@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { BoardToolbar } from '@/components/daily-allocation/board/BoardToolbar';
 import { DailyAllocationModuleHeader } from '@/components/daily-allocation/board/DailyAllocationModuleHeader';
+import { CopyAllocationDialog } from '@/components/daily-allocation/board/CopyAllocationDialog';
 import { DailyAllocationViewportFit } from '@/components/daily-allocation/board/DailyAllocationViewportFit';
 import { ResourceSidebar, type ResourceSidebarTab } from '@/components/daily-allocation/board/ResourceSidebar';
 import { JobsPanel, type DailyAllocationTimelineMode } from '@/components/daily-allocation/board/JobsPanel';
@@ -69,6 +70,7 @@ import {
   mapDailyAllocationClientXToMinutes,
   toDailyAllocationLondonIsoFromMinutes,
 } from '@/lib/utils/daily-allocation-timeline';
+import { dailyAllocationSessionWindow } from '@/lib/utils/daily-allocation-sessions';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import type { JobCatalogueOption } from '@/types/job-catalogue';
 import type {
@@ -181,6 +183,7 @@ export function DailyAllocationManagerBoard({
   });
   const [assignOpen, setAssignOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
   const [unallocatedConfirm, setUnallocatedConfirm] = useState(false);
   const [publishFailed, setPublishFailed] = useState(false);
   const [deleteVisit, setDeleteVisit] = useState<DailyAllocationVisit | null>(null);
@@ -500,28 +503,39 @@ export function DailyAllocationManagerBoard({
       }
       setVisitDialog(null);
       setStatusMessage('Visit saved.');
+      return optimisticVisit;
     } catch (error) {
       showMutationError(error, 'Unable to save visit.');
+      return null;
     }
   }
 
-  async function createVisitAt(job: DailyAllocationJobProjection, workDate: string, startMinutes: number | null) {
-    const window = getDailyAllocationInitialVisitWindow(
-      startMinutes ?? 8 * 60,
-      180,
-      DAILY_ALLOCATION_DEFAULT_END_HOUR
-    );
+  async function createVisitAt(
+    job: DailyAllocationJobProjection,
+    workDate: string,
+    startMinutes: number | null,
+    assignment?: { profileId: string },
+  ) {
+    const sessionWindow = dailyAllocationSessionWindow('full');
+    const window = assignment
+      ? sessionWindow
+      : getDailyAllocationInitialVisitWindow(
+        startMinutes ?? sessionWindow.startMinutes,
+        sessionWindow.endMinutes - sessionWindow.startMinutes,
+        DAILY_ALLOCATION_DEFAULT_END_HOUR
+      );
     const form: VisitFormState = {
       ...emptyVisitForm(workDate),
       job: jobToOption(job),
       startTime: `${String(Math.floor(window.startMinutes / 60)).padStart(2, '0')}:${String(window.startMinutes % 60).padStart(2, '0')}`,
       endTime: `${String(Math.floor(window.endMinutes / 60)).padStart(2, '0')}:${String(window.endMinutes % 60).padStart(2, '0')}`,
     };
-    if (startMinutes == null) {
+    if (startMinutes == null && !assignment) {
       openAddVisit(jobResourceKey(job), workDate);
       return;
     }
-    await submitVisitForm(form, 'add');
+    const visit = await submitVisitForm(form, 'add');
+    if (visit && assignment) await assignEmployee(visit, assignment.profileId);
   }
 
   async function moveVisit(
@@ -982,7 +996,15 @@ export function DailyAllocationManagerBoard({
     })();
 
     if (source.kind === 'job' && (target.surface === 'timeline' || target.surface === 'week-cell') && target.workDate) {
-      void createVisitAt(source.job, target.workDate, target.surface === 'timeline' ? startMinutes : 8 * 60);
+      const profileId = target.jobKey?.startsWith('employee:')
+        ? target.jobKey.slice('employee:'.length)
+        : null;
+      void createVisitAt(
+        source.job,
+        target.workDate,
+        target.surface === 'timeline' && !profileId ? startMinutes : null,
+        profileId ? { profileId } : undefined,
+      );
       return;
     }
     if (source.kind === 'visit' && (target.surface === 'timeline' || target.surface === 'week-cell') && target.workDate) {
@@ -1066,6 +1088,7 @@ export function DailyAllocationManagerBoard({
           <DailyAllocationModuleHeader
             latestPublicationLabel={latestPublicationLabel}
             onOpenHistory={() => setHistoryOpen(true)}
+            onCopy={() => setCopyOpen(true)}
             onPublish={() => {
               setUnallocatedConfirm(false);
               setPublishOpen(true);
@@ -1197,6 +1220,15 @@ export function DailyAllocationManagerBoard({
                   onResizeVisit={(visit, startsAt, endsAt) => {
                     void resizeVisit(visit, startsAt, endsAt);
                   }}
+                  persistenceLabel={(visitId) => {
+                    const related = boardState.openOperations.filter((operation) => (
+                      operation.claims?.some((claim) => claim.scope === 'visit-tree' && claim.id === visitId)
+                    ));
+                    if (related.some((operation) => operation.status === 'uncertain')) return 'Checking';
+                    if (related.some((operation) => operation.executionStatus === 'awaiting-retry')) return 'Retrying';
+                    if (related.length > 0) return 'Saving';
+                    return null;
+                  }}
                   onPointerInteractionChange={boardState.setPointerInteractionActive}
                   onFitEligibleChange={setTimelineFitEligible}
                 />
@@ -1284,6 +1316,15 @@ export function DailyAllocationManagerBoard({
           }}
           onConfirm={(evidence) => void handleOverrideConfirm(evidence)}
           saving={mutations.createOverride.isPending}
+        />
+        <CopyAllocationDialog
+          open={copyOpen}
+          sourceDate={selectedDate}
+          teamId={ownerTeamId}
+          sourcePlanVersion={planDayForDate(fullBoard, selectedDate)?.plan_version ?? null}
+          targetPlanVersion={null}
+          onOpenChange={setCopyOpen}
+          onApplied={() => void boardState.refetch()}
         />
         <PublishDialog
           open={publishOpen}

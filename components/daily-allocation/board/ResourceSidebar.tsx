@@ -31,6 +31,7 @@ import {
   DAILY_ALLOCATION_TAB_FONT_MAX_PX,
   fitSingleLineFontSize,
 } from '@/components/daily-allocation/board/fit-single-line-font';
+import Link from 'next/link';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { cn } from '@/lib/utils/cn';
 import type {
@@ -376,8 +377,8 @@ export function ResourceSidebar({
               ) : filteredJobs.map((job) => {
                 const source: DailyAllocationDragSource = { kind: 'job', job };
                 return (
+                  <div key={jobResourceKey(job)} className="space-y-1">
                   <DraggableCard
-                    key={jobResourceKey(job)}
                     id={`job:${jobResourceKey(job)}`}
                     type={DAILY_ALLOCATION_DND.job}
                     source={source}
@@ -389,6 +390,11 @@ export function ResourceSidebar({
                     handleTestId={`daily-allocation-resource-drag-handle-job-${job.source_id}`}
                     onSelect={() => onSelectResource(source)}
                   />
+                  <div className="flex flex-wrap gap-2 px-1 text-[11px]">
+                    <Link className="text-sky-300 underline-offset-2 hover:underline" href={`/daily-allocation/jobs/${encodeURIComponent(job.job_code)}`}>Job sheet</Link>
+                    {job.source_href ? <Link className="text-sky-300 underline-offset-2 hover:underline" href={job.source_href}>Source</Link> : null}
+                  </div>
+                  </div>
                 );
               })
             ) : null}
@@ -414,8 +420,8 @@ export function ResourceSidebar({
                   assignments: labourByEmployee.get(employee.profile_id) || [],
                 });
                 return (
+                  <div key={employee.profile_id} className="space-y-1">
                   <DraggableCard
-                    key={employee.profile_id}
                     id={`employee:${employee.profile_id}`}
                     type={DAILY_ALLOCATION_DND.employee}
                     source={source}
@@ -429,6 +435,12 @@ export function ResourceSidebar({
                     handleTestId={`daily-allocation-resource-drag-handle-employee-${employee.profile_id}`}
                     onSelect={() => onSelectResource(source)}
                   />
+                  <div className="px-1 text-[11px]">
+                    <Link className="text-sky-300 underline-offset-2 hover:underline" href={`/absence/manage?tab=calendar&profile_id=${encodeURIComponent(employee.profile_id)}`}>
+                      Absence and shifts
+                    </Link>
+                  </div>
+                  </div>
                 );
               })
             ) : null}
@@ -444,8 +456,8 @@ export function ResourceSidebar({
                   plantByResource.get(item.id) || []
                 );
                 return (
+                  <div key={item.id} className="space-y-1">
                   <DraggableCard
-                    key={item.id}
                     id={`plant:${item.id}`}
                     type={DAILY_ALLOCATION_DND.plant}
                     source={source}
@@ -457,6 +469,12 @@ export function ResourceSidebar({
                     handleTestId={`daily-allocation-resource-drag-handle-plant-${item.id}`}
                     onSelect={() => onSelectResource(source)}
                   />
+                  <div className="px-1 text-[11px]">
+                    <Link className="text-sky-300 underline-offset-2 hover:underline" href={`/fleet/plant/${item.id}/history`}>
+                      Fleet history
+                    </Link>
+                  </div>
+                  </div>
                 );
               })
             ) : null}

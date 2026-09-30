@@ -119,6 +119,7 @@ export function reconcilePlant<T extends PlannedPlantInput>(
       plant_kind: item.plant_kind,
       plant_id: item.plant_id,
       hired_serial: item.hired_serial,
+      hired_company: item.hired_company ?? null,
       plant_label: item.plant_kind === 'hired'
         ? `${item.hired_description || 'Hired plant'} (${item.hired_serial || 'no serial'})`
         : formatFleetAssetLabel({
@@ -140,6 +141,7 @@ export function reconcilePlant<T extends PlannedPlantInput>(
       plant_kind: inspection.is_hired_plant ? 'hired' : 'registered',
       plant_id: inspection.plant_id,
       hired_serial: inspection.hired_plant_id_serial,
+      hired_company: inspection.hired_plant_hiring_company,
       plant_label: inspection.is_hired_plant
         ? `${inspection.hired_plant_description || 'Hired plant'} (${inspection.hired_plant_id_serial || 'no serial'})`
         : formatFleetAssetLabel({

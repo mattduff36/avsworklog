@@ -5,8 +5,8 @@ import type {
   DailyAllocationPlantAssignment,
 } from '@/types/daily-allocation';
 
-export const DAILY_ALLOCATION_OCCUPANCY_START_MINUTES = 5 * 60;
-export const DAILY_ALLOCATION_OCCUPANCY_END_MINUTES = 20 * 60;
+export const DAILY_ALLOCATION_OCCUPANCY_START_MINUTES = 7 * 60;
+export const DAILY_ALLOCATION_OCCUPANCY_END_MINUTES = 16 * 60 + 30;
 const MIDDAY_MINUTES = 12 * 60;
 
 export type DailyAllocationOccupancyState = 'available' | 'booked' | 'unavailable';
@@ -90,6 +90,9 @@ export function buildDailyAllocationEmployeeOccupancy(input: {
   assignments: DailyAllocationLabourAssignment[];
 }): DailyAllocationOccupancySegment[] {
   let segments = availableDay();
+  const halfDaySession = input.day?.availability === 'half_day_absence'
+    ? input.day.blocking_absence?.half_day_session
+    : null;
   if (input.day?.availability === 'full_day_absence') {
     segments = overlay(
       segments,
@@ -98,10 +101,10 @@ export function buildDailyAllocationEmployeeOccupancy(input: {
       'unavailable'
     );
   } else {
-    if (input.day && !input.day.am_working) {
+    if (input.day && (!input.day.am_working || halfDaySession === 'AM')) {
       segments = overlay(segments, DAILY_ALLOCATION_OCCUPANCY_START_MINUTES, MIDDAY_MINUTES, 'unavailable');
     }
-    if (input.day && !input.day.pm_working) {
+    if (input.day && (!input.day.pm_working || halfDaySession === 'PM')) {
       segments = overlay(segments, MIDDAY_MINUTES, DAILY_ALLOCATION_OCCUPANCY_END_MINUTES, 'unavailable');
     }
   }
@@ -127,5 +130,5 @@ export function formatDailyAllocationOccupancySummary(
   if (unavailable.length > 0) {
     return `Unavailable ${unavailable.map((segment) => `${clock(segment.startMinutes)}–${clock(segment.endMinutes)}`).join(', ')}`;
   }
-  return 'Available 05:00–20:00';
+  return 'Available 07:00–16:30';
 }

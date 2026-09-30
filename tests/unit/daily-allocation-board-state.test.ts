@@ -237,7 +237,7 @@ describe('daily allocation coordinator', () => {
       code: 'UNCERTAIN_OUTCOME',
     });
     await flush();
-    await vi.advanceTimersByTimeAsync(250 + 500 + 1000);
+    await vi.advanceTimersByTimeAsync(250 + 500 + 1000 + 2000);
     await completion;
     expect(value.getOperations()[0]).toMatchObject({
       id: 'uncertain',

@@ -25,7 +25,7 @@ export function ResourceOccupancyStrip({
 }) {
   return (
     <span
-      className="pointer-events-none absolute inset-x-1 bottom-0 h-1 overflow-hidden rounded-full bg-slate-950/70"
+      className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 overflow-hidden rounded-b-[inherit] bg-slate-950/80"
       role="img"
       aria-label={label}
     >

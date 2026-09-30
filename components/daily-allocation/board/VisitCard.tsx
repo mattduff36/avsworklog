@@ -13,7 +13,13 @@ import { DAILY_ALLOCATION_DND } from '@/components/daily-allocation/board/board-
 import { cn } from '@/lib/utils/cn';
 import {
   formatDailyAllocationVisitTime,
+  getDailyAllocationTimeMinutes,
 } from '@/lib/utils/daily-allocation-timeline';
+import {
+  classifyDailyAllocationSession,
+  dailyAllocationSessionLabel,
+  type DailyAllocationSession,
+} from '@/lib/utils/daily-allocation-sessions';
 import type {
   DailyAllocationBoardConflict,
   DailyAllocationLabourAssignment,
@@ -38,6 +44,8 @@ export interface VisitCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onAssign: () => void;
+  onSetSession?: (session: DailyAllocationSession) => void;
+  persistenceLabel?: string | null;
   onResizePointerDown?: (edge: 'start' | 'end', event: ReactPointerEvent<HTMLButtonElement>) => void;
   onResizeKeyDown?: (edge: 'start' | 'end', event: ReactKeyboardEvent<HTMLButtonElement>) => void;
 }
@@ -59,6 +67,8 @@ export function VisitCard({
   onEdit,
   onDelete,
   onAssign,
+  onSetSession,
+  persistenceLabel,
   onResizePointerDown,
   onResizeKeyDown,
 }: VisitCardProps) {
@@ -122,6 +132,9 @@ export function VisitCard({
           <span className="block truncate text-[11px] font-semibold tabular-nums">{timeLabel}</span>
           <span className="block truncate text-xs font-medium">{title || visit.job_code}</span>
           <span className="block truncate text-[11px] text-sky-100/80">{visit.site_address}</span>
+          {persistenceLabel ? (
+            <span className="block text-[11px] text-sky-200">{persistenceLabel}</span>
+          ) : null}
           {resources.length > 0 ? (
             <span className="block truncate text-[11px] text-sky-100/70">{resources.join(' · ')}</span>
           ) : (
@@ -135,6 +148,33 @@ export function VisitCard({
           ))}
         </span>
       </button>
+      {onSetSession ? (
+        <div className="mt-1 flex gap-1">
+          {(['full', 'am', 'pm'] as const).map((session) => {
+            const active = classifyDailyAllocationSession(
+              getDailyAllocationTimeMinutes(visit.starts_at),
+              getDailyAllocationTimeMinutes(visit.ends_at),
+            ) === session;
+            return (
+              <button
+                key={session}
+                type="button"
+                aria-pressed={active}
+                className={cn(
+                  'rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                  active ? 'bg-white text-slate-950' : 'bg-white/10 text-white',
+                )}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSetSession(session);
+                }}
+              >
+                {dailyAllocationSessionLabel(session)}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       <div className="flex items-center justify-end gap-1 px-1 pb-1">
         <Button
           type="button"

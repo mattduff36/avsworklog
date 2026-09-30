@@ -69,6 +69,9 @@ const LegacyQuotesTable = dynamic(
 const QuoteDetailsModal = dynamic(
   () => import('./components/QuoteDetailsModal').then((mod) => mod.QuoteDetailsModal)
 );
+const QuoteMergeGroupDialog = dynamic(
+  () => import('./components/QuoteMergeGroupDialog').then((mod) => mod.QuoteMergeGroupDialog)
+);
 const QuoteFormDialog = dynamic(
   () => import('./components/QuoteFormDialog').then((mod) => mod.QuoteFormDialog)
 );
@@ -324,6 +327,8 @@ export default function QuotesPage() {
 
   // Modals
   const [detailQuoteId, setDetailQuoteId] = useState<string | null>(null);
+  const fullQuoteOverrideId = useRef<string | null>(null);
+  const [mergeGroupQuoteId, setMergeGroupQuoteId] = useState<string | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editingQuote, setEditingQuote] = useState<Quote | null>(null);
   const [customerFormOpen, setCustomerFormOpen] = useState(false);
@@ -552,8 +557,16 @@ export default function QuotesPage() {
   ]);
 
   useEffect(() => {
+    if (!quoteIdFromQuery || fullQuoteOverrideId.current === quoteIdFromQuery) return;
+    const matchedQuote = quotes.find(quote => quote.id === quoteIdFromQuery);
+    if (!matchedQuote) return;
+    if (matchedQuote.merge_info) {
+      setMergeGroupQuoteId(matchedQuote.id);
+      setDetailQuoteId(null);
+      return;
+    }
     setDetailQuoteId(quoteIdFromQuery);
-  }, [quoteIdFromQuery]);
+  }, [quoteIdFromQuery, quotes]);
 
   useEffect(() => {
     if (quoteIdFromQuery || !quoteReferenceFromQuery) return;
@@ -563,7 +576,13 @@ export default function QuotesPage() {
       || quote.base_quote_reference.toUpperCase() === normalizedReference
       || quote.merge_info?.aliases.some(alias => alias.toUpperCase() === normalizedReference)
     ));
-    if (matchedQuote) setDetailQuoteId(matchedQuote.id);
+    if (!matchedQuote || fullQuoteOverrideId.current === matchedQuote.id) return;
+    if (matchedQuote.merge_info) {
+      setMergeGroupQuoteId(matchedQuote.id);
+      setDetailQuoteId(null);
+      return;
+    }
+    setDetailQuoteId(matchedQuote.id);
   }, [quoteIdFromQuery, quoteReferenceFromQuery, quotes]);
 
   async function handleCreate(data: QuoteFormData) {
@@ -662,16 +681,31 @@ export default function QuotesPage() {
   }
 
   function handleOpenQuoteDetails(nextQuoteId: string) {
+    fullQuoteOverrideId.current = nextQuoteId;
+    setMergeGroupQuoteId(null);
     setDetailQuoteId(nextQuoteId);
     syncQuoteQuery(nextQuoteId);
   }
 
-  function handleCloseQuoteDetails() {
+  function handleOpenMergeGroup(nextQuoteId: string) {
+    fullQuoteOverrideId.current = null;
     setDetailQuoteId(null);
+    setMergeGroupQuoteId(nextQuoteId);
+    syncQuoteQuery(nextQuoteId);
+  }
+
+  function handleCloseQuoteDetails() {
+    fullQuoteOverrideId.current = null;
+    setDetailQuoteId(null);
+    setMergeGroupQuoteId(null);
     syncQuoteQuery(null);
   }
 
   function handleRowClick(quote: Quote) {
+    if (quote.merge_info) {
+      handleOpenMergeGroup(quote.id);
+      return;
+    }
     handleOpenQuoteDetails(quote.id);
   }
 
@@ -847,7 +881,7 @@ export default function QuotesPage() {
             canMerge={canEditLegacyQuotes}
             onMerged={async (nextQuoteId) => {
               await fetchData();
-              handleOpenQuoteDetails(nextQuoteId);
+              handleOpenMergeGroup(nextQuoteId);
             }}
           />
         </TabsContent>
@@ -903,6 +937,16 @@ export default function QuotesPage() {
         </TabsContent>
       </Tabs>
 
+      {mergeGroupQuoteId ? (
+        <QuoteMergeGroupDialog
+          open
+          quoteId={mergeGroupQuoteId}
+          onClose={handleCloseQuoteDetails}
+          onOpenQuote={handleOpenQuoteDetails}
+          onRefresh={fetchData}
+        />
+      ) : null}
+
       {detailQuoteId ? (
         <QuoteDetailsModal
           open
@@ -911,6 +955,7 @@ export default function QuotesPage() {
           onQuoteChange={handleOpenQuoteDetails}
           onEdit={handleEditFromModal}
           onRefresh={fetchData}
+          onOpenMergeGroup={handleOpenMergeGroup}
           managerOptions={managerOptions}
         />
       ) : null}

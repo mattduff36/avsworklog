@@ -71,7 +71,7 @@ describe('DA2-UI-001 manager board contract', () => {
     );
     expect(moduleHeader).toContain('AppPageHeader');
     expect(moduleHeader).toContain('Daily Allocation');
-    expect(moduleHeader).toContain('Place timed visits against catalogue jobs');
+    expect(moduleHeader).toContain('Assign jobs and plant to employees');
     expect(moduleHeader).toContain('Publication history');
     expect(moduleHeader).toContain('daily-allocation-publish');
     expect(board).toContain('DailyAllocationModuleHeader');

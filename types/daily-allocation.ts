@@ -180,6 +180,7 @@ export interface DailyPlantReconciliationRow {
   plant_kind: DailyPlantKind;
   plant_id: string | null;
   hired_serial: string | null;
+  hired_company: string | null;
   plant_label: string;
   planned_job_code: string | null;
   actual_job_code: string | null;

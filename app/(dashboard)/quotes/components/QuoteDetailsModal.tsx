@@ -88,6 +88,7 @@ interface QuoteDetailsModalProps {
   onQuoteChange: (quoteId: string) => void;
   onEdit: (quote: Quote) => void;
   onRefresh: () => void;
+  onOpenMergeGroup?: (quoteId: string) => void;
   managerOptions: QuoteManagerOption[];
 }
 
@@ -285,7 +286,7 @@ async function buildResponseError(response: Response, fallback: string) {
   return error;
 }
 
-export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdit, onRefresh, managerOptions }: QuoteDetailsModalProps) {
+export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdit, onRefresh, onOpenMergeGroup, managerOptions }: QuoteDetailsModalProps) {
   const { profile } = useAuth();
   const [quote, setQuote] = useState<Quote | null>(null);
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(quoteId);
@@ -1419,6 +1420,15 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                   <p className="mt-1">
                     Retired numbers: {quote.merge_info.aliases.join(', ') || 'None'}
                   </p>
+                  {onOpenMergeGroup ? (
+                    <button
+                      type="button"
+                      className="mt-3 rounded border border-amber-400/40 px-2 py-1 text-xs font-medium hover:bg-amber-500/10"
+                      onClick={() => onOpenMergeGroup(quote.id)}
+                    >
+                      View all merged quotes
+                    </button>
+                  ) : null}
                   {quote.merge_info.pdf_snapshots?.length ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {quote.merge_info.pdf_snapshots.map(snapshot => (

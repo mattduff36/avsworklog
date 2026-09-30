@@ -66,7 +66,7 @@ type PersistCommand = (
   context: DailyAllocationPersistContext
 ) => Promise<DailyAllocationPersistSuccess<unknown>>;
 
-const RETRY_DELAYS_MS = [250, 500, 1000];
+const RETRY_DELAYS_MS = [250, 500, 1000, 2000];
 const MAX_AMBIGUOUS_RETRIES = RETRY_DELAYS_MS.length;
 
 export function isAmbiguousDailyAllocationFailure(error: unknown): boolean {

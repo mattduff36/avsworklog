@@ -2,8 +2,8 @@ import { addDays, eachDayOfInterval, format, isValid, parseISO, startOfWeek } fr
 
 const ALLOCATION_TIME_ZONE = 'Europe/London';
 
-export const DAILY_ALLOCATION_DEFAULT_START_HOUR = 5;
-export const DAILY_ALLOCATION_DEFAULT_END_HOUR = 20;
+export const DAILY_ALLOCATION_DEFAULT_START_HOUR = 7;
+export const DAILY_ALLOCATION_DEFAULT_END_HOUR = 17;
 export const DAILY_ALLOCATION_MIN_DURATION_MINUTES = 30;
 export const DAILY_ALLOCATION_SNAP_MINUTES = 30;
 

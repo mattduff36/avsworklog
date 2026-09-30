@@ -34,6 +34,7 @@ export {
   assignDailyAllocationPlant,
   unassignDailyAllocationPlant,
   createDailyAllocationConflictOverride,
+  copyDailyAllocationPlan,
 } from '@/lib/server/daily-allocation/mutations';
 
 export {

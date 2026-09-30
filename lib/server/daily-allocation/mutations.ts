@@ -636,3 +636,41 @@ export async function createDailyAllocationConflictOverride(
     }
   );
 }
+
+const copyPlanSchema = z.object({
+  request_id: z.string().uuid(),
+  source_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  target_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  team_id: z.string().min(1),
+  categories: z.array(z.enum(['employees', 'jobs', 'plant'])).min(1),
+  apply: z.boolean(),
+  expected_source_plan_version: z.number().int().positive(),
+  expected_target_plan_version: z.number().int().positive().nullable(),
+}).strict();
+
+export interface DailyAllocationCopyResult {
+  applied: boolean;
+  source_date: string;
+  target_date: string;
+  target_plan_version: number | null;
+  additions: Array<{ label: string; detail: string }>;
+  skips: Array<{ label: string; detail: string }>;
+  warnings: Array<{ label: string; detail: string }>;
+}
+
+export async function copyDailyAllocationPlan(
+  input: unknown,
+): Promise<DailyAllocationCopyResult> {
+  const { supabase } = await requireDailyAllocationManagerMutation();
+  const parsed = parseWithSchema(copyPlanSchema, input, 'Invalid allocation copy.');
+  return callDailyAllocationRpc<DailyAllocationCopyResult>(supabase, 'copy_daily_allocation_plan_v2', {
+    p_request_id: parsed.request_id,
+    p_source_date: parsed.source_date,
+    p_target_date: parsed.target_date,
+    p_team_id: parsed.team_id,
+    p_categories: parsed.categories,
+    p_apply: parsed.apply,
+    p_expected_source_plan_version: parsed.expected_source_plan_version,
+    p_expected_target_plan_version: parsed.expected_target_plan_version,
+  });
+}

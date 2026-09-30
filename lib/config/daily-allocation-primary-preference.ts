@@ -26,15 +26,15 @@ export function readDailyAllocationPrimaryPreference(
   userId: string
 ): DailyAllocationBoardPrimary {
   if (typeof window === 'undefined' || !userId) {
-    return DAILY_ALLOCATION_BOARD_PRIMARIES.job;
+    return DAILY_ALLOCATION_BOARD_PRIMARIES.employee;
   }
   try {
     const value = localStorage.getItem(getDailyAllocationPrimaryStorageKey(userId));
     return isDailyAllocationBoardPrimary(value)
       ? value
-      : DAILY_ALLOCATION_BOARD_PRIMARIES.job;
+      : DAILY_ALLOCATION_BOARD_PRIMARIES.employee;
   } catch {
-    return DAILY_ALLOCATION_BOARD_PRIMARIES.job;
+    return DAILY_ALLOCATION_BOARD_PRIMARIES.employee;
   }
 }
 

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns';
 import {
   dailyAllocationBoardOptimisticKey,
   dailyAllocationBoardQueryKey,
@@ -44,6 +45,7 @@ export interface DailyAllocationBoardController {
   isBoardFetching: boolean;
   isMutationPending: boolean;
   pendingOperations: DailyAllocationOptimisticOperation[];
+  openOperations: DailyAllocationOptimisticOperation[];
   boardError: unknown;
   mutationError: unknown;
   setMutationError: (error: unknown) => void;
@@ -122,6 +124,16 @@ export function useDailyAllocationBoardController(options: {
 }): DailyAllocationBoardController {
   const queryClient = useQueryClient();
   const query = useDailyAllocationBoardQuery(options.startDate, options.endDate);
+  useEffect(() => {
+    if (!options.startDate || !options.endDate || options.startDate > options.endDate) return;
+    const span = differenceInCalendarDays(parseISO(options.endDate), parseISO(options.startDate));
+    const nextStart = format(addDays(parseISO(options.endDate), 1), 'yyyy-MM-dd');
+    const nextEnd = format(addDays(parseISO(nextStart), span), 'yyyy-MM-dd');
+    void queryClient.prefetchQuery({
+      queryKey: dailyAllocationBoardQueryKey(nextStart, nextEnd),
+      queryFn: () => fetchDailyAllocationBoardRange(nextStart, nextEnd),
+    });
+  }, [options.endDate, options.startDate, queryClient]);
   const ledger = useDailyAllocationOptimisticLedger();
   const resolvedUserId = options.userId || query.data?.context.user_id || '';
   const viewPreference = useDailyAllocationViewPreference(resolvedUserId);
@@ -218,6 +230,9 @@ export function useDailyAllocationBoardController(options: {
     boardKey
   );
   const pendingOperations = ledger.operations.filter((operation) => operation.status === 'pending');
+  const openOperations = ledger.operations.filter((operation) => (
+    operation.status === 'pending' || operation.status === 'uncertain'
+  ));
   const viewBoard = projected.board
     ? projectDailyAllocationBoardView(projected.board, viewPreference.view, selectedDate)
     : undefined;
@@ -236,6 +251,7 @@ export function useDailyAllocationBoardController(options: {
     isBoardFetching: query.isFetching,
     isMutationPending: pendingOperations.length > 0,
     pendingOperations,
+    openOperations,
     boardError: query.error,
     mutationError,
     setMutationError,

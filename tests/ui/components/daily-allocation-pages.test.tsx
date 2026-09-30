@@ -1739,6 +1739,7 @@ describe('daily allocation job sheet', () => {
         plant_kind: 'registered',
         plant_id: 'plant-1',
         hired_serial: null,
+        hired_company: null,
         plant_label: 'EX-01',
         planned_job_code: 'JOB-100',
         actual_job_code: 'JOB-100',

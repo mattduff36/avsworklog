@@ -106,6 +106,13 @@ const DAILY_CHECK_REPORTS: ReportCardConfig[] = [
     filenamePrefix: 'Daily_Checks_Defects_Log',
     buttonClassName: 'bg-inspection hover:bg-inspection-dark text-white',
   },
+  {
+    title: 'Plant Usage',
+    description: 'Published plant allocation with daily-check validation for manual Sage entry. Limited to 62 days.',
+    endpoint: '/api/reports/daily-allocation/plant-usage',
+    filenamePrefix: 'Plant_Usage',
+    buttonClassName: 'bg-inspection hover:bg-inspection-dark text-white',
+  },
 ];
 
 const ABSENCE_REPORTS: ReportCardConfig[] = [

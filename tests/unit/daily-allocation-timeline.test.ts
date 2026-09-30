@@ -113,8 +113,8 @@ describe('DA2-TIME-001 daily allocation timeline', () => {
     expect(getDailyAllocationInitialVisitWindow(420, 400).durationMinutes).toBe(180);
     expect(getDailyAllocationInitialVisitWindow(420, null).durationMinutes).toBe(180);
     expect(getDailyAllocationTimelineRange([], '2026-08-13')).toEqual({
-      startHour: 5,
-      endHour: 20,
+      startHour: 7,
+      endHour: 17,
     });
   });
 

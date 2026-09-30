@@ -27,6 +27,7 @@ interface JobsPanelProps {
   onDeleteVisit: (visit: DailyAllocationVisit) => void;
   onAssignVisit: (visit: DailyAllocationVisit) => void;
   onResizeVisit: (visit: DailyAllocationVisit, startsAt: string, endsAt: string) => void;
+  persistenceLabel?: (visitId: string) => string | null;
   onPointerInteractionChange?: (active: boolean) => void;
   onFitEligibleChange?: (eligible: boolean) => void;
 }
@@ -49,6 +50,7 @@ export function JobsPanel({
   onDeleteVisit,
   onAssignVisit,
   onResizeVisit,
+  persistenceLabel,
   onPointerInteractionChange,
   onFitEligibleChange,
 }: JobsPanelProps) {
@@ -72,6 +74,7 @@ export function JobsPanel({
             onDeleteVisit={onDeleteVisit}
             onAssignVisit={onAssignVisit}
             onResizeVisit={onResizeVisit}
+            persistenceLabel={persistenceLabel}
             onPointerInteractionChange={onPointerInteractionChange}
             onFitEligibleChange={onFitEligibleChange}
           />

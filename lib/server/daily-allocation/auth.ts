@@ -268,6 +268,16 @@ export function mapDailyAllocationRpcError(
       'VIEW_AS'
     );
   }
+  if (message.includes('TARGET_NEEDS_CONVERSION')) {
+    return new DailyAllocationError(
+      'The next day still has untimed allocation. Convert that day before copying into it.',
+      409,
+      'TARGET_NEEDS_CONVERSION'
+    );
+  }
+  if (message.includes('FORBIDDEN')) {
+    return new DailyAllocationError('You cannot copy allocation for this team.', 403, 'FORBIDDEN');
+  }
   if (message.includes('STALE_PLAN_VERSION')) {
     return new DailyAllocationError(
       'This plan was updated by someone else. Reload and try again.',

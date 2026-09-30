@@ -1,4 +1,6 @@
 import { isDailyAllocationStaleOrConflictError } from '@/lib/client/daily-allocation';
+import { dailyAllocationProofsSatisfied } from '@/components/daily-allocation/board/daily-allocation-board-reconciliation';
+import { reconcileOptimisticOperations } from '@/components/daily-allocation/board/daily-allocation-optimistic-ledger';
 import {
   projectDailyAllocationState,
   type DailyAllocationOptimisticKind,
@@ -123,7 +125,18 @@ export async function runDailyAllocationOptimisticMutation<T>(
 
   try {
     const result = await admission.completion;
-    input.adapter.scheduleReconciliation([input.boardKey]);
+    const authoritative = { board: input.adapter.getBoard() };
+    const settled = input.ledger.getOperations().find((operation) => operation.id === admission.operation.id);
+    if (settled && dailyAllocationProofsSatisfied(settled, authoritative)) {
+      input.ledger.setOperations((current) => reconcileOptimisticOperations(
+        current,
+        input.boardKey,
+        authoritative,
+        new Set([settled.id]),
+      ));
+    } else {
+      input.adapter.scheduleReconciliation([input.boardKey]);
+    }
     return result;
   } catch (error) {
     input.adapter.scheduleReconciliation([input.boardKey]);

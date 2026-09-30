@@ -5,11 +5,12 @@ import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAll
 import { Button } from '@/components/ui/button';
 
 export const DAILY_ALLOCATION_MODULE_DESCRIPTION =
-  'Place timed visits against catalogue jobs, assign people and plant, then publish an immutable allocation.';
+  'Assign jobs and plant to employees for a full day, morning, or afternoon, then publish an immutable allocation.';
 
 interface DailyAllocationModuleHeaderProps {
   latestPublicationLabel?: string;
   onOpenHistory?: () => void;
+  onCopy?: () => void;
   onPublish: () => void;
   publishDisabled?: boolean;
   publishDisabledReason?: string;
@@ -19,6 +20,7 @@ interface DailyAllocationModuleHeaderProps {
 export function DailyAllocationModuleHeader({
   latestPublicationLabel,
   onOpenHistory,
+  onCopy,
   onPublish,
   publishDisabled,
   publishDisabledReason,
@@ -51,6 +53,11 @@ export function DailyAllocationModuleHeader({
                 onClick={onOpenHistory}
               >
                 Publication history
+              </Button>
+            ) : null}
+            {onCopy ? (
+              <Button type="button" variant="outline" onClick={onCopy}>
+                Copy
               </Button>
             ) : null}
             <Button

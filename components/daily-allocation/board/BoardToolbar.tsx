@@ -54,7 +54,7 @@ export function BoardToolbar({
   view,
   onDateChange,
   onViewChange,
-  primary = DAILY_ALLOCATION_BOARD_PRIMARIES.job,
+  primary = DAILY_ALLOCATION_BOARD_PRIMARIES.employee,
   onPrimaryChange,
   isLoading,
   isFetching,
@@ -148,10 +148,10 @@ export function BoardToolbar({
       >
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground xl:hidden">
-            Drag from the grip handle onto a visit, or select a visit and tap a resource.
+            Drop a job on an employee for a full day, then switch it to AM or PM.
           </p>
           <p className="hidden text-sm text-muted-foreground xl:block">
-            Drag from the grip handle onto a timed visit, or select the visit and tap a resource.
+            Drop a job on an employee for a full day. Plant is assigned to that employee's visit.
           </p>
         </div>
 

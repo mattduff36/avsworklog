@@ -2,7 +2,8 @@ import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDateTime } from '@/lib/utils/date';
-import { formatDailyAllocationVisitTime } from '@/lib/utils/daily-allocation-timeline';
+import { formatDailyAllocationVisitTime, getDailyAllocationTimeMinutes } from '@/lib/utils/daily-allocation-timeline';
+import { classifyDailyAllocationSession, dailyAllocationSessionLabel } from '@/lib/utils/daily-allocation-sessions';
 import type { DailyAllocationIssuedItem, DailyAllocationIssuedVisit } from '@/types/daily-allocation';
 
 function formatWorkDate(workDate: string): string {
@@ -17,15 +18,20 @@ function formatWorkDate(workDate: string): string {
 function VisitRow({ visit }: { visit: DailyAllocationIssuedVisit }) {
   const start = formatDailyAllocationVisitTime(visit.starts_at) || visit.instructions.start_time;
   const end = formatDailyAllocationVisitTime(visit.ends_at);
+  const session = start && end
+    ? classifyDailyAllocationSession(getDailyAllocationTimeMinutes(visit.starts_at), getDailyAllocationTimeMinutes(visit.ends_at))
+    : null;
   return (
     <li className="rounded-md border p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-medium">{visit.job_code}</p>
         <p>
+          {session ? <span className="mr-2 font-medium">{dailyAllocationSessionLabel(session)}</span> : null}
           <time dateTime={visit.starts_at}>{start || '—'}</time>
           {end ? <>–<time dateTime={visit.ends_at}>{end}</time></> : null}
         </p>
       </div>
+      {visit.customer_name ? <p className="text-muted-foreground">{visit.customer_name}</p> : null}
       {visit.title ? <p className="text-muted-foreground">{visit.title}</p> : null}
       {visit.site_address ? <p><span className="text-muted-foreground">Site:</span> {visit.site_address}</p> : null}
       {visit.instructions.meeting_point ? <p><span className="text-muted-foreground">Meeting point:</span> {visit.instructions.meeting_point}</p> : null}

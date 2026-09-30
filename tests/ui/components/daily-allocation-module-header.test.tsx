@@ -20,7 +20,7 @@ describe('DailyAllocationModuleHeader', () => {
     const header = screen.getByTestId('daily-allocation-module-header');
     expect(header).toContainElement(screen.getByRole('heading', { name: 'Daily Allocation' }));
     expect(header).toHaveTextContent(
-      'Place timed visits against catalogue jobs, assign people and plant, then publish an immutable allocation.'
+      'Assign jobs and plant to employees for a full day, morning, or afternoon, then publish an immutable allocation.'
     );
     expect(header).toHaveTextContent('Rev 3 · Casey');
     fireEvent.click(screen.getByRole('button', { name: 'Publication history' }));
