@@ -46,7 +46,11 @@ interface SessionBoardProps {
   onDeleteVisit: (visit: DailyAllocationVisit) => void;
   onAssignVisit: (visit: DailyAllocationVisit) => void;
   onMoveVisit: (visit: DailyAllocationVisit) => void;
-  onSetSession: (visit: DailyAllocationVisit, session: DailyAllocationSession) => void;
+  onSetSession: (
+    visit: DailyAllocationVisit,
+    session: DailyAllocationSession,
+    profileId?: string | null,
+  ) => void;
   onReviewCustom?: () => void;
 }
 
@@ -128,7 +132,11 @@ function SessionVisit({
   onDeleteVisit: (visit: DailyAllocationVisit) => void;
   onAssignVisit: (visit: DailyAllocationVisit) => void;
   onMoveVisit: (visit: DailyAllocationVisit) => void;
-  onSetSession: (visit: DailyAllocationVisit, session: DailyAllocationSession) => void;
+  onSetSession: (
+    visit: DailyAllocationVisit,
+    session: DailyAllocationSession,
+    profileId?: string | null,
+  ) => void;
 }) {
   return (
     <VisitCard
@@ -149,7 +157,7 @@ function SessionVisit({
       onEdit={() => onEditVisit(visit)}
       onDelete={() => onDeleteVisit(visit)}
       onAssign={() => onAssignVisit(visit)}
-      onSetSession={(session) => onSetSession(visit, session)}
+      onSetSession={(session) => onSetSession(visit, session, row.employee?.profile_id ?? null)}
     />
   );
 }

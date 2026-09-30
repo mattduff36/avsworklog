@@ -18,6 +18,7 @@ interface NormalizeVisit {
   visit_id: string;
   job_code: string;
   session: DailyAllocationSession;
+  row_version?: number;
 }
 
 interface NormalizePreview {
@@ -64,6 +65,7 @@ export function NormalizeSessionsDialog({
           adjustments: (preview?.visits || []).map((visit) => ({
             visit_id: visit.visit_id,
             session: visit.session,
+            ...(typeof visit.row_version === 'number' ? { row_version: visit.row_version } : {}),
           })),
         }),
       });

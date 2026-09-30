@@ -667,6 +667,7 @@ const normalizeSessionsSchema = z.object({
   adjustments: z.array(z.object({
     visit_id: z.string().uuid(),
     session: z.enum(['full', 'am', 'pm']),
+    row_version: z.number().int().positive().optional(),
   })).default([]),
 }).strict();
 

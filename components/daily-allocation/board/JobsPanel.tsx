@@ -22,7 +22,11 @@ interface JobsPanelProps {
   onDeleteVisit: (visit: DailyAllocationVisit) => void;
   onAssignVisit: (visit: DailyAllocationVisit) => void;
   onMoveVisit: (visit: DailyAllocationVisit) => void;
-  onSetSession: (visit: DailyAllocationVisit, session: DailyAllocationSession) => void;
+  onSetSession: (
+    visit: DailyAllocationVisit,
+    session: DailyAllocationSession,
+    profileId?: string | null,
+  ) => void;
   onReviewCustom?: () => void;
   persistenceLabel?: (visitId: string) => string | null;
 }

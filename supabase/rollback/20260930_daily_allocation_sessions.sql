@@ -10,28 +10,8 @@ DROP FUNCTION IF EXISTS public.list_daily_allocation_plant_conflicts_range(DATE,
 DROP FUNCTION IF EXISTS private.daily_allocation_session_bounds(TEXT);
 DROP FUNCTION IF EXISTS private.daily_allocation_is_session_interval(TIMESTAMPTZ, TIMESTAMPTZ);
 
-DELETE FROM private.daily_allocation_mutation_requests
-WHERE action = 'session_normalize';
-
-ALTER TABLE private.daily_allocation_mutation_requests
-  DROP CONSTRAINT IF EXISTS daily_allocation_mutation_requests_action_check;
-
-ALTER TABLE private.daily_allocation_mutation_requests
-  ADD CONSTRAINT daily_allocation_mutation_requests_action_check CHECK (
-    action IN (
-      'convert',
-      'visit_upsert',
-      'visit_move',
-      'visit_delete',
-      'labour_assign',
-      'labour_unassign',
-      'plant_assign',
-      'plant_unassign',
-      'override_create',
-      'publish',
-      'plan_copy'
-    )
-  );
+-- Ledger rows stay. The action check keeps session_normalize so existing
+-- request history remains valid after the function is dropped.
 
 ALTER TABLE public.daily_allocation_visit_labour
   DROP CONSTRAINT IF EXISTS daily_allocation_visit_labour_excl_overlap;

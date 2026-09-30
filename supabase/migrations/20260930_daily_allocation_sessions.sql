@@ -66,6 +66,12 @@ LANGUAGE plpgsql
 SET search_path = pg_catalog, public, private
 AS $$
 BEGIN
+  IF TG_OP = 'UPDATE'
+    AND NEW.work_date IS NOT DISTINCT FROM OLD.work_date
+    AND NEW.starts_at IS NOT DISTINCT FROM OLD.starts_at
+    AND NEW.ends_at IS NOT DISTINCT FROM OLD.ends_at THEN
+    RETURN NEW;
+  END IF;
   IF NOT private.daily_allocation_is_session_interval(NEW.starts_at, NEW.ends_at) THEN
     RAISE EXCEPTION 'VALIDATION' USING ERRCODE = '23514';
   END IF;
@@ -75,7 +81,7 @@ $$;
 
 DROP TRIGGER IF EXISTS daily_allocation_visits_session_guard ON public.daily_allocation_visits;
 CREATE TRIGGER daily_allocation_visits_session_guard
-  BEFORE INSERT OR UPDATE OF starts_at, ends_at
+  BEFORE INSERT OR UPDATE OF work_date, starts_at, ends_at
   ON public.daily_allocation_visits
   FOR EACH ROW
   EXECUTE FUNCTION private.enforce_daily_allocation_visit_session();
@@ -138,6 +144,20 @@ AS $$
     AND NOT (
       public.effective_module_access_level('daily-allocation') >= 5
       OR public.can_actor_manage_daily_allocation_team(drafts.owner_team_id)
+    )
+  UNION ALL
+  SELECT
+    plant.work_date,
+    plant.plant_id,
+    plant.hired_serial,
+    plant.hired_company,
+    plant.owner_team_id
+  FROM public.daily_allocation_visit_plant plant
+  WHERE plant.work_date BETWEEN p_start_date AND p_end_date
+    AND public.effective_has_module_level('daily-allocation', 4)
+    AND NOT (
+      public.effective_module_access_level('daily-allocation') >= 5
+      OR public.can_actor_manage_daily_allocation_team(plant.owner_team_id)
     );
 $$;
 
@@ -201,6 +221,7 @@ DECLARE
   result JSONB;
   conflict_count INTEGER;
   updated_count INTEGER;
+  labour_row RECORD;
 BEGIN
   actor_id := private.require_daily_allocation_v2_writer();
   IF NOT public.can_actor_manage_daily_allocation_team(p_team_id) THEN
@@ -338,6 +359,61 @@ BEGIN
       COALESCE(other_plan.ends_at, other_visit.ends_at),
       '[)'
     );
+
+  IF EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(COALESCE(p_adjustments, '[]'::jsonb)) item
+    GROUP BY item->>'visit_id'
+    HAVING COUNT(*) > 1
+  ) OR EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(COALESCE(p_adjustments, '[]'::jsonb)) item
+    WHERE COALESCE(item->>'visit_id', '') <> ''
+      AND NOT EXISTS (
+        SELECT 1
+        FROM pg_temp.daily_allocation_session_plan planned
+        WHERE planned.visit_id::text = item->>'visit_id'
+      )
+  ) THEN
+    RAISE EXCEPTION 'VALIDATION';
+  END IF;
+
+  IF p_apply AND EXISTS (
+    SELECT 1
+    FROM jsonb_array_elements(COALESCE(p_adjustments, '[]'::jsonb)) item
+    JOIN pg_temp.daily_allocation_session_plan planned
+      ON planned.visit_id::text = item->>'visit_id'
+    WHERE item ? 'row_version'
+      AND (item->>'row_version')::integer IS DISTINCT FROM planned.row_version
+  ) THEN
+    RAISE EXCEPTION 'STALE_PLAN_VERSION';
+  END IF;
+
+  FOR labour_row IN
+    SELECT planned.visit_id, labour.profile_id, planned.starts_at, planned.ends_at
+    FROM pg_temp.daily_allocation_session_plan planned
+    JOIN public.daily_allocation_visit_labour labour ON labour.visit_id = planned.visit_id
+  LOOP
+    BEGIN
+      PERFORM private.daily_allocation_v2_assert_labour_assignable(
+        plan_day.id,
+        labour_row.visit_id,
+        labour_row.profile_id,
+        p_work_date,
+        labour_row.starts_at,
+        labour_row.ends_at,
+        NULL
+      );
+    EXCEPTION
+      WHEN OTHERS THEN
+        IF SQLERRM = 'HARD_CONFLICT' THEN
+          INSERT INTO pg_temp.daily_allocation_session_conflicts (visit_id, detail)
+          VALUES (labour_row.visit_id, 'Employee is absent or off shift');
+        ELSE
+          RAISE;
+        END IF;
+    END;
+  END LOOP;
 
   SELECT COUNT(*) INTO conflict_count FROM pg_temp.daily_allocation_session_conflicts;
   result := jsonb_build_object(

@@ -568,6 +568,7 @@ export function DailyAllocationManagerBoard({
     workDate: string,
     session: DailyAllocationSession,
     nextProfileId?: string | null,
+    draggedProfileId?: string | null,
   ) {
     if (!fullBoard) return false;
     const planDay = admitPlanDay(workDate);
@@ -575,6 +576,50 @@ export function DailyAllocationManagerBoard({
     const window = dailyAllocationSessionWindow(session);
     const startsAt = toDailyAllocationLondonIsoFromMinutes(workDate, window.startMinutes);
     const endsAt = toDailyAllocationLondonIsoFromMinutes(workDate, window.endMinutes);
+    const movingProfile = draggedProfileId || nextProfileId || null;
+    const companions = fullBoard.labour_assignments.filter(
+      (item) => item.visit_id === visit.id && item.profile_id !== movingProfile,
+    );
+    if (movingProfile && companions.length > 0) {
+      if (!nextProfileId) {
+        toast.error('This visit is shared. Move one employee at a time.');
+        return false;
+      }
+      const destinationAlreadyAssigned = fullBoard.labour_assignments.some(
+        (item) => item.visit_id === visit.id && item.profile_id === nextProfileId,
+      );
+      if (!(destinationAlreadyAssigned && nextProfileId !== movingProfile)) {
+        const catalogueJob = fullBoard.jobs.find((job) => (
+          job.source_type === visit.job_source_type && job.source_id === visit.job_source_id
+        ));
+        createVisitAt(catalogueJob || {
+          source_type: visit.job_source_type,
+          source_id: visit.job_source_id,
+          job_code: visit.job_code,
+          customer_name: null,
+          title: null,
+          site_address: visit.site_address,
+          source_href: null,
+        }, workDate, session, nextProfileId);
+      }
+      const current = fullBoard.labour_assignments.find(
+        (item) => item.visit_id === visit.id && item.profile_id === movingProfile,
+      );
+      if (current) {
+        mutations.unassignLabour.mutate({
+          assignment_id: current.id,
+          expected_plan_version: planDay.plan_version,
+          expected_row_version: current.row_version,
+        }, {
+          onError: (error) => showMutationError(
+            error,
+            'The new visit was created. This employee is still on the shared visit.',
+          ),
+        });
+      }
+      setStatusMessage('Employee moved onto a separate visit.');
+      return true;
+    }
     const optimisticVisit = {
       ...visit,
       work_date: workDate,
@@ -1012,7 +1057,13 @@ export function DailyAllocationManagerBoard({
       return;
     }
     if (source.kind === 'visit' && target.surface === 'session' && target.workDate && target.session) {
-      void moveVisit(source.visit, target.workDate, target.session, target.profileId);
+      void moveVisit(
+        source.visit,
+        target.workDate,
+        target.session,
+        target.profileId,
+        source.profileId,
+      );
       return;
     }
     if (source.kind === 'plant' && target.surface === 'session' && target.workDate && target.session && target.profileId) {
@@ -1219,8 +1270,8 @@ export function DailyAllocationManagerBoard({
                     setAssignOpen(true);
                   }}
                   onMoveVisit={openMoveVisit}
-                  onSetSession={(visit, session) => {
-                    void moveVisit(visit, visit.work_date, session);
+                  onSetSession={(visit, session, profileId) => {
+                    void moveVisit(visit, visit.work_date, session, profileId);
                   }}
                   onReviewCustom={() => setNormalizeOpen(true)}
                   persistenceLabel={(visitId) => {

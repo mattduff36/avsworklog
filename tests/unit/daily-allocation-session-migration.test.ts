@@ -21,7 +21,10 @@ describe('daily allocation session migration', () => {
     expect(migration).toContain("TIME '07:00', TIME '16:30'");
     expect(migration).toContain("TIME '07:00', TIME '12:00'");
     expect(migration).toContain("TIME '12:00', TIME '16:30'");
-    expect(migration).toContain('BEFORE INSERT OR UPDATE OF starts_at, ends_at');
+    expect(migration).toContain('BEFORE INSERT OR UPDATE OF work_date, starts_at, ends_at');
+    expect(migration).toContain('NEW.starts_at IS NOT DISTINCT FROM OLD.starts_at');
+    expect(migration).toContain('daily_allocation_visit_plant plant');
+    expect(migration).toContain('Employee is absent or off shift');
     expect(migration).toContain('IF NOT p_apply THEN');
     expect(migration).toContain("RAISE EXCEPTION 'CONFLICT'");
     expect(migration).toContain('STALE_PLAN_VERSION');
@@ -46,5 +49,6 @@ describe('daily allocation session migration', () => {
     expect(rollback).toContain('CREATE OR REPLACE FUNCTION public.copy_daily_allocation_plan_v2');
     expect(rollback).toContain("SELECT 'addition', 'visit', rows.source_visit_id, rows.job_code, 'Visit'");
     expect(rollback).not.toContain('DROP TABLE public.daily_allocation_visits');
+    expect(rollback).not.toContain('DELETE FROM private.daily_allocation_mutation_requests');
   });
 });
