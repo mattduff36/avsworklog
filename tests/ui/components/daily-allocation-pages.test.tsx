@@ -1423,7 +1423,10 @@ describe('daily allocation manager board', () => {
     expect(screen.getByRole('button', { name: 'Fit timeline to width' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Use scrollable timeline' })).toBeInTheDocument();
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Weekly' }), { button: 0 });
-    expect(await screen.findByTestId('daily-allocation-view-heading')).toHaveTextContent('Weekly job board');
+    expect(await screen.findByTestId('daily-allocation-view-heading')).toHaveTextContent('Weekly employee board');
+    expect(screen.getAllByText('Alex Worker').length).toBeGreaterThan(0);
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Primary Jobs' }), { button: 0 });
+    expect(screen.getByTestId('daily-allocation-view-heading')).toHaveTextContent('Weekly job board');
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Primary Employees' }), { button: 0 });
     expect(screen.getAllByText('Alex Worker').length).toBeGreaterThan(0);
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Employees (1)' }), { button: 0 });
@@ -1548,12 +1551,13 @@ describe('daily allocation manager board', () => {
     });
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse(empty)));
     renderBoardPage();
-    expect((await screen.findAllByText(/No timed visits/)).length).toBeGreaterThan(0);
+    expect(await screen.findByText('Alex Worker')).toBeInTheDocument();
+    expect(screen.queryByTestId('daily-allocation-visit-visit-1')).not.toBeInTheDocument();
     expect(
-      within(screen.getByTestId('daily-allocation-daily-board')).getAllByRole('button', {
+      within(screen.getByTestId('daily-allocation-daily-board')).queryByRole('button', {
         name: '+ Add timed visit',
       })
-    ).toHaveLength(1);
+    ).not.toBeInTheDocument();
     cleanup();
 
     vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ error: 'Board exploded.' }, 500)));

@@ -151,7 +151,7 @@ export function BoardToolbar({
             Drop a job on an employee for a full day, then switch it to AM or PM.
           </p>
           <p className="hidden text-sm text-muted-foreground xl:block">
-            Drop a job on an employee for a full day. Plant is assigned to that employee's visit.
+            Drop a job on an employee for a full day. Plant is assigned to that employee visit.
           </p>
         </div>
 

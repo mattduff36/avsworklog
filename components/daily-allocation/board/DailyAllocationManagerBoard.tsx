@@ -1002,7 +1002,7 @@ export function DailyAllocationManagerBoard({
       void createVisitAt(
         source.job,
         target.workDate,
-        target.surface === 'timeline' && !profileId ? startMinutes : null,
+        profileId ? null : target.surface === 'timeline' ? startMinutes : 8 * 60,
         profileId ? { profileId } : undefined,
       );
       return;

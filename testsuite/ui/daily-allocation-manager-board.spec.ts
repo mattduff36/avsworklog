@@ -575,7 +575,7 @@ async function expectBoardChromeFill(page: Page) {
   await expect(moduleHeader.getByTestId('daily-allocation-publish')).toBeVisible();
   await expect(toolbar).toBeVisible();
   await expect(titleRow).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Daily job board', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Daily employee board', exact: true })).toBeVisible();
   await expect(toolbar.getByRole('button', { name: 'Publication history' })).toHaveCount(0);
   await expect(toolbar.getByTestId('daily-allocation-publish')).toHaveCount(0);
   await expect(resources).toBeVisible();
@@ -610,7 +610,7 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
   test('desktop keeps the same visits across daily, weekly, and all primary projections', async ({ page }) => {
     await openManagerBoard(page);
 
-    await expect(page.getByRole('heading', { name: 'Daily job board', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Daily employee board', exact: true })).toBeVisible();
     await expect(page.getByTestId('daily-allocation-period-label')).toHaveText('Sun 13 Sep 2026');
     await page.getByRole('button', { name: 'Next day' }).click();
     await expect(page.getByTestId('daily-allocation-period-label')).toHaveText('Mon 14 Sep 2026');
@@ -663,6 +663,8 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
 
   test('offers fit/scroll controls and resizes a visit by one keyboard grid step', async ({ page }) => {
     const evidence = await openManagerBoard(page);
+    await page.getByRole('tab', { name: 'Primary Jobs' }).click();
+    await expect(page.getByRole('heading', { name: 'Daily job board', exact: true })).toBeVisible();
 
     const displayMode = page.getByRole('group', { name: 'Daily timeline display mode' });
     const fit = displayMode.getByRole('button', { name: 'Fit timeline to width' });
