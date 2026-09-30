@@ -1,5 +1,30 @@
 [
   {
+    "version": "0926.15.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated Daily Allocation and Inventory. Split shared session moves and keep history. Plan employees by full and half-day sessions.",
+    "summary": "Updated Daily Allocation and Inventory. Split shared session moves and keep history. Plan employees by full and half-day sessions.",
+    "details": [
+      "Updated Daily Allocation and Inventory, with changes to background routes, interface components, shared logic, shared typing, automated tests, and data storage.",
+      "Updated data storage, with changes to automated tests and data storage.",
+      "Updated projects, with changes to interface components and automated tests.",
+      "Updated navigation, with changes to interface components and shared logic.",
+      "Updated reports, with changes to background routes and shared logic.",
+      "Updated inventory, with changes to automated tests."
+    ],
+    "areas": [
+      "Daily Allocation",
+      "Inventory. Split shared session moves",
+      "Keep history. Plan employees by full",
+      "Half-day sessions"
+    ],
+    "areaKeys": [
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-09-30T14:14:00.348Z"
+  },
+  {
     "version": "0926.14.0",
     "updateKind": "major",
     "title": "Daily Allocation update",

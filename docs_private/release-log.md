@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 0926.15.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update Daily Allocation and Inventory`
+
+**PUSHED AT**
+2026-09-30T14:14:00.348Z
+
+**WHAT CHANGED**
+Update Daily Allocation and Inventory. Split shared session moves and keep history. Plan employees by full and half-day sessions.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Allocation and Inventory, with changes to background routes, interface components, shared logic, shared typing, automated tests, and data storage.
+- Updated data storage, with changes to automated tests and data storage.
+- Updated projects, with changes to interface components and automated tests.
+- Updated navigation, with changes to interface components and shared logic.
+- Updated reports, with changes to background routes and shared logic.
+- Updated inventory, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update Daily Allocation and Inventory`
+- `fix(daily-allocation): split shared session moves and keep history`
+- `feat(daily-allocation): plan employees by full and half-day sessions`
+
 ## 0926.14.0
 
 **GIT COMMIT MESSAGE**
