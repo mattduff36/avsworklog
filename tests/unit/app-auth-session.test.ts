@@ -20,6 +20,8 @@ const {
   profileMaybeSingleMock,
   updateEqMock,
   updateIsMock,
+  updateNeqMock,
+  updateMock,
 } = vi.hoisted(() => ({
   maybeSingleMock: vi.fn(),
   singleMock: vi.fn(),
@@ -34,6 +36,8 @@ const {
   profileMaybeSingleMock: vi.fn(),
   updateEqMock: vi.fn(),
   updateIsMock: vi.fn(),
+  updateNeqMock: vi.fn(),
+  updateMock: vi.fn(),
 }));
 
 vi.mock('next/headers', () => ({
@@ -75,14 +79,17 @@ vi.mock('@/lib/supabase/admin', () => ({
             single: singleMock,
           })),
         })),
-        update: vi.fn(() => {
+        update: (...args: unknown[]) => {
+          updateMock(...args);
           const chain: {
             eq: ReturnType<typeof vi.fn>;
             is: ReturnType<typeof vi.fn>;
+            neq: ReturnType<typeof vi.fn>;
             select: ReturnType<typeof vi.fn>;
           } = {
             eq: updateEqMock.mockImplementation(() => chain),
             is: updateIsMock.mockImplementation(() => chain),
+            neq: updateNeqMock.mockImplementation(() => chain),
             select: vi.fn(() => ({
               single: singleMock,
               maybeSingle: singleMock,
@@ -93,7 +100,7 @@ vi.mock('@/lib/supabase/admin', () => ({
             })),
           };
           return chain;
-        }),
+        },
       };
     }),
     auth: {
@@ -136,6 +143,7 @@ import {
   getCurrentAuthenticatedProfile,
   issueAppSession,
   revokeAllAppSessionsForProfile,
+  revokeOtherAppSessionsForProfile,
   validateAppSession,
 } from '@/lib/server/app-auth/session';
 
@@ -600,5 +608,29 @@ describe('app auth session helpers', () => {
     expect(revokedCount).toBe(1);
     expect(updateEqMock).toHaveBeenCalledWith('profile_id', 'user-1');
     expect(updateIsMock).toHaveBeenCalledWith('revoked_at', null);
+  });
+
+  it('revokes other active sessions for a profile while keeping the current session', async () => {
+    const revokedCount = await revokeOtherAppSessionsForProfile(
+      'user-1',
+      'session-keep',
+      'password_changed'
+    );
+
+    expect(revokedCount).toBe(1);
+    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({
+      revoked_reason: 'password_changed',
+    }));
+    expect(updateEqMock).toHaveBeenCalledWith('profile_id', 'user-1');
+    expect(updateIsMock).toHaveBeenCalledWith('revoked_at', null);
+    expect(updateNeqMock).toHaveBeenCalledWith('id', 'session-keep');
+  });
+
+  it('revokes every active session when there is no current app session to preserve', async () => {
+    await revokeOtherAppSessionsForProfile('user-1', null, 'password_changed');
+
+    expect(updateEqMock).toHaveBeenCalledWith('profile_id', 'user-1');
+    expect(updateIsMock).toHaveBeenCalledWith('revoked_at', null);
+    expect(updateNeqMock).not.toHaveBeenCalled();
   });
 });

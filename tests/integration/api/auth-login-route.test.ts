@@ -163,20 +163,24 @@ describe('auth login route', () => {
   });
 
   it('retries with a trimmed password when only edge whitespace differs', async () => {
-    signInWithPassword
-      .mockResolvedValueOnce({
+    signInWithPassword.mockImplementation(async ({ password }: { password: string }) => {
+      if (password === 'correct-password') {
+        return {
+          data: {
+            user: {
+              id: 'user-1',
+              email: 'user-1@example.com',
+            },
+          },
+          error: null,
+        };
+      }
+
+      return {
         data: { user: null },
         error: { message: 'Invalid login credentials' },
-      })
-      .mockResolvedValueOnce({
-        data: {
-          user: {
-            id: 'user-1',
-            email: 'user-1@example.com',
-          },
-        },
-        error: null,
-      });
+      };
+    });
 
     const request = new Request('http://localhost/api/auth/login', {
       method: 'POST',
@@ -291,5 +295,40 @@ describe('auth login route', () => {
     expect(response.status).toBe(401);
     expect(payload.error).toBe('Invalid email or password');
     expect(issueAppSession).not.toHaveBeenCalled();
+  });
+
+  it('revokes a session issued while the password was changing and does not set its cookie', async () => {
+    signInWithPassword
+      .mockResolvedValueOnce({
+        data: {
+          user: {
+            id: 'user-1',
+            email: 'user-1@example.com',
+          },
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { user: null },
+        error: { message: 'Invalid login credentials' },
+      });
+
+    const request = new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: 'user-1@example.com',
+        password: 'old-password',
+      }),
+    });
+
+    const response = await loginPost(request as never);
+    const payload = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(payload.error).toBe('Invalid email or password');
+    expect(issueAppSession).toHaveBeenCalledTimes(1);
+    expect(revokeAppSession).toHaveBeenCalledWith('session-1', 'password_changed');
+    expect(response.cookies.get(APP_SESSION_COOKIE_NAME)?.value).toBeUndefined();
   });
 });

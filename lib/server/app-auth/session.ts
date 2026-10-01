@@ -468,6 +468,35 @@ export async function revokeAllAppSessionsForProfile(
   return (data || []).length;
 }
 
+export async function revokeOtherAppSessionsForProfile(
+  profileId: string,
+  currentSessionId: string | null,
+  reason: string
+): Promise<number> {
+  const admin = createAdminClient();
+  const nowIso = new Date().toISOString();
+  let query = admin
+    .from('app_auth_sessions')
+    .update({
+      revoked_at: nowIso,
+      revoked_reason: reason,
+    })
+    .eq('profile_id', profileId)
+    .is('revoked_at', null);
+
+  if (currentSessionId) {
+    query = query.neq('id', currentSessionId);
+  }
+
+  const { data, error } = await query.select('id');
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return (data || []).length;
+}
+
 export async function validateAppSession(
   options: {
     includeEmail?: boolean;

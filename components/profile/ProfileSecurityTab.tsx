@@ -23,7 +23,7 @@ export function ProfileSecurityTab({ sensitiveModules }: ProfileSecurityTabProps
               <KeyRound className="h-6 w-6 sm:h-5 sm:w-5" />
             </div>
             <div>
-              <CardTitle>Password Reset</CardTitle>
+              <CardTitle>Change password</CardTitle>
               <CardDescription className="text-base sm:text-sm">Change your account password when needed.</CardDescription>
             </div>
           </div>

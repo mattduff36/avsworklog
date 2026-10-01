@@ -122,6 +122,17 @@ export async function POST(request: NextRequest) {
       actorProfileId: user.id,
     });
 
+    // Confirm the password still matches after the session row exists, so a
+    // password change that landed during this login cannot leave the new session behind.
+    const passwordStillValid = await verifyPasswordLogin(supabase, email, password);
+    if (!passwordStillValid || passwordStillValid.id !== user.id) {
+      await revokeAppSession(nextSession.row.id, 'password_changed');
+      return NextResponse.json(
+        { error: 'Invalid email or password' },
+        { status: 401 }
+      );
+    }
+
     if (existing.session) {
       await revokeAppSession(existing.session.id, 'replaced_by_password_login', nextSession.row.id);
     }

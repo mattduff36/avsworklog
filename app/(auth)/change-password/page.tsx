@@ -19,6 +19,8 @@ interface AuthSessionResponse {
   } | null;
 }
 
+const PROFILE_SECURITY_PATH = '/profile?tab=settings&settingsTab=security';
+
 export default function ChangePasswordPage() {
   const router = useRouter();
 
@@ -34,8 +36,9 @@ export default function ChangePasswordPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [userName, setUserName] = useState('');
+  const [mustChangePassword, setMustChangePassword] = useState(false);
 
-  // Check if user is logged in and needs to change password
+  // Check if user is logged in. The page serves both mandatory and voluntary changes.
   useEffect(function () {
     async function checkUser() {
       try {
@@ -53,13 +56,7 @@ export default function ChangePasswordPage() {
         }
 
         setUserName(profile.full_name || 'User');
-
-        // If they don't need to change password, redirect to dashboard
-        if (!profile.must_change_password) {
-          router.replace('/dashboard');
-          return;
-        }
-
+        setMustChangePassword(profile.must_change_password === true);
         setLoading(false);
       } catch (error) {
         console.error('Error checking user:', error);
@@ -114,9 +111,9 @@ export default function ChangePasswordPage() {
 
       setSuccess(true);
 
-      // Redirect to dashboard after 2 seconds
+      const returnPath = mustChangePassword ? '/dashboard' : PROFILE_SECURITY_PATH;
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push(returnPath);
       }, 2000);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to change password';
@@ -164,7 +161,11 @@ export default function ChangePasswordPage() {
                 </div>
               </div>
               <h2 className="text-2xl font-bold text-white">Password Changed Successfully!</h2>
-              <p className="text-muted-foreground">Redirecting you to the dashboard...</p>
+              <p className="text-muted-foreground">
+                {mustChangePassword
+                  ? 'Redirecting you to the dashboard...'
+                  : 'Redirecting you to Security...'}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -181,9 +182,19 @@ export default function ChangePasswordPage() {
               <KeyRound className="h-8 w-8 text-amber-500" />
             </div>
           </div>
-          <CardTitle className="text-2xl text-white">Change Your Password</CardTitle>
+          <CardTitle className="text-2xl text-white">
+            {mustChangePassword ? 'Change Your Password' : 'Change password'}
+          </CardTitle>
           <CardDescription className="text-muted-foreground">
-            Welcome, <strong className="text-white">{userName}</strong>! For security reasons, you must change your temporary password before continuing.
+            {mustChangePassword ? (
+              <>
+                Welcome, <strong className="text-white">{userName}</strong>! For security reasons, you must change your temporary password before continuing.
+              </>
+            ) : (
+              <>
+                Choose a new password for your account. You will stay signed in on this device, and other devices will be signed out.
+              </>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -213,7 +213,7 @@ function buildLoginRedirectUrl(): string {
   return url.toString();
 }
 
-function buildAuthenticatedRedirectUrl(payload: ClientAuthSessionResponse): string | null {
+export function buildAuthenticatedRedirectUrl(payload: ClientAuthSessionResponse): string | null {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -236,10 +236,6 @@ function buildAuthenticatedRedirectUrl(payload: ClientAuthSessionResponse): stri
       return redirectTarget;
     }
 
-    return '/dashboard';
-  }
-
-  if (currentPath.startsWith('/change-password') && !mustChangePassword) {
     return '/dashboard';
   }
 
