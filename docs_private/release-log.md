@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.0.0
+
+**GIT COMMIT MESSAGE**
+`feat(auth): let signed-in users change their own password`
+
+**PUSHED AT**
+2026-10-01T13:06:21.474Z
+
+**WHAT CHANGED**
+Let signed-in users change their own password.
+
+**VERSION HISTORY DETAILS**
+- Let signed-in users change their own password, with changes to background routes, shared logic, and automated tests.
+- Updated profile, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `feat(auth): let signed-in users change their own password`
+
 ## 0926.15.0
 
 **GIT COMMIT MESSAGE**
