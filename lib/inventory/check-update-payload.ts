@@ -6,6 +6,7 @@ export interface InventoryItemDetailsUpdateInput {
   last_checked_at: string | null;
   check_interval_days: number | null;
   hasCheckHistory: boolean;
+  serial_number?: string | null;
 }
 
 export function buildInventoryItemDetailsUpdatePayload(
@@ -20,5 +21,6 @@ export function buildInventoryItemDetailsUpdatePayload(
       ? {}
       : { last_checked_at: input.last_checked_at }),
     check_interval_days: input.check_interval_days,
+    ...(input.serial_number !== undefined ? { serial_number: input.serial_number } : {}),
   };
 }

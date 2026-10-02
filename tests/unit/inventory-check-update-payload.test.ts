@@ -38,4 +38,21 @@ describe('INV-CHECK-PATCH-001 inventory detail update payload', () => {
       last_checked_at: '2026-05-01',
     });
   });
+
+  it('includes a minor plant serial number when the edit form provides one', () => {
+    const payload = buildInventoryItemDetailsUpdatePayload({
+      item_number: 'MP1',
+      name: 'Fuel station',
+      category: 'minor_plant',
+      location_id: 'loc-1',
+      last_checked_at: null,
+      check_interval_days: 180,
+      hasCheckHistory: true,
+      serial_number: 'SN100',
+    });
+
+    expect(payload).toMatchObject({
+      serial_number: 'SN100',
+    });
+  });
 });

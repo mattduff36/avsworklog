@@ -179,6 +179,7 @@ export interface InventoryItemFormData {
   location_id: string;
   last_checked_at: string;
   check_interval_months: string;
+  serial_number: string;
   status: InventoryStatus;
 }
 
@@ -305,6 +306,7 @@ export const EMPTY_INVENTORY_ITEM_FORM: InventoryItemFormData = {
   location_id: '',
   last_checked_at: '',
   check_interval_months: '',
+  serial_number: '',
   status: 'active',
 };
 

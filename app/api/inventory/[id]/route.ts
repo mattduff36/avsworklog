@@ -10,6 +10,11 @@ import {
   toInventoryMoveErrorResponse,
 } from '@/lib/server/inventory-move';
 import { isInventoryRetireReason, type InventoryCategory, type InventoryRetireReason, type InventoryStatus } from '@/app/(dashboard)/inventory/types';
+import {
+  INVENTORY_MINOR_PLANT_CATEGORY,
+  parseMinorPlantSerialNumber,
+  saveMinorPlantSerialNumber,
+} from '@/lib/server/inventory-minor-plant-serial';
 import type { Database } from '@/types/database';
 
 interface RouteParams {
@@ -23,10 +28,17 @@ interface InventoryItemUpdateBody {
   location_id?: string;
   last_checked_at?: string | null;
   check_interval_days?: number | null;
+  serial_number?: string | null;
   status?: InventoryStatus;
   retire_reason?: InventoryRetireReason | null;
   check_warning_confirmation?: unknown;
 }
+
+const INVENTORY_ITEM_SELECT = `
+  *,
+  location:inventory_locations(*),
+  minor_plant_detail:inventory_minor_plant_details(*)
+`;
 
 type InventoryLocationRow = Database['public']['Tables']['inventory_locations']['Row'];
 
@@ -58,6 +70,29 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
     const body = (await request.json()) as InventoryItemUpdateBody;
     const admin = createAdminClient();
+    let serialNumberToSave: string | null | undefined;
+    if (body.serial_number !== undefined) {
+      let category = body.category?.trim() || '';
+      if (!category) {
+        const { data: currentItem, error: currentItemError } = await admin
+          .from('inventory_items')
+          .select('category')
+          .eq('id', id)
+          .maybeSingle();
+        if (currentItemError) throw currentItemError;
+        if (!currentItem) {
+          return NextResponse.json({ error: 'Inventory item not found' }, { status: 404 });
+        }
+        category = currentItem.category || '';
+      }
+      if (category === INVENTORY_MINOR_PLANT_CATEGORY) {
+        const parsedSerialNumber = parseMinorPlantSerialNumber(body.serial_number);
+        if (!parsedSerialNumber.ok) {
+          return NextResponse.json({ error: parsedSerialNumber.error }, { status: 400 });
+        }
+        serialNumberToSave = parsedSerialNumber.value;
+      }
+    }
     let requestedLocationId: string | null = null;
     const update: Record<string, unknown> = {
       updated_by: access.userId,
@@ -176,11 +211,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .from('inventory_items')
       .update(update)
       .eq('id', id)
-      .select(`
-        *,
-        location:inventory_locations(*),
-        minor_plant_detail:inventory_minor_plant_details(*)
-      `)
+      .select(INVENTORY_ITEM_SELECT)
       .single();
 
     if (error) {
@@ -199,16 +230,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
       const { data: movedData, error: movedLoadError } = await admin
         .from('inventory_items')
-        .select(`
-          *,
-          location:inventory_locations(*),
-          minor_plant_detail:inventory_minor_plant_details(*)
-        `)
+        .select(INVENTORY_ITEM_SELECT)
         .eq('id', id)
         .single();
 
       if (movedLoadError) throw movedLoadError;
       responseItem = movedData;
+    }
+
+    if (serialNumberToSave !== undefined && responseItem.category === INVENTORY_MINOR_PLANT_CATEGORY) {
+      await saveMinorPlantSerialNumber(admin, {
+        inventoryItemId: id,
+        serialNumber: serialNumberToSave,
+        userId: access.userId,
+      });
+      const { data: reloadedItem, error: reloadError } = await admin
+        .from('inventory_items')
+        .select(INVENTORY_ITEM_SELECT)
+        .eq('id', id)
+        .single();
+      if (reloadError) throw reloadError;
+      responseItem = reloadedItem;
     }
 
     const item = await withEnrichedInventoryLocation(

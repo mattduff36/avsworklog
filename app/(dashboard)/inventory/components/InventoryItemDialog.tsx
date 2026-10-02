@@ -35,20 +35,37 @@ import {
   isInventoryUnknownLocation,
 } from '../utils';
 import { toast } from 'sonner';
+import { validateAndNormalizePlantSerialNumber } from '@/lib/utils/plant-serial-number';
 import { InventoryLocationSelect } from './InventoryLocationSelect';
+import { InventorySerialNumberField } from './InventorySerialNumberField';
 
 interface InventoryItemDialogProps {
   open: boolean;
   locations: InventoryLocation[];
   categories: InventoryItemCategory[];
+  initialCategory?: string;
   onClose: () => void;
   onSubmit: (data: InventoryItemFormData) => Promise<void>;
+}
+
+function resolveDialogCategory(
+  categories: InventoryItemCategory[],
+  initialCategory: string | undefined,
+): InventoryCategory {
+  if (
+    initialCategory
+    && (categories.length === 0 || categories.some((category) => category.slug === initialCategory))
+  ) {
+    return initialCategory;
+  }
+  return categories[0]?.slug || EMPTY_INVENTORY_ITEM_FORM.category;
 }
 
 export function InventoryItemDialog({
   open,
   locations,
   categories,
+  initialCategory,
   onClose,
   onSubmit,
 }: InventoryItemDialogProps) {
@@ -67,10 +84,10 @@ export function InventoryItemDialog({
     setSubmitError('');
     setForm({
       ...EMPTY_INVENTORY_ITEM_FORM,
-      category: categories[0]?.slug || EMPTY_INVENTORY_ITEM_FORM.category,
+      category: resolveDialogCategory(categories, initialCategory),
     });
     setSelectedLocation(null);
-  }, [categories, open]);
+  }, [categories, initialCategory, open]);
 
   const categoryOptions = categories.length > 0
     ? [...categories]
@@ -89,9 +106,21 @@ export function InventoryItemDialog({
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setSubmitError('');
+    let nextForm = form;
+    if (form.category === 'minor_plant') {
+      const serialNumber = validateAndNormalizePlantSerialNumber(form.serial_number);
+      if (!serialNumber.valid) {
+        const message = serialNumber.error || 'Serial Number must contain only letters and numbers';
+        setSubmitError(message);
+        toast.error(message, { id: 'inventory-item-save-error' });
+        return;
+      }
+      nextForm = { ...form, serial_number: serialNumber.value || '' };
+      setForm(nextForm);
+    }
     setSaving(true);
     try {
-      await onSubmit(form);
+      await onSubmit(nextForm);
       onClose();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to save inventory item';
@@ -150,6 +179,13 @@ export function InventoryItemDialog({
                   className="bg-slate-800 border-slate-600"
                 />
               </div>
+              {form.category === 'minor_plant' ? (
+                <InventorySerialNumberField
+                  id="serial_number"
+                  value={form.serial_number}
+                  onChange={(value) => updateField('serial_number', value)}
+                />
+              ) : null}
             </div>
 
             {hasSpecialCheckStatus ? (

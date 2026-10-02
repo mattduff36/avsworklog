@@ -10,6 +10,11 @@ import {
 } from '@/lib/server/inventory-locations';
 import { isUnknownInventoryLocationName } from '@/app/(dashboard)/inventory/utils';
 import type { InventoryCategory, InventoryStatus } from '@/app/(dashboard)/inventory/types';
+import {
+  INVENTORY_MINOR_PLANT_CATEGORY,
+  parseMinorPlantSerialNumber,
+  saveMinorPlantSerialNumber,
+} from '@/lib/server/inventory-minor-plant-serial';
 import type { Database } from '@/types/database';
 
 const completeListPath = 'data/COMPLETE LIST 2023.xlsx';
@@ -21,6 +26,7 @@ interface InventoryItemRequestBody {
   location_id?: string;
   last_checked_at?: string | null;
   check_interval_days?: number | null;
+  serial_number?: string | null;
   status?: InventoryStatus;
 }
 
@@ -292,6 +298,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Location is required' }, { status: 400 });
     }
 
+    const category = body.category?.trim() || INVENTORY_MINOR_PLANT_CATEGORY;
+    let serialNumber: string | null = null;
+    if (category === INVENTORY_MINOR_PLANT_CATEGORY && body.serial_number !== undefined) {
+      const parsedSerialNumber = parseMinorPlantSerialNumber(body.serial_number);
+      if (!parsedSerialNumber.ok) {
+        return NextResponse.json({ error: parsedSerialNumber.error }, { status: 400 });
+      }
+      serialNumber = parsedSerialNumber.value;
+    }
+
     const admin = createAdminClient();
     const { data: location, error: locationError } = await admin
       .from('inventory_locations')
@@ -309,7 +325,7 @@ export async function POST(request: NextRequest) {
         item_number: itemNumber,
         item_number_normalized: normalizeInventoryItemNumber(itemNumber),
         name,
-        category: body.category || 'minor_plant',
+        category,
         location_id: locationId,
         last_checked_at: cleanOptionalDate(body.last_checked_at),
         check_interval_days: body.check_interval_days || null,
@@ -329,6 +345,21 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'An inventory item with this ID number already exists' }, { status: 400 });
       }
       throw error;
+    }
+
+    if (serialNumber) {
+      await saveMinorPlantSerialNumber(admin, {
+        inventoryItemId: data.id,
+        serialNumber,
+        userId: access.userId,
+      });
+      const { data: detail, error: detailError } = await admin
+        .from('inventory_minor_plant_details')
+        .select('*')
+        .eq('inventory_item_id', data.id)
+        .maybeSingle();
+      if (detailError) throw detailError;
+      data.minor_plant_detail = detail;
     }
 
     const item = await withEnrichedInventoryLocation(

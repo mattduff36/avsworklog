@@ -30,6 +30,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertTriangle, CalendarCheck, Clock, Download, Loader2, MapPin, PackageSearch } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import { validateAndNormalizePlantSerialNumber } from '@/lib/utils/plant-serial-number';
 import { cn } from '@/lib/utils/cn';
 import {
   InventoryMobilePrimaryNav,
@@ -52,6 +53,7 @@ import {
   type InventoryMovePayload,
 } from '../../types';
 import { InventoryCheckModal, type InventoryChecklistSubmitPayload } from '../../components/InventoryCheckModal';
+import { InventorySerialNumberField } from '../../components/InventorySerialNumberField';
 import { InventoryMoveButton } from '../../components/InventoryMoveButton';
 import { MoveInventoryDialog } from '../../components/MoveInventoryDialog';
 import { InventoryMoveCheckWarningDialog } from '../../components/InventoryMoveCheckWarningDialog';
@@ -164,6 +166,7 @@ function buildItemEditForm(item: InventoryItem): InventoryItemFormData {
     location_id: item.location_id || '',
     last_checked_at: item.last_checked_at || '',
     check_interval_months: item.check_interval_days ? String(getInventoryCheckIntervalMonths(item)) : '',
+    serial_number: item.minor_plant_detail?.serial_number || '',
     status: item.status,
   };
 }
@@ -318,6 +321,20 @@ export default function InventoryItemDetailPage() {
 
   function handleSaveItemDetails(event: React.FormEvent) {
     event.preventDefault();
+    let serialNumber = editForm.serial_number;
+    if (editForm.category === 'minor_plant') {
+      const serialResult = validateAndNormalizePlantSerialNumber(editForm.serial_number);
+      if (!serialResult.valid) {
+        const message = serialResult.error || 'Serial Number must contain only letters and numbers';
+        setDetailsSubmitError(message);
+        toast.error(message);
+        return;
+      }
+      serialNumber = serialResult.value || '';
+      if (serialNumber !== editForm.serial_number) {
+        setEditForm((current) => ({ ...current, serial_number: serialNumber }));
+      }
+    }
     const parsedInterval = Number.parseInt(editForm.check_interval_months, 10);
     const hasCheckHistory = (payload?.checks.length || 0) > 0;
     const updatePayload = buildInventoryItemDetailsUpdatePayload({
@@ -330,6 +347,7 @@ export default function InventoryItemDetailPage() {
         Number.isFinite(parsedInterval) && parsedInterval > 0 ? parsedInterval : null
       ),
       hasCheckHistory,
+      ...(editForm.category === 'minor_plant' ? { serial_number: serialNumber || null } : {}),
     });
     void submitItemDetails(updatePayload);
   }
@@ -621,6 +639,13 @@ export default function InventoryItemDetailPage() {
                           className="bg-slate-800 border-slate-600"
                         />
                       </div>
+                      {editForm.category === 'minor_plant' ? (
+                        <InventorySerialNumberField
+                          id="edit_serial_number"
+                          value={editForm.serial_number}
+                          onChange={(value) => updateEditField('serial_number', value)}
+                        />
+                      ) : null}
                     </div>
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -725,12 +750,12 @@ export default function InventoryItemDetailPage() {
                     <DetailRow label="Source" value={item.source || 'Not recorded'} />
                     <DetailRow label="Source Reference" value={item.source_reference || 'Not recorded'} />
                     <DetailRow label="Group" value={group?.name || 'No group'} />
+                    {item.category === 'minor_plant' || item.minor_plant_detail ? (
+                      <DetailRow label="Serial Number" value={item.minor_plant_detail?.serial_number || 'Not recorded'} />
+                    ) : null}
                     {item.minor_plant_detail ? (
                       <>
                         <DetailRow label="Plant ID" value={item.minor_plant_detail.plant_identifier || 'Not recorded'} />
-                        {'serial_number' in item.minor_plant_detail ? (
-                          <DetailRow label="Serial Number" value={item.minor_plant_detail.serial_number || 'Not recorded'} />
-                        ) : null}
                         <DetailRow label="Make" value={item.minor_plant_detail.make || 'Not recorded'} />
                         <DetailRow label="Model" value={item.minor_plant_detail.model || 'Not recorded'} />
                         <DetailRow label="Registration" value={item.minor_plant_detail.reg_number || 'Not recorded'} />

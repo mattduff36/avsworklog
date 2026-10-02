@@ -575,10 +575,15 @@ export default function InventoryPage() {
   }
 
   function buildInventoryItemPayload(data: InventoryItemFormData) {
-    const { check_interval_months: checkIntervalMonths, ...payload } = data;
+    const {
+      check_interval_months: checkIntervalMonths,
+      serial_number: serialNumber,
+      ...payload
+    } = data;
     const intervalMonths = Number.parseInt(checkIntervalMonths, 10);
     return {
       ...payload,
+      ...(payload.category === 'minor_plant' ? { serial_number: serialNumber } : {}),
       check_interval_days: checkIntervalMonthsToDays(
         Number.isFinite(intervalMonths) && intervalMonths > 0 ? intervalMonths : null
       ),
@@ -1461,6 +1466,7 @@ export default function InventoryPage() {
         open={itemDialogOpen}
         locations={knownLocations}
         categories={categories}
+        initialCategory={pageTab === 'overview' && overviewTab === 'minor_plant' ? 'minor_plant' : undefined}
         onClose={() => setItemDialogOpen(false)}
         onSubmit={handleCreateItem}
       />
