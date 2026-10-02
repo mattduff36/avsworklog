@@ -1,5 +1,22 @@
 [
   {
+    "version": "1026.1.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated inventory.",
+    "summary": "Updated inventory.",
+    "details": [
+      "Updated inventory, with changes to background routes, app screens, shared logic, and automated tests."
+    ],
+    "areas": [
+      "Inventory"
+    ],
+    "areaKeys": [
+      "inventory"
+    ],
+    "pushedAt": "2026-10-02T11:19:39.012Z"
+  },
+  {
     "version": "1026.0.1",
     "updateKind": "minor",
     "title": "App reliability update",

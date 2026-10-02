@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.1.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update inventory`
+
+**PUSHED AT**
+2026-10-02T11:19:39.012Z
+
+**WHAT CHANGED**
+Update inventory.
+
+**VERSION HISTORY DETAILS**
+- Updated inventory, with changes to background routes, app screens, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update inventory`
+
 ## 1026.0.1
 
 **GIT COMMIT MESSAGE**
