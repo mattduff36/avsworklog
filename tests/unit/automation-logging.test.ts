@@ -3,13 +3,18 @@ import { tmpdir } from 'os';
 import path from 'path';
 import { Readable, Writable } from 'stream';
 import { describe, expect, it } from 'vitest';
-import { renderAutomationAdvisorReview } from '@/scripts/automation/advisor-review';
+import { createAutomationAdvisorPackage, renderAutomationAdvisorReview } from '@/scripts/automation/advisor-review';
 import { loadKnowledgeStore, summarizeKnowledgeOutcomes } from '@/scripts/fixerrors-knowledge';
 import { redactSensitiveText } from '@/scripts/automation/logger';
 import { runMonthlyAutomationFollowUp, writeMonthlyAutomationPendingFollowUp } from '@/scripts/automation/monthly-follow-up';
 import { updateAutomationMemory } from '@/scripts/automation/memory';
 import { reviewAutomationRun } from '@/scripts/automation/self-review';
-import type { AutomationMemory, AutomationMemorySuggestion, AutomationRunLog } from '@/scripts/automation/types';
+import type {
+  AutomationMemory,
+  AutomationMemorySuggestion,
+  AutomationMonthlyMetrics,
+  AutomationRunLog,
+} from '@/scripts/automation/types';
 
 function createRunLog(overrides: Partial<AutomationRunLog> = {}): AutomationRunLog {
   return {
@@ -457,7 +462,106 @@ describe('automation logging helpers', () => {
     expect(review).not.toContain('200-log fetch limit');
     expect(review).toContain('filtered more than 75%');
     expect(review).toContain('untriaged');
+    expect(review).toContain('1 repeated pattern delta(s) are regression-test candidates.');
+    expect(review).toContain(
+      'new: Error in Console: Repeated production failure (3 occurrence(s), 1 run(s), no prior pattern baseline). Regression-test candidate.'
+    );
+    expect(review).not.toContain('Surface repeated production patterns as deltas');
     expect(review).toContain('## Copy/Paste Cursor Prompt');
+  });
+
+  it('FIXERR-ADV-002 surfaces repeated production patterns as month-to-month regression deltas', () => {
+    const currentPattern = {
+      errorType: 'Error',
+      component: 'Console',
+      normalizedMessage: 'Repeated production failure',
+      occurrences: 4,
+      sourceFiles: ['app/api/example/route.ts'],
+    };
+    const previousMetrics: AutomationMonthlyMetrics = {
+      scriptName: 'fixerrors',
+      month: '2026-04',
+      generatedAt: '2026-04-30T00:00:00.000Z',
+      runCount: 1,
+      failureCount: 0,
+      averageDurationMs: 1000,
+      modeCounts: { analysis: 1 },
+      fixerrors: {
+        totalFetched: 2,
+        totalFiltered: 0,
+        totalGrouped: 2,
+        fetchLimitHitCount: 0,
+        verifiedOutcomeCount: 0,
+        recurrenceCount: 0,
+        highFilteredRuns: 0,
+        untriagedCount: 0,
+        staleCount: 0,
+        repeatedPatternCount: 2,
+        repeatedSourceFileCount: 0,
+        repeatedPatterns: [
+          {
+            key: 'Error in Console: Repeated production failure',
+            runs: 1,
+            occurrences: 1,
+          },
+          {
+            key: 'Error in Console: Cleared production failure',
+            runs: 1,
+            occurrences: 2,
+          },
+        ],
+      },
+    };
+    const options = {
+      advisorDirectory: '/tmp/not-used',
+      scriptName: 'fixerrors',
+      generatedAt: '2026-05-19T00:00:00.000Z',
+      monthKey: '2026-05',
+      previousMetrics,
+      logs: [
+        createRunLog({
+          id: 'fixerrors-delta',
+          scriptName: 'fixerrors',
+          mode: 'analysis',
+          startedAt: '2026-05-19T00:00:00.000Z',
+          steps: [
+            {
+              name: 'Write error analysis report',
+              status: 'passed' as const,
+              startedAt: '2026-05-19T00:00:00.000Z',
+              endedAt: '2026-05-19T00:00:01.000Z',
+              durationMs: 1000,
+              metadata: {
+                totalFetched: 4,
+                afterFiltering: 4,
+                patternsFound: 1,
+                topPatterns: [currentPattern],
+              },
+            },
+          ],
+        }),
+      ],
+    };
+    const review = renderAutomationAdvisorReview(options);
+    const advisorPackage = createAutomationAdvisorPackage(options);
+
+    expect(review).toContain(
+      'increased: Error in Console: Repeated production failure (4 occurrence(s), 1 run(s), previously 1). Regression-test candidate.'
+    );
+    expect(review).toContain(
+      'cleared: Error in Console: Cleared production failure (previously 2 occurrence(s)).'
+    );
+    expect(advisorPackage.prompt.focusAreas).toContain(
+      'Review repeated production pattern deltas as regression-test candidates'
+    );
+    expect(review).not.toContain('Surface repeated production patterns as deltas');
+    expect(advisorPackage.metrics.fixerrors?.repeatedPatterns).toEqual([
+      {
+        key: 'Error in Console: Repeated production failure',
+        runs: 1,
+        occurrences: 4,
+      },
+    ]);
   });
 
   it('preserves human-edited suggestion statuses when memory is updated', () => {

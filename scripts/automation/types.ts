@@ -123,6 +123,12 @@ export interface AutomationReviewPrompt {
   prompt: string;
 }
 
+export interface RepeatedProductionPattern {
+  key: string;
+  runs: number;
+  occurrences: number;
+}
+
 export interface AutomationMonthlyMetrics {
   scriptName: string;
   month: string;
@@ -151,6 +157,7 @@ export interface AutomationMonthlyMetrics {
     staleCount: number;
     repeatedPatternCount: number;
     repeatedSourceFileCount: number;
+    repeatedPatterns?: RepeatedProductionPattern[];
   };
   workflowReview?: WorkflowReviewMetrics;
 }

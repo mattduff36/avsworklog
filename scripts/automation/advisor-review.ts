@@ -8,6 +8,7 @@ import type {
   AutomationReviewPrompt,
   AutomationRunLog,
   AutomationStepLog,
+  RepeatedProductionPattern,
 } from './types';
 
 interface AdvisorReviewOptions {
@@ -69,7 +70,7 @@ interface FixErrorsMetrics {
   verifiedOutcomeCount: number;
   recurrenceCount: number;
   highFilteredRuns: number;
-  repeatedPatterns: Array<{ key: string; runs: number; occurrences: number }>;
+  repeatedPatterns: RepeatedProductionPattern[];
   repeatedSourceFiles: Array<{ file: string; count: number }>;
   fixLogStatusCounts: Record<string, number>;
   noSourcePatternCount: number;
@@ -374,8 +375,123 @@ function buildFixErrorsMetrics(options: AdvisorPackageOptions, metrics: FixError
       staleCount,
       repeatedPatternCount: metrics.repeatedPatterns.length,
       repeatedSourceFileCount: metrics.repeatedSourceFiles.length,
+      repeatedPatterns: metrics.repeatedPatterns.map((pattern) => ({
+        key: pattern.key,
+        runs: pattern.runs,
+        occurrences: pattern.occurrences,
+      })),
     },
   };
+}
+
+type RepeatedPatternDeltaKind = 'new' | 'increased' | 'continued' | 'decreased' | 'cleared';
+
+interface RepeatedPatternDelta {
+  kind: RepeatedPatternDeltaKind;
+  key: string;
+  runs: number;
+  occurrences: number;
+  previousOccurrences: number;
+}
+
+const PATTERN_DELTA_ORDER: Record<RepeatedPatternDeltaKind, number> = {
+  new: 0,
+  increased: 1,
+  continued: 2,
+  decreased: 3,
+  cleared: 4,
+};
+
+function readRepeatedPatternBaseline(previous?: AutomationMonthlyMetrics): {
+  tracked: boolean;
+  patterns: RepeatedProductionPattern[];
+} {
+  const stored = previous?.fixerrors?.repeatedPatterns;
+  if (!Array.isArray(stored)) return { tracked: false, patterns: [] };
+  return {
+    tracked: true,
+    patterns: stored.filter(
+      (pattern): pattern is RepeatedProductionPattern =>
+        Boolean(pattern) &&
+        typeof pattern.key === 'string' &&
+        pattern.key.length > 0 &&
+        typeof pattern.runs === 'number' &&
+        typeof pattern.occurrences === 'number'
+    ),
+  };
+}
+
+function buildRepeatedPatternDeltas(
+  current: readonly RepeatedProductionPattern[],
+  baseline: { tracked: boolean; patterns: readonly RepeatedProductionPattern[] }
+): RepeatedPatternDelta[] {
+  const previousByKey = new Map(baseline.patterns.map((pattern) => [pattern.key, pattern]));
+  const currentKeys = new Set(current.map((pattern) => pattern.key));
+  const deltas: RepeatedPatternDelta[] = [];
+
+  for (const pattern of current) {
+    const prior = previousByKey.get(pattern.key);
+    if (!prior) {
+      deltas.push({
+        kind: 'new',
+        key: pattern.key,
+        runs: pattern.runs,
+        occurrences: pattern.occurrences,
+        previousOccurrences: 0,
+      });
+      continue;
+    }
+    const kind: RepeatedPatternDeltaKind =
+      pattern.occurrences > prior.occurrences
+        ? 'increased'
+        : pattern.occurrences < prior.occurrences
+          ? 'decreased'
+          : 'continued';
+    deltas.push({
+      kind,
+      key: pattern.key,
+      runs: pattern.runs,
+      occurrences: pattern.occurrences,
+      previousOccurrences: prior.occurrences,
+    });
+  }
+
+  if (baseline.tracked) {
+    for (const prior of baseline.patterns) {
+      if (currentKeys.has(prior.key)) continue;
+      deltas.push({
+        kind: 'cleared',
+        key: prior.key,
+        runs: 0,
+        occurrences: 0,
+        previousOccurrences: prior.occurrences,
+      });
+    }
+  }
+
+  return deltas.sort(
+    (left, right) =>
+      PATTERN_DELTA_ORDER[left.kind] - PATTERN_DELTA_ORDER[right.kind] ||
+      right.occurrences - left.occurrences ||
+      left.key.localeCompare(right.key)
+  );
+}
+
+function isRegressionTestCandidate(kind: RepeatedPatternDeltaKind): boolean {
+  return kind !== 'cleared';
+}
+
+function formatRepeatedPatternDelta(delta: RepeatedPatternDelta, baselineTracked: boolean): string {
+  const candidate = isRegressionTestCandidate(delta.kind) ? ' Regression-test candidate.' : '';
+  if (delta.kind === 'new') {
+    const prior = baselineTracked ? 'previously 0' : 'no prior pattern baseline';
+    return `new: ${delta.key} (${delta.occurrences} occurrence(s), ${delta.runs} run(s), ${prior}).${candidate}`;
+  }
+  if (delta.kind === 'cleared') {
+    return `cleared: ${delta.key} (previously ${delta.previousOccurrences} occurrence(s)).`;
+  }
+  const change = delta.kind === 'continued' ? 'unchanged' : `previously ${delta.previousOccurrences}`;
+  return `${delta.kind}: ${delta.key} (${delta.occurrences} occurrence(s), ${delta.runs} run(s), ${change}).${candidate}`;
 }
 
 function renderPreviousAdvice(memory?: AutomationMemory, previousSuggestions: AutomationMemorySuggestion[] = []): string[] {
@@ -661,17 +777,6 @@ function buildFixErrorsSuggestions(options: AdvisorPackageOptions, metrics: FixE
     }));
   }
 
-  if (metrics.repeatedPatterns.length > 0) {
-    suggestions.push(createSuggestion({
-      scriptName: options.scriptName,
-      monthKey: options.monthKey,
-      id: 'surface-repeated-pattern-deltas',
-      title: 'Surface repeated production patterns as deltas',
-      reason: 'Recurring production errors should stand out as likely regression-test candidates.',
-      evidence: metrics.repeatedPatterns.slice(0, 3).map((pattern) => pattern.key),
-    }));
-  }
-
   return suggestions;
 }
 
@@ -686,13 +791,18 @@ function buildFixErrorsPackage(options: AdvisorPackageOptions): AutomationAdviso
   }
   const monthlyMetrics = buildFixErrorsMetrics(options, metrics);
   const suggestions = buildFixErrorsSuggestions(options, metrics);
+  const patternBaseline = readRepeatedPatternBaseline(options.previousMetrics);
+  const patternDeltas = buildRepeatedPatternDeltas(metrics.repeatedPatterns, patternBaseline);
+  const regressionCandidateCount = patternDeltas.filter((delta) => isRegressionTestCandidate(delta.kind)).length;
   const filteredRatio = metrics.totalFetched > 0 ? metrics.totalFiltered / metrics.totalFetched : 0;
   const untriagedCount = metrics.fixLogStatusCounts.untriaged ?? 0;
   const staleCount = metrics.fixLogStatusCounts.stale ?? 0;
   const risks = [
     ...(metrics.recurrenceCount > 0 ? [`${metrics.recurrenceCount} verified fix recurrence(s) need review.`] : []),
     ...(metrics.highFilteredRuns > 0 ? [`${metrics.highFilteredRuns} run(s) filtered more than 75% of fetched errors; review localhost/admin filtering periodically.`] : []),
-    ...(metrics.repeatedPatterns.length > 0 ? [`${metrics.repeatedPatterns.length} repeated pattern(s) appeared across reviewed logs.`] : []),
+    ...(regressionCandidateCount > 0
+      ? [`${regressionCandidateCount} repeated pattern delta(s) are regression-test candidates.`]
+      : []),
     ...(untriagedCount > 0 ? [`Fix log contains ${untriagedCount} untriaged entr${untriagedCount === 1 ? 'y' : 'ies'}.`] : []),
     ...(staleCount > 0 ? [`Fix log contains ${staleCount} stale entr${staleCount === 1 ? 'y' : 'ies'}.`] : []),
   ];
@@ -708,6 +818,9 @@ function buildFixErrorsPackage(options: AdvisorPackageOptions): AutomationAdviso
   ];
   const focusAreas = Array.from(new Set([
     ...suggestions.map((suggestion) => suggestion.title),
+    ...(regressionCandidateCount > 0
+      ? ['Review repeated production pattern deltas as regression-test candidates']
+      : []),
     ...((options.memory?.suggestions ?? [])
       .filter((suggestion) => suggestion.status === 'pending')
       .slice(-3)
@@ -766,6 +879,13 @@ function buildFixErrorsPackage(options: AdvisorPackageOptions): AutomationAdviso
     '## Previous Advice And Outcomes',
     '',
     ...renderPreviousAdvice(options.memory, options.previousSuggestions),
+    '',
+    '## Repeated Pattern Deltas',
+    '',
+    ...renderList(
+      patternDeltas.map((delta) => formatRepeatedPatternDelta(delta, patternBaseline.tracked)),
+      'No repeated-pattern deltas.'
+    ),
     '',
     '## Repeated Error Patterns',
     '',
