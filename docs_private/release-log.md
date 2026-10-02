@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.2.0
+
+**GIT COMMIT MESSAGE**
+`feat(timesheets): update Timesheets and Absence & Leave`
+
+**PUSHED AT**
+2026-10-02T14:24:35.532Z
+
+**WHAT CHANGED**
+Update Timesheets and Absence & Leave.
+
+**VERSION HISTORY DETAILS**
+- Updated Timesheets and Absence & Leave, with changes to app screens, shared logic, and automated tests.
+- Updated absence and leave, with changes to shared logic and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(timesheets): update Timesheets and Absence & Leave`
+
 ## 1026.1.0
 
 **GIT COMMIT MESSAGE**

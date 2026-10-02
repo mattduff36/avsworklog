@@ -1,5 +1,25 @@
 [
   {
+    "version": "1026.2.0",
+    "updateKind": "major",
+    "title": "Timesheets update",
+    "description": "Updated Timesheets and Absence & Leave.",
+    "summary": "Updated Timesheets and Absence & Leave.",
+    "details": [
+      "Updated Timesheets and Absence & Leave, with changes to app screens, shared logic, and automated tests.",
+      "Updated absence and leave, with changes to shared logic and automated tests."
+    ],
+    "areas": [
+      "Timesheets",
+      "Absence & Leave"
+    ],
+    "areaKeys": [
+      "timesheets",
+      "absence"
+    ],
+    "pushedAt": "2026-10-02T14:24:35.532Z"
+  },
+  {
     "version": "1026.1.0",
     "updateKind": "major",
     "title": "Inventory update",
