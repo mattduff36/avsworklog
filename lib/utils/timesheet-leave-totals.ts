@@ -33,6 +33,13 @@ export interface LeaveAwareWeeklyTotal {
   display: string;
 }
 
+/** Days above this worked-hours total are shown in red as a possible typo. Submit stays allowed. */
+export const LONG_WORKING_DAY_HOURS = 13.5;
+
+export function isLongWorkingDay(hours: number | null | undefined): boolean {
+  return typeof hours === 'number' && Number.isFinite(hours) && hours > LONG_WORKING_DAY_HOURS;
+}
+
 export interface LeaveAwareTotalsResult {
   rows: LeaveAwareRowTotal[];
   rowByDay: Map<number, LeaveAwareRowTotal>;

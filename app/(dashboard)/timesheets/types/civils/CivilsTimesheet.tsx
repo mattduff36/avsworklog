@@ -49,7 +49,7 @@ import {
   resolveTimesheetOffDayStates,
   shouldDisableTimesheetWorkingInputs,
 } from '@/lib/utils/timesheet-off-days';
-import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline, isLongWorkingDay } from '@/lib/utils/timesheet-leave-totals';
 import {
   formatDidNotWorkReasonRemark,
   getMissingScheduledDidNotWorkReasonException,
@@ -1814,7 +1814,7 @@ export function CivilsTimesheet({
                 <TabsContent key={index} value={String(index)} className="space-y-4 px-4 pb-4 overflow-hidden">
                   <div className="text-center mb-4">
                     <h3 className="text-3xl font-bold text-foreground">{DAY_NAMES[index]}</h3>
-                    <p className="text-xl font-semibold text-timesheet">
+                    <p className={`text-xl font-semibold ${isLongWorkingDay(leaveAwareTotals.rowByDay.get(entry.day_of_week)?.workedHours ?? entry.daily_total) ? 'text-red-500' : 'text-timesheet'}`}>
                       {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display ?? `${formatHours(entry.daily_total)}h`}
                     </p>
                   </div>
@@ -2253,7 +2253,7 @@ export function CivilsTimesheet({
                         ) : null}
                       </div>
                     </td>
-                    <td className="p-3 text-right font-semibold text-timesheet">
+                    <td className={`p-3 text-right font-semibold ${isLongWorkingDay(leaveAwareTotals.rowByDay.get(entry.day_of_week)?.workedHours ?? entry.daily_total) ? 'text-red-500' : 'text-timesheet'}`}>
                       {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display ?? `${formatHours(entry.daily_total)}h`}
                     </td>
                     <td className="p-3">

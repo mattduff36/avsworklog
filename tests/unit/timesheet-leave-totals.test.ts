@@ -3,6 +3,7 @@ import {
   buildLeaveAwareTotals,
   buildLeaveDaysBreakdown,
   formatLeaveAwareWeeklyDisplay,
+  isLongWorkingDay,
 } from '@/lib/utils/timesheet-leave-totals';
 
 describe('timesheet leave-aware totals', () => {
@@ -106,5 +107,13 @@ describe('timesheet leave-aware totals', () => {
 
   it('formats weekly leave-aware display with compact hour/day values', () => {
     expect(formatLeaveAwareWeeklyDisplay(27, 1.5)).toBe('27 hours + 1.5 days');
+  });
+
+  it('flags worked days above 13.5 hours and leaves 13.5 hours unchanged', () => {
+    expect(isLongWorkingDay(13.5)).toBe(false);
+    expect(isLongWorkingDay(13.51)).toBe(true);
+    expect(isLongWorkingDay(14)).toBe(true);
+    expect(isLongWorkingDay(22)).toBe(true);
+    expect(isLongWorkingDay(null)).toBe(false);
   });
 });

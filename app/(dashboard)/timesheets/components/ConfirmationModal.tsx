@@ -18,7 +18,7 @@ import {
 import { DAY_NAMES } from '@/types/timesheet';
 import { formatHours } from '@/lib/utils/time-calculations';
 import type { TimesheetOffDayState } from '@/lib/utils/timesheet-off-days';
-import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline, isLongWorkingDay } from '@/lib/utils/timesheet-leave-totals';
 import { collectUniqueJobNumbers, getEntryJobNumbers } from '@/lib/utils/timesheet-job-codes';
 import { minutesToHours } from '@/lib/payroll/calculate';
 import type { PayrollWeekBreakdown } from '@/lib/payroll/types';
@@ -294,7 +294,7 @@ export function ConfirmationModal({
                                   ? `${entry.time_started} - ${entry.time_finished}`
                                   : 'No times'}
                               </span>
-                              <span className="font-semibold text-foreground">
+                              <span className={`font-semibold ${isLongWorkingDay(rowTotal?.workedHours ?? entry.daily_total) ? 'text-red-500' : 'text-foreground'}`}>
                                 {rowTotal?.display || `${formatHours(entry.daily_total)}h`}
                               </span>
                             </>

@@ -75,7 +75,7 @@ import {
   resolveTimesheetOffDayStates,
   shouldDisableTimesheetWorkingInputs,
 } from '@/lib/utils/timesheet-off-days';
-import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline } from '@/lib/utils/timesheet-leave-totals';
+import { buildLeaveAwareTotals, formatLeaveAwareWeeklyDisplayMultiline, isLongWorkingDay } from '@/lib/utils/timesheet-leave-totals';
 import { isPlantTimesheetV2, normalizeTimesheetEntriesForDisplay } from '@/lib/utils/plant-timesheet-v2-normalization';
 import {
   areCataloguedJobNumbers,
@@ -1642,13 +1642,15 @@ export default function ViewTimesheetPage() {
                           }}
                           disabled={disableWorkingInputs}
                           className={`w-24 text-right font-semibold ${
-                            manuallyEditedDays.has(index) 
-                              ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700' 
+                            isLongWorkingDay(leaveAwareTotals.rowByDay.get(entry.day_of_week)?.workedHours ?? displayEntry.daily_total)
+                              ? 'text-red-500'
+                              : manuallyEditedDays.has(index)
+                              ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700'
                               : ''
                           }`}
                         />
                       ) : (
-                        <span className={manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}>
+                        <span className={isLongWorkingDay(leaveAwareTotals.rowByDay.get(entry.day_of_week)?.workedHours ?? displayEntry.daily_total) ? 'text-red-500' : manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}>
                           {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || `${formatHours(displayEntry.daily_total)}h`}
                         </span>
                       )}
@@ -1846,13 +1848,15 @@ export default function ViewTimesheetPage() {
                           }}
                           disabled={disableWorkingInputs}
                           className={`w-24 text-right text-lg font-bold ${
-                            manuallyEditedDays.has(index) 
-                              ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700' 
+                            isLongWorkingDay(leaveAwareTotals.rowByDay.get(entry.day_of_week)?.workedHours ?? displayEntry.daily_total)
+                              ? 'text-red-500'
+                              : manuallyEditedDays.has(index)
+                              ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700'
                               : ''
                           }`}
                         />
                       ) : (
-                        <span className={`text-lg font-bold ${manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+                        <span className={`text-lg font-bold ${isLongWorkingDay(leaveAwareTotals.rowByDay.get(entry.day_of_week)?.workedHours ?? displayEntry.daily_total) ? 'text-red-500' : manuallyEditedDays.has(index) ? 'text-blue-600 dark:text-blue-400' : ''}`}>
                           {leaveAwareTotals.rowByDay.get(entry.day_of_week)?.display || `${formatHours(displayEntry.daily_total)}h`}
                         </span>
                       )}

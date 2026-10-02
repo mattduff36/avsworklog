@@ -17,6 +17,7 @@ import { PanelLoader } from '@/components/ui/panel-loader';
 import { AlertCircle, Save, Send, User } from 'lucide-react';
 import { DAY_NAMES } from '@/types/timesheet';
 import { formatHours, roundTimeToNearestQuarterHour } from '@/lib/utils/time-calculations';
+import { isLongWorkingDay } from '@/lib/utils/timesheet-leave-totals';
 import { SignaturePad } from '@/components/forms/SignaturePad';
 import { Database } from '@/types/database';
 import { isAdminRole } from '@/lib/utils/role-access';
@@ -635,7 +636,7 @@ export function PlantTimesheetV2({
                         <Input value={formatDerivedHours(entry.operator_working_hours)} readOnly className="h-9 bg-muted/30" />
                       </TableCell>
                       <TableCell>
-                        <Input value={formatDerivedHours(entry.daily_total)} readOnly className="h-9 bg-muted/30 font-semibold" />
+                        <Input value={formatDerivedHours(entry.daily_total)} readOnly className={`h-9 bg-muted/30 font-semibold ${isLongWorkingDay(entry.daily_total) ? 'text-red-500' : ''}`} />
                       </TableCell>
                       <TableCell>
                         <Input
