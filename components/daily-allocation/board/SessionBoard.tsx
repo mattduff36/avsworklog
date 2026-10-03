@@ -391,7 +391,7 @@ function EmployeeDaySessions({
         <div
           role="gridcell"
           aria-label={`${row.label}, ${workDate}, full day`}
-          className="pointer-events-none col-span-2 col-start-1 row-start-1 z-[1] min-h-28 space-y-2 p-2"
+          className="pointer-events-none col-span-2 col-start-1 row-start-1 z-[1] space-y-2 p-2"
         >
           {fullVisits.map((visit) => (
             <div key={visit.id} className="pointer-events-auto">
