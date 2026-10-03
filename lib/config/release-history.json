@@ -1,5 +1,28 @@
 [
   {
+    "version": "1026.5.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated Daily Allocation, Data storage, and Sign in.",
+    "summary": "Updated Daily Allocation, Data storage, and Sign in.",
+    "details": [
+      "Updated Daily Allocation, Data storage, and Sign in, with changes to background routes, interface components, shared logic, shared typing, automated tests, and data storage.",
+      "Updated data storage, with changes to automated tests and data storage.",
+      "Updated sign in, with changes to shared logic."
+    ],
+    "areas": [
+      "Daily Allocation",
+      "Data storage",
+      "Sign in"
+    ],
+    "areaKeys": [
+      "daily-allocation",
+      "data-storage",
+      "sign-in"
+    ],
+    "pushedAt": "2026-10-03T23:35:37.744Z"
+  },
+  {
     "version": "1026.4.0",
     "updateKind": "major",
     "title": "Daily Allocation update",

@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.5.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update Daily Allocation, Data storage, and Sign in`
+
+**PUSHED AT**
+2026-10-03T23:35:37.744Z
+
+**WHAT CHANGED**
+Update Daily Allocation, Data storage, and Sign in.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Allocation, Data storage, and Sign in, with changes to background routes, interface components, shared logic, shared typing, automated tests, and data storage.
+- Updated data storage, with changes to automated tests and data storage.
+- Updated sign in, with changes to shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update Daily Allocation, Data storage, and Sign in`
+
 ## 1026.4.0
 
 **GIT COMMIT MESSAGE**
