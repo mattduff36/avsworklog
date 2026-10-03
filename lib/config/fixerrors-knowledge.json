@@ -43,13 +43,13 @@
         "tests/unit/http-error-transient-classification.test.ts"
       ],
       "confidence": "high",
-      "outcome": "fix_verified_local",
+      "outcome": "fix_verified_live",
       "lane": "fast",
       "firstSeen": "2026-09-29T15:04:13.472Z",
       "lastSeen": "2026-09-29T15:04:13.472Z",
       "occurrences": 1,
       "recurrenceCount": 0,
-      "updatedAt": "2026-09-29T15:04:13.472Z"
+      "updatedAt": "2026-10-03T19:45:58.000Z"
     },
     {
       "id": "fei_799cf0e7f1654ddd",
