@@ -74,8 +74,10 @@ import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import type { JobCatalogueOption } from '@/types/job-catalogue';
 import type {
   DailyAllocationConflictKind,
+  DailyAllocationConflictOverride,
   DailyAllocationConvertInput,
   DailyAllocationJobProjection,
+  DailyAllocationLabourAssignment,
   DailyAllocationPlanDay,
   DailyAllocationRangeBoardPayload,
   DailyAllocationVisit,
@@ -175,7 +177,6 @@ export function DailyAllocationManagerBoard({
   const selectedDate = boardState.selectedDate;
   const dragActiveRef = useRef(false);
   const publishAttemptRef = useRef<PublishAttempt | null>(null);
-  const dropRollbackVisitIds = useRef(new Set<string>());
   const overrideConfirmedRef = useRef(false);
 
   const [resourceTab, setResourceTab] = useState<ResourceSidebarTab>('jobs');
@@ -497,24 +498,11 @@ export function DailyAllocationManagerBoard({
     return { id: optimisticPlanDay.id, plan_version: 1 };
   }
 
-  function removeRejectedDropVisit(
-    visit: Pick<DailyAllocationVisit, 'id' | 'row_version'>,
-    expectedPlanVersion: number,
-  ) {
-    dropRollbackVisitIds.current.delete(visit.id);
-    void mutations.removeVisit.mutateAsync({
-      visit_id: visit.id,
-      expected_plan_version: expectedPlanVersion,
-      expected_row_version: visit.row_version,
-    }).catch((error: unknown) => showMutationError(error, 'Unable to remove the rejected visit.'));
-  }
-
   function createVisitAt(
     job: DailyAllocationJobProjection,
     workDate: string,
     session: DailyAllocationSession,
     profileId?: string,
-    options?: { rollbackOnAssignmentFailure?: boolean },
   ): DailyAllocationVisit | null {
     if (!fullBoard) return null;
     const planDay = admitPlanDay(workDate);
@@ -581,34 +569,34 @@ export function DailyAllocationManagerBoard({
           updated_at: new Date().toISOString(),
         },
       }, {
-        onError: (error) => {
-          showMutationError(error, 'Unable to assign employee.');
-          if (options?.rollbackOnAssignmentFailure) {
-            removeRejectedDropVisit(optimisticVisit, planDay.plan_version);
-          }
-        },
+        onError: (error) => showMutationError(error, 'Unable to assign employee.'),
       });
     }
     setStatusMessage('Visit added.');
     return optimisticVisit;
   }
 
-  function commitWarnedJobDrop(evidence: string) {
-    if (!fullBoard || !pendingJobDrop) return;
-    const planDay = admitPlanDay(pendingJobDrop.workDate);
+  function commitJobDrop(input: {
+    job: DailyAllocationJobProjection;
+    workDate: string;
+    profileId: string;
+    warning?: DailyAllocationConflictKind;
+    evidence?: string;
+  }) {
+    if (!fullBoard) return;
+    const planDay = admitPlanDay(input.workDate);
     if (!planDay) return;
-    overrideConfirmedRef.current = true;
     const window = dailyAllocationSessionWindow('full');
-    const starts_at = toDailyAllocationLondonIsoFromMinutes(pendingJobDrop.workDate, window.startMinutes);
-    const ends_at = toDailyAllocationLondonIsoFromMinutes(pendingJobDrop.workDate, window.endMinutes);
-    const visit: DailyAllocationVisit = {
+    const starts_at = toDailyAllocationLondonIsoFromMinutes(input.workDate, window.startMinutes);
+    const ends_at = toDailyAllocationLondonIsoFromMinutes(input.workDate, window.endMinutes);
+    const optimisticVisit: DailyAllocationVisit = {
       id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'visit'),
       plan_day_id: planDay.id,
-      work_date: pendingJobDrop.workDate,
-      job_source_type: pendingJobDrop.job.source_type,
-      job_source_id: pendingJobDrop.job.source_id,
-      job_code: pendingJobDrop.job.job_code,
-      site_address: pendingJobDrop.job.site_address || '',
+      work_date: input.workDate,
+      job_source_type: input.job.source_type,
+      job_source_id: input.job.source_id,
+      job_code: input.job.job_code,
+      site_address: input.job.site_address || '',
       starts_at,
       ends_at,
       meeting_point: null,
@@ -618,91 +606,56 @@ export function DailyAllocationManagerBoard({
       updated_at: new Date().toISOString(),
       owner_team_id: ownerTeamId || fullBoard.context.team_id || '',
     };
-    const overrideId = createOptimisticEntityId(globalThis.crypto.randomUUID(), 'override');
-    dropRollbackVisitIds.current.add(visit.id);
-    const removeVisit = () => {
-      if (!dropRollbackVisitIds.current.has(visit.id)) return;
-      removeRejectedDropVisit(visit, planDay.plan_version);
+    const optimisticAssignment: DailyAllocationLabourAssignment = {
+      id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'labour'),
+      visit_id: optimisticVisit.id,
+      plan_day_id: planDay.id,
+      work_date: input.workDate,
+      profile_id: input.profileId,
+      starts_at,
+      ends_at,
+      meeting_point: null,
+      meet_person: null,
+      notes: null,
+      row_version: 1,
+      updated_at: optimisticVisit.updated_at,
     };
-    mutations.createVisit.mutate({
+    const optimisticOverride: DailyAllocationConflictOverride | null = input.warning
+      ? {
+          id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'override'),
+          plan_day_id: planDay.id,
+          visit_id: optimisticVisit.id,
+          profile_id: input.profileId,
+          plant_id: null,
+          conflict_kind: input.warning,
+          evidence: input.evidence || '',
+          confirmed_by: fullBoard.context.user_id,
+          confirmed_at: optimisticVisit.updated_at,
+        }
+      : null;
+    mutations.createAssignedVisit.mutate({
       request: {
         plan_day_id: planDay.id,
         expected_plan_version: planDay.plan_version,
-        job_source_type: visit.job_source_type,
-        job_source_id: visit.job_source_id,
-        job_code: visit.job_code,
+        profile_id: input.profileId,
+        job_source_type: input.job.source_type,
+        job_source_id: input.job.source_id,
+        job_code: input.job.job_code,
         starts_at,
         ends_at,
         meeting_point: null,
         meet_person: null,
         notes: null,
+        conflict_kind: input.warning ?? null,
+        evidence: input.warning ? input.evidence ?? null : null,
       },
-      optimisticVisit: visit,
+      optimisticVisit,
+      optimisticAssignment,
+      optimisticOverride,
     }, {
-      onError: (error) => {
-        dropRollbackVisitIds.current.delete(visit.id);
-        showMutationError(error, 'Unable to create visit.');
-      },
-    });
-    void mutations.createOverride.mutateAsync({
-      request: {
-        plan_day_id: planDay.id,
-        expected_plan_version: planDay.plan_version,
-        conflict_kind: pendingJobDrop.warning,
-        evidence,
-        visit_id: visit.id,
-        profile_id: pendingJobDrop.profileId,
-      },
-      optimisticOverride: {
-        id: overrideId,
-        plan_day_id: planDay.id,
-        visit_id: visit.id,
-        profile_id: pendingJobDrop.profileId,
-        plant_id: null,
-        conflict_kind: pendingJobDrop.warning,
-        evidence,
-        confirmed_by: fullBoard.context.user_id,
-        confirmed_at: new Date().toISOString(),
-      },
-    }).catch(() => {
-      removeVisit();
-    });
-    mutations.assignLabour.mutate({
-      request: {
-        visit_id: visit.id,
-        profile_id: pendingJobDrop.profileId,
-        expected_plan_version: planDay.plan_version,
-        meeting_point: null,
-        meet_person: null,
-        notes: null,
-        override_id: overrideId,
-      },
-      optimisticAssignment: {
-        id: createOptimisticEntityId(globalThis.crypto.randomUUID(), 'labour'),
-        visit_id: visit.id,
-        plan_day_id: planDay.id,
-        work_date: pendingJobDrop.workDate,
-        profile_id: pendingJobDrop.profileId,
-        starts_at,
-        ends_at,
-        meeting_point: null,
-        meet_person: null,
-        notes: null,
-        row_version: 1,
-        updated_at: new Date().toISOString(),
-      },
-    }, {
-      onSuccess: () => {
-        dropRollbackVisitIds.current.delete(visit.id);
-      },
-      onError: (error) => {
-        showMutationError(error, 'Unable to assign employee.');
-        removeVisit();
-      },
+      onError: (error) => showMutationError(error, 'Unable to assign this job.'),
     });
     setStatusMessage('Visit added.');
-    setPendingJobDrop(null);
-    setOverrideKind(null);
   }
 
   async function moveVisit(
@@ -880,11 +833,7 @@ export function DailyAllocationManagerBoard({
     const block = employeeAssignmentBlock(visit, profileId);
     if (block && 'hard' in block) {
       toast.error(block.hard);
-      if (dropRollbackVisitIds.current.has(visit.id)) {
-        removeRejectedDropVisit(visit, planDay.plan_version);
-      } else {
-        void boardState.refetch();
-      }
+      void boardState.refetch();
       return;
     }
     if (block && 'warning' in block && !overrideId) {
@@ -923,13 +872,8 @@ export function DailyAllocationManagerBoard({
       });
       toast.success(existingAssignment ? 'Employee instructions updated.' : 'Employee assigned.');
       setStatusMessage(existingAssignment ? 'Employee instructions updated.' : 'Employee assigned.');
-      dropRollbackVisitIds.current.delete(visit.id);
     } catch (error) {
       showMutationError(error, 'Unable to assign employee.');
-      if (dropRollbackVisitIds.current.has(visit.id)) {
-        const latestPlan = planDayForDate(fullBoard, visit.work_date);
-        if (latestPlan) removeRejectedDropVisit(visit, latestPlan.plan_version);
-      }
     }
   }
 
@@ -1042,7 +986,16 @@ export function DailyAllocationManagerBoard({
 
   async function handleOverrideConfirm(evidence: string) {
     if (pendingJobDrop) {
-      commitWarnedJobDrop(evidence);
+      overrideConfirmedRef.current = true;
+      commitJobDrop({
+        job: pendingJobDrop.job,
+        workDate: pendingJobDrop.workDate,
+        profileId: pendingJobDrop.profileId,
+        warning: pendingJobDrop.warning,
+        evidence,
+      });
+      setPendingJobDrop(null);
+      setOverrideKind(null);
       return;
     }
     if (!fullBoard || !pendingAssign || !overrideKind) return;
@@ -1243,8 +1196,10 @@ export function DailyAllocationManagerBoard({
         setOverrideKind(block.warning);
         return;
       }
-      createVisitAt(source.job, target.workDate, 'full', target.profileId, {
-        rollbackOnAssignmentFailure: true,
+      commitJobDrop({
+        job: source.job,
+        workDate: target.workDate,
+        profileId: target.profileId,
       });
       return;
     }
@@ -1558,13 +1513,6 @@ export function DailyAllocationManagerBoard({
           kind={overrideKind}
           onOpenChange={(open) => {
             if (!open) {
-              if (!overrideConfirmedRef.current && pendingAssign?.type === 'employee'
-                && dropRollbackVisitIds.current.has(pendingAssign.visit.id)) {
-                const planDay = fullBoard
-                  ? planDayForDate(fullBoard, pendingAssign.visit.work_date)
-                  : null;
-                if (planDay) removeRejectedDropVisit(pendingAssign.visit, planDay.plan_version);
-              }
               if (!overrideConfirmedRef.current) setPendingJobDrop(null);
               overrideConfirmedRef.current = false;
               setOverrideKind(null);
@@ -1572,7 +1520,7 @@ export function DailyAllocationManagerBoard({
             }
           }}
           onConfirm={(evidence) => void handleOverrideConfirm(evidence)}
-          saving={mutations.createOverride.isPending}
+          saving={mutations.createOverride.isPending || mutations.createAssignedVisit.isPending}
         />
         <NormalizeSessionsDialog
           open={normalizeOpen}

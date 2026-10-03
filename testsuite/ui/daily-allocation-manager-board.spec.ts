@@ -8,6 +8,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { config } from 'dotenv';
 import type {
+  DailyAllocationAssignedVisitInput,
   DailyAllocationConversionSource,
   DailyAllocationConvertInput,
   DailyAllocationLabourAssignInput,
@@ -44,6 +45,8 @@ interface MockEvidence {
   labourRequests: DailyAllocationLabourAssignInput[];
   publishConfirmations: boolean[];
   visitUpdates: DailyAllocationVisitUpsertInput[];
+  assignedVisitRequests: DailyAllocationAssignedVisitInput[];
+  releaseAssignedVisit: () => void;
 }
 
 const jobOne = {
@@ -81,7 +84,7 @@ function availableDay(workDate: string) {
   };
 }
 
-function createBoard(mode: MockMode): DailyAllocationRangeBoardPayload {
+function createBoard(mode: MockMode, pendingProfileId?: string): DailyAllocationRangeBoardPayload {
   const planDay = {
     id: 'plan-day-1',
     work_date: WORK_DATE,
@@ -160,7 +163,7 @@ function createBoard(mode: MockMode): DailyAllocationRangeBoardPayload {
     updated_at: '2026-09-12T09:00:00.000Z',
   };
 
-  return {
+  const board: DailyAllocationRangeBoardPayload = {
     start_date: WEEK_DATES[0],
     end_date: WEEK_DATES.at(-1)!,
     dates: WEEK_DATES,
@@ -252,6 +255,28 @@ function createBoard(mode: MockMode): DailyAllocationRangeBoardPayload {
     },
     publications: [],
   };
+  if (pendingProfileId) {
+    const employee = board.resources.employees.find((item) => item.profile_id === pendingProfileId);
+    if (employee) {
+      employee.days = employee.days.map((day) => day.work_date === WORK_DATE
+        ? {
+            ...day,
+            pending_absence: {
+              absence_id: 'absence-pending',
+              reason_id: 'reason-1',
+              reason_name: 'Holiday',
+              colour: null,
+              is_paid: true,
+              is_half_day: false,
+              half_day_session: null,
+              status: 'pending',
+              allocation_behaviour: 'block',
+            },
+          }
+        : day);
+    }
+  }
+  return board;
 }
 
 function createConversionSource(): DailyAllocationConversionSource {
@@ -292,14 +317,24 @@ function createConversionSource(): DailyAllocationConversionSource {
 async function installDailyAllocationMocks(
   page: Page,
   mode: MockMode = 'converted',
+  options?: { pendingProfileId?: string; holdAssignedVisit?: boolean },
 ): Promise<MockEvidence> {
-  let board = createBoard(mode);
+  let board = createBoard(mode, options?.pendingProfileId);
   let publishAttempts = 0;
+  let releaseAssignedVisit = () => {};
+  let assignedVisitGate = Promise.resolve();
+  if (options?.holdAssignedVisit) {
+    assignedVisitGate = new Promise((resolve) => {
+      releaseAssignedVisit = resolve;
+    });
+  }
   const evidence: MockEvidence = {
     conversionRequests: [],
     labourRequests: [],
     publishConfirmations: [],
     visitUpdates: [],
+    assignedVisitRequests: [],
+    releaseAssignedVisit: () => releaseAssignedVisit(),
   };
 
   await page.route('**/api/auth/session', async (route) => {
@@ -443,6 +478,79 @@ async function installDailyAllocationMocks(
       },
     });
   });
+  await page.route('**/api/daily-allocation/assigned-visits', async (route) => {
+    const request = route.request().postDataJSON() as DailyAllocationAssignedVisitInput;
+    evidence.assignedVisitRequests.push(request);
+    await assignedVisitGate;
+    const sequence = evidence.assignedVisitRequests.length;
+    const visit = {
+      id: `assigned-visit-${sequence}`,
+      plan_day_id: request.plan_day_id,
+      work_date: WORK_DATE,
+      owner_team_id: TEAM_ID,
+      job_source_type: request.job_source_type,
+      job_source_id: request.job_source_id,
+      job_code: request.job_code,
+      site_address: 'Bravo Site',
+      starts_at: request.starts_at,
+      ends_at: request.ends_at,
+      meeting_point: request.meeting_point ?? null,
+      meet_person: request.meet_person ?? null,
+      notes: request.notes ?? null,
+      row_version: 1,
+      updated_at: '2026-09-12T12:00:00.000Z',
+    };
+    const assignment = {
+      id: `assigned-labour-${sequence}`,
+      visit_id: visit.id,
+      plan_day_id: request.plan_day_id,
+      work_date: WORK_DATE,
+      profile_id: request.profile_id,
+      starts_at: request.starts_at,
+      ends_at: request.ends_at,
+      meeting_point: request.meeting_point ?? null,
+      meet_person: request.meet_person ?? null,
+      notes: request.notes ?? null,
+      row_version: 1,
+      updated_at: visit.updated_at,
+    };
+    const override = request.conflict_kind
+      ? {
+          id: `assigned-override-${sequence}`,
+          plan_day_id: request.plan_day_id,
+          visit_id: visit.id,
+          profile_id: request.profile_id,
+          plant_id: null,
+          conflict_kind: request.conflict_kind,
+          evidence: request.evidence || '',
+          confirmed_by: USER_ID,
+          confirmed_at: visit.updated_at,
+        }
+      : null;
+    const planVersion = request.expected_plan_version + 1;
+    board = {
+      ...board,
+      visits: [...board.visits, visit],
+      labour_assignments: [...board.labour_assignments, assignment],
+      overrides: override ? [...board.overrides, override] : board.overrides,
+      plan_days: board.plan_days.map((planDay) => (
+        planDay.id === request.plan_day_id ? { ...planDay, plan_version: planVersion } : planDay
+      )),
+    };
+    await route.fulfill({
+      status: 201,
+      json: {
+        visit_id: visit.id,
+        visit,
+        assignment_id: assignment.id,
+        assignment,
+        override_id: override?.id ?? null,
+        override,
+        plan_day_id: request.plan_day_id,
+        plan_version: planVersion,
+      },
+    });
+  });
   await page.route('**/api/daily-allocation/assignments/labour', async (route) => {
     const request = route.request().postDataJSON() as DailyAllocationLabourAssignInput;
     evidence.labourRequests.push(request);
@@ -548,10 +656,14 @@ async function installLocalMiddlewareSession(page: Page): Promise<void> {
   }]);
 }
 
-async function openManagerBoard(page: Page, mode: MockMode = 'converted') {
+async function openManagerBoard(
+  page: Page,
+  mode: MockMode = 'converted',
+  options?: { pendingProfileId?: string; holdAssignedVisit?: boolean },
+) {
   await page.clock.setFixedTime(FIXED_NOW);
   await installLocalMiddlewareSession(page);
-  const evidence = await installDailyAllocationMocks(page, mode);
+  const evidence = await installDailyAllocationMocks(page, mode, options);
   await page.goto('/daily-allocation', {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
@@ -794,7 +906,93 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     }]);
     await expect(page.getByText('Legacy drafts converted.')).toBeVisible();
   });
+
+  test('keeps a clean job drop on the employee while the save is delayed', async ({ page }) => {
+    const evidence = await openManagerBoard(page, 'converted', { holdAssignedVisit: true });
+    const bob = page.getByTestId('daily-allocation-board-row-employee-employee-bob');
+    const unassigned = page.getByTestId('daily-allocation-board-row-unassigned');
+    const dropped = bob.getByRole('button', { name: 'Select JOB-200 07:00–16:30' });
+    const unassignedCopy = unassigned.getByRole('button', { name: 'Select JOB-200 07:00–16:30' });
+    await expect(dropped).toHaveCount(0);
+
+    await dropJobOnEmployee(page, 'employee-bob');
+
+    await expect.poll(() => evidence.assignedVisitRequests.length).toBe(1);
+    await expect(dropped).toBeVisible();
+    await expect(unassignedCopy).toHaveCount(0);
+    evidence.releaseAssignedVisit();
+    await expect(dropped).toBeVisible();
+    await expect(unassignedCopy).toHaveCount(0);
+    await expect(page.getByTestId('daily-allocation-board-status')).toHaveText('Visit added.');
+  });
+
+  test('cancels a warned job drop without creating a visit', async ({ page }) => {
+    const evidence = await openManagerBoard(page, 'converted', {
+      pendingProfileId: 'employee-charlie',
+    });
+    await dropJobOnEmployee(page, 'employee-charlie');
+    const dialog = page.getByRole('alertdialog', { name: 'Confirm warning override' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(dialog).toBeHidden();
+    expect(evidence.assignedVisitRequests).toHaveLength(0);
+    await expect(page.getByTestId('daily-allocation-board-row-employee-employee-charlie').getByRole('button', { name: 'Select JOB-200 07:00–16:30' })).toHaveCount(0);
+    await expect(page.getByTestId('daily-allocation-board-row-unassigned').getByRole('button', { name: 'Select JOB-200 07:00–16:30' })).toHaveCount(0);
+  });
+
+  test('confirms a warned job drop directly on the employee', async ({ page }) => {
+    const evidence = await openManagerBoard(page, 'converted', {
+      pendingProfileId: 'employee-charlie',
+      holdAssignedVisit: true,
+    });
+    const charlie = page.getByTestId('daily-allocation-board-row-employee-employee-charlie');
+    const unassigned = page.getByTestId('daily-allocation-board-row-unassigned');
+    const dropped = charlie.getByRole('button', { name: 'Select JOB-200 07:00–16:30' });
+    const unassignedCopy = unassigned.getByRole('button', { name: 'Select JOB-200 07:00–16:30' });
+    await dropJobOnEmployee(page, 'employee-charlie');
+    const dialog = page.getByRole('alertdialog', { name: 'Confirm warning override' });
+    await dialog.locator('#daily-allocation-override-evidence').fill('Supervisor confirmed the pending absence.');
+    await dialog.getByRole('button', { name: 'Confirm override' }).click();
+
+    await expect.poll(() => evidence.assignedVisitRequests.length).toBe(1);
+    expect(evidence.assignedVisitRequests[0]).toMatchObject({
+      profile_id: 'employee-charlie',
+      conflict_kind: 'pending_absence',
+      evidence: 'Supervisor confirmed the pending absence.',
+    });
+    await expect(dropped).toBeVisible();
+    await expect(unassignedCopy).toHaveCount(0);
+    evidence.releaseAssignedVisit();
+    await expect(dropped).toBeVisible();
+    await expect(unassignedCopy).toHaveCount(0);
+  });
 });
+
+async function dropJobOnEmployee(page: Page, profileId: string) {
+  const handle = page.getByTestId('daily-allocation-resource-drag-handle-job-quote-200');
+  const target = page.getByTestId(`daily-allocation-session-${profileId}-${WORK_DATE}-pm`);
+  await handle.scrollIntoViewIfNeeded();
+  await target.scrollIntoViewIfNeeded();
+  const handleBox = await handle.boundingBox();
+  const targetBox = await target.boundingBox();
+  expect(handleBox).toBeTruthy();
+  expect(targetBox).toBeTruthy();
+  const dropX = targetBox!.x + targetBox!.width / 2;
+  const dropY = targetBox!.y + Math.min(24, targetBox!.height / 2);
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2 + 24, handleBox!.y + handleBox!.height / 2, { steps: 4 });
+  await page.mouse.move(dropX, dropY, { steps: 12 });
+  const hit = await page.evaluate(({ x, y }) => {
+    const element = document.elementFromPoint(x, y);
+    return element?.closest('[data-testid^="daily-allocation-session-"]')?.getAttribute('data-testid')
+      || element?.getAttribute('data-testid')
+      || element?.textContent?.slice(0, 80)
+      || 'none';
+  }, { x: dropX, y: dropY });
+  expect(hit).toBe(`daily-allocation-session-${profileId}-${WORK_DATE}-pm`);
+  await page.mouse.up();
+}
 
 test.describe('DAFP-UI-001 touch tablet', () => {
   test.use({

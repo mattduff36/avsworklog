@@ -517,7 +517,6 @@ export function OverrideDialog({
   onConfirm: (evidence: string) => void;
   saving?: boolean;
 }) {
-  const [evidence, setEvidence] = useState('');
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
@@ -529,29 +528,46 @@ export function OverrideDialog({
               : 'This assignment is outside the usual working pattern. Record why it should proceed.'}
           </AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="space-y-2">
-          <Label htmlFor="daily-allocation-override-evidence">Evidence</Label>
-          <Textarea
-            id="daily-allocation-override-evidence"
-            value={evidence}
-            onChange={(event) => setEvidence(event.target.value)}
-          />
-        </div>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
-            className={boardControlStyles.primary}
-            disabled={!evidence.trim() || saving}
-            onClick={(event) => {
-              event.preventDefault();
-              onConfirm(evidence.trim());
-            }}
-          >
-            Confirm override
-          </AlertDialogAction>
-        </AlertDialogFooter>
+        {open ? (
+          <OverrideEvidenceField onConfirm={onConfirm} saving={saving} />
+        ) : null}
       </AlertDialogContent>
     </AlertDialog>
+  );
+}
+
+function OverrideEvidenceField({
+  onConfirm,
+  saving,
+}: {
+  onConfirm: (evidence: string) => void;
+  saving?: boolean;
+}) {
+  const [evidence, setEvidence] = useState('');
+  return (
+    <>
+      <div className="space-y-2">
+        <Label htmlFor="daily-allocation-override-evidence">Evidence</Label>
+        <Textarea
+          id="daily-allocation-override-evidence"
+          value={evidence}
+          onChange={(event) => setEvidence(event.target.value)}
+        />
+      </div>
+      <AlertDialogFooter>
+        <AlertDialogCancel>Cancel</AlertDialogCancel>
+        <AlertDialogAction
+          className={boardControlStyles.primary}
+          disabled={!evidence.trim() || saving}
+          onClick={(event) => {
+            event.preventDefault();
+            onConfirm(evidence.trim());
+          }}
+        >
+          Confirm override
+        </AlertDialogAction>
+      </AlertDialogFooter>
+    </>
   );
 }
 

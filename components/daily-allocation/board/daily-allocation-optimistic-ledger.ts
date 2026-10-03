@@ -19,6 +19,7 @@ export type DailyAllocationExecutionStatus =
 export type DailyAllocationOptimisticKind =
   | 'convert'
   | 'create-visit'
+  | 'create-assigned-visit'
   | 'update-visit'
   | 'delete-visit'
   | 'assign-labour'

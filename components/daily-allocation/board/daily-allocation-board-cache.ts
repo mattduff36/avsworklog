@@ -251,6 +251,59 @@ export function patchBoardRemovePlantAssignment(
   };
 }
 
+export function patchBoardWithAssignedVisit(
+  board: DailyAllocationRangeBoardPayload,
+  visit: DailyAllocationVisit,
+  assignment: DailyAllocationLabourAssignment,
+  override?: DailyAllocationConflictOverride | null,
+  replaceIds?: {
+    visitId?: string;
+    assignmentId?: string;
+    overrideId?: string;
+  }
+): DailyAllocationRangeBoardPayload {
+  const visitReplaceId = replaceIds?.visitId;
+  const assignmentReplaceId = replaceIds?.assignmentId;
+  const overrideReplaceId = replaceIds?.overrideId;
+  const replacing = Boolean(visitReplaceId || assignmentReplaceId || overrideReplaceId);
+  const visits = board.visits.filter((item) => item.id !== visit.id && item.id !== visitReplaceId);
+  const labour = board.labour_assignments.filter(
+    (item) => item.id !== assignment.id && item.id !== assignmentReplaceId
+  );
+  let overrides = board.overrides.map((item) =>
+    visitReplaceId && item.visit_id === visitReplaceId
+      ? { ...item, visit_id: visit.id }
+      : item
+  );
+  if (override) {
+    overrides = [
+      ...overrides.filter((item) => item.id !== override.id && item.id !== overrideReplaceId),
+      { ...override, visit_id: visit.id, plan_day_id: visit.plan_day_id },
+    ];
+  } else if (overrideReplaceId) {
+    overrides = overrides.filter((item) => item.id !== overrideReplaceId);
+  }
+  return {
+    ...board,
+    visits: sortByStartsAt([...visits, visit]),
+    labour_assignments: sortByStartsAt([
+      ...labour,
+      {
+        ...assignment,
+        visit_id: visit.id,
+        plan_day_id: visit.plan_day_id,
+        work_date: visit.work_date,
+        starts_at: visit.starts_at,
+        ends_at: visit.ends_at,
+      },
+    ]),
+    overrides,
+    plan_days: replacing
+      ? board.plan_days
+      : bumpPlanDayVersion(board.plan_days, visit.plan_day_id),
+  };
+}
+
 export function patchBoardWithOverride(
   board: DailyAllocationRangeBoardPayload,
   override: DailyAllocationConflictOverride,

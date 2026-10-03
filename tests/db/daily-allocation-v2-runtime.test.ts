@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -1103,39 +1104,48 @@ describeConcurrency('DA2A-DB-001 disposable PostgreSQL suite [LTDB-CONC-001]', (
     originalWritesEnabled = runtime.rows[0]?.writes_enabled ?? false;
     runtimeCaptured = true;
     await setupClient.query(
+      stripOuterMigrationTransaction(readFileSync(DA2_DATA_CONTRACT_MIGRATION_PATH, 'utf8'))
+    );
+    await setupClient.query(
       readFileSync('scripts/supabase/activate-daily-allocation-v2.sql', 'utf8')
     );
 
     await authenticate(setupClient);
-    const converted = await setupClient.query<{ plan_day_id: string }>(
-      `
-        SELECT public.convert_daily_allocation_plan_day_v2($1::date, 'team-1') AS plan_day_id
-      `,
+    const source = await setupClient.query<{ source: { source_fingerprint?: string } }>(
+      `SELECT public.get_daily_allocation_conversion_source_v2($1::date, 'team-1') AS source`,
       [workDate]
     );
-    planDayId = converted.rows[0].plan_day_id;
+    const converted = await setupClient.query<{ converted: { plan_day_id?: string } }>(
+      `
+        SELECT public.convert_daily_allocation_plan_day_v2(
+          $1::uuid, $2::date, 'team-1', $3::text, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb
+        ) AS converted
+      `,
+      [randomUUID(), workDate, source.rows[0].source.source_fingerprint]
+    );
+    planDayId = String(converted.rows[0].converted.plan_day_id);
 
     await setupClient.query(
       `
         SELECT public.upsert_daily_allocation_visit_v2(
-          NULL, $1::uuid, 1, 1, 'project_number', $2::uuid, '60001-MD',
-          ($3::date + TIME '09:00') AT TIME ZONE 'Europe/London',
-          ($3::date + TIME '12:00') AT TIME ZONE 'Europe/London',
+          $1::uuid, NULL::uuid, $2::uuid, 1, 1, 'project_number', $3::uuid, '60001-MD',
+          ($4::date + TIME '09:00') AT TIME ZONE 'Europe/London',
+          ($4::date + TIME '12:00') AT TIME ZONE 'Europe/London',
           NULL, NULL, NULL
         )
       `,
-      [planDayId, DA2_ACTORS.jobA, workDate]
+      [randomUUID(), planDayId, DA2_ACTORS.jobA, workDate]
     );
     await setupClient.query(
       `
         SELECT public.upsert_daily_allocation_visit_v2(
-          NULL, $1::uuid, 2, 1, 'project_number', $2::uuid, '60002-MD',
-          ($3::date + TIME '10:00') AT TIME ZONE 'Europe/London',
-          ($3::date + TIME '13:00') AT TIME ZONE 'Europe/London',
+          $1::uuid, NULL::uuid, $2::uuid, 2, 1, 'project_number', $3::uuid, '60002-MD',
+          ($4::date + TIME '10:00') AT TIME ZONE 'Europe/London',
+          ($4::date + TIME '13:00') AT TIME ZONE 'Europe/London',
           NULL, NULL, NULL
         )
       `,
-      [planDayId, DA2_ACTORS.jobB, workDate]
+      [randomUUID(), planDayId, DA2_ACTORS.jobB, workDate]
     );
     await setupClient.query('RESET ROLE');
 
@@ -1279,10 +1289,10 @@ describeConcurrency('DA2A-DB-001 disposable PostgreSQL suite [LTDB-CONC-001]', (
       client.query(
         `
           SELECT public.assign_daily_allocation_labour_v2(
-            $1::uuid, $2::uuid, 3, NULL, NULL, NULL, NULL
+            $1::uuid, $2::uuid, $3::uuid, 3, NULL, NULL, NULL, NULL, NULL
           )
         `,
-        [visitId, DA2_ACTORS.employeeA]
+        [randomUUID(), visitId, DA2_ACTORS.employeeA]
       );
 
     const settled = await Promise.race([
@@ -1321,6 +1331,363 @@ describeConcurrency('DA2A-DB-001 disposable PostgreSQL suite [LTDB-CONC-001]', (
     );
     expect(state.rows[0]).toEqual({ plan_version: 4, assignments: 1 });
   }, 30_000);
+
+  it('creates an assigned visit atomically for clean and warning job drops', async () => {
+    const dropDate = '2026-08-24';
+    const lockDate = '2026-08-25';
+    const absenceReason = '77777777-7777-4777-8777-777777777777';
+    const planIds: string[] = [];
+
+    async function asOwner<T>(run: () => Promise<T>): Promise<T> {
+      await setupClient.query('RESET ROLE');
+      try {
+        return await run();
+      } finally {
+        await authenticate(setupClient);
+      }
+    }
+
+    async function convertDate(workDate: string): Promise<string> {
+      const source = await setupClient.query<{ source: { source_fingerprint?: string } }>(
+        `SELECT public.get_daily_allocation_conversion_source_v2($1::date, 'team-1') AS source`,
+        [workDate]
+      );
+      const converted = await setupClient.query<{ converted: { plan_day_id?: string } }>(
+        `
+          SELECT public.convert_daily_allocation_plan_day_v2(
+            $1::uuid, $2::date, 'team-1', $3::text, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb
+          ) AS converted
+        `,
+        [randomUUID(), workDate, source.rows[0].source.source_fingerprint]
+      );
+      const planId = String(converted.rows[0].converted.plan_day_id);
+      planIds.push(planId);
+      return planId;
+    }
+
+    async function counts(planId: string) {
+      const state = await setupClient.query<{
+        plan_version: number;
+        visits: number;
+        assignments: number;
+        overrides: number;
+      }>(
+        `
+          SELECT
+            plan_days.plan_version,
+            (SELECT COUNT(*)::int FROM public.daily_allocation_visits WHERE plan_day_id = plan_days.id) AS visits,
+            (SELECT COUNT(*)::int FROM public.daily_allocation_visit_labour WHERE plan_day_id = plan_days.id) AS assignments,
+            (SELECT COUNT(*)::int FROM public.daily_allocation_conflict_overrides WHERE plan_day_id = plan_days.id) AS overrides
+          FROM public.daily_allocation_plan_days plan_days
+          WHERE plan_days.id = $1::uuid
+        `,
+        [planId]
+      );
+      return state.rows[0];
+    }
+
+    async function assignedVisit(
+      client: Client,
+      input: {
+        requestId?: string;
+        planId: string;
+        version: number;
+        profileId: string;
+        jobId: string;
+        jobCode: string;
+        workDate: string;
+        notes?: string | null;
+        conflictKind?: string | null;
+        evidence?: string | null;
+        invalidInterval?: boolean;
+      }
+    ) {
+      const startTime = input.invalidInterval ? '09:00' : '07:00';
+      const endTime = input.invalidInterval ? '12:00' : '16:30';
+      const result = await client.query<{ result: {
+        visit_id: string;
+        assignment_id: string;
+        override_id: string | null;
+        plan_version: number;
+      } }>(
+        `
+          SELECT public.create_daily_allocation_assigned_visit_v2(
+            $1::uuid,
+            $2::uuid,
+            $3::integer,
+            $4::uuid,
+            'project_number',
+            $5::uuid,
+            $6::text,
+            ($7::date + $8::time) AT TIME ZONE 'Europe/London',
+            ($7::date + $9::time) AT TIME ZONE 'Europe/London',
+            NULL,
+            NULL,
+            $10::text,
+            $11::text,
+            $12::text
+          ) AS result
+        `,
+        [
+          input.requestId || randomUUID(),
+          input.planId,
+          input.version,
+          input.profileId,
+          input.jobId,
+          input.jobCode,
+          input.workDate,
+          startTime,
+          endTime,
+          input.notes ?? null,
+          input.conflictKind ?? null,
+          input.evidence ?? null,
+        ]
+      );
+      return result.rows[0].result;
+    }
+
+    try {
+      await setupClient.query('ALTER TABLE public.plant ADD COLUMN IF NOT EXISTS plant_id TEXT');
+      await setupClient.query(stripOuterMigrationTransaction(readFileSync(
+        'supabase/migrations/20260930_daily_allocation_sessions.sql',
+        'utf8'
+      )));
+      await setupClient.query(stripOuterMigrationTransaction(readFileSync(
+        'supabase/migrations/20261003_daily_allocation_assigned_visit.sql',
+        'utf8'
+      )));
+      await setupClient.query(`
+        UPDATE private.daily_allocation_v2_runtime
+        SET board_enabled = TRUE, writes_enabled = TRUE, updated_at = NOW()
+        WHERE singleton = TRUE
+      `);
+      await setupClient.query('RESET ROLE');
+      const privileges = await setupClient.query<{
+        authenticated: boolean;
+        anon: boolean;
+        service_role: boolean;
+      }>(`
+        SELECT
+          has_function_privilege('authenticated', p.oid, 'EXECUTE') AS authenticated,
+          has_function_privilege('anon', p.oid, 'EXECUTE') AS anon,
+          has_function_privilege('service_role', p.oid, 'EXECUTE') AS service_role
+        FROM pg_proc p
+        JOIN pg_namespace n ON n.oid = p.pronamespace
+        WHERE n.nspname = 'public'
+          AND p.proname = 'create_daily_allocation_assigned_visit_v2'
+      `);
+      expect(privileges.rows).toEqual([{
+        authenticated: true,
+        anon: false,
+        service_role: false,
+      }]);
+      await authenticate(setupClient);
+      const planId = await convertDate(dropDate);
+
+      await firstClient.query(`SELECT set_config('request.jwt.claim.sub', $1, false)`, [
+        DA2_ACTORS.employeeA,
+      ]);
+      await firstClient.query(`SELECT set_config('request.jwt.claims', $1, false)`, [
+        JSON.stringify({ sub: DA2_ACTORS.employeeA }),
+      ]);
+      await expect(assignedVisit(firstClient, {
+        planId,
+        version: 1,
+        profileId: DA2_ACTORS.employeeA,
+        jobId: DA2_ACTORS.jobA,
+        jobCode: '60001-MD',
+        workDate: dropDate,
+      })).rejects.toThrow(/Manager-level daily allocation access is required/);
+      await authenticate(firstClient);
+      expect(await counts(planId)).toMatchObject({ visits: 0, assignments: 0, overrides: 0 });
+
+      await asOwner(() => setupClient.query(
+        `
+          INSERT INTO public.absences (profile_id, reason_id, date, end_date, is_half_day, status)
+          VALUES ($1::uuid, $2::uuid, $3::date, $3::date, FALSE, 'approved')
+        `,
+        [DA2_ACTORS.employeeA, absenceReason, dropDate]
+      ));
+      const beforeHard = await counts(planId);
+      await expect(assignedVisit(setupClient, {
+        planId,
+        version: beforeHard.plan_version,
+        profileId: DA2_ACTORS.employeeA,
+        jobId: DA2_ACTORS.jobA,
+        jobCode: '60001-MD',
+        workDate: dropDate,
+      })).rejects.toThrow(/HARD_CONFLICT/);
+      expect(await counts(planId)).toEqual(beforeHard);
+      await asOwner(() => setupClient.query(
+        'DELETE FROM public.absences WHERE date = $1::date',
+        [dropDate]
+      ));
+
+      const clean = await assignedVisit(setupClient, {
+        planId,
+        version: beforeHard.plan_version,
+        profileId: DA2_ACTORS.employeeA,
+        jobId: DA2_ACTORS.jobA,
+        jobCode: '60001-MD',
+        workDate: dropDate,
+      });
+      expect(clean.override_id).toBeNull();
+      expect(clean.plan_version).toBe(beforeHard.plan_version + 1);
+      const afterClean = await counts(planId);
+      expect(afterClean).toEqual({
+        plan_version: beforeHard.plan_version + 1,
+        visits: 1,
+        assignments: 1,
+        overrides: 0,
+      });
+
+      await asOwner(() => setupClient.query(
+        `
+          INSERT INTO public.absences (profile_id, reason_id, date, end_date, is_half_day, status)
+          VALUES ($1::uuid, $2::uuid, $3::date, $3::date, FALSE, 'pending')
+        `,
+        [DA2_ACTORS.employeeB, absenceReason, dropDate]
+      ));
+      const requestId = randomUUID();
+      const warned = await assignedVisit(setupClient, {
+        requestId,
+        planId,
+        version: afterClean.plan_version,
+        profileId: DA2_ACTORS.employeeB,
+        jobId: DA2_ACTORS.jobB,
+        jobCode: '60002-MD',
+        workDate: dropDate,
+        conflictKind: 'pending_absence',
+        evidence: 'Supervisor confirmed the pending absence.',
+      });
+      expect(warned.override_id).toBeTruthy();
+      expect(warned.plan_version).toBe(afterClean.plan_version + 1);
+      const afterWarning = await counts(planId);
+      expect(afterWarning).toEqual({
+        plan_version: afterClean.plan_version + 1,
+        visits: 2,
+        assignments: 2,
+        overrides: 1,
+      });
+
+      const replay = await assignedVisit(setupClient, {
+        requestId,
+        planId,
+        version: afterClean.plan_version,
+        profileId: DA2_ACTORS.employeeB,
+        jobId: DA2_ACTORS.jobB,
+        jobCode: '60002-MD',
+        workDate: dropDate,
+        conflictKind: 'pending_absence',
+        evidence: 'Supervisor confirmed the pending absence.',
+      });
+      expect(replay.visit_id).toBe(warned.visit_id);
+      expect(await counts(planId)).toEqual(afterWarning);
+
+      await expect(assignedVisit(setupClient, {
+        requestId,
+        planId,
+        version: afterWarning.plan_version,
+        profileId: DA2_ACTORS.employeeB,
+        jobId: DA2_ACTORS.jobB,
+        jobCode: '60002-MD',
+        workDate: dropDate,
+        notes: 'Changed after the first save',
+        conflictKind: 'pending_absence',
+        evidence: 'Supervisor confirmed the pending absence.',
+      })).rejects.toThrow(/REQUEST_ID_REUSED/);
+      expect(await counts(planId)).toEqual(afterWarning);
+
+      await expect(assignedVisit(setupClient, {
+        planId,
+        version: afterWarning.plan_version,
+        profileId: DA2_ACTORS.employeeA,
+        jobId: DA2_ACTORS.jobB,
+        jobCode: '60002-MD',
+        workDate: dropDate,
+        invalidInterval: true,
+      })).rejects.toThrow(/Invalid visit interval/);
+      expect(await counts(planId)).toEqual(afterWarning);
+
+      const beforeStale = await counts(planId);
+      await expect(assignedVisit(setupClient, {
+        planId,
+        version: beforeStale.plan_version - 1,
+        profileId: DA2_ACTORS.employeeA,
+        jobId: DA2_ACTORS.jobA,
+        jobCode: '60001-MD',
+        workDate: dropDate,
+      })).rejects.toThrow(/STALE_PLAN_VERSION/);
+      expect(await counts(planId)).toEqual(beforeStale);
+
+      const lockPlanId = await convertDate(lockDate);
+      await firstClient.query('BEGIN');
+      try {
+        await assignedVisit(firstClient, {
+          planId: lockPlanId,
+          version: 1,
+          profileId: DA2_ACTORS.employeeA,
+          jobId: DA2_ACTORS.jobA,
+          jobCode: '60001-MD',
+          workDate: lockDate,
+        });
+        await secondClient.query(`SET lock_timeout = '500ms'`);
+        await expect(assignedVisit(secondClient, {
+          planId: lockPlanId,
+          version: 1,
+          profileId: DA2_ACTORS.employeeA,
+          jobId: DA2_ACTORS.jobB,
+          jobCode: '60002-MD',
+          workDate: lockDate,
+        })).rejects.toThrow(/lock timeout/i);
+      } finally {
+        await firstClient.query('ROLLBACK');
+        await secondClient.query(`SET lock_timeout = '8s'`);
+      }
+      expect(await counts(lockPlanId)).toMatchObject({
+        plan_version: 1,
+        visits: 0,
+        assignments: 0,
+        overrides: 0,
+      });
+    } finally {
+      await firstClient.query('ROLLBACK').catch(() => undefined);
+      await secondClient.query(`SET lock_timeout = '8s'`).catch(() => undefined);
+      await setupClient.query('RESET ROLE').catch(() => undefined);
+      if (planIds.length > 0) {
+        await setupClient.query(
+          'DELETE FROM public.daily_allocation_visit_labour WHERE plan_day_id = ANY($1::uuid[])',
+          [planIds]
+        );
+        await setupClient.query(
+          'DELETE FROM public.daily_allocation_conflict_overrides WHERE plan_day_id = ANY($1::uuid[])',
+          [planIds]
+        );
+        await setupClient.query(
+          'DELETE FROM public.daily_allocation_visits WHERE plan_day_id = ANY($1::uuid[])',
+          [planIds]
+        );
+        await setupClient.query('BEGIN');
+        await setupClient.query(
+          'ALTER TABLE public.daily_allocation_plan_days DISABLE TRIGGER daily_allocation_plan_days_immutable_delete'
+        );
+        await setupClient.query(
+          'DELETE FROM public.daily_allocation_plan_days WHERE id = ANY($1::uuid[])',
+          [planIds]
+        );
+        await setupClient.query(
+          'ALTER TABLE public.daily_allocation_plan_days ENABLE TRIGGER daily_allocation_plan_days_immutable_delete'
+        );
+        await setupClient.query('COMMIT');
+      }
+      await setupClient.query('DELETE FROM public.absences WHERE date = ANY($1::date[])', [
+        [dropDate, lockDate],
+      ]).catch(() => undefined);
+      await authenticate(setupClient).catch(() => undefined);
+      await authenticate(firstClient).catch(() => undefined);
+      await authenticate(secondClient).catch(() => undefined);
+    }
+  }, 180_000);
 
   it('DA2A-LOCK-001 serializes rollout operations with a fail-fast session lock', async () => {
     await setupClient.query('RESET ROLE');

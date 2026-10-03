@@ -62,6 +62,21 @@ function managerMocks() {
   });
 }
 
+function assignedVisitPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    plan_day_id: '11111111-1111-4111-8111-111111111111',
+    expected_plan_version: 2,
+    profile_id: '22222222-2222-4222-8222-222222222222',
+    job_source_type: 'project_number',
+    job_source_id: '44444444-4444-4444-8444-444444444444',
+    job_code: '60001-MD',
+    starts_at: '2026-08-14T07:00:00+01:00',
+    ends_at: '2026-08-14T16:30:00+01:00',
+    ...overrides,
+  };
+}
+
 function conversionPayload(teamId = 'team-1') {
   return {
     request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -118,6 +133,13 @@ describe('DA2-AUTH-001 daily allocation v2 API', () => {
       }),
     }));
     expect(visitResponse.status).toBe(403);
+
+    const { POST: createAssignedVisit } = await import('@/app/api/daily-allocation/assigned-visits/route');
+    const assignedResponse = await createAssignedVisit(new NextRequest('http://localhost/api/daily-allocation/assigned-visits', {
+      method: 'POST',
+      body: JSON.stringify(assignedVisitPayload()),
+    }));
+    expect(assignedResponse.status).toBe(403);
   }, 10_000);
 
   it('rejects view-as and forged-team v2 mutations', async () => {
@@ -671,4 +693,75 @@ describe('session normalization route', () => {
       })
     );
   });
+});
+
+describe('assigned visit job drops', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    managerMocks();
+  });
+
+  it('returns the atomic RPC result for a clean assignment', async () => {
+    const result = {
+      visit_id: 'visit-1',
+      visit: { id: 'visit-1' },
+      assignment_id: 'labour-1',
+      assignment: { id: 'labour-1' },
+      override_id: null,
+      override: null,
+      plan_day_id: '11111111-1111-4111-8111-111111111111',
+      plan_version: 3,
+    };
+    const client = authClient();
+    client.rpc = vi.fn().mockResolvedValue({ data: result, error: null });
+    mockCreateClient.mockResolvedValue(client);
+
+    const { POST } = await import('@/app/api/daily-allocation/assigned-visits/route');
+    const response = await POST(new NextRequest('http://localhost/api/daily-allocation/assigned-visits', {
+      method: 'POST',
+      body: JSON.stringify(assignedVisitPayload()),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual(result);
+    expect(client.rpc).toHaveBeenCalledWith(
+      'create_daily_allocation_assigned_visit_v2',
+      expect.objectContaining({
+        p_request_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        p_plan_day_id: '11111111-1111-4111-8111-111111111111',
+        p_expected_plan_version: 2,
+        p_profile_id: '22222222-2222-4222-8222-222222222222',
+        p_conflict_kind: null,
+        p_evidence: null,
+      })
+    );
+  });
+
+  it('rejects an override without evidence before calling the RPC', async () => {
+    const client = authClient();
+    mockCreateClient.mockResolvedValue(client);
+    const { POST } = await import('@/app/api/daily-allocation/assigned-visits/route');
+    const response = await POST(new NextRequest('http://localhost/api/daily-allocation/assigned-visits', {
+      method: 'POST',
+      body: JSON.stringify(assignedVisitPayload({ conflict_kind: 'pending_absence' })),
+    }));
+    expect(response.status).toBe(400);
+    expect(client.rpc).not.toHaveBeenCalled();
+  });
+
+  it.each(['HARD_CONFLICT', 'CONFLICT_NOT_PRESENT'])(
+    'maps %s to a deterministic conflict',
+    async (message) => {
+      const client = authClient();
+      client.rpc = vi.fn().mockResolvedValue({ data: null, error: { message } });
+      mockCreateClient.mockResolvedValue(client);
+      const { POST } = await import('@/app/api/daily-allocation/assigned-visits/route');
+      const response = await POST(new NextRequest('http://localhost/api/daily-allocation/assigned-visits', {
+        method: 'POST',
+        body: JSON.stringify(assignedVisitPayload()),
+      }));
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({ code: message });
+    }
+  );
 });

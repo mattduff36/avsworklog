@@ -16,6 +16,8 @@ import {
 } from '@/lib/server/daily-allocation/auth';
 import { mapLabourDraft, mapPlantDraft } from '@/lib/server/daily-allocation/legacy-adapter';
 import type {
+  DailyAllocationAssignedVisitInput,
+  DailyAllocationAssignedVisitResult,
   DailyAllocationAssignmentDeleteInput,
   DailyAllocationAssignmentDeleteResult,
   DailyAllocationAssignmentMutationResult,
@@ -187,6 +189,52 @@ export const visitDeleteSchema = z.object({
   expected_plan_version: versionSchema,
   expected_row_version: versionSchema,
 }).strict();
+
+export const assignedVisitSchema = z.object({
+  request_id: uuidSchema,
+  plan_day_id: uuidSchema,
+  expected_plan_version: versionSchema,
+  profile_id: uuidSchema,
+  job_source_type: jobSourceSchema,
+  job_source_id: uuidSchema,
+  job_code: z.string().trim().min(1, 'A catalogue job is required.'),
+  starts_at: isoDateTimeSchema,
+  ends_at: isoDateTimeSchema,
+  meeting_point: z.string().trim().max(500).nullable().optional(),
+  meet_person: z.string().trim().max(200).nullable().optional(),
+  notes: z.string().trim().max(2000).nullable().optional(),
+  conflict_kind: conflictKindSchema.nullable().optional(),
+  evidence: z.string().trim().max(2000).nullable().optional(),
+}).strict().superRefine((value, ctx) => {
+  if (new Date(value.ends_at) <= new Date(value.starts_at)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Visit end time must be after its start time.',
+      path: ['ends_at'],
+    });
+  }
+  if (!isDailyAllocationTrustedInterval(value.starts_at, value.ends_at)) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Visit times must land on 30-minute London boundaries, stay on one day, and last at least 30 minutes.',
+      path: ['starts_at'],
+    });
+  }
+  if (value.conflict_kind && !value.evidence?.trim()) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Override evidence is required.',
+      path: ['evidence'],
+    });
+  }
+  if (!value.conflict_kind && value.evidence?.trim()) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'Override kind is required.',
+      path: ['conflict_kind'],
+    });
+  }
+});
 
 export const labourAssignSchema = z.object({
   request_id: uuidSchema,
@@ -546,6 +594,33 @@ export async function deleteDailyAllocationVisit(
     p_expected_row_version: parsed.expected_row_version,
   });
   return result;
+}
+
+export async function createDailyAllocationAssignedVisit(
+  input: DailyAllocationAssignedVisitInput
+): Promise<DailyAllocationAssignedVisitResult> {
+  const { supabase } = await requireDailyAllocationManagerMutation();
+  const parsed = parseWithSchema(assignedVisitSchema, input, 'Invalid assigned visit.');
+  return callDailyAllocationRpc<DailyAllocationAssignedVisitResult>(
+    supabase,
+    'create_daily_allocation_assigned_visit_v2',
+    {
+      p_request_id: parsed.request_id,
+      p_plan_day_id: parsed.plan_day_id,
+      p_expected_plan_version: parsed.expected_plan_version,
+      p_profile_id: parsed.profile_id,
+      p_job_source_type: parsed.job_source_type,
+      p_job_source_id: parsed.job_source_id,
+      p_job_code: parsed.job_code,
+      p_starts_at: parsed.starts_at,
+      p_ends_at: parsed.ends_at,
+      p_meeting_point: blankToNull(parsed.meeting_point),
+      p_meet_person: blankToNull(parsed.meet_person),
+      p_notes: blankToNull(parsed.notes),
+      p_conflict_kind: parsed.conflict_kind || null,
+      p_evidence: parsed.conflict_kind ? parsed.evidence?.trim() || null : null,
+    }
+  );
 }
 
 export async function assignDailyAllocationLabour(

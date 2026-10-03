@@ -384,8 +384,20 @@ export function mapDailyAllocationRpcError(
   if (message.includes('Idempotency key is required')) {
     return new DailyAllocationError('Idempotency key is required.', 400, 'VALIDATION');
   }
-  if (message.includes('Override evidence is required') || message.includes('Override subject is required')) {
-    return new DailyAllocationError(message.includes('subject') ? 'Override subject is required.' : 'Override evidence is required.', 400, 'VALIDATION');
+  if (message.includes('Override evidence is required') || message.includes('Override subject is required') || message.includes('Override kind is required')) {
+    const validationMessage = message.includes('subject')
+      ? 'Override subject is required.'
+      : message.includes('kind')
+        ? 'Override kind is required.'
+        : 'Override evidence is required.';
+    return new DailyAllocationError(validationMessage, 400, 'VALIDATION');
+  }
+  if (message.includes('CONFLICT_NOT_PRESENT')) {
+    return new DailyAllocationError(
+      'That warning is no longer present. Refresh the board before assigning.',
+      409,
+      'CONFLICT_NOT_PRESENT'
+    );
   }
   if (message.includes('Off-shift override requires a visit')) {
     return new DailyAllocationError('Off-shift override requires a visit.', 400, 'VALIDATION');

@@ -1,4 +1,6 @@
 import type {
+  DailyAllocationAssignedVisitInput,
+  DailyAllocationAssignedVisitResult,
   DailyAllocationAssignmentDeleteInput,
   DailyAllocationAssignmentDeleteResult,
   DailyAllocationAssignmentMutationResult,
@@ -187,6 +189,15 @@ export async function fetchDailyAllocationConversionSource(
     await fetch(
       `/api/daily-allocation/convert?work_date=${encodeURIComponent(workDate)}&team_id=${encodeURIComponent(teamId)}`
     )
+  );
+}
+
+export async function createDailyAllocationAssignedVisit(
+  input: DailyAllocationAssignedVisitInput
+): Promise<DailyAllocationAssignedVisitResult> {
+  assertNoProvisionalDailyAllocationIds(input);
+  return readResponse(
+    await fetch('/api/daily-allocation/assigned-visits', jsonRequest('POST', input))
   );
 }
 

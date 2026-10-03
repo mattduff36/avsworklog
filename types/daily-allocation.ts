@@ -518,6 +518,34 @@ export interface DailyAllocationVisitMutationResult {
   plan_version: number;
 }
 
+export interface DailyAllocationAssignedVisitInput {
+  request_id: string;
+  plan_day_id: string;
+  expected_plan_version: number;
+  profile_id: string;
+  job_source_type: JobCatalogueSourceType;
+  job_source_id: string;
+  job_code: string;
+  starts_at: string;
+  ends_at: string;
+  meeting_point?: string | null;
+  meet_person?: string | null;
+  notes?: string | null;
+  conflict_kind?: DailyAllocationConflictKind | null;
+  evidence?: string | null;
+}
+
+export interface DailyAllocationAssignedVisitResult {
+  visit_id: string;
+  visit: DailyAllocationVisit;
+  assignment_id: string;
+  assignment: DailyAllocationLabourAssignment;
+  override_id: string | null;
+  override: DailyAllocationConflictOverride | null;
+  plan_day_id: string;
+  plan_version: number;
+}
+
 export interface DailyAllocationVisitDeleteResult {
   visit_id: string;
   plan_day_id: string;

@@ -26,6 +26,7 @@ export {
   deletePlantDraft,
   getDailyAllocationConversionSource,
   convertDailyAllocationPlanDay,
+  createDailyAllocationAssignedVisit,
   upsertDailyAllocationVisit,
   moveDailyAllocationVisit,
   deleteDailyAllocationVisit,

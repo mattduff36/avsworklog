@@ -5,6 +5,7 @@ import {
   assignDailyAllocationLabour,
   assignDailyAllocationPlant,
   convertDailyAllocationPlanDay,
+  createDailyAllocationAssignedVisit,
   createDailyAllocationConflictOverride,
   createDailyAllocationVisit,
   DailyAllocationApiError,
@@ -28,6 +29,7 @@ import {
 import {
   patchBoardPlanVersion,
   patchBoardRemoveLabourAssignment,
+  patchBoardWithAssignedVisit,
   patchBoardRemovePlantAssignment,
   patchBoardRemoveVisit,
   patchBoardWithLabourAssignment,
@@ -55,6 +57,8 @@ import {
 import { useDailyAllocationBoard } from '@/components/daily-allocation/board/hooks/use-daily-allocation-board';
 import type { DailyAllocationRangeBoardPayload } from '@/types/daily-allocation';
 import type {
+  DailyAllocationAssignedVisitInput,
+  DailyAllocationAssignedVisitResult,
   DailyAllocationAssignmentDeleteInput,
   DailyAllocationConvertInput,
   DailyAllocationLabourAssignInput,
@@ -957,10 +961,104 @@ export function useProjectCopiedAllocation() {
   });
 }
 
+export function useCreateDailyAllocationAssignedVisit() {
+  const { boardKey, runMutation } = useOptimisticMutationRunner();
+  return useCoordinatedMutation('create-assigned-visit', async (input: {
+      request: CoordinatedRequest<DailyAllocationAssignedVisitInput>;
+      optimisticVisit: DailyAllocationVisit;
+      optimisticAssignment: DailyAllocationLabourAssignment;
+      optimisticOverride?: DailyAllocationConflictOverride | null;
+    }) => runMutation({
+      kind: 'create-assigned-visit',
+      claims: [
+        planDayClaim(input.request.plan_day_id),
+        visitClaim(input.optimisticVisit.id),
+        resourceDayClaim('labour', input.request.profile_id, input.optimisticVisit.work_date),
+        assignmentClaim(input.optimisticAssignment.id),
+        ...(input.optimisticOverride ? [assignmentClaim(input.optimisticOverride.id)] : []),
+      ],
+      identityWaitKeys: [input.request.plan_day_id].filter((id) => id.startsWith('optimistic:')),
+      duplicateKey: [
+        'assigned-visit',
+        input.request.plan_day_id,
+        input.request.profile_id,
+        input.request.job_source_id,
+        input.optimisticVisit.starts_at,
+      ].join(':'),
+      apply: (state) => applyIfBoard(state.board, (board) =>
+        patchBoardWithAssignedVisit(
+          board,
+          input.optimisticVisit,
+          input.optimisticAssignment,
+          input.optimisticOverride
+        )
+      ),
+      mutate: async ({ requestId, resolveIdentity, getPersistenceBoard }) => {
+        const planDayId = resolveIdentity(input.request.plan_day_id);
+        return createDailyAllocationAssignedVisit({
+          ...input.request,
+          request_id: requestId,
+          plan_day_id: planDayId,
+          expected_plan_version: currentPlanVersion(
+            getPersistenceBoard(),
+            planDayId,
+            input.request.expected_plan_version
+          ),
+        });
+      },
+      acknowledge: (result: DailyAllocationAssignedVisitResult) => ({
+        apply: (state) => applyIfBoard(state.board, (board) =>
+          patchBoardPlanVersion(
+            patchBoardWithAssignedVisit(
+              board,
+              result.visit,
+              result.assignment,
+              result.override,
+              {
+                visitId: input.optimisticVisit.id,
+                assignmentId: input.optimisticAssignment.id,
+                overrideId: input.optimisticOverride?.id,
+              }
+            ),
+            result.plan_day_id,
+            result.plan_version
+          )
+        ),
+        identityAliases: {
+          [input.optimisticVisit.id]: result.visit_id,
+          [input.optimisticAssignment.id]: result.assignment_id,
+          ...(input.optimisticOverride && result.override_id
+            ? { [input.optimisticOverride.id]: result.override_id }
+            : {}),
+        },
+        proofs: {
+          [boardKey]: (base) =>
+            base.board?.visits.some((visit) => visit.id === result.visit_id) === true
+            && base.board?.labour_assignments.some((assignment) =>
+              assignment.id === result.assignment_id
+              && assignment.visit_id === result.visit_id
+              && assignment.profile_id === result.assignment.profile_id
+            ) === true
+            && (result.override_id == null
+              || base.board?.overrides.some((override) =>
+                override.id === result.override_id
+                && override.visit_id === result.visit_id
+              ) === true)
+            && base.board?.plan_days.some((planDay) =>
+              planDay.id === result.plan_day_id
+              && planDay.plan_version >= result.plan_version
+            ) === true,
+        },
+      }),
+    }),
+  );
+}
+
 export function useDailyAllocationBoardMutations() {
   const boardState = useDailyAllocationBoard();
   const convert = useConvertDailyAllocationPlanDay();
   const createVisit = useCreateDailyAllocationVisit();
+  const createAssignedVisit = useCreateDailyAllocationAssignedVisit();
   const updateVisit = useUpdateDailyAllocationVisit();
   const moveVisit = useMoveDailyAllocationVisit();
   const removeVisit = useDeleteDailyAllocationVisit();
@@ -974,6 +1072,7 @@ export function useDailyAllocationBoardMutations() {
   const mutations = [
     convert,
     createVisit,
+    createAssignedVisit,
     updateVisit,
     moveVisit,
     removeVisit,
@@ -989,6 +1088,7 @@ export function useDailyAllocationBoardMutations() {
   return {
     convert,
     createVisit,
+    createAssignedVisit,
     updateVisit,
     moveVisit,
     removeVisit,

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { buildDailyAllocationBoardRows } from '@/components/daily-allocation/board/daily-allocation-board-primary';
 import {
   patchBoardPlanVersion,
   patchBoardRemoveLabourAssignment,
   patchBoardRemoveVisit,
+  patchBoardWithAssignedVisit,
   patchBoardWithLabourAssignment,
   patchBoardWithOverride,
   patchBoardWithPlantAssignment,
@@ -224,5 +226,77 @@ describe('daily allocation board cache', () => {
       labour.id
     );
     expect(afterAssignAck.plan_days[0].plan_version).toBe(5);
+  });
+
+  it('admits a job drop as one assigned projection and replaces every provisional id once', () => {
+    const source = boardFixture();
+    const optimisticVisit = { ...visit, id: 'optimistic:visit' };
+    const optimisticLabour: DailyAllocationLabourAssignment = {
+      id: 'optimistic:labour',
+      visit_id: optimisticVisit.id,
+      plan_day_id: 'plan-1',
+      work_date: visit.work_date,
+      profile_id: 'profile-1',
+      starts_at: visit.starts_at,
+      ends_at: visit.ends_at,
+      meeting_point: null,
+      meet_person: null,
+      notes: null,
+      row_version: 1,
+      updated_at: visit.updated_at,
+    };
+    const optimisticOverride: DailyAllocationConflictOverride = {
+      id: 'optimistic:override',
+      plan_day_id: 'plan-1',
+      visit_id: optimisticVisit.id,
+      profile_id: 'profile-1',
+      plant_id: null,
+      conflict_kind: 'pending_absence',
+      evidence: 'Supervisor confirmed',
+      confirmed_by: 'user-1',
+      confirmed_at: visit.updated_at,
+    };
+    const admitted = patchBoardWithAssignedVisit(
+      source,
+      optimisticVisit,
+      optimisticLabour,
+      optimisticOverride
+    );
+    expect(admitted.plan_days[0].plan_version).toBe(3);
+    expect(admitted.visits.map((item) => item.id)).toEqual(['optimistic:visit']);
+    expect(admitted.labour_assignments.map((item) => item.id)).toEqual(['optimistic:labour']);
+    expect(admitted.overrides.map((item) => item.id)).toEqual(['optimistic:override']);
+    const admittedRows = buildDailyAllocationBoardRows({
+      primary: 'employee',
+      board: admitted,
+      dates: ['2026-08-13'],
+    });
+    expect(admittedRows.map((row) => row.kind)).toEqual(['employee']);
+    expect(admittedRows[0]).toMatchObject({
+      id: 'employee:profile-1',
+      visits: [expect.objectContaining({ id: 'optimistic:visit' })],
+    });
+
+    const acknowledged = patchBoardPlanVersion(
+      patchBoardWithAssignedVisit(
+        source,
+        { ...visit, id: 'visit-real', row_version: 1 },
+        { ...optimisticLabour, id: 'labour-real', visit_id: 'visit-real' },
+        { ...optimisticOverride, id: 'override-real', visit_id: 'visit-real' },
+        {
+          visitId: optimisticVisit.id,
+          assignmentId: optimisticLabour.id,
+          overrideId: optimisticOverride.id,
+        }
+      ),
+      'plan-1',
+      4
+    );
+    expect(acknowledged.plan_days[0].plan_version).toBe(4);
+    expect(acknowledged.visits.map((item) => item.id)).toEqual(['visit-real']);
+    expect(acknowledged.labour_assignments.map((item) => item.id)).toEqual(['labour-real']);
+    expect(acknowledged.overrides.map((item) => item.id)).toEqual(['override-real']);
+    expect(source.plan_days[0].plan_version).toBe(2);
+    expect(source.visits).toHaveLength(0);
   });
 });
