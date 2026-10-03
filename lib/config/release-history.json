@@ -1,5 +1,22 @@
 [
   {
+    "version": "1026.6.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated daily allocation.",
+    "summary": "Updated daily allocation.",
+    "details": [
+      "Updated daily allocation, with changes to interface components and automated tests."
+    ],
+    "areas": [
+      "Daily Allocation"
+    ],
+    "areaKeys": [
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-10-03T23:54:04.552Z"
+  },
+  {
     "version": "1026.5.0",
     "updateKind": "major",
     "title": "Daily Allocation update",
