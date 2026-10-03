@@ -81,8 +81,9 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(board).toContain('source.kind === \'visit\'');
     expect(board).toMatch(/createVisitAt\(\s*source\.job,\s*target\.workDate,\s*'full'/);
     expect(board).toContain('planJobDropAssignment');
-    expect(board).toContain('rollbackOnHardConflict');
-    expect(board).toContain("error.code === 'HARD_CONFLICT'");
+    expect(board).toContain('rollbackOnAssignmentFailure');
+    expect(board).toContain('commitWarnedJobDrop');
+    expect(board).toContain('setPendingJobDrop(null)');
     expect(board).toContain('mutations.moveVisit.mutateAsync');
     expect(board).toContain('expected_source_plan_version');
     expect(board).toContain('expected_target_plan_version');

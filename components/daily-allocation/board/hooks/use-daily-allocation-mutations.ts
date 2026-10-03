@@ -553,8 +553,11 @@ export function useAssignDailyAllocationLabour() {
         input.request.notes ?? '',
         input.request.override_id ?? '',
       ].join(':'),
-      identityWaitKeys: [input.request.visit_id, input.optimisticAssignment.plan_day_id]
-        .filter((id) => id.startsWith('optimistic:')),
+      identityWaitKeys: [
+        input.request.visit_id,
+        input.optimisticAssignment.plan_day_id,
+        input.request.override_id,
+      ].filter((id): id is string => Boolean(id?.startsWith('optimistic:'))),
       apply: (state) => applyIfBoard(state.board, (board) =>
         patchBoardWithLabourAssignment(board, input.optimisticAssignment)
       ),
