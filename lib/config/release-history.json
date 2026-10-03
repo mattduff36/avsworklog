@@ -1,5 +1,26 @@
 [
   {
+    "version": "1026.3.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated Daily Allocation and Projects. Simplify board sessions. Record timesheets fix live verification.",
+    "summary": "Updated Daily Allocation and Projects. Simplify board sessions. Record timesheets fix live verification.",
+    "details": [
+      "Updated Daily Allocation and Projects, with changes to interface components and automated tests.",
+      "Updated projects, with changes to background routes, app screens, shared logic, and automated tests."
+    ],
+    "areas": [
+      "Daily Allocation",
+      "Error reporting",
+      "Projects. Simplify board sessions. Record timesheets fix live verification"
+    ],
+    "areaKeys": [
+      "daily-allocation",
+      "error-reporting"
+    ],
+    "pushedAt": "2026-10-03T21:16:08.046Z"
+  },
+  {
     "version": "1026.2.0",
     "updateKind": "major",
     "title": "Timesheets update",

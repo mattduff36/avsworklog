@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.3.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update Daily Allocation and Projects`
+
+**PUSHED AT**
+2026-10-03T21:16:08.046Z
+
+**WHAT CHANGED**
+Update Daily Allocation and Projects. Simplify board sessions. Record timesheets fix live verification.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Allocation and Projects, with changes to interface components and automated tests.
+- Updated projects, with changes to background routes, app screens, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update Daily Allocation and Projects`
+- `feat(daily-allocation): simplify board sessions`
+- `chore(errors): record timesheets fix live verification`
+
 ## 1026.2.0
 
 **GIT COMMIT MESSAGE**
