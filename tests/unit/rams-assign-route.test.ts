@@ -18,6 +18,7 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import { getSystemAccountIds } from '@/lib/server/system-accounts';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import { POST } from '@/app/api/rams/[id]/assign/route';
 
 const DOC_ID = '11111111-1111-4111-8111-111111111111';
@@ -202,6 +203,13 @@ describe('POST /api/rams/[id]/assign', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'Failed to unassign employees: assignment state changed',
     });
+    expect(logServerError).toHaveBeenCalledWith(expect.objectContaining({
+      userId: MANAGER_ID,
+      additionalData: {
+        documentId: DOC_ID,
+        actorId: MANAGER_ID,
+      },
+    }));
     expect(deleteStates[0]?.neq).toEqual({ status: 'signed' });
     expect(deleteStates[0]?.in).toEqual({ employee_id: [USER_A] });
     expect(deleteStates[0]?.select).toBe('employee_id');
@@ -288,7 +296,15 @@ describe('POST /api/rams/[id]/assign', () => {
     expect(response.status).toBe(400);
     expect(getUsersWithModuleAccess).toHaveBeenCalledWith('rams', [USER_B], expect.anything());
     await expect(response.json()).resolves.toMatchObject({
-      error: 'One or more employees do not have Projects access',
+      error: 'One or more employees do not have RAMS access',
     });
+    expect(logServerError).toHaveBeenCalledWith(expect.objectContaining({
+      error: 'One or more employees do not have RAMS access',
+      userId: MANAGER_ID,
+      additionalData: {
+        documentId: DOC_ID,
+        actorId: MANAGER_ID,
+      },
+    }));
   });
 });

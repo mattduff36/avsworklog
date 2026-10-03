@@ -540,6 +540,7 @@ export function OverrideDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
+            className={boardControlStyles.primary}
             disabled={!evidence.trim() || saving}
             onClick={(event) => {
               event.preventDefault();
@@ -591,11 +592,12 @@ export function PublishDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           {failed ? (
-            <Button variant="outline" onClick={onRefresh} disabled={publishing}>
+            <Button variant="outline" className={boardControlStyles.outline} onClick={onRefresh} disabled={publishing}>
               Refresh and start new attempt
             </Button>
           ) : null}
           <AlertDialogAction
+            className={boardControlStyles.primary}
             onClick={(event) => {
               event.preventDefault();
               onPublish();
@@ -637,6 +639,7 @@ export function DeleteVisitDialog({
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
+            className={boardControlStyles.danger}
             disabled={saving}
             onClick={(event) => {
               event.preventDefault();

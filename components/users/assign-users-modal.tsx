@@ -158,16 +158,13 @@ function AssignUsersModalContent({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(true) : handleClose())}>
-      <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] flex-col sm:max-w-4xl lg:max-w-5xl">
-        <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-          <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] flex-col overflow-hidden sm:max-w-4xl lg:max-w-5xl">
+        <form onSubmit={handleSubmit} className="flex max-h-full min-h-0 flex-1 flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription>
               {entityLabel ? (
-                <>
-                  <span className="font-medium text-foreground">{entityLabel}</span>
-                  <br />
-                </>
+                <span className="mb-1 block line-clamp-2 break-words font-medium text-foreground">{entityLabel}</span>
               ) : null}
               {description}
             </DialogDescription>
@@ -238,7 +235,7 @@ function AssignUsersModalContent({
                 className={cn('min-h-[360px] rounded-lg border border-border', spinnerClassName)}
               />
             ) : (
-              <ScrollArea className="h-[420px] pr-4">
+              <ScrollArea className="h-[420px] max-h-[calc(100dvh-16rem)] min-h-[12rem] pr-4">
                 <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                   {visibleUsers.length === 0 ? (
                     <p className="py-4 text-center text-sm text-muted-foreground md:col-span-2">{emptyMessage}</p>
@@ -275,7 +272,7 @@ function AssignUsersModalContent({
             )}
           </div>
 
-          <DialogFooter className="gap-3">
+          <DialogFooter className="shrink-0 gap-3">
             <Button type="button" variant="outline" onClick={handleClose} disabled={submitting}>
               Cancel
             </Button>

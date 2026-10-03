@@ -5,6 +5,7 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import { RAMSExportDocument } from '@/lib/pdf/RAMSExportDocument';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { assignmentRoleLabel, RAMS_ASSIGNMENT_EMPLOYEE_EMBED, type RamsJobRole } from '@/lib/rams/assignment-role';
 
 export async function GET(
   request: NextRequest,
@@ -57,7 +58,7 @@ export async function GET(
       .from('rams_assignments')
       .select(`
         *,
-        employee:profiles!rams_assignments_employee_id_fkey(id, full_name, role)
+        ${RAMS_ASSIGNMENT_EMPLOYEE_EMBED}
       `)
       .eq('rams_document_id', id)
       .order('signed_at', { ascending: false });
@@ -115,7 +116,24 @@ export async function GET(
         created_at: typedDocument.created_at,
         uploader_name: typedDocument.uploader?.full_name || 'Unknown',
       },
-      assignments: assignments || [],
+      assignments: ((assignments || []) as Array<{
+        id: string;
+        status: 'pending' | 'read' | 'signed';
+        signed_at: string | null;
+        signature_data: string | null;
+        comments: string | null;
+        action_taken: string | null;
+        employee: {
+          full_name: string | null;
+          role: RamsJobRole | RamsJobRole[] | null;
+        } | null;
+      }>).map((assignment) => ({
+        ...assignment,
+        employee: {
+          full_name: assignment.employee?.full_name ?? 'Unknown',
+          role: assignmentRoleLabel(assignment.employee?.role),
+        },
+      })),
       visitorSignatures: visitorSignatures || [],
       logoUrl,
     });

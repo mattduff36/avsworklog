@@ -233,3 +233,13 @@ export function evaluateEmployeeAssignmentBlock(
   }
   return null;
 }
+
+export type JobDropAssignmentPlan = 'reject' | 'override' | 'assign';
+
+export function planJobDropAssignment(
+  block: { hard: string } | { warning: DailyAllocationConflictKind } | null,
+): JobDropAssignmentPlan {
+  if (block && 'hard' in block) return 'reject';
+  if (block && 'warning' in block) return 'override';
+  return 'assign';
+}

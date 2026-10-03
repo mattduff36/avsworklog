@@ -11,6 +11,25 @@ import {
   findAssignmentIdOverlap,
   normalizeAssignmentIds,
 } from '@/lib/server/rams-assignments';
+import { assignmentRoleLabel, RAMS_ASSIGNMENT_EMPLOYEE_EMBED, type RamsJobRole } from '@/lib/rams/assignment-role';
+
+async function logRejectedAssignmentSave(
+  request: NextRequest,
+  actorId: string,
+  documentId: string,
+  message: string,
+) {
+  await logServerError({
+    error: message,
+    request,
+    componentName: '/api/rams/[id]/assign',
+    userId: actorId,
+    additionalData: {
+      documentId,
+      actorId,
+    },
+  });
+}
 
 export async function POST(
   request: NextRequest,
@@ -113,12 +132,16 @@ export async function POST(
         .in('id', employeeIds);
 
       if (empError || !employees) {
-        return NextResponse.json({ error: 'Failed to verify employees' }, { status: 400 });
+        const message = 'Failed to verify employees';
+        await logRejectedAssignmentSave(request, user.id, id, message);
+        return NextResponse.json({ error: message }, { status: 400 });
       }
 
       if (employees.length !== employeeIds.length) {
+        const message = 'One or more employee IDs are invalid';
+        await logRejectedAssignmentSave(request, user.id, id, message);
         return NextResponse.json(
-          { error: 'One or more employee IDs are invalid' },
+          { error: message },
           { status: 400 }
         );
       }
@@ -126,8 +149,10 @@ export async function POST(
       if (newlyAssignedIds.length > 0) {
         const allowedUserIds = await getUsersWithModuleAccess('rams', newlyAssignedIds, admin);
         if (newlyAssignedIds.some((employeeId) => !allowedUserIds.has(employeeId))) {
+          const message = 'One or more employees do not have RAMS access';
+          await logRejectedAssignmentSave(request, user.id, id, message);
           return NextResponse.json(
-            { error: 'One or more employees do not have Projects access' },
+            { error: message },
             { status: 400 }
           );
         }
@@ -182,8 +207,10 @@ export async function POST(
 
       if (unassignError) {
         console.error('Unassignment error:', unassignError);
+        const message = `Failed to unassign employees: ${unassignError.message}`;
+        await logRejectedAssignmentSave(request, user.id, id, message);
         return NextResponse.json(
-          { error: `Failed to unassign employees: ${unassignError.message}` },
+          { error: message },
           { status: 500 }
         );
       }
@@ -192,8 +219,10 @@ export async function POST(
         (row) => row.employee_id
       );
       if (!assignmentIdSetsEqual(deletedIds, unassignableIds)) {
+        const message = 'Failed to unassign employees: assignment state changed';
+        await logRejectedAssignmentSave(request, user.id, id, message);
         return NextResponse.json(
-          { error: 'Failed to unassign employees: assignment state changed' },
+          { error: message },
           { status: 409 }
         );
       }
@@ -218,8 +247,10 @@ export async function POST(
 
       if (assignError) {
         console.error('Assignment error:', assignError);
+        const message = `Failed to create assignments: ${assignError.message}`;
+        await logRejectedAssignmentSave(request, user.id, id, message);
         return NextResponse.json(
-          { error: `Failed to create assignments: ${assignError.message}` },
+          { error: message },
           { status: 500 }
         );
       }
@@ -288,7 +319,7 @@ export async function GET(
       .from('rams_assignments')
       .select(`
         *,
-        employee:profiles!rams_assignments_employee_id_fkey(id, full_name, role)
+        ${RAMS_ASSIGNMENT_EMPLOYEE_EMBED}
       `)
       .eq('rams_document_id', id)
       .order('assigned_at', { ascending: false });
@@ -301,9 +332,25 @@ export async function GET(
       );
     }
 
+    const labelledAssignments = ((assignments || []) as Array<{
+      employee?: {
+        id?: string | null;
+        full_name?: string | null;
+        role?: RamsJobRole | RamsJobRole[] | null;
+      } | null;
+    }>).map((assignment) => ({
+      ...assignment,
+      employee: assignment.employee
+        ? {
+            ...assignment.employee,
+            role: assignmentRoleLabel(assignment.employee.role),
+          }
+        : assignment.employee,
+    }));
+
     return NextResponse.json({
       success: true,
-      assignments,
+      assignments: labelledAssignments,
     });
   } catch (error) {
     console.error('Unexpected error in GET assignments:', error);

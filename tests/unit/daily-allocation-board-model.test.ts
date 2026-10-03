@@ -6,6 +6,7 @@ import {
   filterDailyAllocationBoardForTeam,
   isDateConverted,
   planDayForDate,
+  planJobDropAssignment,
   resolveDailyAllocationActiveTeamId,
   visitOverlapsHalfDaySession,
 } from '@/components/daily-allocation/board/board-model';
@@ -350,5 +351,14 @@ describe('half-day absence overlap', () => {
     expect(evaluateEmployeeAssignmentBlock(pmAbsentOffShiftAm, morning, 'employee-1')).toEqual({
       warning: 'off_shift',
     });
+  });
+});
+
+describe('planJobDropAssignment', () => {
+  it('rejects hard blocks, opens an override for warnings, and assigns when clear', () => {
+    expect(planJobDropAssignment({ hard: 'This employee is absent for the full day.' })).toBe('reject');
+    expect(planJobDropAssignment({ warning: 'pending_absence' })).toBe('override');
+    expect(planJobDropAssignment({ warning: 'off_shift' })).toBe('override');
+    expect(planJobDropAssignment(null)).toBe('assign');
   });
 });

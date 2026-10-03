@@ -37,6 +37,7 @@ import {
 import {
   evaluateEmployeeAssignmentBlock,
   filterDailyAllocationBoardForTeam,
+  planJobDropAssignment,
   authoritativePlanDayIdentity,
   isDateConverted,
   latestPublicationForDate,
@@ -167,6 +168,8 @@ export function DailyAllocationManagerBoard({
   const selectedDate = boardState.selectedDate;
   const dragActiveRef = useRef(false);
   const publishAttemptRef = useRef<PublishAttempt | null>(null);
+  const dropRollbackVisitIds = useRef(new Set<string>());
+  const overrideConfirmedRef = useRef(false);
 
   const [resourceTab, setResourceTab] = useState<ResourceSidebarTab>('jobs');
   const [resourceSearch, setResourceSearch] = useState('');
@@ -486,15 +489,28 @@ export function DailyAllocationManagerBoard({
     return { id: optimisticPlanDay.id, plan_version: 1 };
   }
 
+  function removeRejectedDropVisit(
+    visit: Pick<DailyAllocationVisit, 'id' | 'row_version'>,
+    expectedPlanVersion: number,
+  ) {
+    dropRollbackVisitIds.current.delete(visit.id);
+    void mutations.removeVisit.mutateAsync({
+      visit_id: visit.id,
+      expected_plan_version: expectedPlanVersion,
+      expected_row_version: visit.row_version,
+    }).catch((error: unknown) => showMutationError(error, 'Unable to remove the rejected visit.'));
+  }
+
   function createVisitAt(
     job: DailyAllocationJobProjection,
     workDate: string,
     session: DailyAllocationSession,
     profileId?: string,
-  ) {
-    if (!fullBoard) return;
+    options?: { rollbackOnHardConflict?: boolean },
+  ): DailyAllocationVisit | null {
+    if (!fullBoard) return null;
     const planDay = admitPlanDay(workDate);
-    if (!planDay) return;
+    if (!planDay) return null;
     const window = dailyAllocationSessionWindow(session);
     const starts_at = toDailyAllocationLondonIsoFromMinutes(workDate, window.startMinutes);
     const ends_at = toDailyAllocationLondonIsoFromMinutes(workDate, window.endMinutes);
@@ -557,10 +573,20 @@ export function DailyAllocationManagerBoard({
           updated_at: new Date().toISOString(),
         },
       }, {
-        onError: (error) => showMutationError(error, 'Unable to assign employee.'),
+        onError: (error) => {
+          showMutationError(error, 'Unable to assign employee.');
+          if (
+            options?.rollbackOnHardConflict
+            && isDailyAllocationApiError(error)
+            && error.code === 'HARD_CONFLICT'
+          ) {
+            removeRejectedDropVisit(optimisticVisit, planDay.plan_version);
+          }
+        },
       });
     }
     setStatusMessage('Visit added.');
+    return optimisticVisit;
   }
 
   async function moveVisit(
@@ -738,7 +764,11 @@ export function DailyAllocationManagerBoard({
     const block = employeeAssignmentBlock(visit, profileId);
     if (block && 'hard' in block) {
       toast.error(block.hard);
-      void boardState.refetch();
+      if (dropRollbackVisitIds.current.has(visit.id)) {
+        removeRejectedDropVisit(visit, planDay.plan_version);
+      } else {
+        void boardState.refetch();
+      }
       return;
     }
     if (block && 'warning' in block && !overrideId) {
@@ -777,8 +807,17 @@ export function DailyAllocationManagerBoard({
       });
       toast.success(existingAssignment ? 'Employee instructions updated.' : 'Employee assigned.');
       setStatusMessage(existingAssignment ? 'Employee instructions updated.' : 'Employee assigned.');
+      dropRollbackVisitIds.current.delete(visit.id);
     } catch (error) {
       showMutationError(error, 'Unable to assign employee.');
+      if (
+        dropRollbackVisitIds.current.has(visit.id)
+        && isDailyAllocationApiError(error)
+        && error.code === 'HARD_CONFLICT'
+      ) {
+        const latestPlan = planDayForDate(fullBoard, visit.work_date);
+        if (latestPlan) removeRejectedDropVisit(visit, latestPlan.plan_version);
+      }
     }
   }
 
@@ -894,6 +933,7 @@ export function DailyAllocationManagerBoard({
     const planDay = planDayForDate(fullBoard, pendingAssign.visit.work_date);
     if (!planDay) return;
     try {
+      overrideConfirmedRef.current = true;
       const result = await mutations.createOverride.mutateAsync({
         request: {
           plan_day_id: planDay.id,
@@ -1053,7 +1093,47 @@ export function DailyAllocationManagerBoard({
     if (!source || !target || !fullBoard) return;
 
     if (source.kind === 'job' && target.surface === 'session' && target.workDate && target.session && target.profileId) {
-      createVisitAt(source.job, target.workDate, 'full', target.profileId);
+      const window = dailyAllocationSessionWindow('full');
+      const previewVisit: DailyAllocationVisit = {
+        id: 'drop-preview',
+        plan_day_id: '',
+        work_date: target.workDate,
+        owner_team_id: ownerTeamId,
+        job_source_type: source.job.source_type,
+        job_source_id: source.job.source_id,
+        job_code: source.job.job_code,
+        site_address: source.job.site_address || '',
+        starts_at: toDailyAllocationLondonIsoFromMinutes(target.workDate, window.startMinutes),
+        ends_at: toDailyAllocationLondonIsoFromMinutes(target.workDate, window.endMinutes),
+        meeting_point: null,
+        meet_person: null,
+        notes: null,
+        row_version: 1,
+        updated_at: new Date().toISOString(),
+      };
+      const block = evaluateEmployeeAssignmentBlock(fullBoard, previewVisit, target.profileId);
+      const dropPlan = planJobDropAssignment(block);
+      if (dropPlan === 'reject' && block && 'hard' in block) {
+        toast.error(block.hard);
+        return;
+      }
+      const created = createVisitAt(
+        source.job,
+        target.workDate,
+        'full',
+        dropPlan === 'assign' ? target.profileId : undefined,
+        { rollbackOnHardConflict: dropPlan === 'assign' },
+      );
+      if (dropPlan === 'override' && created && block && 'warning' in block) {
+        dropRollbackVisitIds.current.add(created.id);
+        setPendingAssign({
+          type: 'employee',
+          profileId: target.profileId,
+          visit: created,
+          instructions: { meeting_point: null, meet_person: null, notes: null },
+        });
+        setOverrideKind(block.warning);
+      }
       return;
     }
     if (source.kind === 'visit' && target.surface === 'session' && target.workDate && target.session) {
@@ -1366,6 +1446,10 @@ export function DailyAllocationManagerBoard({
           kind={overrideKind}
           onOpenChange={(open) => {
             if (!open) {
+              if (!overrideConfirmedRef.current && pendingAssign?.type === 'employee') {
+                dropRollbackVisitIds.current.delete(pendingAssign.visit.id);
+              }
+              overrideConfirmedRef.current = false;
               setOverrideKind(null);
               setPendingAssign(null);
             }

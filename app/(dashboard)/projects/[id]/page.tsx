@@ -35,6 +35,7 @@ import { AssignEmployeesModal } from '@/components/rams/AssignEmployeesModal';
 import { formatFileSize } from '@/lib/utils/file-validation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
+import { assignmentRoleLabel, RAMS_ASSIGNMENT_EMPLOYEE_EMBED, type RamsJobRole } from '@/lib/rams/assignment-role';
 
 interface RAMSDocument {
   id: string;
@@ -172,13 +173,27 @@ export default function RAMSDetailsPage() {
         .from('rams_assignments')
         .select(`
           *,
-          employee:profiles!rams_assignments_employee_id_fkey(id, full_name, role)
+          ${RAMS_ASSIGNMENT_EMPLOYEE_EMBED}
         `)
         .eq('rams_document_id', documentId)
         .order('assigned_at', { ascending: false });
 
       if (!assignError && assignData) {
-        setAssignments(assignData.map((assignment) => ({
+        const typedAssignments = assignData as unknown as Array<{
+          id: string;
+          employee_id: string | null;
+          status: string | null;
+          assigned_at: string | null;
+          read_at: string | null;
+          signed_at: string | null;
+          employee: {
+            id: string | null;
+            full_name: string | null;
+            role: RamsJobRole | RamsJobRole[] | null;
+          } | null;
+        }>;
+
+        setAssignments(typedAssignments.map((assignment) => ({
           ...assignment,
           employee_id: assignment.employee_id ?? '',
           status: assignment.status ?? 'pending',
@@ -186,7 +201,7 @@ export default function RAMSDetailsPage() {
           employee: {
             id: assignment.employee?.id ?? assignment.employee_id ?? '',
             full_name: assignment.employee?.full_name ?? 'Unknown',
-            role: assignment.employee?.role ?? '',
+            role: assignmentRoleLabel(assignment.employee?.role),
           },
         })));
       }

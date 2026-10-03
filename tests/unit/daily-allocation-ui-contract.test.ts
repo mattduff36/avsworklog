@@ -79,7 +79,10 @@ describe('DA2-UI-001 manager board contract', () => {
 
     expect(board).toContain("surface === 'session'");
     expect(board).toContain('source.kind === \'visit\'');
-    expect(board).toMatch(/createVisitAt\(source\.job,\s*target\.workDate,\s*'full'/);
+    expect(board).toMatch(/createVisitAt\(\s*source\.job,\s*target\.workDate,\s*'full'/);
+    expect(board).toContain('planJobDropAssignment');
+    expect(board).toContain('rollbackOnHardConflict');
+    expect(board).toContain("error.code === 'HARD_CONFLICT'");
     expect(board).toContain('mutations.moveVisit.mutateAsync');
     expect(board).toContain('expected_source_plan_version');
     expect(board).toContain('expected_target_plan_version');
@@ -126,6 +129,10 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(sessionBoard).toContain("sessionVisits(visits, 'full')");
     expect(sessionBoard).toContain("style={{ gridColumn: 'span 2 / span 2' }}");
     expect(sessionBoard).toContain('RESIZE_DRAG_THRESHOLD_PX');
+    expect(sessionBoard).toContain('const pairedHighlight = amDrop.isDropTarget || pmDrop.isDropTarget');
+    expect(sessionBoard).toContain("leadingBorder={session === 'am'}");
+    expect(sessionBoard).toContain('role="columnheader" className="border-b border-l border-border');
+    expect(sessionBoard).toContain("!(bothHalvesEmpty && session === 'pm')");
 
     const visitCard = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/VisitCard.tsx'),
@@ -133,6 +140,16 @@ describe('DA2-UI-001 manager board contract', () => {
     );
     expect(visitCard).toContain('Resize to half or full day');
     expect(visitCard).not.toContain('dailyAllocationSessionLabel');
+
+    const dialogs = readFileSync(
+      resolve(process.cwd(), 'components/daily-allocation/board/AllocationDialogs.tsx'),
+      'utf8'
+    );
+    expect(dialogs).toContain('className={boardControlStyles.danger}');
+    expect(dialogs).toContain('className={boardControlStyles.primary}');
+    expect(dialogs).toContain('className={boardControlStyles.outline}');
+    expect(dialogs).toContain('Delete visit');
+    expect(dialogs).toContain('Confirm override');
 
     const timeline = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/DailyTimeline.tsx'),

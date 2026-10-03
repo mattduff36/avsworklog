@@ -91,20 +91,12 @@ function sessionVisits(visits: DailyAllocationVisit[], session: DailyAllocationS
   ) === session);
 }
 
-function SessionDrop({
-  profileId,
-  date,
-  session,
-  label,
-  children,
-}: {
-  profileId: string | null;
-  date: string;
-  session: DailyAllocationSession;
-  label: string;
-  children: ReactNode;
-}) {
-  const { ref, isDropTarget } = useDroppable({
+function useEmployeeSessionDrop(
+  profileId: string | null,
+  date: string,
+  session: DailyAllocationSession,
+) {
+  return useDroppable({
     id: `session:${profileId || 'unassigned'}:${date}:${session}`,
     type: DAILY_ALLOCATION_DND.timeline,
     accept: [DAILY_ALLOCATION_DND.job, DAILY_ALLOCATION_DND.visit, DAILY_ALLOCATION_DND.plant],
@@ -117,15 +109,37 @@ function SessionDrop({
       },
     },
   });
+}
+
+function SessionDrop({
+  dropRef,
+  profileId,
+  date,
+  session,
+  label,
+  highlighted,
+  leadingBorder,
+  children,
+}: {
+  dropRef: (element: Element | null) => void;
+  profileId: string | null;
+  date: string;
+  session: DailyAllocationSession;
+  label: string;
+  highlighted: boolean;
+  leadingBorder: boolean;
+  children: ReactNode;
+}) {
   return (
     <div
-      ref={ref}
+      ref={dropRef}
       role="gridcell"
       aria-label={label}
       data-testid={`daily-allocation-session-${profileId || 'unassigned'}-${date}-${session}`}
       className={cn(
-        'min-h-28 space-y-2 border-l border-border bg-slate-950/50 p-2',
-        isDropTarget && 'bg-[hsl(var(--daily-allocation-primary)/0.12)]'
+        'min-h-28 space-y-2 bg-slate-950/50 p-2',
+        leadingBorder && 'border-l border-border',
+        highlighted && 'bg-[hsl(var(--daily-allocation-primary)/0.12)]',
       )}
     >
       {children}
@@ -283,6 +297,113 @@ function EmployeeRail({
   );
 }
 
+function EmployeeDaySessions({
+  board,
+  row,
+  workDate,
+  selectedVisitId,
+  labourNames,
+  plantLabels,
+  persistenceLabel,
+  onSelectVisit,
+  onEditVisit,
+  onDeleteVisit,
+  onAssignVisit,
+  onMoveVisit,
+  onSetSession,
+}: {
+  board: DailyAllocationRangeBoardPayload;
+  row: DailyAllocationBoardRow;
+  workDate: string;
+  selectedVisitId: string | null;
+  labourNames: (visitId: string) => string[];
+  plantLabels: (visitId: string) => string[];
+  persistenceLabel?: (visitId: string) => string | null;
+  onSelectVisit: (visit: DailyAllocationVisit) => void;
+  onEditVisit: (visit: DailyAllocationVisit) => void;
+  onDeleteVisit: (visit: DailyAllocationVisit) => void;
+  onAssignVisit: (visit: DailyAllocationVisit) => void;
+  onMoveVisit: (visit: DailyAllocationVisit) => void;
+  onSetSession: (
+    visit: DailyAllocationVisit,
+    session: DailyAllocationSession,
+    profileId?: string | null,
+  ) => void;
+}) {
+  const visits = row.visitsByDate[workDate] || [];
+  const fullVisits = sessionVisits(visits, 'full');
+  const profileId = row.employee?.profile_id || null;
+  const amDrop = useEmployeeSessionDrop(profileId, workDate, 'am');
+  const pmDrop = useEmployeeSessionDrop(profileId, workDate, 'pm');
+  const pairedHighlight = amDrop.isDropTarget || pmDrop.isDropTarget;
+  const drops = { am: amDrop, pm: pmDrop };
+  const bothHalvesEmpty = HALF_DAY_SESSIONS.every((session) => sessionVisits(visits, session).length === 0);
+  const visitProps = {
+    board,
+    row,
+    date: workDate,
+    selectedVisitId,
+    labourNames,
+    plantLabels,
+    persistenceLabel,
+    onSelectVisit,
+    onEditVisit,
+    onDeleteVisit,
+    onAssignVisit,
+    onMoveVisit,
+    onSetSession,
+  };
+
+  return (
+    <div
+      role="presentation"
+      className="grid grid-cols-2"
+      style={{ gridColumn: 'span 2 / span 2' }}
+      data-session-pair={pairedHighlight ? 'active' : 'idle'}
+    >
+      {HALF_DAY_SESSIONS.map((session) => {
+        const halfDayVisits = sessionVisits(visits, session);
+        const showDropPrompt = halfDayVisits.length === 0
+          && fullVisits.length === 0
+          && Boolean(profileId)
+          && !(bothHalvesEmpty && session === 'pm');
+        return (
+          <SessionDrop
+            key={`${row.id}:${workDate}:${session}`}
+            dropRef={drops[session].ref}
+            profileId={profileId}
+            date={workDate}
+            session={session}
+            label={`${row.label}, ${workDate}, ${dailyAllocationSessionLabel(session)}`}
+            highlighted={pairedHighlight}
+            leadingBorder={session === 'am'}
+          >
+            {halfDayVisits.map((visit) => (
+              <SessionVisit key={visit.id} {...visitProps} visit={visit} />
+            ))}
+            {showDropPrompt ? (
+              <p className="text-[11px] text-muted-foreground">Drop a job</p>
+            ) : null}
+          </SessionDrop>
+        );
+      })}
+      {fullVisits.length > 0 ? (
+        <div
+          role="gridcell"
+          aria-label={`${row.label}, ${workDate}, full day`}
+          className="pointer-events-none col-span-2 col-start-1 row-start-1 z-[1] min-h-28 space-y-2 p-2"
+        >
+          {fullVisits.map((visit) => (
+            <div key={visit.id} className="pointer-events-auto">
+              <SessionVisit {...visitProps} visit={visit} />
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SessionBoard({
   board,
   view,
@@ -342,83 +463,24 @@ export function SessionBoard({
         ) : rows.map((row) => (
           <div key={row.id} role="row" className="contents" data-testid={getDailyAllocationBoardRowTestId(row)}>
             <EmployeeRail row={row} board={board} date={date} />
-            {visibleDates.map((workDate) => {
-              const visits = row.visitsByDate[workDate] || [];
-              const fullVisits = sessionVisits(visits, 'full');
-              const profileId = row.employee?.profile_id || null;
-              return (
-                <div
-                  key={`${row.id}:${workDate}`}
-                  role="presentation"
-                  className="grid grid-cols-2"
-                  style={{ gridColumn: 'span 2 / span 2' }}
-                >
-                  {HALF_DAY_SESSIONS.map((session) => {
-                    const halfDayVisits = sessionVisits(visits, session);
-                    return (
-                      <SessionDrop
-                        key={`${row.id}:${workDate}:${session}`}
-                        profileId={profileId}
-                        date={workDate}
-                        session={session}
-                        label={`${row.label}, ${workDate}, ${dailyAllocationSessionLabel(session)}`}
-                      >
-                        {halfDayVisits.map((visit) => (
-                          <SessionVisit
-                            key={visit.id}
-                            board={board}
-                            row={row}
-                            visit={visit}
-                            date={workDate}
-                            selectedVisitId={selectedVisitId}
-                            labourNames={labourNames}
-                            plantLabels={plantLabels}
-                            persistenceLabel={persistenceLabel}
-                            onSelectVisit={onSelectVisit}
-                            onEditVisit={onEditVisit}
-                            onDeleteVisit={onDeleteVisit}
-                            onAssignVisit={onAssignVisit}
-                            onMoveVisit={onMoveVisit}
-                            onSetSession={onSetSession}
-                          />
-                        ))}
-                        {halfDayVisits.length === 0 && fullVisits.length === 0 && profileId ? (
-                          <p className="text-[11px] text-muted-foreground">Drop a job</p>
-                        ) : null}
-                      </SessionDrop>
-                    );
-                  })}
-                  {fullVisits.length > 0 ? (
-                    <div
-                      role="gridcell"
-                      aria-label={`${row.label}, ${workDate}, full day`}
-                      className="pointer-events-none col-span-2 col-start-1 row-start-1 z-[1] min-h-28 space-y-2 p-2"
-                    >
-                      {fullVisits.map((visit) => (
-                        <div key={visit.id} className="pointer-events-auto">
-                          <SessionVisit
-                            board={board}
-                            row={row}
-                            visit={visit}
-                            date={workDate}
-                            selectedVisitId={selectedVisitId}
-                            labourNames={labourNames}
-                            plantLabels={plantLabels}
-                            persistenceLabel={persistenceLabel}
-                            onSelectVisit={onSelectVisit}
-                            onEditVisit={onEditVisit}
-                            onDeleteVisit={onDeleteVisit}
-                            onAssignVisit={onAssignVisit}
-                            onMoveVisit={onMoveVisit}
-                            onSetSession={onSetSession}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              );
-            })}
+            {visibleDates.map((workDate) => (
+              <EmployeeDaySessions
+                key={`${row.id}:${workDate}`}
+                board={board}
+                row={row}
+                workDate={workDate}
+                selectedVisitId={selectedVisitId}
+                labourNames={labourNames}
+                plantLabels={plantLabels}
+                persistenceLabel={persistenceLabel}
+                onSelectVisit={onSelectVisit}
+                onEditVisit={onEditVisit}
+                onDeleteVisit={onDeleteVisit}
+                onAssignVisit={onAssignVisit}
+                onMoveVisit={onMoveVisit}
+                onSetSession={onSetSession}
+              />
+            ))}
           </div>
         ))}
       </div>

@@ -670,6 +670,40 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     await expect(page.getByTestId('daily-allocation-board-status')).toHaveText('Visit moved.');
   });
 
+  test('treats AM and PM as one drop target while a job is dragged', async ({ page }) => {
+    const evidence = await openManagerBoard(page);
+    const bobAm = page.getByTestId(`daily-allocation-session-employee-bob-${WORK_DATE}-am`);
+    const bobPm = page.getByTestId(`daily-allocation-session-employee-bob-${WORK_DATE}-pm`);
+    const borderLeft = (locator: ReturnType<Page['getByTestId']>) => locator.evaluate((element) => getComputedStyle(element).borderLeftWidth);
+    expect(await borderLeft(bobAm)).not.toBe('0px');
+    expect(await borderLeft(bobPm)).toBe('0px');
+    expect(await page.getByRole('columnheader', { name: 'AM', exact: true }).evaluate((element) => getComputedStyle(element).borderLeftWidth)).not.toBe('0px');
+    expect(await page.getByRole('columnheader', { name: 'PM', exact: true }).evaluate((element) => getComputedStyle(element).borderLeftWidth)).not.toBe('0px');
+    await expect(bobAm).toContainText('Drop a job');
+    await expect(bobPm).not.toContainText('Drop a job');
+
+    const idleBackground = await page.getByTestId(`daily-allocation-session-employee-charlie-${WORK_DATE}-am`).evaluate((element) => getComputedStyle(element).backgroundColor);
+    const handle = page.getByTestId('daily-allocation-resource-drag-handle-job-quote-200');
+    const handleBox = await handle.boundingBox();
+    const bobPmBox = await bobPm.boundingBox();
+    expect(handleBox).toBeTruthy();
+    expect(bobPmBox).toBeTruthy();
+    await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(handleBox!.x + handleBox!.width / 2 + 24, handleBox!.y + handleBox!.height / 2, { steps: 4 });
+    await page.mouse.move(bobPmBox!.x + bobPmBox!.width / 2, bobPmBox!.y + 24, { steps: 8 });
+    await expect.poll(async () => {
+      const [amBackground, pmBackground] = await Promise.all([
+        bobAm.evaluate((element) => getComputedStyle(element).backgroundColor),
+        bobPm.evaluate((element) => getComputedStyle(element).backgroundColor),
+      ]);
+      return amBackground === pmBackground && amBackground !== idleBackground;
+    }).toBe(true);
+    await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2, { steps: 8 });
+    await page.mouse.up();
+    expect(evidence.visitUpdates).toHaveLength(0);
+  });
+
   test('supports select-to-assign fallback, employee instruction overrides, and publication confirmation', async ({ page }) => {
     const evidence = await openManagerBoard(page);
 
