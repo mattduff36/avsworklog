@@ -13,13 +13,7 @@ import { DAILY_ALLOCATION_DND } from '@/components/daily-allocation/board/board-
 import { cn } from '@/lib/utils/cn';
 import {
   formatDailyAllocationVisitTime,
-  getDailyAllocationTimeMinutes,
 } from '@/lib/utils/daily-allocation-timeline';
-import {
-  classifyDailyAllocationSession,
-  dailyAllocationSessionLabel,
-  type DailyAllocationSession,
-} from '@/lib/utils/daily-allocation-sessions';
 import type {
   DailyAllocationBoardConflict,
   DailyAllocationLabourAssignment,
@@ -44,9 +38,9 @@ export interface VisitCardProps {
   onEdit: () => void;
   onDelete: () => void;
   onAssign: () => void;
-  onSetSession?: (session: DailyAllocationSession) => void;
   sourceProfileId?: string | null;
   persistenceLabel?: string | null;
+  resizeEdges?: readonly ('start' | 'end')[];
   onResizePointerDown?: (edge: 'start' | 'end', event: ReactPointerEvent<HTMLButtonElement>) => void;
   onResizeKeyDown?: (edge: 'start' | 'end', event: ReactKeyboardEvent<HTMLButtonElement>) => void;
 }
@@ -68,9 +62,9 @@ export function VisitCard({
   onEdit,
   onDelete,
   onAssign,
-  onSetSession,
   sourceProfileId = null,
   persistenceLabel,
+  resizeEdges = ['start', 'end'],
   onResizePointerDown,
   onResizeKeyDown,
 }: VisitCardProps) {
@@ -111,7 +105,7 @@ export function VisitCard({
               ? 'border-amber-400'
               : 'border-sky-700/70',
         isDragging && 'opacity-60',
-        compact && 'static'
+        compact && 'relative'
       )}
     >
       <button
@@ -150,33 +144,6 @@ export function VisitCard({
           ))}
         </span>
       </button>
-      {onSetSession ? (
-        <div className="mt-1 flex gap-1">
-          {(['full', 'am', 'pm'] as const).map((session) => {
-            const active = classifyDailyAllocationSession(
-              getDailyAllocationTimeMinutes(visit.starts_at),
-              getDailyAllocationTimeMinutes(visit.ends_at),
-            ) === session;
-            return (
-              <button
-                key={session}
-                type="button"
-                aria-pressed={active}
-                className={cn(
-                  'rounded px-1.5 py-0.5 text-[10px] font-semibold',
-                  active ? 'bg-white text-slate-950' : 'bg-white/10 text-white',
-                )}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSetSession(session);
-                }}
-              >
-                {dailyAllocationSessionLabel(session)}
-              </button>
-            );
-          })}
-        </div>
-      ) : null}
       <div className="flex items-center justify-end gap-1 px-1 pb-1">
         <Button
           type="button"
@@ -221,30 +188,34 @@ export function VisitCard({
       </div>
       {onResizePointerDown || onResizeKeyDown ? (
         <>
-          <button
-            type="button"
-            aria-label={`Adjust start of ${visit.job_code}, currently ${formatDailyAllocationVisitTime(visit.starts_at)}. Use Left and Right arrow keys in 30 minute steps.`}
-            title="Adjust start in 30-minute steps"
-            className="absolute inset-y-1 left-0 z-10 w-3 touch-none cursor-ew-resize rounded-l-md bg-transparent focus-visible:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300 [@media(pointer:coarse)]:w-11"
-            onPointerDown={(event) => onResizePointerDown?.('start', event)}
-            onKeyDown={(event) => onResizeKeyDown?.('start', event)}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-          />
-          <button
-            type="button"
-            aria-label={`Adjust end of ${visit.job_code}, currently ${formatDailyAllocationVisitTime(visit.ends_at)}. Use Left and Right arrow keys in 30 minute steps.`}
-            title="Adjust end in 30-minute steps"
-            className="absolute inset-y-1 right-0 z-10 w-3 touch-none cursor-ew-resize rounded-r-md bg-transparent focus-visible:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300 [@media(pointer:coarse)]:w-11"
-            onPointerDown={(event) => onResizePointerDown?.('end', event)}
-            onKeyDown={(event) => onResizeKeyDown?.('end', event)}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-          />
+          {resizeEdges.includes('start') ? (
+            <button
+              type="button"
+              aria-label={`Adjust start of ${visit.job_code}, currently ${formatDailyAllocationVisitTime(visit.starts_at)}. Drag or use Left and Right arrow keys to switch between half and full day.`}
+              title="Resize to half or full day"
+              className="absolute inset-y-1 left-0 z-10 w-3 touch-none cursor-ew-resize rounded-l-md bg-transparent focus-visible:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300 [@media(pointer:coarse)]:w-11"
+              onPointerDown={(event) => onResizePointerDown?.('start', event)}
+              onKeyDown={(event) => onResizeKeyDown?.('start', event)}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            />
+          ) : null}
+          {resizeEdges.includes('end') ? (
+            <button
+              type="button"
+              aria-label={`Adjust end of ${visit.job_code}, currently ${formatDailyAllocationVisitTime(visit.ends_at)}. Drag or use Left and Right arrow keys to switch between half and full day.`}
+              title="Resize to half or full day"
+              className="absolute inset-y-1 right-0 z-10 w-3 touch-none cursor-ew-resize rounded-r-md bg-transparent focus-visible:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-300 [@media(pointer:coarse)]:w-11"
+              onPointerDown={(event) => onResizePointerDown?.('end', event)}
+              onKeyDown={(event) => onResizeKeyDown?.('end', event)}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+              }}
+            />
+          ) : null}
         </>
       ) : null}
       <span className="sr-only">

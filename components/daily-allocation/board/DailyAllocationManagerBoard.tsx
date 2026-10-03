@@ -1053,14 +1053,18 @@ export function DailyAllocationManagerBoard({
     if (!source || !target || !fullBoard) return;
 
     if (source.kind === 'job' && target.surface === 'session' && target.workDate && target.session && target.profileId) {
-      createVisitAt(source.job, target.workDate, target.session, target.profileId);
+      createVisitAt(source.job, target.workDate, 'full', target.profileId);
       return;
     }
     if (source.kind === 'visit' && target.surface === 'session' && target.workDate && target.session) {
+      const currentSession = classifyDailyAllocationVisitSession(
+        source.visit.starts_at,
+        source.visit.ends_at,
+      );
       void moveVisit(
         source.visit,
         target.workDate,
-        target.session,
+        currentSession === 'full' ? 'full' : target.session,
         target.profileId,
         source.profileId,
       );

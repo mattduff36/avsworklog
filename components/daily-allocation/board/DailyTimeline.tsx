@@ -32,7 +32,6 @@ import {
   getDailyAllocationTimelineRange,
   toDailyAllocationLondonIsoFromMinutes,
 } from '@/lib/utils/daily-allocation-timeline';
-import { dailyAllocationSessionWindow } from '@/lib/utils/daily-allocation-sessions';
 import type { DailyAllocationRangeBoardPayload, DailyAllocationVisit } from '@/types/daily-allocation';
 import type { DailyAllocationBoardPrimary } from '@/lib/config/daily-allocation-primary-preference';
 import type { DailyAllocationTimelineMode } from '@/components/daily-allocation/board/JobsPanel';
@@ -547,14 +546,6 @@ export function DailyTimeline({
                     onEdit={() => onEditVisit(visit)}
                     onDelete={() => onDeleteVisit(visit)}
                     onAssign={() => onAssignVisit(visit)}
-                    onSetSession={(session) => {
-                      const window = dailyAllocationSessionWindow(session);
-                      onResizeVisit(
-                        visit,
-                        toDailyAllocationLondonIsoFromMinutes(date, window.startMinutes),
-                        toDailyAllocationLondonIsoFromMinutes(date, window.endMinutes),
-                      );
-                    }}
                     onResizePointerDown={(edge, event) => handleResizePointerDown(visit, edge, event)}
                     onResizeKeyDown={(edge, event) => resizeByKeyboard(visit, edge, event)}
                   />

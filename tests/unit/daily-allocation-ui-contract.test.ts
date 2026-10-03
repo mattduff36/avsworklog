@@ -79,6 +79,7 @@ describe('DA2-UI-001 manager board contract', () => {
 
     expect(board).toContain("surface === 'session'");
     expect(board).toContain('source.kind === \'visit\'');
+    expect(board).toMatch(/createVisitAt\(source\.job,\s*target\.workDate,\s*'full'/);
     expect(board).toContain('mutations.moveVisit.mutateAsync');
     expect(board).toContain('expected_source_plan_version');
     expect(board).toContain('expected_target_plan_version');
@@ -116,6 +117,22 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(jobsPanel).toContain('daily-allocation-jobs-panel');
     expect(jobsPanel).not.toContain('Search jobs');
     expect(jobsPanel).not.toContain('daily-allocation-view-heading');
+
+    const sessionBoard = readFileSync(
+      resolve(process.cwd(), 'components/daily-allocation/board/SessionBoard.tsx'),
+      'utf8'
+    );
+    expect(sessionBoard).toContain("const HALF_DAY_SESSIONS = ['am', 'pm']");
+    expect(sessionBoard).toContain("sessionVisits(visits, 'full')");
+    expect(sessionBoard).toContain("style={{ gridColumn: 'span 2 / span 2' }}");
+    expect(sessionBoard).toContain('RESIZE_DRAG_THRESHOLD_PX');
+
+    const visitCard = readFileSync(
+      resolve(process.cwd(), 'components/daily-allocation/board/VisitCard.tsx'),
+      'utf8'
+    );
+    expect(visitCard).toContain('Resize to half or full day');
+    expect(visitCard).not.toContain('dailyAllocationSessionLabel');
 
     const timeline = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/DailyTimeline.tsx'),

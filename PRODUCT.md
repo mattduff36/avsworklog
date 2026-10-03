@@ -36,7 +36,7 @@ Daily Allocation is an AVS publishing and compliance workflow, not a generic sch
 
 Confirmed Daily Allocation facts (workstream `DA2-7F3C`):
 
-- Deliver Daily and Weekly manager views with employee rows and Full, AM, and PM session targets. Jobs and Plant stay sidebar resources. Availability warnings and keyboard-accessible alternatives are required. Touch support is required. There is no Jobs/Employees/Plant board-axis switch, minute timeline, resize handle, or arbitrary start/end editor.
+- Deliver Daily and Weekly manager views with employee rows and AM/PM columns. A newly dropped job defaults to Full and its card spans both columns; managers resize either edge between Full and the relevant half day. Jobs and Plant stay sidebar resources. Availability warnings and keyboard-accessible alternatives are required. Touch support is required. There is no Jobs/Employees/Plant board-axis switch, minute timeline, arbitrary-duration resize, or arbitrary start/end editor.
 - Preserve immutable publish/revision history, per-visit defaults plus per-employee instruction overrides, employee self-view, exactly one allocation or absence itinerary message per scoped employee per publication, plant reconciliation, job sheets, and current job-catalogue identity.
 - Canonical jobs must not be duplicated into a Daily Allocation job table.
 - Visit storage stays `starts_at`/`ends_at` `TIMESTAMPTZ`, same London date, half-open `[start,end)`, `end > start`. New and moved draft visits use only Full `07:00–16:30`, AM `07:00–12:00`, or PM `12:00–16:30` Europe/London. Do not add a session enum column. Published custom intervals stay readable as exact times. Editable custom intervals are normalized only through an explicit preview.

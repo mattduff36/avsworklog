@@ -1,6 +1,10 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+  ReactNode,
+} from 'react';
 import { format, parseISO } from 'date-fns';
 import { useDroppable } from '@dnd-kit/react';
 import { DAILY_ALLOCATION_DND } from '@/components/daily-allocation/board/board-dnd';
@@ -29,7 +33,33 @@ import {
 import type { DailyAllocationBoardView } from '@/lib/config/daily-allocation-view-preference';
 import type { DailyAllocationRangeBoardPayload, DailyAllocationVisit } from '@/types/daily-allocation';
 
-const SESSIONS: DailyAllocationSession[] = ['full', 'am', 'pm'];
+const HALF_DAY_SESSIONS = ['am', 'pm'] as const;
+const RESIZE_DRAG_THRESHOLD_PX = 24;
+
+function resizedSession(
+  session: DailyAllocationSession,
+  edge: 'start' | 'end',
+  deltaX: number,
+): DailyAllocationSession | null {
+  if (Math.abs(deltaX) < RESIZE_DRAG_THRESHOLD_PX) return null;
+  if (session === 'full' && edge === 'start' && deltaX > 0) return 'pm';
+  if (session === 'full' && edge === 'end' && deltaX < 0) return 'am';
+  if (session === 'am' && edge === 'end' && deltaX > 0) return 'full';
+  if (session === 'pm' && edge === 'start' && deltaX < 0) return 'full';
+  return null;
+}
+
+function keyboardResizedSession(
+  session: DailyAllocationSession,
+  edge: 'start' | 'end',
+  key: string,
+): DailyAllocationSession | null {
+  if (session === 'full' && edge === 'start' && key === 'ArrowRight') return 'pm';
+  if (session === 'full' && edge === 'end' && key === 'ArrowLeft') return 'am';
+  if (session === 'am' && edge === 'end' && key === 'ArrowRight') return 'full';
+  if (session === 'pm' && edge === 'start' && key === 'ArrowLeft') return 'full';
+  return null;
+}
 
 interface SessionBoardProps {
   board: DailyAllocationRangeBoardPayload;
@@ -138,6 +168,61 @@ function SessionVisit({
     profileId?: string | null,
   ) => void;
 }) {
+  const currentSession = classifyDailyAllocationSession(
+    getDailyAllocationTimeMinutes(visit.starts_at),
+    getDailyAllocationTimeMinutes(visit.ends_at),
+  );
+  const resizeEdges = currentSession === 'full'
+    ? (['start', 'end'] as const)
+    : currentSession === 'am'
+      ? (['end'] as const)
+      : currentSession === 'pm'
+        ? (['start'] as const)
+        : [];
+
+  function handleResizePointerDown(
+    edge: 'start' | 'end',
+    event: ReactPointerEvent<HTMLButtonElement>,
+  ) {
+    if (!currentSession) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const startX = event.clientX;
+    const pointerId = event.pointerId;
+
+    const cleanup = () => {
+      window.removeEventListener('pointerup', finish);
+      window.removeEventListener('pointercancel', cancel);
+    };
+    const finish = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      cleanup();
+      const nextSession = resizedSession(currentSession, edge, pointerEvent.clientX - startX);
+      if (nextSession) {
+        onSetSession(visit, nextSession, row.employee?.profile_id ?? null);
+      }
+    };
+    const cancel = (pointerEvent: PointerEvent) => {
+      if (pointerEvent.pointerId !== pointerId) return;
+      cleanup();
+    };
+
+    window.addEventListener('pointerup', finish);
+    window.addEventListener('pointercancel', cancel);
+  }
+
+  function handleResizeKeyDown(
+    edge: 'start' | 'end',
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+  ) {
+    if (!currentSession) return;
+    const nextSession = keyboardResizedSession(currentSession, edge, event.key);
+    if (!nextSession) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSetSession(visit, nextSession, row.employee?.profile_id ?? null);
+  }
+
   return (
     <VisitCard
       visit={visit}
@@ -157,7 +242,9 @@ function SessionVisit({
       onEdit={() => onEditVisit(visit)}
       onDelete={() => onDeleteVisit(visit)}
       onAssign={() => onAssignVisit(visit)}
-      onSetSession={(session) => onSetSession(visit, session, row.employee?.profile_id ?? null)}
+      resizeEdges={resizeEdges}
+      onResizePointerDown={currentSession ? handleResizePointerDown : undefined}
+      onResizeKeyDown={currentSession ? handleResizeKeyDown : undefined}
     />
   );
 }
@@ -216,8 +303,13 @@ export function SessionBoard({
 }: SessionBoardProps) {
   const visibleDates = view === 'daily' ? [date] : dates;
   const columns = view === 'daily'
-    ? SESSIONS.map((session) => ({ key: session, label: dailyAllocationSessionLabel(session), date, session }))
-    : visibleDates.flatMap((workDate) => SESSIONS.map((session) => ({
+    ? HALF_DAY_SESSIONS.map((session) => ({
+        key: session,
+        label: dailyAllocationSessionLabel(session),
+        date,
+        session,
+      }))
+    : visibleDates.flatMap((workDate) => HALF_DAY_SESSIONS.map((session) => ({
         key: `${workDate}:${session}`,
         label: `${format(parseISO(workDate), 'EEE d')} ${dailyAllocationSessionLabel(session)}`,
         date: workDate,
@@ -250,40 +342,81 @@ export function SessionBoard({
         ) : rows.map((row) => (
           <div key={row.id} role="row" className="contents" data-testid={getDailyAllocationBoardRowTestId(row)}>
             <EmployeeRail row={row} board={board} date={date} />
-            {columns.map((column) => {
-              const dayVisits = sessionVisits(row.visitsByDate[column.date] || [], column.session);
+            {visibleDates.map((workDate) => {
+              const visits = row.visitsByDate[workDate] || [];
+              const fullVisits = sessionVisits(visits, 'full');
               const profileId = row.employee?.profile_id || null;
               return (
-                <SessionDrop
-                  key={`${row.id}:${column.key}`}
-                  profileId={profileId}
-                  date={column.date}
-                  session={column.session}
-                  label={`${row.label}, ${column.date}, ${dailyAllocationSessionLabel(column.session)}`}
+                <div
+                  key={`${row.id}:${workDate}`}
+                  role="presentation"
+                  className="grid grid-cols-2"
+                  style={{ gridColumn: 'span 2 / span 2' }}
                 >
-                  {dayVisits.map((visit) => (
-                    <SessionVisit
-                      key={visit.id}
-                      board={board}
-                      row={row}
-                      visit={visit}
-                      date={column.date}
-                      selectedVisitId={selectedVisitId}
-                      labourNames={labourNames}
-                      plantLabels={plantLabels}
-                      persistenceLabel={persistenceLabel}
-                      onSelectVisit={onSelectVisit}
-                      onEditVisit={onEditVisit}
-                      onDeleteVisit={onDeleteVisit}
-                      onAssignVisit={onAssignVisit}
-                      onMoveVisit={onMoveVisit}
-                      onSetSession={onSetSession}
-                    />
-                  ))}
-                  {dayVisits.length === 0 && profileId ? (
-                    <p className="text-[11px] text-muted-foreground">Drop a job</p>
+                  {HALF_DAY_SESSIONS.map((session) => {
+                    const halfDayVisits = sessionVisits(visits, session);
+                    return (
+                      <SessionDrop
+                        key={`${row.id}:${workDate}:${session}`}
+                        profileId={profileId}
+                        date={workDate}
+                        session={session}
+                        label={`${row.label}, ${workDate}, ${dailyAllocationSessionLabel(session)}`}
+                      >
+                        {halfDayVisits.map((visit) => (
+                          <SessionVisit
+                            key={visit.id}
+                            board={board}
+                            row={row}
+                            visit={visit}
+                            date={workDate}
+                            selectedVisitId={selectedVisitId}
+                            labourNames={labourNames}
+                            plantLabels={plantLabels}
+                            persistenceLabel={persistenceLabel}
+                            onSelectVisit={onSelectVisit}
+                            onEditVisit={onEditVisit}
+                            onDeleteVisit={onDeleteVisit}
+                            onAssignVisit={onAssignVisit}
+                            onMoveVisit={onMoveVisit}
+                            onSetSession={onSetSession}
+                          />
+                        ))}
+                        {halfDayVisits.length === 0 && fullVisits.length === 0 && profileId ? (
+                          <p className="text-[11px] text-muted-foreground">Drop a job</p>
+                        ) : null}
+                      </SessionDrop>
+                    );
+                  })}
+                  {fullVisits.length > 0 ? (
+                    <div
+                      role="gridcell"
+                      aria-label={`${row.label}, ${workDate}, full day`}
+                      className="pointer-events-none col-span-2 col-start-1 row-start-1 z-[1] min-h-28 space-y-2 p-2"
+                    >
+                      {fullVisits.map((visit) => (
+                        <div key={visit.id} className="pointer-events-auto">
+                          <SessionVisit
+                            board={board}
+                            row={row}
+                            visit={visit}
+                            date={workDate}
+                            selectedVisitId={selectedVisitId}
+                            labourNames={labourNames}
+                            plantLabels={plantLabels}
+                            persistenceLabel={persistenceLabel}
+                            onSelectVisit={onSelectVisit}
+                            onEditVisit={onEditVisit}
+                            onDeleteVisit={onDeleteVisit}
+                            onAssignVisit={onAssignVisit}
+                            onMoveVisit={onMoveVisit}
+                            onSetSession={onSetSession}
+                          />
+                        </div>
+                      ))}
+                    </div>
                   ) : null}
-                </SessionDrop>
+                </div>
               );
             })}
           </div>

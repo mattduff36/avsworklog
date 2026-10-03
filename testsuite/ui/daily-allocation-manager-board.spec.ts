@@ -100,8 +100,8 @@ function createBoard(mode: MockMode): DailyAllocationRangeBoardPayload {
     job_source_id: jobOne.source_id,
     job_code: jobOne.job_code,
     site_address: jobOne.site_address,
-    starts_at: londonIso(8 * 60),
-    ends_at: londonIso(11 * 60),
+    starts_at: londonIso(7 * 60),
+    ends_at: londonIso(16 * 60 + 30),
     meeting_point: 'Site office',
     meet_person: 'Casey',
     notes: 'Bring permit pack',
@@ -634,10 +634,36 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     await expect(visitTwo).toBeVisible();
   });
 
-  test('moves a visit to the morning session from the card', async ({ page }) => {
+  test('shows two half-day columns and resizes a full-day card to the morning', async ({ page }) => {
     const evidence = await openManagerBoard(page);
     await expect(page.getByRole('heading', { name: 'Daily employee board', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'AM' }).first().click();
+    await expect(page.getByRole('columnheader', { name: 'AM', exact: true })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'PM', exact: true })).toBeVisible();
+    await expect(page.getByRole('columnheader', { name: 'Full day', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Full day', exact: true })).toHaveCount(0);
+
+    const visit = page.getByTestId('daily-allocation-visit-visit-1');
+    const amCell = page.getByTestId(`daily-allocation-session-employee-alice-${WORK_DATE}-am`);
+    const pmCell = page.getByTestId(`daily-allocation-session-employee-alice-${WORK_DATE}-pm`);
+    const [visitBox, amBox, pmBox] = await Promise.all([
+      visit.boundingBox(),
+      amCell.boundingBox(),
+      pmCell.boundingBox(),
+    ]);
+    expect(visitBox).toBeTruthy();
+    expect(amBox).toBeTruthy();
+    expect(pmBox).toBeTruthy();
+    expect(visitBox!.width).toBeGreaterThan(amBox!.width);
+    expect(visitBox!.x).toBeLessThan(pmBox!.x);
+    expect(visitBox!.x + visitBox!.width).toBeGreaterThan(pmBox!.x + pmBox!.width - 12);
+
+    const resizeEnd = page.getByRole('button', { name: /Adjust end of JOB-100/ });
+    const resizeBox = await resizeEnd.boundingBox();
+    expect(resizeBox).toBeTruthy();
+    await page.mouse.move(resizeBox!.x + resizeBox!.width / 2, resizeBox!.y + resizeBox!.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(resizeBox!.x - 48, resizeBox!.y + resizeBox!.height / 2);
+    await page.mouse.up();
     await expect.poll(() => evidence.visitUpdates.length).toBe(1);
     expect(evidence.visitUpdates[0].starts_at).toBe(londonIso(7 * 60));
     expect(evidence.visitUpdates[0].ends_at).toBe(londonIso(12 * 60));
