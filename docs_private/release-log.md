@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.7.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update daily allocation`
+
+**PUSHED AT**
+2026-10-04T00:47:53.522Z
+
+**WHAT CHANGED**
+Update daily allocation.
+
+**VERSION HISTORY DETAILS**
+- Updated daily allocation, with changes to interface components and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update daily allocation`
+
 ## 1026.6.0
 
 **GIT COMMIT MESSAGE**
