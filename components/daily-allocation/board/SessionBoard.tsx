@@ -137,7 +137,7 @@ function SessionDrop({
       aria-label={label}
       data-testid={`daily-allocation-session-${profileId || 'unassigned'}-${date}-${session}`}
       className={cn(
-        'min-h-28 space-y-2 bg-slate-950/50 p-2',
+        'row-start-1 min-h-28 space-y-2 bg-slate-950/50 p-2',
         leadingBorder && 'border-l border-border',
         highlighted && 'bg-[hsl(var(--daily-allocation-primary)/0.12)]',
       )}

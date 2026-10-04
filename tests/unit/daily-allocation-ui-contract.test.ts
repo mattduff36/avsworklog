@@ -138,9 +138,11 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(sessionBoard).toContain("leadingBorder={session === 'am'}");
     expect(sessionBoard).toContain('role="columnheader" className="border-b border-l border-border');
     expect(sessionBoard).toContain("!(bothHalvesEmpty && session === 'pm')");
-    expect(sessionBoard).toContain("'min-h-28 space-y-2 bg-slate-950/50 p-2'");
+    expect(sessionBoard).toContain("'row-start-1 min-h-28 space-y-2 bg-slate-950/50 p-2'");
     expect(sessionBoard).toContain('className="pointer-events-none col-span-2 col-start-1 row-start-1 z-[1] space-y-2 p-2"');
     expect(sessionBoard).not.toContain('row-start-1 z-[1] min-h-28');
+    expect(sessionBoard).not.toContain('agent log');
+    expect(sessionBoard).not.toContain('debug-63c139');
 
     const visitCard = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/VisitCard.tsx'),
