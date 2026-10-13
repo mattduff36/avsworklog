@@ -11,7 +11,7 @@ import { ModuleBetaBadge } from '@/components/ui/module-beta-badge';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogScrollArea, DialogTitle, dialogContentViewportClassName } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { SearchInput } from '@/components/ui/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -487,14 +487,16 @@ export function ExternalDocumentsWorkspace({
       )}
 
       <Dialog open={canManage && createOpen} onOpenChange={(open) => { if (!saving) setCreateOpen(open); }}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto" mobileKeyboardSafe>
-          <DialogHeader>
+        <DialogContent className={dialogContentViewportClassName({ size: '4xl', scroll: 'content', className: 'border-border text-white' })} mobileKeyboardSafe>
+          <DialogHeader className="shrink-0">
             <DialogTitle>Add document</DialogTitle>
             <DialogDescription>Combine the files into one PDF and save the details with it.</DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={saveCreate}>
-            <DocumentEditor mode="create" draft={createDraft} onDraftChange={setCreateDraft} options={options} optionsLoading={optionsLoading} optionsError={optionsError} canManageSharing={canManage} disabled={saving} formError={createError} />
-            <DialogFooter>
+          <form className="flex min-h-0 flex-1 flex-col" onSubmit={saveCreate}>
+            <DialogScrollArea className="pr-1">
+              <DocumentEditor mode="create" draft={createDraft} onDraftChange={setCreateDraft} options={options} optionsLoading={optionsLoading} optionsError={optionsError} canManageSharing={canManage} disabled={saving} formError={createError} />
+            </DialogScrollArea>
+            <DialogFooter className="shrink-0 border-t border-border pt-4">
               <Button type="button" variant="outline" disabled={saving} onClick={() => setCreateOpen(false)}>Cancel</Button>
               <Button type="submit" className="bg-external-documents text-white hover:bg-external-documents-dark" disabled={saving}>{saving ? 'Saving…' : 'Save document'}</Button>
             </DialogFooter>
@@ -536,15 +538,17 @@ export function ExternalDocumentsWorkspace({
       </Dialog>
 
       <Dialog open={canManage && Boolean(editDraft)} onOpenChange={(open) => { if (!open && !saving) setEditDraft(null); }}>
-        <DialogContent className="max-h-[calc(100dvh-1rem)] w-[calc(100vw-1rem)] max-w-3xl overflow-y-auto" mobileKeyboardSafe>
-          <DialogHeader>
+        <DialogContent className={dialogContentViewportClassName({ size: '4xl', scroll: 'content', className: 'border-border text-white' })} mobileKeyboardSafe>
+          <DialogHeader className="shrink-0">
             <DialogTitle>Edit document</DialogTitle>
             <DialogDescription>Update the details, asset link, or who can read this document.</DialogDescription>
           </DialogHeader>
           {editDraft ? (
-            <form className="space-y-4" onSubmit={saveEdit}>
-              <DocumentEditor mode="edit" draft={editDraft} onDraftChange={setEditDraft} options={options} optionsLoading={optionsLoading} optionsError={optionsError} canManageSharing={canManage} disabled={saving} formError={editError} />
-              <DialogFooter>
+            <form className="flex min-h-0 flex-1 flex-col" onSubmit={saveEdit}>
+              <DialogScrollArea className="pr-1">
+                <DocumentEditor mode="edit" draft={editDraft} onDraftChange={setEditDraft} options={options} optionsLoading={optionsLoading} optionsError={optionsError} canManageSharing={canManage} disabled={saving} formError={editError} />
+              </DialogScrollArea>
+              <DialogFooter className="shrink-0 border-t border-border pt-4">
                 <Button type="button" variant="outline" disabled={saving} onClick={() => setEditDraft(null)}>Cancel</Button>
                 <Button type="submit" className="bg-external-documents text-white hover:bg-external-documents-dark" disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</Button>
               </DialogFooter>

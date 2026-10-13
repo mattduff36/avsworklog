@@ -94,7 +94,7 @@ describe('POST /api/quotes/[id]/invoices', () => {
     expect(mockFetchQuoteBundle).not.toHaveBeenCalled();
   });
 
-  it('rejects invoice amounts above the remaining balance', async () => {
+  it('keeps merged invoice amounts within the remaining balance', async () => {
     const { POST } = await import('@/app/api/quotes/[id]/invoices/route');
 
     mockFetchQuoteBundle.mockResolvedValue({
@@ -102,7 +102,9 @@ describe('POST /api/quotes/[id]/invoices', () => {
         id: 'quote-1',
         status: 'po_received',
         is_latest_version: true,
+        quote_thread_id: 'thread-1',
       },
+      mergeInfo: { survivor_quote_thread_id: 'thread-1', members: [{ quote_thread_id: 'thread-1' }] },
       lineItems: [],
       attachments: [],
       invoices: [],
@@ -134,6 +136,48 @@ describe('POST /api/quotes/[id]/invoices', () => {
     expect(payload.field_errors).toEqual({
       amount: 'This quote has £100.00 remaining.',
     });
+  });
+
+  it('records additional hire above the quoted total without revising the quote', async () => {
+    const { POST } = await import('@/app/api/quotes/[id]/invoices/route');
+    const existingInvoice = { id: 'old-invoice', amount: 1450 };
+    const extraInvoice = { id: 'extra-invoice', amount: 1220, invoice_number: '35304', invoice_date: '2026-09-30', comments: 'Additional hire', created_at: '2026-10-13T12:00:00Z' };
+    const insert = vi.fn(() => ({ select: () => ({ single: async () => ({ data: extraInvoice, error: null }) }) }));
+    const update = vi.fn((_updates: Record<string, unknown>) => ({ eq: async () => ({ error: null }) }));
+    const from = vi.fn((table: string) => {
+      if (table === 'quote_invoices') return { insert };
+      if (table === 'quotes') return { update };
+      throw new Error(`Unexpected table ${table}`);
+    });
+    mockCreateClient.mockResolvedValue({
+      auth: { getUser: async () => ({ data: { user: { id: 'user-1' } }, error: null }) }, from,
+    });
+    const quote = { id: 'quote-1', quote_thread_id: 'thread-1', quote_reference: '50085-LC', total: 1450, status: 'completed_full', is_latest_version: true, invoiced_at: '2026-09-01' };
+    const initialBundle = {
+      quote, invoices: [existingInvoice], invoiceRequests: [], versions: [quote], lineItems: [], attachments: [], timeline: [],
+      invoiceSummary: { invoicedTotal: 1450, pendingRequestedTotal: 0, remainingBalance: 0, availableToRequest: 0, status: 'fully_invoiced' },
+      financialSummary: { remaining_to_invoice: 0, available_to_request: 0 },
+    };
+    mockFetchQuoteBundle.mockResolvedValueOnce(initialBundle).mockResolvedValue({
+      ...initialBundle, invoices: [existingInvoice, extraInvoice],
+      invoiceSummary: { ...initialBundle.invoiceSummary, invoicedTotal: 2670, remainingBalance: -1220 },
+      financialSummary: { remaining_to_invoice: -1220, available_to_request: 0 },
+    });
+    const response = await POST(new NextRequest('http://localhost/api/quotes/quote-1/invoices', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ invoice_number: '35304', invoice_date: '2026-09-30', amount: 1220, invoice_scope: 'partial', comments: 'Additional hire' }),
+    }), { params: Promise.resolve({ id: 'quote-1' }) });
+    expect(response.status).toBe(201);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ quote_id: 'quote-1', amount: 1220, invoice_number: '35304' }));
+    for (const call of update.mock.calls) {
+      expect(call[0]).not.toHaveProperty('total');
+      expect(call[0]).not.toHaveProperty('revision_number');
+      expect(call[0]).not.toHaveProperty('status');
+    }
+    expect(mockAppendQuoteTimelineEvent).toHaveBeenCalled();
+    const payload = await response.json();
+    expect(payload.invoices).toEqual([existingInvoice, extraInvoice]);
+    expect(quote.total).toBe(1450);
   });
 
   it('rejects invoices against historical versions', async () => {

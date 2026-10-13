@@ -5,6 +5,7 @@ import { PDFDocument } from 'pdf-lib';
 const state = vi.hoisted(() => ({
   userId: '22222222-2222-4222-8222-222222222222' as string | null,
   level: 4,
+  superAdmin: true,
   pin: false,
   insertError: false,
   row: {} as Record<string, unknown>,
@@ -13,7 +14,7 @@ const state = vi.hoisted(() => ({
   remove: vi.fn(),
   signed: vi.fn(),
 }));
-vi.mock('@/lib/utils/view-as', () => ({ getEffectiveRole: vi.fn(async () => ({ user_id: state.userId, is_actual_super_admin: true, is_viewing_as: true })) }));
+vi.mock('@/lib/utils/view-as', () => ({ getEffectiveRole: vi.fn(async () => ({ user_id: state.userId, is_actual_super_admin: state.superAdmin, is_viewing_as: state.superAdmin })) }));
 vi.mock('@/lib/utils/rbac', () => ({ getEffectiveModuleAccessLevel: vi.fn(async () => state.level) }));
 vi.mock('@/lib/server/sensitive-module-access', () => ({ requireSensitiveModuleAccess: vi.fn(async () => state.pin ? NextResponse.json({ error: 'PIN required' }, { status: 428 }) : null) }));
 vi.mock('@/lib/supabase/admin', () => ({ createAdminClient: state.admin }));
@@ -29,6 +30,7 @@ function request(path = '', init?: RequestInit) { return new NextRequest(`http:/
 
 beforeEach(() => {
   vi.clearAllMocks();
+  state.superAdmin = true;
   state.userId = '22222222-2222-4222-8222-222222222222'; state.level = 4; state.pin = false; state.insertError = false;
   state.row = {
     id, title: 'Sample', category: 'Service record', external_company: 'Sample provider', document_date: '2026-10-13', expiry_date: null,
@@ -253,6 +255,17 @@ async function uploadForm(sharedWith: string[]) {
 }
 
 describe('External Documents reader exclusions', () => {
+  it('loads reader options for a level 5 administrator without superadmin or View As privileges', async () => {
+    state.superAdmin = false;
+    state.level = 5;
+    installReaderAdmin();
+    const response = await list(request('?options=1'));
+    expect(response.status).toBe(200);
+    expect((await response.json()).readers).toEqual([{ id: ordinaryId, label: 'Ordinary Person' }]);
+    expect(readerState.selects.some((columns) => columns.includes('email'))).toBe(false);
+    expect(readerState.mutations).toEqual([]);
+  });
+
   it('returns ordinary readers and excludes placeholder, system, profile, and email-only hidden accounts', async () => {
     installReaderAdmin({ listUsers: 'paged' });
     const response = await list(request('?options=1'));

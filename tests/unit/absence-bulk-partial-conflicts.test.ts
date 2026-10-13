@@ -14,6 +14,7 @@ vi.mock('@/lib/server/work-shifts', () => ({
 
 interface MockProfile {
   id: string;
+  deleted_at?: string | null;
   full_name: string;
   employee_id: string | null;
   annual_holiday_allowance_days: number | null;
@@ -76,6 +77,24 @@ function buildMockSupabase(options: BuildMockSupabaseOptions) {
             return {
               eq() {
                 return {
+                  is(field: string, value: null) {
+                    expect(field).toBe('deleted_at');
+                    expect(value).toBeNull();
+                    return {
+                      gt(_field: string, minimum: number) {
+                        return {
+                          async order() {
+                            return {
+                              data: options.profiles.filter(profile =>
+                                profile.deleted_at == null && (profile.annual_holiday_allowance_days ?? 0) > minimum
+                              ),
+                              error: null,
+                            };
+                          },
+                        };
+                      },
+                    };
+                  },
                   gt(_field: string, value: number) {
                     const filteredProfiles = options.profiles.filter(
                       (profile) => (profile.annual_holiday_allowance_days ?? 0) > value
@@ -239,6 +258,45 @@ describe('bookBulkAbsence partial conflict handling', () => {
       absence_reasons: { name: 'Annual Leave' },
     },
   ];
+
+  it.each([false, true])('excludes deleted employees from Christmas bookings (confirm=%s)', async (confirm) => {
+    const christmasProfiles = Array.from({ length: 58 }, (_, index) => ({
+      ...profiles[0],
+      id: `christmas-${index}`,
+      deleted_at: index >= 55 ? '2026-10-01T00:00:00Z' : null,
+    }));
+    vi.mocked(loadEmployeeWorkShiftPatternMap).mockResolvedValue(
+      new Map(christmasProfiles.map(profile => [profile.id, { ...STANDARD_WORK_SHIFT_PATTERN }]))
+    );
+    const { supabase, insertedAbsenceRows, insertedBatchRows } = buildMockSupabase({
+      profiles: christmasProfiles, annualAbsences: [], existingRows: [],
+    });
+    const result = await bookBulkAbsence({
+      supabase: supabase as never, actorProfileId: 'manager-1', reasonId: 'reason-annual',
+      startDate: '2027-12-23', endDate: '2027-12-24', notes: 'Christmas Holidays',
+      applyToAll: true, confirm,
+    });
+    expect(result.totalEmployees).toBe(55);
+    expect(result.targetedEmployees).toBe(55);
+    expect(result.wouldCreate).toBe(55);
+    expect(insertedAbsenceRows).toHaveLength(confirm ? 55 : 0);
+    expect(insertedBatchRows).toHaveLength(confirm ? 1 : 0);
+    expect(insertedAbsenceRows.some(row => ['christmas-55', 'christmas-56', 'christmas-57'].includes(String(row.profile_id)))).toBe(false);
+  });
+
+  it('does not restore a deleted employee through an explicit selection', async () => {
+    const { supabase, insertedAbsenceRows, insertedBatchRows } = buildMockSupabase({
+      profiles: [...profiles, { ...profiles[0], id: 'deleted-person', deleted_at: '2026-10-01T00:00:00Z' }],
+      annualAbsences: [], existingRows: [],
+    });
+    await expect(bookBulkAbsence({
+      supabase: supabase as never, actorProfileId: 'manager-1', reasonId: 'reason-annual',
+      startDate: '2027-12-23', endDate: '2027-12-24', applyToAll: false,
+      employeeIds: ['deleted-person'], confirm: true,
+    })).rejects.toThrow('No employees matched');
+    expect(insertedAbsenceRows).toHaveLength(0);
+    expect(insertedBatchRows).toHaveLength(0);
+  });
 
   it('previews segmented rows, counting full and partial conflicts separately', async () => {
     const { supabase, insertedAbsenceRows, insertedBatchRows } = buildMockSupabase({

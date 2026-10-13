@@ -1026,6 +1026,7 @@ async function getBulkAbsenceEmployees(supabase: AnySupabase): Promise<BulkAbsen
     .from('profiles')
     .select('id, full_name, employee_id, annual_holiday_allowance_days, is_system_account, roles(id, name, display_name)')
     .eq('is_system_account', false)
+    .is('deleted_at', null)
     .gt('annual_holiday_allowance_days', 0)
     .order('full_name');
 

@@ -674,8 +674,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       errors.confirm_matches_request = 'Confirm the invoice details match the manager request.';
     }
 
-    if (Number.isFinite(amount) && amount - suggestedInvoiceAmount > 0.005) {
-      errors.amount = `This quote has £${suggestedInvoiceAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })} remaining. Create a new version first if the amount has increased.`;
+    if ((selectedInvoiceRequest || quote?.merge_info) && Number.isFinite(amount) && amount - suggestedInvoiceAmount > 0.005) {
+      errors.amount = `This quote has £${suggestedInvoiceAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })} remaining. Linked requests and merged quotes must stay within their available balance.`;
     }
     if (
       quote?.merge_info
@@ -2390,6 +2390,11 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                           className={getFieldClassName(invoiceFieldErrors, 'amount')}
                         />
                         {renderFieldError(invoiceFieldErrors, 'amount')}
+                        {!selectedInvoiceRequest && !quote?.merge_info ? (
+                          <p className="text-xs text-muted-foreground">
+                            Additional hire charges can exceed the quoted total. The original quote stays unchanged.
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-2">
                         <Label>Date *</Label>

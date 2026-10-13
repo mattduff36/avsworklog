@@ -245,7 +245,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       ? groupRemainingBalance
       : Math.min(selectedSourceBalance, groupRemainingBalance);
 
-    if (normalizedAmount - remainingBalance > 0.005) {
+    // Accounts can record additional hire charges on an ordinary quote without
+    // changing its value. Requests and merged-source allocations retain their caps.
+    if ((linkedRequest || bundleBeforeInsert.mergeInfo) && normalizedAmount - remainingBalance > 0.005) {
       return NextResponse.json(
         {
           error: 'Invoice amount cannot be more than the adjusted quote-thread balance. Record a quote-value adjustment first if the amount has increased.',

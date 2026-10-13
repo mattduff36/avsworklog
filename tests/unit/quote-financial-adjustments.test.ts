@@ -99,6 +99,19 @@ const versions = [
 ];
 
 describe('quote financial adjustment calculations', () => {
+  it('keeps the original quote and reports additional hire invoiced above its value', () => {
+    const quoteVersions = [{ ...versions[0], id: 'hire', total: 1450 }];
+    const result = calculateQuoteFinancials({
+      versions: quoteVersions,
+      invoices: [invoice({ id: 'original-hire', quote_id: 'hire', amount: 1450 }), invoice({ id: 'extra-hire', quote_id: 'hire', amount: 1220 })],
+    });
+    expect(result.threadSummary.adjusted_quote_value).toBe(1450);
+    expect(result.threadSummary.net_invoiced).toBe(2670);
+    expect(result.threadSummary.remaining_to_invoice).toBe(-1220);
+    expect(result.threadSummary.reconciliation_status).toBe('over_invoiced');
+    expect(result.threadSummary.available_to_request).toBe(0);
+    expect(quoteVersions).toHaveLength(1);
+  });
   it('uses the newest base revision and adds extras without double-counting the original', () => {
     const result = calculateQuoteFinancials({
       versions,
