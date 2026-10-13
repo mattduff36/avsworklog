@@ -1,5 +1,42 @@
 [
   {
+    "version": "1026.8.0",
+    "updateKind": "major",
+    "title": "External Documents update",
+    "description": "Updated External Documents, Navigation, Fleet, PDF document documents, Daily Allocation, Dashboard, Help and FAQ, and Data storage.",
+    "summary": "Updated External Documents, Navigation, Fleet, PDF document documents, Daily Allocation, Dashboard, Help and FAQ, and Data storage.",
+    "details": [
+      "Updated External Documents, Navigation, Fleet, PDF document documents, Daily Allocation, Dashboard, Help and FAQ, and Data storage, with changes to background routes, app screens, interface components, shared logic, shared typing, automated tests, data storage, and documentation.",
+      "Updated PDF document documents, with changes to shared logic and automated tests.",
+      "Updated data storage, with changes to data storage.",
+      "Updated navigation, with changes to shared logic.",
+      "Updated fleet, with changes to app screens.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated daily allocation, with changes to interface components.",
+      "Updated dashboard, with changes to app screens."
+    ],
+    "areas": [
+      "External Documents",
+      "Navigation",
+      "Fleet",
+      "PDF document documents",
+      "Daily Allocation",
+      "Dashboard",
+      "Help",
+      "FAQ",
+      "Data storage"
+    ],
+    "areaKeys": [
+      "external-documents",
+      "navigation",
+      "fleet",
+      "daily-allocation",
+      "dashboard",
+      "data-storage"
+    ],
+    "pushedAt": "2026-10-13T10:27:15.347Z"
+  },
+  {
     "version": "1026.7.0",
     "updateKind": "major",
     "title": "Daily Allocation update",

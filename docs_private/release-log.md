@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.8.0
+
+**GIT COMMIT MESSAGE**
+`feat(external-documents): update External Documents, Navigation, Fleet, PDF documents, Daily Allocation, Dashboard, Help and FAQ, and Data storage`
+
+**PUSHED AT**
+2026-10-13T10:27:15.347Z
+
+**WHAT CHANGED**
+Update External Documents, Navigation, Fleet, PDF documents, Daily Allocation, Dashboard, Help and FAQ, and Data storage.
+
+**VERSION HISTORY DETAILS**
+- Updated External Documents, Navigation, Fleet, PDF documents, Daily Allocation, Dashboard, Help and FAQ, and Data storage, with changes to background routes, app screens, interface components, shared logic, shared typing, automated tests, data storage, and documentation.
+- Updated PDF documents, with changes to shared logic and automated tests.
+- Updated data storage, with changes to data storage.
+- Updated navigation, with changes to shared logic.
+- Updated fleet, with changes to app screens.
+- Updated help and FAQ, with changes to documentation.
+- Updated daily allocation, with changes to interface components.
+- Updated dashboard, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(external-documents): update External Documents, Navigation, Fleet, PDF documents, Daily Allocation, Dashboard, Help and FAQ, and Data storage`
+
 ## 1026.7.0
 
 **GIT COMMIT MESSAGE**
