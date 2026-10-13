@@ -145,6 +145,9 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
   if (href.startsWith('/daily-allocation')) {
     return { bg: 'bg-daily-allocation', text: 'text-white' };
   }
+  if (href.startsWith('/external-documents')) {
+    return { bg: 'bg-external-documents', text: 'text-white' };
+  }
   // Default - Brand yellow
   return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
 }
@@ -153,6 +156,7 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
  * Get module brand color for inactive icon state.
  */
 function getNavItemIconColor(href: string): string {
+  if (href.startsWith('/external-documents')) return 'text-external-documents';
   if (href === '/dashboard' || href === '/help') return 'text-avs-yellow';
   if (href.startsWith('/timesheets')) return 'text-timesheet';
   if (href.startsWith('/van-inspections')) return 'text-inspection';

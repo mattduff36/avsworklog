@@ -20,10 +20,12 @@ const options: ExternalDocumentOptionsResponse = {
 function EditorHarness({
   mode = 'create',
   disabled = false,
+  formError = null,
   initial,
 }: {
   mode?: 'create' | 'edit';
   disabled?: boolean;
+  formError?: string | null;
   initial?: ExternalDocumentDraft;
 }) {
   const [draft, setDraft] = useState<ExternalDocumentDraft>(initial ?? emptyExternalDocumentDraft());
@@ -37,7 +39,7 @@ function EditorHarness({
       optionsError={null}
       canManageSharing
       disabled={disabled}
-      formError={null}
+      formError={formError}
     />
   );
 }
@@ -107,6 +109,63 @@ describe('DocumentEditor', () => {
     expect(screen.queryByLabelText('Take a photo')).not.toBeInTheDocument();
     expect(screen.queryByText('alpha.pdf')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Title *')).toHaveValue('Service sheet');
-    expect(within(screen.getByRole('group', { name: 'Access' })).getByText(/manager access/)).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Access' })).getByText('Selected people and document managers can read this document.')).toBeInTheDocument();
+  });
+
+  it('keeps the draft when switching tabs and collapsing more details', () => {
+    render(<EditorHarness />);
+
+    fireEvent.change(screen.getByLabelText('Title *'), { target: { value: 'Brake cert' } });
+    fireEvent.click(screen.getByText('More details'));
+    fireEvent.change(screen.getByLabelText('Reference (optional)'), { target: { value: 'INV-9' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Alice Smith' }));
+
+    const alpha = new File(['alpha'], 'alpha.pdf', { type: 'application/pdf' });
+    fireEvent.change(screen.getByLabelText('Choose files'), { target: { files: [alpha] } });
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Details' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Files (1)' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Access (1)' }));
+
+    expect(screen.getByLabelText('Title *')).toHaveValue('Brake cert');
+    expect(screen.getByText('1. alpha.pdf')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Alice Smith' })).toBeChecked();
+    expect(screen.getByLabelText('Reference (optional)')).toHaveValue('INV-9');
+
+    fireEvent.click(screen.getByText('More details'));
+    expect(screen.queryByLabelText('Reference (optional)')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('More details'));
+    expect(screen.getByLabelText('Reference (optional)')).toHaveValue('INV-9');
+  });
+
+  it('opens more details on edit when optional values exist and follows form errors to the right tab', () => {
+    const initial: ExternalDocumentDraft = {
+      ...emptyExternalDocumentDraft(),
+      title: 'Service sheet',
+      reference: 'INV-1',
+    };
+    const { unmount } = render(<EditorHarness mode="edit" initial={initial} />);
+    expect(screen.getByLabelText('Reference (optional)')).toHaveValue('INV-1');
+    expect(screen.queryByRole('tab', { name: /Files/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+    unmount();
+
+    const { rerender } = render(<EditorHarness />);
+    expect(screen.getByRole('tab', { name: 'Files (0)' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.queryByLabelText('Reference (optional)')).not.toBeInTheDocument();
+
+    rerender(<EditorHarness formError="Enter a title." />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a title.');
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Title *')).toHaveAttribute('aria-invalid', 'true');
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Access (0)' }), { button: 0, ctrlKey: false });
+    expect(screen.getByRole('tab', { name: 'Access (0)' })).toHaveAttribute('aria-selected', 'true');
+
+    rerender(<EditorHarness formError="Add at least one original file." />);
+    expect(screen.getByRole('tab', { name: 'Files (0)' })).toHaveAttribute('aria-selected', 'true');
+
+    rerender(<EditorHarness formError="The expiry date cannot be earlier than the document date." />);
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByLabelText('Expiry date (optional)')).toBeInTheDocument();
   });
 });
