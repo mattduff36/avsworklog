@@ -1,5 +1,24 @@
 [
   {
+    "version": "1026.8.2",
+    "updateKind": "minor",
+    "title": "Dashboard improvements",
+    "description": "Place external documents tile before help.",
+    "summary": "Place external documents tile before help.",
+    "details": [
+      "Updated external documents, with changes to interface components and automated tests.",
+      "Updated quotes, with changes to background routes, app screens, and automated tests.",
+      "Updated absence and leave, with changes to shared logic and automated tests."
+    ],
+    "areas": [
+      "Dashboard"
+    ],
+    "areaKeys": [
+      "dashboard"
+    ],
+    "pushedAt": "2026-10-13T21:26:14.803Z"
+  },
+  {
     "version": "1026.8.1",
     "updateKind": "minor",
     "title": "App improvements",

@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.8.2
+
+**GIT COMMIT MESSAGE**
+`fix(dashboard): place external documents tile before help`
+
+**PUSHED AT**
+2026-10-13T21:26:14.803Z
+
+**WHAT CHANGED**
+Place external documents tile before help.
+
+**VERSION HISTORY DETAILS**
+- Updated external documents, with changes to interface components and automated tests.
+- Updated quotes, with changes to background routes, app screens, and automated tests.
+- Updated absence and leave, with changes to shared logic and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(dashboard): place external documents tile before help`
+
 ## 1026.8.1
 
 **GIT COMMIT MESSAGE**
