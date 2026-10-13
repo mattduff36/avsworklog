@@ -40,6 +40,7 @@ import { useAllAbsenceReasons, useAllAbsences, useDeleteAbsence, useUpdateAbsenc
 import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
 import { canDeleteAbsenceRecord } from '@/lib/utils/absence-delete-guard';
+import { planAbsenceDeleteFailure } from '@/lib/utils/absence-error-handling';
 import { formatDateISO, getCurrentFinancialYear, getFinancialYearMonths } from '@/lib/utils/date';
 import {
   eachDayOfInterval,
@@ -331,13 +332,13 @@ export function AbsenceCalendarAdmin() {
     setCurrentMonthIndex(initialMonthIndex);
   }, [initialMonthIndex]);
 
-  const { data: calendarAbsences, isLoading } = useAllAbsences({
+  const { data: calendarAbsences, isLoading, refetch: refetchCalendarAbsences } = useAllAbsences({
     dateFrom: formatDateISO(displayFinancialYear.start),
     dateTo: formatDateISO(displayFinancialYear.end),
     includeArchived: true,
     matchOverlappingDateRange: true,
   });
-  const { data: allowanceAbsences, isLoading: allowanceRowsLoading } = useAllAbsences({
+  const { data: allowanceAbsences, isLoading: allowanceRowsLoading, refetch: refetchAllowanceAbsences } = useAllAbsences({
     dateFrom: formatDateISO(displayFinancialYear.start),
     dateTo: formatDateISO(displayFinancialYear.end),
     includeArchived: true,
@@ -442,6 +443,20 @@ export function AbsenceCalendarAdmin() {
       setDeleteTargetId(null);
     } catch (error) {
       console.error('Error deleting absence:', error);
+      const plan = planAbsenceDeleteFailure(error, { listRefetchSucceeded: false });
+      if (plan.kind === 'stale') {
+        const results = await Promise.allSettled([
+          refetchCalendarAbsences(),
+          refetchAllowanceAbsences(),
+        ]);
+        const listRefetchSucceeded = results.every(
+          (result) => result.status === 'fulfilled' && result.value.isSuccess
+        );
+        const recovered = planAbsenceDeleteFailure(error, { listRefetchSucceeded });
+        setDeleteTargetId(null);
+        if (recovered.kind === 'stale') toast.warning(recovered.message);
+        return;
+      }
       toast.error(error instanceof Error ? error.message : 'Failed to delete absence');
     } finally {
       setDeleteSubmitting(false);

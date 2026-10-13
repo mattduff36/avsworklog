@@ -85,3 +85,76 @@ export function shouldLogAbsenceManageError(error: unknown): boolean {
     !isNetworkFetchError(error)
   );
 }
+
+const STALE_ABSENCE_DELETE_MESSAGES = new Set([
+  'Absence record not found',
+  'Absence not found',
+]);
+
+function staleAbsenceDeleteText(error: unknown): string {
+  const direct = extractErrorMessage(error).trim();
+  if (direct) return direct;
+
+  if (error && typeof error === 'object' && 'error' in error) {
+    const nested = (error as { error?: unknown }).error;
+    if (typeof nested === 'string') return nested.trim();
+  }
+
+  return '';
+}
+
+function readStructuredStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object') return null;
+  const record = error as { status?: unknown; statusCode?: unknown; code?: unknown };
+  for (const value of [record.status, record.statusCode, record.code]) {
+    if (typeof value === 'number') return value;
+    if (typeof value === 'string' && /^\d{3}$/.test(value)) return Number(value);
+  }
+  return null;
+}
+
+/**
+ * Missing-row delete only. Exact copy from the financial-year guard and the
+ * historical absence API message. A 404 may accompany that copy; generic
+ * not-found text and 401/403/500 never qualify.
+ */
+export function isStaleAbsenceDeleteError(error: unknown): boolean {
+  const message = staleAbsenceDeleteText(error);
+  if (!STALE_ABSENCE_DELETE_MESSAGES.has(message)) return false;
+
+  const status = readStructuredStatus(error);
+  if (status !== null && status !== 404) return false;
+  return true;
+}
+
+export function staleAbsenceDeleteUserMessage(listRefreshed: boolean): string {
+  return listRefreshed
+    ? 'This absence is no longer available. The list has been refreshed.'
+    : 'This absence is no longer available.';
+}
+
+export type AbsenceDeleteFailurePlan =
+  | {
+      kind: 'stale';
+      closeConfirmation: true;
+      clearTarget: true;
+      refreshAllowance: true;
+      toast: 'warning';
+      message: string;
+    }
+  | { kind: 'unchanged' };
+
+export function planAbsenceDeleteFailure(
+  error: unknown,
+  options: { listRefetchSucceeded: boolean }
+): AbsenceDeleteFailurePlan {
+  if (!isStaleAbsenceDeleteError(error)) return { kind: 'unchanged' };
+  return {
+    kind: 'stale',
+    closeConfirmation: true,
+    clearTarget: true,
+    refreshAllowance: true,
+    toast: 'warning',
+    message: staleAbsenceDeleteUserMessage(options.listRefetchSucceeded),
+  };
+}

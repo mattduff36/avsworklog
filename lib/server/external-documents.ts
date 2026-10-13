@@ -10,6 +10,7 @@ import {
   parseStoredExternalDocument,
 } from '@/lib/external-documents/validation';
 import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-access';
+import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
 import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 import { logServerError } from '@/lib/utils/server-error-logger';
@@ -233,7 +234,7 @@ async function assertComplete(
 }
 
 async function loadOptions(admin: AdminClient, request: NextRequest): Promise<ExternalDocumentOptionsResponse> {
-  const [vansResult, plantResult, hgvResult, readerResult] = await Promise.all([
+  const [vansResult, plantResult, hgvResult, readerResult, hiddenIds] = await Promise.all([
     admin
       .from('vans')
       .select('id, reg_number, nickname, status, asset_type', { count: 'exact' })
@@ -250,12 +251,13 @@ async function loadOptions(admin: AdminClient, request: NextRequest): Promise<Ex
       .limit(OPTION_LIMIT),
     admin
       .from('profiles')
-      .select('id, full_name, email, employee_id, is_placeholder, is_system_account', { count: 'exact' })
+      .select('id, full_name, employee_id, is_placeholder, is_system_account', { count: 'exact' })
       .is('deleted_at', null)
       .eq('is_placeholder', false)
       .eq('is_system_account', false)
       .order('full_name', { ascending: true })
       .limit(OPTION_LIMIT),
+    getHiddenSystemTestAccountIds(admin),
   ]);
 
   const [vans, plant, hgvs, readers] = await Promise.all([
@@ -271,7 +273,7 @@ async function loadOptions(admin: AdminClient, request: NextRequest): Promise<Ex
       plant: mapAssets(plant, ['nickname', 'plant_id'], 'Plant'),
       hgvs: mapAssets(hgvs, ['nickname', 'reg_number'], 'HGV'),
     },
-    readers: mapReaders(readers),
+    readers: mapReaders(readers, hiddenIds),
   };
 }
 
@@ -295,7 +297,16 @@ function mapAssets(
   }).sort((left, right) => left.label.localeCompare(right.label));
 }
 
-function mapReaders(rows: unknown[]): ExternalDocumentReaderOption[] {
+function isHiddenReaderId(hiddenIds: Set<string>, id: string): boolean {
+  const normalized = id.toLowerCase();
+  if (hiddenIds.has(id) || hiddenIds.has(normalized)) return true;
+  for (const hiddenId of hiddenIds) {
+    if (hiddenId.toLowerCase() === normalized) return true;
+  }
+  return false;
+}
+
+function mapReaders(rows: unknown[], hiddenIds: Set<string>): ExternalDocumentReaderOption[] {
   return rows.flatMap((row) => {
     if (!row || typeof row !== 'object') {
       throw new ExternalDocumentsHttpError(500, 'Document options could not be loaded.');
@@ -307,13 +318,13 @@ function mapReaders(rows: unknown[]): ExternalDocumentReaderOption[] {
     const candidate = {
       id: record.id,
       full_name: record.full_name,
-      email: typeof record.email === 'string' ? record.email : null,
       employee_id: typeof record.employee_id === 'string' ? record.employee_id : null,
       is_placeholder: record.is_placeholder === true,
       is_system_account: record.is_system_account === true,
     };
     if (
-      candidate.is_placeholder
+      isHiddenReaderId(hiddenIds, candidate.id)
+      || candidate.is_placeholder
       || isSystemAccountProfile(candidate)
       || isHiddenSystemTestAccountProfile(candidate)
     ) {
@@ -336,10 +347,13 @@ async function assertAssetExists(admin: AdminClient, kind: 'van' | 'plant' | 'hg
 
 async function canonicalReaderIds(admin: AdminClient, ids: string[]): Promise<string[]> {
   if (ids.length === 0) return [];
-  const { data, error } = await admin
-    .from('profiles')
-    .select('id, full_name, email, employee_id, is_placeholder, is_system_account, deleted_at')
-    .in('id', ids);
+  const [{ data, error }, hiddenIds] = await Promise.all([
+    admin
+      .from('profiles')
+      .select('id, full_name, employee_id, is_placeholder, is_system_account, deleted_at')
+      .in('id', ids),
+    getHiddenSystemTestAccountIds(admin),
+  ]);
   if (error || !Array.isArray(data)) {
     throw new ExternalDocumentsHttpError(500, 'The people to share with could not be checked.');
   }
@@ -353,13 +367,13 @@ async function canonicalReaderIds(admin: AdminClient, ids: string[]): Promise<st
     const candidate = {
       id: record.id,
       full_name: typeof record.full_name === 'string' ? record.full_name : '',
-      email: typeof record.email === 'string' ? record.email : null,
       employee_id: typeof record.employee_id === 'string' ? record.employee_id : null,
       is_placeholder: record.is_placeholder === true,
       is_system_account: record.is_system_account === true,
     };
     if (
-      candidate.is_placeholder
+      isHiddenReaderId(hiddenIds, candidate.id)
+      || candidate.is_placeholder
       || isSystemAccountProfile(candidate)
       || isHiddenSystemTestAccountProfile(candidate)
     ) {

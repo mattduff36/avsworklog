@@ -121,3 +121,184 @@ describe('External Documents server boundaries', () => {
     expect(state.remove).toHaveBeenCalledWith([state.upload.mock.calls[0][0]]);
   });
 });
+
+const ordinaryId = '44444444-4444-4444-8444-444444444444';
+const hiddenEmailOnlyId = '55555555-5555-4555-8555-555555555555';
+const hiddenEmployeeId = '66666666-6666-4666-8666-666666666666';
+const placeholderId = '77777777-7777-4777-8777-777777777777';
+const systemId = '88888888-8888-4888-8888-888888888888';
+
+const readerState = vi.hoisted(() => ({
+  selects: [] as string[],
+  mutations: [] as string[],
+  listUsers: vi.fn(),
+}));
+
+function profile(id: string, fullName: string, employeeId: string, flags?: { placeholder?: boolean; system?: boolean }) {
+  return {
+    id,
+    full_name: fullName,
+    employee_id: employeeId,
+    is_placeholder: flags?.placeholder === true,
+    is_system_account: flags?.system === true,
+    deleted_at: null,
+  };
+}
+
+const readerProfiles = [
+  profile(ordinaryId, 'Ordinary Person', 'EMP100'),
+  profile(hiddenEmailOnlyId, 'Email Only Hidden', 'EMP200'),
+  profile(hiddenEmployeeId, 'Employee Hidden', 'TS-ADM'),
+  profile(placeholderId, 'Placeholder Person', 'EMP300', { placeholder: true }),
+  profile(systemId, 'System Person', 'EMP400', { system: true }),
+];
+
+function installReaderAdmin(options?: { listUsers?: 'missing' | 'error' | 'paged' }) {
+  readerState.selects = [];
+  readerState.mutations = [];
+  readerState.listUsers.mockReset();
+  if (options?.listUsers === 'error') {
+    readerState.listUsers.mockResolvedValue({ data: { users: [] }, error: { message: 'auth unavailable' } });
+  } else if (options?.listUsers === 'paged') {
+    readerState.listUsers.mockImplementation(async ({ page, perPage }: { page: number; perPage: number }) => {
+      if (page === 1) {
+        return {
+          data: {
+            users: Array.from({ length: perPage }, (_, index) => ({
+              id: `page-one-${index}`,
+              email: `person${index}@example.com`,
+            })),
+          },
+          error: null,
+        };
+      }
+      return {
+        data: { users: [{ id: hiddenEmailOnlyId, email: 'testsuite-admin@squiresapp.test' }] },
+        error: null,
+      };
+    });
+  } else if (options?.listUsers !== 'missing') {
+    readerState.listUsers.mockResolvedValue({
+      data: { users: [{ id: hiddenEmailOnlyId, email: 'manager@avsworklog.test' }] },
+      error: null,
+    });
+  }
+
+  state.admin.mockImplementation(() => ({
+    from: (table: string) => {
+      let inserted = false;
+      let updated = false;
+      const chain = {
+        select: vi.fn((columns: string) => {
+          readerState.selects.push(`${table}:${columns}`);
+          return chain;
+        }),
+        eq: vi.fn(() => chain),
+        is: vi.fn(() => chain),
+        or: vi.fn(() => chain),
+        order: vi.fn(() => chain),
+        contains: vi.fn(() => chain),
+        in: vi.fn(async (_column: string, ids: string[]) => {
+          if (readerState.selects.some((columns) => columns.includes('email'))) {
+            return { data: null, error: { message: 'column profiles.email does not exist' } };
+          }
+          const allowed = new Set(ids.map((id) => id.toLowerCase()));
+          return {
+            data: table === 'profiles' ? readerProfiles.filter((row) => allowed.has(row.id.toLowerCase())) : [],
+            error: null,
+          };
+        }),
+        limit: vi.fn(async () => {
+          if (readerState.selects.some((columns) => columns.includes('email'))) {
+            return { data: null, error: { message: 'column profiles.email does not exist' }, count: null };
+          }
+          return {
+            data: table === 'profiles' ? readerProfiles : [],
+            error: null,
+            count: table === 'profiles' ? readerProfiles.length : 0,
+          };
+        }),
+        insert: vi.fn(() => { inserted = true; readerState.mutations.push('insert'); return chain; }),
+        update: vi.fn(() => { updated = true; readerState.mutations.push('update'); return chain; }),
+        maybeSingle: vi.fn(async () => ({ data: state.row, error: null })),
+        single: vi.fn(async () => {
+          if (inserted && state.insertError) return { data: null, error: { message: 'Fixture insert failure' } };
+          if (!inserted && !updated) return { data: null, error: { message: 'Unexpected single' } };
+          const { storage_path: _path, ...row } = state.row;
+          return { data: row, error: null };
+        }),
+        range: vi.fn(async () => ({ data: [], error: null, count: 0 })),
+      };
+      return chain;
+    },
+    auth: options?.listUsers === 'missing' ? { admin: {} } : { admin: { listUsers: readerState.listUsers } },
+    storage: { from: () => ({ upload: state.upload, remove: state.remove, createSignedUrl: state.signed }) },
+  }));
+}
+
+async function uploadForm(sharedWith: string[]) {
+  const pdf = await PDFDocument.create();
+  pdf.addPage();
+  const form = new FormData();
+  form.set('file', new File([new Uint8Array(await pdf.save())], 'sample.pdf', { type: 'application/pdf' }));
+  form.set('metadata', JSON.stringify({
+    title: 'Sample',
+    category: 'Service record',
+    external_company: 'Sample provider',
+    document_date: '2026-10-13',
+    source_files: ['sample.pdf'],
+    shared_with: sharedWith,
+  }));
+  return form;
+}
+
+describe('External Documents reader exclusions', () => {
+  it('returns ordinary readers and excludes placeholder, system, profile, and email-only hidden accounts', async () => {
+    installReaderAdmin({ listUsers: 'paged' });
+    const response = await list(request('?options=1'));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.readers).toEqual([{ id: ordinaryId, label: 'Ordinary Person' }]);
+    expect(readerState.listUsers).toHaveBeenCalledTimes(2);
+    expect(readerState.selects.some((columns) => columns.includes('email'))).toBe(false);
+    expect(readerState.mutations).toEqual([]);
+  });
+
+  it('rejects email-only hidden readers on create and update without writing', async () => {
+    installReaderAdmin();
+    const created = await create(request('', { method: 'POST', body: await uploadForm([hiddenEmailOnlyId]) }));
+    expect(created.status).toBe(400);
+    const updated = await update(
+      request(`/${id}`, { method: 'PATCH', body: JSON.stringify({ shared_with: [hiddenEmailOnlyId] }) }),
+      context,
+    );
+    expect(updated.status).toBe(400);
+    expect(state.upload).not.toHaveBeenCalled();
+    expect(readerState.mutations).toEqual([]);
+    expect(readerState.selects.some((columns) => columns.includes('email'))).toBe(false);
+  });
+
+  it('shares with an ordinary reader', async () => {
+    installReaderAdmin();
+    const created = await create(request('', { method: 'POST', body: await uploadForm([ordinaryId]) }));
+    expect(created.status).toBe(201);
+    const updated = await update(
+      request(`/${id}`, { method: 'PATCH', body: JSON.stringify({ shared_with: [ordinaryId] }) }),
+      context,
+    );
+    expect(updated.status).toBe(200);
+    expect(readerState.mutations).toEqual(['insert', 'update']);
+  });
+
+  it('fails closed when hidden-account auth enumeration fails', async () => {
+    installReaderAdmin({ listUsers: 'error' });
+    expect((await list(request('?options=1'))).status).toBe(500);
+    installReaderAdmin({ listUsers: 'missing' });
+    const created = await create(request('', { method: 'POST', body: await uploadForm([ordinaryId]) }));
+    expect(created.status).toBe(500);
+    expect(state.upload).not.toHaveBeenCalled();
+    expect(readerState.mutations).toEqual([]);
+  });
+
+
+});

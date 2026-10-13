@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { logServerError } from '@/lib/utils/server-error-logger';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
 import { getActorAbsenceSecondaryPermissions } from '@/lib/server/absence-secondary-permissions';
@@ -10,6 +11,26 @@ import {
   undoBulkAbsenceBatch,
 } from '@/lib/services/absence-bank-holiday-sync';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+
+// Persist server failure context without copying employee selections or booking notes.
+async function recordBulkAbsenceFailure(error: unknown, operation: string, request?: NextRequest) {
+  const message = error instanceof Error ? error.message
+    : error && typeof error === 'object' && 'message' in error && typeof error.message === 'string'
+      ? error.message : 'Unknown bulk absence failure';
+  const code = error && typeof error === 'object' && 'code' in error
+    && typeof error.code === 'string' && /^[A-Z0-9_]{1,32}$/.test(error.code) ? error.code : null;
+  try {
+    await logServerError({
+      error: error instanceof Error ? error : new Error(message),
+      request: request ?? null,
+      componentName: `absence bulk ${operation}`,
+      additionalData: { operation, databaseCode: code },
+    });
+  } catch {
+    // A diagnostic failure must not replace the original failed response.
+    console.error('Could not persist bulk absence failure diagnostics');
+  }
+}
 
 interface BulkAbsencePayload {
   reasonId?: string;
@@ -93,6 +114,7 @@ export async function GET() {
     return NextResponse.json({ success: true, batches });
   } catch (error) {
     console.error('Error loading bulk absence batches:', error);
+    await recordBulkAbsenceFailure(error, 'list');
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to load bulk absence batches' },
       { status: 500 }
@@ -135,6 +157,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error booking bulk absence:', error);
+    await recordBulkAbsenceFailure(error, 'book', request);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to book bulk absence' },
       { status: 500 }
@@ -158,6 +181,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
     console.error('Error undoing bulk absence batch:', error);
+    await recordBulkAbsenceFailure(error, 'undo', request);
     return NextResponse.json(
       { success: false, error: error instanceof Error ? error.message : 'Failed to undo bulk absence batch' },
       { status: 500 }

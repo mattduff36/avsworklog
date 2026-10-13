@@ -351,7 +351,7 @@ export default function PlantHistoryPage({
 }) {
   const unwrappedParams = use(params);
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, isManager, isAdmin } = useAuth();
   const supabase = createClient();
   
   const [plant, setPlant] = useState<Plant | null>(null);
@@ -763,6 +763,7 @@ export default function PlantHistoryPage({
                 }
               : null
           }
+          canEditServiceState={Boolean(isManager || isAdmin)}
           onSuccess={() => {
             setEditDialogOpen(false);
             fetchPlantData();

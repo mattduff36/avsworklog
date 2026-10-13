@@ -54,7 +54,11 @@ import { AbsenceAboutHelper } from '@/app/(dashboard)/absence/components/Absence
 import { AllowanceDetailsPanel } from '@/app/(dashboard)/absence/components/AllowanceDetailsPanel';
 import { ManageOverviewAdminActions } from '@/app/(dashboard)/absence/manage/components/ManageOverviewAdminActions';
 import { WorkShiftsContent } from '@/app/(dashboard)/absence/manage/components/WorkShiftsContent';
-import { getErrorMessage, shouldLogAbsenceManageError } from '@/lib/utils/absence-error-handling';
+import {
+  getErrorMessage,
+  planAbsenceDeleteFailure,
+  shouldLogAbsenceManageError,
+} from '@/lib/utils/absence-error-handling';
 import { canDeleteAbsenceRecord } from '@/lib/utils/absence-delete-guard';
 import {
   buildAbsenceTimesheetImpactMessage,
@@ -191,7 +195,7 @@ export default function AdminAbsencePage() {
     status,
     includeArchived,
   ]);
-  const { data: absences, isLoading } = useAllAbsences(absenceFilters);
+  const { data: absences, isLoading, refetch: refetchAbsences } = useAllAbsences(absenceFilters);
   const actorProfileId = profile?.id || '';
   const scopedAbsences = useMemo(() => {
     return (absences || []).filter((absence) => {
@@ -938,6 +942,26 @@ export default function AdminAbsencePage() {
       } else {
         console.warn('Delete absence request rejected:', message);
       }
+
+      let listRefetchSucceeded = false;
+      const initialPlan = planAbsenceDeleteFailure(error, { listRefetchSucceeded });
+      if (initialPlan.kind === 'stale') {
+        try {
+          const result = await refetchAbsences();
+          listRefetchSucceeded = result.isSuccess;
+        } catch {
+          listRefetchSucceeded = false;
+        }
+        const recovered = planAbsenceDeleteFailure(error, { listRefetchSucceeded });
+        if (recovered.kind === 'stale') {
+          setShowDeleteDialog(false);
+          setDeleteTargetId(null);
+          setAllowancesRefreshKey((key) => key + 1);
+          toast.warning(recovered.message, { id: errorContextId });
+          return;
+        }
+      }
+
       toast.error(message, { id: errorContextId });
     } finally {
       setDeleteSubmitting(false);

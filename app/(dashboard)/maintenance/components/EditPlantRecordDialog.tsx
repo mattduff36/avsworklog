@@ -34,6 +34,7 @@ import type { MaintenanceHistoryValueType } from '@/lib/utils/maintenance-histor
 import { safeMaintenanceHistoryFieldName } from '@/lib/utils/maintenance-history';
 import { toast } from 'sonner';
 import { normalizePlantSerialNumber, isValidPlantSerialNumber } from '@/lib/utils/plant-serial-number';
+import { buildPlantServiceStateWrite } from '@/lib/utils/plant-service-state-edit';
 import {
   DEFAULT_LOLER_PERIOD_LABEL,
   findLolerMaintenanceCategory,
@@ -106,11 +107,11 @@ const editPlantRecordSchema = z.object({
   ),
   last_service_hours: z.preprocess(
     (val) => val === '' || val === null || val === undefined ? null : Number(val),
-    z.number().int().positive('Last service hours must be a positive number').optional().nullable()
+    z.number().int().nonnegative('Last service hours cannot be negative').optional().nullable()
   ),
   next_service_hours: z.preprocess(
     (val) => val === '' || val === null || val === undefined ? null : Number(val),
-    z.number().int().positive('Next service hours must be a positive number').optional().nullable()
+    z.number().int().nonnegative('Next service hours cannot be negative').optional().nullable()
   ),
   // LOLER fields
   loler_due_date: z.string().optional().nullable(),
@@ -134,6 +135,7 @@ interface EditPlantRecordDialogProps {
   onOpenChange: (open: boolean) => void;
   plant: Plant | null;
   maintenanceRecord: MaintenanceRecord | null;
+  canEditServiceState?: boolean;
   onSuccess?: () => void;
   onRetire?: () => void;
 }
@@ -143,6 +145,7 @@ export function EditPlantRecordDialog({
   onOpenChange,
   plant,
   maintenanceRecord,
+  canEditServiceState = false,
   onSuccess,
   onRetire
 }: EditPlantRecordDialogProps) {
@@ -190,8 +193,12 @@ export function EditPlantRecordDialog({
         mot_due_date: formatDateForInput(maintenanceRecord?.mot_due_date),
         current_mileage: maintenanceRecord?.current_mileage || undefined,
         current_hours: maintenanceRecord?.current_hours || plant.current_hours || undefined,
-        last_service_hours: maintenanceRecord?.last_service_hours || undefined,
-        next_service_hours: maintenanceRecord?.next_service_hours || undefined,
+        last_service_hours: canEditServiceState
+          ? maintenanceRecord?.last_service_hours ?? undefined
+          : undefined,
+        next_service_hours: canEditServiceState
+          ? maintenanceRecord?.next_service_hours ?? undefined
+          : undefined,
         loler_due_date: formatDateForInput(plant.loler_due_date),
         loler_last_inspection_date: formatDateForInput(plant.loler_last_inspection_date),
         loler_certificate_number: plant.loler_certificate_number || '',
@@ -203,7 +210,7 @@ export function EditPlantRecordDialog({
       setHadSelectedUser(false);
       clearAssignmentOverrideRef.current = undefined;
     }
-  }, [plant, maintenanceRecord, reset]);
+  }, [plant, maintenanceRecord, reset, canEditServiceState]);
 
   useEffect(() => {
     if (!open || !plant?.id) {
@@ -459,11 +466,18 @@ export function EditPlantRecordDialog({
         }
       }
 
+      const serviceStateWrite = buildPlantServiceStateWrite({
+        canEditServiceState,
+        lastServiceHours: data.last_service_hours ?? null,
+        nextServiceHours: data.next_service_hours ?? null,
+        previousLastServiceHours: maintenanceRecord?.last_service_hours ?? null,
+        previousNextServiceHours: maintenanceRecord?.next_service_hours ?? null,
+      });
+
       // Update or create vehicle_maintenance record
       const maintenanceUpdates: Record<string, unknown> = {
         current_hours: data.current_hours || null,
-        last_service_hours: data.last_service_hours || null,
-        next_service_hours: data.next_service_hours || null,
+        ...serviceStateWrite.maintenanceFields,
         tax_due_date: normalizeDateValue(data.tax_due_date) || null,
         mot_due_date: normalizeDateValue(data.mot_due_date) || null,
         current_mileage: data.current_mileage || null,
@@ -490,27 +504,7 @@ export function EditPlantRecordDialog({
         });
       }
 
-      const newLastServiceHours = normalizeValue(data.last_service_hours);
-      const oldLastServiceHours = normalizeValue(maintenanceRecord?.last_service_hours);
-      if (newLastServiceHours !== oldLastServiceHours) {
-        fieldChanges.push({
-          field_name: 'last_service_hours',
-          old_value: oldLastServiceHours?.toString() || null,
-          new_value: newLastServiceHours?.toString() || null,
-          value_type: 'mileage'
-        });
-      }
-
-      const newNextServiceHours = normalizeValue(data.next_service_hours);
-      const oldNextServiceHours = normalizeValue(maintenanceRecord?.next_service_hours);
-      if (newNextServiceHours !== oldNextServiceHours) {
-        fieldChanges.push({
-          field_name: 'next_service_hours',
-          old_value: oldNextServiceHours?.toString() || null,
-          new_value: newNextServiceHours?.toString() || null,
-          value_type: 'mileage'
-        });
-      }
+      fieldChanges.push(...serviceStateWrite.historyChanges);
 
       const newTrackerId = normalizeValue(data.tracker_id?.trim());
       const oldTrackerId = normalizeValue(maintenanceRecord?.tracker_id);
@@ -922,35 +916,39 @@ export function EditPlantRecordDialog({
                 )}
               </div>
 
-              {/* Next Service Hours */}
-              <div className="space-y-2">
-                <Label htmlFor="next_service_hours">Next Service (Hours)</Label>
-                <Input
-                  id="next_service_hours"
-                  type="number"
-                  {...register('next_service_hours')}
-                  placeholder="e.g., 2000"
-                  className="bg-input border-border text-white"
-                />
-                {errors.next_service_hours && (
-                  <p className="text-sm text-red-400">{errors.next_service_hours.message}</p>
-                )}
-              </div>
+              {canEditServiceState && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="next_service_hours">Next Service (Hours)</Label>
+                    <Input
+                      id="next_service_hours"
+                      type="number"
+                      min={0}
+                      {...register('next_service_hours')}
+                      placeholder="e.g., 2000"
+                      className="bg-input border-border text-white"
+                    />
+                    {errors.next_service_hours && (
+                      <p className="text-sm text-red-400">{errors.next_service_hours.message}</p>
+                    )}
+                  </div>
 
-              {/* Last Service Hours */}
-              <div className="space-y-2">
-                <Label htmlFor="last_service_hours">Last Service (Hours)</Label>
-                <Input
-                  id="last_service_hours"
-                  type="number"
-                  {...register('last_service_hours')}
-                  placeholder="e.g., 1000"
-                  className="bg-input border-border text-white"
-                />
-                {errors.last_service_hours && (
-                  <p className="text-sm text-red-400">{errors.last_service_hours.message}</p>
-                )}
-              </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="last_service_hours">Last Service (Hours)</Label>
+                    <Input
+                      id="last_service_hours"
+                      type="number"
+                      min={0}
+                      {...register('last_service_hours')}
+                      placeholder="e.g., 1000"
+                      className="bg-input border-border text-white"
+                    />
+                    {errors.last_service_hours && (
+                      <p className="text-sm text-red-400">{errors.last_service_hours.message}</p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
