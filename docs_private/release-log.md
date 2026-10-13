@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.8.1
+
+**GIT COMMIT MESSAGE**
+`fix: repair document readers and absence flows (fei_4fb4489388818f84)`
+
+**PUSHED AT**
+2026-10-13T17:01:21.117Z
+
+**WHAT CHANGED**
+Repair document readers and absence flows (fei_4fb4489388818f84).
+
+**VERSION HISTORY DETAILS**
+- Updated absence and leave, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated external documents, with changes to shared logic and automated tests.
+- Updated maintenance, with changes to app screens.
+- Updated fleet, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix: repair document readers and absence flows (fei_4fb4489388818f84)`
+
 ## 1026.8.0
 
 **GIT COMMIT MESSAGE**

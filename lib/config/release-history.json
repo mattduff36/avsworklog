@@ -1,5 +1,24 @@
 [
   {
+    "version": "1026.8.1",
+    "updateKind": "minor",
+    "title": "App improvements",
+    "description": "Repair document readers and absence flows (fei_4fb4489388818f84).",
+    "summary": "Repair document readers and absence flows (fei_4fb4489388818f84).",
+    "details": [
+      "Updated absence and leave, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated external documents, with changes to shared logic and automated tests.",
+      "Updated maintenance, with changes to app screens.",
+      "Updated fleet, with changes to app screens."
+    ],
+    "areas": [
+      "Repair document readers",
+      "Absence flows (fei_4fb4489388818f84)"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-10-13T17:01:21.117Z"
+  },
+  {
     "version": "1026.8.0",
     "updateKind": "major",
     "title": "External Documents update",
