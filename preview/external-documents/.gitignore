@@ -1,0 +1,5 @@
+.next/
+next-env.d.ts
+tsconfig.tsbuildinfo
+public/pdf.min.mjs
+public/pdf.worker.min.mjs

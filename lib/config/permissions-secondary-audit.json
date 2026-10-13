@@ -314,6 +314,19 @@
         "Manager": "No default access during the initial rollout. A future explicit Level 4 grant permits scoped labour and plant allocation management for the manager's team/reporting lines.",
         "Admin": "Automatic Level 5 access, including global allocation management and publication, independent of team defaults."
       }
+    },
+    {
+      "displayName": "External Documents",
+      "moduleName": "external-documents",
+      "matrixGate": "Contractor+ when the team or a user override enables it; no automatic team or user grants",
+      "minimumRole": "Contractor",
+      "byRole": {
+        "Contractor": "Enabled Level 1 retrieves active documents explicitly shared with the user. No upload, library-wide view, metadata or link edits, access grants, or archive.",
+        "Employee": "Same assigned-document retrieval when the module is enabled. No management actions.",
+        "Supervisor": "Same assigned-document retrieval. Upload, view-all, edits, grants, and archive require Level 4.",
+        "Manager": "Level 4 management when enabled: upload, view all, edit metadata and asset links, grant or revoke access, and archive or restore. Rollout does not grant this automatically.",
+        "Admin": "Automatic Level 5 access with the same management actions. Non-admin access still depends on an explicit team or user grant."
+      }
     }
   ],
   "prdRelevantMismatches": [

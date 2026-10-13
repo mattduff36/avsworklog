@@ -92,6 +92,10 @@
     --daily-allocation-primary: 204 78% 42%;
     --daily-allocation-light: 204 80% 95%;
     --daily-allocation-dark: 204 78% 30%;
+
+    --external-documents-primary: 239 32% 52%;
+    --external-documents-light: 239 30% 95%;
+    --external-documents-dark: 239 32% 36%;
     
     --report-primary: 150 70% 45%;
     --report-light: 150 100% 96%;
@@ -216,6 +220,12 @@
     --primary: var(--daily-allocation-primary);
     --primary-foreground: 210 40% 98%;
     --ring: var(--daily-allocation-primary);
+  }
+
+  [data-accent="external-documents"] {
+    --primary: var(--external-documents-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--external-documents-primary);
   }
 
   [data-accent="reports"] {
@@ -540,6 +550,14 @@ html[data-display-board-text-size="5"] {
   .bg-daily-allocation-dark { background-color: hsl(var(--daily-allocation-dark)); }
   .text-daily-allocation { color: hsl(var(--daily-allocation-primary)); }
   .border-daily-allocation { border-color: hsl(var(--daily-allocation-primary)); }
+
+  /* External Documents */
+  .bg-external-documents { background-color: hsl(var(--external-documents-primary)); }
+  .bg-external-documents-light { background-color: hsl(var(--external-documents-light)); }
+  .bg-external-documents-soft { background-color: hsl(var(--external-documents-primary) / 0.12); }
+  .bg-external-documents-dark { background-color: hsl(var(--external-documents-dark)); }
+  .text-external-documents { color: hsl(var(--external-documents-primary)); }
+  .border-external-documents { border-color: hsl(var(--external-documents-primary)); }
   
   /* Tab styling */
   [role="tab"][data-state="active"] {

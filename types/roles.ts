@@ -176,6 +176,7 @@ export const STANDARD_MODULES: ModuleName[] = [
   'inventory',
   'reminders',
   'daily-allocation',
+  'external-documents',
 ];
 
 export const MANAGEMENT_MODULES: ModuleName[] = [
@@ -218,6 +219,7 @@ export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'inventory': 'Inventory',
   'reminders': 'Reminders',
   'daily-allocation': 'Allocation',
+  'external-documents': 'Ext. Docs',
 };
 
 export const MODULE_CSS_VAR: Record<ModuleName, string> = {
@@ -245,6 +247,7 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'inventory': '--inventory-primary',
   'reminders': '--reminders-primary',
   'daily-allocation': '--daily-allocation-primary',
+  'external-documents': '--external-documents-primary',
 };
 
 // All available modules in the system
@@ -272,7 +275,8 @@ export type ModuleName =
   | 'quotes'
   | 'inventory'
   | 'reminders'
-  | 'daily-allocation';
+  | 'daily-allocation'
+  | 'external-documents';
 
 export type SensitiveAccessModuleName = ModuleName | 'debug';
 
@@ -301,6 +305,7 @@ export const ALL_MODULES: ModuleName[] = [
   'inventory',
   'reminders',
   'daily-allocation',
+  'external-documents',
 ];
 
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
@@ -328,6 +333,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'inventory': 'Inventory',
   'reminders': 'Reminders',
   'daily-allocation': 'Daily Allocation',
+  'external-documents': 'External Documents',
 };
 
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
@@ -355,6 +361,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'inventory': 'Track small tools, equipment, and location buckets',
   'reminders': 'View and action assigned reminders',
   'daily-allocation': 'Assign daily labour and plant to jobs, then publish tomorrow’s instructions',
+  'external-documents': 'Store and retrieve shared third-party documents',
 };
 
 // For API responses

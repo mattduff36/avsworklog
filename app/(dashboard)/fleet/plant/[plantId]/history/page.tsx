@@ -1,5 +1,7 @@
 'use client';
 
+import { AssetExternalDocuments } from '@/components/external-documents/AssetExternalDocuments';
+
 import { useState, useEffect, useCallback, use, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -693,6 +695,7 @@ export default function PlantHistoryPage({
 
         {/* Documents Tab */}
         <TabsContent value="documents" className="space-y-4">
+          <AssetExternalDocuments assetType="plant" assetId={unwrappedParams.plantId} />
           <Card className="bg-slate-800/50 border-border">
             <CardHeader>
               <CardTitle>Workshop Task Attachments</CardTitle>

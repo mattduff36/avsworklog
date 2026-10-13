@@ -1,5 +1,7 @@
 'use client';
 
+import { AssetExternalDocuments } from '@/components/external-documents/AssetExternalDocuments';
+
 import { useState, useEffect, useCallback, use, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
@@ -1360,6 +1362,7 @@ export default function VanHistoryPage({
 
         {/* Documents Tab */}
         <TabsContent value="documents">
+          <AssetExternalDocuments assetType="van" assetId={resolvedParams.vanId} />
           <Card className="bg-slate-800/50 border-border">
             <CardHeader>
               <CardTitle>Workshop Task Attachments</CardTitle>

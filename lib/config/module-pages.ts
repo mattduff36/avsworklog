@@ -198,6 +198,14 @@ export const MODULE_PAGES: ModulePage[] = [
         { value: 'daily-allocation-job', label: 'Job Allocation Sheet' },
       ],
     },
+    {
+      module: 'external-documents',
+      displayName: MODULE_DISPLAY_NAMES['external-documents'],
+      subPages: [
+        { value: 'external-documents-library', label: 'Document Library' },
+        { value: 'external-documents-view', label: 'View Document' },
+      ],
+    },
   {
     module: 'other',
     displayName: 'Other',
@@ -340,6 +348,10 @@ export function getPageUrl(value: string): string {
     'daily-allocation-board': '/daily-allocation',
     'daily-allocation-my': '/daily-allocation/my',
     'daily-allocation-job': '/daily-allocation/jobs/[code]',
+
+    // External Documents
+    'external-documents-library': '/external-documents',
+    'external-documents-view': '/external-documents',
     
     // Admin - FAQ
     'admin-faq-list': '/admin/faq',

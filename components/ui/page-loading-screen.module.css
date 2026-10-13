@@ -203,3 +203,8 @@
     transform: translateX(-25%);
   }
 }
+
+.screen[data-loader-accent="external-documents"],
+.compact[data-loader-accent="external-documents"] {
+  --loader-accent: var(--external-documents-primary);
+}

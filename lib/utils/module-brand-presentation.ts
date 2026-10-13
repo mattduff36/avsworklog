@@ -67,6 +67,11 @@ const SURFACE_BY_CSS_VAR: Record<string, ModuleBrandSurfaceClasses> = {
     cardHover: 'hover:bg-[hsl(var(--daily-allocation-primary)/0.16)]',
     thumbnail: 'border-[hsl(var(--daily-allocation-primary)/0.35)] bg-[hsl(var(--daily-allocation-primary)/0.40)] text-daily-allocation',
   },
+  '--external-documents-primary': {
+    card: 'border-[hsl(var(--external-documents-primary)/0.35)] bg-[hsl(var(--external-documents-primary)/0.10)]',
+    cardHover: 'hover:bg-[hsl(var(--external-documents-primary)/0.16)]',
+    thumbnail: 'border-[hsl(var(--external-documents-primary)/0.35)] bg-[hsl(var(--external-documents-primary)/0.40)] text-external-documents',
+  },
   '--avs-yellow': {
     card: 'border-[hsl(var(--avs-yellow)/0.35)] bg-[hsl(var(--avs-yellow)/0.10)]',
     cardHover: 'hover:bg-[hsl(var(--avs-yellow)/0.16)]',

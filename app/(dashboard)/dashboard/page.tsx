@@ -32,6 +32,7 @@ import { useRamsAssignmentSummary } from '@/lib/hooks/useNavMetrics';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError, createStatusError } from '@/lib/utils/http-error';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
 import { DashboardTaskBadgeLinks } from '@/components/layout/DashboardTaskBadgeLinks';
+import { ModuleBetaBadge } from '@/components/ui/module-beta-badge';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
 import { YardKioskAutoLaunch } from './components/YardKioskAutoLaunch';
 
@@ -469,6 +470,7 @@ export default function DashboardPage() {
         'inventory': 'inventory',
         'daily-allocation': 'daily-allocation',
         'reminders': 'reminders',
+        'external-documents': 'external-documents',
       };
 
       const moduleName = moduleMap[formType.id];
@@ -664,7 +666,7 @@ export default function DashboardPage() {
                 formType.id === 'maintenance' &&
                 !showPrimaryBadgeLoading &&
                 (maintenanceDueSoonCount > 0 || maintenanceOverdueCount > 0);
-              const showDailyAllocationBetaBadge = formType.id === 'daily-allocation';
+              const showDailyAllocationBetaBadge = formType.id === 'daily-allocation' || formType.id === 'external-documents';
               const maintenanceDueSoonAnimationIndex =
                 showMaintenanceBadges && maintenanceDueSoonCount > 0
                   ? nextDashboardBadgeAnimationIndex++
@@ -721,7 +723,7 @@ export default function DashboardPage() {
                     )}
                     {showDailyAllocationBetaBadge ? (
                       <div className="absolute top-2 right-2">
-                        <DailyAllocationBetaBadge tone="onColor" />
+                        <ModuleBetaBadge tone="onColor" accent={formType.id === 'external-documents' ? 'external-documents' : 'daily-allocation'} />
                       </div>
                     ) : null}
                     <Icon className={tabletModeEnabled ? 'h-12 w-12' : 'h-8 w-8'} />

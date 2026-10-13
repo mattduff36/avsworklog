@@ -33,6 +33,7 @@ import {
   SlidersHorizontal,
   PackageSearch,
   GraduationCap,
+  Files,
   LucideIcon
 } from 'lucide-react';
 import type { ModuleName, PermissionAccessLevel } from '@/types/roles';
@@ -134,6 +135,13 @@ export const employeeNavItems: NavItem[] = [
     icon: CalendarDays,
     module: 'daily-allocation',
     minimumAccessLevel: 2,
+    category: 'employee'
+  },
+  {
+    href: '/external-documents',
+    label: 'External Documents',
+    icon: Files,
+    module: 'external-documents',
     category: 'employee'
   },
   { 
