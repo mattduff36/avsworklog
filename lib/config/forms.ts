@@ -44,18 +44,6 @@ export interface FormType {
 
 export const FORM_TYPES: FormType[] = [
   {
-    id: 'external-documents',
-    title: 'External Documents',
-    description: 'Third-party reports and service records',
-    icon: FileText,
-    href: '/external-documents',
-    listHref: '/external-documents',
-    color: 'external-documents',
-    enabled: true,
-    minimumAccessLevel: 1,
-  },
-
-  {
     id: 'timesheet',
     title: 'Timesheets',
     description: 'Weekly time tracking',
@@ -175,6 +163,17 @@ export const FORM_TYPES: FormType[] = [
     listHref: '/reminders',
     color: 'reminders',
     enabled: true,
+  },
+  {
+    id: 'external-documents',
+    title: 'External Documents',
+    description: 'Third-party reports and service records',
+    icon: FileText,
+    href: '/external-documents',
+    listHref: '/external-documents',
+    color: 'external-documents',
+    enabled: true,
+    minimumAccessLevel: 1,
   },
   {
     id: 'help',
