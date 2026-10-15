@@ -1,5 +1,18 @@
 [
   {
+    "version": "1026.8.4",
+    "updateKind": "minor",
+    "title": "App improvements",
+    "description": "Load approvals details in batches the gateway accepts.",
+    "summary": "Load approvals details in batches the gateway accepts.",
+    "details": [
+      "Updated approvals, with changes to app screens, shared logic, and automated tests."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-10-15T23:49:23.646Z"
+  },
+  {
     "version": "1026.8.3",
     "updateKind": "minor",
     "title": "App improvements",

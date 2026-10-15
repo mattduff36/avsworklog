@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.8.4
+
+**GIT COMMIT MESSAGE**
+`fix: load approvals details in batches the gateway accepts`
+
+**PUSHED AT**
+2026-10-15T23:49:23.646Z
+
+**WHAT CHANGED**
+Load approvals details in batches the gateway accepts.
+
+**VERSION HISTORY DETAILS**
+- Updated approvals, with changes to app screens, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix: load approvals details in batches the gateway accepts`
+
 ## 1026.8.3
 
 **GIT COMMIT MESSAGE**
