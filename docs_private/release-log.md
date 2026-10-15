@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.8.3
+
+**GIT COMMIT MESSAGE**
+`fix: keep blank usage-event failures visible in logs (fei_2b3d85a6481fa899)`
+
+**PUSHED AT**
+2026-10-15T19:58:49.336Z
+
+**WHAT CHANGED**
+Name the approvals request when a load fails. Keep blank usage-event failures visible in logs (fei_2b3d85a6481fa899).
+
+**VERSION HISTORY DETAILS**
+- Updated external documents, with changes to interface components.
+- Updated approvals, with changes to app screens, shared logic, and automated tests.
+- Updated navigation, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `fix: name the approvals request when a load fails`
+- `fix: keep blank usage-event failures visible in logs (fei_2b3d85a6481fa899)`
+
 ## 1026.8.2
 
 **GIT COMMIT MESSAGE**
