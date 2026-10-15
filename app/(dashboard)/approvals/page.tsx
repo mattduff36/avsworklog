@@ -83,6 +83,7 @@ import {
   approvalsFetchFailureContext,
   markApprovalsFetchFailure,
 } from '@/lib/utils/approvals-fetch-error';
+import { chunkApprovalsIds } from '@/lib/utils/approvals-fetch-batches';
 import {
   canLoadApprovalsFilterDirectory,
   getApprovalsTimesheetStatuses,
@@ -654,46 +655,51 @@ function ApprovalsContent() {
 
       const minStartIso = weekBounds.reduce((min, row) => (row.startIso < min ? row.startIso : min), weekBounds[0].startIso);
       const maxEndIso = weekBounds.reduce((max, row) => (row.endIso > max ? row.endIso : max), weekBounds[0].endIso);
+      const timesheetIdChunks = chunkApprovalsIds(visibleTimesheetIds);
+      const profileIdChunks = chunkApprovalsIds(userIds);
 
-      const [entriesResult, absencesResult] = await Promise.all([
-        supabase
-          .from('timesheet_entries')
-          .select(`
-            timesheet_id,
-            day_of_week,
-            daily_total,
-            job_number,
-            timesheet_entry_job_codes (
+      const [entryResults, absenceResults] = await Promise.all([
+        Promise.all(timesheetIdChunks.map((timesheetIds) =>
+          supabase
+            .from('timesheet_entries')
+            .select(`
+              timesheet_id,
+              day_of_week,
+              daily_total,
               job_number,
-              display_order
-            ),
-            working_in_yard,
-            did_not_work
-          `)
-          .in('timesheet_id', visibleTimesheetIds),
-        supabase
-          .from('absences')
-          .select('profile_id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
-          .in('profile_id', userIds)
-          .in('status', ['pending', 'approved', 'processed'])
-          .lte('date', maxEndIso)
-          .or(`end_date.gte.${minStartIso},and(end_date.is.null,date.gte.${minStartIso})`),
+              timesheet_entry_job_codes (
+                job_number,
+                display_order
+              ),
+              working_in_yard,
+              did_not_work
+            `)
+            .in('timesheet_id', timesheetIds)
+        )),
+        Promise.all(profileIdChunks.map((profileIds) =>
+          supabase
+            .from('absences')
+            .select('profile_id, date, end_date, status, is_half_day, half_day_session, allow_timesheet_work_on_leave, absence_reasons(name,color,is_paid)')
+            .in('profile_id', profileIds)
+            .in('status', ['pending', 'approved', 'processed'])
+            .lte('date', maxEndIso)
+            .or(`end_date.gte.${minStartIso},and(end_date.is.null,date.gte.${minStartIso})`)
+        )),
       ]);
 
-      if (entriesResult.error) throw markApprovalsFetchFailure('timesheet-entries', entriesResult.error);
-      if (absencesResult.error) throw markApprovalsFetchFailure('absences', absencesResult.error);
+      const entriesError = entryResults.find((result) => result.error)?.error;
+      if (entriesError) throw markApprovalsFetchFailure('timesheet-entries', entriesError);
+      const absencesError = absenceResults.find((result) => result.error)?.error;
+      if (absencesError) throw markApprovalsFetchFailure('absences', absencesError);
 
       const entriesByTimesheet = new Map<string, TimesheetEntry[]>();
-      ((entriesResult.data || []) as TimesheetEntryWithTimesheetId[]).forEach(({ timesheet_id, ...entry }) => {
+      entryResults.flatMap((result) => (result.data || []) as TimesheetEntryWithTimesheetId[]).forEach(({ timesheet_id, ...entry }) => {
         const existing = entriesByTimesheet.get(timesheet_id) || [];
         existing.push(entry);
         entriesByTimesheet.set(timesheet_id, existing);
       });
 
-      const { data: absencesData, error: absencesError } = absencesResult;
-      if (absencesError) throw markApprovalsFetchFailure('absences', absencesError);
-
-      const approvedAbsences = (absencesData || []) as ApprovedAbsenceForApprovals[];
+      const approvedAbsences = absenceResults.flatMap((result) => (result.data || []) as ApprovedAbsenceForApprovals[]);
       const absencesByProfile = new Map<string, ApprovedAbsenceForApprovals[]>();
       approvedAbsences.forEach((absence) => {
         const existing = absencesByProfile.get(absence.profile_id) || [];
