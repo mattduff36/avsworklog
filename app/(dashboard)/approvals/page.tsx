@@ -78,6 +78,12 @@ import {
 import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import {
+  APPROVALS_FETCH_ERROR_CONTEXT_ID,
+  APPROVALS_FETCH_FAILURE_MESSAGE,
+  approvalsFetchFailureContext,
+  markApprovalsFetchFailure,
+} from '@/lib/utils/approvals-fetch-error';
+import {
   canLoadApprovalsFilterDirectory,
   getApprovalsTimesheetStatuses,
   getApprovalsDefaultStatusFilters,
@@ -617,7 +623,7 @@ function ApprovalsContent() {
       const { data: timesheetData, error: timesheetError } = await timesheetQuery
         .order('submitted_at', { ascending: false });
 
-      if (timesheetError) throw timesheetError;
+      if (timesheetError) throw markApprovalsFetchFailure('timesheet-headers', timesheetError);
       const typedTimesheets = (timesheetData || []) as TimesheetWithProfile[];
       const timesheetsWithLeaveTotals = typedTimesheets.map((timesheet) => ({
         ...timesheet,
@@ -674,8 +680,8 @@ function ApprovalsContent() {
           .or(`end_date.gte.${minStartIso},and(end_date.is.null,date.gte.${minStartIso})`),
       ]);
 
-      if (entriesResult.error) throw entriesResult.error;
-      if (absencesResult.error) throw absencesResult.error;
+      if (entriesResult.error) throw markApprovalsFetchFailure('timesheet-entries', entriesResult.error);
+      if (absencesResult.error) throw markApprovalsFetchFailure('absences', absencesResult.error);
 
       const entriesByTimesheet = new Map<string, TimesheetEntry[]>();
       ((entriesResult.data || []) as TimesheetEntryWithTimesheetId[]).forEach(({ timesheet_id, ...entry }) => {
@@ -685,7 +691,7 @@ function ApprovalsContent() {
       });
 
       const { data: absencesData, error: absencesError } = absencesResult;
-      if (absencesError) throw absencesError;
+      if (absencesError) throw markApprovalsFetchFailure('absences', absencesError);
 
       const approvedAbsences = (absencesData || []) as ApprovedAbsenceForApprovals[];
       const absencesByProfile = new Map<string, ApprovedAbsenceForApprovals[]>();
@@ -718,16 +724,16 @@ function ApprovalsContent() {
       const enrichedById = new Map(enrichedVisibleTimesheets.map((timesheet) => [timesheet.id, timesheet]));
       setTimesheets(timesheetsWithLeaveTotals.map((timesheet) => enrichedById.get(timesheet.id) || timesheet));
     } catch (error) {
-      const errorContextId = 'approvals-fetch-list-error';
+      const failureContext = approvalsFetchFailureContext(error);
       const shouldLogError =
         !isAuthErrorStatus(getErrorStatus(error)) &&
         !isClientSessionPausedError(error) &&
         !isNetworkFetchError(error);
 
       if (shouldLogError) {
-        console.error('Error fetching approvals:', error, { errorContextId });
+        console.error('Error fetching approvals:', error, failureContext);
       }
-      toast.error('Failed to load approvals', { id: errorContextId });
+      toast.error(APPROVALS_FETCH_FAILURE_MESSAGE, { id: APPROVALS_FETCH_ERROR_CONTEXT_ID });
     } finally {
       setLoading(false);
     }
