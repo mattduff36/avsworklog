@@ -34,6 +34,20 @@ function originMatchesRequest(request: NextRequest): boolean {
   }
 }
 
+const USAGE_ANALYTICS_FAILURE_MESSAGE = 'Failed to record usage analytics';
+
+function usageAnalyticsErrorForLog(error: unknown): Error {
+  if (!(error instanceof Error)) {
+    return new Error(USAGE_ANALYTICS_FAILURE_MESSAGE);
+  }
+
+  if (error.message.trim().length === 0) {
+    error.message = USAGE_ANALYTICS_FAILURE_MESSAGE;
+  }
+
+  return error;
+}
+
 function isTransientUsageAnalyticsError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const lowerMessage = message.toLowerCase();
@@ -89,8 +103,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const loggedError = usageAnalyticsErrorForLog(error);
     await logServerError({
-      error: error as Error,
+      error: loggedError,
       request,
       componentName: '/api/me/usage-events',
       additionalData: {
@@ -100,7 +115,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to record usage analytics' },
+      { error: loggedError.message },
       { status: 500 }
     );
   }
