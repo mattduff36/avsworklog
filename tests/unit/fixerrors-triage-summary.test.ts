@@ -56,6 +56,19 @@ describe('fixerrors triage summary', () => {
     expect(rendered).toContain('Say "fix" to proceed with this recommendation now.');
   });
 
+  it('FXERR-V5-SUMMARY-010 keeps outstanding rows when a new capture is empty', () => {
+    const rendered = renderFixerrorsRunSummary({
+      found: [],
+      fixedLive: [],
+      outstanding: [{ id: rowId, title: 'Employee directory', count: 1, nextStep: 'Deploy and verify live.' }],
+    });
+    expect(rendered).toContain('Errors found\n- none');
+    expect(rendered).toContain('Errors fixed live\n- none');
+    expect(rendered).toContain(rowId);
+    expect(rendered).toContain('Outstanding work remains: YES');
+    expect(rendered).toContain('Next step: Deploy and verify live.');
+  });
+
   it('FXERR-V5-SUMMARY-007 reports no outstanding work when every found item is closed', () => {
     const rendered = renderFixerrorsRunSummary({
       found: [{ id: 'cluster-1', title: 'Expected denial', count: 4, nextStep: null }],

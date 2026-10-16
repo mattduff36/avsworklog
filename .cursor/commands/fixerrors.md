@@ -5,7 +5,7 @@
 `npm run fixerrors` captures a repeatable-read snapshot of **untriaged active** production error logs and does not mutate those rows. `/fixerrors` then diagnoses, repairs, and finalizes exact row dispositions. Archiving never means an incident is live-fixed. Never push or deploy.
 
 1. Run `npm run fixerrors`. This writes the recovery artifact, analysis report, sanitized retrieval packet, and `docs_private/error-run-summary.txt`. It does not archive or triage captured rows. After a successful capture it may purge **archived** rows whose `archived_at` is older than 12 months. Suppressed localhost/admin rows stay in snapshot coverage and are not silently dropped.
-2. If the new snapshot is empty, Stop here: no analysis Task, no reviewer. Still reproduce the summary, including any already-triaged outstanding rows. Do not edit or commit.
+2. Always review already-triaged outstanding rows for deployed fixes, even when the new snapshot is empty. For each candidate, obtain current deployment identity and verification relevant to its original failure; a generic 401 smoke does not prove an error-handling fix. Reconcile only exact IDs through step 19 after validating the private evidence manifest and current row state. Evidence gaps leave the row outstanding with a concrete next step. An empty capture never proves closure. If there are no new rows, skip new-error analysis and product edits, then report the refreshed summary.
 3. Finalization is `npm run fixerrors:finalize` after a validated decision. It may update exact snapshot IDs from untriaged active to outstanding active, or archive them only as `no_fix_required` or `fixed_live`. Retention stays a separate transaction. `error_log_alerts` change only via verified CASCADE. Any artifact, target, schema, identity, expiry, partition, mixed-state, or transaction mismatch suspends operational trust and stops that write. Do not change `scripts/fixerrors-safety.ts` or `fixerrors-exact-snapshot-v5` from this command. v4 artifacts fail closed.
 4. After a non-empty snapshot, launch **exactly one** `Task` for premium analysis:
    - `subagent_type: "generalPurpose"`
@@ -38,4 +38,13 @@
 16. The parent completion message must reproduce `docs_private/error-run-summary.txt` exactly, with these sections in order: `Errors found`, `Errors fixed live`, `Errors still outstanding`, and `Outstanding work remains: YES` or `NO`. Each outstanding item includes one next step. No-fix rows are found, not fixed and not outstanding. After that status line, include the deterministic `Final recommendation` generated from the first outstanding next step and, when work remains, the exact invitation `Say "fix" to proceed with this recommendation now.` If no work remains, recommend that no further fixerrors action is required and omit the invitation.
 17. Resolve any printed monthly follow-up through the established flow.
 18. Crash recovery only: if finalization sealed a disposition but the transaction did not finish, `npm run fixerrors -- --cleanup` with the exact bound snapshot identity may be used. It must never blanket-archive untriaged rows and must never delete active or recently archived rows. Old v2/v3/v4 commands fail closed.
-19. Historical reconciliation is not part of this command. Use the separate exact-ID reconcile script only for a proven manifest. Do not unarchive by predicate.
+19. Historical reconciliation is not part of this command. Legacy reopen of untouched archives stays `npm run fixerrors:reconcile` with `--apply --confirm-target=<project-ref>`. Moving active outstanding rows to `fixed_live` is the separate registered contract `fixerrors-fixed-live` / `fixerrors-fixed-live-exact-id-v1`, dry-run by default:
+
+```bash
+npm run fixerrors:reconcile -- --mode=fixed-live --manifest=docs_private/fixerrors-fixed-live-manifest.json
+npm run fixerrors:reconcile -- --mode=fixed-live --manifest=docs_private/fixerrors-fixed-live-manifest.json --apply --confirm-target=<project-ref> --confirm-manifest=<sha256>
+```
+
+The checksum is the dry-run SHA-256 of the manifest file bytes. Apply is all-or-nothing under `SERIALIZABLE` and `FOR UPDATE`, updates only triage and archive metadata for those exact IDs, and refreshes `docs_private/error-run-summary.txt` from those closures plus every remaining outstanding row. Do not unarchive by predicate and do not broaden `fixerrors-exact-snapshot-v5`.
+
+If closure committed but report refresh failed, use the same manifest and confirmations with `--refresh` instead of `--apply`. This read-only recovery verifies every closed row and its stored deployment evidence before regenerating the post receipt and summary; it never repeats the mutation.

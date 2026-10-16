@@ -200,4 +200,60 @@ describe('TEE V2.2 trusted operational action policy', () => {
       reason: 'trusted-operational-scope-mismatch',
     });
   });
+
+  it('FE-TRUST-003 keeps fixed-live reconcile on a separate contract from v5', () => {
+    const fixedLive = TRUSTED_OPERATIONAL_ACTIONS['fixerrors-fixed-live'];
+    expect(fixedLive).toMatchObject({
+      commandId: 'fixerrors-fixed-live',
+      safetyContract: 'fixerrors-fixed-live-exact-id-v1',
+    });
+    expect(fixedLive.allowedMutations).toEqual([
+      expect.objectContaining({
+        operation: 'update',
+        purpose: 'fixed-live-exact-id',
+        targetPredicate: "status = 'active' AND triage_state = 'outstanding'",
+      }),
+    ]);
+    expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract).toBe('fixerrors-exact-snapshot-v5');
+    expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations).not.toEqual(
+      fixedLive.allowedMutations
+    );
+    expect(
+      classifyOperationalAction({
+        commandId: 'fixerrors-fixed-live',
+        safetyContract: 'fixerrors-fixed-live-exact-id-v1',
+        intent: 'execute',
+        explicitlyRequested: true,
+        confirmationBoundToSnapshot: true,
+        runtimeSafetyChecksPassed: true,
+        requestedMutations: fixedLive.allowedMutations,
+      })
+    ).toMatchObject({
+      kind: 'operational_execution',
+      trusted: true,
+      safetyContract: 'fixerrors-fixed-live-exact-id-v1',
+    });
+    expect(
+      classifyOperationalAction({
+        commandId: 'fixerrors-fixed-live',
+        safetyContract: 'fixerrors-exact-snapshot-v5',
+        intent: 'execute',
+        explicitlyRequested: true,
+        confirmationBoundToSnapshot: true,
+        runtimeSafetyChecksPassed: true,
+        requestedMutations: fixedLive.allowedMutations,
+      })
+    ).toMatchObject({
+      trustSuspended: true,
+      reason: 'trusted-operational-contract-mismatch',
+    });
+    expect(
+      classifyOperationalAction(
+        trustedExecution({ requestedMutations: fixedLive.allowedMutations })
+      )
+    ).toMatchObject({
+      trustSuspended: true,
+      reason: 'trusted-operational-scope-mismatch',
+    });
+  });
 });

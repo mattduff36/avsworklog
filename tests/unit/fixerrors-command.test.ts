@@ -32,7 +32,8 @@ describe('fixerrors command orchestration', () => {
     expect(command).toContain('gpt-5.6-sol-high');
     expect(command).toContain('docs_private/error-analysis-decision.json');
     expect(command).toMatch(/Do \*\*not\*\* use `architecture-gate` for analysis/u);
-    expect(command).toContain('Stop here: no analysis Task, no reviewer');
+    expect(command).toContain('Always review already-triaged outstanding rows');
+    expect(command).toContain('even when the new snapshot is empty');
   });
 
   it('FIXERR-CMD-003 requires a two-pass final-diff-reviewer after code-changing fixes', () => {
