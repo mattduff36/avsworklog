@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.8.5
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): reconcile verified outstanding errors by exact ID`
+
+**PUSHED AT**
+2026-10-16T01:12:29.175Z
+
+**WHAT CHANGED**
+Reconcile verified outstanding errors by exact ID.
+
+**VERSION HISTORY DETAILS**
+- Updated actions, with changes to automation scripts and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): reconcile verified outstanding errors by exact ID`
+
 ## 1026.8.4
 
 **GIT COMMIT MESSAGE**
