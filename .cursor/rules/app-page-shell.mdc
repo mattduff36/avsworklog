@@ -11,13 +11,13 @@ alwaysApply: false
 - Use `width="narrow"` only when the page intentionally needs a smaller reading width.
 - Do not use bare `max-w-*` page wrappers without `mx-auto`; they left-align inside the app layout.
 - Use the current header surface style: `rounded-lg border border-border bg-white p-6 dark:bg-slate-900`.
+- Standard module headers use a title, one short optional description, optional Beta badge and actions. Do not add a decorative icon or extra information/footer line; see `DESIGN.md`.
 
 ```tsx
 <AppPageShell>
   <AppPageHeader
     title="Module"
     description="Short description"
-    icon={<FileText className="h-5 w-5" />}
   />
   <Card className="border-border">...</Card>
 </AppPageShell>

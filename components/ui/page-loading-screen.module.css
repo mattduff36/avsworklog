@@ -208,3 +208,8 @@
 .compact[data-loader-accent="external-documents"] {
   --loader-accent: var(--external-documents-primary);
 }
+
+.screen[data-loader-accent="policies-procedures"],
+.compact[data-loader-accent="policies-procedures"] {
+  --loader-accent: var(--policies-procedures-primary);
+}

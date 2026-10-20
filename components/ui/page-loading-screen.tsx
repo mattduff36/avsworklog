@@ -18,6 +18,7 @@ export type LoaderAccent =
   | 'hgv-inspection'
   | 'hgv-inspections'
   | 'external-documents'
+  | 'policies-procedures'
   | 'rams'
   | 'absence'
   | 'maintenance'
@@ -44,6 +45,7 @@ const ROUTE_ACCENT_TO_LOADER_ACCENT: Record<AccentType, LoaderAccent> = {
   'plant-inspections': 'plant-inspection',
   'hgv-inspections': 'hgv-inspection',
   'external-documents': 'external-documents',
+  'policies-procedures': 'policies-procedures',
   rams: 'rams',
   absence: 'absence',
   maintenance: 'maintenance',

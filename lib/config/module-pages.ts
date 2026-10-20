@@ -206,6 +206,14 @@ export const MODULE_PAGES: ModulePage[] = [
         { value: 'external-documents-view', label: 'View Document' },
       ],
     },
+    {
+      module: 'policies-procedures',
+      displayName: MODULE_DISPLAY_NAMES['policies-procedures'],
+      subPages: [
+        { value: 'policies-procedures-library', label: 'Document Library' },
+        { value: 'policies-procedures-view', label: 'View Document' },
+      ],
+    },
   {
     module: 'other',
     displayName: 'Other',
@@ -352,6 +360,8 @@ export function getPageUrl(value: string): string {
     // External Documents
     'external-documents-library': '/external-documents',
     'external-documents-view': '/external-documents',
+    'policies-procedures-library': '/policies-procedures',
+    'policies-procedures-view': '/policies-procedures',
     
     // Admin - FAQ
     'admin-faq-list': '/admin/faq',

@@ -3,6 +3,17 @@
 /* Tailwind v4: enable class-based dark variant */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Register semantic utilities with Tailwind v4; CSS variables alone do not
+   generate bg-popover or text-muted-foreground classes. Resolve at use sites
+   so portalled menus and route-scoped accents retain the active theme. */
+@theme inline {
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+}
+
 /* AVS Squires Brand Colors */
 @layer base {
   :root {
@@ -93,6 +104,9 @@
     --daily-allocation-light: 204 80% 95%;
     --daily-allocation-dark: 204 78% 30%;
 
+    --policies-procedures-primary: 174 45% 36%;
+    --policies-procedures-light: 174 30% 95%;
+    --policies-procedures-dark: 174 45% 25%;
     --external-documents-primary: 239 32% 52%;
     --external-documents-light: 239 30% 95%;
     --external-documents-dark: 239 32% 36%;
@@ -226,6 +240,11 @@
     --primary: var(--external-documents-primary);
     --primary-foreground: 210 40% 98%;
     --ring: var(--external-documents-primary);
+  }
+  [data-accent="policies-procedures"] {
+    --primary: var(--policies-procedures-primary);
+    --primary-foreground: 210 40% 98%;
+    --ring: var(--policies-procedures-primary);
   }
 
   [data-accent="reports"] {
@@ -630,7 +649,6 @@ html { scroll-behavior: smooth; }
 [data-radix-popover-content],
 [data-side] {
   z-index: 250 !important;
-  position: fixed !important;
 }
 
 /* iOS Safari input width fixes */
@@ -1042,3 +1060,10 @@ body.app-widescreen-enabled main > .max-w-7xl {
   animation: validation-glow 1.8s ease-in-out infinite;
   outline: none;
 }
+
+  .bg-policies-procedures { background-color: hsl(var(--policies-procedures-primary)); }
+  .bg-policies-procedures-light { background-color: hsl(var(--policies-procedures-light)); }
+  .bg-policies-procedures-soft { background-color: hsl(var(--policies-procedures-primary) / 0.12); }
+  .bg-policies-procedures-dark { background-color: hsl(var(--policies-procedures-dark)); }
+  .text-policies-procedures { color: hsl(var(--policies-procedures-primary)); }
+  .border-policies-procedures { border-color: hsl(var(--policies-procedures-primary)); }

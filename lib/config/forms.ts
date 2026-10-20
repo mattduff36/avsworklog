@@ -176,6 +176,17 @@ export const FORM_TYPES: FormType[] = [
     minimumAccessLevel: 1,
   },
   {
+    id: 'policies-procedures',
+    title: 'Policies and Procedures',
+    description: 'Controlled policies, procedures and handbooks',
+    icon: FileText,
+    href: '/policies-procedures',
+    listHref: '/policies-procedures',
+    color: 'policies-procedures',
+    enabled: true,
+    minimumAccessLevel: 1,
+  },
+  {
     id: 'help',
     title: 'Help',
     description: 'FAQs and support resources',

@@ -327,6 +327,19 @@
         "Manager": "Level 4 management when enabled: upload, view all, edit metadata and asset links, grant or revoke access, and archive or restore. Rollout does not grant this automatically.",
         "Admin": "Automatic Level 5 access with the same management actions. Non-admin access still depends on an explicit team or user grant."
       }
+    },
+    {
+      "displayName": "Policies and Procedures",
+      "moduleName": "policies-procedures",
+      "matrixGate": "Enabled Level 1+ reads current published documents; Level 4+ controls versions. No automatic grants.",
+      "minimumRole": "Contractor",
+      "byRole": {
+        "Contractor": "Enabled Level 1 can read current published documents.",
+        "Employee": "Enabled Level 2 can read current published documents.",
+        "Supervisor": "Enabled Level 3 can read current published documents.",
+        "Manager": "Enabled Level 4 can upload drafts, publish versions, view history and archive or restore.",
+        "Admin": "Level 5 manages all documents; View As uses effective access."
+      }
     }
   ],
   "prdRelevantMismatches": [

@@ -1688,6 +1688,7 @@ describe('daily allocation manager board', () => {
     expect(screen.getByRole('button', { name: 'Add visit' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Assign resources' })).toBeInTheDocument();
     expect(screen.getByTestId('daily-allocation-module-header')).toHaveTextContent('Daily Allocation');
+    expect(screen.getByTestId('daily-allocation-module-header')).toHaveTextContent('Rev 1 · Manager One');
     expect(screen.getByTestId('daily-allocation-toolbar')).not.toContainElement(
       screen.getByRole('button', { name: 'Publication history' })
     );

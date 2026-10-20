@@ -4,13 +4,15 @@ import { cn } from '@/lib/utils/cn';
 export function ModuleBetaBadge({ className, tone = 'brand', accent = 'daily-allocation' }: {
   className?: string;
   tone?: 'brand' | 'onColor';
-  accent?: 'daily-allocation' | 'external-documents';
+  accent?: 'daily-allocation' | 'external-documents' | 'policies-procedures';
 }) {
   return (
     <Badge variant="outline" className={cn(
       'w-fit px-2 py-0 text-[10px] font-semibold uppercase tracking-[0.16em] print:hidden',
       tone === 'onColor'
         ? 'border-white/30 bg-white/10 text-white'
+        : accent === 'policies-procedures'
+          ? 'border-policies-procedures/30 bg-policies-procedures-soft text-teal-300'
         : accent === 'external-documents'
           ? 'border-external-documents/30 bg-external-documents-soft text-indigo-300'
           : 'border-daily-allocation/30 bg-daily-allocation-soft text-daily-allocation',

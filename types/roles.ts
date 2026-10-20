@@ -177,6 +177,7 @@ export const STANDARD_MODULES: ModuleName[] = [
   'reminders',
   'daily-allocation',
   'external-documents',
+  'policies-procedures',
 ];
 
 export const MANAGEMENT_MODULES: ModuleName[] = [
@@ -220,6 +221,7 @@ export const MODULE_SHORT_NAMES: Record<ModuleName, string> = {
   'reminders': 'Reminders',
   'daily-allocation': 'Allocation',
   'external-documents': 'Ext. Docs',
+  'policies-procedures': 'Policies',
 };
 
 export const MODULE_CSS_VAR: Record<ModuleName, string> = {
@@ -248,6 +250,7 @@ export const MODULE_CSS_VAR: Record<ModuleName, string> = {
   'reminders': '--reminders-primary',
   'daily-allocation': '--daily-allocation-primary',
   'external-documents': '--external-documents-primary',
+  'policies-procedures': '--policies-procedures-primary',
 };
 
 // All available modules in the system
@@ -276,7 +279,8 @@ export type ModuleName =
   | 'inventory'
   | 'reminders'
   | 'daily-allocation'
-  | 'external-documents';
+  | 'external-documents'
+  | 'policies-procedures';
 
 export type SensitiveAccessModuleName = ModuleName | 'debug';
 
@@ -306,6 +310,7 @@ export const ALL_MODULES: ModuleName[] = [
   'reminders',
   'daily-allocation',
   'external-documents',
+  'policies-procedures',
 ];
 
 export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
@@ -334,6 +339,7 @@ export const MODULE_DISPLAY_NAMES: Record<ModuleName, string> = {
   'reminders': 'Reminders',
   'daily-allocation': 'Daily Allocation',
   'external-documents': 'External Documents',
+  'policies-procedures': 'Policies and Procedures',
 };
 
 export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
@@ -362,6 +368,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'reminders': 'View and action assigned reminders',
   'daily-allocation': 'Assign daily labour and plant to jobs, then publish tomorrow’s instructions',
   'external-documents': 'Store and retrieve shared third-party documents',
+  'policies-procedures': 'Controlled company policies, procedures and handbooks',
 };
 
 // For API responses

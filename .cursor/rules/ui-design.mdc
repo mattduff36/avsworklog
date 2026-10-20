@@ -16,3 +16,5 @@ Read the relevant sections of `DESIGN.md` for substantial UI work: new pages; pa
 For trivial local work (copy/text, one-property styling, tiny isolated fixes, or logic-only edits inside a TSX component), follow this rule plus the local canonical implementation. Load `DESIGN.md` only if the change is uncertain.
 
 Do not treat Inventory mobile chrome, Workshop’s hand-rolled header, or tablet-mode experiments as the default page recipe. Named references and anti-patterns are in `DESIGN.md`. For new generic chrome and reusable visual patterns, follow `DESIGN.md` even when the current module already contains a documented legacy or specialised look.
+
+For new modules, follow DESIGN.md's required management-list composition and visual acceptance checklist. Reuse existing loaders/search/actions; library imports alone do not establish visual quality. Record legacy inconsistencies separately instead of copying or broadly rewriting them.

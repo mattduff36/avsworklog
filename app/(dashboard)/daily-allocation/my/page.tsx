@@ -132,7 +132,7 @@ function MyDailyAllocationBody({
       {current ? (
         <IssuedAllocationCard item={current} highlighted={highlighted} />
       ) : (
-        <Card>
+        <Card className="border-border">
           <CardContent className="p-6 text-sm text-muted-foreground">
             No published allocation is available yet.
           </CardContent>
@@ -140,7 +140,7 @@ function MyDailyAllocationBody({
       )}
       {earlier.length ? (
         <div className="mt-6 space-y-3">
-          <h2 className="text-lg font-semibold">Earlier revisions</h2>
+          <h2 className="text-lg font-semibold text-foreground">Earlier revisions</h2>
           {earlier.map((item) => (
             <IssuedAllocationCard
               key={`${item.publication_id}-${item.work_date}-${item.revision_no}`}

@@ -43,6 +43,8 @@ Verified route keys in `lib/theme/getAccentFromRoute.ts`:
 | `inventory` | `/inventory` |
 | `reminders` | `/reminders` |
 | `daily-allocation` | `/daily-allocation` |
+| `external-documents` | `/external-documents` |
+| `policies-procedures` | `/policies-procedures` |
 | `debug` | `/debug` |
 | `reports` | `/reports` |
 | `fleet` | `/fleet` |
@@ -56,7 +58,7 @@ Each module also has `.bg-*`, `.bg-*-light`, `.bg-*-dark`, `.text-*`, `.border-*
 
 **How to use colour**
 
-- Navbar wordmark, house icon, and most header icons stay AVS yellow (`AppPageHeader` icon well is `bg-avs-yellow/15 text-avs-yellow` unless overridden).
+- Navbar wordmark and house icon stay AVS yellow. Standard module headers omit decorative icons; where a specialist header icon is explicitly approved, its `AppPageHeader` icon well defaults to `bg-avs-yellow/15 text-avs-yellow` unless overridden.
 - Primary in-page actions on a coloured module should use that module utility (`bg-inventory`, `bg-workshop`, …) with explicit light text. Do not assume `bg-primary` is readable: module `--primary-foreground` is light, brand yellow’s is dark.
 - Do not flood a page with module colour. Use it for selected tabs, primary CTAs, loaders, and a few tinted chips.
 
@@ -67,7 +69,7 @@ Active tabs are globally forced to `--primary` in `globals.css` (`[role="tab"][d
 Stable recipe for a new dashboard page:
 
 1. `AppPageShell` (`mx-auto w-full space-y-6`, default `max-w-6xl`). Widths: `narrow` 4xl, `medium` 5xl, `default` 6xl, `wide` 7xl, `full` none.
-2. `AppPageHeader` with `title`, optional `description`, optional Lucide `icon`, optional `actions`.
+2. `AppPageHeader` with `title`, one optional short `description`, optional `actions`, and Beta badge in `titleMeta` when applicable. Standard module title bars have no decorative icon or extra information/footer line. Icon/footer slots are for explicitly approved specialist exceptions, not the new-module default. Match the loading header to the same convention.
 3. `Card` / table / tabs below.
 
 The dashboard content column is separately capped at `max-w-7xl mx-auto px-4 sm:px-6 lg:px-8` in `DashboardContent`, except:
@@ -90,13 +92,14 @@ Copy from `components/ui/` unless a named reference already specialises:
 - Canonical: `button`, `card`, `input`, `select`, `dialog`, `alert-dialog`, `tabs`, `table`, `badge`, `search-input`, `status-filter`, `multi-select-filter`, `data-view-controls`, `sonner`, `page-loader` / `page-loading-screen`, `service-unavailable-state`.
 - Specialised — do not generalise: `once-ui` (add-asset), `selectable-card` (RAMS/timesheet/inspection/absence pickers), Inventory mobile chrome.
 
-`Badge` is small and muted by default. Put status colour on the badge or a chip, not on the whole card. Dashboard home tiles use `lib/utils/module-brand-presentation.ts` for tinted surfaces; that helper is for the home grid, not a second page-card system. Do not invent a matching tile kit on other routes.
+`Badge` is small but its default variant uses the route primary colour. Use explicit semantic variants/classes for status; do not treat every status as a primary action. Put status colour on the badge or a chip, not on the whole card. Dashboard home tiles use `lib/utils/module-brand-presentation.ts` for tinted surfaces; that helper is for the home grid, not a second page-card system. Do not invent a matching tile kit on other routes.
 
 ## Surfaces and borders
 
 - Default card: `rounded-lg border bg-slate-900` (`components/ui/card.tsx`). Prefer adding `border-border` or `border-slate-700` explicitly on new cards.
 - Softer experimental surfaces (Inventory): `border-slate-700/60 bg-slate-900/60` or `bg-slate-900/70`. Do not make that the default.
 - Dialogs: `globals.css` forces `[role="dialog"]` / `[role="alertdialog"]` to card background, `1px` border, `z-index: 200`. Dropdowns/popovers sit at `z-250`.
+- Dropdown menus must have an opaque slate surface (`bg-popover`), readable foreground, border and visible focus state. Tailwind v4 semantic utilities must be registered in `@theme inline`; defining the raw CSS token alone does not generate a utility. Let Radix position its content within its portal wrapper: never force `position: fixed` on `[data-side]`. Verify the menu opens beside its trigger, stays inside the viewport, and closes with Escape with focus returned to the trigger.
 - Border strength is usually `border-border` (slate-800) or `border-slate-600` / `border-slate-700` on controls.
 
 ## Typography
@@ -105,6 +108,7 @@ Copy from `components/ui/` unless a named reference already specialises:
 - Card title primitive: `text-2xl font-semibold`.
 - Body / table: `text-sm`. Inputs are `text-base` on small screens and `md:text-sm` to avoid iOS zoom.
 - Muted: `text-muted-foreground` or `text-slate-300` / `text-slate-400`.
+- Table helper/secondary lines (references, categories, file formats and supporting metadata) use `text-xs text-muted-foreground` (light grey/slate-400), visibly quieter than the primary title/value. Check the computed colour in the browser; a smaller font alone is not a muted hierarchy. Preserve explicit status and overdue colours.
 - Placeholders are forced muted/slate-400.
 
 A `@media (max-width: 768px)` block in `globals.css` shrinks `html` to `12.8px` and overrides many spacing/type utilities. Profile mobile text-size steps (`data-mobile-text-size`, 1–5) further scale `html` under `767px`. Display-board text size is a separate `data-display-board-text-size` scale.
@@ -150,7 +154,7 @@ Desktop management lists are tables (`components/ui/table.tsx`, `text-sm`). Card
 - mobile list alternatives (Projects manage has `ProjectsDocumentsMobileCards`)
 - summary metrics
 
-Timesheets is the cleanest table + `DataViewToggle` example. Inventory’s desktop table is fine to copy; its mobile cards/nav are not the default.
+Timesheets is a table + `DataViewToggle` reference (its current saved/default view may be cards); copy the relevant table component, not the whole page. Inventory’s desktop table is fine to copy; its mobile cards/nav are not the default.
 
 ## Forms and dialogs
 
@@ -166,7 +170,7 @@ Use `Dialog` / `AlertDialog`. `DialogContent` supports `size`, `scroll`, `mobile
 
 | State | Current representation |
 | --- | --- |
-| Full-page auth/boot | `PageLoader` → `PageLoadingScreen` (route accent spinner) |
+| Full-page auth/boot | `PageLoader` → `PageLoadingScreen` (shared animated progress bar with route accent) |
 | Page ready, body loading | `AppPageLoadingShell` or `SectionLoader` / `PanelLoader` |
 | Empty | in-page muted copy or an empty `Card`, not a shared empty component |
 | Service outage | `ServiceUnavailableState` (amber card) and `DatabaseOutageBlocker` |
@@ -217,8 +221,8 @@ Page-specific / do not copy as default: custom mobile header card (`rounded-xl`,
 2. Copy the closest named reference, not a random large page.
 3. Wrap with `AppPageShell` + `AppPageHeader`.
 4. Gate with `usePermissionCheck` / `useModuleAccessLevel` for UX; enforce on the server.
-5. Use `SearchInput`, `StatusFilter`, and `DataViewToggle` if the page is a list.
-6. Desktop table; add cards only if the reference already does.
+5. Use `SearchInput` and the appropriate shared filters. Add `DataViewToggle` only when both views solve a real task; it is not required on every list.
+6. Desktop management table; on mobile preserve essential information and usable actions with a deliberate compact layout or cards. Never squeeze an action-heavy desktop table to fit.
 7. Tabs: no list gap unless tablet mode already wraps.
 8. Toasts + `AlertDialog`; loaders from `AppPageLoadingShell` / `PanelLoader`.
 9. Keep module colour on primary CTA and active tab; keep header icon yellow unless the reference overrides it.
@@ -228,7 +232,7 @@ Page-specific / do not copy as default: custom mobile header card (`rounded-xl`,
 **Use**
 
 - New standard module page: `app/(dashboard)/timesheets/page.tsx`
-- Tabbed asset module: `app/(dashboard)/fleet/page.tsx`
+- Tabbed asset module: `app/(dashboard)/fleet/page.tsx` (tabs/organisation only; its manual header is legacy, use AppPageHeader)
 - Employee issued/read view: `app/(dashboard)/daily-allocation/my/page.tsx`
 - Dense admin table + dialogs: `app/(dashboard)/admin/users/page.tsx`
 - Shared shell primitives: `components/layout/AppPageShell.tsx`, `components/layout/AppPageLoadingShell.tsx`
@@ -243,3 +247,40 @@ Page-specific / do not copy as default: custom mobile header card (`rounded-xl`,
 - `components/daily-allocation/LegacyDailyAllocationManager.tsx` — legacy board
 - `components/ui/once-ui.tsx` — add-asset only
 - `components/layout/MobileNavBar.tsx` — not shipped
+
+
+## Required composition for new management lists
+
+This is the target for new and substantially revised UI. Existing exceptions are tracked in [UI_DESIGN_AUDIT.md](docs/UI_DESIGN_AUDIT.md); their presence is not permission to copy them. A library import alone does not meet this standard.
+
+- **Header:** AppPageShell + AppPageHeader; title, one short optional description, optional Beta badge in titleMeta, one clear primary action. No decorative title icon or additional information/footer line on standard modules. Put essential workflow help beside the relevant control or inside its dialog. No invented statistics or decorative metric cards.
+- **List surface:** one bordered Card containing a consistently padded toolbar and list; avoid nested cards on desktop. SearchInput grows, labelled Select/MultiSelectFilter controls wrap. Keep refresh separate from destructive actions. Show result count and a clear-filter action when filtered.
+- **Table:** use components/ui/table, text-sm, muted header and aligned cells. Give the main entity the most width; title is prominent, reference/category secondary. Keep dates/version/status compact. Use explicit semantic status chips (published/success, draft/neutral, archived/muted) with text as well as colour. Format dates for en-GB; distinguish missing dates from overdue dates. Do not turn every status into a bright primary badge.
+- **Actions:** keep the main read/open action visible; group secondary actions in the existing DropdownMenu with a record-specific accessible name. Separate destructive/archive actions and retain AlertDialog confirmation. Hide actions unavailable to the effective access level; server enforcement remains essential. Do not make a clickable row the only way to open an item.
+- **Mobile:** preserve document identity, status and primary action; combine secondary metadata or use a deliberate card view. Avoid horizontal page overflow and long rows of buttons. Allow long names/references to wrap. Controls must remain usable under the app's global mobile scaling.
+- **States:** AppPageLoadingShell for initial page readiness, PanelLoader/SectionLoader for content loading. Never introduce plain loading paragraphs or a new loader for ordinary module fetches. Inline button spinners remain appropriate for mutations. Keep errors distinct from empty results, supply Retry, and never display an error as a zero-result success. Empty library, filtered zero-results and no published reader documents need different copy/actions. Clear filters only clears view state.
+- **Dialogs:** use shared Dialog/AlertDialog, title and description, bounded scroll and explicit readable primary colours. Preserve focus return and Escape behaviour. Version history needs readable status/date hierarchy too. Loading, denial and mutation-disabled states must remain distinct.
+
+### Module identity and navigation contract
+
+Module links in the navbar must match their dashboard tile's identity; modules present in both surfaces must retain the same relative order after permission filtering. Home, management-only links and role-specific destinations are deliberate exceptions, not reasons to maintain arbitrary ordering. The navbar wordmark may remain AVS yellow; the entire bar need not be flooded with route colour.
+
+Current implementation still duplicates mappings in forms/navigation, Navbar, route accents, roles, tile presentation and loader CSS. A consolidated presentation registry is **planned, not shipped**. Until then, check every applicable mapping when adding a module. Do not change permissions or collapse different route thresholds while unifying presentation.
+
+### Working references by concern
+
+| Concern | Reference | Boundary |
+| --- | --- | --- |
+| Standard shell and actions | components/layout/AppPageShell.tsx | Prefer its slots over manual headers. |
+| Compact list, secondary actions and states | components/policies-procedures/PoliciesWorkspace.tsx | First implementation of this recipe; desktop/mobile checked, owner visual approval pending. Do not copy document domain logic. |
+| Sortable operational table | app/(dashboard)/timesheets/components/TimesheetsListTable.tsx | Reuse composition; column visibility and multiple views are optional. |
+| Search and filters | components/ui/search-input.tsx, status-filter.tsx, multi-select-filter.tsx | Choose controls for the actual filter semantics. |
+| Loading | components/layout/AppPageLoadingShell.tsx, components/ui/panel-loader.tsx | Use registered module accent, preserve existing animation. |
+
+### Visual acceptance before calling a module complete
+
+1. Check desktop and narrow mobile, long titles, populated lists and open action menus/dialogs. Verify keyboard focus and record-specific labels; colour must not be the only status indicator.
+2. Check loading, failure/retry, empty library and no matches; confirm no content flash while permissions load. Check reader/controller/denied views without modifying live records.
+3. Compare navbar icon/active colour, dashboard identity and relative order. If shared implementation is deferred, record it explicitly rather than claiming consistency.
+4. Preserve existing data/API/permission behaviour; run typecheck and focused affected tests. Visual checks complement them, not replace them. No production build or deployment is implied by UI work.
+5. Report exactly which states/viewports were inspected and which remain unverified. A source inventory is not a browser audit. Do not impose screenshot tests on every small change.

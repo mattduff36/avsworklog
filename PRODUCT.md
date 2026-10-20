@@ -73,6 +73,14 @@ Open (not invented here): visual world, palette, typography, and exact FFTS boar
 4. Permissions follow current effective module access, not JWT user metadata.
 5. Adapt proven schedule-board interactions without importing another product's data model.
 
+## Quotes: negative invoice entry
+
+Accounts/admin users can record a Sage credit note by entering a negative ad-hoc invoice amount and selecting the original invoice. This creates one entry in the existing financial-adjustment ledger, not a negative invoice row. The credit requires a reference, date and reason, cannot exceed the remaining invoice balance, and follows existing reconciliation confirmation and reversal behaviour. Sage remains the accounting source of truth.
+
+## Policies and Procedures
+
+The controlled document library serves current published policies and procedures to permitted readers. Document controllers (module Level 4) upload immutable draft versions, explicitly publish completed documents and archive/restore documents. A replacement draft leaves the previous published version available until publication. Historical versions are retained for controllers. Files remain private and all access follows effective module permissions and any configured PIN gate. Initial SharePoint imports remain drafts until reviewed and published; the source-of-truth cutover requires release acceptance.
+
 ## Error log triage
 
 Application error logs on `/debug` stay visible until their outcome is closed. Untriaged active rows are red. Diagnosed rows that are not yet deployed and verified live stay active and are orange, with one next step. Only no-fix-required rows and deployed live-verified fixes are archived. A local commit is not a live fix. Bulk archive is not a product action.

@@ -349,7 +349,7 @@ export function LegacyDailyAllocationManager() {
           title="Daily Allocation unavailable"
           titleMeta={dailyAllocationBetaBadge}
           description={loadError || 'The allocation board could not be loaded.'}
-          actions={<Button onClick={() => void loadBoard(workDate)}>Retry</Button>}
+          actions={<Button className="h-11 bg-daily-allocation text-white hover:bg-daily-allocation-dark md:h-9" onClick={() => void loadBoard(workDate)}>Retry</Button>}
         />
       </AppPageShell>
     );
@@ -363,19 +363,37 @@ export function LegacyDailyAllocationManager() {
         description="Assign one primary job per employee, plan plant, then publish immutable instructions."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => setWorkDate(format(addDays(parseISO(workDate), -1), 'yyyy-MM-dd'))}>
+            <p className="basis-full text-sm text-muted-foreground md:max-w-xs md:basis-auto md:text-right">
+              {board.latest_publication
+                ? `Latest published revision ${board.latest_publication.revision_no}${board.latest_publication.published_by_name ? ` by ${board.latest_publication.published_by_name}` : ''}`
+                : 'No published revision for this date yet.'}
+            </p>
+            <Button variant="outline" className="h-11 w-11 md:h-9 md:w-9" aria-label="Previous day" onClick={() => setWorkDate(format(addDays(parseISO(workDate), -1), 'yyyy-MM-dd'))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Input
               type="date"
+              aria-label="Work date"
               value={workDate}
               onChange={(event) => setWorkDate(event.target.value)}
-              className="w-auto"
+              className="h-11 w-auto md:h-10"
             />
-            <Button variant="outline" onClick={() => setWorkDate(format(addDays(parseISO(workDate), 1), 'yyyy-MM-dd'))}>
+            <Button variant="outline" className="h-11 w-11 md:h-9 md:w-9" aria-label="Next day" onClick={() => setWorkDate(format(addDays(parseISO(workDate), 1), 'yyyy-MM-dd'))}>
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button onClick={() => setConfirmPublish(true)} disabled={loading || incompleteCount > 0}>
+            {incompleteCount > 0 ? (
+              <p id="legacy-daily-allocation-publish-reason" className="max-w-sm text-sm text-muted-foreground">
+                {incompleteCount} employee{incompleteCount === 1 ? '' : 's'} still need a job
+              </p>
+            ) : (
+              <p className="text-sm text-emerald-300">Ready to publish</p>
+            )}
+            <Button
+              className="h-11 bg-daily-allocation text-white hover:bg-daily-allocation-dark md:h-9"
+              onClick={() => setConfirmPublish(true)}
+              disabled={loading || incompleteCount > 0}
+              aria-describedby={incompleteCount > 0 ? 'legacy-daily-allocation-publish-reason' : undefined}
+            >
               Publish
             </Button>
           </div>
@@ -386,22 +404,6 @@ export function LegacyDailyAllocationManager() {
         <AppPageLoadingShell title="Daily Allocation" message="Loading board..." />
       ) : (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            {board.latest_publication ? (
-              <span>
-                Latest published revision {board.latest_publication.revision_no}
-                {board.latest_publication.published_by_name ? ` by ${board.latest_publication.published_by_name}` : ''}
-              </span>
-            ) : (
-              <span>No published revision for this date yet.</span>
-            )}
-            {incompleteCount > 0 ? (
-              <Badge variant="secondary">{incompleteCount} employee{incompleteCount === 1 ? '' : 's'} still need a job</Badge>
-            ) : (
-              <Badge>Ready to publish</Badge>
-            )}
-          </div>
-
           {board.publication_history.length > 0 ? (
             <Card>
               <CardHeader>
@@ -595,7 +597,7 @@ function LabourRow({
               <Badge variant="secondary">{row.blocking_absence?.reason_name || row.availability.replaceAll('_', ' ')}</Badge>
             ) : null}
             {row.pending_absence ? <Badge variant="outline">Pending absence</Badge> : null}
-            {row.publish_ready ? <Badge>Ready</Badge> : <Badge variant="secondary">Incomplete</Badge>}
+            {row.publish_ready ? <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-300">Ready</Badge> : <Badge variant="outline" className="border-slate-600 bg-slate-800 text-slate-300">Incomplete</Badge>}
           </div>
         </div>
         {row.warnings.map((warning) => (

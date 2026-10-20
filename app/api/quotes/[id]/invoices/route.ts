@@ -1,3 +1,4 @@
+import { recordNegativeInvoice } from '@/lib/server/quote-credit-entry';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
     const body = await request.json() as {
+      credited_invoice_id?: string;
       invoice_request_id?: string;
       invoice_number?: string;
       invoice_date?: string;
@@ -83,6 +85,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         comments?: string | null;
       }>;
     };
+
+    if (Number(body.amount) < 0) {
+      return recordNegativeInvoice(id, body, user.id);
+    }
 
     const fieldErrors: InvoiceFieldErrors = {};
     const normalizedInvoiceNumber = typeof body.invoice_number === 'string' ? body.invoice_number.trim() : '';

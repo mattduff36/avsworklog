@@ -108,6 +108,7 @@ interface QuoteDetailsDirtySnapshot {
   startAlertDays: string;
   completionStatus: QuoteCompletionStatus;
   completionComments: string;
+  creditedInvoiceId: string;
   invoiceNumber: string;
   invoiceAmount: string;
   invoiceDate: string;
@@ -302,6 +303,9 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [startAlertDays, setStartAlertDays] = useState('');
   const [completionStatus, setCompletionStatus] = useState<QuoteCompletionStatus>('approved_in_full');
   const [completionComments, setCompletionComments] = useState('');
+  const [creditedInvoiceId, setCreditedInvoiceId] = useState('');
+  const [creditVarianceRequired, setCreditVarianceRequired] = useState(false);
+  const [confirmCreditVariance, setConfirmCreditVariance] = useState(false);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceAmount, setInvoiceAmount] = useState('');
   const [invoiceDate, setInvoiceDate] = useState(new Date().toISOString().slice(0, 10));
@@ -362,6 +366,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const canManageSchedule = Boolean(isLatestVersion && quote && ['po_received', 'in_progress'].includes(quote.status));
   const canEditQuote = Boolean(isLatestVersion && quote && ['draft', 'changes_requested', 'pending_internal_approval'].includes(quote.status));
   const canDeleteDraft = Boolean(isLatestVersion && quote?.status === 'draft');
+  const isCreditEntry = !selectedInvoiceRequestId && Number(invoiceAmount) < 0;
   const canManageInvoices = isLatestVersion;
   const canManageAttachments = isLatestVersion;
   const canCreateVersions = isLatestVersion;
@@ -429,6 +434,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     startAlertDays,
     completionStatus,
     completionComments,
+    creditedInvoiceId,
     invoiceNumber,
     invoiceAmount,
     invoiceDate,
@@ -591,6 +597,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
   function clearInvoiceError(field?: string) {
     setInvoiceError(null);
+    if (field) {
+      setCreditVarianceRequired(false);
+      setConfirmCreditVariance(false);
+    }
     if (!field) {
       setInvoiceFieldErrors({});
       return;
@@ -663,8 +673,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
     const amount = selectedInvoiceRequest ? Number(selectedInvoiceRequest.requested_amount) : Number(invoiceAmount);
     if (!selectedInvoiceRequest) {
-      if (!invoiceAmount || !Number.isFinite(amount) || amount <= 0) {
-        errors.amount = 'Enter an invoice amount greater than 0.';
+      if (!invoiceAmount || !Number.isFinite(amount) || amount === 0) {
+        errors.amount = 'Enter a positive invoice amount or a negative credit amount.';
+      }
+      if (amount < 0) {
+        if (!canManageSage) errors.amount = 'Only Accounts or admin users can record credit notes.';
+        if (!creditedInvoiceId) errors.credited_invoice_id = 'Choose the original invoice.';
+        if (!invoiceComments.trim()) errors.comments = 'Enter the reason for the credit.';
       }
 
       if (!invoiceDate) {
@@ -680,6 +695,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     if (
       quote?.merge_info
       && !selectedInvoiceRequest
+      && !isCreditEntry
       && invoiceMergeScope === 'source'
       && invoiceSourceThreadIds.length === 0
     ) {
@@ -708,6 +724,9 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setStartAlertDays(nextQuote.start_alert_days ? String(nextQuote.start_alert_days) : '');
     setCompletionStatus(nextQuote.completion_status === 'approved_in_part' ? 'approved_in_part' : 'approved_in_full');
     setCompletionComments(nextQuote.completion_comments || '');
+    setCreditedInvoiceId('');
+    setCreditVarianceRequired(false);
+    setConfirmCreditVariance(false);
     setInvoiceNumber('');
     setInvoiceAmount(nextInvoiceAmount);
     setInvoiceDate(today);
@@ -749,6 +768,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       startAlertDays: nextQuote.start_alert_days ? String(nextQuote.start_alert_days) : '',
       completionStatus: nextQuote.completion_status === 'approved_in_part' ? 'approved_in_part' : 'approved_in_full',
       completionComments: nextQuote.completion_comments || '',
+      creditedInvoiceId: '',
       invoiceNumber: '',
       invoiceAmount: nextInvoiceAmount,
       invoiceDate: today,
@@ -1268,6 +1288,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          credited_invoice_id: isCreditEntry ? creditedInvoiceId : undefined,
+          confirm_variance: isCreditEntry ? confirmCreditVariance : undefined,
           invoice_request_id: selectedInvoiceRequest?.id || undefined,
           invoice_number: invoiceNumber,
           invoice_date: selectedInvoiceRequest?.requested_invoice_date || invoiceDate,
@@ -1283,10 +1305,13 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       });
 
       if (!res.ok) {
+        if (isCreditEntry && res.status === 409) setCreditVarianceRequired(true);
         throw await buildResponseError(res, 'Unable to add this invoice right now.');
       }
 
-      toast.success('Invoice added');
+      const result = await res.json();
+      toast.success(isCreditEntry ? 'Credit note recorded in the financial adjustment ledger' : 'Invoice added');
+      if (result.warning) toast.warning(result.warning);
       setInvoiceNumber('');
       setInvoiceAmount('');
       setInvoiceComments('');
@@ -2321,10 +2346,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       <div className="space-y-2">
                         <Label>Pending Request</Label>
                         <Select
-                          value={selectedInvoiceRequestId}
+                          value={selectedInvoiceRequestId || 'ad-hoc'}
                           onValueChange={(value) => {
                             clearInvoiceError();
-                            setSelectedInvoiceRequestId(value);
+                            setSelectedInvoiceRequestId(value === 'ad-hoc' ? '' : value);
                             setInvoiceMatchesRequest(false);
                           }}
                           disabled={!canManageInvoices}
@@ -2333,6 +2358,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                             <SelectValue placeholder="Select pending request" />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="ad-hoc">Ad-hoc invoice / credit note</SelectItem>
                             {pendingInvoiceRequests.map(request => (
                               <SelectItem key={request.id} value={request.id}>
                                 {format(new Date(request.requested_invoice_date), 'dd MMM yyyy')} • £{Number(request.requested_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })} • {request.requested_invoice_scope}
@@ -2355,9 +2381,26 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       </div>
                     ) : null}
 
+                    {isCreditEntry && (
+                      <div className="space-y-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3">
+                        <p className="text-sm">This negative entry records a credit note in the existing ledger. Use the credit note number from Sage and select the invoice being credited.</p>
+                        <Label htmlFor="credited-invoice">Original invoice *</Label>
+                        <Select value={creditedInvoiceId} onValueChange={value => { clearInvoiceError('credited_invoice_id'); setCreditedInvoiceId(value); }} disabled={!canManageSage}>
+                          <SelectTrigger id="credited-invoice"><SelectValue placeholder="Choose the original invoice" /></SelectTrigger>
+                          <SelectContent>
+                            {(quote.invoices || []).map(invoice => (
+                              <SelectItem key={invoice.id} value={invoice.id}>{invoice.invoice_number} — £{Number(invoice.amount).toFixed(2)}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {renderFieldError(invoiceFieldErrors, 'credited_invoice_id')}
+                        {creditVarianceRequired && <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={confirmCreditVariance} onChange={event => setConfirmCreditVariance(event.target.checked)} /><span>I have reviewed the financial summary and confirm the reconciliation variance.</span></label>}
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                       <div className="space-y-2 sm:col-span-2">
-                        <Label>Invoice Number *</Label>
+                        <Label>{isCreditEntry ? 'Credit Note Number *' : 'Invoice Number *'}</Label>
                         <Input
                           value={invoiceNumber}
                           disabled={!canManageInvoices}
@@ -2373,7 +2416,6 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                         <Label>Amount *</Label>
                         <Input
                           type="number"
-                          min={0}
                           step="0.01"
                           value={selectedInvoiceRequest ? String(selectedInvoiceRequest.requested_amount) : invoiceAmount}
                           disabled={!canManageInvoices || Boolean(selectedInvoiceRequest)}
@@ -2392,7 +2434,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                         {renderFieldError(invoiceFieldErrors, 'amount')}
                         {!selectedInvoiceRequest && !quote?.merge_info ? (
                           <p className="text-xs text-muted-foreground">
-                            Additional hire charges can exceed the quoted total. The original quote stays unchanged.
+                            Enter a negative amount to record a credit note. Additional hire charges can exceed the quoted total.
                           </p>
                         ) : null}
                       </div>
@@ -2418,7 +2460,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                         <Select
                           value={selectedInvoiceRequest?.requested_invoice_scope || invoiceScope}
                           onValueChange={(value: 'full' | 'partial') => setInvoiceScope(value)}
-                          disabled={!canManageInvoices || Boolean(selectedInvoiceRequest)}
+                          disabled={!canManageInvoices || Boolean(selectedInvoiceRequest) || isCreditEntry}
                         >
                           <SelectTrigger className={getSelectClassName(invoiceFieldErrors, 'invoice_scope')}>
                             <SelectValue />
@@ -2431,7 +2473,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                         {renderFieldError(invoiceFieldErrors, 'invoice_scope')}
                       </div>
                       <div className="space-y-2">
-                        <Label>Accounts Comments</Label>
+                        <Label>{isCreditEntry ? 'Credit reason *' : 'Accounts Comments'}</Label>
                         <Textarea
                           value={invoiceComments}
                           disabled={!canManageInvoices}
@@ -2446,7 +2488,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       </div>
                     </div>
 
-                    {quote.merge_info ? (
+                    {quote.merge_info && !isCreditEntry ? (
                       <div className="space-y-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
                         <div className="space-y-2">
                           <Label>Merged quote billing</Label>
@@ -2523,10 +2565,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
 
                       <Button
                         onClick={addInvoice}
-                        disabled={actionLoading || !canManageInvoices}
+                        disabled={actionLoading || !canManageInvoices || (isCreditEntry && !canManageSage)}
                         className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow/90 sm:self-start"
                       >
-                        <Receipt className="mr-2 h-4 w-4" /> Add Invoice Details
+                        <Receipt className="mr-2 h-4 w-4" /> {isCreditEntry ? 'Record Credit Note' : 'Add Invoice Details'}
                       </Button>
                     </div>
                   </div>
@@ -2564,6 +2606,16 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                       <p className="text-sm text-muted-foreground">No invoices recorded yet.</p>
                     )}
                   </div>
+                  {(quote.financial_adjustments || []).filter(entry => entry.adjustment_type === 'credit_note').map(entry => (
+                    <div key={entry.id} className="rounded-lg border border-amber-500/30 p-4 text-sm">
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <span>Credit note {entry.external_reference || entry.adjustment_number}</span>
+                        <span className="font-semibold">-£{Number(entry.amount).toFixed(2)}{entry.is_reversed ? ' (reversed)' : ''}</span>
+                      </div>
+                      <p className="text-muted-foreground">{entry.reason}</p>
+                      <a className="underline" href={`/api/quotes/financial-adjustments/${entry.id}/document`} target="_blank" rel="noreferrer">View ledger record</a>
+                    </div>
+                  ))}
                 </TabsContent>
 
                 <TabsContent value="attachments" className="space-y-4">

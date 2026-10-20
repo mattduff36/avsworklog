@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ZodError } from 'zod';
-import { FileText } from 'lucide-react';
+import { AlertCircle, FileText, Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { DocumentEditor, emptyExternalDocumentDraft, type ExternalDocumentDraft } from '@/components/external-documents/DocumentEditor';
@@ -11,8 +11,9 @@ import { ModuleBetaBadge } from '@/components/ui/module-beta-badge';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { PanelLoader } from '@/components/ui/panel-loader';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogScrollArea, DialogTitle, dialogContentViewportClassName } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { SearchInput } from '@/components/ui/search-input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -30,6 +31,32 @@ import {
 } from '@/types/external-documents';
 
 const betaBadge = <ModuleBetaBadge accent="external-documents" />;
+const primaryAction = 'h-11 bg-external-documents text-white hover:bg-external-documents-dark md:h-9';
+
+function formatDocumentDate(value: string): string {
+  const day = value.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return value;
+  return new Intl.DateTimeFormat('en-GB', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC',
+  }).format(new Date(`${day}T12:00:00Z`));
+}
+
+function documentMeta(document: ExternalDocument): string {
+  return [document.reference, document.category, document.external_company].filter(Boolean).join(' · ');
+}
+
+function DocumentStatus({ archived }: { archived: boolean }) {
+  return (
+    <Badge
+      variant="outline"
+      className={archived
+        ? 'border-slate-600 bg-slate-800 text-slate-300'
+        : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'}
+    >
+      {archived ? 'Archived' : 'Active'}
+    </Badge>
+  );
+}
 
 function errorText(error: unknown): string {
   if (error instanceof ExternalDocumentsClientError || error instanceof ExternalDocumentPdfError) return error.message;
@@ -340,150 +367,174 @@ export function ExternalDocumentsWorkspace({
     onDocumentIdChange?.(id);
   }
 
+  const filtersActive = Boolean(searchInput.trim() || category !== 'all' || (canManage && archive !== 'active') || assetFilter);
+  function clearFilters() {
+    setSearchInput('');
+    setSearch('');
+    setCategory('all');
+    setArchive('active');
+    setPage(1);
+    if (assetFilter || assetLinkError) onAssetFilterChange?.(null);
+  }
+
   return (
     <AppPageShell>
       {banner}
       <AppPageHeader
         title="External Documents"
         titleMeta={betaBadge}
-        icon={<FileText className="h-5 w-5" />}
         description={accessLevel < 1
           ? 'Level 0 has no External Documents access, so nothing is requested or shown.'
           : 'Service records, reports and other documents from external companies.'}
         actions={canManage ? (
-          <Button type="button" className="h-11 bg-external-documents text-white hover:bg-external-documents-dark md:h-9" onClick={() => { setCreateError(null); setCreateOpen(true); }}>
-            Add document
+          <Button type="button" className={primaryAction} onClick={() => { setCreateError(null); setCreateOpen(true); }}>
+            <Plus className="mr-2 h-4 w-4" />Add document
           </Button>
         ) : null}
       />
 
       {accessLevel < 1 ? null : (
-        <section className="space-y-4 rounded-lg border border-border bg-slate-900 p-4 sm:p-6" aria-busy={listLoading} aria-labelledby="external-documents-library">
-          <h2 id="external-documents-library" className="text-lg font-semibold">Library</h2>
-          {accessLevel < 4 ? <p className="text-sm text-muted-foreground">You can open active documents that have been shared with you.</p> : null}
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="space-y-2 md:col-span-2 xl:col-span-1">
-              <Label htmlFor="external-documents-search">Search</Label>
-              <SearchInput id="external-documents-search" value={searchInput} placeholder="Title, company, reference, or notes" onChange={(event) => setSearchInput(event.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="external-documents-category">Category</Label>
-              <Select value={category} onValueChange={(value) => setCategory(value as ExternalDocumentCategory | 'all')}>
-                <SelectTrigger id="external-documents-category"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All categories</SelectItem>
-                  {EXTERNAL_DOCUMENT_CATEGORIES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            {canManage ? (
-              <div className="space-y-2">
-                <Label htmlFor="external-documents-archive">Archive</Label>
-                <Select value={archive} onValueChange={(value) => setArchive(value as ExternalDocumentArchiveFilter)}>
-                  <SelectTrigger id="external-documents-archive"><SelectValue /></SelectTrigger>
+        <Card className="overflow-hidden border-border">
+          <CardContent className="p-0">
+            <div className="space-y-3 border-b border-border p-4 sm:p-5">
+              <div className="flex flex-wrap items-center gap-3">
+                <SearchInput id="external-documents-search" aria-label="Search documents" value={searchInput} placeholder="Title, company, reference, or notes" onChange={(event) => setSearchInput(event.target.value)} containerClassName="min-w-48 flex-1" />
+                <Select value={category} onValueChange={(value) => setCategory(value as ExternalDocumentCategory | 'all')}>
+                  <SelectTrigger id="external-documents-category" aria-label="Category" className="h-11 w-full sm:w-52 md:h-10"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="archived">Archived</SelectItem>
-                    <SelectItem value="all">Active and archived</SelectItem>
+                    <SelectItem value="all">All categories</SelectItem>
+                    {EXTERNAL_DOCUMENT_CATEGORIES.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {canManage ? (
+                  <Select value={archive} onValueChange={(value) => setArchive(value as ExternalDocumentArchiveFilter)}>
+                    <SelectTrigger id="external-documents-archive" aria-label="Archive" className="h-11 w-full sm:w-48 md:h-10"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="archived">Archived</SelectItem>
+                      <SelectItem value="all">Active and archived</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : null}
+                {canManage ? (
+                  <Select
+                    value={assetChoices.some((choice) => choice.value === assetKey) || !assetKey ? (assetKey || 'all') : assetKey}
+                    onValueChange={(value) => {
+                      if (!onAssetFilterChange) return;
+                      if (value === 'all') onAssetFilterChange(null);
+                      else {
+                        const [asset_type, asset_id] = value.split(':') as ['van' | 'plant' | 'hgv', string];
+                        onAssetFilterChange({ asset_type, asset_id });
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="external-documents-asset" aria-label="Linked asset" className="h-11 w-full sm:w-56 md:h-10"><SelectValue placeholder="All assets" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All assets</SelectItem>
+                      {assetKey && !assetChoices.some((choice) => choice.value === assetKey) ? <SelectItem value={assetKey}>Linked asset</SelectItem> : null}
+                      {assetChoices.map((choice) => <SelectItem key={choice.value} value={choice.value}>{choice.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                ) : null}
+                <Button type="button" variant="outline" size="icon" className="h-11 w-11 md:h-10 md:w-10" aria-label="Refresh documents" onClick={() => setReloadKey((value) => value + 1)} disabled={listLoading}>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
               </div>
-            ) : null}
-            {canManage ? (
-              <div className="space-y-2">
-                <Label htmlFor="external-documents-asset">Asset</Label>
-                <Select
-                  value={assetChoices.some((choice) => choice.value === assetKey) || !assetKey ? (assetKey || 'all') : assetKey}
-                  onValueChange={(value) => {
-                    if (!onAssetFilterChange) return;
-                    if (value === 'all') onAssetFilterChange(null);
-                    else {
-                      const [asset_type, asset_id] = value.split(':') as ['van' | 'plant' | 'hgv', string];
-                      onAssetFilterChange({ asset_type, asset_id });
-                    }
-                  }}
-                >
-                  <SelectTrigger id="external-documents-asset"><SelectValue placeholder="All assets" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All assets</SelectItem>
-                    {assetKey && !assetChoices.some((choice) => choice.value === assetKey) ? <SelectItem value={assetKey}>Linked asset</SelectItem> : null}
-                    {assetChoices.map((choice) => <SelectItem key={choice.value} value={choice.value}>{choice.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="flex min-h-8 flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                <p aria-live="polite">
+                  {listError ? 'Document library unavailable' : listLoading ? 'Document library' : `${list?.total ?? 0} document${list?.total === 1 ? '' : 's'}${filtersActive ? ' matching filters' : ''}`}
+                  {accessLevel < 4 ? ' · Shared with you' : ''}
+                </p>
+                {filtersActive ? <Button type="button" variant="ghost" size="sm" onClick={clearFilters}>Clear filters</Button> : null}
               </div>
-            ) : assetFilter ? (
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Linked asset</p>
-                <Button type="button" variant="outline" onClick={() => onAssetFilterChange?.(null)}>Clear asset filter</Button>
-              </div>
-            ) : null}
-          </div>
-
-          {assetLinkError ? <p className="text-sm text-destructive" role="alert">{assetLinkError}</p> : null}
-          {listError ? (
-            <div className="space-y-2" role="alert">
-              <p className="text-sm text-destructive">{listError}</p>
-              <Button type="button" variant="outline" onClick={() => setReloadKey((value) => value + 1)}>Try again</Button>
             </div>
-          ) : null}
-          {listLoading ? <p className="text-sm text-muted-foreground" role="status">Loading documents…</p> : null}
-          {!listLoading && !listError && !assetLinkError && list && list.documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No documents match these filters.</p>
-          ) : null}
 
-          {list && list.documents.length > 0 ? (
-            <>
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Title</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Company</TableHead>
-                      <TableHead>Document date</TableHead>
-                      <TableHead>Asset</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {list.documents.map((document) => (
-                      <TableRow key={document.id}>
-                        <TableCell className="font-medium">{document.title}</TableCell>
-                        <TableCell>{document.category}</TableCell>
-                        <TableCell>{document.external_company}</TableCell>
-                        <TableCell>{document.document_date}</TableCell>
-                        <TableCell>{assetLabel(document, options)}</TableCell>
-                        <TableCell>{document.is_archived ? <Badge variant="outline">Archived</Badge> : <Badge variant="outline">Active</Badge>}</TableCell>
-                        <TableCell><Button type="button" variant="outline" size="sm" onClick={() => openDocument(document.id)}>View</Button></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+            {listError || assetLinkError ? (
+              <div role="alert" className="flex flex-col items-center gap-3 px-5 py-12 text-center">
+                <AlertCircle className="h-7 w-7 text-destructive" />
+                <h2 className="font-semibold">{listError ? 'Unable to load documents' : 'This asset link is not valid'}</h2>
+                <p className="max-w-md text-sm text-muted-foreground">{listError || assetLinkError}</p>
+                {listError ? <Button type="button" variant="outline" onClick={() => setReloadKey((value) => value + 1)}>Try again</Button> : null}
+                {assetLinkError ? <Button type="button" variant="outline" onClick={clearFilters}>Clear filters</Button> : null}
               </div>
-              <ul className="space-y-3 md:hidden">
-                {list.documents.map((document) => (
-                  <li key={document.id} className="space-y-2 rounded-lg border border-border p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-medium">{document.title}</p>
-                      <Badge variant="outline">{document.is_archived ? 'Archived' : 'Active'}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{document.category} · {document.external_company}</p>
-                    <p className="text-sm text-muted-foreground">{document.document_date} · {assetLabel(document, options)}</p>
-                    <Button type="button" variant="outline" className="h-11" onClick={() => openDocument(document.id)}>View</Button>
-                  </li>
-                ))}
-              </ul>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm text-muted-foreground">Showing {rangeStart}–{rangeEnd} of {list.total}</p>
-                <div className="flex gap-2">
-                  <Button type="button" variant="outline" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous page</Button>
-                  <Button type="button" variant="outline" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>Next page</Button>
+            ) : listLoading ? <PanelLoader message="Loading documents…" accent="external-documents" className="py-16" />
+              : !list || list.documents.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 px-5 py-14 text-center">
+                  <div className="rounded-full bg-slate-800 p-3"><FileText className="h-6 w-6 text-muted-foreground" /></div>
+                  <h2 className="font-semibold">{filtersActive ? 'No matching documents' : canManage ? 'Your document library is empty' : 'No shared documents yet'}</h2>
+                  <p className="max-w-md text-sm text-muted-foreground">
+                    {filtersActive
+                      ? 'Try a different title, company, reference or filter, or clear your filters.'
+                      : canManage
+                        ? 'Add the first external document. You can combine files into one PDF before saving.'
+                        : 'Documents shared with you will appear here.'}
+                  </p>
+                  {filtersActive ? <Button type="button" variant="outline" onClick={clearFilters}>Clear filters</Button> : canManage ? <Button type="button" className={primaryAction} onClick={() => { setCreateError(null); setCreateOpen(true); }}><Plus className="mr-2 h-4 w-4" />Add document</Button> : null}
                 </div>
-              </div>
-            </>
-          ) : null}
-        </section>
+              ) : (
+                <>
+                  <div className="hidden md:block">
+                    <Table aria-label="External documents">
+                      <TableHeader className="bg-slate-800/40">
+                        <TableRow>
+                          <TableHead className="w-[46%] pl-5">Document</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Asset</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="pr-5 text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {list.documents.map((document) => (
+                          <TableRow key={document.id}>
+                            <TableCell className="py-4 pl-5">
+                              <p className="break-words font-medium text-foreground">{document.title}</p>
+                              <p className="mt-1 text-xs text-muted-foreground">{documentMeta(document)}</p>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-sm">
+                              {formatDocumentDate(document.document_date)}
+                              {document.expiry_date ? <p className="mt-1 text-xs text-muted-foreground">Expires {formatDocumentDate(document.expiry_date)}</p> : null}
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground">{assetLabel(document, options)}</TableCell>
+                            <TableCell><DocumentStatus archived={document.is_archived} /></TableCell>
+                            <TableCell className="pr-5 text-right">
+                              <Button type="button" variant="outline" size="sm" className="h-11 md:h-8" aria-label={`View ${document.title}`} onClick={() => openDocument(document.id)}>View</Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <ul className="divide-y divide-border md:hidden" aria-label="External documents">
+                    {list.documents.map((document) => (
+                      <li key={document.id} className="space-y-3 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <p className="min-w-0 break-words text-xs font-medium text-muted-foreground">{document.reference || document.category}</p>
+                          <DocumentStatus archived={document.is_archived} />
+                        </div>
+                        <h2 className="break-words text-base font-semibold">{document.title}</h2>
+                        <p className="text-sm text-muted-foreground">{document.external_company}</p>
+                        <div className="flex flex-wrap items-end justify-between gap-3">
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            <p>{formatDocumentDate(document.document_date)}{document.expiry_date ? ` · Expires ${formatDocumentDate(document.expiry_date)}` : ''}</p>
+                            <p>{assetLabel(document, options)}</p>
+                          </div>
+                          <Button type="button" variant="outline" className="h-11" aria-label={`View ${document.title}`} onClick={() => openDocument(document.id)}>View</Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 sm:px-5">
+                    <p className="text-xs text-muted-foreground">Showing {rangeStart}–{rangeEnd} of {list.total}</p>
+                    <div className="flex gap-2">
+                      <Button type="button" variant="outline" className="h-11 md:h-9" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous page</Button>
+                      <Button type="button" variant="outline" className="h-11 md:h-9" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>Next page</Button>
+                    </div>
+                  </div>
+                </>
+              )}
+          </CardContent>
+        </Card>
       )}
 
       <Dialog open={canManage && createOpen} onOpenChange={(open) => { if (!saving) setCreateOpen(open); }}>
@@ -510,27 +561,32 @@ export function ExternalDocumentsWorkspace({
             <DialogTitle>{detail?.title ?? 'Document'}</DialogTitle>
             <DialogDescription>View the saved document or download a copy.</DialogDescription>
           </DialogHeader>
-          {detailLoading ? <p className="text-sm text-muted-foreground" role="status">Loading the document…</p> : null}
-          {detailError ? <p className="text-sm text-destructive" role="alert">{detailError}</p> : null}
+          {detailLoading ? <PanelLoader message="Loading the document…" accent="external-documents" className="py-10" /> : null}
+          {detailError ? (
+            <div role="alert" className="flex flex-col items-center gap-3 px-2 py-8 text-center">
+              <AlertCircle className="h-7 w-7 text-destructive" />
+              <p className="max-w-md text-sm text-muted-foreground">{detailError}</p>
+            </div>
+          ) : null}
           {detail && fileUrl ? (
             <div className="space-y-4">
               <div className="flex flex-wrap gap-2">
-                <Button asChild variant="outline"><a href={fileUrl} download={detail.file_name}>Download PDF</a></Button>
-                {canManage ? <Button type="button" variant="outline" onClick={() => { setEditError(null); setEditDraft(draftFromDocument(detail)); }}>Edit details</Button> : null}
-                {canManage ? <Button type="button" variant="outline" onClick={() => setArchiveIntent(detail)}>{detail.is_archived ? 'Restore' : 'Archive'}</Button> : null}
+                <Button asChild variant="outline" className="h-11 md:h-9"><a href={fileUrl} download={detail.file_name}>Download PDF</a></Button>
+                {canManage ? <Button type="button" variant="outline" className="h-11 md:h-9" onClick={() => { setEditError(null); setEditDraft(draftFromDocument(detail)); }}>Edit details</Button> : null}
+                {canManage ? <Button type="button" variant="outline" className="h-11 md:h-9" onClick={() => setArchiveIntent(detail)}>{detail.is_archived ? 'Restore' : 'Archive'}</Button> : null}
               </div>
               <PDFCanvasRenderer url={fileUrl} />
               <dl className="grid gap-3 text-sm sm:grid-cols-2">
-                <div><dt className="text-muted-foreground">Category</dt><dd>{detail.category}</dd></div>
-                <div><dt className="text-muted-foreground">External company</dt><dd>{detail.external_company}</dd></div>
-                <div><dt className="text-muted-foreground">Document date</dt><dd>{detail.document_date}</dd></div>
-                <div><dt className="text-muted-foreground">Expiry</dt><dd>{detail.expiry_date ?? 'None'}</dd></div>
-                <div><dt className="text-muted-foreground">Reference</dt><dd>{detail.reference ?? 'None'}</dd></div>
-                <div><dt className="text-muted-foreground">Asset</dt><dd>{assetLabel(detail, options)}</dd></div>
-                <div><dt className="text-muted-foreground">Pages</dt><dd>{detail.page_count}</dd></div>
-                <div><dt className="text-muted-foreground">Status</dt><dd>{detail.is_archived ? 'Archived' : 'Active'}</dd></div>
-                <div className="sm:col-span-2"><dt className="text-muted-foreground">Notes</dt><dd className="whitespace-pre-wrap">{detail.notes ?? 'None'}</dd></div>
-                {canManage ? <div className="sm:col-span-2"><dt className="text-muted-foreground">Shared with</dt><dd>{detail.shared_with.length === 0 ? 'Nobody' : `${detail.shared_with.length} people`}</dd></div> : null}
+                <div><dt className="text-xs text-muted-foreground">Category</dt><dd>{detail.category}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">External company</dt><dd>{detail.external_company}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Document date</dt><dd>{formatDocumentDate(detail.document_date)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Expiry</dt><dd>{detail.expiry_date ? formatDocumentDate(detail.expiry_date) : 'None'}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Reference</dt><dd>{detail.reference ?? 'None'}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Asset</dt><dd>{assetLabel(detail, options)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Pages</dt><dd>{detail.page_count}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Status</dt><dd><DocumentStatus archived={detail.is_archived} /></dd></div>
+                <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Notes</dt><dd className="whitespace-pre-wrap">{detail.notes ?? 'None'}</dd></div>
+                {canManage ? <div className="sm:col-span-2"><dt className="text-xs text-muted-foreground">Shared with</dt><dd>{detail.shared_with.length === 0 ? 'Nobody' : `${detail.shared_with.length} people`}</dd></div> : null}
               </dl>
             </div>
           ) : null}

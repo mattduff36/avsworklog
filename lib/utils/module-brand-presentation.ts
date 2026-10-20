@@ -72,6 +72,11 @@ const SURFACE_BY_CSS_VAR: Record<string, ModuleBrandSurfaceClasses> = {
     cardHover: 'hover:bg-[hsl(var(--external-documents-primary)/0.16)]',
     thumbnail: 'border-[hsl(var(--external-documents-primary)/0.35)] bg-[hsl(var(--external-documents-primary)/0.40)] text-external-documents',
   },
+  '--policies-procedures-primary': {
+    card: 'border-[hsl(var(--policies-procedures-primary)/0.35)] bg-[hsl(var(--policies-procedures-primary)/0.10)]',
+    cardHover: 'hover:bg-[hsl(var(--policies-procedures-primary)/0.16)]',
+    thumbnail: 'border-[hsl(var(--policies-procedures-primary)/0.35)] bg-[hsl(var(--policies-procedures-primary)/0.40)] text-policies-procedures',
+  },
   '--avs-yellow': {
     card: 'border-[hsl(var(--avs-yellow)/0.35)] bg-[hsl(var(--avs-yellow)/0.10)]',
     cardHover: 'hover:bg-[hsl(var(--avs-yellow)/0.16)]',

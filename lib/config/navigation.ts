@@ -144,6 +144,13 @@ export const employeeNavItems: NavItem[] = [
     module: 'external-documents',
     category: 'employee'
   },
+  {
+    href: '/policies-procedures',
+    label: 'Policies and Procedures',
+    icon: Files,
+    module: 'policies-procedures',
+    category: 'employee'
+  },
   { 
     href: '/help', 
     label: 'Help', 

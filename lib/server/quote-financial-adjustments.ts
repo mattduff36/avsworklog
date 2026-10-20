@@ -561,6 +561,7 @@ function validateVariance(
 export async function createFinancialAdjustment(
   input: CreateFinancialAdjustmentInput,
   actorUserId: string,
+  options?: { creditEntry?: boolean },
 ): Promise<FinancialAdjustmentMutationResult> {
   const client = createPgClient();
   await client.connect();
@@ -648,6 +649,24 @@ export async function createFinancialAdjustment(
         throw new Error(
           'Select an active credit note or invoice void for this refund.',
         );
+      }
+    }
+
+    // The invoice-entry shortcut uses the same locked ledger transaction. Never
+    // create a second negative invoice or allow a retry to apply the credit twice.
+    if (options?.creditEntry) {
+      if (input.adjustment_type !== 'credit_note' || !effectiveInvoice || effectiveInvoice.is_voided) {
+        throw new Error('Choose an active invoice to credit.');
+      }
+      if (Math.round(amount * 100) > Math.round(effectiveInvoice.net_invoiced * 100)) {
+        throw new Error('The credit exceeds the remaining invoice value.');
+      }
+      const reference = input.external_reference?.trim().toLowerCase();
+      if (!reference || state.adjustments.some(adjustment =>
+        adjustment.adjustment_type === 'credit_note'
+        && adjustment.external_reference?.trim().toLowerCase() === reference
+      )) {
+        throw new Error('This credit note reference has already been recorded, or is missing. Check the financial adjustment ledger.');
       }
     }
 

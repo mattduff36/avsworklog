@@ -32,37 +32,40 @@ export function DailyAllocationModuleHeader({
         title="Daily Allocation"
         titleMeta={<DailyAllocationBetaBadge />}
         description={DAILY_ALLOCATION_MODULE_DESCRIPTION}
-        details={latestPublicationLabel}
         actions={(
           <>
-            {publishDisabled && publishDisabledReason ? (
-              <p
-                id="daily-allocation-publish-reason"
-                className="max-w-56 truncate text-sm text-muted-foreground"
-                data-testid="daily-allocation-publish-reason"
-                title={publishDisabledReason}
-              >
-                {publishDisabledReason}
+            {latestPublicationLabel ? (
+              <p className="basis-full text-sm text-muted-foreground md:max-w-xs md:basis-auto md:text-right" data-testid="daily-allocation-latest-publication">
+                {latestPublicationLabel}
               </p>
             ) : null}
             {onOpenHistory ? (
               <Button
                 type="button"
                 variant="outline"
-                className="border-border text-muted-foreground"
+                className="h-11 border-border text-muted-foreground md:h-9"
                 onClick={onOpenHistory}
               >
                 Publication history
               </Button>
             ) : null}
             {onCopy ? (
-              <Button type="button" variant="outline" onClick={onCopy}>
+              <Button type="button" variant="outline" className="h-11 md:h-9" onClick={onCopy}>
                 Copy
               </Button>
             ) : null}
+            {publishDisabled && publishDisabledReason ? (
+              <p
+                id="daily-allocation-publish-reason"
+                className="max-w-sm text-sm text-muted-foreground"
+                data-testid="daily-allocation-publish-reason"
+              >
+                {publishDisabledReason}
+              </p>
+            ) : null}
             <Button
               type="button"
-              className="bg-daily-allocation text-white shadow-md transition-all duration-200 hover:bg-daily-allocation-dark hover:shadow-lg active:scale-95"
+              className="h-11 bg-daily-allocation text-white shadow-md transition-all duration-200 hover:bg-daily-allocation-dark hover:shadow-lg active:scale-95 md:h-9"
               onClick={onPublish}
               disabled={publishDisabled || publishing}
               aria-describedby={publishDisabled && publishDisabledReason ? 'daily-allocation-publish-reason' : undefined}

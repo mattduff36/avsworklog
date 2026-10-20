@@ -149,3 +149,7 @@ Use mocks or isolated fixtures for Level 0/2/4 scenarios. Do not create producti
 - [ ] Error classification does not hide operator/type failures as missing schema.
 - [ ] Registration, level, API, RLS, notification, release, audit, transaction, and rollback tests pass.
 - [ ] Production activation and rollback owners are named.
+
+## Visual implementation acceptance
+
+Before building new module UI, read `DESIGN.md`, especially required management-list composition and visual acceptance. Use the shared shell, controls and loaders; verify module identity across navigation/dashboard/loading. Inspect desktop/mobile and loading/error/empty/permission states. Record deferred inconsistencies in `docs/UI_DESIGN_AUDIT.md`. Permission registration alone does not establish visual completeness.

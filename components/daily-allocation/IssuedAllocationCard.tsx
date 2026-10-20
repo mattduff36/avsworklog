@@ -31,14 +31,14 @@ function VisitRow({ visit }: { visit: DailyAllocationIssuedVisit }) {
           {end ? <>–<time dateTime={visit.ends_at}>{end}</time></> : null}
         </p>
       </div>
-      {visit.customer_name ? <p className="text-muted-foreground">{visit.customer_name}</p> : null}
-      {visit.title ? <p className="text-muted-foreground">{visit.title}</p> : null}
-      {visit.site_address ? <p><span className="text-muted-foreground">Site:</span> {visit.site_address}</p> : null}
-      {visit.instructions.meeting_point ? <p><span className="text-muted-foreground">Meeting point:</span> {visit.instructions.meeting_point}</p> : null}
-      {visit.instructions.meet_person ? <p><span className="text-muted-foreground">Meet:</span> {visit.instructions.meet_person}</p> : null}
-      {visit.instructions.notes ? <p><span className="text-muted-foreground">Notes:</span> {visit.instructions.notes}</p> : null}
+      {visit.customer_name ? <p className="text-xs text-muted-foreground">{visit.customer_name}</p> : null}
+      {visit.title ? <p className="text-xs text-muted-foreground">{visit.title}</p> : null}
+      {visit.site_address ? <p><span className="text-xs text-muted-foreground">Site:</span> {visit.site_address}</p> : null}
+      {visit.instructions.meeting_point ? <p><span className="text-xs text-muted-foreground">Meeting point:</span> {visit.instructions.meeting_point}</p> : null}
+      {visit.instructions.meet_person ? <p><span className="text-xs text-muted-foreground">Meet:</span> {visit.instructions.meet_person}</p> : null}
+      {visit.instructions.notes ? <p><span className="text-xs text-muted-foreground">Notes:</span> {visit.instructions.notes}</p> : null}
       {visit.plant && visit.plant.length > 0 ? (
-        <p><span className="text-muted-foreground">Plant:</span> {visit.plant.map((item) => item.label).join(', ')}</p>
+        <p><span className="text-xs text-muted-foreground">Plant:</span> {visit.plant.map((item) => item.label).join(', ')}</p>
       ) : null}
     </li>
   );
@@ -54,20 +54,20 @@ export function IssuedAllocationCard({
   const isV2 = item.snapshot_version === 2;
   return (
     <Card
-      className={highlighted ? 'border-primary' : undefined}
+      className={highlighted ? 'border-daily-allocation' : 'border-border'}
       data-testid={isV2 ? 'daily-allocation-issued-v2' : 'daily-allocation-issued-v1'}
     >
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base sm:text-lg">
           <span>{formatWorkDate(item.work_date)}</span>
           <span className="flex flex-wrap items-center gap-2">
-            {item.revision_no > 0 ? <Badge variant="secondary">Revision {item.revision_no}</Badge> : null}
-            <Badge variant="outline">{isV2 ? 'Timed itinerary' : 'Legacy allocation'}</Badge>
+            {item.revision_no > 0 ? <Badge variant="outline" className="border-slate-600 bg-slate-800 text-slate-300">Revision {item.revision_no}</Badge> : null}
+            <Badge variant="outline" className={isV2 ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-slate-600 bg-slate-800 text-slate-300'}>{isV2 ? 'Timed itinerary' : 'Legacy allocation'}</Badge>
           </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
-        <p className="text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Published {formatDateTime(item.published_at) || item.published_at}
         </p>
         {item.availability !== 'available' && item.absence ? (
@@ -90,13 +90,13 @@ export function IssuedAllocationCard({
         ) : null}
         {!isV2 ? (
           <>
-            {item.job_code ? <p><span className="text-muted-foreground">Job:</span> {item.job_code}</p> : null}
-            {item.title ? <p><span className="text-muted-foreground">Title:</span> {item.title}</p> : null}
-            {item.site_address ? <p><span className="text-muted-foreground">Site:</span> {item.site_address}</p> : null}
-            {item.instructions.start_time ? <p><span className="text-muted-foreground">Start:</span> {item.instructions.start_time}</p> : null}
-            {item.instructions.meeting_point ? <p><span className="text-muted-foreground">Meeting point:</span> {item.instructions.meeting_point}</p> : null}
-            {item.instructions.meet_person ? <p><span className="text-muted-foreground">Meet:</span> {item.instructions.meet_person}</p> : null}
-            {item.instructions.notes ? <p><span className="text-muted-foreground">Notes:</span> {item.instructions.notes}</p> : null}
+            {item.job_code ? <p><span className="text-xs text-muted-foreground">Job:</span> {item.job_code}</p> : null}
+            {item.title ? <p><span className="text-xs text-muted-foreground">Title:</span> {item.title}</p> : null}
+            {item.site_address ? <p><span className="text-xs text-muted-foreground">Site:</span> {item.site_address}</p> : null}
+            {item.instructions.start_time ? <p><span className="text-xs text-muted-foreground">Start:</span> {item.instructions.start_time}</p> : null}
+            {item.instructions.meeting_point ? <p><span className="text-xs text-muted-foreground">Meeting point:</span> {item.instructions.meeting_point}</p> : null}
+            {item.instructions.meet_person ? <p><span className="text-xs text-muted-foreground">Meet:</span> {item.instructions.meet_person}</p> : null}
+            {item.instructions.notes ? <p><span className="text-xs text-muted-foreground">Notes:</span> {item.instructions.notes}</p> : null}
           </>
         ) : null}
       </CardContent>

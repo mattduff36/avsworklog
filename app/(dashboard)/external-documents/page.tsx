@@ -2,7 +2,6 @@
 
 import { Suspense, useMemo } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { FileText } from 'lucide-react';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { ExternalDocumentsWorkspace } from '@/components/external-documents/ExternalDocumentsWorkspace';
@@ -51,7 +50,6 @@ function ExternalDocumentsPage() {
       <AppPageLoadingShell
         title="External Documents"
         titleMeta={betaBadge}
-        icon={<FileText className="h-5 w-5" />}
         message="Loading external documents..."
       />
     );
@@ -63,7 +61,6 @@ function ExternalDocumentsPage() {
         <AppPageHeader
           title="External Documents"
           titleMeta={betaBadge}
-          icon={<FileText className="h-5 w-5" />}
           description="This module is not enabled for your team."
         />
       </AppPageShell>
@@ -76,7 +73,6 @@ function ExternalDocumentsPage() {
         <AppPageHeader
           title="External Documents"
           titleMeta={betaBadge}
-          icon={<FileText className="h-5 w-5" />}
           description="Enter your PIN to open External Documents."
         />
         <SensitiveModuleGate moduleLabel="External Documents" access={sensitiveAccess} />
@@ -90,7 +86,6 @@ function ExternalDocumentsPage() {
         <AppPageHeader
           title="External Documents"
           titleMeta={betaBadge}
-          icon={<FileText className="h-5 w-5" />}
           description="Your profile could not be loaded, so documents were not requested."
         />
       </AppPageShell>
@@ -137,7 +132,6 @@ export default function ExternalDocumentsRoute() {
         <AppPageLoadingShell
           title="External Documents"
           titleMeta={betaBadge}
-          icon={<FileText className="h-5 w-5" />}
           message="Loading external documents..."
         />
       )}

@@ -666,7 +666,7 @@ export default function DashboardPage() {
                 formType.id === 'maintenance' &&
                 !showPrimaryBadgeLoading &&
                 (maintenanceDueSoonCount > 0 || maintenanceOverdueCount > 0);
-              const showDailyAllocationBetaBadge = formType.id === 'daily-allocation' || formType.id === 'external-documents';
+              const showDailyAllocationBetaBadge = formType.id === 'daily-allocation' || formType.id === 'external-documents' || formType.id === 'policies-procedures';
               const maintenanceDueSoonAnimationIndex =
                 showMaintenanceBadges && maintenanceDueSoonCount > 0
                   ? nextDashboardBadgeAnimationIndex++
@@ -723,7 +723,7 @@ export default function DashboardPage() {
                     )}
                     {showDailyAllocationBetaBadge ? (
                       <div className="absolute top-2 right-2">
-                        <ModuleBetaBadge tone="onColor" accent={formType.id === 'external-documents' ? 'external-documents' : 'daily-allocation'} />
+                        <ModuleBetaBadge tone="onColor" accent={formType.id === 'policies-procedures' ? 'policies-procedures' : formType.id === 'external-documents' ? 'external-documents' : 'daily-allocation'} />
                       </div>
                     ) : null}
                     <Icon className={tabletModeEnabled ? 'h-12 w-12' : 'h-8 w-8'} />

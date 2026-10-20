@@ -91,6 +91,7 @@ function NavbarBrand({ className, hideWordmarkOnNarrow = false, onNavigate }: Na
  * Each module gets its own color when the link is active
  */
 function getNavItemActiveColors(href: string): { bg: string; text: string } {
+  if (href.startsWith('/policies-procedures')) return { bg: 'bg-policies-procedures', text: 'text-white' };
   // Dashboard and Help use brand yellow (with dark text)
   if (href === '/dashboard' || href === '/help') {
     return { bg: 'bg-avs-yellow', text: 'text-slate-900' };
@@ -156,6 +157,7 @@ function getNavItemActiveColors(href: string): { bg: string; text: string } {
  * Get module brand color for inactive icon state.
  */
 function getNavItemIconColor(href: string): string {
+  if (href.startsWith('/policies-procedures')) return 'text-policies-procedures';
   if (href.startsWith('/external-documents')) return 'text-external-documents';
   if (href === '/dashboard' || href === '/help') return 'text-avs-yellow';
   if (href.startsWith('/timesheets')) return 'text-timesheet';

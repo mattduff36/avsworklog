@@ -21,6 +21,7 @@ export type AccentType =
   | 'debug'
   | 'daily-allocation'
   | 'external-documents'
+  | 'policies-procedures'
   | 'brand'; // yellow for Dashboard, Manager/Admin, Help
 
 /**
@@ -51,6 +52,7 @@ export function getAccentFromRoute(
   if (path.startsWith('/inventory')) return 'inventory';
   if (path.startsWith('/reminders')) return 'reminders';
   if (path.startsWith('/daily-allocation')) return 'daily-allocation';
+  if (path.startsWith('/policies-procedures')) return 'policies-procedures';
   if (path.startsWith('/external-documents')) return 'external-documents';
   if (path.startsWith('/debug')) return 'debug';
   if (path.startsWith('/reports')) return 'reports';
