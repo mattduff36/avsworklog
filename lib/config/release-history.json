@@ -1,5 +1,22 @@
 [
   {
+    "version": "1026.9.1",
+    "updateKind": "minor",
+    "title": "Timesheets improvements",
+    "description": "Retain submit diagnostics [fixerrors-89a00124-cluster-2].",
+    "summary": "Retain submit diagnostics [fixerrors-89a00124-cluster-2].",
+    "details": [
+      "Retain submit diagnostics [fixerrors-89a00124-cluster-2], with changes to shared logic and automated tests."
+    ],
+    "areas": [
+      "Timesheets"
+    ],
+    "areaKeys": [
+      "timesheets"
+    ],
+    "pushedAt": "2026-10-20T22:21:46.693Z"
+  },
+  {
     "version": "1026.9.0",
     "updateKind": "major",
     "title": "App update",
