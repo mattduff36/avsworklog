@@ -2,6 +2,32 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.9.0
+
+**GIT COMMIT MESSAGE**
+`feat: add credit notes and policies with consistent beta module UI`
+
+**PUSHED AT**
+2026-10-20T22:07:40.553Z
+
+**WHAT CHANGED**
+Preserve applied policy migration line endings. Reuse pending plan identity and refresh interaction coverage. Add credit notes and policies with consistent beta module UI.
+
+**VERSION HISTORY DETAILS**
+- Updated policies and procedures, with changes to background routes, app screens, interface components, shared logic, automated tests, and data storage.
+- Updated quotes, with changes to background routes, app screens, shared logic, and automated tests.
+- Reuse pending plan identity and refresh interaction coverage, with changes to app screens, interface components, and automated tests.
+- Updated external documents, with changes to app screens and interface components.
+- Updated navigation, with changes to interface components and shared logic.
+- Updated help and FAQ, with changes to documentation.
+- Updated data storage, with changes to data storage.
+- Updated dashboard, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(release): preserve applied policy migration line endings`
+- `fix(daily-allocation): reuse pending plan identity and refresh interaction coverage`
+- `feat: add credit notes and policies with consistent beta module UI`
+
 ## 1026.8.5
 
 **GIT COMMIT MESSAGE**

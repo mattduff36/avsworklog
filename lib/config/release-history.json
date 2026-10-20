@@ -1,5 +1,34 @@
 [
   {
+    "version": "1026.9.0",
+    "updateKind": "major",
+    "title": "App update",
+    "description": "Preserve applied policy migration line endings. Reuse pending plan identity and refresh interaction coverage. Add credit notes and policies with consistent beta module UI.",
+    "summary": "Preserve applied policy migration line endings. Reuse pending plan identity and refresh interaction coverage. Add credit notes and policies with consistent beta module UI.",
+    "details": [
+      "Updated policies and procedures, with changes to background routes, app screens, interface components, shared logic, automated tests, and data storage.",
+      "Updated quotes, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Reuse pending plan identity and refresh interaction coverage, with changes to app screens, interface components, and automated tests.",
+      "Updated external documents, with changes to app screens and interface components.",
+      "Updated navigation, with changes to interface components and shared logic.",
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated data storage, with changes to data storage.",
+      "Updated dashboard, with changes to app screens."
+    ],
+    "areas": [
+      "Release automation",
+      "Daily Allocation",
+      "Preserve applied policy migration line endings. Reuse pending plan identity",
+      "Refresh interaction coverage. Add credit notes",
+      "Policies with consistent beta module UI"
+    ],
+    "areaKeys": [
+      "release-automation",
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-10-20T22:07:40.553Z"
+  },
+  {
     "version": "1026.8.5",
     "updateKind": "minor",
     "title": "Fixerrors improvements",
