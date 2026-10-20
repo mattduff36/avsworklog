@@ -93,6 +93,7 @@ describe('timesheet submit client', () => {
     const diagnostics = getTimesheetSubmitErrorDiagnostics(error);
     expect(diagnostics).toEqual({
       name: 'TimesheetSubmitRequestError',
+      message: 'Timesheet submission failed (HTTP 400; code=INVALID_INPUT; reason=SCHEMA_VALIDATION)',
       status: 400,
       code: 'INVALID_INPUT',
       reason: 'SCHEMA_VALIDATION',
@@ -103,5 +104,28 @@ describe('timesheet submit client', () => {
     expect(logger).toHaveBeenCalledWith('Error saving timesheet:', diagnostics);
     expect(JSON.stringify(diagnostics)).not.toContain(SIGNATURE);
     expect(JSON.stringify(diagnostics)).not.toContain(USER_ID);
+  });
+
+  it('TS-SUBMIT-LOG-001 preserves failure details in the console collector message without server text', async () => {
+    const privateServerMessage = `Cannot submit for ${USER_ID}`;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: privateServerMessage, code: 'CONFLICT' }), {
+        status: 409,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    ));
+    const logger = vi.fn();
+    const result = submitTimesheet(validRequest());
+    await expect(result).rejects.toMatchObject({ status: 409, code: 'CONFLICT' });
+    await result.catch((error: unknown) => logTimesheetSubmitFailure(error, logger));
+
+    expect(logger).toHaveBeenCalledTimes(1);
+    const diagnostics = logger.mock.calls[0][1];
+    // This is the representation retained by the error-like console collector.
+    const collected = `${diagnostics.name}: ${diagnostics.message}`;
+    expect(collected).toBe('TimesheetSubmitRequestError: Timesheet submission failed (HTTP 409; code=CONFLICT; reason=REQUEST_FAILED)');
+    expect(JSON.stringify(logger.mock.calls)).not.toContain(privateServerMessage);
+    expect(JSON.stringify(logger.mock.calls)).not.toContain(USER_ID);
+    expect(JSON.stringify(logger.mock.calls)).not.toContain(SIGNATURE);
   });
 });

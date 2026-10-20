@@ -47,6 +47,9 @@ export function getTimesheetSubmitErrorDiagnostics(error: unknown): Record<strin
   if (error instanceof TimesheetSubmitRequestError) {
     return {
       name: error.name,
+      // The console collector serializes error-like objects using name/message only.
+      // Keep technical diagnostics there without copying the server's free-text error.
+      message: `Timesheet submission failed (HTTP ${error.status}; code=${error.code}; reason=${error.reason})`,
       status: error.status,
       code: error.code,
       reason: error.reason,
