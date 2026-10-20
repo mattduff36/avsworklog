@@ -760,34 +760,15 @@ describe('daily allocation manager board', () => {
           work_date: '2026-08-14',
         });
       }
-      if (url === '/api/daily-allocation/assignments/labour' && init?.method === 'POST') {
-        return jsonResponse({
-          assignment_id: 'labour-2',
-          plan_day_id: 'plan-converted',
-          plan_version: 6,
-          assignment: {
-            id: 'labour-2',
-            visit_id: 'visit-2',
-            plan_day_id: 'plan-converted',
-            work_date: '2026-08-14',
-            profile_id: 'employee-1',
-            starts_at: '2026-08-14T06:00:00.000Z',
-            ends_at: '2026-08-14T15:30:00.000Z',
-            meeting_point: null,
-            meet_person: null,
-            notes: null,
-            row_version: 1,
-            updated_at: '2026-08-14T08:00:00.000Z',
-          },
-        });
-      }
-      if (url === '/api/daily-allocation/visits' && init?.method === 'POST') {
+      if (url === '/api/daily-allocation/assigned-visits' && init?.method === 'POST') {
         return jsonResponse({
           visit_id: 'visit-2',
+          assignment_id: 'labour-2',
+          override_id: null,
+          override: null,
           plan_day_id: 'plan-converted',
-          plan_version: 5,
+          plan_version: 6,
           visit: {
-            ...unconverted.jobs[0],
             id: 'visit-2',
             plan_day_id: 'plan-converted',
             work_date: '2026-08-14',
@@ -796,8 +777,22 @@ describe('daily allocation manager board', () => {
             job_source_id: 'quote-1',
             job_code: 'JOB-100',
             site_address: '1 Test Street',
-            starts_at: '2026-08-14T07:00:00.000Z',
-            ends_at: '2026-08-14T10:00:00.000Z',
+            starts_at: '2026-08-14T06:00:00.000Z',
+            ends_at: '2026-08-14T15:30:00.000Z',
+            meeting_point: null,
+            meet_person: null,
+            notes: null,
+            row_version: 1,
+            updated_at: '2026-08-14T08:00:00.000Z',
+          },
+          assignment: {
+            id: 'labour-2',
+            visit_id: 'visit-2',
+            plan_day_id: 'plan-converted',
+            work_date: '2026-08-14',
+            profile_id: 'employee-1',
+            starts_at: '2026-08-14T06:00:00.000Z',
+            ends_at: '2026-08-14T15:30:00.000Z',
             meeting_point: null,
             meet_person: null,
             notes: null,
@@ -823,9 +818,23 @@ describe('daily allocation manager board', () => {
 
     await waitFor(() => {
       expect(fetchMock.mock.calls.some(([url]) => String(url) === '/api/daily-allocation/convert')).toBe(true);
-      expect(fetchMock.mock.calls.some(([url, init]) =>
-        String(url) === '/api/daily-allocation/visits' && init?.method === 'POST'
-      )).toBe(true);
+      const assigned = fetchMock.mock.calls.filter(([url, init]) =>
+        String(url) === '/api/daily-allocation/assigned-visits' && init?.method === 'POST'
+      );
+      expect(assigned).toHaveLength(1);
+      const body = JSON.parse(String(assigned[0]?.[1]?.body)) as {
+        plan_day_id: string;
+        expected_plan_version: number;
+        profile_id: string;
+        starts_at: string;
+        ends_at: string;
+      };
+      expect(body.plan_day_id).toBe('plan-converted');
+      expect(body.plan_day_id.startsWith('optimistic:')).toBe(false);
+      expect(body.expected_plan_version).toBe(4);
+      expect(body.profile_id).toBe('employee-1');
+      expect(body.starts_at).toBe('2026-08-14T06:00:00.000Z');
+      expect(body.ends_at).toBe('2026-08-14T15:30:00.000Z');
     });
   });
 
@@ -1093,11 +1102,14 @@ describe('daily allocation manager board', () => {
           work_date: '2026-08-14',
         });
       }
-      if (url === '/api/daily-allocation/visits' && init?.method === 'POST') {
+      if (url === '/api/daily-allocation/assigned-visits' && init?.method === 'POST') {
         return jsonResponse({
-          visit_id: `visit-${globalThis.crypto.randomUUID()}`,
+          visit_id: 'visit-2',
+          assignment_id: 'labour-2',
+          override_id: null,
+          override: null,
           plan_day_id: 'plan-converted',
-          plan_version: 5,
+          plan_version: 6,
           visit: {
             id: 'visit-2',
             plan_day_id: 'plan-converted',
@@ -1107,21 +1119,14 @@ describe('daily allocation manager board', () => {
             job_source_id: 'quote-1',
             job_code: 'JOB-100',
             site_address: '1 Test Street',
-            starts_at: '2026-08-14T07:00:00.000Z',
-            ends_at: '2026-08-14T10:00:00.000Z',
+            starts_at: '2026-08-14T06:00:00.000Z',
+            ends_at: '2026-08-14T15:30:00.000Z',
             meeting_point: null,
             meet_person: null,
             notes: null,
             row_version: 1,
             updated_at: '2026-08-14T08:00:00.000Z',
           },
-        });
-      }
-      if (url === '/api/daily-allocation/assignments/labour' && init?.method === 'POST') {
-        return jsonResponse({
-          assignment_id: 'labour-2',
-          plan_day_id: 'plan-converted',
-          plan_version: 6,
           assignment: {
             id: 'labour-2',
             visit_id: 'visit-2',
@@ -1167,14 +1172,23 @@ describe('daily allocation manager board', () => {
     releaseConvert();
     await waitFor(() => {
       const visitBodies = fetchMock.mock.calls
-        .filter(([url, init]) => String(url) === '/api/daily-allocation/visits' && init?.method === 'POST')
+        .filter(([url, init]) => String(url) === '/api/daily-allocation/assigned-visits' && init?.method === 'POST')
         .map(([, init]) => JSON.parse(String(init?.body)) as {
           plan_day_id: string;
           expected_plan_version: number;
+          profile_id: string;
+          starts_at: string;
+          ends_at: string;
         });
       expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/daily-allocation/convert')).toHaveLength(1);
       expect(visitBodies).toEqual([
-        expect.objectContaining({ plan_day_id: 'plan-converted', expected_plan_version: 4 }),
+        expect.objectContaining({
+          plan_day_id: 'plan-converted',
+          expected_plan_version: 4,
+          profile_id: 'employee-1',
+          starts_at: '2026-08-14T06:00:00.000Z',
+          ends_at: '2026-08-14T15:30:00.000Z',
+        }),
       ]);
       expect(visitBodies[0]?.plan_day_id.startsWith('optimistic:')).toBe(false);
       expect(visitBodies[0]?.expected_plan_version).not.toBe(1);
@@ -1709,7 +1723,13 @@ describe('daily allocation manager board', () => {
   });
 
   it('moves a visit to the morning session from the card', async () => {
-    const board = buildRangeBoard();
+    const board = buildRangeBoard({
+      visits: [{
+        ...buildRangeBoard().visits[0],
+        starts_at: '2026-08-14T06:00:00.000Z',
+        ends_at: '2026-08-14T15:30:00.000Z',
+      }],
+    });
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.startsWith('/api/daily-allocation/board')) return jsonResponse(board);
@@ -1735,7 +1755,10 @@ describe('daily allocation manager board', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     renderBoardPage();
-    fireEvent.click((await screen.findAllByRole('button', { name: 'AM' }))[0]);
+    const resizeEnd = (await screen.findAllByRole('button', {
+      name: /Adjust end of JOB-100/,
+    }))[0];
+    fireEvent.keyDown(resizeEnd, { key: 'ArrowLeft' });
 
     await waitFor(() => {
       const request = fetchMock.mock.calls.find(

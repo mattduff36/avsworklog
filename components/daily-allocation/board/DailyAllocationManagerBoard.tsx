@@ -459,8 +459,12 @@ export function DailyAllocationManagerBoard({
 
   function admitPlanDay(workDate: string): AuthoritativePlanDay | null {
     if (!fullBoard || !ownerTeamId) return null;
-    const existing = authoritativePlanDayIdentity(planDayForDate(fullBoard, workDate));
+    const existingPlan = planDayForDate(fullBoard, workDate);
+    const existing = authoritativePlanDayIdentity(existingPlan);
     if (existing) return existing;
+    // A provisional plan means conversion for this team/date is already in flight.
+    // Reuse it so later drops share that conversion instead of minting another plan id.
+    if (existingPlan) return { id: existingPlan.id, plan_version: existingPlan.plan_version };
     const hasLegacy = fullBoard.legacy.labour.some((draft) => draft.work_date === workDate)
       || fullBoard.legacy.plant.some((draft) => draft.work_date === workDate);
     if (hasLegacy) {

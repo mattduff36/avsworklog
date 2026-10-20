@@ -14,7 +14,7 @@ Scope: source-pattern inventory of every `app/**/page.tsx` file, with targeted i
 | B6 | Low | Reports route accent differs from navbar management-yellow mapping; toolbox-talk tabs are a hard-coded red exception. | Resolve intended identity with owner, then unify mappings; do not silently recolour existing modules. |
 | B7 | Medium | Existing registration tests cover permissions/metadata, not rendered navigation order or visual quality. | Add focused shared-presentation contract tests when centralising; keep screenshot review for layouts/states. |
 | B8 | Medium | Policies used plain fetch loading, hand-built search, crowded actions and default statuses. | Addressed in this pass with existing primitives; browser results reported separately. |
-| B9 | Medium | Daily Allocation put the latest publication on the header details line and truncated the publish-disabled reason. Legacy board and issued cards used brighter default status chips. | Moved publication metadata into actions, retained full publish reason and muted issued metadata. Port-4000 desktop board/history checked read-only; schedule/drag behaviour retained. Three existing drag/session UI tests still fail; no claim of a green full UI suite. |
+| B9 | Medium | Daily Allocation put the latest publication on the header details line and truncated the publish-disabled reason. Legacy board and issued cards used brighter default status chips. | Moved publication metadata into actions, retained full publish reason and muted issued metadata. Port-4000 desktop board/history checked read-only. Follow-up corrected stale interaction fixtures and reused provisional plan identity; all 40 board/header UI tests pass. |
 
 ## Intentional exceptions
 
