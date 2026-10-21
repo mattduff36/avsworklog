@@ -56,6 +56,7 @@ export const INVENTORY_KIOSK_HARDWARE_TARGET_TEST_FILE =
 export const DAILY_ALLOCATION_SESSION_TARGET_TEST_FILE =
   'tests/db/daily-allocation-session-runtime.test.ts';
 export const ALLOWED_TARGET_TEST_FILES = [
+  'tests/unit/fixerrors-close-stale-postgres.test.ts',
   TARGET_TEST_FILE,
   HGV_SAVE_TARGET_TEST_FILE,
   DELETE_USER_LEAVE_LOCK_TARGET_TEST_FILE,
