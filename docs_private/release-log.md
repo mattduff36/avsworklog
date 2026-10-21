@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.10.0
+
+**GIT COMMIT MESSAGE**
+`feat(reports): add job labour hours and man-day report`
+
+**PUSHED AT**
+2026-10-21T12:44:29.049Z
+
+**WHAT CHANGED**
+Add job labour hours and man-day report.
+
+**VERSION HISTORY DETAILS**
+- Added job labour hours and man-day report, with changes to background routes, app screens, interface components, shared logic, shared typing, and automated tests.
+- Updated timesheets, with changes to background routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(reports): add job labour hours and man-day report`
+
 ## 1026.9.1
 
 **GIT COMMIT MESSAGE**

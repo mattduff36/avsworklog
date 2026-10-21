@@ -1,5 +1,25 @@
 [
   {
+    "version": "1026.10.0",
+    "updateKind": "major",
+    "title": "Reports update",
+    "description": "Added job labour hours and man-day report.",
+    "summary": "Added job labour hours and man-day report.",
+    "details": [
+      "Added job labour hours and man-day report, with changes to background routes, app screens, interface components, shared logic, shared typing, and automated tests.",
+      "Updated timesheets, with changes to background routes."
+    ],
+    "areas": [
+      "Reports",
+      "Job labour hours",
+      "Man-day report"
+    ],
+    "areaKeys": [
+      "reports"
+    ],
+    "pushedAt": "2026-10-21T12:44:29.049Z"
+  },
+  {
     "version": "1026.9.1",
     "updateKind": "minor",
     "title": "Timesheets improvements",
