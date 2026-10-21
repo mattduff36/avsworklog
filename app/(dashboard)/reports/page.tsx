@@ -14,6 +14,7 @@ import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { toast } from 'sonner';
 import { useQueryState } from 'nuqs';
 import { NuqsClientAdapter } from '@/components/providers/NuqsClientAdapter';
+import { JobLabourReport } from '@/components/reports/JobLabourReport';
 import {
   Calendar,
   ClipboardList,
@@ -726,6 +727,7 @@ function ReportsContent() {
                     onDownload={downloadReport}
                   />
                 ))}
+                <JobLabourReport dateFrom={dateFrom} dateTo={dateTo} />
               </div>
             )}
 
