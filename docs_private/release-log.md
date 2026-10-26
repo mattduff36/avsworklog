@@ -2,6 +2,33 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.11.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update daily allocation`
+
+**PUSHED AT**
+2026-10-26T21:46:55.303Z
+
+**WHAT CHANGED**
+Update daily allocation. Unify task creation and clarify category requirements. Organize module overview and enforce report access. Record live verification for stale timesheet overrides [fei_6290863ef01836a4]. Recover stale calendar timesheet overrides [fei_6290863ef01836a4].
+
+**VERSION HISTORY DETAILS**
+- Organize module overview and enforce report access, with changes to app screens, interface components, shared logic, and automated tests.
+- Unify task creation and clarify category requirements, with changes to app screens and automated tests.
+- Updated navigation, with changes to app screens, interface components, and automated tests.
+- Recover stale calendar timesheet overrides [fei_6290863ef01836a4], with changes to app screens, shared logic, and automated tests.
+- Updated sign in, with changes to automated tests.
+- Updated daily allocation, with changes to interface components and automated tests.
+- Updated daily tasks, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update daily allocation`
+- `fix(workshop): unify task creation and clarify category requirements`
+- `feat(reports): organize module overview and enforce report access`
+- `chore(fixerrors): record live verification for stale timesheet overrides [fei_6290863ef01836a4]`
+- `fix(absence): recover stale calendar timesheet overrides [fei_6290863ef01836a4]`
+
 ## 1026.10.1
 
 **GIT COMMIT MESSAGE**
