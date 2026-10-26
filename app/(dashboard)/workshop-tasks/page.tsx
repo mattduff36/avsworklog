@@ -240,8 +240,28 @@ export default function WorkshopTasksPage() {
   }, [searchParams, showSettings]);
 
   const fetcher = useWorkshopTasksFetchers({ supabase, userId: user?.id, vehicleFilter, setLoading, setTasks, setVehicles, setRecentVehicleIds, setTaskAttachmentCounts, setCategories, setPlantCategories, setHgvCategories, setSubcategories, setPlantSubcategories, setHgvSubcategories, setCurrentMeterReading, setMeterReadingType });
-  const filteredSubcategories = selectedCategoryId ? (assetTab === 'plant' ? plantSubcategories : assetTab === 'hgv' ? hgvSubcategories : subcategories).filter(sub => sub.category_id === selectedCategoryId) : [];
-  const activeCategories = assetTab === 'plant' ? plantCategories : assetTab === 'hgv' ? hgvCategories : categories;
+  const selectedAddVehicle = vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
+  const selectedAddAssetType =
+    selectedAddVehicle?.asset_type === 'van' || selectedAddVehicle?.asset_type === 'plant' || selectedAddVehicle?.asset_type === 'hgv'
+      ? selectedAddVehicle.asset_type
+      : null;
+  const addSubcategories = selectedAddAssetType === 'plant'
+    ? plantSubcategories
+    : selectedAddAssetType === 'hgv'
+      ? hgvSubcategories
+      : selectedAddAssetType === 'van'
+        ? subcategories
+        : [];
+  const filteredSubcategories = selectedCategoryId
+    ? addSubcategories.filter((sub) => sub.category_id === selectedCategoryId)
+    : [];
+  const activeCategories = selectedAddAssetType === 'plant'
+    ? plantCategories
+    : selectedAddAssetType === 'hgv'
+      ? hgvCategories
+      : selectedAddAssetType === 'van'
+        ? categories
+        : [];
   // Subcategories are retained for historical reads only; new/edit flows never require them.
   const categoryHasSubcategories = false;
   const tabFilteredTasks = useMemo(() => {

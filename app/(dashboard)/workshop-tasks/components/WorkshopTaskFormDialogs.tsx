@@ -34,6 +34,24 @@ function normalizeTemplateAppliesTo(rawValues?: string[] | null): string[] {
   return Array.from(new Set(normalizedValues));
 }
 
+type WorkshopAssetType = 'van' | 'plant' | 'hgv';
+
+const CREATE_ASSET_TYPE_OPTIONS: Array<{ value: WorkshopAssetType; label: string }> = [
+  { value: 'van', label: 'Van' },
+  { value: 'plant', label: 'Plant' },
+  { value: 'hgv', label: 'HGV' },
+];
+
+function readWorkshopAssetType(value?: string | null): WorkshopAssetType | '' {
+  return value === 'van' || value === 'plant' || value === 'hgv' ? value : '';
+}
+
+type CategoryLinkState =
+  | { status: 'idle' }
+  | { status: 'loading'; categoryId: string }
+  | { status: 'error'; categoryId: string }
+  | { status: 'ready'; categoryId: string; linkedIds: string[] };
+
 interface WorkshopTaskFormDialogsProps {
   userId?: string | null;
   showAddModal: boolean;
@@ -116,7 +134,6 @@ export function WorkshopTaskFormDialogs({
   selectedSubcategoryId,
   onSelectedSubcategoryIdChange,
   filteredSubcategories,
-  meterReadingType,
   newMeterReading,
   onNewMeterReadingChange,
   currentMeterReading,
@@ -159,8 +176,38 @@ export function WorkshopTaskFormDialogs({
   const { tabletModeEnabled } = useTabletMode();
   const addDialogContentRef = useRef<HTMLDivElement>(null);
   const editDialogContentRef = useRef<HTMLDivElement>(null);
+  const vehiclesRef = useRef(vehicles);
+  useEffect(() => {
+    vehiclesRef.current = vehicles;
+  }, [vehicles]);
+  const [assetTypeChoice, setAssetTypeChoice] = useState<WorkshopAssetType | ''>('');
+  const [addModalWasOpen, setAddModalWasOpen] = useState(showAddModal);
+  const [categoryLinkResult, setCategoryLinkResult] = useState<{
+    categoryId: string;
+    status: 'error' | 'ready';
+    linkedIds: string[];
+  } | null>(null);
+  const [categoryLinkRetry, setCategoryLinkRetry] = useState(0);
+  const categoryLinkRequestRef = useRef(0);
+  if (addModalWasOpen !== showAddModal) {
+    setAddModalWasOpen(showAddModal);
+    if (!showAddModal) setAssetTypeChoice('');
+  }
+  const categoryLinkState = useMemo<CategoryLinkState>(() => {
+    if (!selectedCategoryId) return { status: 'idle' };
+    if (categoryLinkResult?.categoryId !== selectedCategoryId) {
+      return { status: 'loading', categoryId: selectedCategoryId };
+    }
+    if (categoryLinkResult.status === 'ready') {
+      return { status: 'ready', categoryId: selectedCategoryId, linkedIds: categoryLinkResult.linkedIds };
+    }
+    return { status: 'error', categoryId: selectedCategoryId };
+  }, [categoryLinkResult, selectedCategoryId]);
+  const selectedAddVehicle = vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
+  const selectedAddAssetType = assetTypeChoice || readWorkshopAssetType(selectedAddVehicle?.asset_type);
   const isAddFormDirty = Boolean(
-    selectedVehicleId ||
+    selectedAddAssetType ||
+      selectedVehicleId ||
       selectedCategoryId ||
       selectedSubcategoryId ||
       newMeterReading.trim() ||
@@ -178,75 +225,108 @@ export function WorkshopTaskFormDialogs({
       editComments !== editTaskComments ||
       editMileage.trim()
   );
-  const selectedAddVehicle = vehicles.find((vehicle) => vehicle.id === selectedVehicleId);
-  const selectedAddAssetType =
-    selectedAddVehicle?.asset_type === 'van' || selectedAddVehicle?.asset_type === 'plant' || selectedAddVehicle?.asset_type === 'hgv'
-      ? selectedAddVehicle.asset_type
-      : assetTab === 'all'
-        ? null
-        : assetTab;
-  const [linkedCategoryTemplateIds, setLinkedCategoryTemplateIds] = useState<string[] | null>(null);
-
   useEffect(() => {
-    let cancelled = false;
-    if (!selectedCategoryId) {
-      setLinkedCategoryTemplateIds(null);
-      return;
-    }
-    (async () => {
+    if (!selectedCategoryId) return undefined;
+    const requestId = categoryLinkRequestRef.current + 1;
+    categoryLinkRequestRef.current = requestId;
+    const categoryId = selectedCategoryId;
+
+    void (async () => {
       try {
         const response = await fetch(
-          `/api/workshop-tasks/category-attachments?categoryId=${selectedCategoryId}`,
+          `/api/workshop-tasks/category-attachments?categoryId=${encodeURIComponent(categoryId)}`,
         );
-        const data = await response.json();
-        if (!response.ok || cancelled) return;
-        const ids = ((data.templates || []) as Array<{ templateId: string }>).map(
-          (template) => template.templateId,
-        );
-        setLinkedCategoryTemplateIds(ids);
-        // Categories with links require exactly one attachment selection.
-        if (ids.length > 0) {
-          const currentValid = selectedAttachmentTemplateIds.filter((id) => ids.includes(id));
-          if (currentValid.length !== 1) {
-            onSelectedAttachmentTemplateIdsChange(ids.slice(0, 1));
-          }
-        } else {
-          onSelectedAttachmentTemplateIdsChange([]);
+        const data = await response.json().catch(() => null);
+        if (categoryLinkRequestRef.current !== requestId) return;
+        if (!response.ok || !data || !Array.isArray(data.templates)) {
+          setCategoryLinkResult({ status: 'error', categoryId, linkedIds: [] });
+          return;
         }
+        const linkedIds = ((Array.isArray(data.allTemplates) ? data.allTemplates : data.templates) as Array<{ templateId?: string }>)
+          .map((template) => template.templateId || '')
+          .filter(Boolean);
+        setCategoryLinkResult({ status: 'ready', categoryId, linkedIds });
       } catch {
-        if (!cancelled) setLinkedCategoryTemplateIds([]);
+        if (categoryLinkRequestRef.current !== requestId) return;
+        setCategoryLinkResult({ status: 'error', categoryId, linkedIds: [] });
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCategoryId]);
 
-  const filteredAttachmentTemplates = useMemo(() => {
-    if (!selectedAddAssetType) return [];
-    const byAsset = attachmentTemplates.filter((template) =>
-      normalizeTemplateAppliesTo(template.applies_to).includes(selectedAddAssetType),
+    return () => {
+      categoryLinkRequestRef.current += 1;
+    };
+  }, [categoryLinkRetry, selectedCategoryId]);
+
+  const linkedCategoryTemplateIds =
+    categoryLinkState.status === 'ready' && categoryLinkState.categoryId === selectedCategoryId
+      ? categoryLinkState.linkedIds
+      : [];
+  const compatibleLinkedTemplates = useMemo(() => {
+    if (!selectedAddAssetType || categoryLinkState.status !== 'ready' || categoryLinkState.categoryId !== selectedCategoryId) {
+      return [];
+    }
+    if (categoryLinkState.linkedIds.length === 0) return [];
+    const linkedIds = new Set(categoryLinkState.linkedIds);
+    return attachmentTemplates.filter(
+      (template) =>
+        linkedIds.has(template.id) &&
+        normalizeTemplateAppliesTo(template.applies_to).includes(selectedAddAssetType),
     );
-    if (!selectedCategoryId) return [];
-    if (linkedCategoryTemplateIds == null) return byAsset;
-    if (linkedCategoryTemplateIds.length === 0) return [];
-    return byAsset.filter((template) => linkedCategoryTemplateIds.includes(template.id));
-  }, [attachmentTemplates, selectedAddAssetType, selectedCategoryId, linkedCategoryTemplateIds]);
-  const addUsesKm = meterReadingType === 'mileage' && selectedAddVehicle?.asset_type === 'hgv';
-  const addMeterLabel = meterReadingType === 'hours' ? 'Current Hours' : addUsesKm ? 'Current KM' : 'Current Mileage';
-  const addMeterPlaceholder = meterReadingType === 'hours' ? 'hours' : addUsesKm ? 'KM' : 'mileage';
-  const addMeterUnit = meterReadingType === 'hours' ? 'hours' : addUsesKm ? 'km' : 'miles';
+  }, [attachmentTemplates, categoryLinkState, selectedAddAssetType, selectedCategoryId]);
+
+  useEffect(() => {
+    if (!selectedCategoryId || categoryLinkState.status === 'loading' || categoryLinkState.status === 'idle') {
+      return;
+    }
+    if (categoryLinkState.status === 'error' || categoryLinkState.categoryId !== selectedCategoryId) {
+      if (selectedAttachmentTemplateIds.length > 0) onSelectedAttachmentTemplateIdsChange([]);
+      return;
+    }
+    if (!selectedAddAssetType || categoryLinkState.linkedIds.length === 0 || compatibleLinkedTemplates.length === 0) {
+      if (selectedAttachmentTemplateIds.length > 0) onSelectedAttachmentTemplateIdsChange([]);
+      return;
+    }
+    if (compatibleLinkedTemplates.length === 1) {
+      const onlyId = compatibleLinkedTemplates[0]?.id;
+      if (onlyId && (selectedAttachmentTemplateIds.length !== 1 || selectedAttachmentTemplateIds[0] !== onlyId)) {
+        onSelectedAttachmentTemplateIdsChange([onlyId]);
+      }
+      return;
+    }
+    const allowedIds = new Set(compatibleLinkedTemplates.map((template) => template.id));
+    const nextIds = selectedAttachmentTemplateIds.filter((id) => allowedIds.has(id));
+    if (nextIds.length > 1) {
+      onSelectedAttachmentTemplateIdsChange([]);
+      return;
+    }
+    if (nextIds.length !== selectedAttachmentTemplateIds.length) {
+      onSelectedAttachmentTemplateIdsChange(nextIds);
+    }
+  }, [
+    categoryLinkState,
+    compatibleLinkedTemplates,
+    onSelectedAttachmentTemplateIdsChange,
+    selectedAddAssetType,
+    selectedAttachmentTemplateIds,
+    selectedCategoryId,
+  ]);
+  const addUsesKm = selectedAddAssetType === 'hgv';
+  const addUsesHours = selectedAddAssetType === 'plant';
+  const addMeterLabel = addUsesHours ? 'Current Hours' : addUsesKm ? 'Current KM' : 'Current Mileage';
+  const addMeterPlaceholder = addUsesHours ? 'hours' : addUsesKm ? 'KM' : 'mileage';
+  const addMeterUnit = addUsesHours ? 'hours' : addUsesKm ? 'km' : 'miles';
   const editUsesKm = !editingTask?.plant_id && Boolean(editingTask?.hgv_id);
   const editMeterLabel = editingTask?.plant_id ? 'Current Hours' : editUsesKm ? 'Current KM' : 'Current Mileage';
   const editMeterPlaceholder = editingTask?.plant_id ? 'hours' : editUsesKm ? 'KM' : 'mileage';
   const editMeterUnit = editingTask?.plant_id ? 'hours' : editUsesKm ? 'km' : 'miles';
   const { clearDraft: clearAddDraft } = useWorkshopDraftPersistence({
     enabled: showAddModal,
+    // Retain existing draft keys; the tab never determines asset or category choices.
     draftId: `workshop-task-add:${userId || 'anonymous'}:${assetTab}`,
     kind: 'workshop-task-add',
     ownerId: userId,
     value: {
+      selectedAddAssetType,
       selectedVehicleId,
       selectedCategoryId,
       selectedSubcategoryId,
@@ -256,8 +336,14 @@ export function WorkshopTaskFormDialogs({
     },
     isDirty: isAddFormDirty,
     onRestore: (draft) => {
+      setCategoryLinkResult(null);
+      const restoredVehicle = vehiclesRef.current.find((vehicle) => vehicle.id === draft.selectedVehicleId);
+      const restoredType =
+        readWorkshopAssetType(draft.selectedAddAssetType) ||
+        readWorkshopAssetType(restoredVehicle?.asset_type);
+      setAssetTypeChoice(restoredType);
       onSelectedVehicleIdChange(draft.selectedVehicleId || '');
-      if (draft.selectedVehicleId) onFetchCurrentMeterReading(draft.selectedVehicleId);
+      onFetchCurrentMeterReading(draft.selectedVehicleId || '');
       onSelectedCategoryIdChange(draft.selectedCategoryId || '');
       onSelectedSubcategoryIdChange(draft.selectedSubcategoryId || '');
       onNewMeterReadingChange(draft.newMeterReading || '');
@@ -320,14 +406,60 @@ export function WorkshopTaskFormDialogs({
     onShowEditModalChange(open);
   }
 
-  useEffect(() => {
-    if (selectedAttachmentTemplateIds.length === 0) return;
-    const visibleTemplateIds = new Set(filteredAttachmentTemplates.map((template) => template.id));
-    const nextSelectedTemplateIds = selectedAttachmentTemplateIds.filter((id) => visibleTemplateIds.has(id));
-    if (nextSelectedTemplateIds.length !== selectedAttachmentTemplateIds.length) {
-      onSelectedAttachmentTemplateIdsChange(nextSelectedTemplateIds);
-    }
-  }, [filteredAttachmentTemplates, onSelectedAttachmentTemplateIdsChange, selectedAttachmentTemplateIds]);
+  function clearCreateDependents(options: { clearAsset: boolean }) {
+    setCategoryLinkResult(null);
+    if (options.clearAsset) onSelectedVehicleIdChange('');
+    onSelectedCategoryIdChange('');
+    onSelectedSubcategoryIdChange('');
+    onSelectedAttachmentTemplateIdsChange([]);
+    onNewMeterReadingChange('');
+    onFetchCurrentMeterReading('');
+  }
+
+  function handleAssetTypeChange(nextType: WorkshopAssetType) {
+    if (nextType === selectedAddAssetType) return;
+    setAssetTypeChoice(nextType);
+    clearCreateDependents({ clearAsset: true });
+  }
+
+  function handleAssetChange(nextVehicleId: string) {
+    if (nextVehicleId === selectedVehicleId) return;
+    setCategoryLinkResult(null);
+    onSelectedVehicleIdChange(nextVehicleId);
+    onSelectedCategoryIdChange('');
+    onSelectedSubcategoryIdChange('');
+    onSelectedAttachmentTemplateIdsChange([]);
+    onNewMeterReadingChange('');
+    onFetchCurrentMeterReading(nextVehicleId);
+  }
+
+  function handleCategoryChange(nextCategoryId: string) {
+    if (nextCategoryId === selectedCategoryId) return;
+    setCategoryLinkResult(null);
+    onSelectedCategoryIdChange(nextCategoryId);
+    onSelectedAttachmentTemplateIdsChange([]);
+  }
+
+  const categoryLinksReady = categoryLinkState.status === 'ready' && categoryLinkState.categoryId === selectedCategoryId;
+  const categoryRequiresForm = categoryLinksReady && linkedCategoryTemplateIds.length > 0;
+  const categoryLinksBlockCreate =
+    !selectedAddAssetType ||
+    !selectedVehicleId ||
+    !selectedCategoryId ||
+    !categoryLinksReady ||
+    (categoryRequiresForm && (
+      compatibleLinkedTemplates.length === 0 ||
+      selectedAttachmentTemplateIds.length !== 1 ||
+      !compatibleLinkedTemplates.some((template) => template.id === selectedAttachmentTemplateIds[0])
+    ));
+  const showRequiredFormSection = categoryRequiresForm;
+  const assetTypeLabel = selectedAddAssetType === 'plant' ? 'plant' : selectedAddAssetType === 'hgv' ? 'HGV' : selectedAddAssetType === 'van' ? 'van' : 'asset';
+
+  function handleCreateTask() {
+    if (submitting || categoryLinksBlockCreate) return;
+    if (workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH || !newMeterReading.trim()) return;
+    onCreateTask();
+  }
 
   return (
     <>
@@ -337,8 +469,10 @@ export function WorkshopTaskFormDialogs({
       >
         <DialogContent
           ref={addDialogContentRef}
-          className={`bg-white dark:bg-slate-900 border-border text-foreground max-w-lg overflow-y-auto max-h-[92vh] ${
-            tabletModeEnabled ? 'max-w-xl p-5 sm:p-6' : ''
+          data-accent="workshop"
+          mobileKeyboardSafe
+          className={`border-slate-700 bg-slate-900 text-slate-100 max-w-xl overflow-y-auto max-h-[92dvh] ${
+            tabletModeEnabled ? 'max-w-2xl p-5 sm:p-6' : ''
           }`}
           onInteractOutside={(event) => {
             if (isAddFormDirty) {
@@ -355,54 +489,126 @@ export function WorkshopTaskFormDialogs({
         >
           <DialogHeader>
             <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Add a new {assetTab === 'plant' ? 'plant' : assetTab === 'hgv' ? 'HGV' : assetTab === 'all' ? '' : 'van'} repair or maintenance task
+            <DialogDescription className="text-slate-300">
+              Choose an asset type, then the asset and category.
             </DialogDescription>
           </DialogHeader>
 
           <div className={tabletModeEnabled ? 'space-y-5' : 'space-y-4'}>
-            <div className="space-y-2">
-              <Label htmlFor="vehicle" className="text-foreground">
-                {assetTab === 'plant' ? 'Plant' : assetTab === 'hgv' ? 'HGV' : assetTab === 'all' ? 'Asset' : 'Van'} <span className="text-red-500">*</span>
-              </Label>
-              <Select value={selectedVehicleId} onValueChange={(value) => {
-                onSelectedVehicleIdChange(value);
-                if (value) {
-                  onFetchCurrentMeterReading(value);
-                }
-              }}>
-                <TabletAwareSelectTrigger id="vehicle" className="bg-white dark:bg-slate-800 border-border text-foreground">
-                  <SelectValue placeholder={`Select ${assetTab === 'plant' ? 'plant' : assetTab === 'hgv' ? 'HGV' : assetTab === 'all' ? 'asset' : 'van'}`} />
-                </TabletAwareSelectTrigger>
-                <TabletAwareSelectContent>
-                  {vehicles
-                    .filter(v => assetTab === 'all' ? true : assetTab === 'plant' ? v.asset_type === 'plant' : assetTab === 'hgv' ? v.asset_type === 'hgv' : v.asset_type === 'van')
-                    .map((vehicle) => (
-                      <TabletAwareSelectItem key={vehicle.id} value={vehicle.id}>
-                        {getAssetDisplay(vehicle, { forSelect: true })}
+            <section className="space-y-3 border-b border-slate-700 pb-4">
+              <h3 className="text-base font-semibold text-slate-100">Asset</h3>
+              <div className="space-y-2">
+                <Label id="add-asset-type-label" className="text-slate-100">
+                  Asset type <span className="text-red-400">*</span>
+                </Label>
+                <div
+                  role="radiogroup"
+                  aria-labelledby="add-asset-type-label"
+                  className="grid grid-cols-3 gap-1 rounded-md border border-slate-700 bg-slate-950 p-1"
+                >
+                  {CREATE_ASSET_TYPE_OPTIONS.map((option) => {
+                    const checked = selectedAddAssetType === option.value;
+                    return (
+                      <label
+                        key={option.value}
+                        className={`flex min-h-11 cursor-pointer items-center justify-center rounded-md px-2 text-sm font-medium focus-within:ring-2 focus-within:ring-workshop md:min-h-9 ${
+                          checked ? 'bg-workshop text-white' : 'text-slate-200 hover:bg-slate-800'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="workshop-create-asset-type"
+                          value={option.value}
+                          checked={checked}
+                          onChange={() => handleAssetTypeChange(option.value)}
+                          className="sr-only"
+                        />
+                        {option.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="vehicle" className="text-slate-100">
+                  Asset <span className="text-red-400">*</span>
+                </Label>
+                <Select
+                  value={selectedVehicleId}
+                  onValueChange={handleAssetChange}
+                  disabled={!selectedAddAssetType}
+                >
+                  <TabletAwareSelectTrigger
+                    id="vehicle"
+                    disabled={!selectedAddAssetType}
+                    className="border-slate-700 bg-slate-800 text-slate-100"
+                  >
+                    <SelectValue placeholder={selectedAddAssetType ? `Select ${assetTypeLabel}` : 'Select an asset type first'} />
+                  </TabletAwareSelectTrigger>
+                  <TabletAwareSelectContent>
+                    {vehicles
+                      .filter((vehicle) => vehicle.asset_type === selectedAddAssetType)
+                      .map((vehicle) => (
+                        <TabletAwareSelectItem key={vehicle.id} value={vehicle.id}>
+                          {getAssetDisplay(vehicle, { forSelect: true })}
+                        </TabletAwareSelectItem>
+                      ))}
+                  </TabletAwareSelectContent>
+                </Select>
+              </div>
+            </section>
+
+            <section className="space-y-3 border-b border-slate-700 pb-4">
+              <h3 className="text-base font-semibold text-slate-100">Category</h3>
+              <p className="rounded-md bg-slate-800 px-3 py-2 text-sm text-slate-200">
+                Choose Repair for repair work. Service and inspection categories may require a checklist.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="category" className="text-slate-100">
+                  Category <span className="text-red-400">*</span>
+                </Label>
+                <Select
+                  value={selectedCategoryId}
+                  onValueChange={handleCategoryChange}
+                  disabled={!selectedVehicleId}
+                >
+                  <TabletAwareSelectTrigger
+                    id="category"
+                    disabled={!selectedVehicleId}
+                    className="border-slate-700 bg-slate-800 text-slate-100"
+                  >
+                    <SelectValue placeholder={selectedVehicleId ? 'Select category' : 'Select an asset first'} />
+                  </TabletAwareSelectTrigger>
+                  <TabletAwareSelectContent>
+                    {activeCategories.map((category) => (
+                      <TabletAwareSelectItem key={category.id} value={category.id}>
+                        {category.name}
                       </TabletAwareSelectItem>
                     ))}
-                </TabletAwareSelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="category" className="text-foreground">
-                Category <span className="text-red-500">*</span>
-              </Label>
-              <Select value={selectedCategoryId} onValueChange={onSelectedCategoryIdChange}>
-                <TabletAwareSelectTrigger id="category" className="bg-white dark:bg-slate-800 border-border text-foreground">
-                  <SelectValue placeholder="Select category" />
-                </TabletAwareSelectTrigger>
-                <TabletAwareSelectContent>
-                  {activeCategories.map((category) => (
-                    <TabletAwareSelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </TabletAwareSelectItem>
-                  ))}
-                </TabletAwareSelectContent>
-              </Select>
-            </div>
+                  </TabletAwareSelectContent>
+                </Select>
+              </div>
+              {selectedCategoryId && categoryLinkState.status === 'loading' && (
+                <p className="text-sm text-slate-200">Checking this category&apos;s form requirement.</p>
+              )}
+              {categoryLinkState.status === 'error' && (
+                <div className="space-y-2" role="alert">
+                  <p className="text-sm text-red-300">Unable to check this category&apos;s form requirements. Retry before creating the task.</p>
+                  <TabletAwareButton type="button" variant="outline" onClick={() => {
+                    setCategoryLinkResult(null);
+                    setCategoryLinkRetry((retry) => retry + 1);
+                  }}>Retry</TabletAwareButton>
+                </div>
+              )}
+              {categoryLinksReady && linkedCategoryTemplateIds.length === 0 && (
+                <p className="text-sm text-slate-200">This category does not require a form.</p>
+              )}
+              {categoryRequiresForm && compatibleLinkedTemplates.length > 0 && (
+                <p className="text-sm text-slate-50">
+                  This category requires a form. Select the matching form below. Choose Repair instead if this is ordinary repair work.
+                </p>
+              )}
+            </section>
 
             {categoryHasSubcategories && (
               <div className="space-y-2">
@@ -428,100 +634,82 @@ export function WorkshopTaskFormDialogs({
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="mileage" className="text-foreground">
-                {addMeterLabel} <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="mileage"
-                type="number"
-                value={newMeterReading}
-                onChange={(e) => onNewMeterReadingChange(e.target.value)}
-                placeholder={`Enter current ${addMeterPlaceholder}`}
-                className="bg-white dark:bg-slate-800 border-border text-foreground"
-                min="0"
-                step="1"
-              />
-              {currentMeterReading !== null && (
-                <p className="text-xs text-muted-foreground">
-                  Last recorded: {currentMeterReading.toLocaleString()} {addMeterUnit}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="comments" className="text-foreground">
-                Task Details <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="comments"
-                value={workshopComments}
-                onChange={(e) => onWorkshopCommentsChange(e.target.value)}
-                placeholder={`Describe the work needed (minimum ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters)`}
-                className="bg-white dark:bg-slate-800 border-border text-foreground min-h-[100px]"
-                maxLength={300}
-              />
-              <p className="text-xs text-muted-foreground">
-                {workshopComments.length}/300 characters (minimum {WORKSHOP_TASK_COMMENT_MIN_LENGTH})
-              </p>
-            </div>
-
-            {attachmentTemplates.length > 0 && (
+            <section className="space-y-3">
+              <h3 className="text-base font-semibold text-slate-100">Details</h3>
               <div className="space-y-2">
-                <Label className="text-foreground flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  {linkedCategoryTemplateIds && linkedCategoryTemplateIds.length > 0
-                    ? 'Linked Attachment'
-                    : 'Attachments'}
-                  {linkedCategoryTemplateIds && linkedCategoryTemplateIds.length > 0 ? (
-                    <span className="text-red-500">*</span>
-                  ) : null}
+                <Label htmlFor="mileage" className="text-slate-100">
+                  {addMeterLabel} <span className="text-red-400">*</span>
                 </Label>
-                <p className="text-xs text-muted-foreground mb-2">
-                  {linkedCategoryTemplateIds && linkedCategoryTemplateIds.length > 0
-                    ? 'Select exactly one attachment linked to this category'
-                    : selectedCategoryId
-                      ? 'This category does not allow attachments'
-                      : 'Select a category to see linked attachments'}
-                </p>
-                <div className={`space-y-2 max-h-40 overflow-y-auto p-2 border border-border rounded-md bg-muted/30 ${tabletModeEnabled ? 'p-3' : ''}`}>
-                  {!selectedAddAssetType && (
-                    <p className="text-xs text-muted-foreground">
-                      Select an asset first to see relevant attachments.
-                    </p>
-                  )}
-                  {selectedAddAssetType && selectedCategoryId && filteredAttachmentTemplates.length === 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      No linked attachments for this category.
-                    </p>
-                  )}
-                  {filteredAttachmentTemplates.map((template) => (
-                    <div key={template.id} className={`flex items-center ${tabletModeEnabled ? 'space-x-3 py-1' : 'space-x-2'}`}>
-                      <input
-                        type="radio"
-                        name="linked-attachment-template"
-                        id={`template-inline-${template.id}`}
-                        checked={selectedAttachmentTemplateIds.includes(template.id)}
-                        onChange={() => {
-                          onSelectedAttachmentTemplateIdsChange([template.id]);
-                        }}
-                        className={`border-gray-300 text-workshop focus:ring-workshop ${tabletModeEnabled ? 'h-5 w-5' : 'h-4 w-4'}`}
-                      />
-                      <label
-                        htmlFor={`template-inline-${template.id}`}
-                        className={`font-normal cursor-pointer text-foreground ${tabletModeEnabled ? 'text-base' : 'text-sm'}`}
-                      >
-                        {template.name}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-                {selectedAttachmentTemplateIds.length > 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    {selectedAttachmentTemplateIds.length} attachment{selectedAttachmentTemplateIds.length > 1 ? 's' : ''} will be added to this task
+                <Input
+                  id="mileage"
+                  type="number"
+                  value={newMeterReading}
+                  onChange={(e) => onNewMeterReadingChange(e.target.value)}
+                  placeholder={`Enter current ${addMeterPlaceholder}`}
+                  className="border-slate-700 bg-slate-800 text-base text-slate-100 md:text-sm"
+                  min="0"
+                  step="1"
+                />
+                {currentMeterReading !== null && (
+                  <p className="text-xs text-slate-400">
+                    Last recorded: {currentMeterReading.toLocaleString()} {addMeterUnit}
                   </p>
                 )}
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="comments" className="text-slate-100">
+                  Task Details <span className="text-red-400">*</span>
+                </Label>
+                <Textarea
+                  id="comments"
+                  value={workshopComments}
+                  onChange={(e) => onWorkshopCommentsChange(e.target.value)}
+                  placeholder={`Describe the work needed (minimum ${WORKSHOP_TASK_COMMENT_MIN_LENGTH} characters)`}
+                  className="min-h-[100px] border-slate-700 bg-slate-800 text-base text-slate-100 md:text-sm"
+                  maxLength={300}
+                />
+                <p className="text-xs text-slate-400">
+                  {workshopComments.length}/300 characters (minimum {WORKSHOP_TASK_COMMENT_MIN_LENGTH})
+                </p>
+              </div>
+            </section>
+
+            {showRequiredFormSection && (
+              <section className="space-y-2 rounded-lg border border-workshop/40 bg-slate-950/60 p-3" aria-labelledby="required-form-heading">
+                <h3 id="required-form-heading" className="flex items-center gap-2 text-base font-semibold text-slate-100">
+                  <FileText className="h-4 w-4" aria-hidden="true" />
+                  Required form
+                  <span className="text-red-400">*</span>
+                </h3>
+                {categoryRequiresForm && compatibleLinkedTemplates.length === 0 && (
+                  <p className="text-sm text-red-300">
+                    This category requires a form, but no active template matches this asset. Choose Repair instead if this is ordinary repair work.
+                  </p>
+                )}
+                {categoryRequiresForm && compatibleLinkedTemplates.length > 0 && (
+                  <div className={`max-h-40 space-y-2 overflow-y-auto rounded-md border border-slate-700 bg-slate-900 p-2 ${tabletModeEnabled ? 'p-3' : ''}`}>
+                    {compatibleLinkedTemplates.map((template) => (
+                      <div key={template.id} className={`flex items-center ${tabletModeEnabled ? 'space-x-3 py-1' : 'space-x-2'}`}>
+                        <input
+                          type="radio"
+                          name="workshop-create-required-form"
+                          id={`template-inline-${template.id}`}
+                          checked={selectedAttachmentTemplateIds.length === 1 && selectedAttachmentTemplateIds[0] === template.id}
+                          onChange={() => onSelectedAttachmentTemplateIdsChange([template.id])}
+                          className={`border-slate-500 text-workshop focus:ring-workshop ${tabletModeEnabled ? 'h-5 w-5' : 'h-4 w-4'}`}
+                        />
+                        <label
+                          htmlFor={`template-inline-${template.id}`}
+                          className={`cursor-pointer font-normal text-slate-100 ${tabletModeEnabled ? 'text-base' : 'text-sm'}`}
+                        >
+                          {template.name}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
             )}
           </div>
 
@@ -538,17 +726,15 @@ export function WorkshopTaskFormDialogs({
               {isAddFormDirty ? 'Discard Changes' : 'Cancel'}
             </TabletAwareButton>
             <TabletAwareButton
-              onClick={onCreateTask}
+              type="button"
+              onClick={handleCreateTask}
               disabled={
                 submitting ||
-                !selectedVehicleId ||
-                !selectedCategoryId ||
+                categoryLinksBlockCreate ||
                 workshopComments.trim().length < WORKSHOP_TASK_COMMENT_MIN_LENGTH ||
-                !newMeterReading.trim() ||
-                (Boolean(linkedCategoryTemplateIds && linkedCategoryTemplateIds.length > 0) &&
-                  selectedAttachmentTemplateIds.length !== 1)
+                !newMeterReading.trim()
               }
-              className="bg-workshop hover:bg-workshop-dark text-white"
+              className="bg-workshop text-white hover:bg-workshop-dark"
             >
               {submitting ? 'Creating...' : 'Create Task'}
             </TabletAwareButton>

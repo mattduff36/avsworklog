@@ -307,6 +307,7 @@ export function useWorkshopTasksFetchers({
   const fetchTasksRequestIdRef = useRef(0);
   const fetchArchivedRequestIdRef = useRef(0);
   const fetchArchivedCountRequestIdRef = useRef(0);
+  const fetchMeterRequestIdRef = useRef(0);
 
   const fetchTasks = useCallback(async () => {
     if (!supabase) return;
@@ -612,8 +613,14 @@ export function useWorkshopTasksFetchers({
   ]);
 
   const fetchCurrentMeterReading = useCallback(async (vehicleId: string) => {
-    if (!supabase) {
+    const requestId = fetchMeterRequestIdRef.current + 1;
+    fetchMeterRequestIdRef.current = requestId;
+    const isCurrentRequest = () => fetchMeterRequestIdRef.current === requestId;
+    setCurrentMeterReading(null);
+
+    if (!vehicleId || !supabase) {
       setCurrentMeterReading(null);
+      if (!vehicleId) setMeterReadingType('mileage');
       return;
     }
 
@@ -626,6 +633,7 @@ export function useWorkshopTasksFetchers({
         .select('id')
         .eq('id', vehicleId)
         .maybeSingle();
+      if (!isCurrentRequest()) return;
 
       if (!vehicleData) {
         const { data: hgvData } = await supabase
@@ -633,6 +641,7 @@ export function useWorkshopTasksFetchers({
           .select('id')
           .eq('id', vehicleId)
           .maybeSingle();
+        if (!isCurrentRequest()) return;
 
         if (hgvData) {
           isHgv = true;
@@ -642,6 +651,7 @@ export function useWorkshopTasksFetchers({
             .select('id')
             .eq('id', vehicleId)
             .maybeSingle();
+          if (!isCurrentRequest()) return;
 
           if (plantData) {
             isPlant = true;
@@ -662,6 +672,7 @@ export function useWorkshopTasksFetchers({
         .order('updated_at', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(2);
+      if (!isCurrentRequest()) return;
 
       if (error) {
         if (error.code === 'PGRST116') {
@@ -679,6 +690,7 @@ export function useWorkshopTasksFetchers({
       const meterData = ((data || [])[0] as { current_hours?: number | null; current_mileage?: number | null } | undefined) ?? null;
       setCurrentMeterReading(isPlant ? (meterData?.current_hours || null) : (meterData?.current_mileage || null));
     } catch (err) {
+      if (!isCurrentRequest()) return;
       if (isTransientNetworkError(err)) {
         console.warn('Network error fetching meter reading (transient):', (err as Error).message);
       } else {
