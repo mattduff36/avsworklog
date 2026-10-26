@@ -2,6 +2,35 @@
   "version": 1,
   "incidents": [
     {
+      "id": "fei_e274a8e0f83917f0",
+      "fingerprint": "9df355b034ba21b232d210398b8ef05fb4c1f46d216c2fbb169ff8999ca6d20c",
+      "errorContextId": null,
+      "httpStatus": null,
+      "route": "/absence/manage",
+      "component": "Console Error",
+      "sourceFile": "app/(dashboard)/absence/manage/components/AbsenceCalendarAdmin.tsx",
+      "normalizedMessage": "Console Error: Error updating timesheet override: Error: Absence record not found Error: Absence record not found at I (<URL>) at async Object.mutationFn (<URL>)",
+      "rootCauseFamily": "source:app/(dashboard)/absence/manage/components/AbsenceCalendarAdmin.tsx",
+      "diagnosis": "Deployed calendar timesheet-override recovery refreshes both queries and closes the day detail only after a successful refetch drops the record.",
+      "fixSummary": "Recover a stale calendar timesheet override by refreshing absence queries and closing the day detail only after the refetch confirms the record is gone.",
+      "changedFiles": [
+        "app/(dashboard)/absence/manage/components/AbsenceCalendarAdmin.tsx",
+        "lib/utils/absence-error-handling.ts",
+        "tests/unit/absence-error-handling.test.ts"
+      ],
+      "tests": [
+        "tests/unit/absence-error-handling.test.ts"
+      ],
+      "confidence": "high",
+      "outcome": "fix_verified_live",
+      "lane": "standard",
+      "firstSeen": "2026-10-26T18:36:00.000Z",
+      "lastSeen": "2026-10-26T18:56:25.612Z",
+      "occurrences": 2,
+      "recurrenceCount": 0,
+      "updatedAt": "2026-10-26T18:56:25.612Z"
+    },
+    {
       "id": "fei_a543230f13ee0e38",
       "fingerprint": "ff4d9ad5235505e3cec24b716d54fe32c737b5e283b12393dbcd01299bde8e47",
       "errorContextId": null,
