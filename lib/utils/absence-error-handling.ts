@@ -144,6 +144,15 @@ export type AbsenceDeleteFailurePlan =
     }
   | { kind: 'unchanged' };
 
+export function shouldCloseStaleTimesheetOverrideDetail(input: {
+  calendarRefetchSucceeded: boolean;
+  refreshedRows: readonly { id: string }[] | null;
+  absenceId: string;
+}): boolean {
+  if (!input.calendarRefetchSucceeded || !input.refreshedRows) return false;
+  return !input.refreshedRows.some((row) => row.id === input.absenceId);
+}
+
 export function planAbsenceDeleteFailure(
   error: unknown,
   options: { listRefetchSucceeded: boolean }

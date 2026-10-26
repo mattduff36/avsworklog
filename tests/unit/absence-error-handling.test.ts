@@ -3,6 +3,7 @@ import {
   isExpectedAbsenceAccessError,
   isStaleAbsenceDeleteError,
   planAbsenceDeleteFailure,
+  shouldCloseStaleTimesheetOverrideDetail,
   shouldLogAbsenceManageError,
 } from '@/lib/utils/absence-error-handling';
 
@@ -102,6 +103,70 @@ describe('absence-error-handling', () => {
     expect(
       planAbsenceDeleteFailure({ status: 403, message: 'Forbidden' }, { listRefetchSucceeded: true })
     ).toEqual({ kind: 'unchanged' });
+  });
+
+  it('plans a warning refresh when a timesheet override hits a missing absence', () => {
+    const refreshed = planAbsenceDeleteFailure(new Error('Absence record not found'), {
+      listRefetchSucceeded: true,
+    });
+    expect(refreshed).toEqual({
+      kind: 'stale',
+      closeConfirmation: true,
+      clearTarget: true,
+      refreshAllowance: true,
+      toast: 'warning',
+      message: 'This absence is no longer available. The list has been refreshed.',
+    });
+    expect(refreshed.kind === 'stale' ? refreshed.message : '').not.toMatch(/enabled|disabled|success/i);
+
+    const pendingRefresh = planAbsenceDeleteFailure(new Error('Absence record not found'), {
+      listRefetchSucceeded: false,
+    });
+    expect(pendingRefresh.kind === 'stale' ? pendingRefresh.message : '').toBe(
+      'This absence is no longer available.'
+    );
+
+    expect(
+      planAbsenceDeleteFailure(new Error('Failed to update timesheet override'), {
+        listRefetchSucceeded: true,
+      })
+    ).toEqual({ kind: 'unchanged' });
+    expect(
+      planAbsenceDeleteFailure({ status: 403, message: 'Absence record not found' }, {
+        listRefetchSucceeded: true,
+      })
+    ).toEqual({ kind: 'unchanged' });
+  });
+
+  it('closes stale timesheet-override detail only after a successful refresh drops the record', () => {
+    expect(
+      shouldCloseStaleTimesheetOverrideDetail({
+        calendarRefetchSucceeded: true,
+        refreshedRows: [{ id: 'other-absence' }],
+        absenceId: 'missing-absence',
+      })
+    ).toBe(true);
+    expect(
+      shouldCloseStaleTimesheetOverrideDetail({
+        calendarRefetchSucceeded: true,
+        refreshedRows: [{ id: 'missing-absence' }],
+        absenceId: 'missing-absence',
+      })
+    ).toBe(false);
+    expect(
+      shouldCloseStaleTimesheetOverrideDetail({
+        calendarRefetchSucceeded: false,
+        refreshedRows: [{ id: 'other-absence' }],
+        absenceId: 'missing-absence',
+      })
+    ).toBe(false);
+    expect(
+      shouldCloseStaleTimesheetOverrideDetail({
+        calendarRefetchSucceeded: true,
+        refreshedRows: null,
+        absenceId: 'missing-absence',
+      })
+    ).toBe(false);
   });
 });
 

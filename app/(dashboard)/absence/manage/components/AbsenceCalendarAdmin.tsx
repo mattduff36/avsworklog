@@ -40,7 +40,10 @@ import { useAllAbsenceReasons, useAllAbsences, useDeleteAbsence, useUpdateAbsenc
 import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { filterEmployeesBySelectedTeam } from '@/lib/utils/absence-admin';
 import { canDeleteAbsenceRecord } from '@/lib/utils/absence-delete-guard';
-import { planAbsenceDeleteFailure } from '@/lib/utils/absence-error-handling';
+import {
+  planAbsenceDeleteFailure,
+  shouldCloseStaleTimesheetOverrideDetail,
+} from '@/lib/utils/absence-error-handling';
 import { formatDateISO, getCurrentFinancialYear, getFinancialYearMonths } from '@/lib/utils/date';
 import {
   eachDayOfInterval,
@@ -475,6 +478,45 @@ export function AbsenceCalendarAdmin() {
       toast.success(checked ? 'Timesheet override enabled' : 'Timesheet override disabled');
     } catch (error) {
       console.error('Error updating timesheet override:', error);
+      const plan = planAbsenceDeleteFailure(error, { listRefetchSucceeded: false });
+      if (plan.kind === 'stale') {
+        const results = await Promise.allSettled([
+          refetchCalendarAbsences(),
+          refetchAllowanceAbsences(),
+        ]);
+        const listRefetchSucceeded = results.every(
+          (result) => result.status === 'fulfilled' && result.value.isSuccess
+        );
+        const recovered = planAbsenceDeleteFailure(error, { listRefetchSucceeded });
+        if (recovered.kind === 'stale') {
+          const calendarResult = results[0];
+          const calendarRefetchSucceeded =
+            calendarResult.status === 'fulfilled' && calendarResult.value.isSuccess === true;
+          const refreshedRows =
+            calendarRefetchSucceeded && Array.isArray(calendarResult.value.data)
+              ? calendarResult.value.data
+              : null;
+          if (
+            shouldCloseStaleTimesheetOverrideDetail({
+              calendarRefetchSucceeded,
+              refreshedRows,
+              absenceId: absence.id,
+            })
+          ) {
+            setShowDayModal(false);
+            setSelectedDate(null);
+            if (editTarget?.id === absence.id) {
+              setEditTarget(null);
+              setEditMode('full');
+            }
+            if (deleteTargetId === absence.id) {
+              setDeleteTargetId(null);
+            }
+          }
+          toast.warning(recovered.message);
+          return;
+        }
+      }
       toast.error(getErrorMessage(error) || 'Failed to update timesheet override');
     } finally {
       setOverrideSubmittingId((current) => (current === absence.id ? null : current));
