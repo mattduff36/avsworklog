@@ -175,6 +175,7 @@ export function WorkshopTaskFormDialogs({
 }: WorkshopTaskFormDialogsProps) {
   const { tabletModeEnabled } = useTabletMode();
   const addDialogContentRef = useRef<HTMLDivElement>(null);
+  const addDialogTitleRef = useRef<HTMLHeadingElement>(null);
   const editDialogContentRef = useRef<HTMLDivElement>(null);
   const vehiclesRef = useRef(vehicles);
   useEffect(() => {
@@ -469,6 +470,10 @@ export function WorkshopTaskFormDialogs({
       >
         <DialogContent
           ref={addDialogContentRef}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            addDialogTitleRef.current?.focus();
+          }}
           data-accent="workshop"
           mobileKeyboardSafe
           className={`border-slate-700 bg-slate-900 text-slate-100 max-w-xl overflow-y-auto max-h-[92dvh] ${
@@ -488,7 +493,7 @@ export function WorkshopTaskFormDialogs({
           }}
         >
           <DialogHeader>
-            <DialogTitle className="text-foreground text-xl">Create Workshop Task</DialogTitle>
+            <DialogTitle ref={addDialogTitleRef} tabIndex={-1} className="text-foreground text-xl outline-none">Create Workshop Task</DialogTitle>
             <DialogDescription className="text-slate-300">
               Choose an asset type, then the asset and category.
             </DialogDescription>
