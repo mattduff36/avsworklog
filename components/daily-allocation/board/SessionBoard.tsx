@@ -138,6 +138,9 @@ function SessionDrop({
       data-testid={`daily-allocation-session-${profileId || 'unassigned'}-${date}-${session}`}
       className={cn(
         'row-start-1 min-h-28 space-y-2 bg-slate-950/50 p-2',
+        // The full-day overlay already occupies row 1. Without an explicit column,
+        // auto-placement spills these cells into implicit columns at the row edge.
+        session === 'am' ? 'col-start-1' : 'col-start-2',
         leadingBorder && 'border-l border-border',
         highlighted && 'bg-[hsl(var(--daily-allocation-primary)/0.12)]',
       )}

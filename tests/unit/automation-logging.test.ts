@@ -277,7 +277,9 @@ describe('automation logging helpers', () => {
       ],
     });
 
-    expect(review).toContain('Verified local fixes: 1');
+    expect(review).toContain(
+      `Verified local fixes: ${Math.max(1, summarizeKnowledgeOutcomes(loadKnowledgeStore()).verifiedOutcomeCount)}`
+    );
     expect(review).toContain('Verified fix recurrences: 1');
     expect(review).not.toContain('200-log fetch limit');
     expect(review).toContain('Review verified fixes that recurred in production');

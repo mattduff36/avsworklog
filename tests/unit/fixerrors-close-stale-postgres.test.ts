@@ -54,7 +54,7 @@ describe('non-actionable exact-ID closure on disposable PostgreSQL', () => {
     expect(artifacts['docs_private/error-run-summary.txt']).toContain(`${C}: untriaged`);
     expect(await closeStaleExactIds(client, m, hash, { refresh: true, writer })).toEqual({ closed: 2, active: 1 });
   });
-  it.each(['drift', 'missing', 'local-evidence', 'pre-artifact', 'expiry', 'mixed-state', 'audit-shape'])('rolls back the whole set on %s', async (failure, context) => {
+  it.for(['drift', 'missing', 'local-evidence', 'pre-artifact', 'expiry', 'mixed-state', 'audit-shape'])('rolls back the whole set on %s', async (failure, context) => {
     if (!available) return context.skip();
     if (failure === 'local-evidence') await client.query("UPDATE public.error_logs SET triage_local_commit='local-proof' WHERE id=$1", [B]);
     if (failure === 'audit-shape') await client.query("UPDATE public.error_logs SET additional_data='{" + '"fixerrorsClosures":{}' + "}' WHERE id=$1", [B]);
