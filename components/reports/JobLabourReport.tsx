@@ -1,19 +1,49 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { JobLabourFiltersSchema } from '@/lib/validation/job-labour-report';
 import type { JobLabourReport as Report } from '@/types/job-labour-report';
 
 const endpoint = '/api/reports/timesheets/job-labour';
 const number = (value: number) => value.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export function JobLabourReport({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
+function DeniedLabourActions({ reason, children }: { reason: string; children: ReactNode }) {
+  const reasonId = useId();
+  return (
+    <>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span tabIndex={0} className="inline-flex flex-wrap gap-2 outline-none" aria-describedby={reasonId}>
+              {children}
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>{reason}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <p id={reasonId} className="text-sm text-muted-foreground">{reason}</p>
+    </>
+  );
+}
+
+export function JobLabourReport({
+  dateFrom,
+  dateTo,
+  embedded = false,
+  accessDeniedReason = null,
+}: {
+  dateFrom: string;
+  dateTo: string;
+  embedded?: boolean;
+  accessDeniedReason?: string | null;
+}) {
   const [jobCodes, setJobCodes] = useState('');
   const [hoursPerDay, setHoursPerDay] = useState('8');
   const [report, setReport] = useState<Report | null>(null);
@@ -29,11 +59,11 @@ export function JobLabourReport({ dateFrom, dateTo }: { dateFrom: string; dateTo
     invalidate();
     setReport(null); setError(''); setBusy(null);
     return invalidate;
-  }, [dateFrom, dateTo, jobCodes, hoursPerDay, invalidate]);
+  }, [accessDeniedReason, dateFrom, dateTo, jobCodes, hoursPerDay, invalidate]);
   const parsed = JobLabourFiltersSchema.safeParse({ dateFrom, dateTo, jobCodes, hoursPerDay });
 
   async function run(format: 'json' | 'xlsx') {
-    if (!parsed.success) return;
+    if (accessDeniedReason || !parsed.success) return;
     controller.current?.abort();
     const abort = new AbortController();
     controller.current = abort;
@@ -69,12 +99,7 @@ export function JobLabourReport({ dateFrom, dateTo }: { dateFrom: string; dateTo
     }
   }
 
-  return <Card className="border-border">
-    <CardHeader>
-      <CardTitle className="text-xl">Job Labour</CardTitle>
-      <CardDescription>Worked hours and man-day equivalents by job, using the report dates above.</CardDescription>
-    </CardHeader>
-    <CardContent className="space-y-4">
+  const form = <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
         <div className="space-y-2">
           <Label htmlFor="job-labour-codes">Job codes</Label>
@@ -88,13 +113,20 @@ export function JobLabourReport({ dateFrom, dateTo }: { dateFrom: string; dateTo
       </div>
       <p className="text-sm text-muted-foreground">Approved/processed timesheets only, filtered by actual work date. Man-day equivalents = worked hours ÷ hours per man-day. Hours on multi-job entries are split equally and marked as estimates. Hidden, deleted and system accounts, leave and yard entries are excluded.</p>
       {!parsed.success && <p role="status" className="text-sm text-muted-foreground">Choose valid dates (up to 366 days), up to 20 job codes and 0.25–24 hours per man-day.</p>}
-      <div className="flex flex-wrap gap-2">
-        <Button className="bg-timesheet text-white hover:bg-timesheet-dark" disabled={!parsed.success || busy !== null} onClick={() => run('json')}>{busy === 'preview' ? 'Generating…' : 'Generate report'}</Button>
-        <Button variant="outline" disabled={!parsed.success || busy !== null} onClick={() => run('xlsx')}>{busy === 'download' ? 'Downloading…' : 'Download Excel'}</Button>
-      </div>
+      {accessDeniedReason ? (
+        <DeniedLabourActions reason={accessDeniedReason}>
+          <Button className="pointer-events-none h-11 bg-avs-yellow text-slate-950 hover:bg-avs-yellow/90 md:h-8" disabled onClick={() => run('json')}>Generate report</Button>
+          <Button variant="outline" className="pointer-events-none h-11 md:h-8" disabled onClick={() => run('xlsx')}>Download Excel</Button>
+        </DeniedLabourActions>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Button className="h-11 bg-avs-yellow text-slate-950 hover:bg-avs-yellow/90 md:h-8" disabled={!parsed.success || busy !== null} onClick={() => run('json')}>{busy === 'preview' ? 'Generating…' : 'Generate report'}</Button>
+          <Button variant="outline" className="h-11 md:h-8" disabled={!parsed.success || busy !== null} onClick={() => run('xlsx')}>{busy === 'download' ? 'Downloading…' : 'Download Excel'}</Button>
+        </div>
+      )}
       {busy === 'preview' && <p role="status" className="text-sm text-muted-foreground">Calculating job labour…</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      {report && <div className="space-y-4" aria-live="polite">
+      {report && !accessDeniedReason && <div className="min-w-0 space-y-4" aria-live="polite">
         <p className="text-sm">{report.filters.dateFrom} to {report.filters.dateTo} · {report.filters.hoursPerDay} hours per man-day</p>
         {report.unmatchedJobCodes.length > 0 && <p className="text-sm text-muted-foreground">No matching approved worked entries for: {report.unmatchedJobCodes.join(', ')}. This does not establish that no work took place.</p>}
         {report.summary.length === 0 ? <p className="text-sm text-muted-foreground">No matching worked entries found within your report permissions.</p> : <>
@@ -118,6 +150,15 @@ export function JobLabourReport({ dateFrom, dateTo }: { dateFrom: string; dateTo
           </details>
         </>}
       </div>}
-    </CardContent>
+    </div>;
+
+  if (embedded) return form;
+
+  return <Card className="border-border">
+    <CardHeader>
+      <CardTitle className="text-xl">Job Labour</CardTitle>
+      <CardDescription>Worked hours and man-day equivalents by job, using the report dates above. Hours come from approved timesheets, not the live Daily Allocation board.</CardDescription>
+    </CardHeader>
+    <CardContent>{form}</CardContent>
   </Card>;
 }

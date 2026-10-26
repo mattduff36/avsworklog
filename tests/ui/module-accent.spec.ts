@@ -130,7 +130,12 @@ test.describe('Module accent theming', () => {
     const vars = await getAccentVars(page);
     expect(vars).not.toBeNull();
     expect(vars!.accent).toBe('brand');
-    await expect(page.locator('nav')).toHaveScreenshot('nav-reports.png');
+    expect(vars!.primary).toBe('48 87% 69%');
+    expect(vars!.primaryForeground).toBe('222 47% 11%');
+    await page.getByRole('button', { name: /Weekly Timesheet Summary Daily hours/ }).click();
+    const download = page.getByRole('button', { name: 'Download Excel for Weekly Timesheet Summary' });
+    await expect(download).toHaveCSS('background-color', 'rgb(241, 214, 74)');
+    await expect(download).toHaveCSS('color', 'rgb(2, 6, 23)');
   });
 });
 

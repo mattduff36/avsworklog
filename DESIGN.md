@@ -46,15 +46,16 @@ Verified route keys in `lib/theme/getAccentFromRoute.ts`:
 | `external-documents` | `/external-documents` |
 | `policies-procedures` | `/policies-procedures` |
 | `debug` | `/debug` |
-| `reports` | `/reports` |
 | `fleet` | `/fleet` |
-| `brand` | everything else, including `/dashboard`, `/help`, `/approvals`, `/actions`, `/toolbox-talks`, `/suggestions/manage`, `/admin/*`, `/quotes`, `/customers`, `/profile` |
+| `brand` | everything else, including `/reports`, `/dashboard`, `/help`, `/approvals`, `/actions`, `/toolbox-talks`, `/suggestions/manage`, `/admin/*`, `/quotes`, `/customers`, `/profile` |
 
-Live primary hues (do not trust stale comments): timesheets blue; van inspections orange; plant inspections brown-orange; HGV inspections deep orange; RAMS/projects green; absence purple; maintenance red; debug red; **fleet teal** (`190 70% 42%`, not rust); workshop clay; inventory slate-blue; reminders cyan; daily allocation blue; reports green. Brand yellow keeps dark `--primary-foreground`; module accents use light foreground.
+`/reports` uses brand yellow with dark `--primary-foreground`. The `reports` accent key remains only for legacy loader mapping. `--report-primary`, `--report-light`, `--report-dark`, and `[data-accent="reports"]` match that yellow and dark foreground; they are not a green reports accent.
+
+Live primary hues (do not trust stale comments): timesheets blue; van inspections orange; plant inspections brown-orange; HGV inspections deep orange; RAMS/projects green; absence purple; maintenance red; debug red; **fleet teal** (`190 70% 42%`, not rust); workshop clay; inventory slate-blue; reminders cyan; daily allocation blue. Brand yellow, including Reports, keeps dark `--primary-foreground`; other module accents use light foreground.
 
 Each module also has `.bg-*`, `.bg-*-light`, `.bg-*-dark`, `.text-*`, `.border-*` utilities. Inventory, reminders, and daily allocation also have `.bg-*-soft`.
 
-`lib/utils/module-brand-presentation.ts` supplies tinted card/thumbnail classes for dashboard tiles. `types/roles.ts` `MODULE_CSS_VAR` maps permission modules to CSS variables; several management modules point at `--avs-yellow` even when `/reports` uses the reports accent. **Route accent wins for `data-accent`.**
+`lib/utils/module-brand-presentation.ts` supplies tinted card/thumbnail classes for dashboard tiles. `types/roles.ts` `MODULE_CSS_VAR` maps permission modules to CSS variables; Reports and several other management modules point at `--avs-yellow`. **Route accent wins for `data-accent`, and `/reports` is brand.**
 
 **How to use colour**
 

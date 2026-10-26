@@ -159,7 +159,7 @@ describe('Accent From Route', () => {
     expect(getAccentFromRoute('/dashboard')).toBe('brand');
     expect(getAccentFromRoute('/fleet')).toBe('fleet');
     expect(getAccentFromRoute('/inventory')).toBe('inventory');
-    expect(getAccentFromRoute('/reports')).toBe('reports');
+    expect(getAccentFromRoute('/reports')).toBe('brand');
     expect(getAccentFromRoute('/debug')).toBe('debug');
     expect(getAccentFromRoute('/debug?tab=notification-settings')).toBe('debug');
   });

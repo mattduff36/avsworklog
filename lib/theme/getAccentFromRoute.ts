@@ -17,7 +17,7 @@ export type AccentType =
   | 'workshop'
   | 'inventory'
   | 'reminders'
-  | 'reports'
+  | 'reports' // legacy loader key; /reports resolves to brand yellow
   | 'debug'
   | 'daily-allocation'
   | 'external-documents'
@@ -55,7 +55,7 @@ export function getAccentFromRoute(
   if (path.startsWith('/policies-procedures')) return 'policies-procedures';
   if (path.startsWith('/external-documents')) return 'external-documents';
   if (path.startsWith('/debug')) return 'debug';
-  if (path.startsWith('/reports')) return 'reports';
+  if (path.startsWith('/reports')) return 'brand';
 
   // Fleet pages → use fleet accent (rust/brick, distinct from maintenance red)
   if (path.startsWith('/fleet')) return 'fleet';

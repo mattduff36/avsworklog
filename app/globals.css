@@ -111,9 +111,9 @@
     --external-documents-light: 239 30% 95%;
     --external-documents-dark: 239 32% 36%;
     
-    --report-primary: 150 70% 45%;
-    --report-light: 150 100% 96%;
-    --report-dark: 150 70% 30%;
+    --report-primary: 48 87% 69%;
+    --report-light: 48 90% 96%;
+    --report-dark: 45 80% 42%;
     
     --admin-primary: 260 60% 50%;
     --admin-light: 260 100% 96%;
@@ -248,9 +248,9 @@
   }
 
   [data-accent="reports"] {
-    --primary: var(--report-primary);
-    --primary-foreground: 210 40% 98%;
-    --ring: var(--report-primary);
+    --primary: 48 87% 69%;
+    --primary-foreground: 222 47% 11%;
+    --ring: 48 87% 69%;
   }
 
   /* Brand (yellow) remains the default for non-module pages */

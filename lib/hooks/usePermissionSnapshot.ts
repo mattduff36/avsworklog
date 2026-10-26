@@ -14,11 +14,14 @@ import {
 interface PermissionSnapshotResponse {
   permissions?: Record<ModuleName, boolean>;
   permission_levels?: Record<ModuleName, number>;
+  module_minimum_access_levels?: Record<ModuleName, number>;
   enabled_modules?: ModuleName[];
   sensitive_pin_modules?: ModuleName[];
   effective_team_id?: string | null;
   effective_team_name?: string | null;
 }
+
+export type PermissionSnapshotState = 'loading' | 'error' | 'ready';
 
 async function fetchPermissionSnapshot(): Promise<PermissionSnapshotResponse> {
   const response = await fetch('/api/me/permissions', { cache: 'no-store' });
@@ -75,6 +78,16 @@ export function usePermissionSnapshot() {
   const holdForRecovery = isAuthErrorStatus(errorStatus) && !query.data;
   const serviceUnavailable = Boolean(query.error) && (errorStatus === null || isServerErrorStatus(errorStatus));
 
+  const moduleMinimumAccessLevels = query.data?.module_minimum_access_levels || null;
+  const permissionSnapshotState: PermissionSnapshotState = authLoading || query.isPending
+    ? 'loading'
+    : query.isError
+      || !query.data?.permission_levels
+      || !moduleMinimumAccessLevels
+      || Object.keys(moduleMinimumAccessLevels).length === 0
+      ? 'error'
+      : 'ready';
+
   const permissions = useMemo(() => {
     if (isAdmin || isSuperAdmin) {
       return ALL_MODULES.reduce<Record<ModuleName, boolean>>((acc, moduleName) => {
@@ -89,6 +102,8 @@ export function usePermissionSnapshot() {
   return {
     permissions,
     permissionLevels: query.data?.permission_levels || null,
+    moduleMinimumAccessLevels,
+    permissionSnapshotState,
     enabledModules,
     enabledModuleSet,
     sensitivePinModules,
