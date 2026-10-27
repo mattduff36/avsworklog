@@ -35,7 +35,7 @@ interface VanInspectionRow {
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
   inspection_date: string;
-  inspection_end_date: string | null;
+  inspection_end_date?: string | null;
   submitted_at: string | null;
   vans: {
     reg_number: string;

@@ -196,7 +196,7 @@ function HgvInspectionsContent() {
     try {
       let query = supabase
         .from('hgv_inspections')
-        .select('*')
+        .select('id, user_id, hgv_id, status, inspection_date, inspection_end_date, submitted_at')
         .order('inspection_date', { ascending: false });
 
       if (!canViewCrossUserInspections) {

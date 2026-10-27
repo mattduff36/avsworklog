@@ -17,8 +17,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Plus, FileText, Clock, CheckCircle2, XCircle, Download, Trash2, Filter, Package, AlertTriangle, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
-import { Timesheet } from '@/types/timesheet';
 import { TimesheetStatusFilter } from '@/types/common';
+import { TIMESHEET_LIST_SELECT, type TimesheetListDeleteTarget, type TimesheetListRow } from '@/types/timesheet-list';
 import { getApprovalsTimesheetStatuses, getTimesheetStatusLabel } from '@/lib/utils/timesheet-status-display';
 import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
 import {
@@ -45,14 +45,6 @@ import {
   TimesheetsListTable,
 } from './components/TimesheetsListTable';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
-
-interface TimesheetWithProfile extends Timesheet {
-  profile?: {
-    full_name: string;
-    employee_id?: string | null;
-    team_id?: string | null;
-  };
-}
 
 interface TimesheetFilterEmployee {
   id: string;
@@ -93,7 +85,7 @@ export default function TimesheetsPage() {
     hasPermission && (absenceSecondaryLoading || (!absenceSecondaryFetchedAfterMount && !hasAbsenceSecondarySnapshot));
   const pageSize = isElevatedUser ? 20 : 10;
   const router = useRouter();
-  const [timesheets, setTimesheets] = useState<TimesheetWithProfile[]>([]);
+  const [timesheets, setTimesheets] = useState<TimesheetListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<TimesheetFilterEmployee[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(false);
@@ -237,7 +229,7 @@ export default function TimesheetsPage() {
   }
 
   const applyClientScopeFilters = useCallback(
-    (rows: TimesheetWithProfile[]) => {
+    (rows: TimesheetListRow[]) => {
       return rows.filter((timesheet) =>
         canShowTimesheetInList({
           actor: {
@@ -278,10 +270,7 @@ export default function TimesheetsPage() {
       const buildQuery = (rangeStart: number, rangeEnd: number) => {
         let query = supabase
           .from('timesheets')
-          .select(`
-            *,
-            profile:profiles!timesheets_user_id_fkey(full_name, employee_id, team_id)
-          `)
+          .select(TIMESHEET_LIST_SELECT)
           .order('week_ending', { ascending: false })
           .range(rangeStart, rangeEnd);
 
@@ -311,7 +300,7 @@ export default function TimesheetsPage() {
         const { data, error } = await buildQuery(0, displayCount);
         if (error) throw error;
 
-        const rows = (data || []) as TimesheetWithProfile[];
+        const rows = (data || []) as TimesheetListRow[];
         setHasMore(rows.length > displayCount);
         setTimesheets(rows.slice(0, displayCount));
         return;
@@ -320,13 +309,13 @@ export default function TimesheetsPage() {
       const chunkSize = Math.max(displayCount + 1, pageSize * 2);
       let offset = 0;
       let reachedEnd = false;
-      const collectedRows: TimesheetWithProfile[] = [];
+      const collectedRows: TimesheetListRow[] = [];
 
       while (!reachedEnd && collectedRows.length < targetCount) {
         const { data, error } = await buildQuery(offset, offset + chunkSize - 1);
         if (error) throw error;
 
-        const dbRows = (data || []) as TimesheetWithProfile[];
+        const dbRows = (data || []) as TimesheetListRow[];
         const filteredRows = applyClientScopeFilters(dbRows);
         const remainingSlots = targetCount - collectedRows.length;
 
@@ -599,7 +588,7 @@ export default function TimesheetsPage() {
     }
   }
 
-  const openDeleteDialog = (e: React.MouseEvent, timesheet: Timesheet) => {
+  const openDeleteDialog = (e: React.MouseEvent, timesheet: TimesheetListDeleteTarget) => {
     e.stopPropagation(); // Prevent card click
     setTimesheetToDelete({
       id: timesheet.id,

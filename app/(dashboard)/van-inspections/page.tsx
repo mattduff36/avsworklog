@@ -22,7 +22,6 @@ import { useRouter } from 'next/navigation';
 import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck, Loader2, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
-import { VanInspection } from '@/types/inspection';
 import { Employee, InspectionStatusFilter } from '@/types/common';
 import { useQueryState } from 'nuqs';
 import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
@@ -56,7 +55,13 @@ import {
   getFleetAssetLabelContext,
 } from '@/lib/utils/fleet-asset-label';
 
-interface InspectionWithVehicle extends VanInspection {
+interface VanInspectionListRow {
+  id: string;
+  van_id: string;
+  user_id: string;
+  status: 'draft' | 'submitted';
+  inspection_date: string;
+  submitted_at: string | null;
   vans: {
     reg_number: string;
     nickname?: string | null;
@@ -120,7 +125,7 @@ function InspectionsContent() {
   const pageSize = canViewCrossUserInspections ? 20 : 10;
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
-  const [inspections, setInspections] = useState<InspectionWithVehicle[]>([]);
+  const [inspections, setInspections] = useState<VanInspectionListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [scopedEmployeeIds, setScopedEmployeeIds] = useState<string[]>([]);
@@ -259,7 +264,7 @@ function InspectionsContent() {
     try {
       let query = supabase
         .from('van_inspections')
-        .select('*')
+        .select('id, van_id, user_id, status, inspection_date, submitted_at')
         .order('inspection_date', { ascending: false })
         .range(0, displayCount);
 
@@ -296,7 +301,7 @@ function InspectionsContent() {
       const { data, error } = await query;
 
       if (error) throw error;
-      const rows = ((data || []) as Array<Omit<InspectionWithVehicle, 'vans' | 'profile'>>).map((row) => ({
+      const rows = ((data || []) as Array<Omit<VanInspectionListRow, 'vans' | 'profile'>>).map((row) => ({
         ...row,
         vans: null,
         profile: null,
@@ -505,7 +510,7 @@ function InspectionsContent() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const getStatusIcon = (inspection: InspectionWithVehicle) => {
+  const getStatusIcon = (inspection: VanInspectionListRow) => {
     const iconColorClass = inspection.has_inform_workshop_task
       ? 'text-inspection'
       : inspection.has_reported_defect
@@ -640,7 +645,7 @@ function InspectionsContent() {
 
   const showInitialLoading = (permissionLoading || loading) && inspections.length === 0;
 
-  const canEditInspection = (inspection: Pick<InspectionWithVehicle, 'status' | 'user_id'>) =>
+  const canEditInspection = (inspection: Pick<VanInspectionListRow, 'status' | 'user_id'>) =>
     canEditDraftInspection({
       status: inspection.status,
       ownerUserId: inspection.user_id,
@@ -648,10 +653,10 @@ function InspectionsContent() {
       canManageInspections,
     });
 
-  const canDeleteInspection = (inspection: Pick<InspectionWithVehicle, 'status' | 'user_id'>) =>
+  const canDeleteInspection = (inspection: Pick<VanInspectionListRow, 'status' | 'user_id'>) =>
     canDeleteInspections && canEditInspection(inspection);
 
-  const getInspectionHref = (inspection: Pick<InspectionWithVehicle, 'id' | 'status' | 'user_id'>) =>
+  const getInspectionHref = (inspection: Pick<VanInspectionListRow, 'id' | 'status' | 'user_id'>) =>
     canEditInspection(inspection)
       ? `/van-inspections/new?id=${inspection.id}`
       : `/van-inspections/${inspection.id}`;

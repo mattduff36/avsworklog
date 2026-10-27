@@ -7,8 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { formatDate } from '@/lib/utils/date';
-import type { Timesheet } from '@/types/timesheet';
 import { TimesheetStatusChips } from '@/components/timesheets/TimesheetStatusChips';
+import type { TimesheetListDeleteTarget, TimesheetListRow } from '@/types/timesheet-list';
 
 export interface TimesheetsListColumnVisibility {
   employeeId: boolean;
@@ -26,20 +26,13 @@ export const DEFAULT_TIMESHEETS_LIST_COLUMN_VISIBILITY: TimesheetsListColumnVisi
   submittedAt: true,
 };
 
-interface TimesheetWithProfile extends Timesheet {
-  profile?: {
-    full_name: string;
-    employee_id?: string | null;
-  };
-}
-
 interface TimesheetsListTableProps {
-  timesheets: TimesheetWithProfile[];
+  timesheets: TimesheetListRow[];
   columnVisibility: TimesheetsListColumnVisibility;
   downloadingId: string | null;
   showDeleteActions: boolean;
   onDownloadPDF: (event: React.MouseEvent, timesheetId: string) => void;
-  onOpenDeleteDialog: (event: React.MouseEvent, timesheet: Timesheet) => void;
+  onOpenDeleteDialog: (event: React.MouseEvent, timesheet: TimesheetListDeleteTarget) => void;
 }
 
 type SortField = 'name' | 'weekEnding' | 'status' | 'submittedAt';
@@ -88,7 +81,7 @@ export function TimesheetsListTable({
     setSortDirection('asc');
   }
 
-  function navigateToTimesheet(timesheet: TimesheetWithProfile) {
+  function navigateToTimesheet(timesheet: Pick<TimesheetListRow, 'id' | 'status'>) {
     if (timesheet.status === 'draft' || timesheet.status === 'rejected') {
       router.push(`/timesheets/new?id=${timesheet.id}`);
       return;
