@@ -95,6 +95,8 @@ Copy from `components/ui/` unless a named reference already specialises:
 
 `Badge` is small but its default variant uses the route primary colour. Use explicit semantic variants/classes for status; do not treat every status as a primary action. Put status colour on the badge or a chip, not on the whole card. Dashboard home tiles use `lib/utils/module-brand-presentation.ts` for tinted surfaces; that helper is for the home grid, not a second page-card system. Do not invent a matching tile kit on other routes.
 
+**Fleet service-type badges:** Reuse `components/fleet/ServiceTypeBadge.tsx` in fleet tables and cards. The approved style has square corners, a `#1e293b` slate background, `#64748b` border and `#f1f5f9` text. Keep the compact 10px semibold label, 16px line height, 6px horizontal padding, and a 6px circular marker with a 4px gap. Marker colours are Basic A `#00ffcc`, Basic B `#3399ff`, Full `#c77dff`, needs choosing `#ffd400`, and unrecognised types `#f8fafc`. Mark the decorative dot `aria-hidden`; always retain the service label. This styling is specific to service types; mileage/date status badges retain their separate urgency colours.
+
 ## Surfaces and borders
 
 - Default card: `rounded-lg border bg-slate-900` (`components/ui/card.tsx`). Prefer adding `border-border` or `border-slate-700` explicitly on new cards.

@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { ServiceTypeBadge } from '@/components/fleet/ServiceTypeBadge';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PanelLoader } from '@/components/ui/panel-loader';
@@ -78,8 +79,6 @@ type SortField =
 
 type SortDirection = 'asc' | 'desc';
 
-const NEXT_SERVICE_TYPE_NEEDS_CHOOSING = 'Next service type needs choosing';
-
 function isVanMaintenanceRecord(vehicle: VehicleMaintenanceWithStatus, isHgvTable: boolean): boolean {
   if (isHgvTable || vehicle.is_plant || vehicle.plant_id || vehicle.hgv_id) return false;
   const assetType = vehicle.vehicle?.asset_type;
@@ -103,39 +102,6 @@ function serviceSelectionState(vehicle: VehicleMaintenanceWithStatus, isHgvTable
           .trim()
       : null);
   return { needsChoosing: false, typeLabel };
-}
-
-function ServiceTypeBadge({
-  needsChoosing,
-  typeLabel,
-}: {
-  needsChoosing: boolean;
-  typeLabel: string | null;
-}) {
-  if (needsChoosing) {
-    return (
-      <Badge
-        variant="outline"
-        className="border-amber-300 bg-amber-100 px-1.5 py-0 text-[10px] font-semibold text-amber-950"
-      >
-        {NEXT_SERVICE_TYPE_NEEDS_CHOOSING}
-      </Badge>
-    );
-  }
-  if (!typeLabel) return null;
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        'px-1.5 py-0 text-[10px] font-semibold',
-        /full/i.test(typeLabel) && 'border-red-200 bg-red-100 text-red-800',
-        /basic\s*a/i.test(typeLabel) && 'border-green-200 bg-green-100 text-green-800',
-        /basic\s*b/i.test(typeLabel) && 'border-blue-200 bg-blue-100 text-blue-800',
-      )}
-    >
-      {typeLabel}
-    </Badge>
-  );
 }
 
 interface ColumnVisibility {

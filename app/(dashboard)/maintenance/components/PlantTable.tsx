@@ -32,6 +32,7 @@ import { createClient } from '@/lib/supabase/client';
 import { AddAssetFlowDialog } from './add-asset/AddAssetFlowDialog';
 import { getStatusColorClass } from '@/lib/utils/maintenanceCalculations';
 import { Badge } from '@/components/ui/badge';
+import { ServiceTypeBadge } from '@/components/fleet/ServiceTypeBadge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { toast } from 'sonner';
@@ -802,12 +803,7 @@ export function PlantTable({
                                     {item?.display_value || 'Not Set'}
                                   </Badge>
                                   {showTypeBadge && typeLabel ? (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-[10px] px-1.5 py-0 font-semibold"
-                                    >
-                                      {typeLabel}
-                                    </Badge>
+                                    <ServiceTypeBadge typeLabel={typeLabel} />
                                   ) : null}
                                 </div>
                               </TableCell>
