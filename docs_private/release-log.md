@@ -2,6 +2,29 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.12.0
+
+**GIT COMMIT MESSAGE**
+`feat(maintenance): rotate van services and fix fei_34334c5a697984cb`
+
+**PUSHED AT**
+2026-10-27T18:08:27.511Z
+
+**WHAT CHANGED**
+Match production category array type in van migration. Rotate van services and fix fei_34334c5a697984cb. Focus modal heading on open.
+
+**VERSION HISTORY DETAILS**
+- Match production category array type in van migration, with changes to background routes, app screens, shared logic, shared typing, and automated tests.
+- Updated data storage, with changes to automated tests and data storage.
+- Focus modal heading on open, with changes to background routes, app screens, interface components, and automated tests.
+- Updated fleet, with changes to background routes and app screens.
+- Updated PDF documents, with changes to background routes.
+
+**COMMITS IN THIS RELEASE**
+- `fix(maintenance): match production category array type in van migration`
+- `feat(maintenance): rotate van services and fix fei_34334c5a697984cb`
+- `fix(workshop): focus modal heading on open`
+
 ## 1026.11.0
 
 **GIT COMMIT MESSAGE**
