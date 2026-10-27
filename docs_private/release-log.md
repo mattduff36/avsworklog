@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.12.1
+
+**GIT COMMIT MESSAGE**
+`style(fleet): apply approved service type badges`
+
+**PUSHED AT**
+2026-10-27T20:05:23.596Z
+
+**WHAT CHANGED**
+Apply approved service type badges.
+
+**VERSION HISTORY DETAILS**
+- Updated maintenance, with changes to app screens.
+- Apply approved service type badges, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `style(fleet): apply approved service type badges`
+
 ## 1026.12.0
 
 **GIT COMMIT MESSAGE**
