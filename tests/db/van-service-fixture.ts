@@ -168,7 +168,7 @@ export async function createFixtureSchema(pg: FixtureDb): Promise<void> {
       workshop_category_id uuid,
       period_value integer,
       period_unit text,
-      applies_to text[],
+      applies_to varchar[],
       is_active boolean DEFAULT true
     );
     CREATE TABLE public.workshop_category_attachment_templates (

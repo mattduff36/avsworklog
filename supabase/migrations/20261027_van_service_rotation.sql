@@ -25,7 +25,7 @@ DECLARE
   v_period_unit TEXT;
   v_category_name TEXT;
   v_category_description TEXT;
-  v_category_applies_to TEXT[];
+  v_category_applies_to public.maintenance_categories.applies_to%TYPE;
   v_category_active BOOLEAN;
   v_version_id UUID;
   v_published_count INTEGER;
