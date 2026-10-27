@@ -379,7 +379,7 @@ describe('SVC-AUDIT-001 append-only service audit', () => {
 describe('SVC-CONFIG-001 service settings integrity', () => {
   it('SVC-CONFIG-001 / SVC-CONFIG-002 rejects inactive templates and mismatched units', () => {
     const server = readRepo('lib/server/asset-service.ts');
-    expect(server).toContain('Inactive or missing templates cannot be linked to Service');
+    expect(server).toContain('Service templates must be active, published and suitable for this asset type');
     expect(server).toContain('getDefaultMeterUnit(input.assetType)');
   });
 });

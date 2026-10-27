@@ -78,6 +78,66 @@ type SortField =
 
 type SortDirection = 'asc' | 'desc';
 
+const NEXT_SERVICE_TYPE_NEEDS_CHOOSING = 'Next service type needs choosing';
+
+function isVanMaintenanceRecord(vehicle: VehicleMaintenanceWithStatus, isHgvTable: boolean): boolean {
+  if (isHgvTable || vehicle.is_plant || vehicle.plant_id || vehicle.hgv_id) return false;
+  const assetType = vehicle.vehicle?.asset_type;
+  return assetType !== 'hgv' && assetType !== 'plant';
+}
+
+function serviceSelectionState(vehicle: VehicleMaintenanceWithStatus, isHgvTable: boolean) {
+  const multiType = Boolean(vehicle.show_service_type_badge);
+  if (!multiType) {
+    return { needsChoosing: false, typeLabel: null as string | null };
+  }
+  if (!vehicle.next_service_template_id) {
+    return { needsChoosing: isVanMaintenanceRecord(vehicle, isHgvTable), typeLabel: null as string | null };
+  }
+  const typeLabel =
+    vehicle.next_service_compact_label ||
+    (vehicle.next_service_template_name
+      ? vehicle.next_service_template_name
+          .replace(/\s*\((HGV|Van|Plant)\)\s*$/i, '')
+          .replace(/Service/i, '')
+          .trim()
+      : null);
+  return { needsChoosing: false, typeLabel };
+}
+
+function ServiceTypeBadge({
+  needsChoosing,
+  typeLabel,
+}: {
+  needsChoosing: boolean;
+  typeLabel: string | null;
+}) {
+  if (needsChoosing) {
+    return (
+      <Badge
+        variant="outline"
+        className="border-amber-300 bg-amber-100 px-1.5 py-0 text-[10px] font-semibold text-amber-950"
+      >
+        {NEXT_SERVICE_TYPE_NEEDS_CHOOSING}
+      </Badge>
+    );
+  }
+  if (!typeLabel) return null;
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        'px-1.5 py-0 text-[10px] font-semibold',
+        /full/i.test(typeLabel) && 'border-red-200 bg-red-100 text-red-800',
+        /basic\s*a/i.test(typeLabel) && 'border-green-200 bg-green-100 text-green-800',
+        /basic\s*b/i.test(typeLabel) && 'border-blue-200 bg-blue-100 text-blue-800',
+      )}
+    >
+      {typeLabel}
+    </Badge>
+  );
+}
+
 interface ColumnVisibility {
   nickname: boolean;
   current_mileage: boolean;
@@ -570,18 +630,7 @@ export function MaintenanceTable({
                               item?.category_field_key === 'next_service_mileage' ||
                               item?.category_field_key === 'next_service_hours' ||
                               /^service(\s+due)?$/i.test(column.category_name);
-                            const showTypeBadge =
-                              isServiceColumn &&
-                              vehicle.show_service_type_badge &&
-                              Boolean(vehicle.next_service_template_id);
-                            const typeLabel =
-                              vehicle.next_service_compact_label ||
-                              (vehicle.next_service_template_name
-                                ? vehicle.next_service_template_name
-                                    .replace(/\s*\((HGV|Van|Plant)\)\s*$/i, '')
-                                    .replace(/Service/i, '')
-                                    .trim()
-                                : null);
+                            const selection = serviceSelectionState(vehicle, isHgvTable);
 
                             return (
                               <TableCell key={column.category_id}>
@@ -589,18 +638,11 @@ export function MaintenanceTable({
                                   <Badge className={`font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
                                     {item?.display_value || 'Not Set'}
                                   </Badge>
-                                  {showTypeBadge && typeLabel ? (
-                                    <Badge
-                                      variant="outline"
-                                      className={cn(
-                                        'text-[10px] px-1.5 py-0 font-semibold',
-                                        /full/i.test(typeLabel) && 'bg-red-100 text-red-800 border-red-200',
-                                        /basic\s*a/i.test(typeLabel) && 'bg-green-100 text-green-800 border-green-200',
-                                        /basic\s*b/i.test(typeLabel) && 'bg-blue-100 text-blue-800 border-blue-200',
-                                      )}
-                                    >
-                                      {typeLabel}
-                                    </Badge>
+                                  {isServiceColumn ? (
+                                    <ServiceTypeBadge
+                                      needsChoosing={selection.needsChoosing}
+                                      typeLabel={selection.typeLabel}
+                                    />
                                   ) : null}
                                 </div>
                               </TableCell>
@@ -619,6 +661,7 @@ export function MaintenanceTable({
               {visibleVehicles.map((vehicle) => {
                 const cardVehicleId = vehicle.hgv_id ?? vehicle.van_id ?? vehicle.id;
                 const isExpanded = expandedCardId === cardVehicleId;
+                const selection = serviceSelectionState(vehicle, isHgvTable);
                 
                 return (
                   <Card 
@@ -691,6 +734,15 @@ export function MaintenanceTable({
                               <span>MOT:</span>
                               <span className="text-white">{formatMaintenanceDate(vehicle.mot_due_date)}</span>
                             </div>
+                            {(selection.needsChoosing || selection.typeLabel) && (
+                              <div className="flex items-center justify-between gap-2">
+                                <span>Next service type:</span>
+                                <ServiceTypeBadge
+                                  needsChoosing={selection.needsChoosing}
+                                  typeLabel={selection.typeLabel}
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -706,13 +758,22 @@ export function MaintenanceTable({
                                 <span className="text-white font-medium">{formatMileage(vehicle.current_mileage)}</span>
                               </div>
                             )}
+                            {(selection.needsChoosing || selection.typeLabel) && (
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-sm text-muted-foreground">Next service type:</span>
+                                <ServiceTypeBadge
+                                  needsChoosing={selection.needsChoosing}
+                                  typeLabel={selection.typeLabel}
+                                />
+                              </div>
+                            )}
                             {maintenanceColumns
                               .filter(column => columnVisibility[`category:${column.category_id}`] ?? true)
                               .map(column => {
                                 const item = vehicle.maintenance_items?.find(maintenanceItem => maintenanceItem.category_id === column.category_id);
 
                                 return (
-                                  <div key={column.category_id} className="flex items-center justify-between">
+                                  <div key={column.category_id} className="flex items-center justify-between gap-2">
                                     <span className="text-sm text-muted-foreground">{column.category_name}:</span>
                                     <Badge className={`font-medium ${getStatusColorClass(item?.status.status || 'not_set')}`}>
                                       {item?.display_value || 'Not Set'}

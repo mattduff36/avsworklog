@@ -30,6 +30,7 @@ import {
 import { BackButton } from '@/components/ui/back-button';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { formatMileage, formatMaintenanceDate } from '@/lib/utils/maintenanceCalculations';
+import { compactServiceLabel } from '@/lib/utils/assetServiceRotation';
 import type { VehicleMaintenanceWithStatus } from '@/types/maintenance';
 import { useWorkshopTaskComments } from '@/lib/hooks/useWorkshopTaskComments';
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
@@ -1093,6 +1094,14 @@ export default function VanHistoryPage({
                             ? `${formatMileage(maintenanceRecord.next_service_mileage)} miles` 
                             : 'Not Set'}
                         </p>
+                        {maintenanceRecord.show_service_type_badge && (
+                          <p className={`text-sm font-medium ${maintenanceRecord.next_service_template_id ? 'text-white' : 'text-amber-300'}`}>
+                            {maintenanceRecord.next_service_template_id
+                              ? (maintenanceRecord.next_service_compact_label
+                                || compactServiceLabel(null, maintenanceRecord.next_service_template_name))
+                              : 'Next service type needs choosing'}
+                          </p>
+                        )}
                       </div>
 
                       {/* Cambelt Due */}

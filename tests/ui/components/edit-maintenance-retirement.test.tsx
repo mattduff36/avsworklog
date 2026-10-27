@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/EditMaintenanceDialog';
 
 const mocks = vi.hoisted(() => ({
+  auth: { isManager: true, isAdmin: false, loading: false },
   createMutation: { isPending: false, mutateAsync: vi.fn() },
   updateMutation: { isPending: false, mutateAsync: vi.fn() },
   taskResult: { data: [] as Array<{ id: string }>, error: null as Error | null },
@@ -14,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
   triggerShakeAnimation: vi.fn(),
 }));
+
+vi.mock('@/lib/hooks/useAuth', () => ({ useAuth: () => mocks.auth }));
+beforeEach(() => { mocks.auth.isManager = true; mocks.auth.isAdmin = false; mocks.auth.loading = false; });
 
 vi.mock('@/lib/hooks/useMaintenance', () => ({
   useCreateMaintenance: () => mocks.createMutation,
@@ -51,14 +55,17 @@ vi.mock('@/components/fleet/NextServiceTypeSelect', () => ({
   NextServiceTypeSelect: ({
     value,
     onChange,
+    disabled,
   }: {
     value: string;
     onChange: (value: string) => void;
+    disabled?: boolean;
   }) => (
     <div>
       <output data-testid="next-service-type">{value}</output>
       <button
         type="button"
+        disabled={disabled}
         onClick={() => onChange('22222222-2222-4222-8222-222222222222')}
       >
         Change next service type
@@ -368,4 +375,51 @@ describe('EditMaintenanceDialog save failure logging', () => {
 
     consoleError.mockRestore();
   });
+});
+
+
+describe('EditMaintenanceDialog protected service fields', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAssignmentFetch();
+    mocks.updateMutation.mutateAsync.mockResolvedValue({ success: true });
+  });
+
+  it('disables protected fields and omits them from ordinary non-manager saves', async () => {
+    mocks.auth.isManager = false;
+    render(<EditMaintenanceDialog open onOpenChange={vi.fn()} vehicle={vehicle as never} />);
+    expect(screen.getByLabelText('Next Service (Miles)')).toBeDisabled();
+    expect(screen.getByLabelText('Last Service (Miles)')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Change next service type' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/Update Comment/), { target: { value: 'Routine maintenance comment' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() => expect(mocks.updateMutation.mutateAsync).toHaveBeenCalledOnce());
+    const updates = mocks.updateMutation.mutateAsync.mock.calls[0][0].updates;
+    for (const field of ['next_service_mileage', 'last_service_mileage', 'next_service_hours', 'last_service_hours', 'next_service_template_id']) {
+      expect(updates).not.toHaveProperty(field);
+    }
+    expect(updates.comment).toBe('Routine maintenance comment');
+  });
+
+  it('preserves an actual zero service reading for managers', async () => {
+    render(<EditMaintenanceDialog open onOpenChange={vi.fn()} vehicle={{ ...vehicle, last_service_mileage: 0 } as never} />);
+    expect(screen.getByLabelText('Last Service (Miles)')).toHaveValue(0);
+    fireEvent.change(screen.getByLabelText(/Update Comment/), { target: { value: 'Confirm zero service baseline' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() => expect(mocks.updateMutation.mutateAsync).toHaveBeenCalledOnce());
+    expect(mocks.updateMutation.mutateAsync.mock.calls[0][0].updates).not.toHaveProperty('last_service_mileage');
+    expect(mocks.updateMutation.mutateAsync.mock.calls[0][0].updates).not.toHaveProperty('expected_service_state');
+  });
+  it('sends an original service snapshot only when a manager intentionally changes service state', async () => {
+    render(<EditMaintenanceDialog open onOpenChange={vi.fn()} vehicle={vehicle as never} />);
+    fireEvent.change(screen.getByLabelText('Last Service (Miles)'), { target: { value: '0' } });
+    fireEvent.change(screen.getByLabelText(/Update Comment/), { target: { value: 'Correct service reading to zero' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() => expect(mocks.updateMutation.mutateAsync).toHaveBeenCalledOnce());
+    const updates = mocks.updateMutation.mutateAsync.mock.calls[0][0].updates;
+    expect(updates.last_service_mileage).toBe(0);
+    expect(updates.expected_service_state).toMatchObject({ last_service_mileage: 500, next_service_mileage: 1500, next_service_rotation_step_id: null });
+    expect(updates).not.toHaveProperty('next_service_mileage');
+  });
+
 });

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/utils/logger';
+import { isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
+import { filterMaintenanceServiceState, hasMaintenanceServiceStateChange, omitUnchangedServiceState, serviceStateSnapshot, matchesServiceStateSnapshot, SERVICE_STATE_SNAPSHOT_FIELDS } from '@/lib/utils/maintenance-service-state-edit';
 import { requireMaintenanceLevel } from '@/lib/server/fleet-maintenance-auth';
 import type {
   CustomMaintenanceItemUpdate,
@@ -74,7 +76,7 @@ export async function PUT(
     const userName = profile?.full_name || 'Unknown User';
     
     // Parse request body
-    const body: UpdateMaintenanceRequest = await request.json();
+    let body: UpdateMaintenanceRequest = await request.json();
     
     // Validate comment (mandatory, min 10 characters)
     if (!body.comment || body.comment.trim().length < 10) {
@@ -98,6 +100,80 @@ export async function PUT(
       );
     }
     
+    // The database protects service state for managers. Check actual changes before
+    // any writes (including custom items), and omit stale unchanged fields for others.
+    const canEditServiceState = await isEffectiveRoleManagerOrHigher();
+    if (!canEditServiceState && hasMaintenanceServiceStateChange(body, currentRecord)) {
+      return NextResponse.json(
+        { error: 'Manager or admin required to update service state' },
+        { status: 403 },
+      );
+    }
+    body = filterMaintenanceServiceState(body, canEditServiceState);
+
+    const originalServiceState = serviceStateSnapshot(currentRecord);
+    body = omitUnchangedServiceState(body, currentRecord);
+    const changesServiceState = hasMaintenanceServiceStateChange(body, currentRecord);
+    if (changesServiceState && !matchesServiceStateSnapshot(body.expected_service_state, originalServiceState)) {
+      return NextResponse.json({ error: 'Service state changed. Refresh the record before saving service changes.' }, { status: 409 });
+    }
+
+    let nextServiceRotationStepId: string | null | undefined;
+    if (body.next_service_template_id !== undefined) {
+      nextServiceRotationStepId = null;
+      if (body.next_service_template_id !== null) {
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.next_service_template_id)) {
+          return NextResponse.json({ error: 'Invalid next service type' }, { status: 400 });
+        }
+        const assetType = currentRecord.hgv_id ? 'hgv' : currentRecord.plant_id ? 'plant' : currentRecord.van_id ? 'van' : null;
+        if (!assetType) {
+          return NextResponse.json({ error: 'Maintenance record is not linked to an asset' }, { status: 400 });
+        }
+        const { data: config, error: configError } = await supabase
+          .from('maintenance_categories')
+          .select('id, workshop_category_id')
+          .eq('config_key', `service_${assetType}`)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (configError) throw configError;
+        if (!config?.workshop_category_id) {
+          return NextResponse.json({ error: 'Service configuration is unavailable' }, { status: 400 });
+        }
+        const [templateResult, linkResult, versionResult, stepResult] = await Promise.all([
+          supabase.from('workshop_attachment_templates').select('id')
+            .eq('id', body.next_service_template_id).eq('is_active', true)
+            .contains('applies_to', [assetType]).maybeSingle(),
+          supabase.from('workshop_category_attachment_templates').select('template_id')
+            .eq('category_id', config.workshop_category_id).eq('template_id', body.next_service_template_id).maybeSingle(),
+          supabase.from('workshop_attachment_template_versions').select('id')
+            .eq('template_id', body.next_service_template_id).eq('status', 'published')
+            .order('version_number', { ascending: false }).limit(1).maybeSingle(),
+          supabase.from('service_rotation_steps').select('id')
+            .eq('maintenance_category_id', config.id).eq('attachment_template_id', body.next_service_template_id)
+            .order('position', { ascending: true }).limit(1).maybeSingle(),
+        ]);
+        const lookupError = templateResult.error || linkResult.error || versionResult.error || stepResult.error;
+        if (lookupError) throw lookupError;
+        if (!templateResult.data || !linkResult.data || !versionResult.data || !stepResult.data) {
+          return NextResponse.json(
+            { error: 'Selected next service type is not an active published service for this asset' },
+            { status: 400 },
+          );
+        }
+        nextServiceRotationStepId = stepResult.data.id;
+        // Saving unrelated fields must not rewind the second HGV Basic A occurrence.
+        if (body.next_service_template_id === currentRecord.next_service_template_id && currentRecord.next_service_rotation_step_id) {
+          const { data: currentStep, error: currentStepError } = await supabase
+            .from('service_rotation_steps').select('id')
+            .eq('id', currentRecord.next_service_rotation_step_id)
+            .eq('maintenance_category_id', config.id)
+            .eq('attachment_template_id', body.next_service_template_id).maybeSingle();
+          if (currentStepError) throw currentStepError;
+          if (currentStep) nextServiceRotationStepId = currentStep.id;
+        }
+      }
+    }
+
     // Build update object (only include provided fields)
     const updates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
@@ -112,6 +188,20 @@ export async function PUT(
       value_type: 'date' | 'mileage' | 'boolean' | 'text';
     }> = [];
     
+    if (body.next_service_template_id !== undefined) {
+      updates.next_service_template_id = body.next_service_template_id;
+      updates.next_service_rotation_step_id = nextServiceRotationStepId;
+      if (currentRecord.next_service_template_id !== body.next_service_template_id ||
+          currentRecord.next_service_rotation_step_id !== nextServiceRotationStepId) {
+        changedFields.push({
+          field_name: 'next_service_type',
+          old_value: currentRecord.next_service_template_id,
+          new_value: body.next_service_template_id,
+          value_type: 'text',
+        });
+      }
+    }
+
     // Check each possible update field
     // Current mileage (manual override)
     if (body.current_mileage !== undefined) {
@@ -297,6 +387,7 @@ export async function PUT(
       }
     }
 
+    const pendingCustomWrites: Array<() => Promise<void>> = [];
     const customItems = body.custom_items || [];
     const customHistoryEntries: Array<{
       van_id: string | null;
@@ -360,6 +451,7 @@ export async function PUT(
         const newValue = serializeCustomValue(item);
         if (oldValue === newValue) continue;
 
+        pendingCustomWrites.push(async () => {
         if (isEmptyCustomValue(item)) {
           if (existingValue) {
             const { error: deleteValueError } = await (supabase as never as { from: (table: string) => { delete: () => { eq: (column: string, value: string) => Promise<{ error: unknown }> } } })
@@ -395,6 +487,7 @@ export async function PUT(
             throw upsertValueError;
           }
         }
+        });
 
         changedFields.push({
           field_name: `category:${category.name}`,
@@ -445,17 +538,27 @@ export async function PUT(
     }
     
     // Update maintenance record
-    const { data: updatedMaintenance, error: updateError } = await supabase
-      .from('vehicle_maintenance')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
+    let updateQuery = supabase.from('vehicle_maintenance').update(updates).eq('id', id);
+    if (changesServiceState) {
+      for (const key of SERVICE_STATE_SNAPSHOT_FIELDS) {
+        const expected = originalServiceState[key];
+        updateQuery = expected === null ? updateQuery.is(key, null) : updateQuery.eq(key, expected);
+      }
+    }
+    const { data: updatedMaintenance, error: updateError } = await updateQuery.select().maybeSingle();
     
     if (updateError) {
+      if (updateError.code === '42501') {
+        return NextResponse.json({ error: 'You do not have permission to update these maintenance fields' }, { status: 403 });
+      }
       logger.error('Failed to update maintenance', updateError);
       throw updateError;
     }
+
+    if (!updatedMaintenance) {
+      return NextResponse.json({ error: 'Maintenance changed while saving. Refresh the record and try again.' }, { status: 409 });
+    }
+    for (const writeCustomValue of pendingCustomWrites) await writeCustomValue();
 
     if (currentRecord.hgv_id && body.current_mileage !== undefined && body.current_mileage !== null) {
       const { error: updateHgvError } = await supabase

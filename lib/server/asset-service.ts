@@ -116,6 +116,7 @@ interface RotationStepRow {
 export async function loadServiceConfig(
   client: pg.Client,
   assetType: ServiceAssetType,
+  lockForWrite = false,
 ): Promise<ServiceConfig> {
   const configKey = getServiceConfigKey(assetType);
   const { rows } = await client.query<ServiceConfigRow>(
@@ -125,6 +126,7 @@ export async function loadServiceConfig(
     WHERE config_key = $1
       AND is_active = true
     LIMIT 1
+    ${lockForWrite ? 'FOR UPDATE' : ''}
     `,
     [configKey],
   );
@@ -316,7 +318,7 @@ export async function saveServiceSettings(input: {
   }
 
   return withTransaction(async (client) => {
-    const config = await loadServiceConfig(client, input.assetType);
+    const config = await loadServiceConfig(client, input.assetType, true);
     if (!config.workshopCategoryId) {
       throw new AssetServiceError('Workshop service category is not linked', 500);
     }
@@ -324,15 +326,44 @@ export async function saveServiceSettings(input: {
     const uniqueLinkedTemplateIds = [...new Set(input.linkedTemplateIds)];
     const { rows: activeTemplates } = await client.query<{ id: string }>(
       `
-      SELECT id
-      FROM public.workshop_attachment_templates
-      WHERE id = ANY($1::uuid[])
-        AND is_active = true
+      SELECT t.id
+      FROM public.workshop_attachment_templates t
+      WHERE t.id = ANY($1::uuid[])
+        AND t.is_active = true
+        AND ($2 = ANY(t.applies_to) OR ($2 = 'van' AND 'vehicle' = ANY(t.applies_to)))
+        AND EXISTS (SELECT 1 FROM public.workshop_attachment_template_versions v
+                    WHERE v.template_id = t.id AND v.status = 'published')
       `,
-      [uniqueLinkedTemplateIds],
+      [uniqueLinkedTemplateIds, input.assetType],
     );
     if (activeTemplates.length !== uniqueLinkedTemplateIds.length) {
-      throw new AssetServiceError('Inactive or missing templates cannot be linked to Service');
+      throw new AssetServiceError('Service templates must be active, published and suitable for this asset type');
+    }
+
+    // Keep step identity (including the second HGV Basic A) on ordinary settings saves.
+    const sameRotation = config.steps.length === input.rotationTemplateIds.length &&
+      config.steps.every((step, index) => step.attachmentTemplateId === input.rotationTemplateIds[index]);
+    if (!sameRotation) {
+      const { rows: references } = await client.query<{ in_use: boolean }>(`
+        SELECT EXISTS (
+          SELECT 1 FROM public.asset_service_events WHERE maintenance_category_id = $1
+          UNION ALL
+          SELECT 1 FROM public.vehicle_maintenance vm
+          JOIN public.service_rotation_steps s ON s.id = vm.next_service_rotation_step_id
+          WHERE s.maintenance_category_id = $1
+          UNION ALL
+          SELECT 1 FROM public.vehicle_maintenance vm
+          JOIN public.service_rotation_steps s ON s.attachment_template_id = vm.next_service_template_id
+          WHERE s.maintenance_category_id = $1
+          UNION ALL
+          SELECT 1 FROM public.workshop_task_attachments a
+          JOIN public.actions task ON task.id = a.task_id
+          WHERE task.workshop_category_id = $2
+        ) AS in_use
+      `, [config.maintenanceCategoryId, config.workshopCategoryId]);
+      if (references[0]?.in_use) {
+        throw new AssetServiceError('This rotation is in use. Changing its order or types requires a reviewed migration that preserves service history.', 409);
+      }
     }
 
     await client.query(
@@ -368,54 +399,20 @@ export async function saveServiceSettings(input: {
       );
     }
 
-    await client.query(
-      `DELETE FROM public.service_rotation_steps WHERE maintenance_category_id = $1`,
-      [config.maintenanceCategoryId],
-    );
-
-    for (let index = 0; index < input.rotationTemplateIds.length; index += 1) {
+    if (!sameRotation) {
       await client.query(
-        `
-        INSERT INTO public.service_rotation_steps (
-          maintenance_category_id, position, attachment_template_id
-        ) VALUES ($1, $2, $3)
-        `,
-        [config.maintenanceCategoryId, index + 1, input.rotationTemplateIds[index]],
+        `DELETE FROM public.service_rotation_steps WHERE maintenance_category_id = $1`,
+        [config.maintenanceCategoryId],
       );
+      for (let index = 0; index < input.rotationTemplateIds.length; index += 1) {
+        await client.query(
+          `INSERT INTO public.service_rotation_steps (maintenance_category_id, position, attachment_template_id)
+           VALUES ($1, $2, $3)`,
+          [config.maintenanceCategoryId, index + 1, input.rotationTemplateIds[index]],
+        );
+      }
     }
-
     const refreshed = await loadServiceConfig(client, input.assetType);
-
-    // Rotation step IDs change on save; re-resolve cursors from next template.
-    const { rows: assetsNeedingCursor } = await client.query<{
-      id: string;
-      next_service_template_id: string | null;
-    }>(
-      `
-      SELECT id, next_service_template_id
-      FROM public.vehicle_maintenance
-      WHERE next_service_template_id IS NOT NULL
-        AND (
-          ($1 = 'van' AND van_id IS NOT NULL)
-          OR ($1 = 'hgv' AND hgv_id IS NOT NULL)
-          OR ($1 = 'plant' AND plant_id IS NOT NULL)
-        )
-      `,
-      [input.assetType],
-    );
-    for (const row of assetsNeedingCursor) {
-      if (!row.next_service_template_id) continue;
-      const step = resolveStepForTemplateFirst(refreshed.steps, row.next_service_template_id);
-      await client.query(
-        `
-        UPDATE public.vehicle_maintenance
-        SET next_service_rotation_step_id = $2,
-            updated_at = NOW()
-        WHERE id = $1
-        `,
-        [row.id, step?.id ?? null],
-      );
-    }
 
     return {
       assetType: input.assetType,
@@ -455,7 +452,7 @@ export async function seedAssetServiceState(input: {
   }
 
   return withTransaction(async (client) => {
-    const config = await loadServiceConfig(client, input.assetType);
+    const config = await loadServiceConfig(client, input.assetType, true);
     const step = resolveStepForTemplateFirst(config.steps, input.nextServiceTemplateId);
     if (!step) {
       throw new AssetServiceError('Selected next service type is not in the active rotation');
@@ -503,7 +500,7 @@ export async function updateAssetNextServiceType(input: {
   comment?: string | null;
 }) {
   return withTransaction(async (client) => {
-    const config = await loadServiceConfig(client, input.assetType);
+    const config = await loadServiceConfig(client, input.assetType, true);
     const step = resolveStepForTemplateFirst(config.steps, input.nextServiceTemplateId);
     if (!step) {
       throw new AssetServiceError('Selected next service type is not in the active rotation');
@@ -639,7 +636,7 @@ export async function completeServiceWorkshopTask(input: CompleteServiceTaskInpu
     const assetId = task.hgv_id || task.plant_id || task.van_id;
     if (!assetId) throw new AssetServiceError('Task has no linked asset', 400);
 
-    const config = await loadServiceConfig(client, assetType);
+    const config = await loadServiceConfig(client, assetType, true);
     if (
       !config.workshopCategoryId ||
       !task.workshop_category_id ||
@@ -991,7 +988,7 @@ export async function correctServiceWorkshopTask(input: CorrectServiceTaskInput)
     const assetId = task.hgv_id || task.plant_id || task.van_id;
     if (!assetId) throw new AssetServiceError('Task has no linked asset', 400);
 
-    const config = await loadServiceConfig(client, assetType);
+    const config = await loadServiceConfig(client, assetType, true);
     const subcategoryParentId = await loadSubcategoryParentCategoryId(
       client,
       task.workshop_subcategory_id

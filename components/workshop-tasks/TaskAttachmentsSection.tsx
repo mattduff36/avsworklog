@@ -18,6 +18,19 @@ import {
   formatAttachmentUndoRemaining,
 } from '@/lib/workshop-attachments/completion-window';
 
+export function preferredAttachmentTemplateName(
+  attachment: {
+    template_name_snapshot?: string | null;
+    workshop_attachment_templates?: { name?: string | null } | null;
+  },
+  fallback = 'Unknown Template',
+): string {
+  const snapshot = attachment.template_name_snapshot?.trim();
+  if (snapshot) return snapshot;
+  const currentName = attachment.workshop_attachment_templates?.name?.trim();
+  return currentName || fallback;
+}
+
 interface TaskAttachmentsSectionProps {
   taskId: string;
   taskStatus: string;
@@ -245,7 +258,7 @@ export function TaskAttachmentsSection({
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      const templateName = attachment.workshop_attachment_templates?.name || 'attachment';
+      const templateName = preferredAttachmentTemplateName(attachment, 'attachment');
       a.href = url;
       a.download = `${templateName.replace(/[^a-z0-9]/gi, '_')}_attachment.pdf`;
       document.body.appendChild(a);
@@ -319,7 +332,7 @@ export function TaskAttachmentsSection({
           {attachments.map((attachment) => {
             const schemaProgress = getSchemaCompletionProgress(attachment);
             const progress = schemaProgress || { completed: 0, total: 0, percentage: 0 };
-            const templateName = attachment.workshop_attachment_templates?.name || 'Unknown Template';
+            const templateName = preferredAttachmentTemplateName(attachment);
             const hasSchemaSnapshot = Boolean(attachment.schema_snapshot?.snapshot_json?.sections?.length);
             const canUndoComplete = !isTaskCompleted && attachment.status === 'completed'
               && canUndoAttachmentCompletion(attachment.completed_at);
@@ -471,7 +484,7 @@ export function TaskAttachmentsSection({
             <AttachmentHybridFormModal
               open={showForm}
               onOpenChange={handleFormOpenChange}
-              templateName={activeAttachment.workshop_attachment_templates?.name || 'Attachment'}
+              templateName={preferredAttachmentTemplateName(activeAttachment, 'Attachment')}
               snapshot={activeAttachment.schema_snapshot}
               existingResponses={activeAttachment.field_responses || []}
               onSave={handleSaveSchemaResponses}

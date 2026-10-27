@@ -36,6 +36,7 @@ interface AttachmentRow {
   completed_by: string | null;
   created_at: string;
   created_by: string | null;
+  template_name_snapshot?: string | null;
   workshop_attachment_templates: {
     id: string;
     name: string;
@@ -412,7 +413,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       assetMeterUnit = inferAssetMeterUnit(assetType);
     }
 
-    const templateName = attachment.workshop_attachment_templates?.name || 'Attachment';
+    const templateName = attachment.template_name_snapshot?.trim()
+      || attachment.workshop_attachment_templates?.name
+      || 'Attachment';
     const logoSrc = await loadSquiresLogoDataUrl();
     const reportCreatedAt = task?.created_at ?? attachment.created_at;
     const reportCompletedAt = task ? task.actioned_at : attachment.completed_at;

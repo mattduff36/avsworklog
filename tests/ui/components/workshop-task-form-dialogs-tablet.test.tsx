@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { WorkshopTaskFormDialogs } from '@/app/(dashboard)/workshop-tasks/components/WorkshopTaskFormDialogs';
+import { preferredAttachmentTemplateName } from '@/components/workshop-tasks/TaskAttachmentsSection';
 import { TabletModeProvider } from '@/components/layout/tablet-mode-context';
 import type React from 'react';
 
@@ -598,5 +599,169 @@ describe('Workshop task dialog tablet safeguards', () => {
     expect(screen.getByText(/no active template matches this asset/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create Task' })).toBeDisabled();
     expect(screen.queryByText('This category does not require a form.')).not.toBeInTheDocument();
+  });
+
+  it('preselects the scheduled van service and does not assume Basic A when unresolved', async () => {
+    const props = createBaseProps();
+    props.vehicles = [{ id: 'van-1', reg_number: 'VAN1', nickname: null, asset_type: 'van' }];
+    props.selectedVehicleId = 'van-1';
+    props.selectedCategoryId = 'service';
+    props.workshopComments = 'needs service details';
+    props.newMeterReading = '100';
+    props.attachmentTemplates = [
+      { id: 'basic', name: 'Basic Service A (Van)', applies_to: ['van'] },
+      { id: 'full', name: 'Full Service (Van)', applies_to: ['van'] },
+    ];
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/api/workshop-tasks/category-attachments')) {
+        return { ok: true, json: async () => ({ templates: [{ templateId: 'basic' }, { templateId: 'full' }] }) } as Response;
+      }
+      if (url.includes('/api/fleet/service-types')) {
+        return {
+          ok: true,
+          json: async () => ({
+            templates: [
+              { templateId: 'basic', templateName: 'Basic Service A (Van)', compactLabel: 'Basic A' },
+              { templateId: 'full', templateName: 'Full Service (Van)', compactLabel: 'Full' },
+            ],
+            rotation: [{ templateId: 'basic' }, { templateId: 'full' }],
+            currentNextServiceTemplateId: null,
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({}) } as Response;
+    }) as unknown as typeof fetch;
+
+    const unresolved = render(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+    await waitFor(() => {
+      expect(screen.getByText(/Choose service type/)).toBeInTheDocument();
+    });
+    expect(screen.getByRole('radio', { name: 'Basic Service A (Van)' })).not.toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Full Service (Van)' })).not.toBeChecked();
+    expect(props.onSelectedAttachmentTemplateIdsChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Create Task' })).toBeDisabled();
+    unresolved.unmount();
+
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/api/workshop-tasks/category-attachments')) {
+        return { ok: true, json: async () => ({ templates: [{ templateId: 'basic' }, { templateId: 'full' }] }) } as Response;
+      }
+      if (url.includes('/api/fleet/service-types')) {
+        return {
+          ok: true,
+          json: async () => ({
+            templates: [
+              { templateId: 'basic', templateName: 'Basic Service A (Van)', compactLabel: 'Basic A' },
+              { templateId: 'full', templateName: 'Full Service (Van)', compactLabel: 'Full' },
+            ],
+            rotation: [{ templateId: 'basic' }, { templateId: 'full' }],
+            currentNextServiceTemplateId: 'full',
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({}) } as Response;
+    }) as unknown as typeof fetch;
+
+    render(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+    await waitFor(() => {
+      expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['full']);
+    });
+    expect(screen.getByText(/Scheduled next service: Full/)).toBeInTheDocument();
+    expect(screen.getByText('Full Service (Van) (scheduled)')).toBeInTheDocument();
+  });
+
+  it('keeps a manual van service choice when a stale service-type response arrives', async () => {
+    const props = createBaseProps();
+    props.vehicles = [
+      { id: 'van-1', reg_number: 'VAN1', nickname: null, asset_type: 'van' },
+      { id: 'van-2', reg_number: 'VAN2', nickname: null, asset_type: 'van' },
+    ];
+    props.selectedVehicleId = 'van-1';
+    props.selectedCategoryId = 'service';
+    props.attachmentTemplates = [
+      { id: 'basic', name: 'Basic Service A (Van)', applies_to: ['van'] },
+      { id: 'full', name: 'Full Service (Van)', applies_to: ['van'] },
+    ];
+
+    let releaseVan1: ((response: Response) => void) | null = null;
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+      if (url.includes('/api/workshop-tasks/category-attachments')) {
+        return { ok: true, json: async () => ({ templates: [{ templateId: 'basic' }, { templateId: 'full' }] }) } as Response;
+      }
+      if (url.includes('/api/fleet/service-types')) {
+        const assetId = new URL(url, 'http://localhost').searchParams.get('assetId');
+        if (assetId === 'van-1') {
+          return new Promise<Response>((resolve) => {
+            releaseVan1 = resolve;
+          });
+        }
+        return {
+          ok: true,
+          json: async () => ({
+            templates: [
+              { templateId: 'basic', templateName: 'Basic Service A (Van)', compactLabel: 'Basic A' },
+              { templateId: 'full', templateName: 'Full Service (Van)', compactLabel: 'Full' },
+            ],
+            rotation: [{ templateId: 'basic' }, { templateId: 'full' }],
+            currentNextServiceTemplateId: 'basic',
+          }),
+        } as Response;
+      }
+      return { ok: true, json: async () => ({}) } as Response;
+    }) as unknown as typeof fetch;
+
+    const view = render(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+    await waitFor(() => {
+      expect(screen.getByRole('radio', { name: 'Full Service (Van)' })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole('radio', { name: 'Full Service (Van)' }));
+    expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['full']);
+
+    props.onSelectedAttachmentTemplateIdsChange.mockClear();
+    view.rerender(
+      <TabletModeProvider>
+        <WorkshopTaskFormDialogs {...props} selectedVehicleId="van-2" selectedAttachmentTemplateIds={[]} />
+      </TabletModeProvider>
+    );
+    await waitFor(() => {
+      expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['basic']);
+    });
+
+    props.onSelectedAttachmentTemplateIdsChange.mockClear();
+    fireEvent.click(screen.getByRole('radio', { name: 'Full Service (Van)' }));
+    expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['full']);
+    props.onSelectedAttachmentTemplateIdsChange.mockClear();
+
+    const releaseStaleVan = releaseVan1;
+    await act(async () => {
+      releaseStaleVan?.({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          templates: [
+            { templateId: 'basic', templateName: 'Basic Service A (Van)', compactLabel: 'Basic A' },
+            { templateId: 'full', templateName: 'Full Service (Van)', compactLabel: 'Full' },
+          ],
+          rotation: [{ templateId: 'basic' }, { templateId: 'full' }],
+          currentNextServiceTemplateId: 'basic',
+        }),
+      } as Response);
+    });
+    expect(screen.getByText(/Scheduled next service: Basic A/)).toBeInTheDocument();
+    expect(props.onSelectedAttachmentTemplateIdsChange).not.toHaveBeenCalled();
+  });
+
+  it('prefers the historic attachment label over the current template name', () => {
+    expect(preferredAttachmentTemplateName({
+      template_name_snapshot: 'Van Service',
+      workshop_attachment_templates: { name: 'Full Service (Van)' },
+    })).toBe('Van Service');
+    expect(preferredAttachmentTemplateName({
+      template_name_snapshot: '   ',
+      workshop_attachment_templates: { name: 'Full Service (Van)' },
+    })).toBe('Full Service (Van)');
   });
 });

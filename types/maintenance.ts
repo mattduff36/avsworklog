@@ -261,7 +261,17 @@ export interface CustomMaintenanceItemUpdate {
 // Request/Response types for API
 // ============================================================================
 
+export interface MaintenanceServiceStateSnapshot {
+  next_service_mileage: number | null;
+  last_service_mileage: number | null;
+  next_service_hours: number | null;
+  last_service_hours: number | null;
+  next_service_template_id: string | null;
+  next_service_rotation_step_id: string | null;
+}
+
 export interface UpdateMaintenanceRequest {
+  expected_service_state?: MaintenanceServiceStateSnapshot;
   current_mileage?: number | null; // Manual override for current mileage
   tax_due_date?: string | null;
   mot_due_date?: string | null;

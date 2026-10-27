@@ -10,6 +10,7 @@ import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { useWorkshopDraftPersistence } from '@/lib/hooks/useWorkshopDraftPersistence';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
+import { compactServiceLabel } from '@/lib/utils/assetServiceRotation';
 import {
   TabletAwareButton,
   TabletAwareSelectContent,
@@ -190,6 +191,17 @@ export function WorkshopTaskFormDialogs({
   } | null>(null);
   const [categoryLinkRetry, setCategoryLinkRetry] = useState(0);
   const categoryLinkRequestRef = useRef(0);
+  const vanServiceRequestRef = useRef(0);
+  const manualTemplateChoiceRef = useRef(false);
+  const selectionScopeRef = useRef('');
+  const autoAppliedSelectionRef = useRef<{ assetId: string; categoryId: string; templateId: string } | null>(null);
+  const [vanServiceSchedule, setVanServiceSchedule] = useState<{
+    assetId: string;
+    categoryId: string;
+    rotationTemplateIds: string[];
+    currentNextServiceTemplateId: string | null;
+    templates: Array<{ templateId: string; templateName: string; compactLabel: string | null }>;
+  } | null>(null);
   if (addModalWasOpen !== showAddModal) {
     setAddModalWasOpen(showAddModal);
     if (!showAddModal) setAssetTypeChoice('');
@@ -262,6 +274,82 @@ export function WorkshopTaskFormDialogs({
     categoryLinkState.status === 'ready' && categoryLinkState.categoryId === selectedCategoryId
       ? categoryLinkState.linkedIds
       : [];
+  const linkedCategoryKey = linkedCategoryTemplateIds.join('|');
+
+  useEffect(() => {
+    const scope = `${selectedVehicleId}|${selectedCategoryId}`;
+    if (selectionScopeRef.current && selectionScopeRef.current !== scope) {
+      manualTemplateChoiceRef.current = false;
+    }
+    selectionScopeRef.current = scope;
+  }, [selectedCategoryId, selectedVehicleId]);
+
+  useEffect(() => {
+    const shouldFetch =
+      selectedAddAssetType === 'van' &&
+      Boolean(selectedVehicleId) &&
+      categoryLinkState.status === 'ready' &&
+      categoryLinkState.categoryId === selectedCategoryId &&
+      linkedCategoryTemplateIds.length >= 2;
+    if (!shouldFetch) return undefined;
+
+    const requestId = vanServiceRequestRef.current + 1;
+    vanServiceRequestRef.current = requestId;
+    const assetId = selectedVehicleId;
+    const categoryId = selectedCategoryId;
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/fleet/service-types?assetType=van&assetId=${encodeURIComponent(assetId)}`,
+        );
+        const data = await response.json().catch(() => null);
+        if (vanServiceRequestRef.current !== requestId) return;
+        const rotationTemplateIds = Array.from(new Set(
+          ((data?.rotation || []) as Array<{ templateId?: string }>)
+            .map((step) => step.templateId || '')
+            .filter(Boolean),
+        ));
+        const templates = ((data?.templates || []) as Array<{
+          templateId?: string;
+          templateName?: string;
+          compactLabel?: string | null;
+        }>)
+          .filter((template) => Boolean(template.templateId))
+          .map((template) => ({
+            templateId: template.templateId || '',
+            templateName: template.templateName || '',
+            compactLabel: template.compactLabel ?? null,
+          }));
+        if (!response.ok || !data) {
+          setVanServiceSchedule(null);
+          return;
+        }
+        setVanServiceSchedule({
+          assetId,
+          categoryId,
+          rotationTemplateIds,
+          currentNextServiceTemplateId: data.currentNextServiceTemplateId || null,
+          templates,
+        });
+      } catch {
+        if (vanServiceRequestRef.current !== requestId) return;
+        setVanServiceSchedule(null);
+      }
+    })();
+
+    return () => {
+      vanServiceRequestRef.current += 1;
+    };
+  }, [
+    categoryLinkState,
+    linkedCategoryKey,
+    linkedCategoryTemplateIds.length,
+    selectedAddAssetType,
+    selectedCategoryId,
+    selectedVehicleId,
+  ]);
+
   const compatibleLinkedTemplates = useMemo(() => {
     if (!selectedAddAssetType || categoryLinkState.status !== 'ready' || categoryLinkState.categoryId !== selectedCategoryId) {
       return [];
@@ -275,6 +363,21 @@ export function WorkshopTaskFormDialogs({
     );
   }, [attachmentTemplates, categoryLinkState, selectedAddAssetType, selectedCategoryId]);
 
+  const vanServiceScheduleApplies = Boolean(
+    selectedAddAssetType === 'van' &&
+    vanServiceSchedule &&
+    vanServiceSchedule.assetId === selectedVehicleId &&
+    vanServiceSchedule.categoryId === selectedCategoryId &&
+    vanServiceSchedule.rotationTemplateIds.length >= 2 &&
+    vanServiceSchedule.rotationTemplateIds.every((templateId) => linkedCategoryTemplateIds.includes(templateId)),
+  );
+  const scheduledNextServiceTemplateId = vanServiceScheduleApplies
+    ? vanServiceSchedule?.currentNextServiceTemplateId ?? null
+    : null;
+  const scheduledNextServiceTemplate = scheduledNextServiceTemplateId
+    ? vanServiceSchedule?.templates.find((template) => template.templateId === scheduledNextServiceTemplateId) ?? null
+    : null;
+
   useEffect(() => {
     if (!selectedCategoryId || categoryLinkState.status === 'loading' || categoryLinkState.status === 'idle') {
       return;
@@ -287,6 +390,47 @@ export function WorkshopTaskFormDialogs({
       if (selectedAttachmentTemplateIds.length > 0) onSelectedAttachmentTemplateIdsChange([]);
       return;
     }
+
+    const allowedIds = new Set(compatibleLinkedTemplates.map((template) => template.id));
+    const currentId = selectedAttachmentTemplateIds.length === 1 ? selectedAttachmentTemplateIds[0] : '';
+    const currentAllowed = Boolean(currentId && allowedIds.has(currentId));
+    const autoApplied = autoAppliedSelectionRef.current;
+    const staleAuto = Boolean(
+      autoApplied &&
+      (autoApplied.assetId !== selectedVehicleId || autoApplied.categoryId !== selectedCategoryId) &&
+      currentId === autoApplied.templateId,
+    );
+
+    if (vanServiceScheduleApplies) {
+      if (manualTemplateChoiceRef.current && (currentAllowed || selectedAttachmentTemplateIds.length === 0)) {
+        return;
+      }
+      if (staleAuto) {
+        autoAppliedSelectionRef.current = null;
+        onSelectedAttachmentTemplateIdsChange([]);
+        return;
+      }
+      if (selectedAttachmentTemplateIds.length > 1) {
+        onSelectedAttachmentTemplateIdsChange([]);
+        return;
+      }
+      if (currentAllowed) return;
+      if (currentId && !currentAllowed) {
+        onSelectedAttachmentTemplateIdsChange([]);
+        return;
+      }
+      const scheduledId = vanServiceSchedule?.currentNextServiceTemplateId ?? null;
+      if (scheduledId && allowedIds.has(scheduledId)) {
+        autoAppliedSelectionRef.current = {
+          assetId: selectedVehicleId,
+          categoryId: selectedCategoryId,
+          templateId: scheduledId,
+        };
+        onSelectedAttachmentTemplateIdsChange([scheduledId]);
+      }
+      return;
+    }
+
     if (compatibleLinkedTemplates.length === 1) {
       const onlyId = compatibleLinkedTemplates[0]?.id;
       if (onlyId && (selectedAttachmentTemplateIds.length !== 1 || selectedAttachmentTemplateIds[0] !== onlyId)) {
@@ -294,7 +438,6 @@ export function WorkshopTaskFormDialogs({
       }
       return;
     }
-    const allowedIds = new Set(compatibleLinkedTemplates.map((template) => template.id));
     const nextIds = selectedAttachmentTemplateIds.filter((id) => allowedIds.has(id));
     if (nextIds.length > 1) {
       onSelectedAttachmentTemplateIdsChange([]);
@@ -310,6 +453,9 @@ export function WorkshopTaskFormDialogs({
     selectedAddAssetType,
     selectedAttachmentTemplateIds,
     selectedCategoryId,
+    selectedVehicleId,
+    vanServiceSchedule,
+    vanServiceScheduleApplies,
   ]);
   const addUsesKm = selectedAddAssetType === 'hgv';
   const addUsesHours = selectedAddAssetType === 'plant';
@@ -349,7 +495,9 @@ export function WorkshopTaskFormDialogs({
       onSelectedSubcategoryIdChange(draft.selectedSubcategoryId || '');
       onNewMeterReadingChange(draft.newMeterReading || '');
       onWorkshopCommentsChange(draft.workshopComments || '');
-      onSelectedAttachmentTemplateIdsChange(draft.selectedAttachmentTemplateIds || []);
+      const restoredTemplateIds = draft.selectedAttachmentTemplateIds || [];
+      manualTemplateChoiceRef.current = restoredTemplateIds.length > 0;
+      onSelectedAttachmentTemplateIdsChange(restoredTemplateIds);
     },
   });
   const { clearDraft: clearEditDraft } = useWorkshopDraftPersistence({
@@ -425,6 +573,9 @@ export function WorkshopTaskFormDialogs({
 
   function handleAssetChange(nextVehicleId: string) {
     if (nextVehicleId === selectedVehicleId) return;
+    manualTemplateChoiceRef.current = false;
+    autoAppliedSelectionRef.current = null;
+    setVanServiceSchedule(null);
     setCategoryLinkResult(null);
     onSelectedVehicleIdChange(nextVehicleId);
     onSelectedCategoryIdChange('');
@@ -436,6 +587,9 @@ export function WorkshopTaskFormDialogs({
 
   function handleCategoryChange(nextCategoryId: string) {
     if (nextCategoryId === selectedCategoryId) return;
+    manualTemplateChoiceRef.current = false;
+    autoAppliedSelectionRef.current = null;
+    setVanServiceSchedule(null);
     setCategoryLinkResult(null);
     onSelectedCategoryIdChange(nextCategoryId);
     onSelectedAttachmentTemplateIdsChange([]);
@@ -694,14 +848,27 @@ export function WorkshopTaskFormDialogs({
                 )}
                 {categoryRequiresForm && compatibleLinkedTemplates.length > 0 && (
                   <div className={`max-h-40 space-y-2 overflow-y-auto rounded-md border border-slate-700 bg-slate-900 p-2 ${tabletModeEnabled ? 'p-3' : ''}`}>
-                    {compatibleLinkedTemplates.map((template) => (
+                    {vanServiceScheduleApplies && (
+                      <p className="text-sm text-amber-100" role="status">
+                        {scheduledNextServiceTemplateId && compatibleLinkedTemplates.some((template) => template.id === scheduledNextServiceTemplateId)
+                          ? `Scheduled next service: ${compactServiceLabel(scheduledNextServiceTemplate?.compactLabel, scheduledNextServiceTemplate?.templateName || compatibleLinkedTemplates.find((template) => template.id === scheduledNextServiceTemplateId)?.name)}. Select that form, or choose another linked form for this visit.`
+                          : 'Choose service type. Next service type needs choosing, so pick Basic A or Full explicitly.'}
+                      </p>
+                    )}
+                    {compatibleLinkedTemplates.map((template) => {
+                      const scheduled = vanServiceScheduleApplies && template.id === scheduledNextServiceTemplateId;
+                      return (
                       <div key={template.id} className={`flex items-center ${tabletModeEnabled ? 'space-x-3 py-1' : 'space-x-2'}`}>
                         <input
                           type="radio"
                           name="workshop-create-required-form"
                           id={`template-inline-${template.id}`}
                           checked={selectedAttachmentTemplateIds.length === 1 && selectedAttachmentTemplateIds[0] === template.id}
-                          onChange={() => onSelectedAttachmentTemplateIdsChange([template.id])}
+                          onChange={() => {
+                            manualTemplateChoiceRef.current = true;
+                            autoAppliedSelectionRef.current = null;
+                            onSelectedAttachmentTemplateIdsChange([template.id]);
+                          }}
                           className={`border-slate-500 text-workshop focus:ring-workshop ${tabletModeEnabled ? 'h-5 w-5' : 'h-4 w-4'}`}
                         />
                         <label
@@ -709,9 +876,11 @@ export function WorkshopTaskFormDialogs({
                           className={`cursor-pointer font-normal text-slate-100 ${tabletModeEnabled ? 'text-base' : 'text-sm'}`}
                         >
                           {template.name}
+                          {scheduled ? ' (scheduled)' : ''}
                         </label>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </section>

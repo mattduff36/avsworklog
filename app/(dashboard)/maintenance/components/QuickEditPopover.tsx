@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
+import { serviceStateSnapshot } from '@/lib/utils/maintenance-service-state-edit';
+import type { MaintenanceServiceStateSnapshot } from '@/types/maintenance';
 
 // Alert type from MaintenanceOverview
 interface Alert {
@@ -19,7 +21,7 @@ interface Alert {
 }
 
 // Vehicle data needed for current values
-interface VehicleData {
+interface VehicleData extends Partial<MaintenanceServiceStateSnapshot> {
   tax_due_date?: string | null;
   mot_due_date?: string | null;
   first_aid_kit_expiry?: string | null;
@@ -146,6 +148,7 @@ export function QuickEditPopover({
   const [loading, setLoading] = useState(false);
   const [newValue, setNewValue] = useState('');
   const [comment, setComment] = useState('');
+  const [originalServiceState, setOriginalServiceState] = useState(() => serviceStateSnapshot(vehicle));
 
   const isHgvAsset = vehicle.vehicle?.asset_type === 'hgv';
   const distanceUnit = isHgvAsset ? 'km' : 'miles';
@@ -164,6 +167,7 @@ export function QuickEditPopover({
   // Reset form when popover opens
   const handleOpenChange = (isOpen: boolean) => {
     if (isOpen) {
+      setOriginalServiceState(serviceStateSnapshot(vehicle));
       // Pre-fill with current value
       if (isDateField && currentValue) {
         // Format date for input (YYYY-MM-DD)
@@ -231,6 +235,9 @@ export function QuickEditPopover({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...payload,
+          ...((fieldName === 'next_service_mileage' || fieldName === 'next_service_hours')
+            ? { expected_service_state: originalServiceState }
+            : {}),
           assetType:
             vehicle.vehicle?.asset_type === 'plant'
               ? 'plant'

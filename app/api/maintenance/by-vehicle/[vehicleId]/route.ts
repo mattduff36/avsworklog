@@ -10,6 +10,8 @@ import type {
 } from '@/types/maintenance';
 import { buildAutomaticMaintenancePlan } from '@/lib/utils/workshopMaintenanceSync';
 import { isEffectiveRoleManagerOrHigher } from '@/lib/utils/rbac';
+import { filterMaintenanceServiceState, hasMaintenanceServiceStateChange, omitUnchangedServiceState, serviceStateSnapshot, matchesServiceStateSnapshot, SERVICE_STATE_SNAPSHOT_FIELDS } from '@/lib/utils/maintenance-service-state-edit';
+import { getServiceSettings } from '@/lib/server/asset-service';
 
 type AssetType = 'van' | 'hgv' | 'plant';
 type FkColumn = 'van_id' | 'hgv_id' | 'plant_id';
@@ -145,15 +147,6 @@ export async function POST(
 
     // Parse request body
     const body: ExtendedUpdateMaintenanceRequest = await request.json();
-    if (
-      body.next_service_template_id !== undefined &&
-      !(await isEffectiveRoleManagerOrHigher())
-    ) {
-      return NextResponse.json(
-        { error: 'Manager or admin required to update the next service type' },
-        { status: 403 },
-      );
-    }
 
     // Validate comment (mandatory, min 10 characters)
     if (!body.comment || body.comment.trim().length < 10) {
@@ -172,7 +165,7 @@ export async function POST(
       : null;
 
     const selectCols =
-      'id, van_id, hgv_id, plant_id, current_mileage, current_hours, tax_due_date, mot_due_date, first_aid_kit_expiry, six_weekly_inspection_due_date, fire_extinguisher_due_date, taco_calibration_due_date, next_service_mileage, last_service_mileage, cambelt_due_mileage, next_service_hours, last_service_hours, tracker_id, notes';
+      'id, van_id, hgv_id, plant_id, current_mileage, current_hours, tax_due_date, mot_due_date, first_aid_kit_expiry, six_weekly_inspection_due_date, fire_extinguisher_due_date, taco_calibration_due_date, next_service_mileage, last_service_mileage, cambelt_due_mileage, next_service_hours, last_service_hours, tracker_id, notes, next_service_template_id, next_service_rotation_step_id';
 
     type ExistingRecord = {
       id: string;
@@ -187,6 +180,8 @@ export async function POST(
       six_weekly_inspection_due_date: string | null;
       fire_extinguisher_due_date: string | null;
       taco_calibration_due_date: string | null;
+      next_service_template_id: string | null;
+      next_service_rotation_step_id: string | null;
       next_service_mileage: number | null;
       last_service_mileage: number | null;
       cambelt_due_mileage: number | null;
@@ -335,7 +330,7 @@ export async function POST(
       assetType,
     });
 
-    const requestedUpdates: Partial<UpdateMaintenanceRequest> = {
+    let requestedUpdates: Partial<UpdateMaintenanceRequest> = {
       ...autoPlan?.maintenanceUpdates,
     };
 
@@ -376,6 +371,18 @@ export async function POST(
         (requestedUpdates as Record<string, unknown>)[fieldName] = fieldValue;
       }
     }
+
+    const originalServiceState = serviceStateSnapshot(existingRecord || {});
+    const canEditServiceState = await isEffectiveRoleManagerOrHigher();
+    if (!canEditServiceState && hasMaintenanceServiceStateChange(requestedUpdates, originalServiceState)) {
+      return NextResponse.json({ error: 'Manager or admin required to update service state' }, { status: 403 });
+    }
+    requestedUpdates = omitUnchangedServiceState(filterMaintenanceServiceState(requestedUpdates, canEditServiceState), originalServiceState);
+    const changesServiceState = hasMaintenanceServiceStateChange(requestedUpdates, originalServiceState);
+    if (changesServiceState && !matchesServiceStateSnapshot(body.expected_service_state, originalServiceState)) {
+      return NextResponse.json({ error: 'Service state changed. Refresh the record before saving service changes.' }, { status: 409 });
+    }
+    const pendingSideEffects: Array<() => Promise<void>> = [];
 
     if (body.loler_due_date !== undefined) {
       requestedPlantUpdates.loler_due_date = body.loler_due_date;
@@ -545,30 +552,21 @@ export async function POST(
         );
       }
 
-      // Keep rotation cursor aligned with the selected template (first matching step).
       if (requestedUpdates.next_service_template_id) {
-        const configKey =
-          assetType === 'hgv' ? 'service_hgv' : assetType === 'plant' ? 'service_plant' : 'service_van';
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- service config keys pending generated types
-        const untyped = supabase as any;
-        const { data: config } = await untyped
-          .from('maintenance_categories')
-          .select('id')
-          .eq('config_key', configKey)
-          .maybeSingle();
-        if (config?.id) {
-          const { data: step } = await untyped
-            .from('service_rotation_steps')
-            .select('id')
-            .eq('maintenance_category_id', config.id)
-            .eq('attachment_template_id', requestedUpdates.next_service_template_id)
-            .order('position', { ascending: true })
-            .limit(1)
-            .maybeSingle();
-          if (step?.id) {
-            updates.next_service_rotation_step_id = step.id;
-          }
+        const settings = await getServiceSettings(assetType);
+        const selectedId = requestedUpdates.next_service_template_id;
+        const linked = settings.linkedTemplates.some((template) => template.templateId === selectedId && template.isActive);
+        const matchingSteps = settings.rotation.filter((step) => step.templateId === selectedId);
+        const { data: published, error: publishedError } = await supabase
+          .from('workshop_attachment_template_versions').select('id')
+          .eq('template_id', selectedId).eq('status', 'published').limit(1);
+        if (!linked || matchingSteps.length === 0 || publishedError || !published?.length) {
+          return NextResponse.json({ error: 'Selected next service type is not an active published service for this asset' }, { status: 400 });
         }
+        const currentStep = existingRecord?.next_service_template_id === selectedId
+          ? matchingSteps.find((step) => step.id === existingRecord?.next_service_rotation_step_id)
+          : undefined;
+        updates.next_service_rotation_step_id = (currentStep ?? matchingSteps[0]).id;
       } else {
         updates.next_service_rotation_step_id = null;
       }
@@ -701,6 +699,7 @@ export async function POST(
         const newValue = serializeCustomValue(item);
         if (oldValue === newValue) continue;
 
+        pendingSideEffects.push(async () => {
         if (isEmptyCustomValue(item)) {
           if (existingValue) {
             const { error: deleteValueError } = await (supabase as never as {
@@ -746,6 +745,7 @@ export async function POST(
             throw upsertValueError;
           }
         }
+        });
 
         changedFields.push({
           field_name: `category:${category.name}`,
@@ -759,6 +759,7 @@ export async function POST(
 
     if (requestedPlantUpdates.loler_due_date !== undefined && plantRecord) {
       if (plantRecord.loler_due_date !== requestedPlantUpdates.loler_due_date) {
+        pendingSideEffects.push(async () => {
         const shouldUseVerifiedAutomaticPlantUpdate =
           Boolean(verifiedTaskContext) &&
           body.loler_due_date === undefined &&
@@ -781,6 +782,7 @@ export async function POST(
         if (!updatedPlant) {
           throw new Error('Plant LOLER due date update was not applied');
         }
+        });
 
         assignChangedField(
           'loler_due_date',
@@ -813,20 +815,26 @@ export async function POST(
       maintenanceRecord = created;
     } else if (!isNewRecord && hasMaintenanceUpdates) {
       // Update existing record
-      const { data: updated, error: updateError } = await supabase
-        .from('vehicle_maintenance')
-        .update(updates)
-        .eq('id', existingRecord!.id)
-        .select()
-        .single();
+      let updateQuery = supabase.from('vehicle_maintenance').update(updates).eq('id', existingRecord!.id);
+      if (changesServiceState) {
+        for (const key of SERVICE_STATE_SNAPSHOT_FIELDS) {
+          const expected = originalServiceState[key];
+          updateQuery = expected === null ? updateQuery.is(key, null) : updateQuery.eq(key, expected);
+        }
+      }
+      const { data: updated, error: updateError } = await updateQuery.select().maybeSingle();
 
       if (updateError) {
+        if (updateError.code === '42501') return NextResponse.json({ error: 'You do not have permission to update these maintenance fields' }, { status: 403 });
         logger.error('Failed to update maintenance record', updateError);
         throw updateError;
       }
 
+      if (!updated) return NextResponse.json({ error: 'Maintenance changed while saving. Refresh the record and try again.' }, { status: 409 });
       maintenanceRecord = updated;
     }
+
+    for (const sideEffect of pendingSideEffects) await sideEffect();
 
     // Create history entries for all changed fields
     if (changedFields.length > 0) {

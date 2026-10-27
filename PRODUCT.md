@@ -84,3 +84,10 @@ The controlled document library serves current published policies and procedures
 ## Error log triage
 
 Application error logs on `/debug` stay visible until their outcome is closed. Untriaged active rows are red. Diagnosed rows that are not yet deployed and verified live stay active and are orange, with one next step. Only no-fix-required rows and deployed live-verified fixes are archived. A local commit is not a live fix. Bulk archive is not a product action.
+
+
+## Van service rotation
+
+Vans alternate Basic Service A and Full Service, with the next service due 10,000 miles after the actual completed service mileage. The existing van checklist remains the Full Service checklist. Basic Service A retains core checks and engine oil/filter servicing, but fuel, air, pollen and gearbox filter items are checks/cleaning rather than routine replacement.
+
+Historic generic Van Service records do not establish whether a Basic or Full service occurred. Existing ambiguous next-service selections require a one-time manager choice; existing due mileages and historic checklist responses remain unchanged. Service completion and corrections retain the shared audited service workflow. HGV and Plant rotations are unchanged.
