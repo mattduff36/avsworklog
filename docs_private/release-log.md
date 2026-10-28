@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.13.0
+
+**GIT COMMIT MESSAGE**
+`feat(maintenance): update maintenance`
+
+**PUSHED AT**
+2026-10-28T00:34:57.686Z
+
+**WHAT CHANGED**
+Update maintenance. Reuse static source location hints. Select lightweight inspection and timesheet rows.
+
+**VERSION HISTORY DETAILS**
+- Reuse static source location hints, with changes to background routes, shared logic, and automated tests.
+- Updated maintenance, with changes to background routes, shared logic, and automated tests.
+- Updated timesheets, with changes to app screens, shared typing, and automated tests.
+- Updated daily tasks, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(maintenance): update maintenance`
+- `perf(inventory): reuse static source location hints`
+- `perf(lists): select lightweight inspection and timesheet rows`
+
 ## 1026.12.1
 
 **GIT COMMIT MESSAGE**

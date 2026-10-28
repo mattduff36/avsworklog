@@ -1,5 +1,28 @@
 [
   {
+    "version": "1026.13.0",
+    "updateKind": "major",
+    "title": "Maintenance update",
+    "description": "Updated maintenance. Reuse static source location hints. Select lightweight inspection and timesheet rows.",
+    "summary": "Updated maintenance. Reuse static source location hints. Select lightweight inspection and timesheet rows.",
+    "details": [
+      "Reuse static source location hints, with changes to background routes, shared logic, and automated tests.",
+      "Updated maintenance, with changes to background routes, shared logic, and automated tests.",
+      "Updated timesheets, with changes to app screens, shared typing, and automated tests.",
+      "Updated daily tasks, with changes to app screens."
+    ],
+    "areas": [
+      "Inventory",
+      "Maintenance. Reuse static source location hints. Select lightweight inspection",
+      "Timesheet rows"
+    ],
+    "areaKeys": [
+      "maintenance",
+      "inventory"
+    ],
+    "pushedAt": "2026-10-28T00:34:57.686Z"
+  },
+  {
     "version": "1026.12.1",
     "updateKind": "minor",
     "title": "Fleet maintenance update",
