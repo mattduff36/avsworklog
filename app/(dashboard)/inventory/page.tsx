@@ -30,6 +30,16 @@ import {
   type RetiredInventoryReadScope,
   type RetiredInventoryScope,
 } from '@/lib/client/inventory-retired-loader';
+import {
+  fullInventoryRefreshPlan,
+  inventoryAccessScopeChanged,
+  inventoryRefreshPlanForMutation,
+  mergeInventoryRefreshPlans,
+  readInventoryAccessScope,
+  type InventoryAccessScope,
+  type InventoryRefreshCollection,
+  type InventoryRefreshPlan,
+} from '@/lib/client/inventory-refresh-plan';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { AlertTriangle, Archive, Boxes, CheckCircle2, MapPin, PackageSearch, Plus, Settings, ShieldCheck, Truck, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -249,6 +259,14 @@ export default function InventoryPage() {
   const [roleViewMode, setRoleViewMode] = useState<InventoryRoleViewMode>(getStoredInventoryRoleViewMode);
   const [mobileViewToggleSlot, setMobileViewToggleSlot] = useState<HTMLElement | null>(null);
   const bundleGenerationRef = useRef(0);
+  const accessScopeRef = useRef<InventoryAccessScope | null>(null);
+  const refreshRunningRef = useRef(false);
+  const refreshAllowedRef = useRef(false);
+  const queuedRefreshRef = useRef<{
+    generation: number;
+    plan: InventoryRefreshPlan;
+    waiters: Array<{ resolve: () => void; reject: (error: unknown) => void }>;
+  } | null>(null);
   const retiredScopeRef = useRef<RetiredInventoryScope | null>(null);
   const retiredRowsLoadedRef = useRef(false);
   const roleViewModeRef = useRef(roleViewMode);
@@ -274,164 +292,249 @@ export default function InventoryPage() {
     return () => window.cancelAnimationFrame(frame);
   }, [pathname]);
 
-  const fetchInventoryData = useCallback(async () => {
-    const generation = ++bundleGenerationRef.current;
-    invalidateRetiredInventoryLoads();
-    try {
-      const contextResponse = await fetch('/api/inventory/context', { cache: 'no-store' });
-      const contextPayload = await contextResponse.json();
-      if (!contextResponse.ok) {
-        throw new Error(contextPayload.error || 'Failed to fetch inventory context');
-      }
-      if (generation !== bundleGenerationRef.current) return;
+  const fetchInventoryData = useCallback((requestedPlan?: InventoryRefreshPlan) => {
+    if (!refreshAllowedRef.current) return Promise.resolve();
+    const plan = requestedPlan ?? fullInventoryRefreshPlan();
 
-      const isManagerOrAdmin = contextPayload.is_manager_or_admin === true;
-      const canManageSiteLocations = contextPayload.can_manage_site_locations === true;
-      const userId = typeof contextPayload.user_id === 'string' ? contextPayload.user_id : '';
-      const canViewRetired = isManagerOrAdmin && userId.length > 0;
-      const nextScope: RetiredInventoryScope = {
-        userId: userId || 'denied',
-        canViewRetired,
+    const runRefresh = async (requested: InventoryRefreshPlan) => {
+      const generation = bundleGenerationRef.current;
+      const previousAccessScope = accessScopeRef.current;
+      let publishedScope = false;
+      let applied = false;
+      const restoreScope = () => {
+        if (generation === bundleGenerationRef.current && publishedScope && !applied) accessScopeRef.current = previousAccessScope;
       };
-      const previousScope = retiredScopeRef.current;
-      const scopeChanged = !previousScope
-        || retiredInventoryScopeKey(previousScope) !== retiredInventoryScopeKey(nextScope);
-      retiredScopeRef.current = nextScope;
-      if (scopeChanged) {
-        retiredRowsLoadedRef.current = false;
-        setRetiredItems([]);
-        setRetiredRowsLoaded(false);
-        setRetiredCount(canViewRetired ? null : 0);
-        setRetiredRowsError(null);
-        setRetiredRowsLoading(false);
+
+      try {
+        const contextResponse = await fetch('/api/inventory/context', { cache: 'no-store' });
+        const contextPayload = await contextResponse.json();
+        if (!contextResponse.ok) {
+          throw new Error(contextPayload.error || 'Failed to fetch inventory context');
+        }
+        if (generation !== bundleGenerationRef.current) return;
+
+        const nextAccessScope = readInventoryAccessScope(contextPayload);
+        let activePlan = requested;
+        if (inventoryAccessScopeChanged(previousAccessScope, nextAccessScope)) {
+          activePlan = fullInventoryRefreshPlan();
+        }
+        accessScopeRef.current = nextAccessScope;
+        publishedScope = true;
+        const wants = (collection: InventoryRefreshCollection) => (
+          activePlan.mode === 'full' || activePlan.collections.has(collection)
+        );
+
+        const isManagerOrAdmin = nextAccessScope.isManagerOrAdmin;
+        const canManageSiteLocations = nextAccessScope.canManageSiteLocations;
+        const userId = nextAccessScope.userId;
+        const canViewRetired = isManagerOrAdmin && userId.length > 0;
+        const nextScope: RetiredInventoryScope = {
+          userId: userId || 'denied',
+          canViewRetired,
+        };
+        let shouldRefreshRows = false;
+        if (wants('retired')) {
+          invalidateRetiredInventoryLoads();
+          const previousScope = retiredScopeRef.current;
+          const scopeChanged = !previousScope
+            || retiredInventoryScopeKey(previousScope) !== retiredInventoryScopeKey(nextScope);
+          retiredScopeRef.current = nextScope;
+          if (scopeChanged) {
+            retiredRowsLoadedRef.current = false;
+            setRetiredItems([]);
+            setRetiredRowsLoaded(false);
+            setRetiredCount(canViewRetired ? null : 0);
+            setRetiredRowsError(null);
+            setRetiredRowsLoading(false);
+          }
+          shouldRefreshRows = canViewRetired && (
+            retiredRowsLoadedRef.current || isManagementRetiredView({
+              roleViewMode: roleViewModeRef.current,
+              pageTab: pageTabRef.current,
+              overviewTab: overviewTabRef.current,
+              searchParams: searchParamsRef.current,
+            })
+          );
+        }
+        const [
+          itemsResult,
+          retiredCountRead,
+          fleetAssetsResponse,
+          categoriesResponse,
+          hardwareResponse,
+          groupsResponse,
+          siteAssignmentsResponse,
+        ] = await Promise.all([
+          wants('items')
+            ? fetchAllPaginatedItems<InventoryItem>('/api/inventory', 'inventory', {
+              limit: 500,
+              errorMessage: 'Failed to fetch inventory items',
+            })
+            : Promise.resolve(null),
+          wants('retired') && canViewRetired ? fetchRetiredInventoryCount(nextScope) : Promise.resolve(null),
+          wants('fleet') ? fetch('/api/inventory/fleet-assets', { cache: 'no-store' }) : Promise.resolve(null),
+          wants('categories') ? fetch('/api/inventory/categories', { cache: 'no-store' }) : Promise.resolve(null),
+          wants('hardware') ? fetch('/api/inventory/hardware', { cache: 'no-store' }) : Promise.resolve(null),
+          wants('groups') && isManagerOrAdmin ? fetch('/api/inventory/groups', { cache: 'no-store' }) : Promise.resolve(null),
+          wants('siteAssignments') && canManageSiteLocations
+            ? fetch('/api/inventory/site-assignments', { cache: 'no-store' })
+            : Promise.resolve(null),
+        ]);
+        const retiredRowsRead = shouldRefreshRows
+          ? await fetchRetiredInventoryRows<InventoryItem>(nextScope)
+          : null;
+        if (generation !== bundleGenerationRef.current) {
+          restoreScope();
+          return;
+        }
+        const currentScopeKey = retiredScopeRef.current
+          ? retiredInventoryScopeKey(retiredScopeRef.current)
+          : null;
+        const readIsCurrent = (read: RetiredInventoryReadScope | null) => (
+          read === null || isCurrentRetiredInventoryRead(read, retiredInventoryLoadEpoch(), currentScopeKey)
+        );
+        if (!readIsCurrent(retiredCountRead) || !readIsCurrent(retiredRowsRead)) {
+          restoreScope();
+          return;
+        }
+
+        const fleetAssetsPayload = fleetAssetsResponse ? await fleetAssetsResponse.json() : { assets: [] };
+        if (fleetAssetsResponse && !fleetAssetsResponse.ok) {
+          throw new Error(fleetAssetsPayload.error || 'Failed to fetch fleet assets');
+        }
+
+        const categoriesPayload = categoriesResponse ? await categoriesResponse.json() : { categories: [] };
+        if (categoriesResponse && !categoriesResponse.ok) {
+          throw new Error(categoriesPayload.error || 'Failed to fetch inventory categories');
+        }
+
+        const hardwarePayload = hardwareResponse ? await hardwareResponse.json() : { items: [], balances: [] };
+        if (hardwareResponse && !hardwareResponse.ok) {
+          throw new Error(hardwarePayload.error || 'Failed to fetch Hardware stock');
+        }
+
+        const groupsPayload = groupsResponse ? await groupsResponse.json() : { groups: [] };
+        if (groupsResponse && !groupsResponse.ok) {
+          throw new Error(groupsPayload.error || 'Failed to fetch inventory groups');
+        }
+
+        const siteAssignmentsPayload = siteAssignmentsResponse
+          ? await siteAssignmentsResponse.json()
+          : { active_locations: [], users: [], assignments: [] };
+        if (siteAssignmentsResponse && !siteAssignmentsResponse.ok) {
+          throw new Error(siteAssignmentsPayload.error || 'Failed to fetch location assignments');
+        }
+
+        if (generation !== bundleGenerationRef.current || !refreshAllowedRef.current) return;
+        setInventoryContext(contextPayload);
+        if (wants('items') && itemsResult) setItems(itemsResult.items);
+        if (wants('retired')) {
+          if (retiredRowsRead) {
+            retiredRowsLoadedRef.current = true;
+            setRetiredItems(retiredRowsRead.items);
+            setRetiredRowsLoaded(true);
+            setRetiredCount(retiredRowsRead.items.length);
+            setRetiredRowsError(null);
+            setRetiredRowsLoading(false);
+          } else if (!retiredRowsLoadedRef.current && retiredCountRead) {
+            setRetiredItems([]);
+            setRetiredRowsLoaded(false);
+            setRetiredCount(retiredCountRead.count);
+            setRetiredRowsError(null);
+          } else if (retiredCountRead) {
+            setRetiredCount(retiredCountRead.count);
+          } else {
+            retiredRowsLoadedRef.current = false;
+            setRetiredItems([]);
+            setRetiredRowsLoaded(false);
+            setRetiredCount(0);
+            setRetiredRowsError(null);
+          }
+        }
+        if (wants('fleet')) setFleetAssets(fleetAssetsPayload.assets || []);
+        if (wants('categories')) setCategories(categoriesPayload.categories || []);
+        if (wants('hardware')) {
+          setHardwareItems(hardwarePayload.items || []);
+          setHardwareBalances(hardwarePayload.balances || []);
+        }
+        if (wants('groups')) setGroups(groupsPayload.groups || []);
+        if (wants('siteAssignments')) {
+          setSiteAssignmentUsers(siteAssignmentsPayload.users || []);
+          setAssignableLocations(siteAssignmentsPayload.active_locations || []);
+          setSiteAssignments(siteAssignmentsPayload.assignments || []);
+        }
+        setInventoryLoadError(null);
+        applied = true;
+      } catch (error) {
+        restoreScope();
+        if (generation !== bundleGenerationRef.current) return;
+        const message = error instanceof Error ? error.message : String(error);
+        const normalizedMessage = message.toLowerCase();
+        const isNetworkFailure =
+          error instanceof TypeError ||
+          normalizedMessage.includes('failed to fetch') ||
+          normalizedMessage.includes('networkerror') ||
+          normalizedMessage.includes('network request failed');
+        const isUnauthorized =
+          normalizedMessage.includes('unauthorized') ||
+          normalizedMessage.includes('session is locked') ||
+          (normalizedMessage.includes('jwt') && normalizedMessage.includes('expired'));
+
+        if (isNetworkFailure || isUnauthorized) {
+          // Non-fatal: transient auth/network issues should not be captured as app errors.
+          console.warn('Inventory data fetch skipped (non-fatal):', error);
+        } else {
+          console.error('Error fetching inventory data:', error);
+        }
+
+        const errorMessage = getInventoryLoadErrorMessage(error);
+        setInventoryLoadError(errorMessage);
+        toast.error(errorMessage, { id: 'inventory-load-error' });
+      } finally {
+        if (generation === bundleGenerationRef.current) setLoading(false);
+      }
+    };
+
+    return new Promise<void>((resolve, reject) => {
+      const start = (
+        activePlan: InventoryRefreshPlan,
+        waiters: Array<{ resolve: () => void; reject: (error: unknown) => void }>,
+      ) => {
+        refreshRunningRef.current = true;
+        void runRefresh(activePlan)
+          .then(() => {
+            waiters.forEach((waiter) => waiter.resolve());
+          })
+          .catch((error: unknown) => {
+            waiters.forEach((waiter) => waiter.reject(error));
+          })
+          .finally(() => {
+            refreshRunningRef.current = false;
+            const next = queuedRefreshRef.current;
+            queuedRefreshRef.current = null;
+            if (!next) return;
+            if (next.generation !== bundleGenerationRef.current || !refreshAllowedRef.current) {
+              next.waiters.forEach((waiter) => waiter.resolve());
+              return;
+            }
+            start(next.plan, next.waiters);
+          });
+      };
+
+      if (refreshRunningRef.current) {
+        const queued = queuedRefreshRef.current;
+        if (queued && queued.generation === bundleGenerationRef.current) {
+          queued.plan = mergeInventoryRefreshPlans(queued.plan, plan);
+          queued.waiters.push({ resolve, reject });
+        } else {
+          queued?.waiters.forEach(waiter => waiter.resolve());
+          queuedRefreshRef.current = { generation: bundleGenerationRef.current, plan, waiters: [{ resolve, reject }] };
+        }
+        return;
       }
 
-      const shouldRefreshRows = canViewRetired && (
-        retiredRowsLoadedRef.current || isManagementRetiredView({
-          roleViewMode: roleViewModeRef.current,
-          pageTab: pageTabRef.current,
-          overviewTab: overviewTabRef.current,
-          searchParams: searchParamsRef.current,
-        })
-      );
-      const [
-        { items: inventoryItems },
-        retiredCountRead,
-        fleetAssetsResponse,
-        categoriesResponse,
-        hardwareResponse,
-        groupsResponse,
-        siteAssignmentsResponse,
-      ] = await Promise.all([
-        fetchAllPaginatedItems<InventoryItem>('/api/inventory', 'inventory', {
-          limit: 500,
-          errorMessage: 'Failed to fetch inventory items',
-        }),
-        canViewRetired ? fetchRetiredInventoryCount(nextScope) : Promise.resolve(null),
-        fetch('/api/inventory/fleet-assets', { cache: 'no-store' }),
-        fetch('/api/inventory/categories', { cache: 'no-store' }),
-        fetch('/api/inventory/hardware', { cache: 'no-store' }),
-        isManagerOrAdmin ? fetch('/api/inventory/groups', { cache: 'no-store' }) : Promise.resolve(null),
-        canManageSiteLocations ? fetch('/api/inventory/site-assignments', { cache: 'no-store' }) : Promise.resolve(null),
-      ]);
-      const retiredRowsRead = shouldRefreshRows
-        ? await fetchRetiredInventoryRows<InventoryItem>(nextScope)
-        : null;
-      if (generation !== bundleGenerationRef.current) return;
-      const currentScopeKey = retiredScopeRef.current
-        ? retiredInventoryScopeKey(retiredScopeRef.current)
-        : null;
-      const readIsCurrent = (read: RetiredInventoryReadScope | null) => (
-        read === null || isCurrentRetiredInventoryRead(read, retiredInventoryLoadEpoch(), currentScopeKey)
-      );
-      if (!readIsCurrent(retiredCountRead) || !readIsCurrent(retiredRowsRead)) return;
-
-      const fleetAssetsPayload = await fleetAssetsResponse.json();
-      if (!fleetAssetsResponse.ok) {
-        throw new Error(fleetAssetsPayload.error || 'Failed to fetch fleet assets');
-      }
-
-      const categoriesPayload = await categoriesResponse.json();
-      if (!categoriesResponse.ok) {
-        throw new Error(categoriesPayload.error || 'Failed to fetch inventory categories');
-      }
-
-      const hardwarePayload = await hardwareResponse.json();
-      if (!hardwareResponse.ok) {
-        throw new Error(hardwarePayload.error || 'Failed to fetch Hardware stock');
-      }
-
-      const groupsPayload = groupsResponse ? await groupsResponse.json() : { groups: [] };
-      if (groupsResponse && !groupsResponse.ok) {
-        throw new Error(groupsPayload.error || 'Failed to fetch inventory groups');
-      }
-
-      const siteAssignmentsPayload = siteAssignmentsResponse
-        ? await siteAssignmentsResponse.json()
-        : { active_locations: [], users: [], assignments: [] };
-      if (siteAssignmentsResponse && !siteAssignmentsResponse.ok) {
-        throw new Error(siteAssignmentsPayload.error || 'Failed to fetch location assignments');
-      }
-
-      setInventoryContext(contextPayload);
-      setItems(inventoryItems);
-      if (retiredRowsRead) {
-        retiredRowsLoadedRef.current = true;
-        setRetiredItems(retiredRowsRead.items);
-        setRetiredRowsLoaded(true);
-        setRetiredCount(retiredRowsRead.items.length);
-        setRetiredRowsError(null);
-        setRetiredRowsLoading(false);
-      } else if (!retiredRowsLoadedRef.current && retiredCountRead) {
-        setRetiredItems([]);
-        setRetiredRowsLoaded(false);
-        setRetiredCount(retiredCountRead.count);
-        setRetiredRowsError(null);
-      } else if (retiredCountRead) {
-        setRetiredCount(retiredCountRead.count);
-      } else {
-        retiredRowsLoadedRef.current = false;
-        setRetiredItems([]);
-        setRetiredRowsLoaded(false);
-        setRetiredCount(0);
-        setRetiredRowsError(null);
-      }
-      setFleetAssets(fleetAssetsPayload.assets || []);
-      setCategories(categoriesPayload.categories || []);
-      setHardwareItems(hardwarePayload.items || []);
-      setHardwareBalances(hardwarePayload.balances || []);
-      setGroups(groupsPayload.groups || []);
-      setSiteAssignmentUsers(siteAssignmentsPayload.users || []);
-      setAssignableLocations(siteAssignmentsPayload.active_locations || []);
-      setSiteAssignments(siteAssignmentsPayload.assignments || []);
-      setInventoryLoadError(null);
-    } catch (error) {
-      if (generation !== bundleGenerationRef.current) return;
-      const message = error instanceof Error ? error.message : String(error);
-      const normalizedMessage = message.toLowerCase();
-      const isNetworkFailure =
-        error instanceof TypeError ||
-        normalizedMessage.includes('failed to fetch') ||
-        normalizedMessage.includes('networkerror') ||
-        normalizedMessage.includes('network request failed');
-      const isUnauthorized =
-        normalizedMessage.includes('unauthorized') ||
-        normalizedMessage.includes('session is locked') ||
-        (normalizedMessage.includes('jwt') && normalizedMessage.includes('expired'));
-
-      if (isNetworkFailure || isUnauthorized) {
-        // Non-fatal: transient auth/network issues should not be captured as app errors.
-        console.warn('Inventory data fetch skipped (non-fatal):', error);
-      } else {
-        console.error('Error fetching inventory data:', error);
-      }
-
-      const errorMessage = getInventoryLoadErrorMessage(error);
-      setInventoryLoadError(errorMessage);
-      toast.error(errorMessage, { id: 'inventory-load-error' });
-    } finally {
-      if (generation === bundleGenerationRef.current) setLoading(false);
-    }
+      start(plan, [{ resolve, reject }]);
+    });
   }, []);
 
   useEffect(() => {
@@ -521,9 +624,11 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
+    refreshAllowedRef.current = !permissionLoading && canViewInventory;
     if (permissionLoading || !canViewInventory) {
       bundleGenerationRef.current += 1;
       invalidateRetiredInventoryLoads();
+      accessScopeRef.current = null;
       retiredScopeRef.current = null;
       retiredRowsLoadedRef.current = false;
       setRetiredItems([]);
@@ -540,7 +645,9 @@ export default function InventoryPage() {
     }
     fetchInventoryData();
     return () => {
+      refreshAllowedRef.current = false;
       bundleGenerationRef.current += 1;
+      accessScopeRef.current = null;
       retiredScopeRef.current = null;
       invalidateRetiredInventoryLoads();
     };
@@ -795,7 +902,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to create inventory item');
     toast.success('Inventory item added');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('item_create'));
   }
 
   async function handleRetireItem(item: InventoryItem, reason: InventoryRetireReason) {
@@ -814,7 +921,7 @@ export default function InventoryPage() {
       return next;
     });
     setRetiringItem(null);
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('item_retire'));
   }
 
   async function handleRestoreItem(item: InventoryItem) {
@@ -827,7 +934,7 @@ export default function InventoryPage() {
     toast.success('Inventory item restored', {
       description: `${item.item_number} returned to active inventory.`,
     });
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('item_restore'));
   }
 
   async function handleCreateLocation(data: InventoryLocationFormData) {
@@ -839,7 +946,7 @@ export default function InventoryPage() {
     await parseJsonResponse(response, 'Failed to create inventory location');
     toast.success('Location added');
     setLocationSearchVersion((version) => version + 1);
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('location'));
   }
 
   async function handleUpdateLocation(data: InventoryLocationFormData) {
@@ -859,7 +966,7 @@ export default function InventoryPage() {
     toast.success('Location updated');
     setEditingLocation(null);
     setLocationSearchVersion((version) => version + 1);
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('location'));
   }
 
   async function handleRemoveLocation(location: InventoryLocation) {
@@ -874,7 +981,7 @@ export default function InventoryPage() {
         await parseJsonResponse(response, 'Failed to remove inventory location');
         toast.success('Location removed');
         setLocationSearchVersion((version) => version + 1);
-        await fetchInventoryData();
+        await fetchInventoryData(inventoryRefreshPlanForMutation('location'));
       },
     });
   }
@@ -900,7 +1007,7 @@ export default function InventoryPage() {
     });
     const result = await parseJsonResponse(response, 'Failed to move inventory items');
     toast.success(result.moved_count === 1 ? 'Item moved' : `${result.moved_count} items moved`);
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('move'));
   }
 
   async function handleRestoreMinorPlantToPlant(itemsToRestore: InventoryItem[]) {
@@ -927,7 +1034,7 @@ export default function InventoryPage() {
             });
           }
           setSelectedItemIds(new Set());
-          await fetchInventoryData();
+          await fetchInventoryData(inventoryRefreshPlanForMutation('minor_plant_restore'));
         } catch (error) {
           toast.error(error instanceof Error ? error.message : 'Failed to move Minor Plant items back to Plant assets');
         } finally {
@@ -945,7 +1052,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to update your inventory location');
     toast.success('Inventory location updated');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('user_location'));
   }
 
   async function handleUnsetUserLocation() {
@@ -954,7 +1061,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to unset your inventory location');
     toast.success('Inventory location unset');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('user_location'));
   }
 
   async function handleRequestLocation(data: { suggested_name: string; note: string }) {
@@ -975,7 +1082,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to assign location');
     toast.success('Location assigned');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('site_assignment'));
   }
 
   async function handleRemoveLocationAssignment({ userId, locationId }: { userId: string; locationId: string }) {
@@ -986,7 +1093,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to remove location assignment');
     toast.success('Location assignment removed');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('site_assignment'));
   }
 
   async function handleSiteAssignmentLegacyQuoteOptIn(includeLegacyQuotes: boolean) {
@@ -1016,7 +1123,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to create inventory category');
     toast.success('Inventory category created');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('category'));
   }
 
   async function handleUpdateCategory(category: InventoryItemCategory, data: InventoryItemCategoryFormData) {
@@ -1027,7 +1134,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to update inventory category');
     toast.success('Inventory category updated');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('category'));
   }
 
   async function handleRemoveCategory(category: InventoryItemCategory) {
@@ -1045,7 +1152,7 @@ export default function InventoryPage() {
         });
         await parseJsonResponse(response, 'Failed to delete inventory category');
         toast.success('Inventory category deleted');
-        await fetchInventoryData();
+        await fetchInventoryData(inventoryRefreshPlanForMutation('category'));
       },
     });
   }
@@ -1058,7 +1165,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to create Hardware item');
     toast.success('Hardware item created');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('hardware'));
   }
 
   async function handleUpdateHardwareItem(
@@ -1072,7 +1179,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to update Hardware item');
     toast.success('Hardware item updated');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('hardware'));
   }
 
   async function handleRemoveHardwareItem(item: InventoryHardwareItem) {
@@ -1091,7 +1198,7 @@ export default function InventoryPage() {
         });
         await parseJsonResponse(response, 'Failed to delete Hardware item');
         toast.success('Hardware item deleted');
-        await fetchInventoryData();
+        await fetchInventoryData(inventoryRefreshPlanForMutation('hardware'));
       },
     });
   }
@@ -1104,7 +1211,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to update Hardware stock');
     toast.success('Hardware stock updated');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('hardware'));
   }
 
   async function handleHardwareTransfer(payload: InventoryHardwareTransferPayload) {
@@ -1115,7 +1222,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to transfer Hardware stock');
     toast.success('Hardware stock transferred');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('hardware'));
   }
 
   async function handleCreateGroup(data: { name: string; description: string; item_ids: string[] }) {
@@ -1126,7 +1233,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to create inventory group');
     toast.success('Inventory group created');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('group'));
   }
 
   async function handleUpdateGroup(group: InventoryItemGroup, data: { name: string; description: string; item_ids: string[] }) {
@@ -1137,7 +1244,7 @@ export default function InventoryPage() {
     });
     await parseJsonResponse(response, 'Failed to update inventory group');
     toast.success('Inventory group updated');
-    await fetchInventoryData();
+    await fetchInventoryData(inventoryRefreshPlanForMutation('group'));
   }
 
   async function handleRemoveGroup(group: InventoryItemGroup) {
@@ -1151,7 +1258,7 @@ export default function InventoryPage() {
         });
         await parseJsonResponse(response, 'Failed to remove inventory group');
         toast.success('Inventory group removed');
-        await fetchInventoryData();
+        await fetchInventoryData(inventoryRefreshPlanForMutation('group'));
       },
     });
   }
