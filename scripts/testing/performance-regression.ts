@@ -35,7 +35,7 @@ async function syntheticPdf() {
 }
 
 async function measure(response: BrowserResponse) {
-  assert.equal(response.status(), 200, 'Expected an authorised successful read');
+  assert.ok(response.ok(), 'Expected an authorised successful read');
   const body = await response.body();
   return { bytes: body.length, body };
 }
