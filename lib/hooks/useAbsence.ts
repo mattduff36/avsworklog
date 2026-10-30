@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { fetchCurrentWorkShift, fetchEmployeeWorkShift } from '@/lib/client/work-shifts';
 import { useAbsenceRealtime } from '@/lib/hooks/useRealtime';
@@ -129,8 +129,13 @@ function hasFilterValue(value?: string): value is string {
   return !!value && value.trim().length > 0;
 }
 
-export function useAbsenceRealtimeQueryInvalidation(enabled = true) {
+export function useAbsenceRealtimeQueryInvalidation(enabled = true, onChange?: () => void) {
   const queryClient = useQueryClient();
+  const onChangeRef = useRef(onChange);
+
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   const invalidateAbsenceQueries = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['absences'] });
@@ -140,6 +145,7 @@ export function useAbsenceRealtimeQueryInvalidation(enabled = true) {
   useAbsenceRealtime((payload) => {
     if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
       invalidateAbsenceQueries();
+      onChangeRef.current?.();
     }
   }, enabled);
 }

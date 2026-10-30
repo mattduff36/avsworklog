@@ -324,8 +324,11 @@ export default function AdminAbsencePage() {
   // Mutations
   const createAbsence = useCreateAbsence();
   const deleteAbsence = useDeleteAbsence();
-  useAbsenceRealtimeQueryInvalidation();
   const [allowancesRefreshKey, setAllowancesRefreshKey] = useState(0);
+  const handleAllowancesRealtimeChange = useCallback(() => {
+    setAllowancesRefreshKey((key) => key + 1);
+  }, []);
+  useAbsenceRealtimeQueryInvalidation(true, handleAllowancesRealtimeChange);
   // Temporary gate is intentionally kept in code for future re-enable.
   const isProtectedTabGateEnabled = false;
   const [protectedTabsUnlocked, setProtectedTabsUnlocked] = useState(false);

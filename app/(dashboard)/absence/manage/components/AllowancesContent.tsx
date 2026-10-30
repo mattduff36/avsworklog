@@ -37,7 +37,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { AlertTriangle, ArrowUpDown, ChevronLeft, ChevronRight, Loader2, Search, Settings2, Sparkles, Trash2, Users } from 'lucide-react';
 import { useUpdateEmployeeAllowance } from '@/lib/hooks/useAbsence';
-import { useAbsenceRealtime } from '@/lib/hooks/useRealtime';
 import { fetchCarryoverMapForFinancialYear, getEffectiveAllowance } from '@/lib/utils/absence-carryover';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
 import { createClient } from '@/lib/supabase/client';
@@ -292,6 +291,10 @@ export function AllowancesContent({
   const [bulkUndoLoading, setBulkUndoLoading] = useState(false);
   const [bulkBatchUndoId, setBulkBatchUndoId] = useState('');
   const [bulkBatches, setBulkBatches] = useState<BulkAbsenceBatchSummary[]>([]);
+  const loadGenerationRef = useRef(0);
+  const bulkHistoryGenerationRef = useRef(0);
+  const showBulkUndoDialogRef = useRef(false);
+  showBulkUndoDialogRef.current = showBulkUndoDialog;
 
   const updateAllowance = useUpdateEmployeeAllowance();
 
@@ -397,21 +400,30 @@ export function AllowancesContent({
   }, [activeTab, generationStatus]);
 
   useEffect(() => {
-    if (activeTab !== 'allowances') return;
-    if (!financialYearResolved) return;
-    if (selectedFinancialYearStartYear === null) return;
-    void loadRows();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, financialYearResolved, selectedFinancialYearStartYear]);
-
-  useEffect(() => {
-    if (activeTab === 'allowances' && financialYearResolved && selectedFinancialYearStartYear !== null && refreshKey !== undefined && refreshKey > 0) {
-      void loadRows();
+    const canLoad =
+      activeTab === 'allowances' &&
+      financialYearResolved &&
+      selectedFinancialYearStartYear !== null;
+    if (!canLoad) {
+      return;
     }
+
+    void loadRows();
+    if (showBulkUndoDialogRef.current) {
+      void loadBulkAbsenceBatches();
+    }
+
+    return () => {
+      loadGenerationRef.current += 1;
+      bulkHistoryGenerationRef.current += 1;
+    };
+    // Initial load and refresh share one effect so a nonzero refreshKey does not fetch twice.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey, activeTab, financialYearResolved, selectedFinancialYearStartYear]);
+  }, [activeTab, financialYearResolved, selectedFinancialYearStartYear, refreshKey, scopeTeamOnly, actorTeamId]);
 
   async function loadRows() {
+    const generation = ++loadGenerationRef.current;
+    const isLatest = () => generation === loadGenerationRef.current;
     setLoading(true);
     try {
       const fyStart = selectedFinancialYear.startIso;
@@ -425,6 +437,7 @@ export function AllowancesContent({
           .order('name'),
       ]);
 
+      if (!isLatest()) return;
       if (reasonsError) throw reasonsError;
 
       type ReasonRow = { id: string; name: string; is_active: boolean; color: string | null };
@@ -448,6 +461,7 @@ export function AllowancesContent({
         .gte('date', fyStart)
         .lte('date', fyEnd);
 
+      if (!isLatest()) return;
       if (absencesError) throw absencesError;
 
       const todayStr = formatLocalDate(new Date());
@@ -503,8 +517,10 @@ export function AllowancesContent({
         team: profile.team || null,
         role: profile.role || null,
       })) as ProfileData[];
+      if (!isLatest()) return;
       if (selectedFinancialYearStartYear === null) return;
       const carryoverByProfile = await fetchCarryoverMapForFinancialYear(supabase, selectedFinancialYearStartYear);
+      if (!isLatest()) return;
       const computedRows: ProfileRow[] = typedProfiles.map((profile) => {
         const totals = summaryByProfile.get(profile.id) || {
           annualTaken: 0,
@@ -564,10 +580,13 @@ export function AllowancesContent({
 
       setRows(computedRows);
     } catch (error) {
+      if (!isLatest()) return;
       console.error('Error fetching allowance rows:', error);
       toast.error('Failed to load employee allowances');
     } finally {
-      setLoading(false);
+      if (isLatest()) {
+        setLoading(false);
+      }
     }
   }
 
@@ -831,14 +850,18 @@ export function AllowancesContent({
   }
 
   async function loadBulkAbsenceBatches() {
+    const generation = ++bulkHistoryGenerationRef.current;
+    const isLatest = () => generation === bulkHistoryGenerationRef.current;
     setBulkUndoLoading(true);
     try {
       const response = await fetch('/api/absence/shutdown', { method: 'GET' });
+      if (!isLatest()) return;
       const payload = (await response.json()) as {
         success?: boolean;
         batches?: BulkAbsenceBatchSummary[];
         error?: string;
       };
+      if (!isLatest()) return;
       if (!response.ok || !payload.success) {
         throw new Error(payload.error || 'Failed to load bulk booking history');
       }
@@ -851,21 +874,15 @@ export function AllowancesContent({
         return nextBatches[0]?.id || '';
       });
     } catch (error) {
+      if (!isLatest()) return;
       console.error('Error loading bulk absence batches:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to load bulk booking history');
     } finally {
-      setBulkUndoLoading(false);
-    }
-  }
-
-  useAbsenceRealtime((payload) => {
-    if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE' || payload.eventType === 'DELETE') {
-      void loadRows();
-      if (showBulkUndoDialog) {
-        void loadBulkAbsenceBatches();
+      if (isLatest()) {
+        setBulkUndoLoading(false);
       }
     }
-  });
+  }
 
   async function handleUndoBulkAbsenceBatch() {
     if (!bulkBatchUndoId) {
