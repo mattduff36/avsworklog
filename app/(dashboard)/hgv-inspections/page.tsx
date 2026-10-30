@@ -20,6 +20,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
 import { formatDate } from '@/lib/utils/date';
+import { enrichHgvInspectionList } from '@/lib/utils/hgv-inspection-list-enrichment';
 import { isUuid } from '@/lib/utils/uuid';
 import { getErrorStatus, isAuthErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import type { Employee, InspectionStatusFilter } from '@/types/common';
@@ -55,15 +56,6 @@ interface HgvSummary {
   id: string;
   reg_number: string;
   nickname: string | null;
-}
-
-interface InspectionItemSummaryRow {
-  inspection_id: string | null;
-  status: string | null;
-}
-
-interface WorkshopTaskSummaryRow {
-  inspection_id: string | null;
 }
 
 function HgvInspectionsContent() {
@@ -228,94 +220,50 @@ function HgvInspectionsContent() {
         hgv: null,
         profile: null,
       }));
-      const validHgvIds = Array.from(new Set(rows.map((row) => row.hgv_id).filter(isUuid)));
-      const validUserIds = Array.from(new Set(rows.map((row) => row.user_id).filter(isUuid)));
-      let hgvMap = new Map<string, { reg_number: string; nickname: string | null }>();
-      let profileMap = new Map<string, { full_name: string }>();
-
-      if (validHgvIds.length > 0) {
-        const { data: hgvs, error: hgvsError } = await supabase
-          .from('hgvs')
-          .select('id, reg_number, nickname')
-          .in('id', validHgvIds);
-
-        if (hgvsError) {
-          console.warn('Unable to load HGV inspection vehicle details:', hgvsError);
-        } else {
-          hgvMap = new Map(
-            ((hgvs || []) as Array<{ id: string; reg_number: string; nickname: string | null }>)
-              .filter((hgv) => Boolean(hgv.id))
-              .map((hgv) => [hgv.id, { reg_number: hgv.reg_number, nickname: hgv.nickname ?? null }])
-          );
-        }
-      }
-
-      if (validUserIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, full_name')
-          .in('id', validUserIds);
-
-        if (profilesError) {
-          console.warn('Unable to load HGV inspection owner names:', profilesError);
-        } else {
-          profileMap = new Map(
-            ((profiles || []) as Array<{ id: string; full_name: string | null }>)
-              .filter((profile): profile is { id: string; full_name: string } =>
-                Boolean(profile.id && profile.full_name)
-              )
-              .map((profile) => [profile.id, { full_name: profile.full_name }])
-          );
-        }
-      }
-
-      const inspectionIds = rows.map((row) => row.id).filter((id): id is string => Boolean(id));
-      let defectInspectionIds = new Set<string>();
-      let workshopTaskInspectionIds = new Set<string>();
-
-      if (inspectionIds.length > 0) {
-        const { data: defectData, error: defectError } = await supabase
-          .from('inspection_items')
-          .select('inspection_id, status')
-          .in('inspection_id', inspectionIds)
-          .in('status', ['attention', 'defect']);
-
-        if (defectError) {
-          console.warn('Unable to determine defect status for HGV inspection icons:', defectError);
-        } else {
-          defectInspectionIds = new Set(
-            ((defectData || []) as InspectionItemSummaryRow[])
-              .map((row) => row.inspection_id)
-              .filter((id): id is string => Boolean(id))
-          );
-        }
-
-        const { data: workshopTaskData, error: workshopTaskError } = await supabase
-          .from('actions')
-          .select('inspection_id')
-          .in('inspection_id', inspectionIds)
-          .eq('action_type', 'workshop_vehicle_task');
-
-        if (workshopTaskError) {
-          console.warn('Unable to determine workshop-task status for HGV inspection icons:', workshopTaskError);
-        } else {
-          workshopTaskInspectionIds = new Set(
-            ((workshopTaskData || []) as WorkshopTaskSummaryRow[])
-              .map((row) => row.inspection_id)
-              .filter((id): id is string => Boolean(id))
-          );
-        }
-      }
-
-      setInspections(
-        rows.map((row) => ({
-          ...row,
-          hgv: row.hgv_id && isUuid(row.hgv_id) ? hgvMap.get(row.hgv_id) ?? null : null,
-          profile: profileMap.get(row.user_id) ?? null,
-          has_reported_defect: defectInspectionIds.has(row.id),
-          has_inform_workshop_task: workshopTaskInspectionIds.has(row.id),
-        }))
-      );
+      setInspections(await enrichHgvInspectionList(rows, {
+        loadHgvs: async (ids) => {
+          const { data, error } = await supabase
+            .from('hgvs')
+            .select('id, reg_number, nickname')
+            .in('id', ids);
+          return {
+            data: (data ?? null) as Array<{ id: string; reg_number: string; nickname: string | null }> | null,
+            error,
+          };
+        },
+        loadProfiles: async (ids) => {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', ids);
+          return {
+            data: (data ?? null) as Array<{ id: string; full_name: string | null }> | null,
+            error,
+          };
+        },
+        loadDefects: async (ids) => {
+          const { data, error } = await supabase
+            .from('inspection_items')
+            .select('inspection_id, status')
+            .in('inspection_id', ids)
+            .in('status', ['attention', 'defect']);
+          return {
+            data: (data ?? null) as Array<{ inspection_id: string | null; status: string | null }> | null,
+            error,
+          };
+        },
+        loadActions: async (ids) => {
+          const { data, error } = await supabase
+            .from('actions')
+            .select('inspection_id')
+            .in('inspection_id', ids)
+            .eq('action_type', 'workshop_vehicle_task');
+          return {
+            data: (data ?? null) as Array<{ inspection_id: string | null }> | null,
+            error,
+          };
+        },
+      }));
     } catch (error) {
       const errorContextId = 'hgv-inspections-fetch-list-error';
       const isNetworkFailure = isNetworkFetchError(error);
