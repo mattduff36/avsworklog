@@ -390,7 +390,8 @@ describe('daily allocation manager board', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     renderBoardPage();
-    const openPublish = await screen.findByRole('button', { name: 'Publish' });
+    // The selected manager is now a lazy chunk; allow its first cold import.
+    const openPublish = await screen.findByRole('button', { name: 'Publish' }, { timeout: 10_000 });
     fireEvent.click(openPublish);
 
     let dialog = await screen.findByRole('alertdialog');

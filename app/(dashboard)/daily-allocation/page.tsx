@@ -1,15 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { addDays, format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { DailyAllocationBetaBadge } from '@/components/daily-allocation/DailyAllocationBetaBadge';
-import { LegacyDailyAllocationManager } from '@/components/daily-allocation/LegacyDailyAllocationManager';
-import { DailyAllocationBoardStateProvider } from '@/components/daily-allocation/board/hooks/use-daily-allocation-board';
-import { DailyAllocationManagerBoard } from '@/components/daily-allocation/board/DailyAllocationManagerBoard';
-import { DailyAllocationUnsupportedWidthMessage } from '@/components/daily-allocation/board/DailyAllocationViewportFit';
 import { fetchDailyAllocationRuntime } from '@/lib/client/daily-allocation';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
@@ -20,6 +17,30 @@ function tomorrowIso() {
 }
 
 const dailyAllocationBetaBadge = <DailyAllocationBetaBadge />;
+
+function DailyAllocationLoading() {
+  return (
+    <AppPageLoadingShell
+      title="Daily Allocation"
+      titleMeta={dailyAllocationBetaBadge}
+      message="Loading daily allocation..."
+    />
+  );
+}
+
+const LegacyDailyAllocationManager = dynamic(
+  () => import('@/components/daily-allocation/LegacyDailyAllocationManager').then((mod) => ({
+    default: mod.LegacyDailyAllocationManager,
+  })),
+  { ssr: false, loading: () => <DailyAllocationLoading /> },
+);
+
+const ProgressiveAllocationManager = dynamic(
+  () => import('./ProgressiveAllocationManager').then((mod) => ({
+    default: mod.ProgressiveAllocationManager,
+  })),
+  { ssr: false, loading: () => <DailyAllocationLoading /> },
+);
 
 export default function DailyAllocationBoardPage() {
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('daily-allocation');
@@ -35,13 +56,7 @@ export default function DailyAllocationBoardPage() {
   });
 
   if (permissionLoading || levelLoading) {
-    return (
-      <AppPageLoadingShell
-        title="Daily Allocation"
-        titleMeta={dailyAllocationBetaBadge}
-        message="Loading daily allocation..."
-      />
-    );
+    return <DailyAllocationLoading />;
   }
 
   if (!hasPermission) {
@@ -69,13 +84,7 @@ export default function DailyAllocationBoardPage() {
   }
 
   if (runtimeQuery.isLoading) {
-    return (
-      <AppPageLoadingShell
-        title="Daily Allocation"
-        titleMeta={dailyAllocationBetaBadge}
-        message="Loading daily allocation..."
-      />
-    );
+    return <DailyAllocationLoading />;
   }
 
   if (runtimeQuery.data?.board_enabled !== true) {
@@ -83,19 +92,11 @@ export default function DailyAllocationBoardPage() {
   }
 
   return (
-    <>
-      <div className="md:hidden">
-        <DailyAllocationUnsupportedWidthMessage />
-      </div>
-      <div className="hidden min-h-0 md:flex md:flex-1 md:flex-col">
-        <DailyAllocationBoardStateProvider
-          startDate={week.start}
-          endDate={week.end}
-          selectedDate={selectedDate}
-        >
-          <DailyAllocationManagerBoard onSelectedDateChange={setSelectedDate} />
-        </DailyAllocationBoardStateProvider>
-      </div>
-    </>
+    <ProgressiveAllocationManager
+      startDate={week.start}
+      endDate={week.end}
+      selectedDate={selectedDate}
+      onSelectedDateChange={setSelectedDate}
+    />
   );
 }

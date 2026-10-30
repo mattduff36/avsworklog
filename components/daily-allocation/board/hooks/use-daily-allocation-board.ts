@@ -5,6 +5,7 @@ import {
   createElement,
   useEffect,
   useContext,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -124,24 +125,60 @@ export function useDailyAllocationBoardController(options: {
 }): DailyAllocationBoardController {
   const queryClient = useQueryClient();
   const query = useDailyAllocationBoardQuery(options.startDate, options.endDate);
+  const resolvedUserId = options.userId || query.data?.context.user_id || '';
+  const prefetchScope = JSON.stringify([resolvedUserId, query.data?.context.team_id, query.data?.context.access_level, query.data?.context.is_admin, query.data?.context.is_manager]);
+  const prefetchedRangeRef = useRef<string | null>(null);
+  const [pointerInteractionActive, setPointerInteractionActive] = useState(false);
+  const [reconciliationBridge] = useState(() => new DailyAllocationReconciliationBridge());
   useEffect(() => {
     if (!options.startDate || !options.endDate || options.startDate > options.endDate) return;
-    const span = differenceInCalendarDays(parseISO(options.endDate), parseISO(options.startDate));
-    const nextStart = format(addDays(parseISO(options.endDate), 1), 'yyyy-MM-dd');
+    if (!query.isSuccess || query.isFetching || pointerInteractionActive) return;
+    const rangeId = `${prefetchScope}:${options.startDate}:${options.endDate}`;
+    if (prefetchedRangeRef.current === rangeId) return;
+
+    const startDate = options.startDate;
+    const endDate = options.endDate;
+    const span = differenceInCalendarDays(parseISO(endDate), parseISO(startDate));
+    const nextStart = format(addDays(parseISO(endDate), 1), 'yyyy-MM-dd');
     const nextEnd = format(addDays(parseISO(nextStart), span), 'yyyy-MM-dd');
-    const previousEnd = format(addDays(parseISO(options.startDate), -1), 'yyyy-MM-dd');
+    const previousEnd = format(addDays(parseISO(startDate), -1), 'yyyy-MM-dd');
     const previousStart = format(addDays(parseISO(previousEnd), -span), 'yyyy-MM-dd');
-    void queryClient.prefetchQuery({
-      queryKey: dailyAllocationBoardQueryKey(nextStart, nextEnd),
-      queryFn: () => fetchDailyAllocationBoardRange(nextStart, nextEnd),
-    });
-    void queryClient.prefetchQuery({
-      queryKey: dailyAllocationBoardQueryKey(previousStart, previousEnd),
-      queryFn: () => fetchDailyAllocationBoardRange(previousStart, previousEnd),
-    });
-  }, [options.endDate, options.startDate, queryClient]);
+    let cancelled = false;
+    let idleId: number | undefined;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const run = () => {
+      if (cancelled || prefetchedRangeRef.current === rangeId) return;
+      if (reconciliationBridge.isInteractionActive()) return;
+      const current = queryClient.getQueryState(dailyAllocationBoardQueryKey(startDate, endDate));
+      // Auth/View As invalidation can happen before React processes its update.
+      if (!current || current.isInvalidated || current.fetchStatus !== 'idle' || current.data !== query.data) return;
+      prefetchedRangeRef.current = rangeId;
+      void queryClient.prefetchQuery({
+        queryKey: dailyAllocationBoardQueryKey(nextStart, nextEnd),
+        queryFn: () => fetchDailyAllocationBoardRange(nextStart, nextEnd),
+      });
+      void queryClient.prefetchQuery({
+        queryKey: dailyAllocationBoardQueryKey(previousStart, previousEnd),
+        queryFn: () => fetchDailyAllocationBoardRange(previousStart, previousEnd),
+      });
+    };
+
+    if (typeof requestIdleCallback === 'function') {
+      idleId = requestIdleCallback(run);
+    } else {
+      timeoutId = setTimeout(run, 200);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId !== undefined && typeof cancelIdleCallback === 'function') {
+        cancelIdleCallback(idleId);
+      }
+      if (timeoutId !== undefined) clearTimeout(timeoutId);
+    };
+  }, [options.endDate, options.startDate, pointerInteractionActive, prefetchScope, query.data, query.isFetching, query.isSuccess, queryClient, reconciliationBridge]);
   const ledger = useDailyAllocationOptimisticLedger();
-  const resolvedUserId = options.userId || query.data?.context.user_id || '';
   const viewPreference = useDailyAllocationViewPreference(resolvedUserId);
   const [internalSelectedDate, setInternalSelectedDate] = useState(
     () => options.selectedDate || options.startDate
@@ -151,7 +188,6 @@ export function useDailyAllocationBoardController(options: {
   const [mutationError, setMutationError] = useState<unknown>(null);
   const boardKey = dailyAllocationBoardOptimisticKey(options.startDate, options.endDate);
   const queryKey = dailyAllocationBoardQueryKey(options.startDate, options.endDate);
-  const [reconciliationBridge] = useState(() => new DailyAllocationReconciliationBridge());
   const [reconciler] = useState(() =>
     new DailyAllocationBoardReconciler({
       delayMs: 400,
@@ -266,6 +302,7 @@ export function useDailyAllocationBoardController(options: {
     selectedDate,
     setSelectedDate,
     setPointerInteractionActive: (active) => {
+      setPointerInteractionActive(active);
       reconciliationBridge.setInteractionActive(active);
       reconciler.setInteractionActive(active);
     },

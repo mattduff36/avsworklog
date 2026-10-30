@@ -12,8 +12,10 @@ describe('DA2-UI-001 manager board contract', () => {
     expect(page).toContain('fetchDailyAllocationRuntime');
     expect(page).toContain('LegacyDailyAllocationManager');
     expect(page).toContain('board_enabled');
-    expect(page).toContain('DailyAllocationBoardStateProvider');
-    expect(page).toContain('DailyAllocationManagerBoard');
+    expect(page).toContain('ProgressiveAllocationManager');
+    const progressive = readFileSync(resolve(process.cwd(), 'app/(dashboard)/daily-allocation/ProgressiveAllocationManager.tsx'), 'utf8');
+    expect(progressive).toContain('DailyAllocationBoardStateProvider');
+    expect(progressive).toContain('DailyAllocationManagerBoard');
 
     const board = readFileSync(
       resolve(process.cwd(), 'components/daily-allocation/board/DailyAllocationManagerBoard.tsx'),
