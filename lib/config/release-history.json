@@ -1,5 +1,23 @@
 [
   {
+    "version": "1026.14.3",
+    "updateKind": "minor",
+    "title": "Data storage maintenance update",
+    "description": "Preserve exact applied migration bytes. Evaluate quote SELECT permissions once per statement.",
+    "summary": "Preserve exact applied migration bytes. Evaluate quote SELECT permissions once per statement.",
+    "details": [
+      "Updated quotes, with changes to data storage.",
+      "Preserve exact applied migration bytes, with changes to data storage."
+    ],
+    "areas": [
+      "Data storage"
+    ],
+    "areaKeys": [
+      "data-storage"
+    ],
+    "pushedAt": "2026-10-30T03:45:53.793Z"
+  },
+  {
     "version": "1026.14.2",
     "updateKind": "minor",
     "title": "App reliability improvements",

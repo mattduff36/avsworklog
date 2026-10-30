@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.14.3
+
+**GIT COMMIT MESSAGE**
+`perf(db): evaluate quote SELECT permissions once per statement`
+
+**PUSHED AT**
+2026-10-30T03:45:53.793Z
+
+**WHAT CHANGED**
+Preserve exact applied migration bytes. Evaluate quote SELECT permissions once per statement.
+
+**VERSION HISTORY DETAILS**
+- Updated quotes, with changes to data storage.
+- Preserve exact applied migration bytes, with changes to data storage.
+
+**COMMITS IN THIS RELEASE**
+- `fix(db): preserve exact applied migration bytes`
+- `perf(db): evaluate quote SELECT permissions once per statement`
+
 ## 1026.14.2
 
 **GIT COMMIT MESSAGE**
