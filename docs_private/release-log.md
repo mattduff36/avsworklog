@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.14.2
+
+**GIT COMMIT MESSAGE**
+`fix(test): accept successful paginated performance reads`
+
+**PUSHED AT**
+2026-10-30T03:29:27.155Z
+
+**WHAT CHANGED**
+Accept successful paginated performance reads.
+
+**VERSION HISTORY DETAILS**
+- Accept successful paginated performance reads.
+
+**COMMITS IN THIS RELEASE**
+- `fix(test): accept successful paginated performance reads`
+
 ## 1026.14.1
 
 **GIT COMMIT MESSAGE**
