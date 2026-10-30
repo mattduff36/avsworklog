@@ -64,7 +64,7 @@ async function main() {
     await page.waitForURL('**/dashboard', { timeout: 60_000 });
 
     phase = 'HGV bounded lightweight list';
-    const hgvRead = page.waitForResponse(response => new URL(response.url()).pathname === '/rest/v1/hgv_inspections');
+    const hgvRead = page.waitForResponse(response => response.request().method() === 'GET' && new URL(response.url()).pathname === '/rest/v1/hgv_inspections');
     const hgvStart = Date.now();
     await page.goto('/hgv-inspections');
     const hgvResponse = await hgvRead;
