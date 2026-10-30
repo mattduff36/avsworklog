@@ -12,83 +12,40 @@ import type { ModuleName } from '@/types/roles';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { filterHiddenReportSubjects, getReportHiddenProfileIds } from '@/lib/server/system-accounts';
+import { getReportHiddenProfileIds } from '@/lib/server/system-accounts';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { getReportDateRangeSpanDays } from '@/lib/server/report-date-range';
 import {
   formatFleetAssetLabel,
   getFleetAssetLabelContext,
 } from '@/lib/utils/fleet-asset-label';
+import {
+  isAbortError,
+  loadInspectionExportManifest,
+  loadInspectionExportPartDetails,
+  loadInspectionItemsByInspectionId,
+  loadPlantDailyHoursByInspectionId,
+  throwIfAborted,
+  type DailyCheckInspection,
+  type HgvInspectionWithRelations,
+  type InspectionExportReader,
+  type PlantInspectionWithRelations,
+  type VanInspectionWithRelations,
+} from '@/lib/server/inspection-export-manifest';
 
 const MAX_INSPECTIONS_PER_PDF = 80;
-
-interface ProfileShape {
-  full_name?: string | null;
-}
-
-interface VanVehicleShape {
-  reg_number?: string | null;
-  nickname?: string | null;
-  vehicle_type?: string | null;
-  van_categories?: { name: string } | null;
-}
-
-interface PlantShape {
-  plant_id?: string | null;
-  nickname?: string | null;
-  serial_number?: string | null;
-  van_categories?: { name: string } | null;
-}
-
-interface HgvShape {
-  reg_number?: string | null;
-  nickname?: string | null;
-  hgv_categories?: { name: string } | null;
-}
-
-interface BaseInspectionShape {
-  id: string;
-  user_id: string;
-  inspection_date: string;
-  inspection_end_date?: string | null;
-  current_mileage?: number | null;
-  status: string;
-  inspector_comments?: string | null;
-  signature_data?: string | null;
-  signed_at?: string | null;
-}
-
-interface VanInspectionWithRelations extends BaseInspectionShape {
-  source: 'van';
-  vehicle?: VanVehicleShape | null;
-  profile?: ProfileShape | null;
-}
-
-interface PlantInspectionWithRelations extends BaseInspectionShape {
-  source: 'plant';
-  plant?: PlantShape | null;
-  profile?: ProfileShape | null;
-  is_hired_plant?: boolean | null;
-  hired_plant_id_serial?: string | null;
-  hired_plant_description?: string | null;
-  hired_plant_hiring_company?: string | null;
-  job_code?: string | null;
-  job_site_address?: string | null;
-}
-
-interface HgvInspectionWithRelations extends BaseInspectionShape {
-  source: 'hgv';
-  hgv?: HgvShape | null;
-  profile?: ProfileShape | null;
-}
-
-type DailyCheckInspection = VanInspectionWithRelations | PlantInspectionWithRelations | HgvInspectionWithRelations;
 
 interface BulkPdfCompletePayload {
   type: 'complete';
   data: string;
   fileName: string;
   contentType: string;
+}
+
+interface StreamControl {
+  closed: boolean;
+  signal: AbortSignal;
+  abort: () => void;
 }
 
 function isValidIsoDate(value: string): boolean {
@@ -103,9 +60,29 @@ function splitIntoChunks<T>(rows: T[], chunkSize: number): T[][] {
   return chunks;
 }
 
-function enqueueJson(controller: ReadableStreamDefaultController<Uint8Array>, payload: unknown): void {
-  const encoder = new TextEncoder();
-  controller.enqueue(encoder.encode(`${JSON.stringify(payload)}\n`));
+function isClosedStreamError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : '';
+  return /closed|invalid state/i.test(message);
+}
+
+function enqueueJson(
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  payload: unknown,
+  control: StreamControl,
+): void {
+  if (control.closed || control.signal.aborted) return;
+  const bytes = new TextEncoder().encode(`${JSON.stringify(payload)}\n`);
+  try {
+    controller.enqueue(bytes);
+  } catch (error) {
+    control.closed = true;
+    control.abort();
+    if (!isClosedStreamError(error) && !isAbortError(error)) throw error;
+  }
+}
+
+function asInspectionExportReader(client: Awaited<ReturnType<typeof createClient>>): InspectionExportReader {
+  return client as unknown as InspectionExportReader;
 }
 
 function getItemDayOfWeek(item: InspectionItem): number {
@@ -231,204 +208,6 @@ function resolveInspectionPdfTemplate(
   return resolveVanTemplate(inspection, items);
 }
 
-async function fetchInspectionItemsByInspectionId(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  inspectionIds: string[]
-): Promise<Map<string, InspectionItem[]>> {
-  if (inspectionIds.length === 0) return new Map();
-
-  const { data, error } = await supabase
-    .from('inspection_items')
-    .select('*')
-    .in('inspection_id', inspectionIds)
-    .order('item_number', { ascending: true });
-
-  if (error) throw error;
-
-  const itemsByInspectionId = new Map<string, InspectionItem[]>();
-  ((data || []) as InspectionItem[]).forEach((item) => {
-    const existing = itemsByInspectionId.get(item.inspection_id) || [];
-    existing.push(item);
-    itemsByInspectionId.set(item.inspection_id, existing);
-  });
-
-  return itemsByInspectionId;
-}
-
-async function fetchPlantDailyHoursByInspectionId(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  inspectionIds: string[]
-): Promise<Map<string, Array<{ day_of_week: number; hours: number | null }>>> {
-  if (inspectionIds.length === 0) return new Map();
-
-  const { data, error } = await supabase
-    .from('inspection_daily_hours')
-    .select('inspection_id, day_of_week, hours')
-    .in('inspection_id', inspectionIds)
-    .order('day_of_week', { ascending: true });
-
-  if (error) throw error;
-
-  const hoursByInspectionId = new Map<string, Array<{ day_of_week: number; hours: number | null }>>();
-  ((data || []) as Array<{ inspection_id: string; day_of_week: number; hours: number | null }>).forEach((row) => {
-    const existing = hoursByInspectionId.get(row.inspection_id) || [];
-    existing.push({ day_of_week: row.day_of_week, hours: row.hours });
-    hoursByInspectionId.set(row.inspection_id, existing);
-  });
-
-  return hoursByInspectionId;
-}
-
-async function fetchScopedInspections(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  dateFrom: string,
-  dateTo: string,
-  availableModules: ModuleName[],
-  scopedModuleIds: Map<ModuleName, Set<string> | null>
-): Promise<DailyCheckInspection[]> {
-  const canAccessVanChecks = availableModules.includes('inspections');
-  const canAccessPlantChecks = availableModules.includes('plant-inspections');
-  const canAccessHgvChecks = availableModules.includes('hgv-inspections');
-
-  const vanScope = scopedModuleIds.get('inspections') || null;
-  const plantScope = scopedModuleIds.get('plant-inspections') || null;
-  const hgvScope = scopedModuleIds.get('hgv-inspections') || null;
-
-  const [vanResult, plantResult, hgvResult] = await Promise.all([
-    canAccessVanChecks && (!vanScope || vanScope.size > 0)
-      ? (async () => {
-          let query = supabase
-            .from('van_inspections')
-            .select(`
-              id,
-              user_id,
-              inspection_date,
-              inspection_end_date,
-              current_mileage,
-              status,
-              inspector_comments,
-              signature_data,
-              signed_at,
-              vehicle:vans(
-                reg_number,
-                nickname,
-                vehicle_type,
-                van_categories(name)
-              ),
-              profile:profiles!van_inspections_user_id_fkey(full_name)
-            `)
-            .neq('status', 'draft')
-            .gte('inspection_date', dateFrom)
-            .lte('inspection_date', dateTo)
-            .order('inspection_date', { ascending: true });
-
-          if (vanScope) {
-            query = query.in('user_id', Array.from(vanScope));
-          }
-          return query;
-        })()
-      : Promise.resolve({ data: [], error: null }),
-    canAccessPlantChecks && (!plantScope || plantScope.size > 0)
-      ? (async () => {
-          let query = supabase
-            .from('plant_inspections')
-            .select(`
-              id,
-              user_id,
-              inspection_date,
-              inspection_end_date,
-              current_mileage,
-              status,
-              inspector_comments,
-              signature_data,
-              signed_at,
-              is_hired_plant,
-              hired_plant_id_serial,
-              hired_plant_description,
-              hired_plant_hiring_company,
-              plant(
-                plant_id,
-                nickname,
-                serial_number,
-                van_categories(name)
-              ),
-              profile:profiles!plant_inspections_user_id_fkey(full_name)
-            `)
-            .neq('status', 'draft')
-            .gte('inspection_date', dateFrom)
-            .lte('inspection_date', dateTo)
-            .order('inspection_date', { ascending: true });
-
-          if (plantScope) {
-            query = query.in('user_id', Array.from(plantScope));
-          }
-          return query;
-        })()
-      : Promise.resolve({ data: [], error: null }),
-    canAccessHgvChecks && (!hgvScope || hgvScope.size > 0)
-      ? (async () => {
-          let query = supabase
-            .from('hgv_inspections')
-            .select(`
-              id,
-              user_id,
-              inspection_date,
-              inspection_end_date,
-              current_mileage,
-              status,
-              inspector_comments,
-              signature_data,
-              signed_at,
-              hgv:hgvs!hgv_inspections_hgv_id_fkey(
-                reg_number,
-                nickname,
-                hgv_categories(name)
-              ),
-              profile:profiles!hgv_inspections_user_id_fkey(full_name)
-            `)
-            .neq('status', 'draft')
-            .gte('inspection_date', dateFrom)
-            .lte('inspection_date', dateTo)
-            .order('inspection_date', { ascending: true });
-
-          if (hgvScope) {
-            query = query.in('user_id', Array.from(hgvScope));
-          }
-          return query;
-        })()
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-
-  if (vanResult.error) {
-    throw vanResult.error;
-  }
-  if (plantResult.error) {
-    throw plantResult.error;
-  }
-  if (hgvResult.error) {
-    throw hgvResult.error;
-  }
-
-  const combined: DailyCheckInspection[] = [
-    ...((vanResult.data || []) as Omit<VanInspectionWithRelations, 'source'>[]).map((row) => ({
-      ...row,
-      source: 'van' as const,
-    })),
-    ...((plantResult.data || []) as Omit<PlantInspectionWithRelations, 'source'>[]).map((row) => ({
-      ...row,
-      source: 'plant' as const,
-    })),
-    ...((hgvResult.data || []) as Omit<HgvInspectionWithRelations, 'source'>[]).map((row) => ({
-      ...row,
-      source: 'hgv' as const,
-    })),
-  ];
-
-  combined.sort((a, b) => a.inspection_date.localeCompare(b.inspection_date));
-  const hiddenProfileIds = await getReportHiddenProfileIds(createAdminClient());
-  return filterHiddenReportSubjects(combined, hiddenProfileIds);
-}
-
 export async function POST(request: NextRequest) {
   let dateFrom = '';
   let dateTo = '';
@@ -454,25 +233,47 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Date range must be 366 days or fewer' }, { status: 400 });
   }
 
+  const generationAbort = new AbortController();
+  const control: StreamControl = { closed: false, signal: generationAbort.signal, abort: () => generationAbort.abort() };
+  const abortGeneration = () => generationAbort.abort();
+  if (request.signal.aborted) generationAbort.abort();
+  else request.signal.addEventListener('abort', abortGeneration, { once: true });
+
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      const safeEnqueue = (payload: unknown) => enqueueJson(controller, payload, control);
+      const safeClose = () => {
+        request.signal.removeEventListener('abort', abortGeneration);
+        if (control.closed) return;
+        control.closed = true;
+        try {
+          controller.close();
+        } catch {
+          // Disconnect can close the controller before the generator finishes.
+        }
+      };
+
       try {
+        throwIfAborted(control.signal);
         const supabase = await createClient();
+        throwIfAborted(control.signal);
         const {
           data: { user },
           error: authError,
         } = await supabase.auth.getUser();
+        throwIfAborted(control.signal);
 
         if (authError || !user) {
-          enqueueJson(controller, { error: 'Unauthorized' });
-          controller.close();
+          safeEnqueue({ error: 'Unauthorized' });
+          safeClose();
           return;
         }
 
         const canAccessReports = await canEffectiveRoleAccessModule('reports');
+        throwIfAborted(control.signal);
         if (!canAccessReports) {
-          enqueueJson(controller, { error: 'Forbidden - Reports access required' });
-          controller.close();
+          safeEnqueue({ error: 'Forbidden - Reports access required' });
+          safeClose();
           return;
         }
 
@@ -481,6 +282,7 @@ export async function POST(request: NextRequest) {
           canEffectiveRoleAccessModule('plant-inspections'),
           canEffectiveRoleAccessModule('hgv-inspections'),
         ]);
+        throwIfAborted(control.signal);
 
         const availableModules: ModuleName[] = [];
         if (canAccessVanChecks) availableModules.push('inspections');
@@ -488,34 +290,47 @@ export async function POST(request: NextRequest) {
         if (canAccessHgvChecks) availableModules.push('hgv-inspections');
 
         if (availableModules.length === 0) {
-          enqueueJson(controller, { error: 'Forbidden - Daily Checks access required' });
-          controller.close();
+          safeEnqueue({ error: 'Forbidden - Daily Checks access required' });
+          safeClose();
           return;
         }
 
         const scopeContext = await getReportScopeContext();
+        throwIfAborted(control.signal);
         const scopedModuleIds = await getScopedModuleProfileIds(availableModules, scopeContext);
+        throwIfAborted(control.signal);
         const hasAnyScope = availableModules.some((moduleName) => {
           const scoped = scopedModuleIds.get(moduleName);
           return scoped === null || (scoped?.size ?? 0) > 0;
         });
         if (!hasAnyScope) {
-          enqueueJson(controller, { error: 'No daily checks found in the selected date range' });
-          controller.close();
+          safeEnqueue({ error: 'No daily checks found in the selected date range' });
+          safeClose();
           return;
         }
 
-        const inspections = await fetchScopedInspections(supabase, dateFrom, dateTo, availableModules, scopedModuleIds);
-        if (inspections.length === 0) {
-          enqueueJson(controller, { error: 'No daily checks found in the selected date range' });
-          controller.close();
+        const reader = asInspectionExportReader(supabase);
+        const hiddenProfileIds = await getReportHiddenProfileIds(createAdminClient());
+        throwIfAborted(control.signal);
+        const manifest = await loadInspectionExportManifest(reader, {
+          dateFrom,
+          dateTo,
+          availableModules,
+          scopedModuleIds,
+          hiddenProfileIds,
+          signal: control.signal,
+        });
+        throwIfAborted(control.signal);
+        if (manifest.length === 0) {
+          safeEnqueue({ error: 'No daily checks found in the selected date range' });
+          safeClose();
           return;
         }
 
-        const totalInspections = inspections.length;
-        const chunks = splitIntoChunks(inspections, MAX_INSPECTIONS_PER_PDF);
+        const totalInspections = manifest.length;
+        const chunks = splitIntoChunks(manifest, MAX_INSPECTIONS_PER_PDF);
         const numParts = chunks.length;
-        enqueueJson(controller, {
+        safeEnqueue({
           type: 'init',
           total: totalInspections,
           needsZip: totalInspections > MAX_INSPECTIONS_PER_PDF,
@@ -527,31 +342,40 @@ export async function POST(request: NextRequest) {
         let processedCount = 0;
 
         for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex += 1) {
+          throwIfAborted(control.signal);
           const chunk = chunks[chunkIndex];
-          const mergedPdf = await PDFDocument.create();
-          const chunkInspectionIds = chunk.map((inspection) => inspection.id);
-          const plantInspectionIds = chunk
+          const partHiddenProfileIds = await getReportHiddenProfileIds(createAdminClient());
+          throwIfAborted(control.signal);
+          const details = await loadInspectionExportPartDetails(reader, chunk, {
+            dateFrom,
+            dateTo,
+            availableModules,
+            scopedModuleIds,
+            hiddenProfileIds: partHiddenProfileIds,
+            signal: control.signal,
+          });
+          throwIfAborted(control.signal);
+          const detailIds = details.map((inspection) => inspection.id);
+          const plantInspectionIds = details
             .filter((inspection): inspection is PlantInspectionWithRelations => inspection.source === 'plant')
             .map((inspection) => inspection.id);
-          let itemsByInspectionId = new Map<string, InspectionItem[]>();
-          let plantHoursByInspectionId = new Map<string, Array<{ day_of_week: number; hours: number | null }>>();
+          const [itemsByInspectionId, plantHoursByInspectionId] = await Promise.all([
+            loadInspectionItemsByInspectionId(reader, detailIds, control.signal),
+            loadPlantDailyHoursByInspectionId(reader, plantInspectionIds, control.signal),
+          ]);
+          throwIfAborted(control.signal);
 
-          try {
-            [itemsByInspectionId, plantHoursByInspectionId] = await Promise.all([
-              fetchInspectionItemsByInspectionId(supabase, chunkInspectionIds),
-              fetchPlantDailyHoursByInspectionId(supabase, plantInspectionIds),
-            ]);
-          } catch (error) {
-            console.error(`Failed to fetch daily check data for PDF part ${chunkIndex + 1}:`, error);
-          }
-
-          for (const inspection of chunk) {
-            const items = itemsByInspectionId.get(inspection.id) || [];
-            const dailyHours = plantHoursByInspectionId.get(inspection.id) || [];
-
+          const mergedPdf = await PDFDocument.create();
+          const detailByKey = new Map(details.map((inspection) => [`${inspection.source}:${inspection.id}`, inspection]));
+          for (const entry of chunk) {
+            throwIfAborted(control.signal);
+            const inspection = detailByKey.get(`${entry.source}:${entry.id}`);
+            const items = inspection ? itemsByInspectionId.get(inspection.id) || [] : [];
+            const dailyHours = inspection ? plantHoursByInspectionId.get(inspection.id) || [] : [];
             processedCount += 1;
-            if (items.length === 0) {
-              enqueueJson(controller, {
+
+            if (!inspection || items.length === 0) {
+              safeEnqueue({
                 type: 'progress',
                 current: processedCount,
                 total: totalInspections,
@@ -563,11 +387,13 @@ export async function POST(request: NextRequest) {
 
             const pdfComponent = resolveInspectionPdfTemplate(inspection, items, dailyHours);
             const pdfBuffer = await renderToBuffer(pdfComponent);
+            throwIfAborted(control.signal);
             const singlePdf = await PDFDocument.load(pdfBuffer);
             const pages = await mergedPdf.copyPages(singlePdf, singlePdf.getPageIndices());
             pages.forEach((page) => mergedPdf.addPage(page));
+            throwIfAborted(control.signal);
 
-            enqueueJson(controller, {
+            safeEnqueue({
               type: 'progress',
               current: processedCount,
               total: totalInspections,
@@ -577,6 +403,7 @@ export async function POST(request: NextRequest) {
           }
 
           const mergedPdfBytes = await mergedPdf.save();
+          throwIfAborted(control.signal);
           const suffix = chunks.length > 1 ? `_Part${chunkIndex + 1}` : '';
           const file = {
             name: `All_Daily_Checks_${dateFrom}_to_${dateTo}${suffix}.pdf`,
@@ -599,6 +426,7 @@ export async function POST(request: NextRequest) {
           };
         } else {
           const zipBuffer = await zip!.generateAsync({ type: 'nodebuffer' });
+          throwIfAborted(control.signal);
           completePayload = {
             type: 'complete',
             data: zipBuffer.toString('base64'),
@@ -607,15 +435,19 @@ export async function POST(request: NextRequest) {
           };
         }
 
-        enqueueJson(controller, completePayload);
-        controller.close();
+        safeEnqueue(completePayload);
+        safeClose();
       } catch (error) {
+        if (control.closed || control.signal.aborted || isAbortError(error)) {
+          safeClose();
+          return;
+        }
         console.error('Streaming PDF generation error:', error);
-        enqueueJson(controller, {
+        safeEnqueue({
           error: 'Failed to generate PDFs',
           details: error instanceof Error ? error.message : 'Unknown error',
         });
-        controller.close();
+        safeClose();
 
         await logServerError({
           error: error as Error,
@@ -626,6 +458,11 @@ export async function POST(request: NextRequest) {
           },
         });
       }
+    },
+    cancel() {
+      request.signal.removeEventListener('abort', abortGeneration);
+      control.closed = true;
+      generationAbort.abort();
     },
   });
 
