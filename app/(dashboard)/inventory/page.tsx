@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AppPageHeader, AppPageShell } from '@/components/layout/AppPageShell';
@@ -20,6 +20,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import {
+  fetchRetiredInventoryCount,
+  fetchRetiredInventoryRows,
+  invalidateRetiredInventoryLoads,
+  isCurrentRetiredInventoryRead,
+  retiredInventoryLoadEpoch,
+  retiredInventoryScopeKey,
+  type RetiredInventoryReadScope,
+  type RetiredInventoryScope,
+} from '@/lib/client/inventory-retired-loader';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { AlertTriangle, Archive, Boxes, CheckCircle2, MapPin, PackageSearch, Plus, Settings, ShieldCheck, Truck, Users } from 'lucide-react';
 import { toast } from 'sonner';
@@ -148,6 +158,19 @@ function getInventoryOverviewTab(requestedOverview: string | null): InventoryOve
   return requestedOverview ? tabByOverview[requestedOverview] || 'small_tools' : 'small_tools';
 }
 
+function isManagementRetiredView(input: {
+  roleViewMode: InventoryRoleViewMode;
+  pageTab: 'overview' | 'locations' | 'settings';
+  overviewTab: InventoryOverviewTab;
+  searchParams: { get(name: string): string | null };
+}): boolean {
+  if (input.roleViewMode !== 'management') return false;
+  if (input.pageTab === 'overview' && input.overviewTab === 'retired') return true;
+  const requestedTab = input.searchParams.get('tab');
+  const onOverview = !requestedTab || requestedTab === 'overview';
+  return onOverview && input.searchParams.get('overview') === 'retired';
+}
+
 function prefersEnrichedInventoryLocation(
   candidate: InventoryLocation,
   existing: InventoryLocation | undefined,
@@ -188,6 +211,10 @@ export default function InventoryPage() {
 
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [retiredItems, setRetiredItems] = useState<InventoryItem[]>([]);
+  const [retiredCount, setRetiredCount] = useState<number | null>(null);
+  const [retiredRowsLoaded, setRetiredRowsLoaded] = useState(false);
+  const [retiredRowsLoading, setRetiredRowsLoading] = useState(false);
+  const [retiredRowsError, setRetiredRowsError] = useState<string | null>(null);
   const [fleetAssets, setFleetAssets] = useState<FleetAssetOption[]>([]);
   const [inventoryContext, setInventoryContext] = useState<InventoryContext | null>(null);
   const [siteAssignmentUsers, setSiteAssignmentUsers] = useState<InventorySiteAssignmentUser[]>([]);
@@ -221,6 +248,17 @@ export default function InventoryPage() {
   });
   const [roleViewMode, setRoleViewMode] = useState<InventoryRoleViewMode>(getStoredInventoryRoleViewMode);
   const [mobileViewToggleSlot, setMobileViewToggleSlot] = useState<HTMLElement | null>(null);
+  const bundleGenerationRef = useRef(0);
+  const retiredScopeRef = useRef<RetiredInventoryScope | null>(null);
+  const retiredRowsLoadedRef = useRef(false);
+  const roleViewModeRef = useRef(roleViewMode);
+  const pageTabRef = useRef(pageTab);
+  const overviewTabRef = useRef(overviewTab);
+  const searchParamsRef = useRef(searchParams);
+  roleViewModeRef.current = roleViewMode;
+  pageTabRef.current = pageTab;
+  overviewTabRef.current = overviewTab;
+  searchParamsRef.current = searchParams;
 
   const handleRoleViewModeChange = useCallback((nextViewMode: InventoryRoleViewMode) => {
     setRoleViewMode(nextViewMode);
@@ -237,18 +275,48 @@ export default function InventoryPage() {
   }, [pathname]);
 
   const fetchInventoryData = useCallback(async () => {
+    const generation = ++bundleGenerationRef.current;
+    invalidateRetiredInventoryLoads();
     try {
       const contextResponse = await fetch('/api/inventory/context', { cache: 'no-store' });
       const contextPayload = await contextResponse.json();
       if (!contextResponse.ok) {
         throw new Error(contextPayload.error || 'Failed to fetch inventory context');
       }
+      if (generation !== bundleGenerationRef.current) return;
 
       const isManagerOrAdmin = contextPayload.is_manager_or_admin === true;
       const canManageSiteLocations = contextPayload.can_manage_site_locations === true;
+      const userId = typeof contextPayload.user_id === 'string' ? contextPayload.user_id : '';
+      const canViewRetired = isManagerOrAdmin && userId.length > 0;
+      const nextScope: RetiredInventoryScope = {
+        userId: userId || 'denied',
+        canViewRetired,
+      };
+      const previousScope = retiredScopeRef.current;
+      const scopeChanged = !previousScope
+        || retiredInventoryScopeKey(previousScope) !== retiredInventoryScopeKey(nextScope);
+      retiredScopeRef.current = nextScope;
+      if (scopeChanged) {
+        retiredRowsLoadedRef.current = false;
+        setRetiredItems([]);
+        setRetiredRowsLoaded(false);
+        setRetiredCount(canViewRetired ? null : 0);
+        setRetiredRowsError(null);
+        setRetiredRowsLoading(false);
+      }
+
+      const shouldRefreshRows = canViewRetired && (
+        retiredRowsLoadedRef.current || isManagementRetiredView({
+          roleViewMode: roleViewModeRef.current,
+          pageTab: pageTabRef.current,
+          overviewTab: overviewTabRef.current,
+          searchParams: searchParamsRef.current,
+        })
+      );
       const [
         { items: inventoryItems },
-        { items: retiredInventoryItems },
+        retiredCountRead,
         fleetAssetsResponse,
         categoriesResponse,
         hardwareResponse,
@@ -259,18 +327,24 @@ export default function InventoryPage() {
           limit: 500,
           errorMessage: 'Failed to fetch inventory items',
         }),
-        isManagerOrAdmin
-          ? fetchAllPaginatedItems<InventoryItem>('/api/inventory?status=retired', 'inventory', {
-            limit: 500,
-            errorMessage: 'Failed to fetch retired inventory items',
-          })
-          : Promise.resolve({ items: [] as InventoryItem[], firstPagePayload: null }),
+        canViewRetired ? fetchRetiredInventoryCount(nextScope) : Promise.resolve(null),
         fetch('/api/inventory/fleet-assets', { cache: 'no-store' }),
         fetch('/api/inventory/categories', { cache: 'no-store' }),
         fetch('/api/inventory/hardware', { cache: 'no-store' }),
         isManagerOrAdmin ? fetch('/api/inventory/groups', { cache: 'no-store' }) : Promise.resolve(null),
         canManageSiteLocations ? fetch('/api/inventory/site-assignments', { cache: 'no-store' }) : Promise.resolve(null),
       ]);
+      const retiredRowsRead = shouldRefreshRows
+        ? await fetchRetiredInventoryRows<InventoryItem>(nextScope)
+        : null;
+      if (generation !== bundleGenerationRef.current) return;
+      const currentScopeKey = retiredScopeRef.current
+        ? retiredInventoryScopeKey(retiredScopeRef.current)
+        : null;
+      const readIsCurrent = (read: RetiredInventoryReadScope | null) => (
+        read === null || isCurrentRetiredInventoryRead(read, retiredInventoryLoadEpoch(), currentScopeKey)
+      );
+      if (!readIsCurrent(retiredCountRead) || !readIsCurrent(retiredRowsRead)) return;
 
       const fleetAssetsPayload = await fleetAssetsResponse.json();
       if (!fleetAssetsResponse.ok) {
@@ -301,7 +375,27 @@ export default function InventoryPage() {
 
       setInventoryContext(contextPayload);
       setItems(inventoryItems);
-      setRetiredItems(retiredInventoryItems);
+      if (retiredRowsRead) {
+        retiredRowsLoadedRef.current = true;
+        setRetiredItems(retiredRowsRead.items);
+        setRetiredRowsLoaded(true);
+        setRetiredCount(retiredRowsRead.items.length);
+        setRetiredRowsError(null);
+        setRetiredRowsLoading(false);
+      } else if (!retiredRowsLoadedRef.current && retiredCountRead) {
+        setRetiredItems([]);
+        setRetiredRowsLoaded(false);
+        setRetiredCount(retiredCountRead.count);
+        setRetiredRowsError(null);
+      } else if (retiredCountRead) {
+        setRetiredCount(retiredCountRead.count);
+      } else {
+        retiredRowsLoadedRef.current = false;
+        setRetiredItems([]);
+        setRetiredRowsLoaded(false);
+        setRetiredCount(0);
+        setRetiredRowsError(null);
+      }
       setFleetAssets(fleetAssetsPayload.assets || []);
       setCategories(categoriesPayload.categories || []);
       setHardwareItems(hardwarePayload.items || []);
@@ -312,6 +406,7 @@ export default function InventoryPage() {
       setSiteAssignments(siteAssignmentsPayload.assignments || []);
       setInventoryLoadError(null);
     } catch (error) {
+      if (generation !== bundleGenerationRef.current) return;
       const message = error instanceof Error ? error.message : String(error);
       const normalizedMessage = message.toLowerCase();
       const isNetworkFailure =
@@ -335,11 +430,108 @@ export default function InventoryPage() {
       setInventoryLoadError(errorMessage);
       toast.error(errorMessage, { id: 'inventory-load-error' });
     } finally {
-      setLoading(false);
+      if (generation === bundleGenerationRef.current) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
+    const scope = retiredScopeRef.current;
+    const entered = Boolean(
+      scope?.canViewRetired
+      && inventoryContext?.is_manager_or_admin === true
+      && inventoryContext.user_id === scope.userId
+      && roleViewMode === 'management'
+      && pageTab === 'overview'
+      && overviewTab === 'retired'
+    );
+    if (!entered || !scope || retiredRowsLoadedRef.current) return;
+
+    let active = true;
+    const epochAtStart = retiredInventoryLoadEpoch();
+    const scopeKey = retiredInventoryScopeKey(scope);
+    setRetiredRowsLoading(true);
+    setRetiredRowsError(null);
+    void fetchRetiredInventoryRows<InventoryItem>(scope)
+      .then((read) => {
+        if (!active) return;
+        const currentScopeKey = retiredScopeRef.current
+          ? retiredInventoryScopeKey(retiredScopeRef.current)
+          : null;
+        if (!isCurrentRetiredInventoryRead(read, retiredInventoryLoadEpoch(), currentScopeKey)) return;
+        retiredRowsLoadedRef.current = true;
+        setRetiredItems(read.items);
+        setRetiredRowsLoaded(true);
+        setRetiredCount(read.items.length);
+        setRetiredRowsError(null);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        if (retiredInventoryLoadEpoch() !== epochAtStart) return;
+        const currentScopeKey = retiredScopeRef.current
+          ? retiredInventoryScopeKey(retiredScopeRef.current)
+          : null;
+        if (currentScopeKey !== scopeKey) return;
+        retiredRowsLoadedRef.current = false;
+        setRetiredRowsError(getInventoryLoadErrorMessage(error));
+      })
+      .finally(() => {
+        if (active) setRetiredRowsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [
+    inventoryContext?.is_manager_or_admin,
+    inventoryContext?.user_id,
+    overviewTab,
+    pageTab,
+    roleViewMode,
+  ]);
+
+  async function retryRetiredRows() {
+    const scope = retiredScopeRef.current;
+    if (!scope?.canViewRetired) return;
+    const epochAtStart = retiredInventoryLoadEpoch();
+    const scopeKey = retiredInventoryScopeKey(scope);
+    setRetiredRowsLoading(true);
+    setRetiredRowsError(null);
+    try {
+      const read = await fetchRetiredInventoryRows<InventoryItem>(scope);
+      const currentScopeKey = retiredScopeRef.current
+        ? retiredInventoryScopeKey(retiredScopeRef.current)
+        : null;
+      if (!isCurrentRetiredInventoryRead(read, retiredInventoryLoadEpoch(), currentScopeKey)) return;
+      retiredRowsLoadedRef.current = true;
+      setRetiredItems(read.items);
+      setRetiredRowsLoaded(true);
+      setRetiredCount(read.items.length);
+      setRetiredRowsError(null);
+    } catch (error) {
+      if (retiredInventoryLoadEpoch() !== epochAtStart) return;
+      const currentScopeKey = retiredScopeRef.current
+        ? retiredInventoryScopeKey(retiredScopeRef.current)
+        : null;
+      if (currentScopeKey !== scopeKey) return;
+      retiredRowsLoadedRef.current = false;
+      setRetiredRowsError(getInventoryLoadErrorMessage(error));
+    } finally {
+      setRetiredRowsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (permissionLoading || !canViewInventory) {
+      bundleGenerationRef.current += 1;
+      invalidateRetiredInventoryLoads();
+      retiredScopeRef.current = null;
+      retiredRowsLoadedRef.current = false;
+      setRetiredItems([]);
+      setRetiredRowsLoaded(false);
+      setRetiredCount(null);
+      setRetiredRowsError(null);
+      setRetiredRowsLoading(false);
+    }
     if (permissionLoading) return;
     if (!canViewInventory) {
       toast.error('Access denied', { id: 'inventory-access-denied' });
@@ -347,6 +539,11 @@ export default function InventoryPage() {
       return;
     }
     fetchInventoryData();
+    return () => {
+      bundleGenerationRef.current += 1;
+      retiredScopeRef.current = null;
+      invalidateRetiredInventoryLoads();
+    };
   }, [canViewInventory, fetchInventoryData, permissionLoading, router]);
 
   useEffect(() => {
@@ -1105,6 +1302,8 @@ export default function InventoryPage() {
     );
   }
 
+  const visibleRetiredCount = retiredRowsLoaded ? retiredItems.length : retiredCount;
+
   return (
     <>
       {mobileRoleViewToggle}
@@ -1303,7 +1502,9 @@ export default function InventoryPage() {
             <div className="mt-1 md:hidden">
               <InventoryMobileSecondaryNav
                 items={INVENTORY_OVERVIEW_SECONDARY_NAV_ITEMS.map((item) => (
-                  item.value === 'retired' ? { ...item, count: retiredItems.length } : item
+                  item.value === 'retired' && typeof visibleRetiredCount === 'number'
+                    ? { ...item, count: visibleRetiredCount }
+                    : item
                 ))}
                 value={overviewTab}
                 onValueChange={changeOverviewTab}
@@ -1326,7 +1527,7 @@ export default function InventoryPage() {
                 </TabsTrigger>
                 <TabsTrigger value="retired" className={INVENTORY_TAB_TRIGGER_CLASSNAME}>
                   <Archive className="h-4 w-4" />
-                  Retired Items ({retiredItems.length})
+                  Retired Items ({visibleRetiredCount ?? '…'})
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -1378,20 +1579,26 @@ export default function InventoryPage() {
             </TabsContent>
 
             <TabsContent value="retired" className="mt-4">
-              <InventoryTable
-                items={retiredItems}
-                selectedItemIds={new Set()}
-                onSelectedItemIdsChange={() => {}}
-                onMove={() => {}}
-                onRestore={handleRestoreItem}
-                onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview&overview=retired')}
-                locationFilterLocations={retiredLocations}
-                categoryLabels={categoryLabels}
-                tableLabel="retired inventory"
-                showMinorPlantDetails={retiredItems.some((item) => item.category === 'minor_plant')}
-                retiredMode
-                filterStorageKey="retired"
-              />
+              {retiredRowsLoaded ? (
+                <InventoryTable
+                  items={retiredItems}
+                  selectedItemIds={new Set()}
+                  onSelectedItemIdsChange={() => {}}
+                  onMove={() => {}}
+                  onRestore={handleRestoreItem}
+                  onOpenDetails={(item) => router.push('/inventory/items/' + item.id + '?fromTab=overview&overview=retired')}
+                  locationFilterLocations={retiredLocations}
+                  categoryLabels={categoryLabels}
+                  tableLabel="retired inventory"
+                  showMinorPlantDetails={retiredItems.some((item) => item.category === 'minor_plant')}
+                  retiredMode
+                  filterStorageKey="retired"
+                />
+              ) : retiredRowsError && !retiredRowsLoading ? (
+                <InventoryLoadErrorNotice message={retiredRowsError} onRetry={retryRetiredRows} />
+              ) : (
+                <PanelLoader message="Loading retired items..." accent="inventory" className="py-20" />
+              )}
             </TabsContent>
           </Tabs>
         </TabsContent>

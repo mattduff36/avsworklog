@@ -147,6 +147,21 @@ async function loadItemGroups(
   );
 }
 
+async function loadRetiredInventoryCount(
+  admin: ReturnType<typeof createAdminClient>,
+): Promise<number> {
+  const { count, error } = await admin
+    .from('inventory_items')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'retired');
+
+  if (error) throw error;
+  if (typeof count !== 'number') {
+    throw new Error('Retired inventory count was not returned');
+  }
+  return count;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const access = await requireInventoryAccess();
@@ -164,6 +179,11 @@ export async function GET(request: NextRequest) {
     }
 
     const admin = createAdminClient();
+    if (requestedStatus === 'retired' && searchParams.get('count') === 'exact') {
+      const count = await loadRetiredInventoryCount(admin);
+      return NextResponse.json({ count });
+    }
+
     const { data, error } = await admin
       .from('inventory_items')
       .select(`
