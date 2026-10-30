@@ -140,6 +140,9 @@ function PlantInspectionsContent() {
   const [inspectionToDelete, setInspectionToDelete] = useState<{ id: string; plantId: string; date: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [displayCount, setDisplayCount] = useState(pageSize);
+  const [hasMore, setHasMore] = useState(false);
+  const [remainingCount, setRemainingCount] = useState<number | null>(null);
+  const fetchGenerationRef = useRef(0);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('plant-inspections-view-mode') as 'cards' | 'table') || 'cards';
@@ -233,13 +236,15 @@ function PlantInspectionsContent() {
   }, [authLoading, user, canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase]);
 
   const fetchInspections = useCallback(async () => {
+    const generation = ++fetchGenerationRef.current;
     if (!user || authLoading || permissionLoading || !canAccessInspectionModule) return;
     setLoading(true);
 
     try {
-      let query = supabase
-        .from('plant_inspections')
-        .select(`
+      const buildQuery = () => {
+        let query = supabase
+          .from('plant_inspections')
+          .select(`
           id,
           plant_id,
           user_id,
@@ -254,48 +259,64 @@ function PlantInspectionsContent() {
           hired_plant_hiring_company,
           job_code,
           job_site_address
-        `)
-        .order('inspection_date', { ascending: false });
+        `, { count: 'exact' })
+          .order('inspection_date', { ascending: false })
+          .order('id', { ascending: false });
 
-      // Filter based on user role and selection
-      if (!canViewCrossUserInspections) {
-        query = query.eq('user_id', user.id);
-      } else {
-        const employeeFilter = normalizedEmployeeFilter || 'all';
-        if (employeeFilter !== 'all') {
-          if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
-            query = query.eq('user_id', user.id);
-          } else {
-            query = query.eq('user_id', employeeFilter);
+        // Filter based on user role and selection
+        if (!canViewCrossUserInspections) {
+          query = query.eq('user_id', user.id);
+        } else {
+          const employeeFilter = normalizedEmployeeFilter || 'all';
+          if (employeeFilter !== 'all') {
+            if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
+              query = query.eq('user_id', user.id);
+            } else {
+              query = query.eq('user_id', employeeFilter);
+            }
+          } else if (hasTeamInspectionVisibility) {
+            query = query.in('user_id', scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]);
           }
-        } else if (hasTeamInspectionVisibility) {
-          query = query.in('user_id', scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]);
         }
+
+        // Apply plant filter
+        const currentPlantFilter = normalizedPlantFilter || 'all';
+        if (currentPlantFilter === 'hired') {
+          query = query.eq('is_hired_plant', true);
+        } else if (currentPlantFilter !== 'all') {
+          query = query.eq('plant_id', currentPlantFilter);
+        }
+
+        const currentStatusFilter = statusFilter || 'all';
+        if (currentStatusFilter !== 'all') {
+          query = query.eq('status', currentStatusFilter as 'draft' | 'submitted');
+        }
+
+        return query;
+      };
+
+      // Growing UI windows can exceed PostgREST's response cap. Continue from
+      // the actual number received, preserving all filters and the sentinel.
+      const data: Array<Omit<InspectionWithPlant, 'plant' | 'profile'>> = [];
+      let count: number | null = null;
+      while (data.length <= displayCount) {
+        const result = await buildQuery().range(data.length, Math.min(displayCount, data.length + 499));
+        if (generation !== fetchGenerationRef.current) return;
+        if (result.error) throw result.error;
+        if (data.length === 0) count = result.count;
+        const batch = (result.data || []) as Array<Omit<InspectionWithPlant, 'plant' | 'profile'>>;
+        if (batch.length === 0) break;
+        data.push(...batch);
+        if (count !== null && data.length >= count) break;
       }
-
-      // Apply plant filter
-      const currentPlantFilter = normalizedPlantFilter || 'all';
-      if (currentPlantFilter === 'hired') {
-        query = query.eq('is_hired_plant', true);
-      } else if (currentPlantFilter !== 'all') {
-        query = query.eq('plant_id', currentPlantFilter);
-      }
-
-      const currentStatusFilter = statusFilter || 'all';
-      if (currentStatusFilter !== 'all') {
-        query = query.eq('status', currentStatusFilter as 'draft' | 'submitted');
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      const rows = ((data || []) as Array<Omit<InspectionWithPlant, 'plant' | 'profile'>>).map((row) => ({
+      const rows = data.map((row) => ({
         ...row,
         plant: null,
         profile: null,
       }));
-      const validPlantIds = Array.from(new Set(rows.map((row) => row.plant_id).filter(isUuid)));
-      const validUserIds = Array.from(new Set(rows.map((row) => row.user_id).filter(isUuid)));
+      const visibleRows = rows.slice(0, displayCount);
+      const validPlantIds = Array.from(new Set(visibleRows.map((row) => row.plant_id).filter(isUuid)));
+      const validUserIds = Array.from(new Set(visibleRows.map((row) => row.user_id).filter(isUuid)));
       let plantMap = new Map<string, {
         plant_id: string;
         nickname: string | null;
@@ -362,7 +383,7 @@ function PlantInspectionsContent() {
         }
       }
 
-      const inspectionIds = rows.map((row) => row.id).filter((id): id is string => Boolean(id));
+      const inspectionIds = visibleRows.map((row) => row.id).filter((id): id is string => Boolean(id));
       let defectInspectionIds = new Set<string>();
       let workshopTaskInspectionIds = new Set<string>();
 
@@ -400,16 +421,20 @@ function PlantInspectionsContent() {
         }
       }
 
-      setInspections(
-        rows.map((row) => ({
-          ...row,
-          plant: row.plant_id && isUuid(row.plant_id) ? plantMap.get(row.plant_id) ?? null : null,
-          profile: profileMap.get(row.user_id) ?? null,
-          has_reported_defect: defectInspectionIds.has(row.id),
-          has_inform_workshop_task: workshopTaskInspectionIds.has(row.id),
-        }))
-      );
+      if (generation !== fetchGenerationRef.current) return;
+      const enriched = visibleRows.map((row) => ({
+        ...row,
+        plant: row.plant_id && isUuid(row.plant_id) ? plantMap.get(row.plant_id) ?? null : null,
+        profile: profileMap.get(row.user_id) ?? null,
+        has_reported_defect: defectInspectionIds.has(row.id),
+        has_inform_workshop_task: workshopTaskInspectionIds.has(row.id),
+      }));
+      const exactCount = typeof count === 'number' ? count : null;
+      setInspections(enriched);
+      setRemainingCount(exactCount === null ? null : Math.max(0, exactCount - enriched.length));
+      setHasMore(exactCount === null ? rows.length > displayCount : exactCount > enriched.length);
     } catch (error) {
+      if (generation !== fetchGenerationRef.current) return;
       const errorContextId = 'plant-inspections-fetch-list-error';
       const isNetworkFailure = isNetworkFetchError(error);
       const isAuthFailure = isAuthErrorStatus(getErrorStatus(error));
@@ -433,7 +458,9 @@ function PlantInspectionsContent() {
         }
       }
     } finally {
-      setLoading(false);
+      if (generation === fetchGenerationRef.current) {
+        setLoading(false);
+      }
     }
   }, [
     user,
@@ -448,11 +475,20 @@ function PlantInspectionsContent() {
     normalizedPlantFilter,
     statusFilter,
     supabase,
+    displayCount,
   ]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
-  }, [pageSize, normalizedEmployeeFilter, statusFilter, normalizedPlantFilter]);
+  }, [
+    pageSize,
+    normalizedEmployeeFilter,
+    statusFilter,
+    normalizedPlantFilter,
+    scopedEmployeeIds,
+    hasOrgWideInspectionVisibility,
+    hasTeamInspectionVisibility,
+  ]);
 
   useEffect(() => {
     try {
@@ -467,7 +503,10 @@ function PlantInspectionsContent() {
   }, []);
 
   useEffect(() => {
-    fetchInspections();
+    void fetchInspections();
+    return () => {
+      fetchGenerationRef.current += 1;
+    };
   }, [fetchInspections]);
 
   // Listen for realtime updates to inspections
@@ -887,15 +926,14 @@ function PlantInspectionsContent() {
             })}
           </div>
 
-          {/* Show More Button */}
-          {inspections.length > displayCount && (
+          {hasMore && (
             <div className="flex justify-center pt-4">
               <Button
                 onClick={() => setDisplayCount((prev) => prev + pageSize)}
                 variant="outline"
                 className={`w-full max-w-xs border-border text-white hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}
               >
-                Show More ({inspections.length - displayCount} remaining)
+                {remainingCount === null ? 'Show More' : `Show More (${remainingCount} remaining)`}
               </Button>
             </div>
           )}
