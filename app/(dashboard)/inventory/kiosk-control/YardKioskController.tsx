@@ -85,35 +85,59 @@ export function YardKioskController() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const holdsControlRef = useRef(false);
+  const statusRequestRef = useRef<{ controller: AbortController; promise: Promise<void> } | null>(null);
+  const mountedRef = useRef(false);
   const activeDeviceId = device?.id ?? null;
 
-  const loadState = useCallback(async (quiet = false) => {
+  const loadState = useCallback(async (quiet = false, fresh = false) => {
+    if (statusRequestRef.current && !fresh) return statusRequestRef.current.promise;
+    statusRequestRef.current?.controller.abort();
+    const controller = new AbortController();
     if (!quiet) setLoading(true);
-    try {
-      const response = await fetch('/api/inventory/kiosk/control', {
-        cache: 'no-store',
-      });
-      const payload = await response.json() as KioskControlResponse;
-      if (!response.ok) {
-        throw new Error(payload.error || 'Unable to load Yard kiosk control');
+    const promise = (async () => {
+      try {
+        const response = await fetch('/api/inventory/kiosk/control', {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const payload = await response.json() as KioskControlResponse;
+        if (controller.signal.aborted || !mountedRef.current) return;
+        if (!response.ok) {
+          throw new Error(payload.error || 'Unable to load Yard kiosk control');
+        }
+        setDevice(payload.device);
+        setError('');
+      } catch (loadError) {
+        if (controller.signal.aborted || !mountedRef.current) return;
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : 'Unable to load Yard kiosk control',
+        );
+      } finally {
+        if (!controller.signal.aborted && mountedRef.current) setLoading(false);
+        if (statusRequestRef.current?.controller === controller) statusRequestRef.current = null;
       }
-      setDevice(payload.device);
-      setError('');
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : 'Unable to load Yard kiosk control',
-      );
-    } finally {
-      if (!quiet) setLoading(false);
-    }
+    })();
+    statusRequestRef.current = { controller, promise };
+    return promise;
   }, []);
 
   useEffect(() => {
-    void loadState();
-    const interval = window.setInterval(() => void loadState(true), 1_000);
-    return () => window.clearInterval(interval);
+    mountedRef.current = true;
+    const poll = () => {
+      if (document.visibilityState !== 'hidden') void loadState(true);
+    };
+    if (document.visibilityState !== 'hidden') void loadState();
+    const interval = window.setInterval(poll, 1_000);
+    document.addEventListener('visibilitychange', poll);
+    return () => {
+      mountedRef.current = false;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', poll);
+      statusRequestRef.current?.controller.abort();
+      statusRequestRef.current = null;
+    };
   }, [loadState]);
 
   const leaseIsActive = Boolean(
@@ -148,7 +172,7 @@ export function YardKioskController() {
       if (!response.ok) {
         throw new Error(payload.error || `Unable to ${operation} Yard kiosk control`);
       }
-      await loadState(true);
+      await loadState(true, true);
       setError('');
       return true;
     } catch (operationError) {
@@ -157,7 +181,7 @@ export function YardKioskController() {
           ? operationError.message
           : 'Unable to update Yard kiosk control',
       );
-      await loadState(true);
+      await loadState(true, true);
       return false;
     } finally {
       if (!quiet) setSaving(false);
