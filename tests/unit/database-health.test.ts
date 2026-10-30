@@ -117,6 +117,59 @@ describe('database health client monitor', () => {
     vi.resetModules();
   });
 
+  it('reuses only recent verified database success for healthy routes, preserving explicit checks', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { markDatabaseBackedSuccess, runDatabaseHealthProbe } = await import('@/lib/database/client-health');
+    markDatabaseBackedSuccess();
+    await runDatabaseHealthProbe('route');
+    await runDatabaseHealthProbe('route');
+    expect(fetchMock).not.toHaveBeenCalled();
+    await runDatabaseHealthProbe('nudge');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(60_001);
+    await runDatabaseHealthProbe('route');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('deduplicates navigation during a probe and does not treat generic HTTP success as DB proof', async () => {
+    let resolve!: (response: Response) => void;
+    const fetchMock = vi.fn(() => new Promise<Response>((done) => { resolve = done; }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { runDatabaseHealthProbe } = await import('@/lib/database/client-health');
+    const pending = runDatabaseHealthProbe('route');
+    const second = runDatabaseHealthProbe('route');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    resolve(jsonResponse(200, { ok: false }));
+    await Promise.all([pending, second]);
+    const third = runDatabaseHealthProbe('route');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    resolve(jsonResponse(200, { ok: true }));
+    await third;
+  });
+
+  it('keeps route recovery probes after confirmed failure and pauses offline or hidden routes', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(503, { reason: 'database_unreachable' }))
+      .mockResolvedValue(jsonResponse(200, { ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { markDatabaseBackedSuccess, runDatabaseHealthProbe, getDatabaseHealthState } = await import('@/lib/database/client-health');
+    markDatabaseBackedSuccess();
+    await runDatabaseHealthProbe('nudge');
+    expect(getDatabaseHealthState().status).toBe('suspect');
+    await runDatabaseHealthProbe('route');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    setOnline(false);
+    await runDatabaseHealthProbe('route');
+    setOnline(true);
+    setVisibilityState('hidden');
+    await runDatabaseHealthProbe('route');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    setVisibilityState('visible');
+    await runDatabaseHealthProbe('visibility');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it('pauses hidden tabs and ignores client-side network failures', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

@@ -513,7 +513,7 @@ export async function runDatabaseHealthProbe(reason: DatabaseHealthProbeReason =
   }
 
   if (
-    reason === 'timer' &&
+    (reason === 'timer' || reason === 'route') &&
     state.status === 'healthy' &&
     hasRecentDbBackedSuccess(currentTime)
   ) {
