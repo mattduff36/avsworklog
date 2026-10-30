@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertTriangle, Archive, Download, Edit, GraduationCap, Loader2, Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
@@ -21,7 +21,23 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LoadMorePagination } from '@/components/ui/load-more-pagination';
-import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import {
+  TRAINING_COLLECTIONS,
+  TRAINING_TAB_COLLECTIONS,
+  clearTrainingLoads,
+  fetchTrainingCollection,
+  invalidateTrainingCollections,
+  isCurrentTrainingRead,
+  parseTrainingTab,
+  splitTrainingRefresh,
+  trainingCollectionEpoch,
+  trainingScopeKey,
+  type TrainingCollection,
+  type TrainingLoadScope,
+  type TrainingMutation,
+  type TrainingTab,
+} from '@/lib/client/training-data-loader';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { useLoadMorePagination } from '@/lib/hooks/useLoadMorePagination';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import {
@@ -39,8 +55,14 @@ import { TrainingRecordDialog } from './components/TrainingRecordDialog';
 import { TrainingPersonDialog } from './components/TrainingPersonDialog';
 import { TrainingQualificationDialog } from './components/TrainingQualificationDialog';
 
-type TrainingTab = 'overview' | 'records' | 'people' | 'qualifications' | 'notes';
 type RecordFilter = 'all' | 'expired' | 'expiring' | 'no_expiry' | 'needs_nvq' | 'awaiting_card' | 'training_booked' | 'manual_review' | 'subcontractors' | 'unlinked' | 'archived';
+type LoadStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+interface CollectionSlot<TData> {
+  status: LoadStatus;
+  data: TData | null;
+  error: string | null;
+}
 
 interface TrainingPersonWithProfile extends TrainingPerson {
   profile?: {
@@ -50,13 +72,129 @@ interface TrainingPersonWithProfile extends TrainingPerson {
   } | null;
 }
 
-interface TrainingDataState {
-  summary: TrainingSummary | null;
-  records: TrainingRecordWithRelations[];
-  people: TrainingPersonWithProfile[];
-  qualifications: TrainingQualification[];
-  notes: TrainingWorkbookNote[];
+interface TrainingCollectionsState {
+  summary: CollectionSlot<TrainingSummary>;
+  records: CollectionSlot<TrainingRecordWithRelations[]>;
+  people: CollectionSlot<TrainingPersonWithProfile[]>;
+  qualifications: CollectionSlot<TrainingQualification[]>;
+  notes: CollectionSlot<TrainingWorkbookNote[]>;
 }
+
+type TrainingCollectionsAction =
+  | { type: 'reset' }
+  | { type: 'loading'; collections: readonly TrainingCollection[] }
+  | { type: 'clear'; collections: readonly TrainingCollection[] }
+  | { type: 'summary-ready'; data: TrainingSummary }
+  | { type: 'records-ready'; data: TrainingRecordWithRelations[] }
+  | { type: 'people-ready'; data: TrainingPersonWithProfile[] }
+  | { type: 'qualifications-ready'; data: TrainingQualification[] }
+  | { type: 'notes-ready'; data: TrainingWorkbookNote[] }
+  | { type: 'error'; collection: TrainingCollection; message: string };
+
+function idleSlot<TData>(): CollectionSlot<TData> {
+  return { status: 'idle', data: null, error: null };
+}
+
+function markCollectionLoading(state: TrainingCollectionsState, collection: TrainingCollection): TrainingCollectionsState {
+  switch (collection) {
+    case 'summary':
+      return { ...state, summary: { status: 'loading', data: state.summary.data, error: null } };
+    case 'records':
+      return { ...state, records: { status: 'loading', data: state.records.data, error: null } };
+    case 'people':
+      return { ...state, people: { status: 'loading', data: state.people.data, error: null } };
+    case 'qualifications':
+      return { ...state, qualifications: { status: 'loading', data: state.qualifications.data, error: null } };
+    case 'notes':
+      return { ...state, notes: { status: 'loading', data: state.notes.data, error: null } };
+    default:
+      return state;
+  }
+}
+
+function clearCollection(state: TrainingCollectionsState, collection: TrainingCollection): TrainingCollectionsState {
+  switch (collection) {
+    case 'summary':
+      return { ...state, summary: idleSlot() };
+    case 'records':
+      return { ...state, records: idleSlot() };
+    case 'people':
+      return { ...state, people: idleSlot() };
+    case 'qualifications':
+      return { ...state, qualifications: idleSlot() };
+    case 'notes':
+      return { ...state, notes: idleSlot() };
+    default:
+      return state;
+  }
+}
+
+function markCollectionError(
+  state: TrainingCollectionsState,
+  collection: TrainingCollection,
+  message: string,
+): TrainingCollectionsState {
+  switch (collection) {
+    case 'summary':
+      return { ...state, summary: { status: 'error', data: state.summary.data, error: message } };
+    case 'records':
+      return { ...state, records: { status: 'error', data: state.records.data, error: message } };
+    case 'people':
+      return { ...state, people: { status: 'error', data: state.people.data, error: message } };
+    case 'qualifications':
+      return { ...state, qualifications: { status: 'error', data: state.qualifications.data, error: message } };
+    case 'notes':
+      return { ...state, notes: { status: 'error', data: state.notes.data, error: message } };
+    default:
+      return state;
+  }
+}
+
+function idleCollections(): TrainingCollectionsState {
+  return {
+    summary: idleSlot(),
+    records: idleSlot(),
+    people: idleSlot(),
+    qualifications: idleSlot(),
+    notes: idleSlot(),
+  };
+}
+
+function trainingCollectionsReducer(
+  state: TrainingCollectionsState,
+  action: TrainingCollectionsAction,
+): TrainingCollectionsState {
+  switch (action.type) {
+    case 'reset':
+      return idleCollections();
+    case 'loading':
+      return action.collections.reduce((next, collection) => markCollectionLoading(next, collection), state);
+    case 'clear':
+      return action.collections.reduce((next, collection) => clearCollection(next, collection), state);
+    case 'summary-ready':
+      return { ...state, summary: { status: 'ready', data: action.data, error: null } };
+    case 'records-ready':
+      return { ...state, records: { status: 'ready', data: action.data, error: null } };
+    case 'people-ready':
+      return { ...state, people: { status: 'ready', data: action.data, error: null } };
+    case 'qualifications-ready':
+      return { ...state, qualifications: { status: 'ready', data: action.data, error: null } };
+    case 'notes-ready':
+      return { ...state, notes: { status: 'ready', data: action.data, error: null } };
+    case 'error':
+      return markCollectionError(state, action.collection, action.message);
+    default:
+      return state;
+  }
+}
+
+const COLLECTION_LOADING_MESSAGE: Record<TrainingCollection, string> = {
+  summary: 'Loading training summary...',
+  records: 'Loading training records...',
+  people: 'Loading training people...',
+  qualifications: 'Loading qualifications...',
+  notes: 'Loading workbook notes...',
+};
 
 const RECORD_FILTERS: Array<{ value: RecordFilter; label: string }> = [
   { value: 'all', label: 'All Active' },
@@ -155,18 +293,32 @@ function TrainingDevelopmentBanner() {
   );
 }
 
+function CollectionFallback({
+  collection,
+  error,
+  onRetry,
+}: {
+  collection: TrainingCollection;
+  error: string | null;
+  onRetry: () => void;
+}) {
+  if (error) {
+    return (
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <Button type="button" variant="outline" onClick={onRetry}>Retry</Button>
+      </div>
+    );
+  }
+  return <PanelLoader message={COLLECTION_LOADING_MESSAGE[collection]} accent="brand" className="py-12" />;
+}
+
 function TrainingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user, isViewingAs, effectiveRole, loading: authLoading } = useAuth();
   const { hasPermission, loading: permissionLoading } = usePermissionCheck('training', false);
-  const [data, setData] = useState<TrainingDataState>({
-    summary: null,
-    records: [],
-    people: [],
-    qualifications: [],
-    notes: [],
-  });
-  const [loading, setLoading] = useState(true);
+  const [collections, dispatch] = useReducer(trainingCollectionsReducer, undefined, idleCollections);
   const [refreshing, setRefreshing] = useState(false);
   const [recordSearch, setRecordSearch] = useState('');
   const [recordFilter, setRecordFilter] = useState<RecordFilter>('all');
@@ -181,54 +333,155 @@ function TrainingContent() {
   const [editingQualification, setEditingQualification] = useState<TrainingQualification | null>(null);
   const [archivingRecordId, setArchivingRecordId] = useState<string | null>(null);
 
-  const activeTab = (['overview', 'records', 'people', 'qualifications', 'notes'].includes(searchParams.get('tab') || '')
-    ? searchParams.get('tab')
-    : 'overview') as TrainingTab;
-
-  const loadTrainingData = useCallback(async (showRefreshing = false) => {
-    if (showRefreshing) setRefreshing(true);
-    try {
-      const [summaryResponse, recordsResult, peopleResult, qualificationResult, notesResult] = await Promise.all([
-        fetch('/api/training/summary', { cache: 'no-store' }),
-        fetchAllPaginatedItems<TrainingRecordWithRelations>('/api/training/records', 'records', { limit: 500, errorMessage: 'Failed to fetch training records' }),
-        fetchAllPaginatedItems<TrainingPersonWithProfile>('/api/training/people', 'people', { limit: 500, errorMessage: 'Failed to fetch training people' }),
-        fetchAllPaginatedItems<TrainingQualification>('/api/training/qualifications', 'qualifications', { limit: 500, errorMessage: 'Failed to fetch training qualifications' }),
-        fetchAllPaginatedItems<TrainingWorkbookNote>('/api/training/notes', 'notes', { limit: 500, errorMessage: 'Failed to fetch training notes' }),
-      ]);
-
-      const summaryPayload = await parseJsonResponse(summaryResponse, 'Failed to fetch training summary') as { summary: TrainingSummary };
-      setData({
-        summary: summaryPayload.summary,
-        records: recordsResult.items,
-        people: peopleResult.items,
-        qualifications: qualificationResult.items,
-        notes: notesResult.items,
-      });
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to load training data');
-    } finally {
-      setLoading(false);
+  const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<TrainingTab>(() => parseTrainingTab(tabParam));
+  const viewAsKey = isViewingAs
+    ? `view:${effectiveRole?.name ?? ''}:${effectiveRole?.team_id ?? ''}`
+    : 'self';
+  const derivedScope: TrainingLoadScope | null = (!authLoading && !permissionLoading && hasPermission && user?.id)
+    ? { userId: user.id, allowed: true, viewAsKey }
+    : null;
+  const derivedKey = derivedScope ? trainingScopeKey(derivedScope) : null;
+  const scopeRef = useRef<TrainingLoadScope | null>(derivedScope);
+  const derivedScopeRef = useRef(derivedScope);
+  const loadedRef = useRef(new Set<TrainingCollection>());
+  const generationRef = useRef(0);
+  const activeTabRef = useRef(activeTab);
+  const previousKeyRef = useRef<string | null | undefined>(undefined);
+  derivedScopeRef.current = derivedScope;
+  activeTabRef.current = activeTab;
+  scopeRef.current = derivedScope;
+  if (previousKeyRef.current !== derivedKey) {
+    const previousKey = previousKeyRef.current;
+    previousKeyRef.current = derivedKey;
+    if (previousKey !== undefined) {
+      generationRef.current += 1;
+      clearTrainingLoads();
+      loadedRef.current.clear();
       setRefreshing(false);
+      dispatch({ type: 'reset' });
     }
+  }
+
+  const loadCollections = useCallback(async (
+    requested: readonly TrainingCollection[],
+    showRefreshing = false,
+  ) => {
+    const scope = scopeRef.current;
+    if (!scope?.allowed || requested.length === 0) return;
+    const generation = generationRef.current;
+    const epochsAtStart = Object.fromEntries(
+      requested.map((collection) => [collection, trainingCollectionEpoch(collection)]),
+    ) as Record<TrainingCollection, number>;
+    if (showRefreshing) setRefreshing(true);
+    dispatch({ type: 'loading', collections: requested });
+    const results = await Promise.all(requested.map(async (collection) => {
+      try {
+        if (collection === 'summary') {
+          const read = await fetchTrainingCollection<TrainingSummary>(scope, collection);
+          return { ok: true as const, collection, epoch: read.epoch, scopeKey: read.scopeKey, data: read.data };
+        }
+        if (collection === 'records') {
+          const read = await fetchTrainingCollection<TrainingRecordWithRelations[]>(scope, collection);
+          return { ok: true as const, collection, epoch: read.epoch, scopeKey: read.scopeKey, data: read.data };
+        }
+        if (collection === 'people') {
+          const read = await fetchTrainingCollection<TrainingPersonWithProfile[]>(scope, collection);
+          return { ok: true as const, collection, epoch: read.epoch, scopeKey: read.scopeKey, data: read.data };
+        }
+        if (collection === 'qualifications') {
+          const read = await fetchTrainingCollection<TrainingQualification[]>(scope, collection);
+          return { ok: true as const, collection, epoch: read.epoch, scopeKey: read.scopeKey, data: read.data };
+        }
+        const read = await fetchTrainingCollection<TrainingWorkbookNote[]>(scope, 'notes');
+        return { ok: true as const, collection: 'notes' as const, epoch: read.epoch, scopeKey: read.scopeKey, data: read.data };
+      } catch (error) {
+        return { ok: false as const, collection, error };
+      }
+    }));
+    if (generation !== generationRef.current) return;
+    const currentScopeKey = scopeRef.current ? trainingScopeKey(scopeRef.current) : null;
+    let toastMessage: string | null = null;
+    for (const result of results) {
+      if (!result.ok) {
+        if (trainingCollectionEpoch(result.collection) !== epochsAtStart[result.collection]) continue;
+        if (currentScopeKey !== trainingScopeKey(scope)) continue;
+        loadedRef.current.delete(result.collection);
+        const message = result.error instanceof Error ? result.error.message : 'Failed to load training data';
+        dispatch({ type: 'error', collection: result.collection, message });
+        toastMessage = message;
+        continue;
+      }
+      if (!isCurrentTrainingRead(result, trainingCollectionEpoch(result.collection), currentScopeKey)) continue;
+      loadedRef.current.add(result.collection);
+      if (result.collection === 'summary') dispatch({ type: 'summary-ready', data: result.data });
+      else if (result.collection === 'records') dispatch({ type: 'records-ready', data: result.data });
+      else if (result.collection === 'people') dispatch({ type: 'people-ready', data: result.data });
+      else if (result.collection === 'qualifications') dispatch({ type: 'qualifications-ready', data: result.data });
+      else dispatch({ type: 'notes-ready', data: result.data });
+    }
+    if (toastMessage) toast.error(toastMessage);
+    if (showRefreshing && generation === generationRef.current) setRefreshing(false);
   }, []);
 
+  const refreshAfterMutation = useCallback(async (mutation: TrainingMutation) => {
+    const { refresh, stale } = splitTrainingRefresh(mutation, activeTabRef.current);
+    const affected = [...refresh, ...stale];
+    invalidateTrainingCollections(affected);
+    for (const collection of affected) loadedRef.current.delete(collection);
+    if (stale.length > 0) dispatch({ type: 'clear', collections: stale });
+    await loadCollections(refresh, true);
+  }, [loadCollections]);
+
+  const refreshVisible = useCallback(async () => {
+    const visible = TRAINING_TAB_COLLECTIONS[activeTabRef.current];
+    const hidden = TRAINING_COLLECTIONS.filter((collection) => !visible.includes(collection));
+    invalidateTrainingCollections(TRAINING_COLLECTIONS);
+    loadedRef.current.clear();
+    if (hidden.length > 0) dispatch({ type: 'clear', collections: hidden });
+    await loadCollections(visible, true);
+  }, [loadCollections]);
+
   useEffect(() => {
-    if (permissionLoading) return;
-    if (!hasPermission) {
+    setActiveTab(parseTrainingTab(tabParam));
+  }, [tabParam]);
+
+  const routerRef = useRef(router);
+  routerRef.current = router;
+
+  useEffect(() => {
+    scopeRef.current = derivedScopeRef.current;
+    if (!authLoading && !permissionLoading && !derivedScopeRef.current) {
       toast.error('Access denied', { id: 'training-access-denied' });
-      router.push('/dashboard');
-      return;
+      routerRef.current.push('/dashboard');
     }
-    loadTrainingData();
-  }, [hasPermission, loadTrainingData, permissionLoading, router]);
+    return () => {
+      generationRef.current += 1;
+      scopeRef.current = null;
+      clearTrainingLoads();
+    };
+  }, [authLoading, derivedKey, permissionLoading]);
+
+  useEffect(() => {
+    if (!derivedKey || !scopeRef.current?.allowed) return;
+    const missing = TRAINING_TAB_COLLECTIONS[activeTab].filter((collection) => !loadedRef.current.has(collection));
+    if (missing.length === 0) return;
+    void loadCollections(missing);
+  }, [activeTab, derivedKey, loadCollections]);
 
   function setTab(tab: TrainingTab) {
+    setActiveTab(tab);
     router.replace(`/training?tab=${tab}`, { scroll: false });
+  }
+
+  function retryCollection(collection: TrainingCollection) {
+    loadedRef.current.delete(collection);
+    void loadCollections([collection]);
   }
 
   const filteredRecords = useMemo(() => {
     const query = recordSearch.trim().toLowerCase();
-    return data.records.filter((record) => {
+    return (collections.records.data ?? []).filter((record) => {
       const expiryStatus = getExpiryStatus(record);
       if (recordFilter === 'all' && record.record_status !== 'active') return false;
       if (recordFilter === 'archived' && record.record_status !== 'archived') return false;
@@ -251,22 +504,22 @@ function TrainingContent() {
         record.comments,
       ], query);
     });
-  }, [data.records, recordFilter, recordSearch]);
+  }, [collections.records.data, recordFilter, recordSearch]);
 
   const filteredPeople = useMemo(() => {
     const query = peopleSearch.trim().toLowerCase();
-    return data.people.filter((person) => includesSearch([
+    return (collections.people.data ?? []).filter((person) => includesSearch([
       person.employee_name_raw,
       person.employee_key,
       person.profile?.full_name,
       person.profile_match_status,
       person.profile_match_notes,
     ], query));
-  }, [data.people, peopleSearch]);
+  }, [collections.people.data, peopleSearch]);
 
   const filteredQualifications = useMemo(() => {
     const query = qualificationSearch.trim().toLowerCase();
-    return data.qualifications.filter((qualification) => {
+    return (collections.qualifications.data ?? []).filter((qualification) => {
       if (qualificationStatus !== 'all' && qualification.validation_status !== qualificationStatus) return false;
       return includesSearch([
         qualification.qualification_raw,
@@ -275,23 +528,23 @@ function TrainingContent() {
         qualification.validation_notes,
       ], query);
     });
-  }, [data.qualifications, qualificationSearch, qualificationStatus]);
+  }, [collections.qualifications.data, qualificationSearch, qualificationStatus]);
 
   const filteredNotes = useMemo(() => {
     const query = notesSearch.trim().toLowerCase();
-    return data.notes.filter((note) => includesSearch([
+    return (collections.notes.data ?? []).filter((note) => includesSearch([
       note.source_sheet,
       note.cell_address,
       note.note_value,
       note.reason,
       note.note_type,
     ], query));
-  }, [data.notes, notesSearch]);
+  }, [collections.notes.data, notesSearch]);
 
-  const priorityTrainingRecords = useMemo(() => data.records
+  const priorityTrainingRecords = useMemo(() => (collections.records.data ?? [])
     .filter((record) => record.record_status === 'active')
     .filter((record) => ['expired', 'expiring', 'none'].includes(getExpiryStatus(record)) || record.cpcs_statuses.length > 0)
-    .slice(0, 10), [data.records]);
+    .slice(0, 10), [collections.records.data]);
 
   const recordPagination = useLoadMorePagination(filteredRecords, { resetKey: `${recordFilter}:${recordSearch}:${filteredRecords.length}` });
   const peoplePagination = useLoadMorePagination(filteredPeople, { resetKey: `${peopleSearch}:${filteredPeople.length}` });
@@ -309,7 +562,7 @@ function TrainingContent() {
     toast.success(target ? 'Training record updated' : 'Training record created');
     setEditingRecord(null);
     setCreatingRecord(false);
-    await loadTrainingData(true);
+    await refreshAfterMutation('record');
   }
 
   async function archiveRecord(record: TrainingRecordWithRelations) {
@@ -319,7 +572,7 @@ function TrainingContent() {
       const response = await fetch(`/api/training/records/${record.id}`, { method: 'DELETE' });
       await parseJsonResponse(response, 'Failed to archive training record');
       toast.success('Training record archived');
-      await loadTrainingData(true);
+      await refreshAfterMutation('record');
     } finally {
       setArchivingRecordId(null);
     }
@@ -335,7 +588,7 @@ function TrainingContent() {
     await parseJsonResponse(response, 'Failed to update training person');
     toast.success('Training person updated');
     setEditingPerson(null);
-    await loadTrainingData(true);
+    await refreshAfterMutation('person');
   }
 
   async function saveQualification(form: TrainingQualificationFormData) {
@@ -348,7 +601,7 @@ function TrainingContent() {
     await parseJsonResponse(response, 'Failed to update training qualification');
     toast.success('Training qualification updated');
     setEditingQualification(null);
-    await loadTrainingData(true);
+    await refreshAfterMutation('qualification');
   }
 
   async function exportRecords() {
@@ -368,7 +621,7 @@ function TrainingContent() {
     }
   }
 
-  if (permissionLoading) {
+  if (authLoading || permissionLoading) {
     return (
       <AppPageLoadingShell
         title="Training"
@@ -381,7 +634,7 @@ function TrainingContent() {
     );
   }
 
-  if (!hasPermission) {
+  if (!hasPermission || !user?.id) {
     return (
       <AppPageLoadingShell
         title="Training"
@@ -394,7 +647,8 @@ function TrainingContent() {
     );
   }
 
-  if (loading) {
+  const summaryBlocking = collections.summary.data === null && collections.summary.status !== 'error';
+  if (summaryBlocking) {
     return (
       <AppPageShell width="full">
         <AppPageHeader
@@ -407,7 +661,7 @@ function TrainingContent() {
     );
   }
 
-  const summary = data.summary;
+  const summary = collections.summary.data;
 
   return (
     <AppPageShell width="full">
@@ -423,7 +677,7 @@ function TrainingContent() {
                 Refreshing
               </div>
             ) : null}
-            <Button variant="outline" onClick={() => loadTrainingData(true)} disabled={refreshing}>
+            <Button variant="outline" onClick={() => void refreshVisible()} disabled={refreshing}>
               Refresh
             </Button>
             <Button variant="outline" onClick={exportRecords} disabled={exporting}>
@@ -440,6 +694,9 @@ function TrainingContent() {
 
       <TrainingDevelopmentBanner />
 
+      {collections.summary.status === 'error' && !summary ? (
+        <CollectionFallback collection="summary" error={collections.summary.error} onRetry={() => retryCollection('summary')} />
+      ) : null}
       {summary ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <SummaryCard label="Active Records" value={summary.activeRecords} description={`${summary.totalRecords} total imported/manual records`} />
@@ -466,7 +723,9 @@ function TrainingContent() {
                 <CardDescription>Expired, expiring, missing expiry, and CPCS action-status records.</CardDescription>
               </CardHeader>
               <CardContent>
-                {priorityTrainingRecords.length === 0 ? (
+                {collections.records.data === null ? (
+                  <CollectionFallback collection="records" error={collections.records.error} onRetry={() => retryCollection('records')} />
+                ) : priorityTrainingRecords.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No training records found.</p>
                 ) : (
                   <div className="space-y-3">
@@ -513,6 +772,10 @@ function TrainingContent() {
               <CardDescription>Search, filter, edit, archive, and export imported records.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {collections.records.data === null ? (
+                <CollectionFallback collection="records" error={collections.records.error} onRetry={() => retryCollection('records')} />
+              ) : (
+              <>
               <div className="flex flex-col gap-3 md:flex-row">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -596,6 +859,8 @@ function TrainingContent() {
                 </Table>
               </div>
               <LoadMorePagination visibleCount={recordPagination.visibleItems.length} totalCount={filteredRecords.length} itemLabel="records" onShowMore={recordPagination.showMore} />
+              </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -607,6 +872,10 @@ function TrainingContent() {
               <CardDescription>Imported people with best-effort profile matches for future module links.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {collections.people.data === null ? (
+                <CollectionFallback collection="people" error={collections.people.error} onRetry={() => retryCollection('people')} />
+              ) : (
+              <>
               <Input placeholder="Search people..." value={peopleSearch} onChange={(event) => setPeopleSearch(event.target.value)} />
               <div className="overflow-x-auto">
                 <Table>
@@ -644,6 +913,8 @@ function TrainingContent() {
                 </Table>
               </div>
               <LoadMorePagination visibleCount={peoplePagination.visibleItems.length} totalCount={filteredPeople.length} itemLabel="people" onShowMore={peoplePagination.showMore} />
+              </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -655,6 +926,10 @@ function TrainingContent() {
               <CardDescription>Raw qualification strings with proposed canonical names awaiting client review.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {collections.qualifications.data === null ? (
+                <CollectionFallback collection="qualifications" error={collections.qualifications.error} onRetry={() => retryCollection('qualifications')} />
+              ) : (
+              <>
               <div className="flex flex-col gap-3 md:flex-row">
                 <Input placeholder="Search qualifications..." value={qualificationSearch} onChange={(event) => setQualificationSearch(event.target.value)} />
                 <Select value={qualificationStatus} onValueChange={setQualificationStatus}>
@@ -697,6 +972,8 @@ function TrainingContent() {
                 </Table>
               </div>
               <LoadMorePagination visibleCount={qualificationPagination.visibleItems.length} totalCount={filteredQualifications.length} itemLabel="qualifications" onShowMore={qualificationPagination.showMore} />
+              </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -708,6 +985,10 @@ function TrainingContent() {
               <CardDescription>Preserved free text that was intentionally not mixed into training records.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {collections.notes.data === null ? (
+                <CollectionFallback collection="notes" error={collections.notes.error} onRetry={() => retryCollection('notes')} />
+              ) : (
+              <>
               <Input placeholder="Search notes..." value={notesSearch} onChange={(event) => setNotesSearch(event.target.value)} />
               <div className="overflow-x-auto">
                 <Table>
@@ -735,6 +1016,8 @@ function TrainingContent() {
                 </Table>
               </div>
               <LoadMorePagination visibleCount={notesPagination.visibleItems.length} totalCount={filteredNotes.length} itemLabel="notes" onShowMore={notesPagination.showMore} />
+              </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
