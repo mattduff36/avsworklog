@@ -1,8 +1,8 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getModuleAccessLevelForEffectiveRole } from '@/lib/server/effective-module-access';
 import { getEffectiveRole, getEffectiveRoleForUser } from '@/lib/utils/view-as';
 import { hasEffectiveRoleFullAccess } from '@/lib/utils/role-access';
 import type { ModuleName, PermissionAccessLevel } from '@/types/roles';
-import { getPermissionLevelsForUser } from '@/lib/server/team-permissions';
 
 export type EffectiveActorRef = {
   userId: string;
@@ -31,23 +31,8 @@ export async function getEffectiveModuleAccessLevel(
   const effectiveRole = actor
     ? await getEffectiveRoleForUser(actor.userId, actor.email)
     : await getEffectiveRole();
-  if (!effectiveRole.user_id || !effectiveRole.role_id) {
-    return 0;
-  }
 
-  if (hasEffectiveRoleFullAccess(effectiveRole)) {
-    return 5;
-  }
-
-  const permissionLevels = await getPermissionLevelsForUser(
-    effectiveRole.user_id,
-    effectiveRole.role_id,
-    createAdminClient(),
-    effectiveRole.team_id,
-    { includeUserOverrides: effectiveRole.is_viewing_as !== true }
-  );
-
-  return permissionLevels[moduleName] || 0;
+  return getModuleAccessLevelForEffectiveRole(effectiveRole, moduleName);
 }
 
 export async function canEffectiveRoleUseModuleLevel(

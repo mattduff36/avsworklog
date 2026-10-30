@@ -1,4 +1,4 @@
-import { canEffectiveRoleAccessModule, getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
+import { getModuleAccessLevelForEffectiveRole } from '@/lib/server/effective-module-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 
 export interface TrainingAccessResult {
@@ -17,12 +17,10 @@ export async function requireTrainingAccess(): Promise<TrainingAccessResult> {
     return { allowed: false, status: 401, error: 'Unauthorized' };
   }
 
-  const hasPermission = await canEffectiveRoleAccessModule('training');
-  if (!hasPermission) {
+  const accessLevel = await getModuleAccessLevelForEffectiveRole(effectiveRole, 'training');
+  if (accessLevel <= 0) {
     return { allowed: false, status: 403, error: 'Forbidden' };
   }
-
-  const accessLevel = await getEffectiveModuleAccessLevel('training');
 
   return {
     allowed: true,
