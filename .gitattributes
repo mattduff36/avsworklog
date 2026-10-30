@@ -1,2 +1,3 @@
 # Preserve the exact bytes already recorded in the production migration ledger.
 supabase/migrations/20261020_policies_procedures.sql text eol=lf
+supabase/migrations/20261030_quote_select_permission_initplans.sql -text
