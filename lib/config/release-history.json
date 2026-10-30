@@ -1,5 +1,42 @@
 [
   {
+    "version": "1026.14.1",
+    "updateKind": "minor",
+    "title": "Inventory maintenance update",
+    "description": "Observe the HGV data read explicitly. Add private structural and browser regression commands. Clear privileged data on actor and access changes. Refresh changed collections and dependent labels. Use one realtime owner for allowance refreshes. Reuse validated actor for one permission resolution. Hydrate inspection export details per PDF document part. Lazy-load managers and defer idle neighbour reads. Page complete inspection history windows. Pause hidden status polls and deduplicate requests. Reuse verified success on healthy navigation. Render visible pages and release offscreen canvases. Page inspection histories with complete filtered windows. Load tab collections on demand. Defer retired rows while preserving exact counts.",
+    "summary": "Observe the HGV data read explicitly. Add private structural and browser regression commands. Clear privileged data on actor and access changes. Refresh changed collections and dependent labels. Use one realtime owner for allowance refreshes. Reuse validated actor for one permission resolution. Hydrate inspection export details per PDF document part. Lazy-load managers and defer idle neighbour reads. Page complete inspection history windows. Pause hidden status polls and deduplicate requests. Reuse verified success on healthy navigation. Render visible pages and release offscreen canvases. Page inspection histories with complete filtered windows. Load tab collections on demand. Defer retired rows while preserving exact counts.",
+    "details": [
+      "Clear privileged data on actor and access changes, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated daily tasks, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Reuse validated actor for one permission resolution, with changes to app screens, shared logic, and automated tests.",
+      "Render visible pages and release offscreen canvases, with changes to background routes, interface components, and automated tests.",
+      "Lazy-load managers and defer idle neighbour reads, with changes to app screens, interface components, and automated tests.",
+      "Use one realtime owner for allowance refreshes, with changes to app screens, shared logic, and automated tests.",
+      "Updated sign in, with changes to shared logic and automated tests.",
+      "Hydrate inspection export details per PDF document part, with changes to background routes."
+    ],
+    "areas": [
+      "Inventory",
+      "Absence & Leave",
+      "Training",
+      "Reports",
+      "Daily Allocation",
+      "PDF documents",
+      "Observe the HGV data read explicitly. Add private structural",
+      "Browser regression commands. Clear privileged data on actor",
+      "Access changes. Refresh changed collections"
+    ],
+    "areaKeys": [
+      "inventory",
+      "absence",
+      "training",
+      "reports",
+      "daily-allocation",
+      "pdf-documents"
+    ],
+    "pushedAt": "2026-10-30T03:08:20.052Z"
+  },
+  {
     "version": "1026.14.0",
     "updateKind": "major",
     "title": "Daily Tasks update",

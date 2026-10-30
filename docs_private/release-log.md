@@ -2,6 +2,44 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.14.1
+
+**GIT COMMIT MESSAGE**
+`perf(inventory): defer retired rows while preserving exact counts`
+
+**PUSHED AT**
+2026-10-30T03:08:20.052Z
+
+**WHAT CHANGED**
+Observe the HGV data read explicitly. Add private structural and browser regression commands. Clear privileged data on actor and access changes. Refresh changed collections and dependent labels. Use one realtime owner for allowance refreshes. Reuse validated actor for one permission resolution. Hydrate inspection export details per PDF part. Lazy-load managers and defer idle neighbour reads. Page complete inspection history windows. Pause hidden status polls and deduplicate requests. Reuse verified success on healthy navigation. Render visible pages and release offscreen canvases. Page inspection histories with complete filtered windows. Load tab collections on demand. Defer retired rows while preserving exact counts.
+
+**VERSION HISTORY DETAILS**
+- Clear privileged data on actor and access changes, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated daily tasks, with changes to background routes, app screens, shared logic, and automated tests.
+- Reuse validated actor for one permission resolution, with changes to app screens, shared logic, and automated tests.
+- Render visible pages and release offscreen canvases, with changes to background routes, interface components, and automated tests.
+- Lazy-load managers and defer idle neighbour reads, with changes to app screens, interface components, and automated tests.
+- Use one realtime owner for allowance refreshes, with changes to app screens, shared logic, and automated tests.
+- Updated sign in, with changes to shared logic and automated tests.
+- Hydrate inspection export details per PDF part, with changes to background routes.
+
+**COMMITS IN THIS RELEASE**
+- `test(perf): observe the HGV data read explicitly`
+- `test(perf): add private structural and browser regression commands`
+- `fix(inventory): clear privileged data on actor and access changes`
+- `perf(inventory): refresh changed collections and dependent labels`
+- `perf(absence): use one realtime owner for allowance refreshes`
+- `perf(training): reuse validated actor for one permission resolution`
+- `perf(reports): hydrate inspection export details per PDF part`
+- `perf(allocation): lazy-load managers and defer idle neighbour reads`
+- `perf(plant): page complete inspection history windows`
+- `perf(kiosk): pause hidden status polls and deduplicate requests`
+- `perf(health): reuse verified success on healthy navigation`
+- `perf(pdf): render visible pages and release offscreen canvases`
+- `perf(hgv): page inspection histories with complete filtered windows`
+- `perf(training): load tab collections on demand`
+- `perf(inventory): defer retired rows while preserving exact counts`
+
 ## 1026.14.0
 
 **GIT COMMIT MESSAGE**
