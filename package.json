@@ -58,6 +58,8 @@
     "test:ui": "vitest --ui",
     "test:run": "tsx scripts/testing/run-terminal-tests.ts --suite vitest -- run",
     "test:coverage": "tsx scripts/testing/run-terminal-tests.ts --suite vitest -- run --coverage",
+    "test:performance:structural": "tsx scripts/testing/performance-structural.ts",
+    "test:performance:browser": "tsx scripts/testing/performance-regression.ts",
     "test:db:local:start": "tsx scripts/local-test-postgres.ts start",
     "test:db:local:run": "tsx scripts/local-test-postgres.ts run",
     "test:db:local:stop": "tsx scripts/local-test-postgres.ts stop",
