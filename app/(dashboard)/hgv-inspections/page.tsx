@@ -103,6 +103,9 @@ function HgvInspectionsContent() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [displayCount, setDisplayCount] = useState(pageSize);
+  const [hasMore, setHasMore] = useState(false);
+  const [remainingCount, setRemainingCount] = useState<number | null>(null);
+  const fetchGenerationRef = useRef(0);
   const [viewMode, setViewMode] = useState<'cards' | 'table'>(() => {
     if (typeof window !== 'undefined') {
       return (localStorage.getItem('hgv-inspections-view-mode') as 'cards' | 'table') || 'cards';
@@ -182,45 +185,63 @@ function HgvInspectionsContent() {
   }, [authLoading, canAccessInspectionModule, permissionLoading, canViewCrossUserInspections, supabase, user]);
 
   const fetchInspections = useCallback(async () => {
+    const generation = ++fetchGenerationRef.current;
     if (!user || authLoading || permissionLoading || !canAccessInspectionModule) return;
     setLoading(true);
 
     try {
-      let query = supabase
-        .from('hgv_inspections')
-        .select('id, user_id, hgv_id, status, inspection_date, inspection_end_date, submitted_at')
-        .order('inspection_date', { ascending: false });
+      const buildQuery = () => {
+        let query = supabase
+          .from('hgv_inspections')
+          .select('id, user_id, hgv_id, status, inspection_date, inspection_end_date, submitted_at', { count: 'exact' })
+          .order('inspection_date', { ascending: false })
+          .order('id', { ascending: false });
 
-      if (!canViewCrossUserInspections) {
-        query = query.eq('user_id', user.id);
-      } else if ((normalizedEmployeeFilter || 'all') !== 'all') {
-        const employeeFilter = normalizedEmployeeFilter as string;
-        if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
+        if (!canViewCrossUserInspections) {
           query = query.eq('user_id', user.id);
-        } else {
-          query = query.eq('user_id', employeeFilter);
+        } else if ((normalizedEmployeeFilter || 'all') !== 'all') {
+          const employeeFilter = normalizedEmployeeFilter as string;
+          if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
+            query = query.eq('user_id', user.id);
+          } else {
+            query = query.eq('user_id', employeeFilter);
+          }
+        } else if (hasTeamInspectionVisibility) {
+          query = query.in('user_id', scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]);
         }
-      } else if (hasTeamInspectionVisibility) {
-        query = query.in('user_id', scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]);
-      }
 
-      if ((normalizedHgvFilter || 'all') !== 'all') {
-        query = query.eq('hgv_id', normalizedHgvFilter as string);
-      }
+        if ((normalizedHgvFilter || 'all') !== 'all') {
+          query = query.eq('hgv_id', normalizedHgvFilter as string);
+        }
 
-      const currentStatusFilter = statusFilter || 'all';
-      if (currentStatusFilter !== 'all') {
-        query = query.eq('status', currentStatusFilter as 'draft' | 'submitted');
-      }
+        const currentStatusFilter = statusFilter || 'all';
+        if (currentStatusFilter !== 'all') {
+          query = query.eq('status', currentStatusFilter as 'draft' | 'submitted');
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
+        return query;
+      };
+      // Growing UI windows can exceed PostgREST's response cap. Continue from
+      // the actual number received, preserving all filters and the sentinel.
+      const data: Array<Omit<HgvInspectionWithRelations, 'hgv' | 'profile'>> = [];
+      let count: number | null = null;
+      while (data.length <= displayCount) {
+        const result = await buildQuery().range(data.length, Math.min(displayCount, data.length + 499));
+        if (generation !== fetchGenerationRef.current) return;
+        if (result.error) throw result.error;
+        if (data.length === 0) count = result.count;
+        const batch = result.data || [];
+        if (batch.length === 0) break;
+        data.push(...batch);
+        if (count !== null && data.length >= count) break;
+      }
       const rows = ((data || []) as Array<Omit<HgvInspectionWithRelations, 'hgv' | 'profile'>>).map((row) => ({
         ...row,
         hgv: null,
         profile: null,
       }));
-      setInspections(await enrichHgvInspectionList(rows, {
+      const visibleRows = rows.slice(0, displayCount);
+      const enriched = await enrichHgvInspectionList(visibleRows, {
         loadHgvs: async (ids) => {
           const { data, error } = await supabase
             .from('hgvs')
@@ -263,8 +284,14 @@ function HgvInspectionsContent() {
             error,
           };
         },
-      }));
+      });
+      if (generation !== fetchGenerationRef.current) return;
+      const exactCount = typeof count === 'number' ? count : null;
+      setInspections(enriched);
+      setRemainingCount(exactCount === null ? null : Math.max(0, exactCount - enriched.length));
+      setHasMore(exactCount === null ? rows.length > displayCount : exactCount > enriched.length);
     } catch (error) {
+      if (generation !== fetchGenerationRef.current) return;
       const errorContextId = 'hgv-inspections-fetch-list-error';
       const isNetworkFailure = isNetworkFetchError(error);
       const isAuthFailure = isAuthErrorStatus(getErrorStatus(error));
@@ -278,7 +305,9 @@ function HgvInspectionsContent() {
         toast.error('Failed to load HGV inspections', { id: errorContextId });
       }
     } finally {
-      setLoading(false);
+      if (generation === fetchGenerationRef.current) {
+        setLoading(false);
+      }
     }
   }, [
     authLoading,
@@ -293,11 +322,20 @@ function HgvInspectionsContent() {
     statusFilter,
     supabase,
     user,
+    displayCount,
   ]);
 
   useEffect(() => {
     setDisplayCount(pageSize);
-  }, [pageSize, normalizedEmployeeFilter, normalizedHgvFilter, statusFilter]);
+  }, [
+    pageSize,
+    normalizedEmployeeFilter,
+    normalizedHgvFilter,
+    statusFilter,
+    scopedEmployeeIds,
+    hasOrgWideInspectionVisibility,
+    hasTeamInspectionVisibility,
+  ]);
 
   useEffect(() => {
     try {
@@ -316,7 +354,10 @@ function HgvInspectionsContent() {
   }, [fetchFilters]);
 
   useEffect(() => {
-    fetchInspections();
+    void fetchInspections();
+    return () => {
+      fetchGenerationRef.current += 1;
+    };
   }, [fetchInspections]);
 
   const handleDownloadPDF = async (e: React.MouseEvent, inspectionId: string) => {
@@ -650,14 +691,14 @@ function HgvInspectionsContent() {
             </Card>
             ))}
           </div>
-          {inspections.length > displayCount && (
+          {hasMore && (
             <div className="flex justify-center pt-4">
               <Button
                 onClick={() => setDisplayCount((prev) => prev + pageSize)}
                 variant="outline"
                 className={`w-full max-w-xs border-border text-white hover:bg-slate-800 ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}
               >
-                Show More ({inspections.length - displayCount} remaining)
+                {remainingCount === null ? 'Show More' : `Show More (${remainingCount} remaining)`}
               </Button>
             </div>
           )}
