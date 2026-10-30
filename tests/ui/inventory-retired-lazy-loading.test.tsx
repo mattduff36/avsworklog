@@ -10,6 +10,8 @@ const pushMock = vi.fn();
 const routerMock = { push: pushMock, replace: vi.fn() };
 const searchParams = new URLSearchParams();
 const permission = { hasPermission: true, loading: false, serviceUnavailable: false, errorStatus: null };
+vi.mock('@/lib/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'manager-1' }, effectiveRole: { id: 'manager-role', name: 'manager', team_id: 'team-1' }, isViewingAs: false, loading: false }) }));
+vi.mock('@/lib/hooks/useModuleAccessLevel', () => ({ useModuleAccessLevel: () => ({ accessLevel: 4, isLoading: false }) }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => routerMock,

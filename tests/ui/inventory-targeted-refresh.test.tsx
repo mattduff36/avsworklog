@@ -2,7 +2,7 @@
 /// <reference types="@testing-library/jest-dom/vitest" />
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import type { InventoryItemFormData } from '@/app/(dashboard)/inventory/types';
 import { resetRetiredInventoryLoaderState } from '@/lib/client/inventory-retired-loader';
@@ -11,6 +11,9 @@ const pushMock = vi.fn();
 const routerMock = { push: pushMock, replace: vi.fn() };
 const searchParams = new URLSearchParams();
 const permission = { hasPermission: true, loading: false, serviceUnavailable: false, errorStatus: null };
+const actor = vi.hoisted(() => ({ roleId: 'manager-role', roleName: 'manager', viewingAs: false, level: 4 }));
+vi.mock('@/lib/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'manager-1' }, effectiveRole: { id: actor.roleId, name: actor.roleName, team_id: 'team-1' }, isViewingAs: actor.viewingAs, loading: false }) }));
+vi.mock('@/lib/hooks/useModuleAccessLevel', () => ({ useModuleAccessLevel: () => ({ accessLevel: actor.level, isLoading: false }) }));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => routerMock,
@@ -271,6 +274,7 @@ function getCallsSince(start: number) {
 
 describe('inventory targeted refresh', () => {
   beforeEach(() => {
+    actor.roleId = 'manager-role'; actor.roleName = 'manager'; actor.viewingAs = false; actor.level = 4;
     permission.hasPermission = true;
     permission.loading = false;
     resetRetiredInventoryLoaderState();
@@ -373,6 +377,24 @@ describe('inventory targeted refresh', () => {
     release(jsonResponse({ inventory: [{ id: 'old', item_number: 'A-OBSOLETE', category: 'tools', status: 'active' }], pagination: { offset: 0, limit: 500, has_more: false } }));
     expect(await screen.findByText('A-NEW-SCOPE')).toBeInTheDocument();
     expect(screen.queryByText('A-OBSOLETE')).not.toBeInTheDocument();
+    view.unmount();
+  });
+
+  it('clears management data immediately when View As changes but module access stays enabled', async () => {
+    const view = render(<InventoryPage />);
+    fireEvent.click(await screen.findByRole('tab', { name: 'Retired Items (2)' }));
+    expect(await screen.findByText('R-1')).toBeInTheDocument();
+    actor.roleId = 'employee-role'; actor.roleName = 'employee'; actor.viewingAs = true; actor.level = 1;
+    fixture.manager = false;
+    holdNextActiveItems = true;
+    view.rerender(<InventoryPage />);
+    expect(screen.queryByText('R-1')).not.toBeInTheDocument();
+    await waitFor(() => expect(releaseHeldItems).toBeTruthy());
+    const release = releaseHeldItems!; releaseHeldItems = null;
+    await act(async () => release(jsonResponse({ inventory: [], pagination: { offset: 0, limit: 500, has_more: false } })));
+    await waitFor(() => expect(screen.queryByText('Loading inventory...')).not.toBeInTheDocument());
+    expect(screen.queryByRole('tab', { name: /Retired Items/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('R-1')).not.toBeInTheDocument();
     view.unmount();
   });
 

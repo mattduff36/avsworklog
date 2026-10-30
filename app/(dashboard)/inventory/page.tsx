@@ -41,6 +41,8 @@ import {
   type InventoryRefreshPlan,
 } from '@/lib/client/inventory-refresh-plan';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import { AlertTriangle, Archive, Boxes, CheckCircle2, MapPin, PackageSearch, Plus, Settings, ShieldCheck, Truck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChangeInventoryLocationDialog } from './components/ChangeInventoryLocationDialog';
@@ -215,6 +217,10 @@ function getInventoryItemLocations(inventoryItems: InventoryItem[]): InventoryLo
 
 export default function InventoryPage() {
   const { hasPermission: canViewInventory, loading: permissionLoading } = usePermissionCheck('inventory', false);
+  const { user, effectiveRole, isViewingAs, loading: authLoading } = useAuth();
+  const { accessLevel, isLoading: levelLoading } = useModuleAccessLevel('inventory');
+  const actorIdentityKey = JSON.stringify([user?.id, effectiveRole?.name, effectiveRole?.role_class, effectiveRole?.is_manager_admin, effectiveRole?.is_super_admin, effectiveRole?.team_id, isViewingAs, accessLevel]);
+  const lastActorIdentityRef = useRef<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -624,8 +630,10 @@ export default function InventoryPage() {
   }
 
   useEffect(() => {
-    refreshAllowedRef.current = !permissionLoading && canViewInventory;
-    if (permissionLoading || !canViewInventory) {
+    const identityChanged = lastActorIdentityRef.current !== actorIdentityKey;
+    lastActorIdentityRef.current = actorIdentityKey;
+    refreshAllowedRef.current = !authLoading && !levelLoading && !permissionLoading && canViewInventory;
+    if (identityChanged || authLoading || levelLoading || permissionLoading || !canViewInventory) {
       bundleGenerationRef.current += 1;
       invalidateRetiredInventoryLoads();
       accessScopeRef.current = null;
@@ -636,8 +644,22 @@ export default function InventoryPage() {
       setRetiredCount(null);
       setRetiredRowsError(null);
       setRetiredRowsLoading(false);
+      if (identityChanged) {
+        setLoading(true);
+        setInventoryContext(null);
+        setItems([]);
+        setGroups([]);
+        setHardwareItems([]);
+        setHardwareBalances([]);
+        setFleetAssets([]);
+        setCategories([]);
+        setSiteAssignmentUsers([]);
+        setAssignableLocations([]);
+        setSiteAssignments([]);
+        setSelectedItemIds(new Set());
+      }
     }
-    if (permissionLoading) return;
+    if (authLoading || levelLoading || permissionLoading) return;
     if (!canViewInventory) {
       toast.error('Access denied', { id: 'inventory-access-denied' });
       router.push('/dashboard');
@@ -651,7 +673,7 @@ export default function InventoryPage() {
       retiredScopeRef.current = null;
       invalidateRetiredInventoryLoads();
     };
-  }, [canViewInventory, fetchInventoryData, permissionLoading, router]);
+  }, [actorIdentityKey, authLoading, canViewInventory, fetchInventoryData, levelLoading, permissionLoading, router]);
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab');
@@ -1263,7 +1285,7 @@ export default function InventoryPage() {
     });
   }
 
-  if (permissionLoading) {
+  if (authLoading || levelLoading || permissionLoading || lastActorIdentityRef.current !== actorIdentityKey) {
     return (
       <AppPageLoadingShell
         title="Inventory"
