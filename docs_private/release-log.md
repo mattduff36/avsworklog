@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1026.14.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-tasks): update daily tasks`
+
+**PUSHED AT**
+2026-10-30T00:14:20.962Z
+
+**WHAT CHANGED**
+Update daily tasks.
+
+**VERSION HISTORY DETAILS**
+- Updated daily tasks, with changes to app screens, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-tasks): update daily tasks`
+
 ## 1026.13.0
 
 **GIT COMMIT MESSAGE**
