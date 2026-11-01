@@ -27,29 +27,36 @@ describe('fixerrors command orchestration', () => {
     expect(command).toContain('suppress-logging');
   });
 
-  it('FIXERR-CMD-002 requires premium generalPurpose analysis and forbids architecture-gate for that step', () => {
-    expect(command).toContain('subagent_type: "generalPurpose"');
-    expect(command).toContain('gpt-5.6-sol-high');
+  it('FIXERR-CMD-002 permits premium parent or worker analysis without recursive delegation', () => {
+    expect(command).toContain('the capable premium parent or its assigned premium worker performs the analysis');
+    expect(command).toContain('no separate analysis Task is required');
+    expect(command).toContain('Workers and reviewers must not launch other agents');
+    expect(command).not.toContain('launch **exactly one** `Task`');
+    expect(command).not.toContain('Parent Cursor Grok');
     expect(command).toContain('docs_private/error-analysis-decision.json');
-    expect(command).toMatch(/Do \*\*not\*\* use `architecture-gate` for analysis/u);
+    expect(command).toContain('No application fixes, no commits, no production SQL');
     expect(command).toContain('Always review already-triaged outstanding rows');
     expect(command).toContain('even when the new snapshot is empty');
   });
 
-  it('FIXERR-CMD-003 requires a two-pass final-diff-reviewer after code-changing fixes', () => {
-    expect(command).toContain('final-diff-reviewer');
-    expect(command).toContain('Diff: uncommitted changes');
-    expect(command).toContain(
-      'Skip the reviewer when every cluster is report-only or manual-investigation and no code changed'
-    );
+  it('FIXERR-CMD-003 selects review by risk and preserves candidate-bound blockers', () => {
+    expect(command).toContain('Routine bounded repairs with sufficient evidence need no second model review');
+    expect(command).toContain('material risk, unresolved uncertainty, an explicit owner request, or an applicable repository gate');
+    expect(command).not.toContain('Launch **exactly one** `final-diff-reviewer`');
+    expect(command).toContain('The root invokes the read-only reviewer directly');
+    expect(command).toContain('its result and tests must match the actual candidate');
+    expect(command).toContain('Unresolved review blockers still prevent commit');
     expect(command).toContain('one closure/delta `final-diff-reviewer`');
     expect(command).toContain('After two failed premium reviews, stop and report');
+    expect(command).toContain('Only when independent review was selected');
     expect(command).toContain(`reviewEscalationReasons: ["${FIXERRORS_COMMAND_MANDATED_REVIEW_REASON}"]`);
+    expect(command).toContain('Otherwise do not emit that reason or claim independent review occurred');
+    expect(command).toContain('Never fabricate review approval or bypass a mechanical release gate');
   });
 
   it('FIXERR-CMD-004 marks mechanical report clusters as advisory input for the decision file', () => {
     expect(analysisScript).toContain(
-      'Mechanical clusters and TEE lanes below are advisory input for the premium analysis step, which writes `docs_private/error-analysis-decision.json`.'
+      'Mechanical clusters and TEE lanes below are advisory input for analysis by the premium parent or assigned worker, which writes `docs_private/error-analysis-decision.json`.'
     );
   });
 });

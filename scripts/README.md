@@ -2,6 +2,10 @@
 
 This directory contains utility scripts for database management, testing, and maintenance.
 
+## Fixerrors analysis and review
+
+The `.cursor/commands/fixerrors.md` contract permits the premium parent or its assigned premium worker to analyze the captured snapshot and implement authorized repairs. It does not require a separate analysis Task or a second model review for every code change. The root selects independent review for material risk, unresolved uncertainty, an owner request or an applicable repository gate; workers never delegate. Keep targeted tests, parent acceptance, candidate-bound evidence and unresolved review blockers. The legacy review marker is emitted only when that selected review actually ran. Snapshot/decision validation, privacy, production authorization, recovery artifacts and release gates are unchanged; generated evidence stays under ignored `docs_private/`. Follow the command for project-specific mutation and recovery behavior.
+
 ## Directory Structure
 
 ### `/migrations`
