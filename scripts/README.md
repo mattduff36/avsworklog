@@ -82,3 +82,5 @@ Other operational scripts may also need:
 - Log all operations for audit trail
 - Handle errors gracefully
 - Document what each script does
+
+Monthly advisor follow-ups now produce a premium lead handoff. Approval/rejection remains explicit, and non-interactive runs leave undecided suggestions pending. Approved plans stay repository-local; resolving a follow-up does not open Cursor, dispatch a worker or activate a schedule. The lead may dispatch only approved, scoped implementation through the installed premium runner, retains operational/release authority, and checks its completion evidence. Legacy Cursor stop-hook telemetry remains editor-specific and is not required for worker receipts.

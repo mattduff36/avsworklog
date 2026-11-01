@@ -148,7 +148,7 @@ function getFallbackPrompt(params: {
   const suggestionsRelativePath = formatRelativePath(params.repoRoot, params.suggestionsPath);
 
   return [
-    'Ready-to-use Cursor prompt:',
+    'Ready-to-use premium lead prompt:',
     '```text',
     `Review the ${params.scriptName} monthly automation suggestions for ${params.monthKey}.`,
     `Use ${reviewRelativePath} and ${suggestionsRelativePath} as source context.`,
@@ -273,17 +273,20 @@ function renderPlan(params: {
     taskId,
     taskType: 'change',
     risk: 'routine',
-    initialParentTier: 'economical',
-    routingDecision: 'economical_default',
+    initialParentTier: 'premium',
+    routingDecision: 'explicit_premium',
     rationale:
       'Monthly automation upgrades are scoped script/test edits that follow an approved suggestion list.',
     fallbackEscalation:
-      'Escalate to premium-final-review if the change expands into shared workflow architecture or verification fails twice.',
+      'Return expanded scope or repeated verification failures to the root for risk-based review selection; workers never delegate.',
     requiredTests: [
       { id: 'AUTO-PLAN-001', status: 'unresolved' },
       { id: 'REGRESSION-001', status: 'unresolved' },
     ],
   });
+
+  // Reuse the registered premium role as a compatibility label, not an autonomy grant.
+  contract.recommendedBuildModel.implementation = { role: 'premium-planning', tier: 'premium', family: 'gpt-sol' };
 
   return [
     '---',
@@ -306,8 +309,8 @@ function renderPlan(params: {
     '',
     `- taskType: change`,
     `- risk: routine`,
-    `- parent tier: economical`,
-    `- routingDecision: economical_default`,
+    `- parent tier: premium`,
+    `- routingDecision: explicit_premium`,
     `- workstreamId: ${workstreamId}`,
     ...(contract.sourceWorkstreamIds?.length
       ? [`- sourceWorkstreamIds: ${contract.sourceWorkstreamIds.join(', ')}`]
@@ -315,10 +318,10 @@ function renderPlan(params: {
     '',
     '## Recommended build model',
     '',
-    '- Implementation: Cursor Grok / economical-default',
+    '- Implementation: premium parent or assigned premium worker; root selects the verified model',
     '- Premium gates: none mandatory for routine automation upgrades',
     '- Switch timing: after_plan_approval',
-    '- Fallback: escalate to premium-final-review if scope expands or verification fails twice',
+    '- Fallback: root reassesses scope or repeated failures and selects independent review when warranted',
     '',
     '## Architecture gate',
     '',
@@ -369,7 +372,7 @@ function renderPlan(params: {
     '',
     '## Completion Requirements',
     '',
-    '- Keep this plan file todo metadata aligned with the build work so Cursor can show completion state correctly.',
+    '- Keep this plan file todo metadata aligned with the implementation and report candidate-bound completion evidence to the root.',
     '- Do not run `npm run build`, commit, or push as part of this upgrade unless the user explicitly asks.',
     '- Report the changed files and verification commands when done.',
     '',
@@ -617,7 +620,7 @@ export async function runMonthlyAutomationFollowUp(params: MonthlyFollowUpParams
     const reviewRelativePath = formatRelativePath(repoRoot, params.reviewPath);
     writeLine(output);
     writeLine(output, `Approved plan written: ${planRelativePath}`);
-    writeLine(output, 'Ready-to-use Cursor prompt:');
+    writeLine(output, 'Ready-to-use premium lead prompt:');
     writeLine(output, '```text');
     writeLine(output, `Build the approved ${params.scriptName} automation upgrades from ${planRelativePath}.`);
     writeLine(output, `Use ${reviewRelativePath} as review context, run focused tests, and do not run npm run build, commit, or push.`);

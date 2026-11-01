@@ -328,7 +328,7 @@ describe('automation logging helpers', () => {
     expect(review).toContain('Builds average 3.0m');
     expect(review).toContain('Commit outcomes observed: 0');
     expect(review).toContain('Push outcomes observed: 0');
-    expect(review).toContain('## Copy/Paste Cursor Prompt');
+    expect(review).toContain('## Premium Lead Handoff');
   });
 
   it('does not re-suggest finalise upgrades when timing and outcome metadata are recorded', () => {
@@ -469,7 +469,7 @@ describe('automation logging helpers', () => {
       'new: Error in Console: Repeated production failure (3 occurrence(s), 1 run(s), no prior pattern baseline). Regression-test candidate.'
     );
     expect(review).not.toContain('Surface repeated production patterns as deltas');
-    expect(review).toContain('## Copy/Paste Cursor Prompt');
+    expect(review).toContain('## Premium Lead Handoff');
   });
 
   it('FIXERR-ADV-002 surfaces repeated production patterns as month-to-month regression deltas', () => {
@@ -694,6 +694,15 @@ describe('automation logging helpers', () => {
 
       expect(result.planPath).toBe(path.join(fixture.root, 'plans', 'automation', 'finalise-2026-06-upgrade-plan.md'));
       expect(existsSync(result.planPath!)).toBe(true);
+      const plan = readFileSync(result.planPath!, 'utf8');
+      expect(plan).toContain('Implementation: premium parent or assigned premium worker');
+      expect(plan).not.toContain('Cursor Grok');
+      expect(plan).toContain('routingDecision: explicit_premium');
+      expect(plan).toContain('workers never delegate');
+      const resolver = readFileSync(path.join(process.cwd(), 'scripts/automation/resolve-monthly-follow-up.ts'), 'utf8');
+      expect(resolver).not.toContain('spawnSync');
+      expect(resolver).not.toContain('writeCursorPlanCopy');
+      expect(resolver).toContain('Repository-local plan file:');
       expect(readFileSync(result.planPath!, 'utf8')).toContain('## Implementation Steps');
       expect(readFileSync(result.planPath!, 'utf8')).toContain('Keep this plan file todo metadata aligned');
       expect(persistedSuggestions[0].status).toBe('approved');
@@ -831,7 +840,7 @@ describe('automation logging helpers', () => {
       expect(existsSync(path.join(fixture.knowledgeDirectory, 'finalise-memory.json'))).toBe(false);
       expect(renderedOutput).toContain('Non-interactive monthly follow-up mode detected.');
       expect(renderedOutput).toContain('Suggestions remain pending.');
-      expect(renderedOutput).toContain('Ready-to-use Cursor prompt:');
+      expect(renderedOutput).toContain('Ready-to-use premium lead prompt:');
     } finally {
       rmSync(fixture.root, { recursive: true, force: true });
     }

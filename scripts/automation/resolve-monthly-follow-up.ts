@@ -1,6 +1,4 @@
-import { spawnSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'fs';
-import { homedir } from 'os';
+import { existsSync, readFileSync, renameSync } from 'fs';
 import path from 'path';
 import {
   runMonthlyAutomationFollowUp,
@@ -56,37 +54,6 @@ function parseArgs(argv: string[]): ResolveOptions {
 
 function loadPendingFollowUp(pendingPath: string): PendingMonthlyFollowUp {
   return JSON.parse(readFileSync(pendingPath, 'utf8')) as PendingMonthlyFollowUp;
-}
-
-function slugify(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, '_')
-    .replace(/^_|_$/gu, '')
-    .slice(0, 80);
-}
-
-function writeCursorPlanCopy(planPath: string, pending: PendingMonthlyFollowUp): string {
-  const cursorPlansDirectory = path.join(homedir(), '.cursor', 'plans');
-  const fileName = `${slugify(`${pending.scriptName}_${pending.monthKey}_automation_upgrades`)}_${Date.now()}.plan.md`;
-  const cursorPlanPath = path.join(cursorPlansDirectory, fileName);
-  const planContent = readFileSync(planPath, 'utf8');
-
-  mkdirSync(cursorPlansDirectory, { recursive: true });
-  writeFileSync(cursorPlanPath, planContent, 'utf8');
-  return cursorPlanPath;
-}
-
-function openCursorPlan(cursorPlanPath: string): void {
-  const result = spawnSync('cursor', ['--reuse-window', cursorPlanPath], {
-    encoding: 'utf8',
-    shell: process.platform === 'win32',
-  });
-
-  if (result.status !== 0) {
-    const details = [result.stdout, result.stderr].filter(Boolean).join('\n').trim();
-    console.warn(`Could not open Cursor plan file automatically.${details ? `\n${details}` : ''}`);
-  }
 }
 
 async function main(): Promise<void> {
@@ -152,10 +119,9 @@ async function main(): Promise<void> {
   }
 
   if (result.planPath) {
-    const cursorPlanPath = writeCursorPlanCopy(result.planPath, pending);
-    console.log(`Cursor plan file: ${cursorPlanPath}`);
-    openCursorPlan(cursorPlanPath);
-    console.log('Opened this Cursor plan file for review and the normal Build flow.');
+    const relativePlan = path.relative(pending.repoRoot, result.planPath).split(path.sep).join('/');
+    console.log(`Repository-local plan file: ${relativePlan}`);
+    console.log('Give this approved plan to the premium lead. No editor, worker or schedule was launched.');
   }
 }
 
