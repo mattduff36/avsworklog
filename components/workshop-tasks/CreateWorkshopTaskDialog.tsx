@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import { createClient } from '@/lib/supabase/client';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -88,6 +89,8 @@ export function CreateWorkshopTaskDialog({
   onSuccess
 }: CreateWorkshopTaskDialogProps) {
   const { user } = useAuth();
+  const workshopAccess = useModuleAccessLevel('workshop-tasks');
+  const canChooseServiceType = !workshopAccess.isLoading && workshopAccess.canUseLevel(3);
   const { tabletModeEnabled } = useTabletMode();
   const supabase = createClient();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -109,6 +112,10 @@ export function CreateWorkshopTaskDialog({
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   const [linkedCategoryTemplateIds, setLinkedCategoryTemplateIds] = useState<string[] | null>(null);
   const [categoryLinksState, setCategoryLinksState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+  const manualServiceChoice = useRef(false);
+  const [scheduleRefresh, setScheduleRefresh] = useState(0);
+  const [serviceSchedule, setServiceSchedule] = useState<{ scope: string; isService: boolean; templateId: string | null } | null>(null);
+  const [scheduleError, setScheduleError] = useState(false);
   
   // Fetch available attachment templates
   const { templates: attachmentTemplates } = useAttachmentTemplates();
@@ -358,6 +365,37 @@ export function CreateWorkshopTaskDialog({
       .filter((template): template is AttachmentTemplate => Boolean(template));
   }, [assetCompatibleTemplates, categoryLinksState, linkedCategoryTemplateIds, selectedCategoryId]);
   const isSelectedHgv = selectedAssetType === 'hgv';
+  const serviceScope = `${selectedAssetType}:${selectedVehicleId}:${selectedCategoryId}`;
+  const needsServiceSchedule = (selectedAssetType === 'van' || selectedAssetType === 'hgv') && (linkedCategoryTemplateIds?.length ?? 0) >= 2;
+  const schedulePending = needsServiceSchedule && serviceSchedule?.scope !== serviceScope;
+  const isScheduledService = needsServiceSchedule && serviceSchedule?.scope === serviceScope && serviceSchedule.isService;
+  useEffect(() => { manualServiceChoice.current = false; }, [open, serviceScope]);
+  useEffect(() => {
+    if (!open) return undefined;
+    const refresh = () => setScheduleRefresh((value) => value + 1);
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [open]);
+  useEffect(() => {
+    if (!open || !selectedVehicleId || categoryLinksState !== 'ready' || !needsServiceSchedule) return undefined;
+    let cancelled = false;
+    setServiceSchedule(null); setScheduleError(false);
+    void (async () => {
+      try {
+        const response = await fetch(`/api/fleet/service-types?assetType=${selectedAssetType}&assetId=${encodeURIComponent(selectedVehicleId)}`, { cache: 'no-store' });
+        const data = await response.json();
+        if (cancelled) return;
+        if (!response.ok) throw new Error('Service options unavailable');
+        const rotationIds = (data.rotation || []).map((step: { templateId: string }) => step.templateId);
+        setServiceSchedule({ scope: serviceScope,
+          isService: rotationIds.length >= 2 && rotationIds.every((id: string) => linkedCategoryTemplateIds?.includes(id)),
+          templateId: data.currentNextServiceTemplateId || null });
+      } catch {
+        if (!cancelled) setScheduleError(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, selectedVehicleId, selectedAssetType, serviceScope, categoryLinksState, needsServiceSchedule, linkedCategoryTemplateIds, scheduleRefresh]);
   const meterFieldLabel = meterReadingType === 'hours' ? 'Current Hours' : isSelectedHgv ? 'Current KM' : 'Current Mileage';
   const meterInputDescriptor = meterReadingType === 'hours' ? 'hours' : isSelectedHgv ? 'KM' : 'mileage';
   const meterUnit = meterReadingType === 'hours' ? 'hours' : isSelectedHgv ? 'km' : 'miles';
@@ -438,6 +476,7 @@ export function CreateWorkshopTaskDialog({
   }, [categories.length, filteredCategories, selectedCategoryId, selectedVehicleId, vehicles.length]);
 
   const handleAddTask = async () => {
+    if (schedulePending) return;
     if (!user?.id) {
       toast.error('You must be logged in to create tasks');
       onOpenChange(false);
@@ -524,6 +563,7 @@ export function CreateWorkshopTaskDialog({
           workshop_comments: workshopComments.trim(),
           meter_reading: readingValue,
           title: taskTitle,
+          service_template_id: validSelectedTemplateIds.length === 1 ? validSelectedTemplateIds[0] : null,
         }),
       });
 
@@ -626,6 +666,7 @@ export function CreateWorkshopTaskDialog({
 
   useEffect(() => {
     if (categoryLinksState !== 'ready' || linkedCategoryTemplateIds == null) return;
+    if (schedulePending) return;
     if (linkedCategoryTemplateIds.length === 0 || filteredAttachmentTemplates.length === 0) {
       if (selectedTemplateIds.length > 0) {
         setSelectedTemplateIds([]);
@@ -635,6 +676,13 @@ export function CreateWorkshopTaskDialog({
     const validSelected = selectedTemplateIds.filter((id) =>
       filteredAttachmentTemplates.some((template) => template.id === id),
     );
+    if (isScheduledService) {
+      if (canChooseServiceType && manualServiceChoice.current && validSelected.length === 1) return;
+      const scheduledId = serviceSchedule?.templateId;
+      const next = scheduledId && filteredAttachmentTemplates.some((template) => template.id === scheduledId) ? [scheduledId] : [];
+      if (next.join('|') !== selectedTemplateIds.join('|')) setSelectedTemplateIds(next);
+      return;
+    }
     if (validSelected.length !== 1) {
       setSelectedTemplateIds([filteredAttachmentTemplates[0].id]);
       return;
@@ -642,7 +690,7 @@ export function CreateWorkshopTaskDialog({
     if (validSelected.length !== selectedTemplateIds.length) {
       setSelectedTemplateIds(validSelected);
     }
-  }, [categoryLinksState, filteredAttachmentTemplates, linkedCategoryTemplateIds, selectedTemplateIds]);
+  }, [categoryLinksState, filteredAttachmentTemplates, linkedCategoryTemplateIds, selectedTemplateIds, schedulePending, isScheduledService, serviceSchedule, canChooseServiceType]);
 
   return (
     <Dialog
@@ -845,6 +893,13 @@ export function CreateWorkshopTaskDialog({
                   <span className="text-red-500">*</span>
                 ) : null}
               </Label>
+              {schedulePending && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  {scheduleError ? 'Service options could not be loaded.' : 'Loading current service options...'}
+                  {scheduleError && <button type="button" className="ml-2 underline" onClick={() => setScheduleRefresh((value) => value + 1)}>Retry</button>}
+                </p>
+              )}
+              {isScheduledService && <p className="text-sm text-muted-foreground">Scheduled next service: {filteredAttachmentTemplates.find((template) => template.id === serviceSchedule?.templateId)?.name || 'Not set'}. {canChooseServiceType ? 'You may choose another service for this visit.' : 'Supervisor access is required to choose a different service.'}</p>}
               <p className="text-xs text-muted-foreground mb-2">
                 {categoryLinksState === 'loading'
                   ? 'Loading attachments for this workshop category...'
@@ -867,11 +922,11 @@ export function CreateWorkshopTaskDialog({
                     <Checkbox
                       id={`template-${template.id}`}
                       checked={selectedTemplateIds.includes(template.id)}
+                      disabled={schedulePending || (isScheduledService && !canChooseServiceType && template.id !== serviceSchedule?.templateId)}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          setSelectedTemplateIds(prev => [...prev, template.id]);
-                        } else {
-                          setSelectedTemplateIds(prev => prev.filter(id => id !== template.id));
+                          manualServiceChoice.current = true;
+                          setSelectedTemplateIds([template.id]);
                         }
                       }}
                     />
@@ -905,6 +960,7 @@ export function CreateWorkshopTaskDialog({
             onClick={handleAddTask}
             disabled={
               submitting ||
+              schedulePending ||
               !selectedVehicleId ||
               !selectedCategoryId ||
               (categoryHasSubcategories && !selectedSubcategoryId) ||

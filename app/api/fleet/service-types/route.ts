@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
       showServiceTypeBadge: settings.linkedTemplates.filter((template) => template.isActive).length >= 2,
       currentNextServiceTemplateId: assetState?.nextServiceTemplateId ?? null,
       currentNextServiceRotationStepId: assetState?.nextServiceRotationStepId ?? null,
-    });
+    }, { headers: { 'Cache-Control': 'private, no-store' } });
   } catch (error) {
     await logServerError({
       error: error instanceof Error ? error : new Error(String(error)),

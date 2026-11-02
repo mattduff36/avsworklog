@@ -5,6 +5,8 @@ import type React from 'react';
 
 const toastError = vi.fn();
 const toastSuccess = vi.fn();
+const access = vi.hoisted(() => ({ level: 3 }));
+vi.mock('@/lib/hooks/useModuleAccessLevel', () => ({ useModuleAccessLevel: () => ({ isLoading: false, canUseLevel: (level: number) => access.level >= level }) }));
 
 vi.mock('sonner', () => ({
   toast: {
@@ -137,6 +139,7 @@ function jsonResponse(body: unknown, ok = true, status = ok ? 200 : 400): Respon
 
 describe('CreateWorkshopTaskDialog category-linked attachments', () => {
   beforeEach(() => {
+    access.level = 3;
     vi.clearAllMocks();
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -153,6 +156,24 @@ describe('CreateWorkshopTaskDialog category-linked attachments', () => {
       }
       return jsonResponse({});
     });
+  });
+
+  it('defaults to the saved service and replaces the selection when a Supervisor chooses another', async () => {
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => String(input).includes('/category-attachments')
+      ? jsonResponse({ templates: [{ templateId: 'tmpl-service' }, { templateId: 'tmpl-other' }] })
+      : jsonResponse({ rotation: [{ templateId: 'tmpl-service' }, { templateId: 'tmpl-other' }], currentNextServiceTemplateId: 'tmpl-other' }));
+    const view = render(<CreateWorkshopTaskDialog open onOpenChange={vi.fn()} initialVehicleId="van-1" initialCategoryId="cat-service" />);
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Other' })).toBeChecked());
+    expect(screen.getByRole('checkbox', { name: 'Service A' })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Service A' }));
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Service A' })).toBeChecked());
+    expect(screen.getByRole('checkbox', { name: 'Other' })).not.toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Other' }));
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Other' })).toBeChecked());
+    expect(screen.getByRole('checkbox', { name: 'Service A' })).not.toBeChecked();
+    access.level = 2;
+    view.rerender(<CreateWorkshopTaskDialog open onOpenChange={vi.fn()} initialVehicleId="van-1" initialCategoryId="cat-service" />);
+    expect(screen.getByRole('checkbox', { name: 'Service A' })).toBeDisabled();
   });
 
   it('MNT-LINK-001 clears invalid prefill and auto-selects the ordered valid intersection', async () => {

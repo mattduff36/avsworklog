@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { splitVehiclesByRecent } from '@/lib/utils/recentVehicles';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
 import { useWorkshopDraftPersistence } from '@/lib/hooks/useWorkshopDraftPersistence';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import { compactServiceLabel } from '@/lib/utils/assetServiceRotation';
 import {
@@ -175,6 +176,8 @@ export function WorkshopTaskFormDialogs({
   onResetEditForm,
 }: WorkshopTaskFormDialogsProps) {
   const { tabletModeEnabled } = useTabletMode();
+  const workshopAccess = useModuleAccessLevel('workshop-tasks');
+  const canChooseServiceType = !workshopAccess.isLoading && workshopAccess.canUseLevel(3);
   const addDialogContentRef = useRef<HTMLDivElement>(null);
   const addDialogTitleRef = useRef<HTMLHeadingElement>(null);
   const editDialogContentRef = useRef<HTMLDivElement>(null);
@@ -191,12 +194,21 @@ export function WorkshopTaskFormDialogs({
   } | null>(null);
   const [categoryLinkRetry, setCategoryLinkRetry] = useState(0);
   const categoryLinkRequestRef = useRef(0);
-  const vanServiceRequestRef = useRef(0);
+  const assetServiceRequestRef = useRef(0);
+  const [serviceScheduleRefresh, setServiceScheduleRefresh] = useState(0);
+  const [serviceScheduleError, setServiceScheduleError] = useState(false);
   const manualTemplateChoiceRef = useRef(false);
+  const [manualChoiceScope, setManualChoiceScope] = useState<string | null>(null);
+  const manualServiceTypeChoice = manualChoiceScope === `${selectedVehicleId}|${selectedCategoryId}`;
+  const markManualChoice = useCallback((value: boolean, scope = `${selectedVehicleId}|${selectedCategoryId}`) => {
+    manualTemplateChoiceRef.current = value;
+    setManualChoiceScope(value ? scope : null);
+  }, [selectedVehicleId, selectedCategoryId]);
   const selectionScopeRef = useRef('');
   const autoAppliedSelectionRef = useRef<{ assetId: string; categoryId: string; templateId: string } | null>(null);
-  const [vanServiceSchedule, setVanServiceSchedule] = useState<{
+  const [assetServiceSchedule, setAssetServiceSchedule] = useState<{
     assetId: string;
+    assetType: string;
     categoryId: string;
     rotationTemplateIds: string[];
     currentNextServiceTemplateId: string | null;
@@ -204,6 +216,7 @@ export function WorkshopTaskFormDialogs({
   } | null>(null);
   if (addModalWasOpen !== showAddModal) {
     setAddModalWasOpen(showAddModal);
+    setAssetServiceSchedule(null);
     if (!showAddModal) setAssetTypeChoice('');
   }
   const categoryLinkState = useMemo<CategoryLinkState>(() => {
@@ -285,26 +298,39 @@ export function WorkshopTaskFormDialogs({
   }, [selectedCategoryId, selectedVehicleId]);
 
   useEffect(() => {
+    if (!showAddModal) return undefined;
+    const refresh = () => {
+      setAssetServiceSchedule(null);
+      setServiceScheduleError(false);
+      setServiceScheduleRefresh((value) => value + 1);
+    };
+    window.addEventListener('focus', refresh);
+    return () => window.removeEventListener('focus', refresh);
+  }, [showAddModal]);
+
+  useEffect(() => {
     const shouldFetch =
-      selectedAddAssetType === 'van' &&
+      showAddModal &&
+      (selectedAddAssetType === 'van' || selectedAddAssetType === 'hgv') &&
       Boolean(selectedVehicleId) &&
       categoryLinkState.status === 'ready' &&
       categoryLinkState.categoryId === selectedCategoryId &&
       linkedCategoryTemplateIds.length >= 2;
     if (!shouldFetch) return undefined;
 
-    const requestId = vanServiceRequestRef.current + 1;
-    vanServiceRequestRef.current = requestId;
+    const requestId = assetServiceRequestRef.current + 1;
+    assetServiceRequestRef.current = requestId;
     const assetId = selectedVehicleId;
     const categoryId = selectedCategoryId;
 
     void (async () => {
       try {
         const response = await fetch(
-          `/api/fleet/service-types?assetType=van&assetId=${encodeURIComponent(assetId)}`,
+          `/api/fleet/service-types?assetType=${selectedAddAssetType}&assetId=${encodeURIComponent(assetId)}`,
+          { cache: 'no-store' },
         );
         const data = await response.json().catch(() => null);
-        if (vanServiceRequestRef.current !== requestId) return;
+        if (assetServiceRequestRef.current !== requestId) return;
         const rotationTemplateIds = Array.from(new Set(
           ((data?.rotation || []) as Array<{ templateId?: string }>)
             .map((step) => step.templateId || '')
@@ -322,24 +348,27 @@ export function WorkshopTaskFormDialogs({
             compactLabel: template.compactLabel ?? null,
           }));
         if (!response.ok || !data) {
-          setVanServiceSchedule(null);
+          setAssetServiceSchedule(null);
+          setServiceScheduleError(true);
           return;
         }
-        setVanServiceSchedule({
+        setAssetServiceSchedule({
           assetId,
+          assetType: selectedAddAssetType,
           categoryId,
           rotationTemplateIds,
           currentNextServiceTemplateId: data.currentNextServiceTemplateId || null,
           templates,
         });
       } catch {
-        if (vanServiceRequestRef.current !== requestId) return;
-        setVanServiceSchedule(null);
+        if (assetServiceRequestRef.current !== requestId) return;
+        setAssetServiceSchedule(null);
+        setServiceScheduleError(true);
       }
     })();
 
     return () => {
-      vanServiceRequestRef.current += 1;
+      assetServiceRequestRef.current += 1;
     };
   }, [
     categoryLinkState,
@@ -348,6 +377,8 @@ export function WorkshopTaskFormDialogs({
     selectedAddAssetType,
     selectedCategoryId,
     selectedVehicleId,
+    showAddModal,
+    serviceScheduleRefresh,
   ]);
 
   const compatibleLinkedTemplates = useMemo(() => {
@@ -363,19 +394,20 @@ export function WorkshopTaskFormDialogs({
     );
   }, [attachmentTemplates, categoryLinkState, selectedAddAssetType, selectedCategoryId]);
 
-  const vanServiceScheduleApplies = Boolean(
-    selectedAddAssetType === 'van' &&
-    vanServiceSchedule &&
-    vanServiceSchedule.assetId === selectedVehicleId &&
-    vanServiceSchedule.categoryId === selectedCategoryId &&
-    vanServiceSchedule.rotationTemplateIds.length >= 2 &&
-    vanServiceSchedule.rotationTemplateIds.every((templateId) => linkedCategoryTemplateIds.includes(templateId)),
+  const assetServiceScheduleApplies = Boolean(
+    (selectedAddAssetType === 'van' || selectedAddAssetType === 'hgv') &&
+    assetServiceSchedule &&
+    assetServiceSchedule.assetId === selectedVehicleId &&
+    assetServiceSchedule.assetType === selectedAddAssetType &&
+    assetServiceSchedule.categoryId === selectedCategoryId &&
+    assetServiceSchedule.rotationTemplateIds.length >= 2 &&
+    assetServiceSchedule.rotationTemplateIds.every((templateId) => linkedCategoryTemplateIds.includes(templateId)),
   );
-  const scheduledNextServiceTemplateId = vanServiceScheduleApplies
-    ? vanServiceSchedule?.currentNextServiceTemplateId ?? null
+  const scheduledNextServiceTemplateId = assetServiceScheduleApplies
+    ? assetServiceSchedule?.currentNextServiceTemplateId ?? null
     : null;
   const scheduledNextServiceTemplate = scheduledNextServiceTemplateId
-    ? vanServiceSchedule?.templates.find((template) => template.templateId === scheduledNextServiceTemplateId) ?? null
+    ? assetServiceSchedule?.templates.find((template) => template.templateId === scheduledNextServiceTemplateId) ?? null
     : null;
 
   useEffect(() => {
@@ -401,8 +433,8 @@ export function WorkshopTaskFormDialogs({
       currentId === autoApplied.templateId,
     );
 
-    if (vanServiceScheduleApplies) {
-      if (manualTemplateChoiceRef.current && (currentAllowed || selectedAttachmentTemplateIds.length === 0)) {
+    if (assetServiceScheduleApplies) {
+      if (canChooseServiceType && manualTemplateChoiceRef.current && (currentAllowed || selectedAttachmentTemplateIds.length === 0)) {
         return;
       }
       if (staleAuto) {
@@ -414,12 +446,15 @@ export function WorkshopTaskFormDialogs({
         onSelectedAttachmentTemplateIdsChange([]);
         return;
       }
-      if (currentAllowed) return;
+      const scheduledId = assetServiceSchedule?.currentNextServiceTemplateId ?? null;
+      // An automatic choice follows the latest saved schedule. Only an explicit
+      // choice for this visit may override it when the dialog refreshes.
+      if (canChooseServiceType && currentAllowed && (!autoApplied || currentId !== autoApplied.templateId)) return;
+      if (currentAllowed && currentId === scheduledId) return;
       if (currentId && !currentAllowed) {
         onSelectedAttachmentTemplateIdsChange([]);
         return;
       }
-      const scheduledId = vanServiceSchedule?.currentNextServiceTemplateId ?? null;
       if (scheduledId && allowedIds.has(scheduledId)) {
         autoAppliedSelectionRef.current = {
           assetId: selectedVehicleId,
@@ -427,6 +462,9 @@ export function WorkshopTaskFormDialogs({
           templateId: scheduledId,
         };
         onSelectedAttachmentTemplateIdsChange([scheduledId]);
+      } else if (currentId) {
+        autoAppliedSelectionRef.current = null;
+        onSelectedAttachmentTemplateIdsChange([]);
       }
       return;
     }
@@ -449,13 +487,14 @@ export function WorkshopTaskFormDialogs({
   }, [
     categoryLinkState,
     compatibleLinkedTemplates,
+    canChooseServiceType,
     onSelectedAttachmentTemplateIdsChange,
     selectedAddAssetType,
     selectedAttachmentTemplateIds,
     selectedCategoryId,
     selectedVehicleId,
-    vanServiceSchedule,
-    vanServiceScheduleApplies,
+    assetServiceSchedule,
+    assetServiceScheduleApplies,
   ]);
   const addUsesKm = selectedAddAssetType === 'hgv';
   const addUsesHours = selectedAddAssetType === 'plant';
@@ -480,10 +519,12 @@ export function WorkshopTaskFormDialogs({
       newMeterReading,
       workshopComments,
       selectedAttachmentTemplateIds,
+      manualServiceTypeChoice,
     },
     isDirty: isAddFormDirty,
     onRestore: (draft) => {
       setCategoryLinkResult(null);
+      setCategoryLinkRetry((value) => value + 1);
       const restoredVehicle = vehiclesRef.current.find((vehicle) => vehicle.id === draft.selectedVehicleId);
       const restoredType =
         readWorkshopAssetType(draft.selectedAddAssetType) ||
@@ -496,7 +537,11 @@ export function WorkshopTaskFormDialogs({
       onNewMeterReadingChange(draft.newMeterReading || '');
       onWorkshopCommentsChange(draft.workshopComments || '');
       const restoredTemplateIds = draft.selectedAttachmentTemplateIds || [];
-      manualTemplateChoiceRef.current = restoredTemplateIds.length > 0;
+      markManualChoice(draft.manualServiceTypeChoice === true, `${draft.selectedVehicleId || ''}|${draft.selectedCategoryId || ''}`);
+      selectionScopeRef.current = `${draft.selectedVehicleId || ''}|${draft.selectedCategoryId || ''}`;
+      autoAppliedSelectionRef.current = !manualTemplateChoiceRef.current && restoredTemplateIds.length === 1
+        ? { assetId: draft.selectedVehicleId, categoryId: draft.selectedCategoryId, templateId: restoredTemplateIds[0] }
+        : null;
       onSelectedAttachmentTemplateIdsChange(restoredTemplateIds);
     },
   });
@@ -573,9 +618,9 @@ export function WorkshopTaskFormDialogs({
 
   function handleAssetChange(nextVehicleId: string) {
     if (nextVehicleId === selectedVehicleId) return;
-    manualTemplateChoiceRef.current = false;
+    markManualChoice(false);
     autoAppliedSelectionRef.current = null;
-    setVanServiceSchedule(null);
+    setAssetServiceSchedule(null);
     setCategoryLinkResult(null);
     onSelectedVehicleIdChange(nextVehicleId);
     onSelectedCategoryIdChange('');
@@ -587,9 +632,9 @@ export function WorkshopTaskFormDialogs({
 
   function handleCategoryChange(nextCategoryId: string) {
     if (nextCategoryId === selectedCategoryId) return;
-    manualTemplateChoiceRef.current = false;
+    markManualChoice(false);
     autoAppliedSelectionRef.current = null;
-    setVanServiceSchedule(null);
+    setAssetServiceSchedule(null);
     setCategoryLinkResult(null);
     onSelectedCategoryIdChange(nextCategoryId);
     onSelectedAttachmentTemplateIdsChange([]);
@@ -597,11 +642,16 @@ export function WorkshopTaskFormDialogs({
 
   const categoryLinksReady = categoryLinkState.status === 'ready' && categoryLinkState.categoryId === selectedCategoryId;
   const categoryRequiresForm = categoryLinksReady && linkedCategoryTemplateIds.length > 0;
+  const serviceSchedulePending = (selectedAddAssetType === 'van' || selectedAddAssetType === 'hgv') &&
+    linkedCategoryTemplateIds.length >= 2 && (!assetServiceSchedule ||
+      assetServiceSchedule.assetId !== selectedVehicleId || assetServiceSchedule.categoryId !== selectedCategoryId ||
+      assetServiceSchedule.assetType !== selectedAddAssetType);
   const categoryLinksBlockCreate =
     !selectedAddAssetType ||
     !selectedVehicleId ||
     !selectedCategoryId ||
     !categoryLinksReady ||
+    serviceSchedulePending ||
     (categoryRequiresForm && (
       compatibleLinkedTemplates.length === 0 ||
       selectedAttachmentTemplateIds.length !== 1 ||
@@ -841,6 +891,12 @@ export function WorkshopTaskFormDialogs({
                   Required form
                   <span className="text-red-400">*</span>
                 </h3>
+                {serviceSchedulePending && (
+                  <p role="status" className="text-sm text-slate-300">
+                    {serviceScheduleError ? 'Service options could not be loaded.' : 'Loading current service options...'}
+                    {serviceScheduleError && <button type="button" className="ml-2 underline" onClick={() => setServiceScheduleRefresh((value) => value + 1)}>Retry</button>}
+                  </p>
+                )}
                 {categoryRequiresForm && compatibleLinkedTemplates.length === 0 && (
                   <p className="text-sm text-red-300">
                     This category requires a form, but no active template matches this asset. Choose Repair instead if this is ordinary repair work.
@@ -848,15 +904,15 @@ export function WorkshopTaskFormDialogs({
                 )}
                 {categoryRequiresForm && compatibleLinkedTemplates.length > 0 && (
                   <div className={`max-h-40 space-y-2 overflow-y-auto rounded-md border border-slate-700 bg-slate-900 p-2 ${tabletModeEnabled ? 'p-3' : ''}`}>
-                    {vanServiceScheduleApplies && (
+                    {assetServiceScheduleApplies && (
                       <p className="text-sm text-amber-100" role="status">
                         {scheduledNextServiceTemplateId && compatibleLinkedTemplates.some((template) => template.id === scheduledNextServiceTemplateId)
-                          ? `Scheduled next service: ${compactServiceLabel(scheduledNextServiceTemplate?.compactLabel, scheduledNextServiceTemplate?.templateName || compatibleLinkedTemplates.find((template) => template.id === scheduledNextServiceTemplateId)?.name)}. Select that form, or choose another linked form for this visit.`
+                          ? `Scheduled next service: ${compactServiceLabel(scheduledNextServiceTemplate?.compactLabel, scheduledNextServiceTemplate?.templateName || compatibleLinkedTemplates.find((template) => template.id === scheduledNextServiceTemplateId)?.name)}. ${canChooseServiceType ? 'Select that form, or choose another linked form for this visit.' : 'Supervisor access is required to choose a different service.'}`
                           : 'Choose service type. Next service type needs choosing, so pick Basic A or Full explicitly.'}
                       </p>
                     )}
                     {compatibleLinkedTemplates.map((template) => {
-                      const scheduled = vanServiceScheduleApplies && template.id === scheduledNextServiceTemplateId;
+                      const scheduled = assetServiceScheduleApplies && template.id === scheduledNextServiceTemplateId;
                       return (
                       <div key={template.id} className={`flex items-center ${tabletModeEnabled ? 'space-x-3 py-1' : 'space-x-2'}`}>
                         <input
@@ -864,8 +920,9 @@ export function WorkshopTaskFormDialogs({
                           name="workshop-create-required-form"
                           id={`template-inline-${template.id}`}
                           checked={selectedAttachmentTemplateIds.length === 1 && selectedAttachmentTemplateIds[0] === template.id}
+                          disabled={serviceSchedulePending || (assetServiceScheduleApplies && !canChooseServiceType && !scheduled)}
                           onChange={() => {
-                            manualTemplateChoiceRef.current = true;
+                            markManualChoice(true);
                             autoAppliedSelectionRef.current = null;
                             onSelectedAttachmentTemplateIdsChange([template.id]);
                           }}

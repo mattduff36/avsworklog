@@ -236,6 +236,7 @@ export function useWorkshopTaskCrudActions({
           workshop_comments: workshopComments.trim(),
           meter_reading: readingValue,
           title: taskTitle,
+          service_template_id: selectedAttachmentTemplateIds.length === 1 ? selectedAttachmentTemplateIds[0] : null,
         }),
       });
 
@@ -271,6 +272,10 @@ export function useWorkshopTaskCrudActions({
 
         if (attachmentErrors.length > 0) {
           toast.error(`Task created but ${attachmentErrors.length} attachment(s) failed to link`);
+          setShowAddModal(false);
+          resetAddForm();
+          fetchTasks();
+          return;
         }
       }
 

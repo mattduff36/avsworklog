@@ -10,6 +10,7 @@ import {
   insertWorkshopTaskAttachmentExactOne,
 } from '@/lib/server/asset-service';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import { canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
 import {
   canonicalizeAttachmentResponses,
   hashAttachmentResponses,
@@ -341,6 +342,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         templateId: template_id,
         templateName: (template as { name?: string }).name ?? null,
         actorId: user.id,
+        canOverrideServiceType: await canEffectiveRoleUseModuleLevel('workshop-tasks', 3),
       });
       const result = await db
         .from('workshop_task_attachments')

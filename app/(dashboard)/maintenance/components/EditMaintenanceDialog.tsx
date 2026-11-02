@@ -36,6 +36,7 @@ import { toast } from 'sonner';
 import { formatRegistrationForInput } from './add-asset/utils';
 import { NicknameUserCombobox } from '@/components/fleet/NicknameUserCombobox';
 import { NextServiceTypeSelect } from '@/components/fleet/NextServiceTypeSelect';
+import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { prepareMaintenanceServiceStateEdit } from '@/lib/utils/maintenance-service-state-edit';
 import {
@@ -163,6 +164,8 @@ export function EditMaintenanceDialog({
   const supabase = createClient();
   const { isManager, isAdmin, loading: authLoading } = useAuth();
   const canEditServiceState = !authLoading && Boolean(isManager || isAdmin);
+  const maintenanceAccess = useModuleAccessLevel('maintenance');
+  const canEditNextServiceType = !maintenanceAccess.isLoading && maintenanceAccess.canUseLevel(3) && Boolean(vehicle?.id);
   const updateMutation = useUpdateMaintenance();
   const createMutation = useCreateMaintenance();
   const { data: maintenanceData } = useMaintenance();
@@ -478,7 +481,7 @@ export function EditMaintenanceDialog({
       })),
       // notes field intentionally omitted - kept in DB/backend for future use but hidden from UI
       comment: data.comment.trim(), // Mandatory comment for audit trail (not a DB column)
-    }, canEditServiceState, vehicle);
+    }, canEditServiceState, vehicle, canEditNextServiceType);
 
     try {
       if (!vehicle.id) {
@@ -912,7 +915,7 @@ export function EditMaintenanceDialog({
                         setValue('next_service_template_id', templateId ? templateId : null, { shouldDirty: true })
                       }
                       required={false}
-                      disabled={!canEditServiceState}
+                      disabled={!canEditNextServiceType}
                     />
                     {String(vehicle.vehicle.asset_type) !== 'hgv' &&
                       String(vehicle.vehicle.asset_type) !== 'plant' &&

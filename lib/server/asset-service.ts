@@ -1282,18 +1282,52 @@ export async function getServiceCorrectionContext(taskId: string) {
   });
 }
 
+export async function validateWorkshopServiceChoice(input: {
+  assetType: ServiceAssetType;
+  assetId: string;
+  categoryId: string | null;
+  subcategoryId: string | null;
+  templateId: string | null;
+  canOverride: boolean;
+}) {
+  if (input.assetType === 'plant') return;
+  return withTransaction(async (client) => {
+    const config = await loadServiceConfig(client, input.assetType);
+    const categoryId = input.subcategoryId
+      ? await loadSubcategoryParentCategoryId(client, input.subcategoryId)
+      : input.categoryId;
+    if (categoryId !== config.workshopCategoryId) return;
+    if (!input.templateId || !config.steps.some((step) => step.attachmentTemplateId === input.templateId)) {
+      throw new AssetServiceError('Select a valid service checklist before creating the task', 400);
+    }
+    if (!input.canOverride) {
+      const { rows } = await client.query<{ next_service_template_id: string | null }>(
+        `SELECT next_service_template_id FROM public.vehicle_maintenance
+         WHERE ${input.assetType === 'hgv' ? 'hgv_id' : 'van_id'} = $1`, [input.assetId],
+      );
+      if (rows[0]?.next_service_template_id !== input.templateId) {
+        throw new AssetServiceError('Supervisor access is required to choose a service other than the scheduled next service. Refresh the task form.', 403);
+      }
+    }
+  });
+}
+
 export async function insertWorkshopTaskAttachmentExactOne(input: {
   taskId: string;
   templateId: string;
   templateName: string | null;
   actorId: string;
+  canOverrideServiceType?: boolean;
 }) {
   return withTransaction(async (client) => {
     const { rows: taskRows } = await client.query<{
       category_id: string | null;
+      van_id: string | null;
+      hgv_id: string | null;
     }>(
       `
-      SELECT COALESCE(a.workshop_category_id, s.category_id) AS category_id
+      SELECT COALESCE(a.workshop_category_id, s.category_id) AS category_id,
+             a.van_id, a.hgv_id
       FROM public.actions a
       LEFT JOIN public.workshop_task_subcategories s
         ON s.id = a.workshop_subcategory_id
@@ -1306,6 +1340,21 @@ export async function insertWorkshopTaskAttachmentExactOne(input: {
     if (!task) throw new AssetServiceError('Task not found', 404);
     if (!task.category_id) {
       throw new AssetServiceError('Workshop category is required for linked attachments');
+    }
+
+    if (!input.canOverrideServiceType && (task.van_id || task.hgv_id)) {
+      const assetType = task.hgv_id ? 'hgv' : 'van';
+      const config = await loadServiceConfig(client, assetType);
+      if (task.category_id === config.workshopCategoryId) {
+        const { rows: state } = await client.query<{ next_service_template_id: string | null }>(
+          `SELECT next_service_template_id FROM public.vehicle_maintenance
+           WHERE ${task.hgv_id ? 'hgv_id' : 'van_id'} = $1 FOR SHARE`,
+          [task.hgv_id || task.van_id],
+        );
+        if (state[0]?.next_service_template_id !== input.templateId) {
+          throw new AssetServiceError('Supervisor access is required to choose a service other than the scheduled next service. Refresh the task form.', 403);
+        }
+      }
     }
 
     const { rows: linkedRows } = await client.query<{ template_id: string }>(

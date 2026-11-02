@@ -100,16 +100,17 @@ export async function PUT(
       );
     }
     
-    // The database protects service state for managers. Check actual changes before
-    // any writes (including custom items), and omit stale unchanged fields for others.
+    // Level 3 (Supervisor) may change the next type. Meter/history corrections
+    // retain their manager gate. Validate before any writes, including custom items.
     const canEditServiceState = await isEffectiveRoleManagerOrHigher();
-    if (!canEditServiceState && hasMaintenanceServiceStateChange(body, currentRecord)) {
+    const managerOnlyChanges = { ...body, next_service_template_id: undefined };
+    if (!canEditServiceState && hasMaintenanceServiceStateChange(managerOnlyChanges, currentRecord)) {
       return NextResponse.json(
         { error: 'Manager or admin required to update service state' },
         { status: 403 },
       );
     }
-    body = filterMaintenanceServiceState(body, canEditServiceState);
+    body = filterMaintenanceServiceState(body, canEditServiceState, true);
 
     const originalServiceState = serviceStateSnapshot(currentRecord);
     body = omitUnchangedServiceState(body, currentRecord);

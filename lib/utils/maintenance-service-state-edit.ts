@@ -25,10 +25,13 @@ export function hasMaintenanceServiceStateChange(
 export function filterMaintenanceServiceState<T extends MaintenanceServiceState>(
   requested: T,
   canEditServiceState: boolean,
+  canEditNextServiceType = canEditServiceState,
 ): T {
   const result = { ...requested };
   if (!canEditServiceState) {
-    for (const key of PROTECTED_MAINTENANCE_SERVICE_FIELDS) delete result[key];
+    for (const key of PROTECTED_MAINTENANCE_SERVICE_FIELDS) {
+      if (key !== 'next_service_template_id' || !canEditNextServiceType) delete result[key];
+    }
   }
   return result;
 }
@@ -56,8 +59,9 @@ export function omitUnchangedServiceState<T extends MaintenanceServiceState>(req
 
 export function prepareMaintenanceServiceStateEdit<T extends MaintenanceServiceState>(
   requested: T, canEdit: boolean, original: MaintenanceServiceState & { next_service_rotation_step_id?: string | null },
+  canEditNextServiceType = canEdit,
 ): T & { expected_service_state?: MaintenanceServiceStateSnapshot } {
-  const result = omitUnchangedServiceState(filterMaintenanceServiceState(requested, canEdit), original);
+  const result = omitUnchangedServiceState(filterMaintenanceServiceState(requested, canEdit, canEditNextServiceType), original);
   return hasMaintenanceServiceStateChange(result, original)
     ? { ...result, expected_service_state: serviceStateSnapshot(original) }
     : result;

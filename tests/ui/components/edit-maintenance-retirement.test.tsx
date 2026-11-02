@@ -8,6 +8,7 @@ import { EditMaintenanceDialog } from '@/app/(dashboard)/maintenance/components/
 
 const mocks = vi.hoisted(() => ({
   auth: { isManager: true, isAdmin: false, loading: false },
+  maintenanceLevel: 3,
   createMutation: { isPending: false, mutateAsync: vi.fn() },
   updateMutation: { isPending: false, mutateAsync: vi.fn() },
   taskResult: { data: [] as Array<{ id: string }>, error: null as Error | null },
@@ -17,7 +18,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/useAuth', () => ({ useAuth: () => mocks.auth }));
-beforeEach(() => { mocks.auth.isManager = true; mocks.auth.isAdmin = false; mocks.auth.loading = false; });
+vi.mock('@/lib/hooks/useModuleAccessLevel', () => ({ useModuleAccessLevel: () => ({ isLoading: false, canUseLevel: (level: number) => mocks.maintenanceLevel >= level }) }));
+beforeEach(() => { mocks.auth.isManager = true; mocks.auth.isAdmin = false; mocks.auth.loading = false; mocks.maintenanceLevel = 3; });
 
 vi.mock('@/lib/hooks/useMaintenance', () => ({
   useCreateMaintenance: () => mocks.createMutation,
@@ -386,6 +388,7 @@ describe('EditMaintenanceDialog protected service fields', () => {
   });
 
   it('disables protected fields and omits them from ordinary non-manager saves', async () => {
+    mocks.maintenanceLevel = 2;
     mocks.auth.isManager = false;
     render(<EditMaintenanceDialog open onOpenChange={vi.fn()} vehicle={vehicle as never} />);
     expect(screen.getByLabelText('Next Service (Miles)')).toBeDisabled();
@@ -399,6 +402,20 @@ describe('EditMaintenanceDialog protected service fields', () => {
       expect(updates).not.toHaveProperty(field);
     }
     expect(updates.comment).toBe('Routine maintenance comment');
+  });
+  it('allows Supervisors to change next type while mileage remains disabled', async () => {
+    mocks.auth.isManager = false;
+    render(<EditMaintenanceDialog open onOpenChange={vi.fn()} vehicle={vehicle as never} />);
+    expect(screen.getByRole('button', { name: 'Change next service type' })).toBeEnabled();
+    expect(screen.getByLabelText('Last Service (Miles)')).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Change next service type' }));
+    fireEvent.change(screen.getByLabelText(/Update Comment/), { target: { value: 'Correct next service type' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+    await waitFor(() => expect(mocks.updateMutation.mutateAsync).toHaveBeenCalledOnce());
+    const updates = mocks.updateMutation.mutateAsync.mock.calls[0][0].updates;
+    expect(updates.next_service_template_id).toBe('22222222-2222-4222-8222-222222222222');
+    expect(updates.expected_service_state).toBeDefined();
+    expect(updates).not.toHaveProperty('last_service_mileage');
   });
 
   it('preserves an actual zero service reading for managers', async () => {

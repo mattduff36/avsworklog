@@ -4,9 +4,12 @@ import { WorkshopTaskFormDialogs } from '@/app/(dashboard)/workshop-tasks/compon
 import { preferredAttachmentTemplateName } from '@/components/workshop-tasks/TaskAttachmentsSection';
 import { TabletModeProvider } from '@/components/layout/tablet-mode-context';
 import type React from 'react';
+import { saveWorkshopDraft } from '@/lib/client/workshop-task-drafts';
 
 let outsidePrevented = false;
 let escapePrevented = false;
+const access = vi.hoisted(() => ({ level: 3 }));
+vi.mock('@/lib/hooks/useModuleAccessLevel', () => ({ useModuleAccessLevel: () => ({ isLoading: false, canUseLevel: (level: number) => access.level >= level }) }));
 
 vi.mock('@/lib/app-auth/client', () => ({
   subscribeToAuthStateChange: () => vi.fn(),
@@ -210,6 +213,7 @@ function createBaseProps(): React.ComponentProps<typeof WorkshopTaskFormDialogs>
 
 describe('Workshop task dialog tablet safeguards', () => {
   beforeEach(() => {
+    access.level = 3;
     localStorage.clear();
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -478,6 +482,7 @@ describe('Workshop task dialog tablet safeguards', () => {
     expect(screen.queryByText('Unlinked Form')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create Task' })).toBeDisabled();
 
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'Van Service A' })).toBeEnabled());
     fireEvent.click(screen.getByRole('radio', { name: 'Van Service A' }));
     expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['van-a']);
     fireEvent.click(screen.getByRole('button', { name: 'Create Task' }));
@@ -672,6 +677,89 @@ describe('Workshop task dialog tablet safeguards', () => {
     expect(screen.getByText('Full Service (Van) (scheduled)')).toBeInTheDocument();
   });
 
+  it.each(['van', 'hgv'] as const)('refreshes an automatic %s service choice on reopen and focus while preserving a manual choice', async (assetType) => {
+    const props = createBaseProps();
+    props.vehicles = [{ id: 'van-1', reg_number: 'VAN1', nickname: null, asset_type: assetType }];
+    props.selectedVehicleId = 'van-1';
+    props.selectedCategoryId = 'service';
+    props.attachmentTemplates = [
+      { id: 'basic', name: 'Basic Service A (Van)', applies_to: [assetType] },
+      { id: 'full', name: 'Full Service (Van)', applies_to: [assetType] },
+    ];
+    let scheduled = 'basic';
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/category-attachments')) {
+        return { ok: true, json: async () => ({ templates: [{ templateId: 'basic' }, { templateId: 'full' }] }) } as Response;
+      }
+      return { ok: true, json: async () => ({
+        templates: [
+          { templateId: 'basic', templateName: 'Basic Service A (Van)', compactLabel: 'Basic A' },
+          { templateId: 'full', templateName: 'Full Service (Van)', compactLabel: 'Full' },
+        ],
+        rotation: [{ templateId: 'basic' }, { templateId: 'full' }],
+        currentNextServiceTemplateId: scheduled,
+      }) } as Response;
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    const view = render(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+    await waitFor(() => expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['basic']));
+    props.selectedAttachmentTemplateIds = ['basic'];
+    view.rerender(<TabletModeProvider><WorkshopTaskFormDialogs {...props} showAddModal={false} /></TabletModeProvider>);
+    scheduled = 'full';
+    props.onSelectedAttachmentTemplateIdsChange.mockClear();
+    view.rerender(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+    await waitFor(() => expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['full']));
+    expect(screen.getByText(/Scheduled next service: Full/)).toBeInTheDocument();
+    props.selectedAttachmentTemplateIds = ['full'];
+    view.rerender(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+    scheduled = 'basic';
+    props.onSelectedAttachmentTemplateIdsChange.mockClear();
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['basic']));
+    fireEvent.click(screen.getByRole('radio', { name: 'Full Service (Van)' }));
+    props.onSelectedAttachmentTemplateIdsChange.mockClear();
+    fireEvent(window, new Event('focus'));
+    await waitFor(() => expect(screen.getByText(/Scheduled next service: Basic A/)).toBeInTheDocument());
+    expect(props.onSelectedAttachmentTemplateIdsChange).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/fleet/service-types'), { cache: 'no-store' });
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining(`assetType=${assetType}`), { cache: 'no-store' });
+    access.level = 2;
+    view.rerender(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+    expect(screen.getByRole('radio', { name: 'Full Service (Van)' })).toBeDisabled();
+  });
+
+  it.each([false, true])('restores a saved draft with manual choice=%s without confusing automatic defaults', async (manualServiceTypeChoice) => {
+    const props = createBaseProps();
+    props.vehicles = [{ id: 'van-1', reg_number: 'VAN1', nickname: null, asset_type: 'van' }];
+    props.selectedVehicleId = 'van-1'; props.selectedCategoryId = 'service';
+    props.selectedAttachmentTemplateIds = ['basic'];
+    props.attachmentTemplates = [
+      { id: 'basic', name: 'Basic', applies_to: ['van'] },
+      { id: 'full', name: 'Full', applies_to: ['van'] },
+    ];
+    await saveWorkshopDraft({ id: `workshop-task-add:${props.userId || 'anonymous'}:van`, kind: 'workshop-task-add', payload: {
+      selectedVehicleId: 'van-1', selectedCategoryId: 'service', selectedAttachmentTemplateIds: ['basic'], manualServiceTypeChoice,
+    } });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    let scheduled: string | null = 'full';
+    global.fetch = vi.fn(async (input: RequestInfo | URL) => ({ ok: true, json: async () => String(input).includes('/category-attachments')
+      ? { templates: [{ templateId: 'basic' }, { templateId: 'full' }] }
+      : { templates: [], rotation: [{ templateId: 'basic' }, { templateId: 'full' }], currentNextServiceTemplateId: scheduled },
+    } as Response));
+    const view = render(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+    await waitFor(() => expect(screen.getByText(/Scheduled next service: Full/)).toBeInTheDocument());
+    await waitFor(() => expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenLastCalledWith([manualServiceTypeChoice ? 'basic' : 'full']));
+    if (!manualServiceTypeChoice) {
+      props.selectedAttachmentTemplateIds = ['full'];
+      view.rerender(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+      props.onSelectedAttachmentTemplateIdsChange.mockClear(); scheduled = null;
+      fireEvent(window, new Event('focus'));
+      await waitFor(() => expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith([]));
+    }
+    confirm.mockRestore();
+  });
+
   it('keeps a manual van service choice when a stale service-type response arrives', async () => {
     const props = createBaseProps();
     props.vehicles = [
@@ -717,8 +805,8 @@ describe('Workshop task dialog tablet safeguards', () => {
     await waitFor(() => {
       expect(screen.getByRole('radio', { name: 'Full Service (Van)' })).toBeInTheDocument();
     });
-    fireEvent.click(screen.getByRole('radio', { name: 'Full Service (Van)' }));
-    expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenCalledWith(['full']);
+    expect(screen.getByRole('radio', { name: 'Full Service (Van)' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Create Task' })).toBeDisabled();
 
     props.onSelectedAttachmentTemplateIdsChange.mockClear();
     view.rerender(

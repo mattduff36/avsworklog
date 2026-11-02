@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
-import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { canEffectiveRoleAccessModule, canEffectiveRoleUseModuleLevel } from '@/lib/utils/rbac';
+import { AssetServiceError, validateWorkshopServiceChoice } from '@/lib/server/asset-service';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { inferAssetMeterUnit } from '@/lib/workshop-tasks/asset-meter';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
@@ -20,6 +21,7 @@ interface CreateWorkshopTaskBody {
   workshop_comments?: string;
   meter_reading?: number | string;
   title?: string | null;
+  service_template_id?: string | null;
 }
 
 interface AssetRecord {
@@ -176,6 +178,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Asset not found' }, { status: 404 });
     }
 
+    await validateWorkshopServiceChoice({
+      assetType: body.asset_type,
+      assetId: vehicleId,
+      categoryId: body.workshop_category_id || null,
+      subcategoryId: body.workshop_subcategory_id || null,
+      templateId: body.service_template_id || null,
+      canOverride: await canEffectiveRoleUseModuleLevel('workshop-tasks', 3),
+    });
+
     const taskData: ActionInsert = {
       action_type: 'workshop_vehicle_task',
       workshop_comments: comments,
@@ -241,6 +252,9 @@ export async function POST(request: NextRequest) {
       meter_reading_updated: meterReadingUpdated,
     }, { status: 201 });
   } catch (error) {
+    if (error instanceof AssetServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
     console.error('Error creating workshop task:', error);
     await logServerError({
       error: error as Error,

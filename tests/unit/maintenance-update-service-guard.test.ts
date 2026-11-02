@@ -101,6 +101,15 @@ describe('maintenance update service-state guard', () => {
     expect(state.filters).toContainEqual({ table: 'workshop_attachment_template_versions', key: 'status', value: 'published' });
     expect(JSON.stringify(state.writes.filter(({ table }) => table === 'maintenance_history'))).toContain('next_service_type');
   });
+  it('allows a Supervisor-level maintenance editor to change next type and cursor, but not due mileage', async () => {
+    expect((await update({ next_service_template_id: TEMPLATE_ID })).status).toBe(200);
+    expect(state.writes.find(({ table }) => table === 'vehicle_maintenance')!.values).toMatchObject({
+      next_service_template_id: TEMPLATE_ID, next_service_rotation_step_id: 'step',
+    });
+    state.writes = [];
+    expect((await update({ next_service_template_id: TEMPLATE_ID, next_service_mileage: 20000 })).status).toBe(403);
+    expect(state.writes).toHaveLength(0);
+  });
   it.each(['service_rotation_steps', 'workshop_attachment_templates', 'workshop_category_attachment_templates', 'workshop_attachment_template_versions'])(
     'rejects missing/incompatible %s before any writes', async (table) => {
       state.manager = true; state.missing = table;
