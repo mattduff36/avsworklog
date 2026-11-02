@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
+import { InspectionMeterCorrectionDialog, type InspectionMeterCorrectionTarget } from '@/components/inspections/InspectionMeterCorrectionDialog';
+import { formatInspectionMeter } from '@/lib/inspections/meter-correction';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useInspectionRealtime } from '@/lib/hooks/useRealtime';
@@ -19,7 +21,7 @@ import { isUuid } from '@/lib/utils/uuid';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, FileText, Truck, Loader2, AlertTriangle } from 'lucide-react';
+import { Plus, Clipboard, Clock, User, Download, Pencil, Trash2, Filter, FileText, Truck, Loader2, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { Employee, InspectionStatusFilter } from '@/types/common';
@@ -56,6 +58,7 @@ import {
 } from '@/lib/utils/fleet-asset-label';
 
 interface VanInspectionListRow {
+  current_mileage: number | null;
   id: string;
   van_id: string;
   user_id: string;
@@ -123,6 +126,15 @@ function InspectionsContent() {
     isSupervisor,
   });
   const pageSize = canViewCrossUserInspections ? 20 : 10;
+  const [meterTarget, setMeterTarget] = useState<InspectionMeterCorrectionTarget | null>(null);
+  const canCorrectReadings = !authLoading && !permissionLoading && canAccessInspectionModule &&
+    (isManager || isAdmin || isSuperAdmin) && !isVanInspectionsMaintenancePaused();
+  const openMeterCorrection = (id: string) => {
+    const inspection = inspections.find(row => row.id === id);
+    if (!canCorrectReadings || !inspection || inspection.status !== 'submitted') return;
+    const assetLabel = inspection.vans?.reg_number || 'Van';
+    setMeterTarget({ id, label: `${assetLabel} · ${formatDate(inspection.inspection_date)}` });
+  };
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
   const [inspections, setInspections] = useState<VanInspectionListRow[]>([]);
@@ -264,7 +276,7 @@ function InspectionsContent() {
     try {
       let query = supabase
         .from('van_inspections')
-        .select('id, van_id, user_id, status, inspection_date, submitted_at')
+        .select('id, van_id, user_id, status, current_mileage, inspection_date, submitted_at')
         .order('inspection_date', { ascending: false })
         .range(0, displayCount);
 
@@ -882,6 +894,8 @@ function InspectionsContent() {
               <VanInspectionsListTable
                 inspections={inspections}
                 columnVisibility={columnVisibility}
+                canCorrectReadings={canCorrectReadings}
+                onEditReading={openMeterCorrection}
                 downloadingId={downloading}
                 deleting={deleting}
                 getInspectionHref={getInspectionHref}
@@ -950,7 +964,8 @@ function InspectionsContent() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between text-sm">
+                <p className="mb-3 text-sm text-muted-foreground tabular-nums">{formatInspectionMeter(inspection.current_mileage, 'van')}</p>
+                <div className="flex flex-wrap gap-2 items-center justify-between text-sm">
                   <div className="text-muted-foreground">
                     {inspection.status === 'submitted'
                       ? inspection.submitted_at
@@ -958,6 +973,14 @@ function InspectionsContent() {
                         : 'Submitted'
                       : 'Draft'}
                   </div>
+                  {canCorrectReadings && inspection.status === 'submitted' && (
+                    <Button variant="outline" size="sm"
+                      className={tabletModeEnabled ? 'min-h-11' : ''}
+                      aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                      onClick={event => { event.stopPropagation(); openMeterCorrection(inspection.id); }}>
+                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                    </Button>
+                  )}
                   {inspection.status === 'submitted' && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, inspection.id)}
@@ -1018,6 +1041,11 @@ function InspectionsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {canCorrectReadings && (
+        <InspectionMeterCorrectionDialog assetType="van" target={meterTarget}
+          onClose={() => setMeterTarget(null)}
+          onSaved={(id, reading) => setInspections(rows => rows.map(row => row.id === id ? { ...row, current_mileage: reading } : row))} />
+      )}
     </AppPageShell>
   );
 }

@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Clipboard, Clock, Download, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Clipboard, Clock, Download, Pencil, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatInspectionMeter } from '@/lib/inspections/meter-correction';
 import { formatDate } from '@/lib/utils/date';
 import {
   formatFleetAssetLabel,
@@ -27,6 +28,7 @@ export const DEFAULT_HGV_INSPECTIONS_COLUMN_VISIBILITY: HgvInspectionsColumnVisi
 };
 
 interface HgvInspectionRow {
+  current_mileage: number | null;
   id: string;
   user_id: string;
   status: 'draft' | 'submitted';
@@ -42,6 +44,8 @@ interface HgvInspectionRow {
 interface HgvInspectionsListTableProps {
   inspections: HgvInspectionRow[];
   columnVisibility: HgvInspectionsColumnVisibility;
+  canCorrectReadings: boolean;
+  onEditReading: (id: string) => void;
   downloadingId: string | null;
   deletingId: string | null;
   getInspectionHref: (inspection: HgvInspectionRow) => string;
@@ -86,6 +90,8 @@ function formatInspectionRange(startDate: string, endDate: string | null) {
 export function HgvInspectionsListTable({
   inspections,
   columnVisibility,
+  canCorrectReadings,
+  onEditReading,
   downloadingId,
   deletingId,
   getInspectionHref,
@@ -163,6 +169,7 @@ export function HgvInspectionsListTable({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
+            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right">Mileage (km)</TableHead>
             {columnVisibility.status && (
               <TableHead
                 className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
@@ -215,6 +222,9 @@ export function HgvInspectionsListTable({
               <TableCell className="text-muted-foreground">
                 {formatInspectionRange(inspection.inspection_date, inspection.inspection_end_date)}
               </TableCell>
+              <TableCell className="text-muted-foreground text-right tabular-nums whitespace-nowrap">
+                {formatInspectionMeter(inspection.current_mileage, 'hgv')}
+              </TableCell>
               {columnVisibility.status && (
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -234,6 +244,12 @@ export function HgvInspectionsListTable({
               )}
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
+                  {canCorrectReadings && inspection.status === 'submitted' && (
+                    <Button variant="outline" size="sm" aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                      onClick={() => onEditReading(inspection.id)}>
+                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                    </Button>
+                  )}
                   {inspection.status === 'submitted' && (
                     <Button
                       onClick={(event) => onDownloadPDF(event, inspection.id)}

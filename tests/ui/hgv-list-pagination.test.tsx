@@ -187,7 +187,7 @@ function assertWindowQuery(entry: QueryLog) {
     { kind: 'order', column: 'inspection_date', ascending: false },
     { kind: 'order', column: 'id', ascending: false },
   ]);
-  expect(entry.select).toBe('id, user_id, hgv_id, status, inspection_date, inspection_end_date, submitted_at');
+  expect(entry.select).toBe('id, user_id, hgv_id, status, current_mileage, inspection_date, inspection_end_date, submitted_at');
   expect(entry.countExact).toBe(true);
 }
 

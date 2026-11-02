@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Clipboard, Clock, Download, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Clipboard, Clock, Download, Pencil, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatInspectionMeter } from '@/lib/inspections/meter-correction';
 import { formatDate } from '@/lib/utils/date';
 import {
   formatFleetAssetLabel,
@@ -29,6 +30,7 @@ export const DEFAULT_VAN_INSPECTIONS_COLUMN_VISIBILITY: VanInspectionsColumnVisi
 };
 
 interface VanInspectionRow {
+  current_mileage: number | null;
   id: string;
   user_id: string;
   status: 'draft' | 'submitted';
@@ -51,6 +53,8 @@ interface VanInspectionRow {
 interface VanInspectionsListTableProps {
   inspections: VanInspectionRow[];
   columnVisibility: VanInspectionsColumnVisibility;
+  canCorrectReadings: boolean;
+  onEditReading: (id: string) => void;
   downloadingId: string | null;
   deleting: boolean;
   getInspectionHref: (inspection: VanInspectionRow) => string;
@@ -88,6 +92,8 @@ function getStatusIcon(inspection: VanInspectionRow) {
 export function VanInspectionsListTable({
   inspections,
   columnVisibility,
+  canCorrectReadings,
+  onEditReading,
   downloadingId,
   deleting,
   getInspectionHref,
@@ -170,6 +176,7 @@ export function VanInspectionsListTable({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
+            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right">Mileage (miles)</TableHead>
             {columnVisibility.status && (
               <TableHead
                 className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
@@ -227,6 +234,9 @@ export function VanInspectionsListTable({
               <TableCell className="text-muted-foreground">
                 {formatDate(inspection.inspection_date)}
               </TableCell>
+              <TableCell className="text-muted-foreground text-right tabular-nums whitespace-nowrap">
+                {formatInspectionMeter(inspection.current_mileage, 'van')}
+              </TableCell>
               {columnVisibility.status && (
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -246,6 +256,12 @@ export function VanInspectionsListTable({
               )}
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
+                  {canCorrectReadings && inspection.status === 'submitted' && (
+                    <Button variant="outline" size="sm" aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                      onClick={() => onEditReading(inspection.id)}>
+                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                    </Button>
+                  )}
                   {inspection.status === 'submitted' && (
                     <Button
                       onClick={(event) => onDownloadPDF(event, inspection.id)}

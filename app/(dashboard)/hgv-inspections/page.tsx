@@ -12,10 +12,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PanelLoader } from '@/components/ui/panel-loader';
-import { Clipboard, Clock, Download, Filter, Loader2, Plus, Trash2, User } from 'lucide-react';
+import { Clipboard, Clock, Download, Filter, Loader2, Plus, Pencil, Trash2, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { createClient } from '@/lib/supabase/client';
 import { fetchUserDirectory } from '@/lib/client/user-directory';
+import { InspectionMeterCorrectionDialog, type InspectionMeterCorrectionTarget } from '@/components/inspections/InspectionMeterCorrectionDialog';
+import { formatInspectionMeter } from '@/lib/inspections/meter-correction';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { canEditDraftInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
@@ -39,6 +41,7 @@ import {
 } from '@/lib/utils/fleet-asset-label';
 
 interface HgvInspectionWithRelations {
+  current_mileage: number | null;
   id: string;
   user_id: string;
   hgv_id: string | null;
@@ -87,6 +90,15 @@ function HgvInspectionsContent() {
     isSupervisor,
   });
   const pageSize = canViewCrossUserInspections ? 20 : 10;
+  const [meterTarget, setMeterTarget] = useState<InspectionMeterCorrectionTarget | null>(null);
+  const canCorrectReadings = !authLoading && !permissionLoading && canAccessInspectionModule &&
+    (isManager || isAdmin || isSuperAdmin);
+  const openMeterCorrection = (id: string) => {
+    const inspection = inspections.find(row => row.id === id);
+    if (!canCorrectReadings || !inspection || inspection.status !== 'submitted') return;
+    const assetLabel = inspection.hgv?.reg_number || 'HGV';
+    setMeterTarget({ id, label: `${assetLabel} · ${formatDate(inspection.inspection_date)}` });
+  };
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
@@ -193,7 +205,7 @@ function HgvInspectionsContent() {
       const buildQuery = () => {
         let query = supabase
           .from('hgv_inspections')
-          .select('id, user_id, hgv_id, status, inspection_date, inspection_end_date, submitted_at', { count: 'exact' })
+          .select('id, user_id, hgv_id, status, current_mileage, inspection_date, inspection_end_date, submitted_at', { count: 'exact' })
           .order('inspection_date', { ascending: false })
           .order('id', { ascending: false });
 
@@ -601,6 +613,8 @@ function HgvInspectionsContent() {
               <HgvInspectionsListTable
                 inspections={inspections.slice(0, displayCount)}
                 columnVisibility={columnVisibility}
+                canCorrectReadings={canCorrectReadings}
+                onEditReading={openMeterCorrection}
                 downloadingId={downloading}
                 deletingId={deleting}
                 getInspectionHref={getInspectionHref}
@@ -666,7 +680,8 @@ function HgvInspectionsContent() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between text-sm">
+                <p className="mb-3 text-sm text-muted-foreground tabular-nums">{formatInspectionMeter(inspection.current_mileage, 'hgv')}</p>
+                <div className="flex flex-wrap gap-2 items-center justify-between text-sm">
                   <div className="text-muted-foreground">
                     {inspection.status === 'submitted'
                       ? inspection.submitted_at
@@ -674,6 +689,14 @@ function HgvInspectionsContent() {
                         : 'Submitted'
                       : 'Draft'}
                   </div>
+                  {canCorrectReadings && inspection.status === 'submitted' && (
+                    <Button variant="outline" size="sm"
+                      className={tabletModeEnabled ? 'min-h-11' : ''}
+                      aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                      onClick={event => { event.stopPropagation(); openMeterCorrection(inspection.id); }}>
+                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                    </Button>
+                  )}
                   {inspection.status === 'submitted' && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, inspection.id)}
@@ -703,6 +726,11 @@ function HgvInspectionsContent() {
             </div>
           )}
         </>
+      )}
+      {canCorrectReadings && (
+        <InspectionMeterCorrectionDialog assetType="hgv" target={meterTarget}
+          onClose={() => setMeterTarget(null)}
+          onSaved={(id, reading) => setInspections(rows => rows.map(row => row.id === id ? { ...row, current_mileage: reading } : row))} />
       )}
     </AppPageShell>
   );

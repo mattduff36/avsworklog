@@ -86,6 +86,12 @@ The controlled document library serves current published policies and procedures
 Application error logs on `/debug` stay visible until their outcome is closed. Untriaged active rows are red. Diagnosed rows that are not yet deployed and verified live stay active and are orange, with one next step. Only no-fix-required rows and deployed live-verified fixes are archived. A local commit is not a live fix. Bulk archive is not a product action.
 
 
+## Daily Check reading corrections
+
+Van, Plant and HGV Daily Check lists show the recorded miles, hours or kilometres to anyone with access to that check. Managers, admins and superadmins with access to the relevant module may correct the reading on any submitted check across teams. Supervisors and employees cannot make these corrections. Effective View As permissions apply.
+
+Corrections change only the reading and retain the submitted check's answers, signature, submitter and status. Every correction records the previous and replacement readings, editor and time in the audit log; a reason/comment is optional. Stale edits are rejected. Linked asset readings are recalculated from the latest submitted check when the corrected reading was still current; a different current reading is preserved. Hired plant checks without a fleet link retain correction history without updating a fleet asset.
+
 ## Van service rotation
 
 Vans alternate Basic Service A and Full Service, with the next service due 10,000 miles after the actual completed service mileage. The existing van checklist remains the Full Service checklist. Basic Service A retains core checks and engine oil/filter servicing, but fuel, air, pollen and gearbox filter items are checks/cleaning rather than routine replacement.

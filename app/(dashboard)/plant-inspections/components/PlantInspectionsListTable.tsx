@@ -2,10 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowUpDown, Clipboard, Clock, Download, Trash2 } from 'lucide-react';
+import { ArrowUpDown, Clipboard, Clock, Download, Pencil, Trash2 } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatInspectionMeter } from '@/lib/inspections/meter-correction';
 import { formatDate } from '@/lib/utils/date';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
@@ -26,6 +27,7 @@ export const DEFAULT_PLANT_INSPECTIONS_COLUMN_VISIBILITY: PlantInspectionsColumn
 };
 
 interface PlantInspectionRow {
+  current_mileage: number | null;
   id: string;
   user_id: string;
   status: 'draft' | 'submitted';
@@ -55,6 +57,8 @@ interface PlantInspectionRow {
 interface PlantInspectionsListTableProps {
   inspections: PlantInspectionRow[];
   columnVisibility: PlantInspectionsColumnVisibility;
+  canCorrectReadings: boolean;
+  onEditReading: (id: string) => void;
   downloadingId: string | null;
   deleting: boolean;
   getInspectionHref: (inspection: PlantInspectionRow) => string;
@@ -107,6 +111,8 @@ function formatInspectionRange(startDate: string, endDate: string | null) {
 export function PlantInspectionsListTable({
   inspections,
   columnVisibility,
+  canCorrectReadings,
+  onEditReading,
   downloadingId,
   deleting,
   getInspectionHref,
@@ -192,6 +198,7 @@ export function PlantInspectionsListTable({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
+            <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right">Hours</TableHead>
             {columnVisibility.status && (
               <TableHead
                 className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
@@ -250,6 +257,9 @@ export function PlantInspectionsListTable({
               <TableCell className="text-muted-foreground">
                 {formatInspectionRange(inspection.inspection_date, inspection.inspection_end_date)}
               </TableCell>
+              <TableCell className="text-muted-foreground text-right tabular-nums whitespace-nowrap">
+                {formatInspectionMeter(inspection.current_mileage, 'plant')}
+              </TableCell>
               {columnVisibility.status && (
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -269,6 +279,12 @@ export function PlantInspectionsListTable({
               )}
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
+                  {canCorrectReadings && inspection.status === 'submitted' && (
+                    <Button variant="outline" size="sm" aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                      onClick={() => onEditReading(inspection.id)}>
+                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                    </Button>
+                  )}
                   {inspection.status === 'submitted' && (
                     <Button
                       onClick={(event) => onDownloadPDF(event, inspection.id)}

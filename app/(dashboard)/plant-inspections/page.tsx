@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
+import { InspectionMeterCorrectionDialog, type InspectionMeterCorrectionTarget } from '@/components/inspections/InspectionMeterCorrectionDialog';
+import { formatInspectionMeter } from '@/lib/inspections/meter-correction';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { usePlantInspectionRealtime } from '@/lib/hooks/useRealtime';
@@ -17,7 +19,7 @@ import { PanelLoader } from '@/components/ui/panel-loader';
 import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Plus, Clipboard, Clock, User, Download, Trash2, Filter, Wrench, Loader2 } from 'lucide-react';
+import { Plus, Clipboard, Clock, User, Download, Pencil, Trash2, Filter, Wrench, Loader2 } from 'lucide-react';
 import { formatDate } from '@/lib/utils/date';
 import { toast } from 'sonner';
 import { PlantInspection } from '@/types/inspection';
@@ -112,6 +114,15 @@ function PlantInspectionsContent() {
     isSupervisor,
   });
   const pageSize = canViewCrossUserInspections ? 20 : 10;
+  const [meterTarget, setMeterTarget] = useState<InspectionMeterCorrectionTarget | null>(null);
+  const canCorrectReadings = !authLoading && !permissionLoading && canAccessInspectionModule &&
+    (isManager || isAdmin || isSuperAdmin);
+  const openMeterCorrection = (id: string) => {
+    const inspection = inspections.find(row => row.id === id);
+    if (!canCorrectReadings || !inspection || inspection.status !== 'submitted') return;
+    const assetLabel = inspection.is_hired_plant ? inspection.hired_plant_id_serial || 'Hired plant' : inspection.plant?.plant_id || 'Plant';
+    setMeterTarget({ id, label: `${assetLabel} · ${formatDate(inspection.inspection_date)}` });
+  };
   const router = useRouter();
   const { tabletModeEnabled } = useTabletMode();
   const [inspections, setInspections] = useState<InspectionWithPlant[]>([]);
@@ -815,6 +826,8 @@ function PlantInspectionsContent() {
               <PlantInspectionsListTable
                 inspections={inspections.slice(0, displayCount)}
                 columnVisibility={columnVisibility}
+                canCorrectReadings={canCorrectReadings}
+                onEditReading={openMeterCorrection}
                 downloadingId={downloading}
                 deleting={deleting}
                 getInspectionHref={getInspectionHref}
@@ -899,7 +912,8 @@ function PlantInspectionsContent() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center justify-between text-sm">
+                <p className="mb-3 text-sm text-muted-foreground tabular-nums">{formatInspectionMeter(inspection.current_mileage, 'plant')}</p>
+                <div className="flex flex-wrap gap-2 items-center justify-between text-sm">
                   <div className="text-muted-foreground">
                     {inspection.status === 'submitted'
                       ? inspection.submitted_at
@@ -907,6 +921,14 @@ function PlantInspectionsContent() {
                         : 'Submitted'
                       : 'Draft'}
                   </div>
+                  {canCorrectReadings && inspection.status === 'submitted' && (
+                    <Button variant="outline" size="sm"
+                      className={tabletModeEnabled ? 'min-h-11' : ''}
+                      aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                      onClick={event => { event.stopPropagation(); openMeterCorrection(inspection.id); }}>
+                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                    </Button>
+                  )}
                   {inspection.status === 'submitted' && (
                     <Button
                       onClick={(e) => handleDownloadPDF(e, inspection.id)}
@@ -966,6 +988,11 @@ function PlantInspectionsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {canCorrectReadings && (
+        <InspectionMeterCorrectionDialog assetType="plant" target={meterTarget}
+          onClose={() => setMeterTarget(null)}
+          onSaved={(id, reading) => setInspections(rows => rows.map(row => row.id === id ? { ...row, current_mileage: reading } : row))} />
+      )}
     </AppPageShell>
   );
 }
