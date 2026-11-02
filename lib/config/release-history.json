@@ -1,5 +1,35 @@
 [
   {
+    "version": "1126.0.0",
+    "updateKind": "minor",
+    "title": "Workshop Tasks update",
+    "description": "Updated Workshop Tasks, Maintenance, Data storage, Actions, and Fleet. Hand off approved plans to premium workers.",
+    "summary": "Updated Workshop Tasks, Maintenance, Data storage, Actions, and Fleet. Hand off approved plans to premium workers.",
+    "details": [
+      "Updated Workshop Tasks, Maintenance, Data storage, Actions, and Fleet, with changes to background routes, app screens, interface components, and automated tests.",
+      "Updated maintenance, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated data storage, with changes to automated tests and data storage.",
+      "Updated actions, with changes to app screens.",
+      "Updated fleet, with changes to background routes."
+    ],
+    "areas": [
+      "Workshop Tasks",
+      "Release automation",
+      "Maintenance",
+      "Data storage",
+      "Actions",
+      "Fleet. Hand off approved plans to premium workers"
+    ],
+    "areaKeys": [
+      "workshop-tasks",
+      "release-automation",
+      "maintenance",
+      "data-storage",
+      "actions"
+    ],
+    "pushedAt": "2026-11-02T14:23:52.124Z"
+  },
+  {
     "version": "1026.14.3",
     "updateKind": "minor",
     "title": "Data storage maintenance update",

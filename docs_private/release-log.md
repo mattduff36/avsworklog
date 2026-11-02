@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.0.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop-tasks): update Workshop Tasks, Maintenance, Data storage, Actions, and Fleet`
+
+**PUSHED AT**
+2026-11-02T14:23:52.124Z
+
+**WHAT CHANGED**
+Update Workshop Tasks, Maintenance, Data storage, Actions, and Fleet. Hand off approved plans to premium workers.
+
+**VERSION HISTORY DETAILS**
+- Updated Workshop Tasks, Maintenance, Data storage, Actions, and Fleet, with changes to background routes, app screens, interface components, and automated tests.
+- Updated maintenance, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated data storage, with changes to automated tests and data storage.
+- Updated actions, with changes to app screens.
+- Updated fleet, with changes to background routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(workshop-tasks): update Workshop Tasks, Maintenance, Data storage, Actions, and Fleet`
+- `refactor(automation): hand off approved plans to premium workers`
+
 ## 1026.14.3
 
 **GIT COMMIT MESSAGE**
