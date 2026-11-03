@@ -505,8 +505,17 @@ function PlantInspectionsContent() {
     try {
       const saved = localStorage.getItem(PLANT_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved) as Partial<PlantInspectionsColumnVisibility>;
-        setColumnVisibility((prev) => ({ ...prev, ...parsed }));
+        const parsed: unknown = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          setColumnVisibility((prev) => ({
+            employeeId: 'employeeId' in parsed && typeof parsed.employeeId === 'boolean'
+              ? parsed.employeeId : prev.employeeId,
+            category: 'category' in parsed && typeof parsed.category === 'boolean'
+              ? parsed.category : prev.category,
+            status: 'status' in parsed && typeof parsed.status === 'boolean'
+              ? parsed.status : prev.status,
+          }));
+        }
       }
     } catch {
       // Ignore invalid persisted state
@@ -804,9 +813,8 @@ function PlantInspectionsContent() {
                 <ColumnVisibilityMenu
                   options={[
                     { id: 'employeeId', label: 'Employee ID', checked: columnVisibility.employeeId },
-                    { id: 'category', label: 'Category', checked: columnVisibility.category },
+                    { id: 'category', label: 'Plant details', checked: columnVisibility.category },
                     { id: 'status', label: 'Status', checked: columnVisibility.status },
-                    { id: 'submittedAt', label: 'Submitted', checked: columnVisibility.submittedAt },
                   ]}
                   onToggle={toggleColumn}
                 />
@@ -913,20 +921,13 @@ function PlantInspectionsContent() {
               </CardHeader>
               <CardContent>
                 <p className="mb-3 text-sm text-muted-foreground tabular-nums">{formatInspectionMeter(inspection.current_mileage, 'plant')}</p>
-                <div className="flex flex-wrap gap-2 items-center justify-between text-sm">
-                  <div className="text-muted-foreground">
-                    {inspection.status === 'submitted'
-                      ? inspection.submitted_at
-                        ? `Submitted ${formatDate(inspection.submitted_at)}`
-                        : 'Submitted'
-                      : 'Draft'}
-                  </div>
+                <div className="flex flex-wrap items-center justify-end gap-2 text-sm">
                   {canCorrectReadings && inspection.status === 'submitted' && (
                     <Button variant="outline" size="sm"
-                      className={tabletModeEnabled ? 'min-h-11' : ''}
-                      aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                      className={tabletModeEnabled ? 'min-h-11 gap-1' : 'h-11 gap-1 md:h-8'}
+                      aria-label={`Edit Daily Check on ${inspection.inspection_date}`}
                       onClick={event => { event.stopPropagation(); openMeterCorrection(inspection.id); }}>
-                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                      <Pencil className="h-4 w-4" aria-hidden="true" />Edit
                     </Button>
                   )}
                   {inspection.status === 'submitted' && (
@@ -935,7 +936,7 @@ function PlantInspectionsContent() {
                       disabled={downloading === inspection.id}
                       variant="outline"
                       size="sm"
-                      className={`bg-slate-900 border-plant-inspection text-plant-inspection hover:bg-plant-inspection hover:text-white transition-all duration-200 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
+                      className={`bg-slate-900 border-plant-inspection text-plant-inspection hover:bg-plant-inspection hover:text-white transition-all duration-200 ${tabletModeEnabled ? 'min-h-11 text-base px-4' : 'h-11 md:h-8'}`}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       {downloading === inspection.id ? 'Downloading...' : 'Download PDF'}

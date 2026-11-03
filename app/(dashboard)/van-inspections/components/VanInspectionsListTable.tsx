@@ -15,18 +15,14 @@ import {
 
 export interface VanInspectionsColumnVisibility {
   employeeId: boolean;
-  vehicleCategory: boolean;
   status: boolean;
-  submittedAt: boolean;
 }
 
 export const VAN_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY = 'van-inspections-table-column-visibility';
 
 export const DEFAULT_VAN_INSPECTIONS_COLUMN_VISIBILITY: VanInspectionsColumnVisibility = {
   employeeId: false,
-  vehicleCategory: true,
   status: true,
-  submittedAt: true,
 };
 
 interface VanInspectionRow {
@@ -63,7 +59,7 @@ interface VanInspectionsListTableProps {
   onOpenDeleteDialog: (event: React.MouseEvent, inspection: VanInspectionRow) => void;
 }
 
-type SortField = 'employee' | 'vehicle' | 'date' | 'status' | 'submittedAt';
+type SortField = 'employee' | 'vehicle' | 'date' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 function getStatusBadge(status: string) {
@@ -117,8 +113,6 @@ export function VanInspectionsListTable({
           return factor * (new Date(a.inspection_date).getTime() - new Date(b.inspection_date).getTime());
         case 'status':
           return factor * a.status.localeCompare(b.status);
-        case 'submittedAt':
-          return factor * ((a.submitted_at || '').localeCompare(b.submitted_at || ''));
         default:
           return 0;
       }
@@ -148,11 +142,6 @@ export function VanInspectionsListTable({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
-            {columnVisibility.employeeId && (
-              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                Employee ID
-              </TableHead>
-            )}
             <TableHead
               className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
               onClick={() => handleSort('vehicle')}
@@ -162,11 +151,6 @@ export function VanInspectionsListTable({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
-            {columnVisibility.vehicleCategory && (
-              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                Category
-              </TableHead>
-            )}
             <TableHead
               className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
               onClick={() => handleSort('date')}
@@ -188,17 +172,6 @@ export function VanInspectionsListTable({
                 </div>
               </TableHead>
             )}
-            {columnVisibility.submittedAt && (
-              <TableHead
-                className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
-                onClick={() => handleSort('submittedAt')}
-              >
-                <div className="flex items-center gap-2">
-                  Submitted
-                  <ArrowUpDown className="h-3 w-3" />
-                </div>
-              </TableHead>
-            )}
             <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right">
               Actions
             </TableHead>
@@ -213,12 +186,12 @@ export function VanInspectionsListTable({
             >
               <TableCell className="font-medium text-white">
                 {inspection.profile?.full_name || 'Unknown User'}
+                {columnVisibility.employeeId && (
+                  <div className="text-xs font-normal text-muted-foreground">
+                    {inspection.profile?.employee_id || '-'}
+                  </div>
+                )}
               </TableCell>
-              {columnVisibility.employeeId && (
-                <TableCell className="text-muted-foreground">
-                  {inspection.profile?.employee_id || '-'}
-                </TableCell>
-              )}
               <TableCell className="text-white">
                 {formatFleetAssetLabel({
                   identifier: inspection.vans?.reg_number || 'Unknown Van',
@@ -226,11 +199,6 @@ export function VanInspectionsListTable({
                   context: getFleetAssetLabelContext(inspection.profile?.full_name),
                 })}
               </TableCell>
-              {columnVisibility.vehicleCategory && (
-                <TableCell className="text-muted-foreground">
-                  {inspection.vans?.van_categories?.name || '-'}
-                </TableCell>
-              )}
               <TableCell className="text-muted-foreground">
                 {formatDate(inspection.inspection_date)}
               </TableCell>
@@ -245,21 +213,13 @@ export function VanInspectionsListTable({
                   </div>
                 </TableCell>
               )}
-              {columnVisibility.submittedAt && (
-                <TableCell className="text-muted-foreground">
-                  {inspection.status === 'submitted'
-                    ? inspection.submitted_at
-                      ? formatDate(inspection.submitted_at)
-                      : 'Submitted'
-                    : 'Draft'}
-                </TableCell>
-              )}
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
                   {canCorrectReadings && inspection.status === 'submitted' && (
-                    <Button variant="outline" size="sm" aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                    <Button variant="outline" size="sm" aria-label={`Edit Daily Check on ${inspection.inspection_date}`}
+                      className="gap-1 px-2 [@media(pointer:coarse)]:min-h-11 [[data-tablet-mode=on]_&]:min-h-11 [&_svg]:size-3.5"
                       onClick={() => onEditReading(inspection.id)}>
-                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                      <Pencil aria-hidden="true" />Edit
                     </Button>
                   )}
                   {inspection.status === 'submitted' && (

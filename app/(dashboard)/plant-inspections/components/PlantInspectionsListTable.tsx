@@ -14,7 +14,6 @@ export interface PlantInspectionsColumnVisibility {
   employeeId: boolean;
   category: boolean;
   status: boolean;
-  submittedAt: boolean;
 }
 
 export const PLANT_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY = 'plant-inspections-table-column-visibility';
@@ -23,7 +22,6 @@ export const DEFAULT_PLANT_INSPECTIONS_COLUMN_VISIBILITY: PlantInspectionsColumn
   employeeId: false,
   category: true,
   status: true,
-  submittedAt: true,
 };
 
 interface PlantInspectionRow {
@@ -67,7 +65,7 @@ interface PlantInspectionsListTableProps {
   onOpenDeleteDialog: (event: React.MouseEvent, inspection: PlantInspectionRow) => void;
 }
 
-type SortField = 'employee' | 'plant' | 'date' | 'status' | 'submittedAt';
+type SortField = 'employee' | 'plant' | 'date' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 function getStatusBadge(status: string) {
@@ -136,8 +134,6 @@ export function PlantInspectionsListTable({
           return factor * (new Date(a.inspection_date).getTime() - new Date(b.inspection_date).getTime());
         case 'status':
           return factor * a.status.localeCompare(b.status);
-        case 'submittedAt':
-          return factor * ((a.submitted_at || '').localeCompare(b.submitted_at || ''));
         default:
           return 0;
       }
@@ -167,11 +163,6 @@ export function PlantInspectionsListTable({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
-            {columnVisibility.employeeId && (
-              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                Employee ID
-              </TableHead>
-            )}
             <TableHead
               className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
               onClick={() => handleSort('plant')}
@@ -184,11 +175,6 @@ export function PlantInspectionsListTable({
             <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
               Job
             </TableHead>
-            {columnVisibility.category && (
-              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                Category
-              </TableHead>
-            )}
             <TableHead
               className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
               onClick={() => handleSort('date')}
@@ -210,17 +196,6 @@ export function PlantInspectionsListTable({
                 </div>
               </TableHead>
             )}
-            {columnVisibility.submittedAt && (
-              <TableHead
-                className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
-                onClick={() => handleSort('submittedAt')}
-              >
-                <div className="flex items-center gap-2">
-                  Submitted
-                  <ArrowUpDown className="h-3 w-3" />
-                </div>
-              </TableHead>
-            )}
             <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right">
               Actions
             </TableHead>
@@ -235,25 +210,26 @@ export function PlantInspectionsListTable({
             >
               <TableCell className="font-medium text-white">
                 {inspection.profile?.full_name || 'Unknown User'}
+                {columnVisibility.employeeId && (
+                  <div className="text-xs font-normal text-muted-foreground">
+                    {inspection.profile?.employee_id || '-'}
+                  </div>
+                )}
               </TableCell>
-              {columnVisibility.employeeId && (
-                <TableCell className="text-muted-foreground">
-                  {inspection.profile?.employee_id || '-'}
-                </TableCell>
-              )}
               <TableCell className="text-white">
                 {getPlantLabel(inspection)}
+                {columnVisibility.category && (
+                  <div className="text-xs text-muted-foreground">
+                    {inspection.is_hired_plant
+                      ? [inspection.hired_plant_hiring_company, inspection.hired_plant_description]
+                        .filter(Boolean).join(' - ') || '-'
+                      : inspection.plant?.van_categories?.name || '-'}
+                  </div>
+                )}
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {inspection.job_code || 'Unclassified'}
               </TableCell>
-              {columnVisibility.category && (
-                <TableCell className="text-muted-foreground">
-                  {inspection.is_hired_plant
-                    ? inspection.hired_plant_hiring_company || inspection.hired_plant_description || '-'
-                    : inspection.plant?.van_categories?.name || '-'}
-                </TableCell>
-              )}
               <TableCell className="text-muted-foreground">
                 {formatInspectionRange(inspection.inspection_date, inspection.inspection_end_date)}
               </TableCell>
@@ -268,21 +244,13 @@ export function PlantInspectionsListTable({
                   </div>
                 </TableCell>
               )}
-              {columnVisibility.submittedAt && (
-                <TableCell className="text-muted-foreground">
-                  {inspection.status === 'submitted'
-                    ? inspection.submitted_at
-                      ? formatDate(inspection.submitted_at)
-                      : 'Submitted'
-                    : 'Draft'}
-                </TableCell>
-              )}
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
                   {canCorrectReadings && inspection.status === 'submitted' && (
-                    <Button variant="outline" size="sm" aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                    <Button variant="outline" size="sm" aria-label={`Edit Daily Check on ${inspection.inspection_date}`}
+                      className="gap-1 px-2 [@media(pointer:coarse)]:min-h-11 [[data-tablet-mode=on]_&]:min-h-11 [&_svg]:size-3.5"
                       onClick={() => onEditReading(inspection.id)}>
-                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                      <Pencil aria-hidden="true" />Edit
                     </Button>
                   )}
                   {inspection.status === 'submitted' && (

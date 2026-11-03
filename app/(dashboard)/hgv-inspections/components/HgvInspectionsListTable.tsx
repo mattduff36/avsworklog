@@ -16,7 +16,6 @@ import {
 export interface HgvInspectionsColumnVisibility {
   employeeId: boolean;
   status: boolean;
-  submittedAt: boolean;
 }
 
 export const HGV_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY = 'hgv-inspections-table-column-visibility';
@@ -24,7 +23,6 @@ export const HGV_INSPECTIONS_COLUMN_VISIBILITY_STORAGE_KEY = 'hgv-inspections-ta
 export const DEFAULT_HGV_INSPECTIONS_COLUMN_VISIBILITY: HgvInspectionsColumnVisibility = {
   employeeId: false,
   status: true,
-  submittedAt: true,
 };
 
 interface HgvInspectionRow {
@@ -54,7 +52,7 @@ interface HgvInspectionsListTableProps {
   onDeleteInspection: (event: React.MouseEvent, inspectionId: string) => void;
 }
 
-type SortField = 'employee' | 'hgv' | 'date' | 'status' | 'submittedAt';
+type SortField = 'employee' | 'hgv' | 'date' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 function getStatusBadge(status: string) {
@@ -115,8 +113,6 @@ export function HgvInspectionsListTable({
           return factor * (new Date(a.inspection_date).getTime() - new Date(b.inspection_date).getTime());
         case 'status':
           return factor * a.status.localeCompare(b.status);
-        case 'submittedAt':
-          return factor * ((a.submitted_at || '').localeCompare(b.submitted_at || ''));
         default:
           return 0;
       }
@@ -146,11 +142,6 @@ export function HgvInspectionsListTable({
                 <ArrowUpDown className="h-3 w-3" />
               </div>
             </TableHead>
-            {columnVisibility.employeeId && (
-              <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border">
-                Employee ID
-              </TableHead>
-            )}
             <TableHead
               className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
               onClick={() => handleSort('hgv')}
@@ -181,17 +172,6 @@ export function HgvInspectionsListTable({
                 </div>
               </TableHead>
             )}
-            {columnVisibility.submittedAt && (
-              <TableHead
-                className="bg-slate-900 text-muted-foreground cursor-pointer hover:bg-slate-800 border-b-2 border-border"
-                onClick={() => handleSort('submittedAt')}
-              >
-                <div className="flex items-center gap-2">
-                  Submitted
-                  <ArrowUpDown className="h-3 w-3" />
-                </div>
-              </TableHead>
-            )}
             <TableHead className="bg-slate-900 text-muted-foreground border-b-2 border-border text-right">
               Actions
             </TableHead>
@@ -206,12 +186,12 @@ export function HgvInspectionsListTable({
             >
               <TableCell className="font-medium text-white">
                 {inspection.profile?.full_name || 'Unknown User'}
+                {columnVisibility.employeeId && (
+                  <div className="text-xs font-normal text-muted-foreground">
+                    {inspection.profile?.employee_id || '-'}
+                  </div>
+                )}
               </TableCell>
-              {columnVisibility.employeeId && (
-                <TableCell className="text-muted-foreground">
-                  {inspection.profile?.employee_id || '-'}
-                </TableCell>
-              )}
               <TableCell className="text-white">
                 {formatFleetAssetLabel({
                   identifier: inspection.hgv?.reg_number || 'Unknown HGV',
@@ -233,21 +213,13 @@ export function HgvInspectionsListTable({
                   </div>
                 </TableCell>
               )}
-              {columnVisibility.submittedAt && (
-                <TableCell className="text-muted-foreground">
-                  {inspection.status === 'submitted'
-                    ? inspection.submitted_at
-                      ? formatDate(inspection.submitted_at)
-                      : 'Submitted'
-                    : 'Draft'}
-                </TableCell>
-              )}
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
                   {canCorrectReadings && inspection.status === 'submitted' && (
-                    <Button variant="outline" size="sm" aria-label={`Edit reading for check on ${inspection.inspection_date}`}
+                    <Button variant="outline" size="sm" aria-label={`Edit Daily Check on ${inspection.inspection_date}`}
+                      className="gap-1 px-2 [@media(pointer:coarse)]:min-h-11 [[data-tablet-mode=on]_&]:min-h-11 [&_svg]:size-3.5"
                       onClick={() => onEditReading(inspection.id)}>
-                      <Pencil className="h-4 w-4 mr-1.5" />Edit reading
+                      <Pencil aria-hidden="true" />Edit
                     </Button>
                   )}
                   {inspection.status === 'submitted' && (
