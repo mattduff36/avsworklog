@@ -114,7 +114,9 @@ export function InspectionMeterCorrectionDialog({ assetType, target, onClose, on
         {error && <p role="alert" className="text-sm text-red-500">{error}</p>}
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button type="submit" form="inspection-meter-correction" disabled={loading || saving || !snapshot || reading.trim() === '' || Number(reading) === snapshot.reading}>
+          <Button type="submit" form="inspection-meter-correction"
+            className="bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover disabled:opacity-70"
+            disabled={loading || saving || !snapshot || reading.trim() === '' || Number(reading) === snapshot.reading}>
             {saving ? 'Saving…' : 'Save correction'}
           </Button>
         </DialogFooter>
