@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.2.0",
+    "updateKind": "major",
+    "title": "Daily Tasks update",
+    "description": "Updated daily tasks.",
+    "summary": "Updated daily tasks.",
+    "details": [
+      "Updated daily tasks, with changes to interface components."
+    ],
+    "areas": [
+      "Daily Tasks"
+    ],
+    "areaKeys": [
+      "daily-tasks"
+    ],
+    "pushedAt": "2026-11-03T10:20:19.092Z"
+  },
+  {
     "version": "1126.1.0",
     "updateKind": "major",
     "title": "Daily Tasks update",
