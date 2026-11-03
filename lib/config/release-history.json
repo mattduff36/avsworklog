@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.2.2",
+    "updateKind": "minor",
+    "title": "Daily Tasks maintenance update",
+    "description": "Simplify Daily Check list columns.",
+    "summary": "Simplify Daily Check list columns.",
+    "details": [
+      "Simplify Daily Check list columns, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Daily Tasks"
+    ],
+    "areaKeys": [
+      "daily-tasks"
+    ],
+    "pushedAt": "2026-11-03T11:52:27.146Z"
+  },
+  {
     "version": "1126.2.1",
     "updateKind": "minor",
     "title": "Navigation improvements",

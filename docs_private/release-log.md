@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.2.2
+
+**GIT COMMIT MESSAGE**
+`refactor(inspections): simplify Daily Check list columns`
+
+**PUSHED AT**
+2026-11-03T11:52:27.146Z
+
+**WHAT CHANGED**
+Simplify Daily Check list columns.
+
+**VERSION HISTORY DETAILS**
+- Simplify Daily Check list columns, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `refactor(inspections): simplify Daily Check list columns`
+
 ## 1126.2.1
 
 **GIT COMMIT MESSAGE**
