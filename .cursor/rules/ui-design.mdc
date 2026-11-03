@@ -18,3 +18,11 @@ For trivial local work (copy/text, one-property styling, tiny isolated fixes, or
 Do not treat Inventory mobile chrome, Workshop’s hand-rolled header, or tablet-mode experiments as the default page recipe. Named references and anti-patterns are in `DESIGN.md`. For new generic chrome and reusable visual patterns, follow `DESIGN.md` even when the current module already contains a documented legacy or specialised look.
 
 For new modules, follow DESIGN.md's required management-list composition and visual acceptance checklist. Reuse existing loaders/search/actions; library imports alone do not establish visual quality. Record legacy inconsistencies separately instead of copying or broadly rewriting them.
+
+## Primary CTAs
+
+The default `Button` pairs `bg-primary text-primary-foreground hover:bg-primary/90`. Keep the primary `@theme inline` mappings in `app/globals.css`: raw CSS variables and foreground overrides alone do not generate a background utility.
+
+Radix dialogs normally portal to `body`, outside the dashboard's route-accent DOM subtree, so they inherit root/brand tokens, not the React parent's module accent. The default Button supports that context. For a fixed/module-coloured CTA, provide an explicit background, foreground and hover pair; see DESIGN.md's Buttons and actions contract.
+
+For new or changed modal primary CTAs, require actual browser inspection with screenshots and computed background/foreground/opacity checks in enabled, disabled and loading states, plus hover/focus. Check desktop and narrow/short viewports (mobile keyboard where applicable), readable labels/spinners and reachable actions. Functional DOM tests and successful builds cannot establish visual visibility. Report uninspected states/viewports rather than claiming visual acceptance.

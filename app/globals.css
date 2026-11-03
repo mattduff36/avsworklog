@@ -7,6 +7,8 @@
    generate bg-popover or text-muted-foreground classes. Resolve at use sites
    so portalled menus and route-scoped accents retain the active theme. */
 @theme inline {
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
   --color-muted-foreground: hsl(var(--muted-foreground));

@@ -18,6 +18,8 @@ Canonical tokens live in [`app/globals.css`](app/globals.css).
 
 Semantic HSL tokens (used as `hsl(var(--token))`): `--background`, `--foreground`, `--card`, `--popover`, `--primary` (AVS yellow by default), `--secondary`, `--muted`, `--accent` (slate, not module colour), `--destructive`, `--success`, `--warning`, `--error`, `--border`, `--input`, `--ring`, `--radius` (`0.625rem`).
 
+CSS tokens alone do not generate Tailwind v4 utilities. Primary utilities are registered as `--color-primary` / `--color-primary-foreground` in `@theme inline`, resolving the HSL tokens at the styled element rather than freezing a root colour. `tests/unit/primary-button-theme.test.ts` checks the real project PostCSS/Tailwind production output, including the hover background.
+
 Brand yellow utilities (hex, not HSL): `.bg-avs-yellow` `#F1D64A`, `.bg-avs-yellow-hover` `#d1b82f`, `.text-avs-yellow`, `.border-avs-yellow`. CSS variables `--avs-yellow` / `--avs-yellow-hover` / `--avs-yellow-light` also exist.
 
 Font: Inter via `--font-inter` on `body`. Headings on standard pages are `text-3xl font-bold text-foreground`. Descriptions are `text-sm text-muted-foreground`.
@@ -60,7 +62,7 @@ Each module also has `.bg-*`, `.bg-*-light`, `.bg-*-dark`, `.text-*`, `.border-*
 **How to use colour**
 
 - Navbar wordmark and house icon stay AVS yellow. Standard module headers omit decorative icons; where a specialist header icon is explicitly approved, its `AppPageHeader` icon well defaults to `bg-avs-yellow/15 text-avs-yellow` unless overridden.
-- Primary in-page actions on a coloured module should use that module utility (`bg-inventory`, `bg-workshop`, …) with explicit light text. Do not assume `bg-primary` is readable: module `--primary-foreground` is light, brand yellow’s is dark.
+- Primary in-page actions can use the default `Button` (paired route primary tokens), or that module's utility (`bg-inventory`, `bg-workshop`, …) with explicit light text. Do not mix a module background with brand yellow's dark foreground.
 - Do not flood a page with module colour. Use it for selected tabs, primary CTAs, loaders, and a few tinted chips.
 
 Active tabs are globally forced to `--primary` in `globals.css` (`[role="tab"][data-state="active"]`). Toolbox-talk tabs are a hard-coded red exception.
@@ -122,7 +124,11 @@ A `@media (max-width: 768px)` block in `globals.css` shrinks `html` to `12.8px` 
 
 Desktop module CTAs are often `h-8`–`h-9`. Inventory’s documented escape hatch is **`h-11` on mobile / `h-8` on `md+`**. The global mobile CSS remaps `.h-8`, `.h-10`, `.h-12`, `.h-14` but **not `.h-11`**, which is why Inventory uses it for touch.
 
-Primary actions inside dark dialogs need explicit background and foreground. Page-level `data-accent` can make the default `Button` unreadable on the dialog surface. Prefer a concrete pair such as `bg-emerald-600 text-white` or the module’s dark utility. Cancel stays `variant="outline"`.
+The default `Button` supplies `bg-primary text-primary-foreground hover:bg-primary/90`: brand yellow with dark text in root/brand context, or the module background with light text inside a module's `data-accent` subtree. Both semantic utilities must be generated; a foreground-only `.bg-primary` override cannot paint a missing background.
+
+`DialogContent` uses a Radix portal to `body`, normally outside `DashboardLayoutClient`'s route-accent subtree. CSS variables follow DOM ancestry, not React ancestry: such a dialog uses root/brand tokens unless its portal host/content supplies an accent. The default `Button` works in that brand context; do not assume a module colour follows the portal. If a dialog needs a fixed/module colour, provide an explicit background, foreground and hover pair (for example `bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover`). Cancel stays `variant="outline"`.
+
+For every new or changed modal primary CTA, inspect the actual rendered browser and capture screenshot evidence at desktop and narrow/short viewports (including the mobile keyboard where applicable). Check enabled, disabled and loading states, plus hover/focus: label/spinner must remain readable and the action reachable. Inspect computed `background-color`, `color` and `opacity` on the portalled button; confirm the expected opaque background before state opacity and sufficient contrast against the dialog. Functional DOM tests prove presence/interaction, not visual visibility; successful CSS compilation or an application build alone does not prove it either. Record any states/viewports not inspected.
 
 Do not use `alert()` / `confirm()`. Use Sonner (`toast` from `sonner`) and `AlertDialog`.
 
