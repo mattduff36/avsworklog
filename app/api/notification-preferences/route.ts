@@ -9,13 +9,23 @@ import type {
 } from '@/types/notifications';
 import {
   canDisableNotificationModule,
+  isNotificationModuleAvailable,
   NOTIFICATION_MODULES,
   NOTIFICATION_MODULE_KEYS,
   type NotificationModuleKey,
 } from '@/types/notifications';
-import { getProfileWithRole } from '@/lib/utils/permissions';
-import { isEffectiveSupervisorOrHigherRole } from '@/lib/utils/role-access';
+import type { ModuleName } from '@/types/roles';
+import { getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
+import { hasEffectiveRoleFullAccess, isEffectiveSupervisorOrHigherRole } from '@/lib/utils/role-access';
 import { getEffectiveRole } from '@/lib/utils/view-as';
+
+const NOTIFICATION_PERMISSION_MODULES: Partial<Record<NotificationModuleKey, ModuleName>> = {
+  errors: 'error-reports',
+  rams: 'rams',
+  approvals: 'approvals',
+  sensitive_pin_security: 'admin-settings',
+  daily_allocation: 'daily-allocation',
+};
 
 type NotificationPreferenceRow = Omit<
   NotificationPreference,
@@ -39,21 +49,23 @@ function normalizeNotificationPreference(pref: NotificationPreferenceRow): Notif
   };
 }
 
-function canUseNotificationModule(
+async function canUseNotificationModule(
   moduleKey: NotificationModuleKey,
-  profile: Awaited<ReturnType<typeof getProfileWithRole>>
-): boolean {
+  effectiveRole: Awaited<ReturnType<typeof getEffectiveRole>>
+): Promise<boolean> {
   const notificationModule = NOTIFICATION_MODULES.find((entry) => entry.key === moduleKey);
   if (!notificationModule) return false;
-  if (notificationModule.availableFor === 'all') return true;
 
-  const role = profile?.role;
-  const isAdmin = profile?.is_super_admin === true || role?.is_super_admin === true || role?.role_class === 'admin';
-  const isManager = role?.is_manager_admin === true || role?.role_class === 'manager';
+  const permissionModule = NOTIFICATION_PERMISSION_MODULES[moduleKey];
+  const permissionLevels = permissionModule
+    ? { [permissionModule]: await getEffectiveModuleAccessLevel(permissionModule) }
+    : undefined;
 
-  if (notificationModule.availableFor === 'admin') return isAdmin;
-  if (notificationModule.availableFor === 'manager') return isManager || isAdmin;
-  return false;
+  return isNotificationModuleAvailable(notificationModule, {
+    isAdmin: hasEffectiveRoleFullAccess(effectiveRole),
+    isManager: effectiveRole.is_manager_admin || effectiveRole.role_class === 'manager',
+    permissionLevels,
+  });
 }
 
 function isDisablePreferenceRequest(input: {
@@ -141,15 +153,12 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Toolbox Talk notifications cannot be disabled' }, { status: 400 });
     }
 
-    if (isDisableRequest) {
-      const effectiveRole = await getEffectiveRole();
-      if (!isEffectiveSupervisorOrHigherRole(effectiveRole)) {
-        return NextResponse.json({ error: 'Only supervisors and above can disable notifications' }, { status: 403 });
-      }
+    const effectiveRole = await getEffectiveRole();
+    if (isDisableRequest && !isEffectiveSupervisorOrHigherRole(effectiveRole)) {
+      return NextResponse.json({ error: 'Only supervisors and above can disable notifications' }, { status: 403 });
     }
 
-    const profile = await getProfileWithRole(user.id);
-    if (!canUseNotificationModule(module_key, profile)) {
+    if (!await canUseNotificationModule(module_key, effectiveRole)) {
       return NextResponse.json({ error: 'Forbidden for this notification module' }, { status: 403 });
     }
 
@@ -175,6 +184,9 @@ export async function PUT(request: NextRequest) {
 
     if (error) {
       throw error;
+    }
+    if (!pref) {
+      throw new Error('Notification preference was not saved');
     }
 
     const response: UpdateNotificationPreferenceResponse = {
