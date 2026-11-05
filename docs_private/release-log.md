@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.2.3
+
+**GIT COMMIT MESSAGE**
+`fix(notifications): honor effective preference permissions [fei_1e41422aa2d3a182]`
+
+**PUSHED AT**
+2026-11-05T01:00:00.336Z
+
+**WHAT CHANGED**
+Honor effective preference permissions [fei_1e41422aa2d3a182].
+
+**VERSION HISTORY DETAILS**
+- Honor effective preference permissions [fei_1e41422aa2d3a182], with changes to background routes and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(notifications): honor effective preference permissions [fei_1e41422aa2d3a182]`
+
 ## 1126.2.2
 
 **GIT COMMIT MESSAGE**

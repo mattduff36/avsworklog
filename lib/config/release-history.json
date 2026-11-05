@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.2.3",
+    "updateKind": "minor",
+    "title": "Notifications improvements",
+    "description": "Honor effective preference permissions [fei_1e41422aa2d3a182].",
+    "summary": "Honor effective preference permissions [fei_1e41422aa2d3a182].",
+    "details": [
+      "Honor effective preference permissions [fei_1e41422aa2d3a182], with changes to background routes and automated tests."
+    ],
+    "areas": [
+      "Notifications"
+    ],
+    "areaKeys": [
+      "notifications"
+    ],
+    "pushedAt": "2026-11-05T01:00:00.336Z"
+  },
+  {
     "version": "1126.2.2",
     "updateKind": "minor",
     "title": "Daily Tasks maintenance update",
