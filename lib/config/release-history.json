@@ -1,5 +1,25 @@
 [
   {
+    "version": "1126.5.0",
+    "updateKind": "major",
+    "title": "Maintenance update",
+    "description": "Updated Maintenance and Help and FAQ.",
+    "summary": "Updated Maintenance and Help and FAQ.",
+    "details": [
+      "Updated Maintenance and Help and FAQ, with changes to automation scripts.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Maintenance",
+      "Help",
+      "FAQ"
+    ],
+    "areaKeys": [
+      "maintenance"
+    ],
+    "pushedAt": "2026-11-09T20:40:51.967Z"
+  },
+  {
     "version": "1126.4.0",
     "updateKind": "major",
     "title": "Quotes update",

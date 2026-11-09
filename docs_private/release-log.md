@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.5.0
+
+**GIT COMMIT MESSAGE**
+`feat(maintenance): update Maintenance and Help and FAQ`
+
+**PUSHED AT**
+2026-11-09T20:40:51.967Z
+
+**WHAT CHANGED**
+Update Maintenance and Help and FAQ.
+
+**VERSION HISTORY DETAILS**
+- Updated Maintenance and Help and FAQ, with changes to automation scripts.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(maintenance): update Maintenance and Help and FAQ`
+
 ## 1126.4.0
 
 **GIT COMMIT MESSAGE**
