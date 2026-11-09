@@ -1,5 +1,34 @@
 [
   {
+    "version": "1126.3.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated Daily Allocation, Projects, Navigation, Sign in, and Data storage.",
+    "summary": "Updated Daily Allocation, Projects, Navigation, Sign in, and Data storage.",
+    "details": [
+      "Updated Daily Allocation, Projects, Navigation, Sign in, and Data storage, with changes to background routes, interface components, shared logic, shared typing, automated tests, and data storage.",
+      "Updated data storage, with changes to data storage.",
+      "Updated projects, with changes to automated tests.",
+      "Updated navigation, with changes to interface components.",
+      "Updated sign in, with changes to shared logic."
+    ],
+    "areas": [
+      "Daily Allocation",
+      "Projects",
+      "Navigation",
+      "Sign in",
+      "Data storage"
+    ],
+    "areaKeys": [
+      "daily-allocation",
+      "projects",
+      "navigation",
+      "sign-in",
+      "data-storage"
+    ],
+    "pushedAt": "2026-11-09T16:31:44.229Z"
+  },
+  {
     "version": "1126.2.3",
     "updateKind": "minor",
     "title": "Notifications improvements",
