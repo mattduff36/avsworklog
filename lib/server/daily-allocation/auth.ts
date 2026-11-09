@@ -359,13 +359,13 @@ export function mapDailyAllocationRpcError(
   }
   if (message.includes('JOB_MISSING_SITE')) {
     return new DailyAllocationError(
-      'This job cannot be allocated until its source record has a proper site address.',
+      'Update this job\'s canonical source with a reliable site address, then refresh and publish again. Draft planning is allowed.',
       400,
       'JOB_MISSING_SITE'
     );
   }
   if (message.includes('JOB_NOT_FOUND') || message.includes('JOB_REQUIRED')) {
-    return new DailyAllocationError('Choose a catalogue job with a valid site address.', 400, 'JOB_NOT_FOUND');
+    return new DailyAllocationError('Choose an active, unambiguous catalogue job.', 400, 'JOB_NOT_FOUND');
   }
   if (message.includes('PUBLISH_INCOMPLETE')) {
     return new DailyAllocationError(

@@ -137,7 +137,7 @@ function SessionDrop({
       aria-label={label}
       data-testid={`daily-allocation-session-${profileId || 'unassigned'}-${date}-${session}`}
       className={cn(
-        'row-start-1 min-h-28 space-y-2 bg-slate-950/50 p-2',
+        'row-start-1 min-h-14 space-y-1 bg-slate-950/50 px-2 py-1',
         // The full-day overlay already occupies row 1. Without an explicit column,
         // auto-placement spills these cells into implicit columns at the row edge.
         session === 'am' ? 'col-start-1' : 'col-start-2',
@@ -287,7 +287,7 @@ function EmployeeRail({
     : null;
   const reason = dailyAllocationEmployeeUnavailableReason(day);
   return (
-    <div role="rowheader" className="sticky left-0 z-10 space-y-2 border-r border-t border-border bg-slate-900 p-3">
+    <div role="rowheader" className="sticky left-0 z-10 space-y-0.5 border-r border-t border-border bg-slate-900 px-3 py-1">
       <p className="truncate font-semibold text-foreground">{row.label}</p>
       <p className="truncate text-sm text-muted-foreground">{row.subtitle || 'Employee'}</p>
       {occupancy ? (
@@ -394,7 +394,7 @@ function EmployeeDaySessions({
         <div
           role="gridcell"
           aria-label={`${row.label}, ${workDate}, full day`}
-          className="pointer-events-none col-span-2 col-start-1 row-start-1 z-[1] space-y-2 p-2"
+          className="pointer-events-none col-span-2 col-start-1 row-start-1 z-[1] space-y-1 px-2 py-1"
         >
           {fullVisits.map((visit) => (
             <div key={visit.id} className="pointer-events-auto">

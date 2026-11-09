@@ -13,6 +13,7 @@ export interface JobCatalogueIdentity {
 }
 
 export interface JobCatalogueRecord extends JobCatalogueIdentity {
+  last_activity_at?: string | null;
   customer_name: string | null;
   title: string | null;
   site_address: string | null;

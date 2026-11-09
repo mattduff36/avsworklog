@@ -6,16 +6,20 @@ import { loadJobCatalogueRecords } from '@/lib/server/job-catalogue';
 
 const CATALOGUE_CACHE_MS = 60_000;
 let catalogueCache: { at: number; records: Awaited<ReturnType<typeof loadJobCatalogueRecords>> } | null = null;
+let catalogueRequest: ReturnType<typeof loadJobCatalogueRecords> | null = null;
 
 async function loadCachedJobCatalogue(admin: ReturnType<typeof createAdminClient>) {
   if (catalogueCache && Date.now() - catalogueCache.at < CATALOGUE_CACHE_MS) {
     return catalogueCache.records;
   }
-  const records = await loadJobCatalogueRecords(admin);
-  catalogueCache = { at: Date.now(), records };
-  return records;
+  catalogueRequest ||= loadJobCatalogueRecords(admin).then((records) => {
+    catalogueCache = { at: Date.now(), records };
+    return records;
+  }).finally(() => { catalogueRequest = null; });
+  return catalogueRequest;
 }
-import { getJobCatalogueBlockReason } from '@/lib/utils/job-catalogue';
+import { isReliableSiteAddress } from '@/lib/utils/job-catalogue';
+import { normalizeCatalogJobCode, normalizeJobNumberInput } from '@/lib/utils/timesheet-job-codes';
 import {
   DailyAllocationError,
   fromUntyped,
@@ -96,6 +100,8 @@ type VisitRow = {
   row_version: number;
   updated_at: string;
 };
+
+type ScheduledJobIdentity = Pick<DailyAllocationVisit, 'job_source_type' | 'job_source_id' | 'job_code'>;
 
 type LabourAssignmentRow = {
   id: string;
@@ -258,48 +264,96 @@ function mapOverride(row: OverrideRow): DailyAllocationConflictOverride {
 
 export function projectDailyAllocationJobs(
   records: JobCatalogueRecord[],
-  visits: DailyAllocationVisit[] = [],
+  visits: ScheduledJobIdentity[] = [],
   labourDrafts: DailyLabourDraft[] = [],
-  plantDrafts: DailyPlantDraft[] = []
+  plantDrafts: DailyPlantDraft[] = [],
+  query = '',
+  scheduledOnly = false
 ): DailyAllocationJobProjection[] {
+  const lookups = new Map<string, Set<string>>();
+  for (const record of records) {
+    for (const code of [record.job_code, ...record.aliases]) {
+      const key = normalizeCatalogJobCode(code);
+      const identities = lookups.get(key) || new Set<string>();
+      identities.add(`${record.source_type}:${record.source_id}`);
+      lookups.set(key, identities);
+    }
+  }
   const recordByIdentity = new Map(records.map((record) => [`${record.source_type}:${record.source_id}`, record]));
   const seen = new Map<string, DailyAllocationJobProjection>();
+  const term = query.trim().toLowerCase();
+  const codeTerm = normalizeJobNumberInput(query).toLowerCase();
 
   const add = (
     sourceType: JobCatalogueSourceType | null,
     sourceId: string | null,
-    jobCode: string | null,
-    siteAddress: string | null
+    jobCode: string | null
   ) => {
     if (!sourceType || !sourceId || !jobCode) return;
     const key = `${sourceType}:${sourceId}`;
     if (seen.has(key)) return;
     const record = recordByIdentity.get(key);
-    if (!record || getJobCatalogueBlockReason(record)) return;
+    if (!record || !record.is_active
+      || (record.block_reason && record.block_reason !== 'missing_site_address')
+      || [record.job_code, ...record.aliases].some((code) => (lookups.get(normalizeCatalogJobCode(code))?.size || 0) > 1)) return;
+    if (term && ![record.job_code, record.customer_name, record.title, ...record.aliases]
+      .some((value) => value?.toLowerCase().includes(term))
+      && !(codeTerm && record.job_code.toLowerCase().includes(codeTerm))) return;
     seen.set(key, {
       source_type: record.source_type,
       source_id: record.source_id,
       job_code: record.job_code || jobCode,
       customer_name: record.customer_name || null,
       title: record.title || null,
-      site_address: record.site_address || siteAddress,
+      site_address: record.site_address,
+      address_valid: record.address_valid,
+      aliases: record.aliases,
       source_href: jobSourceHref(record),
     });
   };
 
-  for (const record of records) {
-    add(record.source_type, record.source_id, record.job_code, record.site_address);
-  }
   for (const visit of visits) {
-    add(visit.job_source_type, visit.job_source_id, visit.job_code, visit.site_address);
+    add(visit.job_source_type, visit.job_source_id, visit.job_code);
   }
   for (const draft of labourDrafts) {
-    add(draft.job_source_type, draft.job_source_id, draft.job_code, draft.site_address);
+    add(draft.job_source_type, draft.job_source_id, draft.job_code);
   }
   for (const draft of plantDrafts) {
-    add(draft.job_source_type, draft.job_source_id, draft.job_code, draft.site_address);
+    add(draft.job_source_type, draft.job_source_id, draft.job_code);
   }
-  return Array.from(seen.values()).sort((left, right) => left.job_code.localeCompare(right.job_code));
+  if (!scheduledOnly) {
+    for (const record of [...records].sort((left, right) => (
+      (right.last_activity_at || '').localeCompare(left.last_activity_at || '')
+      || left.job_code.localeCompare(right.job_code)
+      || left.source_id.localeCompare(right.source_id)
+    ))) {
+      add(record.source_type, record.source_id, record.job_code);
+    }
+  }
+
+  return Array.from(seen.values()).slice(0, scheduledOnly ? undefined : DAILY_ALLOCATION_RESOURCE_JOB_LIMIT);
+}
+
+export const DAILY_ALLOCATION_RESOURCE_JOB_LIMIT = 80;
+
+export async function loadDailyAllocationResourceJobs(start: string, end: string, query: string) {
+  await requireDailyAllocationManagerContext();
+  const range = parseDailyAllocationBoardRange(start, end);
+  if (query.length > 100 || (query.trim().length > 0 && query.trim().length < 2)) {
+    throw new DailyAllocationError('Search using 2 to 100 characters.', 400, 'VALIDATION');
+  }
+  const { supabase } = await requireDailyAllocationUser();
+  const [records, result] = await Promise.all([
+    loadCachedJobCatalogue(createAdminClient()),
+    fromUntyped<ScheduledJobIdentity>(supabase, 'daily_allocation_visits')
+      .select('job_source_type, job_source_id, job_code')
+      .gte('work_date', range.start).lte('work_date', range.end),
+  ]);
+  throwIfError(result.error);
+  return {
+    jobs: projectDailyAllocationJobs(records, result.data || [], [], [], query),
+    limit: DAILY_ALLOCATION_RESOURCE_JOB_LIMIT,
+  };
 }
 
 export async function loadDailyAllocationBoard(workDate: string): Promise<DailyAllocationBoardPayload> {
@@ -748,6 +802,11 @@ export async function loadDailyAllocationBoardRange(
 
   const planDays = (planDaysResult.data || []).map(mapPlanDay);
   const visits = (visitsResult.data || []).map(mapVisit);
+  const catalogueByIdentity = new Map(catalogue.map((record) => [`${record.source_type}:${record.source_id}`, record]));
+  for (const visit of visits) {
+    const record = catalogueByIdentity.get(`${visit.job_source_type}:${visit.job_source_id}`);
+    visit.address_valid = record ? record.address_valid : isReliableSiteAddress(visit.site_address);
+  }
   const labourAssignments = (labourAssignResult.data || []).map(mapLabourAssignment);
   const plantAssignments = (plantAssignResult.data || []).map(mapPlantAssignment);
   const planDayIds = new Set(planDays.map((planDay) => planDay.id));
@@ -871,7 +930,7 @@ export async function loadDailyAllocationBoardRange(
       shiftsByProfile,
     }),
     legacy: { labour: labourDrafts, plant: plantDrafts },
-    jobs: projectDailyAllocationJobs(catalogue, visits, labourDrafts, plantDrafts),
+    jobs: projectDailyAllocationJobs(catalogue, visits, labourDrafts, plantDrafts, '', true),
     resources: {
       employees,
       plant: (plantsResult.data || []).map((row) => ({

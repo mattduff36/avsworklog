@@ -267,6 +267,7 @@ export interface DailyAllocationPlanDay {
 }
 
 export interface DailyAllocationVisit {
+  address_valid?: boolean;
   id: string;
   plan_day_id: string;
   work_date: string;
@@ -382,6 +383,8 @@ export interface DailyAllocationPublicationMeta {
 }
 
 export interface DailyAllocationJobProjection {
+  address_valid?: boolean;
+  aliases?: string[];
   source_type: JobCatalogueSourceType;
   source_id: string;
   job_code: string;
@@ -660,4 +663,3 @@ export interface DailyAllocationPublishV2Input {
 }
 
 export type DailyAllocationPublishInput = DailyAllocationPublishV1Input | DailyAllocationPublishV2Input;
-

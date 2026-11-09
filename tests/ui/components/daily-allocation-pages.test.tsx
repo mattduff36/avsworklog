@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   onDragStart: null as (() => void) | null,
   searchParams: '',
   fetchRuntime: vi.fn(async () => ({ board_enabled: true, writes_enabled: true })),
+  fetchResources: vi.fn(),
 }));
 
 vi.mock('@/lib/client/daily-allocation', async (importOriginal) => {
@@ -32,6 +33,7 @@ vi.mock('@/lib/client/daily-allocation', async (importOriginal) => {
   return {
     ...actual,
     fetchDailyAllocationRuntime: () => mocks.fetchRuntime(),
+    fetchDailyAllocationResourceJobs: () => mocks.fetchResources(),
   };
 });
 
@@ -92,13 +94,13 @@ vi.mock('@/components/layout/AppPageLoadingShell', () => ({
   AppPageLoadingShell: ({ message }: { message: string }) => <div>{message}</div>,
 }));
 
-vi.mock('@/components/daily-allocation/JobCataloguePicker', () => ({
-  JobCataloguePicker: ({
+vi.mock('@/components/daily-allocation/board/DraftJobPicker', () => ({
+  DraftJobPicker: ({
     value,
     disabled,
     onSelect,
   }: {
-    value: string | null;
+    value: JobCatalogueOption | null;
     disabled?: boolean;
     onSelect: (option: JobCatalogueOption | null) => void;
   }) => (
@@ -119,7 +121,7 @@ vi.mock('@/components/daily-allocation/JobCataloguePicker', () => ({
         blockReason: null,
       })}
     >
-      {value || 'Select job code'}
+      {value?.value || 'Select job code'}
     </button>
   ),
 }));
@@ -345,6 +347,7 @@ describe('daily allocation manager board', () => {
     mocks.onDragEnd = null;
     mocks.onDragStart = null;
     mocks.fetchRuntime.mockResolvedValue({ board_enabled: true, writes_enabled: true });
+    mocks.fetchResources.mockResolvedValue({ jobs: buildRangeBoard().jobs, limit: 80 });
     window.sessionStorage.clear();
     window.localStorage.clear();
     mocks.randomUUID.mockReset();
@@ -1801,6 +1804,7 @@ describe('daily allocation manager board', () => {
         },
       ],
     });
+    mocks.fetchResources.mockResolvedValue({ jobs: board.jobs, limit: 80 });
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       if (String(input).startsWith('/api/daily-allocation/board')) return jsonResponse(board);
       throw new Error(`Unexpected request: ${String(input)}`);
@@ -1809,10 +1813,56 @@ describe('daily allocation manager board', () => {
     renderBoardPage();
     const resources = await screen.findByTestId('daily-allocation-resources');
     expect(within(resources).getByTestId('daily-allocation-resources-list')).toBeInTheDocument();
-    expect(within(resources).getByText('JOB-900')).toBeInTheDocument();
+    expect(await within(resources).findByText('JOB-900')).toBeInTheDocument();
     expect((await screen.findAllByTestId('daily-allocation-visit-visit-1')).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('daily-allocation-timeline-live_quote:quote-900-2026-08-14')).not.toBeInTheDocument();
     expect(screen.queryByTestId('daily-allocation-week-cell-live_quote:quote-900-2026-08-14')).not.toBeInTheDocument();
+  });
+
+  it('preselects a missing-address resource outside scheduled board jobs for keyboard Add visit', async () => {
+    const board = buildRangeBoard();
+    mocks.fetchResources.mockResolvedValue({
+      jobs: [{
+        ...board.jobs[0],
+        source_id: 'quote-50075',
+        job_code: '50075-LC',
+        site_address: null,
+        address_valid: false,
+      }],
+      limit: 80,
+    });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).startsWith('/api/daily-allocation/board')) return jsonResponse(board);
+      throw new Error(`Unexpected request: ${String(input)}`);
+    }));
+
+    renderBoardPage();
+    const resource = await screen.findByRole('button', { name: /Select 50075-LC/ });
+    expect(within(resource).getByText('Site address needed before publish')).toBeInTheDocument();
+    fireEvent.click(resource);
+    fireEvent.click(screen.getByRole('button', { name: 'Add visit' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('button', { name: '50075-LC' })).toBeInTheDocument();
+    expect(within(dialog).getByText(/Draft planning is allowed/)).toBeInTheDocument();
+  });
+
+  it.each([
+    { site_address: '1 Old Test Street', address_valid: false },
+    { site_address: '', address_valid: true },
+  ])('uses refreshed canonical address validity on visit cards: $address_valid', async (address) => {
+    const base = buildRangeBoard();
+    const board = buildRangeBoard({ visits: [{ ...base.visits[0], ...address }] });
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input).startsWith('/api/daily-allocation/board')) return jsonResponse(board);
+      throw new Error(`Unexpected request: ${String(input)}`);
+    }));
+
+    renderBoardPage();
+    const cards = await screen.findAllByTestId('daily-allocation-visit-visit-1');
+    for (const card of cards) {
+      expect(Boolean(within(card).queryByText('Site address needed before publish')))
+        .toBe(!address.address_valid);
+    }
   });
 
   it('shows the empty and error board states', async () => {

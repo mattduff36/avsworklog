@@ -36,6 +36,14 @@ const SESSION_MIGRATION_PATH = resolve(
   'supabase/migrations/20260930_daily_allocation_sessions.sql'
 );
 
+function productionFunction(file: string, name: string): string {
+  const sql = readFileSync(resolve(process.cwd(), 'supabase', 'migrations', file), 'utf8').replace(/\r\n/g, '\n');
+  const start = sql.indexOf(`CREATE OR REPLACE FUNCTION ${name}(`);
+  const end = sql.indexOf('\n$$;', start);
+  if (start < 0 || end < 0) throw new Error(`Missing production function ${name}`);
+  return sql.slice(start, end + 4);
+}
+
 type JsonObject = Record<string, unknown>;
 
 function asObject(value: unknown): JsonObject {
@@ -130,6 +138,29 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     await setup.query(stripOuterMigrationTransaction(readFileSync(SAFETY_MIGRATION_PATH, 'utf8')));
     await setup.query('ALTER TABLE public.plant ADD COLUMN IF NOT EXISTS plant_id TEXT');
     await setup.query(stripOuterMigrationTransaction(readFileSync(SESSION_MIGRATION_PATH, 'utf8')));
+    await setup.query(`
+      CREATE TABLE public.customers (id UUID PRIMARY KEY, status TEXT, company_name TEXT);
+      ALTER TABLE public.quotes
+        ADD COLUMN customer_id UUID, ADD COLUMN base_quote_reference TEXT, ADD COLUMN quote_reference TEXT,
+        ADD COLUMN subject_line TEXT, ADD COLUMN project_description TEXT, ADD COLUMN status TEXT,
+        ADD COLUMN commercial_status TEXT, ADD COLUMN is_latest_version BOOLEAN,
+        ADD COLUMN revision_number INTEGER, ADD COLUMN created_at TIMESTAMPTZ;
+      ALTER TABLE public.legacy_quotes ADD COLUMN quote_reference TEXT;
+      ALTER TABLE public.quote_project_numbers ADD COLUMN description TEXT;
+      ALTER TABLE public.quote_reference_aliases ADD COLUMN source_quote_thread_id UUID;
+      UPDATE public.quote_project_numbers SET status = 'open';
+    `);
+    await setup.query(productionFunction('20260813_daily_allocation_module.sql', 'private.allocation_site_is_valid'));
+    await setup.query(stripOuterMigrationTransaction(readFileSync(resolve(
+      process.cwd(), 'supabase', 'migrations', '20260903_job_catalogue_revision_fallback.sql'
+    ), 'utf8')));
+    await setup.query(productionFunction('20260813_daily_allocation_module.sql', 'private.apply_allocation_job_fields'));
+    await setup.query(stripOuterMigrationTransaction(readFileSync(resolve(
+      process.cwd(), 'supabase', 'migrations', '20261003_daily_allocation_assigned_visit.sql'
+    ), 'utf8')));
+    await setup.query(stripOuterMigrationTransaction(readFileSync(resolve(
+      process.cwd(), 'supabase', 'migrations', '20261109_daily_allocation_draft_address.sql'
+    ), 'utf8')));
     await setup.query(
       `UPDATE private.daily_allocation_v2_runtime
        SET board_enabled = TRUE, writes_enabled = TRUE, updated_at = NOW()
@@ -156,6 +187,97 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     );
     return String(asObject(converted.rows[0]?.converted).plan_day_id);
   }
+
+  it('plans 50075-LC without an address, preserves replay/CAS, copies with warning, and publishes only after canonical repair', async () => {
+    const jobId = randomUUID();
+    const sourcePlan = await convertPlan('2026-02-02');
+    await setup.query(`INSERT INTO public.quote_project_numbers (id, project_reference, status, site_address)
+      VALUES ($1, '50075-LC', 'open', NULL)`, [jobId]);
+    const requestId = randomUUID();
+    const args = [requestId, sourcePlan, jobId];
+    const createSql = `SELECT public.create_daily_allocation_assigned_visit_v2(
+      $1::uuid, $2::uuid, 1, '${DA2_ACTORS.employeeA}'::uuid,
+      'project_number', $3::uuid, '50075-LC',
+      '2026-02-02 07:00:00+00', '2026-02-02 16:30:00+00',
+      NULL, NULL, NULL, NULL, NULL
+    ) AS result`;
+    const created = asObject((await actor.query(createSql, args)).rows[0].result);
+    expect(asObject(created.visit)).toMatchObject({ job_code: '50075-LC', site_address: '' });
+    expect(asObject((await actor.query(createSql, args)).rows[0].result)).toEqual(created);
+    await expect(actor.query(createSql, [randomUUID(), sourcePlan, jobId])).rejects.toThrow(/STALE_PLAN_VERSION/);
+
+    const copySql = `SELECT public.copy_daily_allocation_plan_v2(
+      $1::uuid, '2026-02-02'::date, '2026-02-03'::date, 'team-1',
+      ARRAY['jobs'], $2::boolean, 2, NULL
+    ) AS result`;
+    const preview = asObject((await actor.query(copySql, [randomUUID(), false])).rows[0].result);
+    expect(preview.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: '50075-LC', detail: expect.stringContaining('site address') }),
+    ]));
+    const copied = asObject((await actor.query(copySql, [randomUUID(), true])).rows[0].result);
+    expect(copied.applied).toBe(true);
+    expect((await setup.query(`SELECT site_address FROM public.daily_allocation_visits
+      WHERE work_date = '2026-02-03' AND job_source_id = $1`, [jobId])).rows).toEqual([{ site_address: '' }]);
+    await expect(actor.query(`SELECT public.publish_daily_allocation_plan_v2($1::uuid, $2::uuid, 2, $3::text, TRUE)`,
+      [randomUUID(), sourcePlan, randomUUID()])).rejects.toThrow(/JOB_MISSING_SITE/);
+    expect((await setup.query('SELECT COUNT(*)::integer AS count FROM public.daily_allocation_publications WHERE plan_day_id = $1', [sourcePlan])).rows[0].count).toBe(0);
+    await setup.query(`UPDATE public.quote_project_numbers SET site_address = '12 Canonical Site Road' WHERE id = $1`, [jobId]);
+    const published = await actor.query(`SELECT public.publish_daily_allocation_plan_v2($1::uuid, $2::uuid, 2, $3::text, TRUE) AS result`,
+      [randomUUID(), sourcePlan, randomUUID()]);
+    const publicationId = asObject(published.rows[0].result).publication_id;
+    expect(publicationId).toBeTruthy();
+    expect((await setup.query(`SELECT site_address FROM public.daily_allocation_published_visits
+      WHERE publication_id = $1`, [publicationId])).rows).toEqual([{ site_address: '12 Canonical Site Road' }]);
+    expect((await setup.query('SELECT site_address FROM public.daily_allocation_visits WHERE id = $1', [created.visit_id])).rows[0].site_address).toBe('');
+  });
+
+  it('edits and moves unreliable-address drafts, refreshes their source and rejects inactive or ambiguous jobs', async () => {
+    const jobId = randomUUID();
+    const sourcePlan = await convertPlan('2026-02-09');
+    const targetPlan = await convertPlan('2026-02-10');
+    await setup.query(`INSERT INTO public.quote_project_numbers (id, project_reference, status, site_address)
+      VALUES ($1, 'MISSING-SITE', 'open', 'Unconfirmed')`, [jobId]);
+    const upsertSql = `SELECT public.upsert_daily_allocation_visit_v2(
+      $1::uuid, $2::uuid, $3::uuid, $4::integer, $5::integer, 'project_number', $6::uuid, NULL,
+      '2026-02-09 07:00:00+00', '2026-02-09 16:30:00+00', NULL, NULL, NULL
+    ) AS result`;
+    const created = asObject((await actor.query(upsertSql, [randomUUID(), null, sourcePlan, 1, 1, jobId])).rows[0].result);
+    expect(asObject(created.visit).site_address).toBe('Unconfirmed');
+    const edited = asObject((await actor.query(upsertSql, [randomUUID(), created.visit_id, sourcePlan, 2, 1, jobId])).rows[0].result);
+    expect(asObject(edited.visit).row_version).toBe(2);
+    const moveSql = `SELECT public.move_daily_allocation_visit_v2(
+      $1::uuid, $2::uuid, $3::uuid, 3, 1, 2,
+      '2026-02-10 07:00:00+00', '2026-02-10 16:30:00+00'
+    ) AS result`;
+    const moveArgs = [randomUUID(), created.visit_id, targetPlan];
+    const moved = asObject((await actor.query(moveSql, moveArgs)).rows[0].result);
+    expect(asObject(moved.visit)).toMatchObject({ work_date: '2026-02-10', site_address: 'Unconfirmed' });
+    expect(asObject((await actor.query(moveSql, moveArgs)).rows[0].result)).toEqual(moved);
+    await setup.query(`UPDATE public.quote_project_numbers SET status = 'cancelled' WHERE id = $1`, [jobId]);
+    await expect(actor.query(upsertSql, [randomUUID(), null, sourcePlan, 4, 1, jobId])).rejects.toThrow(/JOB_NOT_FOUND/);
+    const copySql = `SELECT public.copy_daily_allocation_plan_v2(
+      $1::uuid, '2026-02-10'::date, '2026-02-11'::date, 'team-1', ARRAY['jobs'], FALSE, 2, NULL
+    ) AS result`;
+    const inactiveCopy = asObject((await actor.query(copySql, [randomUUID()])).rows[0].result);
+    expect(inactiveCopy.additions).toEqual([]);
+    expect(inactiveCopy.skips).toEqual(expect.arrayContaining([
+      expect.objectContaining({ detail: expect.stringContaining('inactive') }),
+    ]));
+    await setup.query(`UPDATE public.quote_project_numbers SET status = 'open', site_address = '19 Repaired Site Street' WHERE id = $1`, [jobId]);
+    const duplicateId = randomUUID();
+    await setup.query(`INSERT INTO public.legacy_quotes (id, quote_reference) VALUES ($1, 'MISSING-SITE')`, [duplicateId]);
+    await expect(actor.query(upsertSql, [randomUUID(), null, sourcePlan, 4, 1, jobId])).rejects.toThrow(/JOB_AMBIGUOUS/);
+    const ambiguousCopy = asObject((await actor.query(copySql, [randomUUID()])).rows[0].result);
+    expect(ambiguousCopy.additions).toEqual([]);
+    await setup.query('DELETE FROM public.legacy_quotes WHERE id = $1', [duplicateId]);
+    const refreshed = await actor.query(`SELECT public.move_daily_allocation_visit_v2(
+      $1::uuid, $2::uuid, $3::uuid, 2, 4, 3,
+      '2026-02-09 07:00:00+00', '2026-02-09 16:30:00+00'
+    ) AS result`, [randomUUID(), created.visit_id, sourcePlan]);
+    expect(asObject(asObject(refreshed.rows[0].result).visit).site_address).toBe('19 Repaired Site Street');
+    await actor.query(`SELECT set_config('request.jwt.claim.sub', $1, false)`, [DA2_ACTORS.employeeB]);
+    await expect(actor.query(upsertSql, [randomUUID(), null, sourcePlan, 5, 1, jobId])).rejects.toThrow();
+  });
 
   it('rejects a custom interval and accepts an exact morning session', async () => {
     const planId = await convertPlan('2026-01-12');

@@ -9,6 +9,7 @@ import type {
   DailyAllocationConversionSource,
   DailyAllocationLabourAssignInput,
   DailyAllocationLabourAssignment,
+  DailyAllocationJobProjection,
   DailyAllocationOverrideInput,
   DailyAllocationOverrideMutationResult,
   DailyAllocationPlantAssignInput,
@@ -170,6 +171,18 @@ export async function fetchDailyAllocationBoardRange(
       `/api/daily-allocation/board?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
     )
   );
+}
+
+export async function fetchDailyAllocationResourceJobs(
+  start: string,
+  end: string,
+  query: string,
+  signal?: AbortSignal
+): Promise<{ jobs: DailyAllocationJobProjection[]; limit: number }> {
+  return readResponse(await fetch(
+    `/api/daily-allocation/resources/jobs?${new URLSearchParams({ start, end, q: query })}`,
+    { signal, cache: 'no-store' }
+  ));
 }
 
 export async function convertDailyAllocationPlanDay(

@@ -52,6 +52,7 @@ const QUOTE_CATALOGUE_SELECT = `
   commercial_status,
   revision_number,
   created_at,
+  updated_at,
   is_latest_version,
   customer:customers!inner(status, company_name)
 `;
@@ -62,6 +63,7 @@ interface QuoteJobCodeCustomer {
 }
 
 interface QuoteJobCodeRow {
+  updated_at?: string | null;
   id: string;
   quote_thread_id: string;
   base_quote_reference: string | null;
@@ -78,6 +80,7 @@ interface QuoteJobCodeRow {
 }
 
 interface LegacyQuoteJobCodeRow {
+  updated_at?: string | null;
   id: string;
   quote_reference: string | null;
   customer_name: string | null;
@@ -86,6 +89,7 @@ interface LegacyQuoteJobCodeRow {
 }
 
 interface ProjectNumberJobCodeRow {
+  updated_at?: string | null;
   id: string;
   project_reference: string | null;
   title: string | null;
@@ -206,7 +210,7 @@ export async function loadJobCatalogueRecords(
     fetchAllPages(async (from, to) => {
       const result = await admin
         .from('legacy_quotes')
-        .select('id, quote_reference, customer_name, title, site_address')
+        .select('id, quote_reference, customer_name, title, site_address, updated_at')
         .not('quote_reference', 'is', null)
         .order('quote_reference', { ascending: true })
         .range(from, to);
@@ -222,6 +226,7 @@ export async function loadJobCatalogueRecords(
           title,
           description,
           site_address,
+          updated_at,
           status,
           merged_into_project_number_id,
           converted_quote_id
@@ -344,6 +349,7 @@ export async function loadJobCatalogueRecords(
     const isActive = row.commercial_status === 'open' && row.status !== 'lost' && row.status !== 'closed';
     pushRecord({
       source_type: 'live_quote',
+      last_activity_at: latestByThread.get(row.quote_thread_id)?.updated_at || row.created_at,
       source_id: row.id,
       job_code: jobCode,
       customer_name: customer?.company_name || null,
@@ -395,6 +401,7 @@ export async function loadJobCatalogueRecords(
     const isActive = row.status === 'open';
     pushRecord({
       source_type: 'project_number',
+      last_activity_at: row.updated_at,
       source_id: row.id,
       job_code: jobCode,
       customer_name: 'Project number',
@@ -414,6 +421,7 @@ export async function loadJobCatalogueRecords(
     const addressValid = isReliableSiteAddress(siteAddress);
     pushRecord({
       source_type: 'legacy_quote',
+      last_activity_at: row.updated_at,
       source_id: row.id,
       job_code: jobCode,
       customer_name: row.customer_name || null,

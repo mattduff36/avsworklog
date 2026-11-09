@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
 import { DAILY_ALLOCATION_DND } from '@/components/daily-allocation/board/board-dnd';
 import { cn } from '@/lib/utils/cn';
+import { isReliableSiteAddress } from '@/lib/utils/job-catalogue';
 import {
   formatDailyAllocationVisitTime,
 } from '@/lib/utils/daily-allocation-timeline';
@@ -85,6 +86,7 @@ export function VisitCard({
   const warnings = conflicts.filter((conflict) => conflict.severity === 'warning');
   const timeLabel = `${formatDailyAllocationVisitTime(visit.starts_at)}–${formatDailyAllocationVisitTime(visit.ends_at)}`;
   const resources = [...labourNames, ...plantLabels];
+  const addressValid = visit.address_valid ?? isReliableSiteAddress(visit.site_address);
 
   return (
     <article
@@ -101,7 +103,7 @@ export function VisitCard({
           ? 'border-[hsl(var(--daily-allocation-primary))] ring-2 ring-[hsl(var(--daily-allocation-primary))]'
           : hard.length > 0
             ? 'border-red-500'
-            : warnings.length > 0
+            : warnings.length > 0 || !addressValid
               ? 'border-amber-400'
               : 'border-sky-700/70',
         isDragging && 'opacity-60',
@@ -128,6 +130,11 @@ export function VisitCard({
           <span className="block truncate text-[11px] font-semibold tabular-nums">{timeLabel}</span>
           <span className="block truncate text-xs font-medium">{title || visit.job_code}</span>
           <span className="block truncate text-[11px] text-sky-100/80">{visit.site_address}</span>
+          {!addressValid ? (
+            <span className="block text-[11px] text-amber-200" title="Update the canonical job source with a reliable site address, then refresh before publishing.">
+              Site address needed before publish
+            </span>
+          ) : null}
           {persistenceLabel ? (
             <span className="block text-[11px] text-sky-200">{persistenceLabel}</span>
           ) : null}

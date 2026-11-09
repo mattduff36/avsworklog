@@ -111,6 +111,11 @@ describe('DA2-AUTH-001 daily allocation v2 API', () => {
     );
     expect(boardResponse.status).toBe(403);
 
+    const { GET: searchJobs } = await import('@/app/api/daily-allocation/resources/jobs/route');
+    expect((await searchJobs(new NextRequest(
+      'http://localhost/api/daily-allocation/resources/jobs?start=2026-08-14&end=2026-08-14&q=50075'
+    ))).status).toBe(403);
+
     const { POST: convert } = await import('@/app/api/daily-allocation/convert/route');
     const convertResponse = await convert(new NextRequest('http://localhost/api/daily-allocation/convert', {
       method: 'POST',
@@ -141,6 +146,18 @@ describe('DA2-AUTH-001 daily allocation v2 API', () => {
     }));
     expect(assignedResponse.status).toBe(403);
   }, 10_000);
+
+  it('validates bounded manager job search before reading the catalogue', async () => {
+    managerMocks();
+    const { GET } = await import('@/app/api/daily-allocation/resources/jobs/route');
+    for (const query of ['a', 'a'.repeat(101)]) {
+      const response = await GET(new NextRequest(
+        `http://localhost/api/daily-allocation/resources/jobs?start=2026-08-14&end=2026-08-14&q=${query}`
+      ));
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ code: 'VALIDATION' });
+    }
+  });
 
   it('rejects view-as and forged-team v2 mutations', async () => {
     mockGetEffectiveModuleAccessLevel.mockResolvedValue(4);

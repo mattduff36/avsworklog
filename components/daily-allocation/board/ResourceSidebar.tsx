@@ -35,8 +35,9 @@ import Link from 'next/link';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { dailyAllocationJobSheetHref, fleetPlantHistoryHref } from '@/lib/navigation/canonical-links';
 import { cn } from '@/lib/utils/cn';
+import { isReliableSiteAddress } from '@/lib/utils/job-catalogue';
+import { useDailyAllocationResourceJobs } from './hooks/use-daily-allocation-resource-jobs';
 import type {
-  DailyAllocationJobProjection,
   DailyAllocationPlantAssignment,
   DailyAllocationPlantResource,
 } from '@/types/daily-allocation';
@@ -54,7 +55,6 @@ interface ResourceSidebarProps {
   search: string;
   onSearchChange: (value: string) => void;
   selectedDate: string;
-  jobs: DailyAllocationJobProjection[];
   plant: DailyAllocationPlantResource[];
   plantAssignments: DailyAllocationPlantAssignment[];
   selectedResourceId: string | null;
@@ -232,7 +232,6 @@ export function ResourceSidebar({
   search,
   onSearchChange,
   selectedDate,
-  jobs,
   plant,
   plantAssignments,
   selectedResourceId,
@@ -245,15 +244,8 @@ export function ResourceSidebar({
   const canOpenQuotes = quotesAccess.hasPermission && !quotesAccess.loading;
   const canOpenFleet = fleetAccess.hasPermission && !fleetAccess.loading;
   const term = search.trim().toLowerCase();
-  const filteredJobs = useMemo(
-    () => jobs.filter((job) => {
-      if (!term) return true;
-      return [job.job_code, job.customer_name, job.title, job.site_address]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(term));
-    }),
-    [jobs, term]
-  );
+  const jobSearch = useDailyAllocationResourceJobs(search, tab === 'jobs');
+  const filteredJobs = jobSearch.jobs;
   const filteredPlant = useMemo(
     () => plant.filter((item) => {
       if (!term) return true;
@@ -273,7 +265,7 @@ export function ResourceSidebar({
   }, [plantAssignments, selectedDate]);
 
   const placeholders: Record<ResourceSidebarTab, string> = {
-    jobs: 'Search jobs',
+    jobs: 'Search code, customer or title',
     plant: 'Search plant',
   };
 
@@ -341,9 +333,23 @@ export function ResourceSidebar({
               onChange={(event) => onSearchChange(event.target.value)}
               placeholder={placeholders[tab]}
               aria-label={placeholders[tab]}
+              maxLength={tab === 'jobs' ? 100 : undefined}
               className="pl-9"
             />
           </div>
+          {tab === 'jobs' ? (
+            <div className="text-xs text-muted-foreground" aria-live="polite">
+              {jobSearch.error ? (
+                <span role="alert">
+                  {jobSearch.error instanceof Error ? jobSearch.error.message : 'Unable to load jobs.'}
+                  {' '}<button type="button" className="underline" onClick={jobSearch.retry}>Retry</button>
+                </span>
+              ) : jobSearch.needsMoreCharacters ? 'Enter at least 2 characters to search the catalogue.'
+                : jobSearch.isLoading ? 'Searching catalogue...'
+                  : term ? 'Up to 80 matching catalogue jobs.'
+                    : 'Up to 80 jobs: scheduled in this view, then recently active. Search the full catalogue.'}
+            </div>
+          ) : null}
         </div>
 
         <div
@@ -352,7 +358,7 @@ export function ResourceSidebar({
         >
           <div className="space-y-2">
             {tab === 'jobs' ? (
-              filteredJobs.length === 0 ? (
+              filteredJobs.length === 0 && !jobSearch.isLoading && !jobSearch.error && !jobSearch.needsMoreCharacters ? (
                 <div className="rounded-lg border border-dashed border-border px-3 py-8 text-center text-sm text-muted-foreground">
                   No catalogue jobs match this search.
                 </div>
@@ -367,7 +373,8 @@ export function ResourceSidebar({
                     selected={selectedResourceId === jobResourceKey(job)}
                     label={job.job_code}
                     subtitle={[job.customer_name, job.title].filter(Boolean).join(' · ') || 'Catalogue job'}
-                    metadata={job.site_address || undefined}
+                    metadata={(job.address_valid ?? isReliableSiteAddress(job.site_address)) ? job.site_address || undefined : 'Site address needed before publish'}
+                    warning={(job.address_valid ?? isReliableSiteAddress(job.site_address)) ? null : 'Update the canonical job source with a reliable site address before publishing.'}
                     tintClassName={boardControlStyles.resourceJob}
                     handleTestId={`daily-allocation-resource-drag-handle-job-${job.source_id}`}
                     onSelect={() => onSelectResource(source)}

@@ -24,7 +24,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { JobCataloguePicker } from '@/components/daily-allocation/JobCataloguePicker';
+import { DraftJobPicker } from './DraftJobPicker';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
 import { cn } from '@/lib/utils/cn';
 import type { JobCatalogueOption } from '@/types/job-catalogue';
@@ -97,11 +97,15 @@ export function VisitEditorDialog({
         <div className="grid gap-3 py-2">
           <div className="space-y-2">
             <Label>Job</Label>
-            <JobCataloguePicker
-              value={form.job?.value || null}
-              sourceId={form.job?.sourceId}
+            <DraftJobPicker
+              value={form.job}
               onSelect={(job) => onFormChange({ ...form, job })}
             />
+            {form.job && !form.job.addressValid ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400">
+                Draft planning is allowed. Update the canonical job source with a reliable site address before publishing.
+              </p>
+            ) : null}
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-2">

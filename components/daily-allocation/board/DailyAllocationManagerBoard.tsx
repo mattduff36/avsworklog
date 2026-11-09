@@ -71,6 +71,7 @@ import {
   type DailyAllocationSession,
 } from '@/lib/utils/daily-allocation-sessions';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import { isReliableSiteAddress } from '@/lib/utils/job-catalogue';
 import type { JobCatalogueOption } from '@/types/job-catalogue';
 import type {
   DailyAllocationConflictKind,
@@ -126,8 +127,8 @@ function jobToOption(job: DailyAllocationJobProjection): JobCatalogueOption {
     source: job.source_type,
     sourceId: job.source_id,
     siteAddress: job.site_address,
-    addressValid: true,
-    aliases: [],
+    addressValid: job.address_valid ?? isReliableSiteAddress(job.site_address),
+    aliases: job.aliases || [],
     isAmbiguous: false,
     blockReason: null,
   };
@@ -312,7 +313,9 @@ export function DailyAllocationManagerBoard({
   }
 
   function openAddVisit(jobKey: string, workDate: string) {
-    const job = fullBoard?.jobs.find((item) => jobResourceKey(item) === jobKey);
+    const job = fullBoard?.jobs.find((item) => jobResourceKey(item) === jobKey)
+      || (selectedResource?.kind === 'job' && jobResourceKey(selectedResource.job) === jobKey
+        ? selectedResource.job : null);
     const form: VisitFormState = {
       ...emptyVisitForm(workDate || selectedDate),
       job: job ? jobToOption(job) : null,
@@ -356,7 +359,7 @@ export function DailyAllocationManagerBoard({
             source: visit.job_source_type,
             sourceId: visit.job_source_id,
             siteAddress: visit.site_address,
-            addressValid: true,
+            addressValid: visit.address_valid ?? isReliableSiteAddress(visit.site_address),
             aliases: [],
             isAmbiguous: false,
             blockReason: null,
@@ -419,6 +422,7 @@ export function DailyAllocationManagerBoard({
       job_source_id: form.job.sourceId,
       job_code: form.job.value,
       site_address: form.job.siteAddress || '',
+      address_valid: form.job.addressValid,
       starts_at,
       ends_at,
       meeting_point: form.meetingPoint || null,
@@ -522,6 +526,7 @@ export function DailyAllocationManagerBoard({
       job_source_id: job.source_id,
       job_code: job.job_code,
       site_address: job.site_address || '',
+      address_valid: job.address_valid,
       starts_at,
       ends_at,
       meeting_point: null,
@@ -601,6 +606,7 @@ export function DailyAllocationManagerBoard({
       job_source_id: input.job.source_id,
       job_code: input.job.job_code,
       site_address: input.job.site_address || '',
+      address_valid: input.job.address_valid,
       starts_at,
       ends_at,
       meeting_point: null,
@@ -1336,7 +1342,6 @@ export function DailyAllocationManagerBoard({
               search={resourceSearch}
               onSearchChange={setResourceSearch}
               selectedDate={selectedDate}
-              jobs={fullBoard.jobs}
               plant={fullBoard.resources.plant}
               plantAssignments={fullBoard.plant_assignments}
               selectedResourceId={
