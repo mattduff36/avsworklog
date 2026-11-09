@@ -1,5 +1,31 @@
 [
   {
+    "version": "1126.6.0",
+    "updateKind": "major",
+    "title": "Notifications update",
+    "description": "Updated Notifications, Timesheets, Help and FAQ, and Data storage. Add Codex-led investigation and repair. Keep runtime learning outside the clean-main gate. Automate exact error lifecycle on local main.",
+    "summary": "Updated Notifications, Timesheets, Help and FAQ, and Data storage. Add Codex-led investigation and repair. Keep runtime learning outside the clean-main gate. Automate exact error lifecycle on local main.",
+    "details": [
+      "Updated actions, with changes to automation scripts and automated tests.",
+      "Updated Notifications, Timesheets, Help and FAQ, and Data storage, with changes to background routes, shared logic, and automated tests.",
+      "Updated timesheets, with changes to app screens and automated tests.",
+      "Updated help and FAQ, with changes to data storage and documentation.",
+      "Updated data storage, with changes to data storage and documentation."
+    ],
+    "areas": [
+      "Notifications",
+      "Timesheets",
+      "Help",
+      "FAQ",
+      "Data storage. Add Codex-led investigation"
+    ],
+    "areaKeys": [
+      "notifications",
+      "timesheets"
+    ],
+    "pushedAt": "2026-11-09T22:35:51.450Z"
+  },
+  {
     "version": "1126.5.0",
     "updateKind": "major",
     "title": "Maintenance update",

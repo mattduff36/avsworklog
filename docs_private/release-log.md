@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.6.0
+
+**GIT COMMIT MESSAGE**
+`feat(notifications): update Notifications, Timesheets, Help and FAQ, and Data storage`
+
+**PUSHED AT**
+2026-11-09T22:35:51.450Z
+
+**WHAT CHANGED**
+Update Notifications, Timesheets, Help and FAQ, and Data storage. Add Codex-led investigation and repair. Keep runtime learning outside the clean-main gate. Automate exact error lifecycle on local main.
+
+**VERSION HISTORY DETAILS**
+- Updated actions, with changes to automation scripts and automated tests.
+- Updated Notifications, Timesheets, Help and FAQ, and Data storage, with changes to background routes, shared logic, and automated tests.
+- Updated timesheets, with changes to app screens and automated tests.
+- Updated help and FAQ, with changes to data storage and documentation.
+- Updated data storage, with changes to data storage and documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(notifications): update Notifications, Timesheets, Help and FAQ, and Data storage`
+- `feat(fixerrors): add Codex-led investigation and repair`
+- `fix(fixerrors): keep runtime learning outside the clean-main gate`
+- `feat(fixerrors): automate exact error lifecycle on local main`
+
 ## 1126.5.0
 
 **GIT COMMIT MESSAGE**
