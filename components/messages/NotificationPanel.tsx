@@ -1,7 +1,7 @@
 'use client';
 
 import type { MouseEvent } from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { PanelLoader } from '@/components/ui/panel-loader';
@@ -28,6 +28,20 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
   const [clearing, setClearing] = useState(false);
   const [markingReadId, setMarkingReadId] = useState<string | null>(null);
   const router = useRouter();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function handleOutsideClick(event: globalThis.MouseEvent) {
+      if (event.target instanceof Node && !panelRef.current?.contains(event.target)) {
+        onClose();
+      }
+    }
+
+    document.addEventListener('click', handleOutsideClick, true);
+    return () => document.removeEventListener('click', handleOutsideClick, true);
+  }, [open, onClose]);
 
   useEffect(() => {
     if (open) {
@@ -154,11 +168,10 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
       {/* Backdrop */}
       <div 
         className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
-        onClick={onClose}
       />
 
       {/* Panel — mobile: near-full width, desktop: 420px right-aligned */}
-      <div className="fixed top-16 left-2 right-2 z-50 sm:left-auto sm:right-4 sm:w-[420px] bg-slate-900 rounded-lg shadow-2xl border border-slate-700 animate-in slide-in-from-top-2 duration-200 flex flex-col max-h-[70vh]">
+      <div ref={panelRef} className="fixed top-16 left-2 right-2 z-50 sm:left-auto sm:right-4 sm:w-[420px] bg-slate-900 rounded-lg shadow-2xl border border-slate-700 animate-in slide-in-from-top-2 duration-200 flex flex-col max-h-[70vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
           <div className="flex items-center gap-2">

@@ -7,7 +7,9 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogScrollArea,
   DialogTitle,
+  dialogContentViewportClassName,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -851,12 +853,16 @@ export function QuoteFormDialog({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         ref={contentRef}
-        className="max-w-4xl max-h-[90vh] overflow-y-auto bg-slate-900 border-slate-700 text-white"
+        mobileKeyboardSafe
+        className={dialogContentViewportClassName({
+          scroll: 'content',
+          className: 'min-h-0 max-w-[110rem] gap-0 bg-slate-900 border-slate-700 p-4 text-white sm:p-6 sm:!w-[calc(100vw-6rem)] sm:!max-h-[calc(100dvh-6rem)]',
+        })}
         onInteractOutside={handleInteractOutside}
         onEscapeKeyDown={handleEscapeKeyDown}
       >
-        <form onSubmit={handleSubmit} noValidate>
-          <DialogHeader>
+        <form onSubmit={handleSubmit} noValidate className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <DialogHeader className="shrink-0 pb-4 pr-8">
             <DialogTitle className="text-white">
               {isEditing ? 'Edit Quote' : 'New Quote'}
             </DialogTitle>
@@ -865,6 +871,7 @@ export function QuoteFormDialog({
             </DialogDescription>
           </DialogHeader>
 
+          <DialogScrollArea className="min-w-0 pr-1 [overflow-wrap:anywhere]">
           {submitError ? (
             <div className="mt-4 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-100">
               {submitError}
@@ -987,7 +994,7 @@ export function QuoteFormDialog({
             Only fields marked with `*` are required to create the initial draft.
           </p>
 
-          <div className="grid gap-4 py-4">
+          <div className="grid min-w-0 grid-cols-1 items-start gap-4 py-4 lg:grid-cols-2 2xl:grid-cols-3 [&>div]:min-w-0 [&_input]:min-w-0 [&_textarea]:min-w-0">
             <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 space-y-4">
               <div>
                 <h4 className="text-sm font-semibold text-white">Quote Details</h4>
@@ -1152,11 +1159,11 @@ export function QuoteFormDialog({
                         type="button"
                         disabled={areCustomerDependentFieldsDisabled}
                         className={cn(
-                          'flex min-h-10 w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50',
+                          'flex min-h-10 min-w-0 w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-50',
                           getFieldClassName('attention_email')
                         )}
                       >
-                        <span className={customerDependentContactEmailDisplay ? 'text-white' : 'text-muted-foreground'}>
+                        <span className={cn('min-w-0 [overflow-wrap:anywhere]', customerDependentContactEmailDisplay ? 'text-white' : 'text-muted-foreground')}>
                           {customerDependentContactEmailDisplay}
                         </span>
                         <ChevronDown className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
@@ -1194,7 +1201,7 @@ export function QuoteFormDialog({
                                       onCheckedChange={checked => toggleSecondaryContact(contact.id, checked === true)}
                                       className="mt-0.5"
                                     />
-                                    <span>
+                                    <span className="min-w-0 [overflow-wrap:anywhere]">
                                       <span className="block text-white">{getContactLabel(contact)}</span>
                                       <span className="block text-xs text-muted-foreground">
                                         {contact.email || 'No email on file'}
@@ -1281,12 +1288,12 @@ export function QuoteFormDialog({
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 space-y-4">
+            <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 space-y-4 lg:col-span-2 2xl:col-span-1">
               <div>
                 <h4 className="text-sm font-semibold text-white">Internal Comms</h4>
                 <p className="text-xs text-slate-400">Planning notes and schedule details are internal only and are not shown on the client quote.</p>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-1 [&>div]:min-w-0">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
                   <Input
@@ -1337,8 +1344,8 @@ export function QuoteFormDialog({
             </div>
 
             {/* Line Items */}
-            <div className="border-t border-slate-700 pt-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+            <div className="border-t border-slate-700 pt-4 lg:col-span-2">
+              <div className="mb-3 flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:justify-between">
                 <div>
                   <h4 className="text-sm font-semibold text-muted-foreground">Pricing / Line Items</h4>
                   <p className="text-xs text-slate-400">Use itemised pricing or refer the client to attached pricing documents.</p>
@@ -1368,7 +1375,7 @@ export function QuoteFormDialog({
               ) : (
               <div className="space-y-2">
                 {/* Header */}
-                <div className="hidden sm:grid grid-cols-[1fr_80px_80px_100px_100px_40px] gap-2 text-xs font-semibold text-muted-foreground px-1">
+                <div className="hidden md:grid grid-cols-[minmax(0,1fr)_80px_80px_100px_100px_40px] gap-2 text-xs font-semibold text-muted-foreground px-1">
                   <span>Description</span>
                   <span>Qty</span>
                   <span>Unit</span>
@@ -1378,10 +1385,10 @@ export function QuoteFormDialog({
                 </div>
 
                 {form.line_items.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_80px_80px_100px_100px_40px] gap-2 items-center bg-slate-800/30 rounded-lg p-2 sm:p-1">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1">
-                        <GripVertical className="h-4 w-4 text-slate-600 hidden sm:block flex-shrink-0" />
+                  <div key={idx} className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_80px_80px_100px_100px_40px] gap-2 items-center bg-slate-800/30 rounded-lg p-2 md:p-1">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex min-w-0 items-center gap-1">
+                        <GripVertical className="h-4 w-4 text-slate-600 hidden md:block flex-shrink-0" />
                         <Textarea
                           value={item.description}
                           onChange={e => updateLineItem(idx, 'description', e.target.value)}
@@ -1444,7 +1451,7 @@ export function QuoteFormDialog({
               )}
             </div>
 
-            <div className="border-t border-slate-700 pt-4 space-y-3">
+            <div className="border-t border-slate-700 pt-4 space-y-3 lg:col-span-2 2xl:col-span-1">
               <div>
                 <h4 className="text-sm font-semibold text-muted-foreground">Client Attachments</h4>
                 <p className="text-xs text-slate-400">Attach pricing sheets, drawings, or supporting documents that can be sent with the client quote.</p>
@@ -1470,8 +1477,8 @@ export function QuoteFormDialog({
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-slate-300">Existing client-visible attachments</p>
                   {clientVisibleAttachments.map(attachment => (
-                    <div key={attachment.id} className="flex flex-col gap-2 rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
-                      <span className="truncate text-slate-200">{attachment.file_name}</span>
+                    <div key={attachment.id} className="flex min-w-0 flex-col gap-2 rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2 text-sm">
+                      <span className="min-w-0 break-words text-slate-200">{attachment.file_name}</span>
                       <div className="flex flex-wrap items-center gap-2">
                         <Button
                           type="button"
@@ -1526,9 +1533,9 @@ export function QuoteFormDialog({
               {attachmentFiles.length > 0 && (
                 <div className="space-y-2">
                   {attachmentFiles.map((file, index) => (
-                    <div key={`${file.name}-${index}`} className="flex items-center justify-between rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2 text-sm">
-                      <span className="truncate text-slate-200">{file.name}</span>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => removeAttachmentFile(index)} className="h-7 w-7 p-0 text-muted-foreground hover:text-red-300">
+                    <div key={`${file.name}-${index}`} className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-slate-700 bg-slate-800/40 px-3 py-2 text-sm">
+                      <span className="min-w-0 break-words text-slate-200">{file.name}</span>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => removeAttachmentFile(index)} className="h-7 w-7 shrink-0 p-0 text-muted-foreground hover:text-red-300">
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
@@ -1538,7 +1545,9 @@ export function QuoteFormDialog({
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          </DialogScrollArea>
+
+          <DialogFooter className="shrink-0 gap-2 border-t border-slate-700 pt-4">
             <Button type="button" variant="outline" onClick={discard} disabled={saving} className="border-slate-600 text-muted-foreground">
               {isFormDirty ? 'Discard Changes' : 'Cancel'}
             </Button>
