@@ -26,3 +26,8 @@ Use deliberate stages only where a handoff helps: record scope, selected inputs,
 ## MPDEE Worker
 
 For suitable engineering work, use the **MPDEE Worker** through Copilot CLI. Follow the installed `mpdee-worker` skill for routing, checks and return to the parent chat. Use **MPDEE Worker** in plans and progress reports.
+
+
+## fixerrors
+
+When the user says "fixerrors", including after another task, execute the Codex-led runbook in .cursor/commands/fixerrors.md. This includes investigating, testing and applying eligible local repairs, and recording exact dispositions and learning without asking the user to say "fix" again. If the chat lacks access to the repository, test runner, or approved production diagnostics, explain which stages are unavailable and hand off to a Codex chat with those capabilities. MPDEE Worker is optional. Do not deploy without separate approval.

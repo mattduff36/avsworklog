@@ -2,9 +2,17 @@
 
 <!-- trusted-operational-action: {"commandId":"fixerrors","safetyContract":"fixerrors-exact-snapshot-v5","registry":"scripts/automation/trusted-operational-actions.ts"} -->
 
-`npm run fixerrors` captures a repeatable-read snapshot of **untriaged active** production error logs, investigates new groups through scoped **MPDEE Worker** requests, then revisits older held cases. Capture itself is read-only; reviewed exact rows are subsequently transitioned through the separate `fixerrors-lifecycle-exact-id-v1` contract. Archiving never means an incident is live-fixed. Never commit, push or deploy automatically.
+`npm run fixerrors -- --chat-led` captures a repeatable-read snapshot of **untriaged active** production error logs, hands the investigation to the active chat, then revisits older held cases. Capture itself is read-only; reviewed exact rows are subsequently transitioned through the separate `fixerrors-lifecycle-exact-id-v1` contract. Archiving never means an incident is live-fixed. Never commit, push or deploy automatically.
 
-## Default automatic lifecycle
+## Chat-led entry point
+
+For an ordinary-language request to run fixerrors, the active chat owns the full run. Check local repository, test and production-read access first. If any are missing, explain the limitation and use a Codex chat that has them. On clean local main run `npm run fixerrors -- --chat-led`. Keep the process open. Investigate the sanitized new-first and held-case packet at docs_private/fixerrors-automatic-retrieval.json. Follow evidence into related source, tests, Git history and authorized diagnostics. Choose repair scope based on the actual change, including API and server files. Preserve auth, data, finance and concurrency contracts unless the proposed change has the required review. Run relevant tests and inspect the complete diff. The MPDEE Worker is optional and budget routing never blocks direct chat investigation.
+
+Submit the review atomically to the path printed by the command. The JSON has two fields, `decision` (the existing FixerrorsDecision schema with the captured snapshot ID and current candidate hashes) and `clusters` (one outcome per ID, with id, status, reason, attempt, tests, and evidence). Use verified-local only after passing relevant checks. Use held for missing evidence or approval and report-only only for evidenced no-fix conditions. The command verifies the reviewed partition, records learning and applies exact lifecycle updates. Never deploy without separate approval.
+
+## Optional standalone MPDEE Worker lifecycle
+
+Select explicitly with `npm run fixerrors -- --worker-led`. Bare `npm run fixerrors` prints the available modes before accessing production. The bare phrase in a chat still means the complete chat-led workflow.
 
 1. Start only in a **clean local main** checkout, before reading connection configuration or capturing errors. Do not create a worktree or change branches. A dirty/non-main checkout blocks the run; do not discard changes to pass this gate. `npm run fixerrors -- --capture-only` explicitly selects the legacy export-only workflow below and never dispatches workers or edits application code.
 2. Investigate exact sanitized groups in new-first order, then held rows oldest-first, including when the new capture is empty. Match evidence by the full incident fingerprint (family, route, component, source, context, status and normalized message), not related retrieval matches. Reuse matching new diagnosis/results for held cases; an unvalidated failed analysis is not reusable. Workers see only the sanitized scoped packet, source/tests and repository instructions, never raw private records or connection configuration. Workers and reviewers must not launch other agents.

@@ -14,6 +14,7 @@
  * Usage: npm run fixerrors
  */
 
+import { awaitChatFixerrorsReview } from './fixerrors-chat';
 import * as dotenv from 'dotenv';
 import { fileURLToPath } from 'url';
 import { relative, resolve } from 'path';
@@ -1294,13 +1295,19 @@ async function main() {
   if (lifecycleReplay && (hashLifecycleRecord(replayPlan) !== lifecycleReplay.planHash ||
       replayPlan?.databaseTargetFingerprint !== lifecycleReplay.target)) throw new Error('Lifecycle replay receipt binding mismatch');
   const captureOnly = args.includes('--capture-only');
-  if (!cleanupConfirmation && !lifecycleReplay && args.some(arg => arg !== '--capture-only')) throw new Error('Unknown fixerrors argument');
+  const chatLed = args.includes('--chat-led');
+  const workerLed = args.includes('--worker-led');
+  if (!args.length) {
+    throw new Error('Run fixerrors from a Codex chat with access to the local repository, tests and approved diagnostics. Use --chat-led for the chat workflow, --worker-led for optional MPDEE automation, or --capture-only for a report.');
+  }
+  if (!cleanupConfirmation && !lifecycleReplay && args.some(arg => !['--capture-only', '--chat-led', '--worker-led'].includes(arg))) throw new Error('Unknown fixerrors argument');
+  if ((chatLed || workerLed) && (args.length !== 1 || captureOnly || cleanupConfirmation || lifecycleReplay)) throw new Error('Select exactly one fixerrors run mode');
   const autoAdapters = cleanupConfirmation || captureOnly || lifecycleReplay ? null : createAutoAdapters();
   dotenv.config({ path: resolve(process.cwd(), '.env.local') });
   const run = new AutomationRun({
     scriptName: 'fixerrors',
     mode: lifecycleReplay ? 'exact-lifecycle-replay' : cleanupConfirmation ? 'trusted-operational-cleanup' :
-      captureOnly ? 'analysis-export' : 'capture-and-local-repair',
+      captureOnly ? 'analysis-export' : chatLed ? 'chat-led-local-repair' : 'capture-and-local-repair',
     args,
     expectedArtifacts: lifecycleReplay ? [] : [
       { path: 'docs_private/error-analysis.md' },
@@ -1696,7 +1703,9 @@ async function main() {
         await client?.end();
         client = null;
         const automatic = await run.step('Investigate new groups, then revisit held cases', () =>
-          runAutomaticFixerrors({ retrieval: automaticRetrieval, snapshotChecksum: snapshot.checksum, adapters: autoAdapters }));
+          chatLed
+            ? awaitChatFixerrorsReview(automaticRetrieval, snapshot.checksum, autoAdapters)
+            : runAutomaticFixerrors({ retrieval: automaticRetrieval, snapshotChecksum: snapshot.checksum, adapters: autoAdapters }));
         const plan = buildAutomaticLifecyclePlan({
           result: automatic, retrieval: automaticRetrieval, bindings,
           suppressed: captured.filter(record => snapshot.coverage!.suppressedIds.includes(record.id)),
