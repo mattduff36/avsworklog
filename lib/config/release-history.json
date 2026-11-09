@@ -1,5 +1,25 @@
 [
   {
+    "version": "1126.4.0",
+    "updateKind": "major",
+    "title": "Quotes update",
+    "description": "Updated Quotes and Notifications.",
+    "summary": "Updated Quotes and Notifications.",
+    "details": [
+      "Updated Quotes and Notifications, with changes to app screens.",
+      "Updated notifications, with changes to interface components."
+    ],
+    "areas": [
+      "Quotes",
+      "Notifications"
+    ],
+    "areaKeys": [
+      "quotes",
+      "notifications"
+    ],
+    "pushedAt": "2026-11-09T20:20:28.044Z"
+  },
+  {
     "version": "1126.3.0",
     "updateKind": "major",
     "title": "Daily Allocation update",
