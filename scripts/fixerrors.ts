@@ -30,7 +30,7 @@ import {
 import { buildAutomaticLifecyclePlan, renderAutomaticLifecycleSummary, type LifecycleBinding } from './fixerrors-lifecycle-run';
 import { renderFixerrorsRunSummary } from './fixerrors-summary';
 import {
-  loadKnowledgeStore,
+  loadRuntimeKnowledgeStore,
   fingerprintIncident,
   rejectSensitiveDocument,
   rejectSensitiveText,
@@ -1498,7 +1498,7 @@ async function main() {
       `  Found ${patterns.length} pattern(s) across ${clusters.length} independent cluster(s)`
     );
 
-    const knowledge = loadKnowledgeStore();
+    const knowledge = loadRuntimeKnowledgeStore();
     const knowledgeOutcomes = summarizeKnowledgeOutcomes(knowledge);
     const candidate = captureCandidateFingerprint();
     const retrieval: AutoRetrieval = {

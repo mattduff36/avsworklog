@@ -9,8 +9,8 @@ import {
   type CandidateFingerprint, type DecisionCluster,
 } from './fixerrors-decision';
 import {
-  fingerprintIncident, loadKnowledgeStore, recordIncidentOutcome, rejectSensitiveDocument,
-  rejectSensitiveText, sanitizeKnowledgeText, saveKnowledgeAtomic, type IncidentOutcome,
+  fingerprintIncident, loadRuntimeKnowledgeStore, recordIncidentOutcome, rejectSensitiveDocument,
+  rejectSensitiveText, runtimeKnowledgePath, sanitizeKnowledgeText, saveKnowledgeAtomic, type IncidentOutcome,
 } from './fixerrors-knowledge';
 import { writeAndVerifyTextArtifactAtomic } from './fixerrors-safety';
 
@@ -246,8 +246,8 @@ export function createAutoAdapters(cwd = process.cwd()): AutoAdapters {
     learn: (retrieval, cluster, outcome, files, tests, summary) => {
       const entry = retrieval.clusters.find(item => item.id === cluster.id);
       if (!entry) throw new Error('Missing incident query');
-      const knowledgePath = path.join(cwd, 'lib', 'config', 'fixerrors-knowledge.json');
-      saveKnowledgeAtomic(recordIncidentOutcome(loadKnowledgeStore(knowledgePath), {
+      const knowledgePath = runtimeKnowledgePath(cwd);
+      saveKnowledgeAtomic(recordIncidentOutcome(loadRuntimeKnowledgeStore(cwd), {
         ...entry.query, diagnosis: cluster.rationale, fixSummary: outcome === 'fix_verified_local' ? summary ?? 'Local repair verified; deployment required' : null,
         changedFiles: files, tests, confidence: 'medium', outcome, lane: cluster.lane, observedAt: new Date().toISOString(),
       }), knowledgePath);

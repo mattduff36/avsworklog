@@ -288,6 +288,18 @@ export function loadKnowledgeStore(filePath = FIXERRORS_KNOWLEDGE_PATH): Knowled
   return parseKnowledgeStore(JSON.parse(readFileSync(filePath, 'utf8')));
 }
 
+export function runtimeKnowledgePath(cwd = process.cwd()): string {
+  return path.join(cwd, 'docs_private', 'fixerrors-runtime-knowledge.json');
+}
+
+export function loadRuntimeKnowledgeStore(cwd = process.cwd()): KnowledgeStore {
+  const seed = loadKnowledgeStore(path.join(cwd, 'lib/config/fixerrors-knowledge.json'));
+  const runtime = loadKnowledgeStore(runtimeKnowledgePath(cwd));
+  const incidents = new Map(seed.incidents.map(incident => [incident.id, incident]));
+  for (const incident of runtime.incidents) incidents.set(incident.id, incident);
+  return parseKnowledgeStore({ version: FIXERRORS_KNOWLEDGE_VERSION, incidents: [...incidents.values()] });
+}
+
 export function assertNoSensitiveKnowledge(store: KnowledgeStore): void {
   parseKnowledgeStore(store);
   assertSafeText(JSON.stringify(store), 'knowledge');
