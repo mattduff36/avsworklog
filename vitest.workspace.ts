@@ -17,6 +17,13 @@ export default defineWorkspace([
         'tests/regression/**/*.test.ts',
         'tests/db/**/*.test.ts',
       ],
+      // These suites require a fresh runner-owned database, not .env.local.
+      exclude: process.env.AVSWORKLOG_TEST_SKIP_DOTENV === '1' && process.env.TEST_DATABASE_URL
+        ? []
+        : [
+          'tests/db/account-merge-runtime.test.ts',
+          'tests/unit/fixerrors-lifecycle-postgres.test.ts',
+        ],
     },
   },
   // Happy DOM environment for UI component tests

@@ -31,6 +31,8 @@ Prefer the one-shot command:
 - `test:db:local:delete-user-leave` runs `tsx scripts/local-test-postgres.ts one-shot --target tests/db/delete-user-annual-leave-lock.test.ts` (`DEL-AL-08`). A skipped or PGlite-only run is not a pass.
 - `test:db:native:delete-user-leave` runs the same `DEL-AL-08` target in a fresh native Windows cluster without Docker.
 - `test:db:native:bank-holiday` applies the exact bank-holiday migration to a fixture schema and runs its real PostgreSQL runtime checks.
+- `test:db:native:account-merge` runs `tsx scripts/local-native-test-postgres.ts one-shot --target tests/db/account-merge-runtime.test.ts`.
+- `test:db:native:fixerrors-lifecycle` runs `tsx scripts/local-native-test-postgres.ts one-shot --target tests/unit/fixerrors-lifecycle-postgres.test.ts`.
 - `test:db:local:start` runs `tsx scripts/local-test-postgres.ts start` to create a fresh disposable instance after recovery teardown.
 - `test:db:local:run` runs `tsx scripts/local-test-postgres.ts run` exactly once against the started instance.
 - `test:db:local:stop` runs `tsx scripts/local-test-postgres.ts stop`, including `down --volumes --remove-orphans`, then proves owned resources are absent.
@@ -45,7 +47,14 @@ Native Windows one-shot examples:
 ```bash
 npm run test:db:native:delete-user-leave
 npm run test:db:native:bank-holiday
+npm run test:db:native:account-merge
+npm run test:db:native:fixerrors-lifecycle
 ```
+
+The account-merge and fixerrors-lifecycle suites are native-only and excluded from
+the default Vitest workspace selection unless the disposable runner supplies both
+its dotenv-disable flag and child-only database URL. Their in-test identity and
+provenance checks remain mandatory; default-suite success is not native DB evidence.
 
 The native runner discovers a complete installation under `C:\Program Files\PostgreSQL\<major>\bin`, creates a sentinel-owned data directory below the current user's temporary directory, starts `pg_ctl` with `-h 127.0.0.1` and the checkout-derived port, runs one target, stops the server, proves the port is closed, and removes only that owned data directory. It never installs or starts a Windows service.
 

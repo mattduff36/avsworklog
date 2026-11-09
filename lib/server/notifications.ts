@@ -44,7 +44,7 @@ interface RecipientQueryResult {
 
 interface NotificationCountQueryResult {
   count: number | null;
-  error: { message?: string | null } | null;
+  error: { message?: string | null; code?: string | null } | null;
 }
 
 interface DeferredToolboxTalkCountQueryResult {
@@ -247,7 +247,12 @@ export async function countUnreadNotificationsForUser(
   });
 
   if (error) {
-    throw new Error(error.message || 'Failed to count notifications');
+    const code = error.code;
+    throw new Error(error.message || 'Failed to count notifications', {
+      cause: typeof code === 'string' && /^(?:[A-Z0-9]{5}|PGRST[0-9]{3})$/u.test(code)
+        ? code
+        : undefined,
+    });
   }
 
   let pendingCount = count || 0;

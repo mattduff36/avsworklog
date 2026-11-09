@@ -94,7 +94,11 @@ import {
   type PendingDidNotWorkBookingMap,
 } from '@/lib/utils/timesheet-did-not-work-bookings';
 import { commitTimesheetDidNotWorkBookings } from '@/lib/client/timesheet-did-not-work-bookings';
-import { submitTimesheet } from '@/lib/client/timesheet-submit';
+import {
+  getTimesheetSubmitErrorDiagnostics,
+  submitTimesheet,
+  TimesheetSubmitRequestError,
+} from '@/lib/client/timesheet-submit';
 import { useBankHolidayWorkConfirm } from '@/lib/hooks/useBankHolidayWorkConfirm';
 import {
   BANK_HOLIDAY_WORK_ENTRY_HELPER,
@@ -1527,7 +1531,12 @@ export function PlantTimesheetV2({
         !isNetworkFetchError(saveError);
 
       if (shouldLogError) {
-        console.error('Error saving plant timesheet:', saveError);
+        console.error(
+          'Error saving plant timesheet:',
+          saveError instanceof TimesheetSubmitRequestError
+            ? getTimesheetSubmitErrorDiagnostics(saveError)
+            : saveError
+        );
       }
 
       if (

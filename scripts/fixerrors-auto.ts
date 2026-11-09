@@ -134,8 +134,11 @@ export function runnerPaths(home = homedir()) {
 export async function dispatchFixerrorsWorker(request: WorkerRequest, requestPath: string, runner = runnerPaths()): Promise<WorkerResult> {
   writeAndVerifyTextArtifactAtomic(requestPath, `${JSON.stringify(request, null, 2)}\n`);
   if (!existsSync(runner.script)) throw new Error('Installed MPDEE Worker runner is missing');
-  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
-    !/(?:TOKEN|SECRET|PASSWORD|API_KEY|POSTGRES|DATABASE_URL|SUPABASE|COOKIE|AUTHORIZATION)/iu.test(key)));
+  const env: NodeJS.ProcessEnv = {
+    NODE_ENV: process.env.NODE_ENV ?? 'production',
+    ...Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+      !/(?:TOKEN|SECRET|PASSWORD|API_KEY|POSTGRES|DATABASE_URL|SUPABASE|COOKIE|AUTHORIZATION)/iu.test(key))),
+  };
   await new Promise<void>((resolve, reject) => {
     const child = spawn('python', [runner.script, requestPath], {
       cwd: request.workspace, env, shell: false, windowsHide: true, stdio: ['ignore', 'ignore', 'ignore'],

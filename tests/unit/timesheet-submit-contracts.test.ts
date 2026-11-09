@@ -41,6 +41,7 @@ describe('timesheet submit contracts', () => {
     expect(plant).toContain("from '@/lib/client/timesheet-submit'");
     expect(plant).toContain('submitTimesheet(');
     expect(plant).toContain("timesheetType: 'plant'");
+    expect(plant).toContain('getTimesheetSubmitErrorDiagnostics(saveError)');
     expect(civils).toContain("from '@/lib/client/timesheet-submit'");
     expect(civils).toContain('submitTimesheet(');
   });

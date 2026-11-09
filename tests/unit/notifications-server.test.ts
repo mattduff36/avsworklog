@@ -24,7 +24,7 @@ function createNotificationsSupabaseMock(
 
 function createNotificationCountSupabaseMock(
   count: number | null,
-  error: { message?: string | null } | null = null,
+  error: { message?: string | null; code?: string | null } | null = null,
   deferredRows: unknown[] = [],
   preferences: unknown[] = [],
   hiddenCount: number | null = null
@@ -207,6 +207,17 @@ describe('listNotificationsForUser', () => {
 });
 
 describe('countUnreadNotificationsForUser', () => {
+  it.each([
+    ['57014', '57014'],
+    ['PGRST003', 'PGRST003'],
+    ['unexpected private text', undefined],
+  ])('keeps only a recognized code as the cause of a blank count error', async (code, cause) => {
+    const { supabase } = createNotificationCountSupabaseMock(null, { code, message: '' });
+
+    await expect(countUnreadNotificationsForUser(supabase as never, 'user-1'))
+      .rejects.toMatchObject({ message: 'Failed to count notifications', cause });
+  });
+
   it('uses an exact count so the badge matches the inbox contents', async () => {
     const { supabase, pendingQuery, deferredQuery } = createNotificationCountSupabaseMock(0);
 

@@ -1,3 +1,4 @@
+import { UNEXPECTED_ERROR_LOG_TRIGGERS } from './fixerrors-trigger-contract';
 import { createHash, randomUUID } from 'crypto';
 import {
   closeSync,
@@ -1681,14 +1682,10 @@ async function assertErrorLogCatalogContracts(client: PgClientLike): Promise<voi
   assertExpectedForeignKeys(foreignKeys.rows);
   const unexpectedTriggers = await client.query<{ trigger_name: unknown }>(`
     /* fixerrors:retention-trigger-catalog */
-    SELECT trigger_row.tgname AS trigger_name
-    FROM pg_trigger trigger_row
-    JOIN pg_class table_row ON table_row.oid = trigger_row.tgrelid
-    JOIN pg_namespace schema_row ON schema_row.oid = table_row.relnamespace
-    WHERE schema_row.nspname = 'public'
-      AND table_row.relname = 'error_logs'
-      AND NOT trigger_row.tgisinternal
-    ORDER BY trigger_row.tgname
+    SELECT 'unexpected trigger contract' AS trigger_name
+    FROM pg_class c
+    WHERE c.oid = 'public.error_logs'::regclass
+      AND ${UNEXPECTED_ERROR_LOG_TRIGGERS}
   `);
   if (unexpectedTriggers.rows.length > 0) {
     throw new Error('error_logs trigger safety contract changed; cleanup blocked');

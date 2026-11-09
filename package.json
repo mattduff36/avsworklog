@@ -73,6 +73,8 @@
     "test:db:native:delete-user-leave": "tsx scripts/local-native-test-postgres.ts one-shot --target tests/db/delete-user-annual-leave-lock.test.ts",
     "test:db:native:contractor-transition": "tsx scripts/local-native-test-postgres.ts one-shot --target tests/db/contractor-role-transition-lock.test.ts",
     "test:db:native:bank-holiday": "tsx scripts/local-native-test-postgres.ts one-shot --target tests/db/timesheet-bank-holiday-runtime.test.ts",
+    "test:db:native:account-merge": "tsx scripts/local-native-test-postgres.ts one-shot --target tests/db/account-merge-runtime.test.ts",
+    "test:db:native:fixerrors-lifecycle": "tsx scripts/local-native-test-postgres.ts one-shot --target tests/unit/fixerrors-lifecycle-postgres.test.ts",
     "test:db:native:daily-allocation-safety": "tsx scripts/local-native-test-postgres.ts one-shot --target tests/db/daily-allocation-safety-runtime.test.ts",
     "test:db:native:daily-allocation-sessions": "tsx scripts/local-native-test-postgres.ts one-shot --target tests/db/daily-allocation-session-runtime.test.ts",
     "test:db:native:inventory-kiosk-hardware": "tsx scripts/local-native-test-postgres.ts one-shot --target tests/db/inventory-kiosk-hardware-identity-runtime.test.ts",

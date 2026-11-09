@@ -104,12 +104,26 @@ describe('POST /api/me/usage-events empty failure logging', () => {
         expect.objectContaining({
           error,
           componentName: '/api/me/usage-events',
+          additionalData: expect.objectContaining({ stage: 'authentication' }),
         })
       );
       expect(error.message).toBe(FAILURE_MESSAGE);
       expect(error.stack).toBe(stack);
     }
   );
+
+  it('distinguishes a storage failure from an authentication failure in the log', async () => {
+    authenticate();
+    vi.mocked(insertClientUsageEvents).mockRejectedValueOnce(new Error(''));
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ error: FAILURE_MESSAGE });
+    expect(logServerError).toHaveBeenCalledWith(expect.objectContaining({
+      additionalData: expect.objectContaining({ stage: 'record-usage' }),
+    }));
+  });
 
   it('preserves a non-empty Error message on the retained 500 response', async () => {
     const error = new Error('usage store rejected the batch');

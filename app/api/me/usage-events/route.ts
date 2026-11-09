@@ -64,16 +64,19 @@ function isTransientUsageAnalyticsError(error: unknown): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  let stage = 'origin-check';
   try {
     if (!originMatchesRequest(request)) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    stage = 'authentication';
     const current = await getCurrentAuthenticatedProfile();
     if (!current) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    stage = 'record-usage';
     const payload = await request.json().catch(() => ({}));
     const inserted = await insertClientUsageEvents({
       request,
@@ -111,6 +114,7 @@ export async function POST(request: NextRequest) {
       additionalData: {
         endpoint: '/api/me/usage-events',
         method: 'POST',
+        stage,
       },
     });
 

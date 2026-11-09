@@ -1,115 +1,91 @@
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { config } from 'dotenv';
-import { resolve } from 'path';
-import pg from 'pg';
-
-config({ path: resolve(process.cwd(), '.env.local') });
-
-const connectionString = process.env.POSTGRES_URL_NON_POOLING || process.env.POSTGRES_URL;
 
 describe('SVC-RLS-001 behavioral service-state protection', () => {
-  let client: pg.Client | null = null;
-  let sampleMaintenanceId: string | null = null;
-  let originalMileage: number | null = null;
+  let db: PGlite;
 
   beforeAll(async () => {
-    if (!connectionString) return;
-    const url = new URL(connectionString);
-    client = new pg.Client({
-      host: url.hostname,
-      port: Number.parseInt(url.port || '5432', 10),
-      database: url.pathname.slice(1),
-      user: url.username,
-      password: url.password ? decodeURIComponent(url.password) : undefined,
-      ssl: { rejectUnauthorized: false },
-    });
-    await client.connect();
-    const { rows } = await client.query<{ id: string; next_service_mileage: number | null }>(
-      `
-      SELECT id, next_service_mileage
-      FROM public.vehicle_maintenance
-      WHERE hgv_id IS NOT NULL
-      ORDER BY updated_at DESC NULLS LAST
-      LIMIT 1
-      `,
-    );
-    sampleMaintenanceId = rows[0]?.id ?? null;
-    originalMileage = rows[0]?.next_service_mileage ?? null;
+    db = new PGlite();
+    await db.exec(`
+      CREATE SCHEMA auth;
+      CREATE ROLE svc_rls_probe NOLOGIN NOSUPERUSER NOBYPASSRLS;
+      CREATE FUNCTION auth.role() RETURNS text LANGUAGE sql AS $$ SELECT 'authenticated'::text $$;
+      CREATE FUNCTION public.effective_is_manager_admin() RETURNS boolean LANGUAGE sql AS
+        $$ SELECT current_setting('test.is_manager')::boolean $$;
+      CREATE FUNCTION public.effective_has_module_level(text, integer) RETURNS boolean LANGUAGE sql AS
+        $$ SELECT $1 = 'maintenance' AND current_setting('test.level')::integer >= $2 $$;
+      REVOKE ALL ON FUNCTION public.effective_has_module_level(text, integer) FROM PUBLIC;
+      GRANT EXECUTE ON FUNCTION public.effective_has_module_level(text, integer) TO svc_rls_probe;
+      CREATE TABLE public.vehicle_maintenance(
+        id integer PRIMARY KEY, van_id integer, hgv_id integer, plant_id integer,
+        next_service_template_id integer, next_service_rotation_step_id integer,
+        last_service_template_id integer, next_service_mileage integer,
+        last_service_mileage integer, next_service_hours integer, last_service_hours integer,
+        current_mileage integer
+      );
+      CREATE TABLE public.service_rotation_steps(id integer, maintenance_category_id integer, attachment_template_id integer);
+      CREATE TABLE public.maintenance_categories(id integer, config_key text, workshop_category_id integer, is_active boolean);
+      CREATE TABLE public.workshop_attachment_templates(id integer, is_active boolean);
+      CREATE TABLE public.workshop_category_attachment_templates(category_id integer, template_id integer);
+      CREATE TABLE public.workshop_attachment_template_versions(template_id integer, status text);
+      INSERT INTO public.vehicle_maintenance VALUES(1,NULL,1,NULL,1,1,1,40000,30000,NULL,NULL,30000);
+      ALTER TABLE public.vehicle_maintenance ENABLE ROW LEVEL SECURITY;
+      CREATE POLICY probe_access ON public.vehicle_maintenance TO svc_rls_probe USING (true) WITH CHECK (true);
+      GRANT USAGE ON SCHEMA public, auth TO svc_rls_probe;
+      GRANT SELECT ON ALL TABLES IN SCHEMA public TO svc_rls_probe;
+      GRANT INSERT, UPDATE ON public.vehicle_maintenance TO svc_rls_probe;
+    `);
+    await db.exec(readFileSync('supabase/migrations/20261102_supervisor_next_service_type.sql', 'utf8'));
+    const closure = readFileSync('supabase/migrations/20260808_asset_service_closure_fixes.sql', 'utf8');
+    const triggerStart = closure.indexOf('DROP TRIGGER IF EXISTS trg_protect_vehicle_maintenance_service_state');
+    expect(triggerStart).toBeGreaterThanOrEqual(0);
+    await db.exec(closure.slice(triggerStart));
+    await db.exec("SET ROLE svc_rls_probe; SET test.is_manager='false'; SET test.level='2'");
   });
 
   afterAll(async () => {
-    if (!client) return;
-    await client.end().catch(() => undefined);
+    await db?.close();
   });
 
-  it('SVC-RLS-001 rejects non-manager authenticated updates to service due mileage', async () => {
-    if (!client || !sampleMaintenanceId) {
-      expect(connectionString, 'POSTGRES_URL_NON_POOLING is required for SVC-RLS-001').toBeTruthy();
-      return;
-    }
-
-    await client.query('BEGIN');
+  it.each([
+    'next_service_mileage=50000',
+    'last_service_mileage=35000',
+    'next_service_hours=500',
+    'last_service_hours=250',
+    'next_service_template_id=2',
+    'next_service_rotation_step_id=2',
+    'last_service_template_id=2',
+  ])('rejects non-manager service-state edits through permissive RLS: %s', async (assignment) => {
+    await db.exec('BEGIN');
     try {
-      // Create a non-manager role that can touch the row through RLS,
-      // then prove the service-state trigger still rejects the write.
-      await client.query(`
-        DO $$
-        BEGIN
-          IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'svc_rls_probe') THEN
-            CREATE ROLE svc_rls_probe NOLOGIN;
-          END IF;
-        END $$;
-      `);
-      await client.query(`GRANT svc_rls_probe TO CURRENT_USER`);
-      await client.query(`GRANT USAGE ON SCHEMA public TO svc_rls_probe`);
-      await client.query(`GRANT USAGE ON SCHEMA auth TO svc_rls_probe`);
-      await client.query(`GRANT SELECT, UPDATE ON public.vehicle_maintenance TO svc_rls_probe`);
-      await client.query(`
-        DROP POLICY IF EXISTS "svc_rls_probe_vehicle_maintenance" ON public.vehicle_maintenance
-      `);
-      await client.query(`
-        CREATE POLICY "svc_rls_probe_vehicle_maintenance"
-          ON public.vehicle_maintenance
-          FOR ALL
-          TO svc_rls_probe
-          USING (true)
-          WITH CHECK (true)
-      `);
-
-      await client.query(`SET LOCAL ROLE svc_rls_probe`);
-      const who = await client.query<{ current_user: string; is_mgr: boolean }>(
-        `SELECT current_user, public.effective_is_manager_admin() AS is_mgr`,
-      );
-      expect(who.rows[0]?.current_user).toBe('svc_rls_probe');
-      expect(who.rows[0]?.is_mgr).toBe(false);
-
-      let rejected = false;
-      try {
-        await client.query(
-          `
-          UPDATE public.vehicle_maintenance
-          SET next_service_mileage = COALESCE(next_service_mileage, 0) + 1
-          WHERE id = $1
-          `,
-          [sampleMaintenanceId],
-        );
-      } catch (error) {
-        rejected = true;
-        expect(String(error)).toMatch(/Manager or admin required to update service state/i);
-      }
-      expect(rejected).toBe(true);
+      const identity = await db.query('SELECT current_user, public.effective_is_manager_admin() AS is_manager');
+      expect(identity.rows[0]).toEqual({ current_user: 'svc_rls_probe', is_manager: false });
+      await expect(db.exec(`UPDATE public.vehicle_maintenance SET ${assignment} WHERE id=1`))
+        .rejects.toMatchObject({ code: '42501', message: 'Manager or admin required to update service state' });
     } finally {
-      await client.query('ROLLBACK');
+      await db.exec('ROLLBACK');
     }
+    expect((await db.query('SELECT next_service_mileage FROM public.vehicle_maintenance WHERE id=1')).rows[0])
+      .toEqual({ next_service_mileage: 40000 });
+  });
 
-    // Privileged connection can still write and restore original value.
-    await client.query(
-      `
-      UPDATE public.vehicle_maintenance
-      SET next_service_mileage = $2
-      WHERE id = $1
-      `,
-      [sampleMaintenanceId, originalMileage],
-    );
+  it('allows ordinary meter updates without allowing service state on insert', async () => {
+    expect((await db.query('UPDATE public.vehicle_maintenance SET current_mileage=31000 WHERE id=1 RETURNING current_mileage')).rows)
+      .toEqual([{ current_mileage: 31000 }]);
+    await expect(db.exec('INSERT INTO public.vehicle_maintenance(id,hgv_id,next_service_mileage) VALUES(2,2,50000)'))
+      .rejects.toMatchObject({ code: '42501', message: 'Manager or admin required to set service state on insert' });
+  });
+
+  it('allows manager updates and inserts through the same RLS role', async () => {
+    await db.exec("BEGIN; SET LOCAL test.is_manager='true'");
+    try {
+      expect((await db.query('UPDATE public.vehicle_maintenance SET next_service_mileage=50000 WHERE id=1 RETURNING next_service_mileage')).rows)
+        .toEqual([{ next_service_mileage: 50000 }]);
+      expect((await db.query('INSERT INTO public.vehicle_maintenance(id,hgv_id,next_service_mileage) VALUES(2,2,60000) RETURNING id')).rows)
+        .toEqual([{ id: 2 }]);
+    } finally {
+      await db.exec('ROLLBACK');
+    }
   });
 });

@@ -88,6 +88,10 @@ export const EXPECTED_LOCAL_TEST_DB_NPM_SCRIPTS = {
   'test:db:local:verify-cleanup': 'tsx scripts/local-test-postgres.ts verify-failure-cleanup',
   'test:db:local:delete-user-leave':
     'tsx scripts/local-test-postgres.ts one-shot --target tests/db/delete-user-annual-leave-lock.test.ts',
+  'test:db:native:account-merge':
+    'tsx scripts/local-native-test-postgres.ts one-shot --target tests/db/account-merge-runtime.test.ts',
+  'test:db:native:fixerrors-lifecycle':
+    'tsx scripts/local-native-test-postgres.ts one-shot --target tests/unit/fixerrors-lifecycle-postgres.test.ts',
 } as const;
 
 /** Parent integration: after wiring package.json, this must hold. */

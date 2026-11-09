@@ -31,6 +31,11 @@ export async function GET() {
         componentName: '/api/messages/notifications/count',
         additionalData: {
           endpoint: '/api/messages/notifications/count',
+          method: 'GET',
+          ...(typeof normalizedError.cause === 'string' &&
+            /^(?:[A-Z0-9]{5}|PGRST[0-9]{3})$/u.test(normalizedError.cause)
+            ? { databaseCode: normalizedError.cause }
+            : {}),
         },
       });
     } catch (logError) {

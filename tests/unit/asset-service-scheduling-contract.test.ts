@@ -13,6 +13,10 @@ import {
   MAINTENANCE_CATEGORY_NAMES,
   categoryAppliesToAsset,
 } from '@/lib/utils/maintenanceCategoryRules';
+import {
+  loadMaintenanceServiceTemplateEnrichment,
+  type ServiceTemplateReads,
+} from '@/lib/server/maintenance-service-template-enrichment';
 
 const HGV_STEPS: ServiceRotationStep[] = [
   { id: 's1', position: 1, attachmentTemplateId: 'basic-a', compactLabel: 'Basic A' },
@@ -385,10 +389,34 @@ describe('SVC-CONFIG-001 service settings integrity', () => {
 });
 
 describe('SVC-UI-002 active distinct badge count', () => {
-  it('SVC-UI-002 counts distinct active linked templates only', () => {
+  it('SVC-UI-002 counts distinct active linked templates only', async () => {
     const maintenance = readRepo('app/api/maintenance/route.ts');
-    expect(maintenance).toContain("eq('is_active', true)");
-    expect(maintenance).toContain('distinctTemplateIds');
+    const enrichment = readRepo('lib/server/maintenance-service-template-enrichment.ts');
+    expect(maintenance).toContain('loadMaintenanceServiceTemplateEnrichment(');
+    expect(maintenance).toContain('createServiceTemplateReads(admin)');
+    expect(maintenance).toContain('applyServiceTemplateEnrichment(vehiclesWithStatus, enrichment)');
+    expect(enrichment).toContain("eq('is_active', true)");
+    const empty = () => Promise.resolve({ data: [], error: null });
+    const reads: ServiceTemplateReads = {
+      listTemplateNames: empty,
+      listCompactLabels: empty,
+      listCategoryLinksForCategory: empty,
+      listCategoryLinks: () => Promise.resolve({
+        data: ['basic-a', 'basic-a', 'basic-b', 'inactive'].map((template_id) => ({
+          category_id: 'hgv-service', template_id,
+        })),
+        error: null,
+      }),
+      listActiveTemplateIds: () => Promise.resolve({
+        data: [{ id: 'basic-a' }, { id: 'basic-a' }, { id: 'basic-b' }],
+        error: null,
+      }),
+    };
+    const result = await loadMaintenanceServiceTemplateEnrichment(reads, {
+      categories: [{ config_key: 'service_hgv', workshop_category_id: 'hgv-service' }],
+      templateIds: [],
+    });
+    expect(result.linkedCountByAssetType.get('hgv')).toBe(2);
   });
 });
 
