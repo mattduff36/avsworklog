@@ -22,3 +22,7 @@ TEE's global skill owns proportional safety/quality and its model registry. This
 Do not load the whole documentation tree, historical reports/plans, unrelated module PRDs, release machinery for ordinary edits, or protocol artifacts for a DIRECT/FAST task. `docs/README.md` is a discovery index, not another standard. Never load secrets or customer/personnel data as AI context. No new summary or stage artifacts for trivial work.
 
 Use deliberate stages only where a handoff helps: record scope, selected inputs, evidence needed and next action in the existing task/plan. Reuse existing protocol artifacts for TEE-FULL; do not create a second state engine or a CONTEXT.md wrapper.
+
+## MPDEE Worker
+
+For suitable engineering work, use the **MPDEE Worker** through Copilot CLI. Follow the installed `mpdee-worker` skill for routing, checks and return to the parent chat. Use **MPDEE Worker** in plans and progress reports.
