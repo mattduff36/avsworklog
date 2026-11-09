@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.7.0
+
+**GIT COMMIT MESSAGE**
+`feat(api): update background services`
+
+**PUSHED AT**
+2026-11-09T22:57:36.670Z
+
+**WHAT CHANGED**
+Update background services.
+
+**VERSION HISTORY DETAILS**
+- Updated background services, with changes to background routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(api): update background services`
+
 ## 1126.6.0
 
 **GIT COMMIT MESSAGE**

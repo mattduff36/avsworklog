@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.7.0",
+    "updateKind": "major",
+    "title": "Background services update",
+    "description": "Updated background services.",
+    "summary": "Updated background services.",
+    "details": [
+      "Updated background services, with changes to background routes."
+    ],
+    "areas": [
+      "Background services"
+    ],
+    "areaKeys": [
+      "background-services"
+    ],
+    "pushedAt": "2026-11-09T22:57:36.670Z"
+  },
+  {
     "version": "1126.6.0",
     "updateKind": "major",
     "title": "Notifications update",
