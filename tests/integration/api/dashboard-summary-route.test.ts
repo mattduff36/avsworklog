@@ -42,7 +42,7 @@ vi.mock('@/lib/server/absence-secondary-permissions', async (importOriginal) => 
 
 function createCountQuery(count: number) {
   const resolved = { count, error: null };
-  return createSupabaseQueryMock(resolved, ['eq', 'in', 'not', 'or']);
+  return createSupabaseQueryMock(resolved, ['eq', 'in', 'is', 'not', 'or']);
 }
 
 function createScopedRowsQuery<T extends Record<string, unknown>>(rows: T[]) {
@@ -561,6 +561,7 @@ describe('GET /api/dashboard/summary', () => {
     expect(payload.metrics.badges.error_logs).toBe(7);
     expect(selectErrorLogs).toHaveBeenCalledWith('id', { count: 'exact', head: true });
     expect(errorLogsCountQuery.eq).toHaveBeenCalledWith('status', 'active');
+    expect(errorLogsCountQuery.is).toHaveBeenCalledWith('triage_state', null);
     expect(errorLogsCountQuery.or).toHaveBeenCalledWith('page_url.is.null,page_url.not.ilike.%localhost%');
     expect(errorLogsCountQuery.or).toHaveBeenCalledWith(
       `user_email.is.null,user_email.neq.${DEBUG_ERROR_LOG_HIDDEN_ADMIN_EMAIL}`

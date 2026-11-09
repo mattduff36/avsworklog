@@ -505,6 +505,7 @@ export async function GET() {
             .from('error_logs')
             .select('id', { count: 'exact', head: true })
             .eq('status', 'active')
+            .is('triage_state', null)
             .or('page_url.is.null,page_url.not.ilike.%localhost%')
             .or(`user_email.is.null,user_email.neq.${DEBUG_ERROR_LOG_HIDDEN_ADMIN_EMAIL}`)
         )
