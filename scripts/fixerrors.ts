@@ -22,15 +22,23 @@ import pg from 'pg';
 import { AutomationRun } from './automation/logger';
 import { TRUSTED_OPERATIONAL_ACTIONS } from './automation/trusted-operational-actions';
 import { captureCandidateFingerprint } from './fixerrors-decision';
+import { createAutoAdapters, continueFixerrorsCapture, isFixerrorsSourcePath, runAutomaticFixerrors, type AutoRetrieval } from './fixerrors-auto';
+import {
+  applyLifecyclePlan, fetchLifecycleRecords, hashLifecycleRecord, parseLifecyclePlan,
+  readLifecycle, type LifecycleRecord,
+} from './fixerrors-lifecycle';
+import { buildAutomaticLifecyclePlan, renderAutomaticLifecycleSummary, type LifecycleBinding } from './fixerrors-lifecycle-run';
 import { renderFixerrorsRunSummary } from './fixerrors-summary';
 import {
   loadKnowledgeStore,
+  fingerprintIncident,
   rejectSensitiveDocument,
   rejectSensitiveText,
   retrieveIncidents,
   sanitizeKnowledgeText,
   summarizeKnowledgeOutcomes,
   type IncidentQuery,
+  type KnowledgeStore,
 } from './fixerrors-knowledge';
 import {
   ERROR_ANALYSIS_PATH,
@@ -64,8 +72,6 @@ export {
   writeAndVerifyErrorSnapshot,
   writeAndVerifyTextArtifactAtomic,
 } from './fixerrors-safety';
-
-dotenv.config({ path: resolve(process.cwd(), '.env.local') });
 
 const ERROR_FIX_LOG_PATH = resolve(process.cwd(), 'docs_private', 'error-fix-log.md');
 const ERROR_RETRIEVAL_PATH = resolve(process.cwd(), 'docs_private', 'error-analysis-retrieval.json');
@@ -711,9 +717,101 @@ export function clusterErrorPatterns(patterns: ErrorPattern[]): ErrorRootCauseCl
     .sort((left, right) => right.occurrences - left.occurrences);
 }
 
+export function splitLifecycleClusters(clusters: ErrorRootCauseCluster[], repoRoot = process.cwd()): ErrorRootCauseCluster[] {
+  const exact = new Map<string, ErrorRootCauseCluster>();
+  for (const cluster of clusters) for (const pattern of cluster.patterns) for (const occurrence of pattern.occurrences) {
+    const single = {
+      ...pattern, occurrences: [occurrence], sourceFiles: extractSourceFilesForError(occurrence, repoRoot),
+      firstSeen: occurrence.timestamp, lastSeen: occurrence.timestamp,
+    };
+    const scoped = { ...cluster, patterns: [single], occurrences: 1 };
+    const fingerprint = fingerprintIncident(buildRetrievalCluster(scoped, { version: 1, incidents: [] }).query);
+    const previous = exact.get(fingerprint);
+    if (previous) {
+      const matching = previous.patterns.find(entry => entry.patternKey === single.patternKey);
+      if (matching) {
+        matching.occurrences.push(occurrence);
+        matching.firstSeen = [matching.firstSeen, occurrence.timestamp].sort()[0];
+        matching.lastSeen = [matching.lastSeen, occurrence.timestamp].sort().at(-1)!;
+        for (const ref of single.sourceFiles) if (!matching.sourceFiles.some(source => source.file === ref.file && source.line === ref.line)) {
+          matching.sourceFiles.push(ref);
+        }
+      } else previous.patterns.push(single);
+      previous.occurrences++;
+    } else exact.set(fingerprint, { ...scoped, id: `cluster-${exact.size + 1}` });
+  }
+  return [...exact.values()];
+}
+
+function safeRetrievalText(value: string): string {
+    const sanitized = sanitizeKnowledgeText(value);
+    try { rejectSensitiveText(sanitized, 'retrieval'); return sanitized; }
+    catch { return '[redacted]'; }
+  }
+
+export function buildRetrievalCluster(cluster: ErrorRootCauseCluster, knowledge: KnowledgeStore): AutoRetrieval['clusters'][number] {
+    const pattern = cluster.patterns[0];
+    const occurrence = pattern?.occurrences[0];
+    const additional = occurrence?.additional_data;
+    let route = 'NoPage';
+    try { route = occurrence?.page_url ? new URL(occurrence.page_url).pathname : 'NoPage'; }
+    catch { route = 'NoPage'; }
+    const query: IncidentQuery = {
+      errorContextId: typeof additional?.errorContextId === 'string' ? safeRetrievalText(additional.errorContextId) : null,
+      httpStatus: typeof additional?.status === 'number' && Number.isInteger(additional.status) &&
+        additional.status >= 100 && additional.status <= 599 ? additional.status : null,
+      route: safeRetrievalText(route),
+      component: safeRetrievalText(pattern?.component ?? 'NoComponent'),
+      sourceFile: pattern?.sourceFiles.map(source => source.file).find(isFixerrorsSourcePath) ?? null,
+      normalizedMessage: safeRetrievalText(pattern?.normalizedMessage ?? ''),
+      rootCauseFamily: safeRetrievalText(cluster.rootCauseFamily),
+    };
+    return {
+      id: cluster.id, rootCauseFamily: safeRetrievalText(cluster.rootCauseFamily),
+      advisoryLane: cluster.lane, advisoryAction: cluster.action, query,
+      sourceFiles: [...new Set(cluster.patterns.flatMap(entry => entry.sourceFiles.map(source => source.file).filter(isFixerrorsSourcePath)))],
+      patterns: cluster.patterns.map(entry => ({
+        errorType: safeRetrievalText(entry.errorType), component: safeRetrievalText(entry.component),
+        normalizedMessage: safeRetrievalText(entry.normalizedMessage),
+        sourceFiles: entry.sourceFiles.map(source => source.file).filter(isFixerrorsSourcePath), occurrences: entry.occurrences.length,
+      })),
+      priorResolutions: retrieveIncidents(knowledge, query),
+    };
+  }
+
+function lifecycleErrorEntry(record: LifecycleRecord): ErrorLogEntry {
+    return {
+      id: record.id, timestamp: String(record.timestamp), created_at: String(record.created_at),
+      error_message: String(record.error_message ?? ''), error_stack: record.error_stack == null ? null : String(record.error_stack),
+      error_type: String(record.error_type ?? ''), user_id: null, user_email: null,
+      page_url: String(record.page_url ?? ''), user_agent: '', component_name: record.component_name == null ? null : String(record.component_name),
+      additional_data: record.additional_data && typeof record.additional_data === 'object' && !Array.isArray(record.additional_data)
+        ? record.additional_data as Record<string, unknown> : null,
+    };
+  }
+
+export function assertLifecycleSnapshotRows(records: LifecycleRecord[], errors: ErrorLogEntry[]): void {
+    const stamp = (value: unknown): string => {
+      if (typeof value !== 'string' || Number.isNaN(Date.parse(value))) throw new Error('Invalid exact snapshot timestamp');
+      return new Date(value).toISOString().slice(0, 19) + '.' + (value.match(/\.(\d+)/u)?.[1] ?? '').padEnd(6, '0') + 'Z';
+    };
+    if (records.length !== errors.length) throw new Error('Lifecycle snapshot exact row set changed');
+    for (const error of errors) {
+      const record = records.find(row => row.id === error.id);
+      if (!record || record.status !== 'active' || record.triage_state !== null ||
+          Object.entries(error).some(([key, value]) =>
+            ['timestamp', 'created_at'].includes(key) ? stamp(record[key]) !== stamp(value) :
+              JSON.stringify(record[key] ?? null) !== JSON.stringify(value))) {
+        throw new Error('Lifecycle source rows no longer match the captured snapshot');
+      }
+    }
+  }
 // ─── Report Generation ───────────────────────────────────────────────
 
-function generateReport(patterns: ErrorPattern[], totalFetched: number, totalFiltered: number): string {
+function generateReport(
+  patterns: ErrorPattern[], totalFetched: number, totalFiltered: number,
+  clusters = clusterErrorPatterns(patterns)
+): string {
   const now = new Date().toISOString();
   const lines: string[] = [];
 
@@ -738,7 +836,6 @@ function generateReport(patterns: ErrorPattern[], totalFetched: number, totalFil
   );
   lines.push('');
 
-  const clusters = clusterErrorPatterns(patterns);
   lines.push('## Root Cause Clusters and TEE Routing');
   lines.push('');
   lines.push('| Cluster | Root cause family | Lane | Action | Patterns | Occurrences |');
@@ -1146,6 +1243,17 @@ function parseCleanupConfirmation(args: string[]): CleanupConfirmation | null {
   };
 }
 
+export function parseLifecycleReplay(args: string[]): { planHash: string; target: string } | null {
+  if (!args.some(arg => arg.startsWith('--resume-lifecycle'))) return null;
+  const planHash = getArgumentValue(args, '--resume-lifecycle');
+  const target = getArgumentValue(args, '--confirm-target');
+  if (args.length !== 2 || !planHash || !target ||
+      !/^[a-f0-9]{64}$/u.test(planHash) || !/^[a-f0-9]{64}$/u.test(target)) {
+    throw new Error('Lifecycle replay requires the exact saved plan hash and database target fingerprint');
+  }
+  return { planHash, target };
+}
+
 const DISPOSITION_MUTATIONS = TRUSTED_OPERATIONAL_ACTIONS.fixerrors.allowedMutations.filter(
   (mutation) => mutation.operation === 'update'
 );
@@ -1179,11 +1287,22 @@ function summarizeClusterLanes(clusters: ErrorRootCauseCluster[]): Record<string
 async function main() {
   const args = process.argv.slice(2);
   const cleanupConfirmation = parseCleanupConfirmation(args);
+  const lifecycleReplay = parseLifecycleReplay(args);
+  const replayPlan = lifecycleReplay ? parseLifecyclePlan(JSON.parse(fs.readFileSync(
+    resolve('docs_private', `fixerrors-lifecycle-${lifecycleReplay.planHash}.pre.json`), 'utf8'
+  )).plan) : null;
+  if (lifecycleReplay && (hashLifecycleRecord(replayPlan) !== lifecycleReplay.planHash ||
+      replayPlan?.databaseTargetFingerprint !== lifecycleReplay.target)) throw new Error('Lifecycle replay receipt binding mismatch');
+  const captureOnly = args.includes('--capture-only');
+  if (!cleanupConfirmation && !lifecycleReplay && args.some(arg => arg !== '--capture-only')) throw new Error('Unknown fixerrors argument');
+  const autoAdapters = cleanupConfirmation || captureOnly || lifecycleReplay ? null : createAutoAdapters();
+  dotenv.config({ path: resolve(process.cwd(), '.env.local') });
   const run = new AutomationRun({
     scriptName: 'fixerrors',
-    mode: cleanupConfirmation ? 'trusted-operational-cleanup' : 'analysis-export',
+    mode: lifecycleReplay ? 'exact-lifecycle-replay' : cleanupConfirmation ? 'trusted-operational-cleanup' :
+      captureOnly ? 'analysis-export' : 'capture-and-local-repair',
     args,
-    expectedArtifacts: [
+    expectedArtifacts: lifecycleReplay ? [] : [
       { path: 'docs_private/error-analysis.md' },
       { path: 'docs_private/error-fix-log.md', required: false },
       { path: 'docs_private/error-snapshot.json' },
@@ -1199,9 +1318,29 @@ async function main() {
     const connectionString = requireNonPoolingConnectionString();
     const databaseTargetFingerprint =
       createDatabaseTargetFingerprint(connectionString);
+    if (lifecycleReplay && lifecycleReplay.target !== databaseTargetFingerprint) throw new Error('Lifecycle replay database target changed');
     client = createPostgresClient(connectionString);
     await client.connect();
     const databaseClient = client as unknown as PgClientLike;
+
+    if (replayPlan) {
+      const registered = TRUSTED_OPERATIONAL_ACTIONS['fixerrors-lifecycle'];
+      await run.step('Replay exact acknowledged lifecycle plan', () =>
+        applyLifecyclePlan(databaseClient, replayPlan, databaseTargetFingerprint), {
+          operationalCommand: registered.commandId, operationalSafetyContract: registered.safetyContract,
+          operationalExecutionCandidate: true, confirmationBoundToSnapshot: true, requestedMutations: registered.allowedMutations,
+        });
+      const active = await fetchLifecycleRecords(databaseClient, undefined, true);
+      const exact = await fetchLifecycleRecords(databaseClient, replayPlan.rows.map(row => row.id));
+      const summary = renderAutomaticLifecycleSummary({
+        records: active.concat(exact.filter(record => record.status === 'archived')),
+        plan: replayPlan, transitionApplied: true,
+      });
+      writeAndVerifyTextArtifactAtomic(resolve('docs_private', 'error-run-summary.txt'), summary);
+      console.log(summary.trimEnd());
+      await run.finish('passed');
+      return;
+    }
 
     if (cleanupConfirmation) {
       console.log('Validating bound snapshot confirmation and cleanup scope...');
@@ -1352,7 +1491,8 @@ async function main() {
       }
     );
     const patternReviewMetadata = getPatternReviewMetadata(patterns);
-    const clusters = clusterErrorPatterns(patterns);
+    const groupedClusters = clusterErrorPatterns(patterns);
+    const clusters = captureOnly ? groupedClusters : splitLifecycleClusters(groupedClusters);
     const clusterLanes = summarizeClusterLanes(clusters);
     console.log(
       `  Found ${patterns.length} pattern(s) across ${clusters.length} independent cluster(s)`
@@ -1361,58 +1501,20 @@ async function main() {
     const knowledge = loadKnowledgeStore();
     const knowledgeOutcomes = summarizeKnowledgeOutcomes(knowledge);
     const candidate = captureCandidateFingerprint();
-    const retrieval = {
+    const retrieval: AutoRetrieval = {
       schemaVersion: 1,
       snapshotId: snapshot.snapshotId,
       baseHead: candidate.baseHead,
       treeFingerprint: candidate.treeFingerprint,
       archiveMeansResolved: false,
-      clusters: clusters.map((cluster) => {
-        const pattern = cluster.patterns[0];
-        const occurrence = pattern?.occurrences[0];
-        const additional = occurrence?.additional_data;
-        const contextId = typeof additional?.errorContextId === 'string' ? additional.errorContextId : null;
-        const status = typeof additional?.status === 'number' ? additional.status : null;
-        let route = 'NoPage';
-        try {
-          route = occurrence?.page_url ? new URL(occurrence.page_url).pathname : 'NoPage';
-        } catch {
-          route = 'NoPage';
-        }
-        const safeText = (value: string): string => {
-          const sanitized = sanitizeKnowledgeText(value);
-          try {
-            rejectSensitiveText(sanitized, 'retrieval');
-            return sanitized;
-          } catch {
-            return '[redacted]';
-          }
-        };
-        const incidentQuery: IncidentQuery = {
-          errorContextId: contextId ? safeText(contextId) : null,
-          httpStatus: status,
-          route: safeText(route),
-          component: safeText(pattern?.component ?? 'NoComponent'),
-          sourceFile: pattern?.sourceFiles[0]?.file ?? null,
-          normalizedMessage: safeText(pattern?.normalizedMessage ?? ''),
-          rootCauseFamily: safeText(cluster.rootCauseFamily),
-        };
-        return {
-          id: cluster.id,
-          rootCauseFamily: cluster.rootCauseFamily,
-          advisoryLane: cluster.lane,
-          advisoryAction: cluster.action,
-          query: incidentQuery,
-          priorResolutions: retrieveIncidents(knowledge, incidentQuery),
-        };
-      }),
+      clusters: clusters.map(cluster => buildRetrievalCluster(cluster, knowledge)),
     };
     rejectSensitiveDocument(retrieval, 'retrieval');
     writeAndVerifyTextArtifactAtomic(ERROR_RETRIEVAL_PATH, `${JSON.stringify(retrieval, null, 2)}\n`);
     console.log('  Written and verified: docs_private/error-analysis-retrieval.json');
 
     console.log('Generating and validating analysis report...');
-    const report = generateReport(patterns, rawErrors.length, errors.length);
+    const report = generateReport(patterns, rawErrors.length, errors.length, clusters);
     await run.step(
       'Write and read-verify error analysis report',
       () => {
@@ -1506,7 +1608,8 @@ async function main() {
         id: cluster.id,
         title: cluster.rootCauseFamily,
         count: cluster.patterns.reduce((total, pattern) => total + pattern.occurrences.length, 0),
-        nextStep: 'Record a validated disposition, then run npm run fixerrors:finalize.',
+        nextStep: captureOnly ? 'Record a validated disposition, then run npm run fixerrors:finalize.' :
+          'Complete the queued scoped MPDEE Worker investigation and exact-row lifecycle transition.',
       })),
       ...existingOutstanding.map((row) => ({
         id: row.id,
@@ -1519,7 +1622,7 @@ async function main() {
       found: pendingFound,
       fixedLive: [],
       outstanding: pendingOutstanding,
-    });
+    }, captureOnly);
     writeAndVerifyTextArtifactAtomic(
       resolve(process.cwd(), 'docs_private', 'error-run-summary.txt'),
       runSummary
@@ -1535,8 +1638,10 @@ async function main() {
     console.log('  Captured rows were not mutated. Finalization is a separate exact-ID step.');
     console.log(runSummary.trimEnd());
 
-    try {
-      const retention = await run.step(
+    await continueFixerrorsCapture({
+      captureOnly,
+      retention: async () => {
+        const retention = await run.step(
         'Purge archived error logs older than 12 months',
         async () => {
           const purged = await runRetentionAfterArchivePhase(
@@ -1549,17 +1654,97 @@ async function main() {
           return purged;
         },
         retentionStepMetadata()
-      );
-      console.log(
+        );
+        console.log(
         `  Retention purged:     ${retention.purgedCount} (eligible ${retention.eligibleCount})`
-      );
-      console.log(`  Retention cutoff:     ${retention.cutoffAt}`);
-    } catch (error) {
-      console.log(
-        '  Retention purge failed; archived snapshot rows were left in place'
-      );
-      throw error;
-    }
+        );
+        console.log(`  Retention cutoff:     ${retention.cutoffAt}`);
+      },
+      recordRetention: outcome => {
+        writeAndVerifyTextArtifactAtomic(resolve('docs_private', 'fixerrors-retention-outcome.json'), JSON.stringify(outcome, null, 2));
+        if (outcome.status === 'blocked') console.warn(outcome.error);
+      },
+      continueLocal: async () => {
+        if (!autoAdapters) throw new Error('Missing clean-main automatic repair authorization');
+        const captured = snapshot.exactIds.length ? await fetchLifecycleRecords(databaseClient, snapshot.exactIds) : [];
+        assertLifecycleSnapshotRows(captured, snapshot.errors);
+        const held = await fetchLifecycleRecords(databaseClient);
+        const bindings: LifecycleBinding[] = coverageClusters.map(binding => ({
+          clusterId: binding.id,
+          records: captured.filter(record => binding.errorLogIds.includes(record.id)),
+          observedAt: new Date(Math.max(...rawErrors.filter(error => binding.errorLogIds.includes(error.id))
+            .map(error => Date.parse(error.timestamp)))).toISOString(),
+        }));
+        const automaticRetrieval: AutoRetrieval = { ...retrieval, clusters: [...retrieval.clusters] };
+        let nextCluster = Math.max(0, ...clusters.map(cluster => Number(cluster.id.slice('cluster-'.length)))) + 1;
+        for (const record of held) {
+          const historical = clusterErrorPatterns(groupIntoPatterns([lifecycleErrorEntry(record)]))[0];
+          if (!historical) throw new Error('Held error has no diagnostic pattern');
+          const entry = buildRetrievalCluster({ ...historical, id: `cluster-${nextCluster++}` }, knowledge);
+          const previous = readLifecycle(record);
+          entry.held = true;
+          entry.existingState = record.triage_local_commit ? 'awaiting-deployment' :
+            previous?.state === 'awaiting-deployment' || previous?.state === 'actionable' ? previous.state : 'awaiting-evidence';
+          entry.matchingAllowed = (!previous || previous.fingerprint === fingerprintIncident(entry.query)) &&
+            !JSON.stringify(entry.query).includes('[redacted]');
+          automaticRetrieval.clusters.push(entry);
+          bindings.push({ clusterId: entry.id, records: [record], observedAt: String(record.timestamp) });
+        }
+        rejectSensitiveDocument(automaticRetrieval, 'automatic retrieval');
+        writeAndVerifyTextArtifactAtomic(resolve('docs_private', 'fixerrors-automatic-retrieval.json'), JSON.stringify(automaticRetrieval, null, 2));
+        // The worker receives only the sanitized packet, never this connection or exact private records.
+        await client?.end();
+        client = null;
+        const automatic = await run.step('Investigate new groups, then revisit held cases', () =>
+          runAutomaticFixerrors({ retrieval: automaticRetrieval, snapshotChecksum: snapshot.checksum, adapters: autoAdapters }));
+        const plan = buildAutomaticLifecyclePlan({
+          result: automatic, retrieval: automaticRetrieval, bindings,
+          suppressed: captured.filter(record => snapshot.coverage!.suppressedIds.includes(record.id)),
+          target: databaseTargetFingerprint,
+        });
+        writeAndVerifyTextArtifactAtomic(resolve('docs_private', 'fixerrors-lifecycle-plan.json'), JSON.stringify(plan, null, 2));
+        autoAdapters.assertUnchanged(automatic.candidate);
+        client = createPostgresClient(connectionString);
+        await client.connect();
+        let transitionApplied = false;
+        let blocker: string | undefined;
+        try {
+          if (plan) {
+            const registered = TRUSTED_OPERATIONAL_ACTIONS['fixerrors-lifecycle'];
+            const lifecycleClient = client;
+            await run.step('Apply exact reviewed lifecycle partition', () =>
+              applyLifecyclePlan(lifecycleClient, plan, databaseTargetFingerprint), {
+                operationalCommand: registered.commandId, operationalSafetyContract: registered.safetyContract,
+                operationalExecutionCandidate: true, confirmationBoundToSnapshot: true, requestedMutations: registered.allowedMutations,
+              });
+          }
+          transitionApplied = true;
+        } catch (error) {
+          const detail = safeRetrievalText(error instanceof Error ? error.message : 'Unknown exact-row lifecycle failure');
+          blocker = `Exact-row lifecycle transition blocked: ${detail}`;
+          run.recordStep({
+            name: 'Suspend exact-row lifecycle transition', status: 'failed',
+            startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), durationMs: 0,
+            error: detail, metadata: {
+              operationalCommand: 'fixerrors-lifecycle', operationalSafetyContract: 'fixerrors-lifecycle-exact-id-v1',
+              operationalExecutionTrusted: false, operationalTrustSuspended: true,
+            },
+          });
+          writeAndVerifyTextArtifactAtomic(resolve('docs_private', 'fixerrors-lifecycle-blocked.json'), JSON.stringify({
+            blocker, resumeArgs: plan ? [`--resume-lifecycle=${hashLifecycleRecord(plan)}`, `--confirm-target=${databaseTargetFingerprint}`] : null,
+          }, null, 2));
+        }
+        const active = await fetchLifecycleRecords(client, undefined, true);
+        const reviewed = captured.concat(held).filter(record => !active.some(row => row.id === record.id) &&
+          (!transitionApplied || plan?.rows.some(row => row.id === record.id &&
+            ['resolved-no-fix', 'fixed-live'].includes(row.metadata.state))));
+        const summary = renderAutomaticLifecycleSummary({ records: active.concat(reviewed), plan, transitionApplied, blocker });
+        writeAndVerifyTextArtifactAtomic(resolve('docs_private', 'error-run-summary.txt'), summary);
+        console.log(summary.trimEnd());
+        if (blocker) throw new Error(blocker);
+        return automatic;
+      },
+    });
     console.log('=============================================\n');
     await run.finish('passed');
   } catch (error) {

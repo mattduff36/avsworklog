@@ -8,6 +8,7 @@ export type FixerrorsSummaryItem = {
 export type FixerrorsRunSummary = {
   found: FixerrorsSummaryItem[];
   fixedLive: FixerrorsSummaryItem[];
+  closedWithoutFix?: FixerrorsSummaryItem[];
   outstanding: FixerrorsSummaryItem[];
 };
 
@@ -25,17 +26,18 @@ function section(title: string, items: FixerrorsSummaryItem[], empty: string): s
   return lines;
 }
 
-export function renderFixerrorsRunSummary(summary: FixerrorsRunSummary): string {
+export function renderFixerrorsRunSummary(summary: FixerrorsRunSummary, inviteToFix = true): string {
   const recommendation = summary.outstanding.find((item) => item.nextStep)?.nextStep;
   const lines = [
     ...section('Errors found', summary.found, 'none'),
     ...section('Errors fixed live', summary.fixedLive, 'none'),
+    ...(summary.closedWithoutFix?.length ? section('Errors closed without a fix', summary.closedWithoutFix, 'none') : []),
     ...section('Errors still outstanding', summary.outstanding, 'none'),
     `Outstanding work remains: ${summary.outstanding.length > 0 ? 'YES' : 'NO'}`,
     '',
     `Final recommendation: ${recommendation ?? 'No further fixerrors action is required.'}`,
   ];
-  if (recommendation) {
+  if (recommendation && inviteToFix) {
     lines.push('Say "fix" to proceed with this recommendation now.');
   }
   return `${lines.join('\n')}\n`;

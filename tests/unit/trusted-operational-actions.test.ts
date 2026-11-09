@@ -36,6 +36,22 @@ function trustedExecution(
 }
 
 describe('TEE V2.2 trusted operational action policy', () => {
+  it('registers lifecycle exact-ID updates separately without broadening the snapshot contract', () => {
+    const registered = TRUSTED_OPERATIONAL_ACTIONS['fixerrors-lifecycle'];
+    expect(registered.safetyContract).toBe('fixerrors-lifecycle-exact-id-v1');
+    expect(registered.allowedMutations).toHaveLength(1);
+    expect(registered.allowedMutations[0]).toMatchObject({
+      operation: 'update', table: 'error_logs', purpose: 'lifecycle-exact-id',
+      targetPredicate: "status = 'active' AND (triage_state IS NULL OR triage_state = 'outstanding')",
+    });
+    expect(classifyOperationalAction(trustedExecution({
+      commandId: registered.commandId, safetyContract: registered.safetyContract, requestedMutations: registered.allowedMutations,
+    })).trusted).toBe(true);
+    expect(classifyOperationalAction(trustedExecution({ requestedMutations: registered.allowedMutations })).trusted).toBe(false);
+    expect(classifyOperationalAction(trustedExecution({
+      commandId: registered.commandId, safetyContract: registered.safetyContract, requestedMutations: registered.allowedMutations, intent: 'modify',
+    })).trusted).toBe(false);
+  });
   it('FE-TRUST-001 treats registered snapshot-bound archive execution as operational', () => {
     expect(TRUSTED_OPERATIONAL_ACTIONS.fixerrors.safetyContract).toBe(
       'fixerrors-exact-snapshot-v5'

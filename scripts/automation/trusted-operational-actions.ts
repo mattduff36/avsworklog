@@ -1,4 +1,4 @@
-export type TrustedOperationalCommandId = 'fixerrors' | 'fixerrors-fixed-live' | 'fixerrors-close-stale';
+export type TrustedOperationalCommandId = 'fixerrors' | 'fixerrors-fixed-live' | 'fixerrors-close-stale' | 'fixerrors-lifecycle';
 
 export type OperationalMutation = {
   schema: string;
@@ -11,6 +11,7 @@ export type OperationalMutation = {
     | 'dependent-diagnostic'
     | 'expired-archived-retention'
     | 'fixed-live-exact-id'
+    | 'lifecycle-exact-id'
     | 'close-stale-exact-id';
   updatedColumns?: readonly string[];
   targetPredicate?: string;
@@ -27,6 +28,19 @@ export const ERROR_LOG_RETENTION_PREDICATE =
   "status = 'archived' AND archived_at < now() - interval '12 months'";
 
 export const TRUSTED_OPERATIONAL_ACTIONS = {
+  'fixerrors-lifecycle': {
+    commandId: 'fixerrors-lifecycle',
+    safetyContract: 'fixerrors-lifecycle-exact-id-v1',
+    trustedOperationalAction: true,
+    allowedMutations: [{
+      schema: 'public', table: 'error_logs', operation: 'update', identityColumn: 'id',
+      purpose: 'lifecycle-exact-id',
+      updatedColumns: ['status', 'archived_at', 'triage_state', 'triaged_at', 'triage_incident_id',
+        'triage_summary', 'triage_next_step', 'triage_local_commit', 'triage_live_verified_at',
+        'triage_live_evidence', 'additional_data'],
+      targetPredicate: "status = 'active' AND (triage_state IS NULL OR triage_state = 'outstanding')",
+    }],
+  },
   'fixerrors-close-stale': {
     commandId: 'fixerrors-close-stale',
     safetyContract: 'fixerrors-close-stale-exact-id-v1',

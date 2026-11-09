@@ -156,9 +156,18 @@ export function isOperationalSnapshotId(value: string): boolean {
 }
 
 export function rejectSensitiveDocument(value: unknown, field: string): void {
-  const scan = JSON.parse(JSON.stringify(value)) as { snapshotId?: unknown };
+  const scan = JSON.parse(JSON.stringify(value)) as { snapshotId?: unknown; baseHead?: unknown; treeFingerprint?: unknown };
   if (scan && typeof scan === 'object' && typeof scan.snapshotId === 'string' && isOperationalSnapshotId(scan.snapshotId)) {
     scan.snapshotId = 'snapshot-id';
+  }
+  // Only typed top-level candidate bindings are exempt from free-text scanning.
+  if (scan && typeof scan === 'object') {
+    if (typeof scan.baseHead === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(scan.baseHead)) {
+      scan.baseHead = 'git-head';
+    }
+    if (typeof scan.treeFingerprint === 'string' && /^[a-f0-9]{64}$/u.test(scan.treeFingerprint)) {
+      scan.treeFingerprint = 'tree-fingerprint';
+    }
   }
   rejectSensitiveText(JSON.stringify(scan), field);
 }

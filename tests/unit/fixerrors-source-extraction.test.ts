@@ -6,6 +6,8 @@ import {
   clusterErrorPatterns,
   extractSourceFilesForError,
   groupIntoPatterns,
+  splitLifecycleClusters,
+  buildRetrievalCluster,
   type ErrorLogEntry,
 } from '@/scripts/fixerrors';
 
@@ -40,6 +42,25 @@ function makeError(overrides: Partial<ErrorLogEntry>): ErrorLogEntry {
 }
 
 describe('fixerrors source extraction', () => {
+  it('partitions automatic lifecycle evidence exactly instead of merging routes/statuses from the same source', () => {
+    const root = createFixture({ 'lib/labels.ts': 'export const label = "safe";\n' });
+    try {
+      const common = { error_message: 'Invalid label', component_name: 'Label', error_stack: 'at lib/labels.ts:1:1' };
+      const errors = [
+        makeError({ ...common, id: 'first', page_url: 'https://example.invalid/one' }),
+        makeError({ ...common, id: 'second', page_url: 'https://example.invalid/two' }),
+        makeError({ ...common, id: 'third', page_url: 'https://example.invalid/one', additional_data: { status: 500 } }),
+        makeError({ ...common, id: 'fourth', page_url: 'https://example.invalid/one' }),
+      ];
+      const grouped = clusterErrorPatterns(groupIntoPatterns(errors, root));
+      expect(grouped).toHaveLength(1);
+      const exact = splitLifecycleClusters(grouped, root);
+      expect(exact.map(cluster => cluster.occurrences)).toEqual([2, 1, 1]);
+      expect(exact.map(cluster => buildRetrievalCluster(cluster, { version: 1, incidents: [] }).query))
+        .toMatchObject([{ route: '/one', httpStatus: null }, { route: '/two', httpStatus: null }, { route: '/one', httpStatus: 500 }]);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
   it('FXERR-CLUSTER-007 routes independent root-cause clusters without critical spillover', () => {
     const patterns = groupIntoPatterns([
       makeError({

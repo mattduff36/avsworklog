@@ -172,6 +172,8 @@ export function parseDecision(value: unknown): FixerrorsDecision {
   for (const field of ['snapshotId', 'analyst', 'baseHead', 'treeFingerprint'] as const) {
     if (typeof value[field] !== 'string' || !value[field]) throw new Error(`Invalid ${field}`);
     if (field === 'snapshotId' && isOperationalSnapshotId(value[field])) continue;
+    if (field === 'baseHead' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value[field])) continue;
+    if (field === 'treeFingerprint' && /^[a-f0-9]{64}$/u.test(value[field])) continue;
     rejectSensitiveText(value[field], field);
   }
   if (!Array.isArray(value.clusters) || value.clusters.length === 0) {

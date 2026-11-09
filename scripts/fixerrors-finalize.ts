@@ -22,8 +22,6 @@ import {
   type PgClientLike,
 } from './fixerrors-safety';
 
-dotenv.config({ path: resolve(process.cwd(), '.env.local') });
-
 const SUMMARY_PATH = resolve(process.cwd(), 'docs_private', 'error-run-summary.txt');
 const LIVE_EVIDENCE_PATH = resolve(process.cwd(), 'docs_private', 'error-live-evidence.json');
 
@@ -92,6 +90,7 @@ function requireConnectionString(): string {
 }
 
 async function main(): Promise<void> {
+  dotenv.config({ path: resolve(process.cwd(), '.env.local') });
   const snapshot = readAndVerifyErrorSnapshot(ERROR_SNAPSHOT_PATH);
   const decision = parseDecision(readDecisionFile('docs_private/error-analysis-decision.json'));
   if (decision.snapshotId !== snapshot.snapshotId) {

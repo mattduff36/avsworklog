@@ -8,6 +8,16 @@ const command = readFileSync(path.join(root, '.cursor', 'commands', 'fixerrors.m
 const analysisScript = readFileSync(path.join(root, 'scripts', 'fixerrors.ts'), 'utf8');
 
 describe('fixerrors command orchestration', () => {
+  it('documents the guarded default lifecycle separately from capture-only and live release', () => {
+    for (const text of ['clean local main', 'MPDEE Worker', 'new-first', 'oldest-first',
+      '30 days without matching new evidence', 'awaiting-deployment', 'account-merge',
+      '--capture-only', '--resume-lifecycle', 'No application fixes, no commits, no production SQL']) {
+      expect(command.toLowerCase()).toContain(text.toLowerCase());
+    }
+    expect(command).toContain('without the legacy generic `Say "fix"` invitation');
+    expect(command).toContain('fail closed');
+    expect(command).toContain('separately approved deployment');
+  });
   it('FIXERR-CMD-001 keeps the v4 snapshot/archive safety contract', () => {
     expect(command).toContain('safetyContract":"fixerrors-exact-snapshot-v5"');
     expect(command).toContain('Errors found');

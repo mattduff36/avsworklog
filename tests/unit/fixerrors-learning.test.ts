@@ -111,6 +111,21 @@ describe('fixerrors learning knowledge', () => {
     }, 'retrieval')).toThrow(/Sensitive knowledge/u);
   });
 
+  it('allows Git binding digests while scanning the same digits in incident text', () => {
+    const digits = '02079460958';
+    const baseHead = 'a' + digits + 'a'.repeat(28);
+    const treeFingerprint = 'b' + digits + 'b'.repeat(52);
+    for (const artifact of ['retrieval', 'decision']) {
+      expect(() => rejectSensitiveDocument({ baseHead, treeFingerprint }, artifact)).not.toThrow();
+      expect(() => rejectSensitiveDocument({
+        baseHead, treeFingerprint, clusters: [{ diagnosis: treeFingerprint }],
+      }, artifact)).toThrow(/Sensitive knowledge/u);
+      expect(() => rejectSensitiveDocument({
+        baseHead, treeFingerprint: 'call ' + digits,
+      }, artifact)).toThrow(/Sensitive knowledge/u);
+    }
+  });
+
   it('FIXERR-KNOW-002 ranks exact matches before related matches and lets a later failure win', () => {
     const first = storeWith(input());
     const failed = recordIncidentOutcome(first, input({

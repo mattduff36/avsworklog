@@ -15,8 +15,6 @@ import {
 } from './fixerrors-safety';
 import { renderFixerrorsRunSummary } from './fixerrors-summary';
 
-dotenv.config({ path: resolve(process.cwd(), '.env.local') });
-
 export const FIXED_LIVE_COMMAND_ID = TRUSTED_OPERATIONAL_ACTIONS['fixerrors-fixed-live'].commandId;
 export const FIXED_LIVE_SAFETY_CONTRACT =
   TRUSTED_OPERATIONAL_ACTIONS['fixerrors-fixed-live'].safetyContract;
@@ -777,6 +775,7 @@ async function reopenLegacyOutstanding(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  dotenv.config({ path: resolve(process.cwd(), '.env.local') });
   const mode = process.argv.find((arg) => arg.startsWith('--mode='))?.slice('--mode='.length);
   if (mode === 'fixed-live') {
     await runFixedLiveMode();
