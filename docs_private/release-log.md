@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.9.0
+
+**GIT COMMIT MESSAGE**
+`feat(fixerrors): add Windows terminal and service runner controls`
+
+**PUSHED AT**
+2026-11-10T21:36:24.658Z
+
+**WHAT CHANGED**
+Workshop managers can delete Daily Checks in any status, including Submitted. Added Windows terminal and service runner controls.
+
+**VERSION HISTORY DETAILS**
+- Delete Daily Checks and their attributable effects while preserving later independent workshop work and asset changes.
+- Restore asset readings from reliable history; missing or ambiguous historical evidence is flagged for manual reconciliation.
+- Start, stop and inspect the Windows runner from a desktop menu, using either a PowerShell terminal or a background Windows service.
+
+**COMMITS IN THIS RELEASE**
+- `fix(inspections): delete checks across statuses and restore asset history`
+- `feat(fixerrors): add Windows terminal and service runner controls`
+
 ## 1126.8.7
 
 **GIT COMMIT MESSAGE**
