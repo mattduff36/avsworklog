@@ -19,6 +19,7 @@ Workshop managers can delete Daily Checks in any status, including Submitted. Ad
 - Start, stop and inspect the Windows runner from a desktop menu, using either a PowerShell terminal or a background Windows service.
 
 **COMMITS IN THIS RELEASE**
+- `fix(inspections): support optional legacy photo response table`
 - `fix(inspections): delete checks across statuses and restore asset history`
 - `feat(fixerrors): add Windows terminal and service runner controls`
 
