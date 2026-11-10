@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.8.6
+
+**GIT COMMIT MESSAGE**
+`fix(errors): validated companion repair 27fb107f-392c-444b-8d52-873ebca09882`
+
+**PUSHED AT**
+2026-11-10T15:15:49.767Z
+
+**WHAT CHANGED**
+Validated companion repair 27fb107f-392c-444b-8d52-873ebca09882.
+
+**VERSION HISTORY DETAILS**
+- Updated app reliability, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(errors): validated companion repair 27fb107f-392c-444b-8d52-873ebca09882`
+
 ## 1126.8.5
 
 **GIT COMMIT MESSAGE**
