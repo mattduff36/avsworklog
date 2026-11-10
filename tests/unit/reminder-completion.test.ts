@@ -169,6 +169,18 @@ function createDraftReminderAdminMock(options: {
 }
 
 describe('reminder completion', () => {
+  it.each(['van', 'plant', 'hgv'] as const)('attributes every derived completion and cancellation to the %s check', async assetType => {
+    const admin = createAssetReminderAdminMock({ actions: [{ id: 'action-1' }] });
+    await completeReminderActionForAsset({
+      admin: admin.client as never, assetType, assetId: 'asset-1', assignedTo: 'inspector-1',
+      actionedBy: 'actor-1', inspectionId: 'check-1',
+    });
+    for (const update of [...admin.reminderUpdates, ...admin.actionUpdates]) {
+      expect(update).toMatchObject({ daily_check_source_id: 'check-1', daily_check_source_type: assetType });
+    }
+    expect(admin.reminderUpdates).toHaveLength(2);
+    expect(admin.actionUpdates).toHaveLength(1);
+  });
   it('resolves an unassigned fleet inspection action after a matching daily check submission', async () => {
     const admin = createAssetReminderAdminMock({
       actions: [{ id: 'action-1' }],

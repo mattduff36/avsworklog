@@ -9,6 +9,7 @@ import {
 import { ACTIVE_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
 import { buildRecentCompletedDefectMap } from '@/lib/utils/inspectionRecentCompletedDefects';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
+import { dailyCheckEffectSource } from '@/lib/inspections/deletion';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
@@ -212,9 +213,11 @@ async function closeDuplicateTask(
   supabaseAdmin: SupabaseClient,
   duplicateTaskId: string,
   keeperTaskId: string,
-  createdBy: string
+  createdBy: string,
+  inspectionId: string
 ): Promise<boolean> {
   const updates: ActionUpdate = {
+    ...dailyCheckEffectSource('hgv', inspectionId),
     status: 'completed',
     actioned: true,
     actioned_at: new Date().toISOString(),
@@ -419,13 +422,16 @@ export async function POST(request: NextRequest) {
             supabaseAdmin,
             duplicateTask.id,
             keeperTask.id,
-            createdBy
+            createdBy,
+            inspectionId
           );
 
           if (closed) {
             dedupedClosed++;
             duplicateTask.status = 'completed';
             autoClosedTaskIds.add(duplicateTask.id);
+          } else {
+            return NextResponse.json({ error: 'Failed to reconcile duplicate defect tasks' }, { status: 409 });
           }
         }
 
@@ -440,6 +446,7 @@ export async function POST(request: NextRequest) {
       if (currentInspectionTask) {
         const originalComment = extractCommentFromDescription(currentInspectionTask.description) || defect.comment || '';
         const updates: ActionUpdate = {
+          ...dailyCheckEffectSource('hgv', inspectionId),
           title,
           description: buildDescriptionWithComment(originalComment),
           hgv_id: hgvId,
@@ -453,6 +460,7 @@ export async function POST(request: NextRequest) {
 
         if (updateError) {
           console.error(`Error updating HGV defect task ${currentInspectionTask.id}:`, updateError);
+          return NextResponse.json({ error: 'Failed to update defect tasks. Refresh before retrying.' }, { status: 409 });
         } else {
           updated++;
         }
@@ -463,6 +471,7 @@ export async function POST(request: NextRequest) {
         const keeperTask = sortByCreatedAtThenId(activeTasksForDefect)[0];
         const originalComment = extractCommentFromDescription(keeperTask.description) || defect.comment || '';
         const updates: ActionUpdate = {
+          ...dailyCheckEffectSource('hgv', inspectionId),
           title,
           description: buildDescriptionWithComment(originalComment),
           hgv_id: hgvId,
@@ -476,7 +485,7 @@ export async function POST(request: NextRequest) {
 
         if (updateError) {
           console.error(`Error updating oldest HGV defect task ${keeperTask.id}:`, updateError);
-          skipped++;
+          return NextResponse.json({ error: 'Failed to update defect tasks. Refresh before retrying.' }, { status: 409 });
         } else {
           updated++;
         }
@@ -524,6 +533,7 @@ export async function POST(request: NextRequest) {
         }
       } else {
         console.error(`Error creating HGV defect task for ${signature}:`, insertError);
+        return NextResponse.json({ error: 'Failed to create defect tasks. Refresh before retrying.' }, { status: 409 });
       }
     }
 

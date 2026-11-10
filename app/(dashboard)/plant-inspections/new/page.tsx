@@ -1555,6 +1555,7 @@ function NewPlantInspectionContent() {
         try {
           await completeInspectionReminder({
             assetType: 'plant',
+            inspectionId: inspection.id,
             assetId: selectedPlantId,
             assignedTo: selectedEmployeeId,
           });

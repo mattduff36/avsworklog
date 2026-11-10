@@ -141,12 +141,24 @@ export async function POST(request: NextRequest) {
   }
 
   const typedTasks = (tasks ?? []) as Pick<ActionRow, 'id' | 'action_type' | 'inspection_id' | 'inspection_item_id'>[];
+  if (!typedTasks.length) return NextResponse.json({ photosByTask: {} });
+  const { data: retained, error: retainedError } = await serviceRole
+    .from('workshop_task_check_photos')
+    .select('task_id, id, inspection_id, item_number, day_of_week, photo_url, caption, created_at')
+    .in('task_id', typedTasks.map(task => task.id));
+  if (retainedError) {
+    return NextResponse.json({ error: 'Failed to load retained workshop evidence' }, { status: 500 });
+  }
+  const retainedByTask: Record<string, NormalizedInspectionPhotoRow[]> = {};
+  for (const { task_id, ...photo } of retained ?? []) {
+    (retainedByTask[task_id] ??= []).push(normalizeInspectionPhoto(photo));
+  }
   const itemIds = Array.from(
     new Set(typedTasks.map((task) => task.inspection_item_id).filter(Boolean))
   ) as string[];
 
   if (itemIds.length === 0) {
-    return NextResponse.json({ photosByTask: {} });
+    return NextResponse.json({ photosByTask: retainedByTask });
   }
 
   const { data: items, error: itemsError } = await serviceRole
@@ -172,7 +184,7 @@ export async function POST(request: NextRequest) {
   );
 
   if (inspectionIds.length === 0) {
-    return NextResponse.json({ photosByTask: {} });
+    return NextResponse.json({ photosByTask: retainedByTask });
   }
 
   const { data: photos, error: photosError } = await serviceRole
@@ -199,7 +211,7 @@ export async function POST(request: NextRequest) {
   const photosByTask = typedTasks.reduce<Record<string, NormalizedInspectionPhotoRow[]>>((acc, task) => {
     const inspectionItem = task.inspection_item_id ? itemsById.get(task.inspection_item_id) : null;
     if (!inspectionItem || !task.inspection_id) {
-      acc[task.id] = [];
+      acc[task.id] = retainedByTask[task.id] ?? [];
       return acc;
     }
 
@@ -218,9 +230,8 @@ export async function POST(request: NextRequest) {
           )
         : [];
 
-    acc[task.id] = sortInspectionPhotos(
-      exactMatches.length > 0 ? exactMatches : fallbackMatches
-    ) as NormalizedInspectionPhotoRow[];
+    const combined = [...(retainedByTask[task.id] ?? []), ...(exactMatches.length > 0 ? exactMatches : fallbackMatches)];
+    acc[task.id] = sortInspectionPhotos([...new Map(combined.map(photo => [photo.id, photo])).values()]) as NormalizedInspectionPhotoRow[];
     return acc;
   }, {});
 

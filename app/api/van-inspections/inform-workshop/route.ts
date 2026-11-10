@@ -8,6 +8,7 @@ import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-acc
 import { getVanInspectionsMaintenanceResponse } from '@/lib/server/van-inspections-maintenance';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import { dailyCheckEffectSource } from '@/lib/inspections/deletion';
 
 /**
  * POST /api/van-inspections/inform-workshop
@@ -229,6 +230,7 @@ export async function POST(request: NextRequest) {
       const { error: updateError } = await supabaseAdmin
         .from('actions')
         .update({
+          ...dailyCheckEffectSource('van', inspectionId),
           title,
           description,
           workshop_comments: trimmedComment,

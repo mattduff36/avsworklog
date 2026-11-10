@@ -1879,69 +1879,18 @@ function NewInspectionContent() {
       // Auto-complete actions for resolved items (works for both draft and submitted)
       if (resolvedItems.size > 0 && vehicleId) {
         try {
-          // Find pending or logged actions for this vehicle's defects
-          const { data: pendingActions } = await supabase
-            .from('actions')
-            .select(`
-              id,
-              inspection_item_id,
-              inspection_id,
-              status,
-              description,
-              van_inspections!inner (
-                van_id
-              )
-            `)
-            .in('status', ['pending', 'logged'])
-            .eq('van_inspections.van_id', vehicleId);
-
-          if (pendingActions && pendingActions.length > 0) {
-            // Get the inspection items from the previous inspection to match with actions
-            const { data: previousInspectionItems } = await supabase
-              .from('inspection_items')
-              .select('id, item_number, item_description')
-              .in(
-                'id',
-                pendingActions
-                  .map((action: { inspection_item_id: string | null }) => action.inspection_item_id)
-                  .filter((inspectionItemId): inspectionItemId is string => Boolean(inspectionItemId)),
-              );
-
-            // For each resolved item, find matching action and complete it
-            for (const [key, resolutionComment] of resolvedItems.entries()) {
-              const [, itemNumStr] = key.split('-');
-              const itemNum = parseInt(itemNumStr);
-              const itemDesc = currentChecklist[itemNum - 1];
-
-              // Find matching action
-              const matchingItem = previousInspectionItems?.find(
-                (item) => item.item_number === itemNum && (item.item_description || '') === itemDesc
-              );
-
-              if (matchingItem) {
-                const matchingAction = pendingActions.find((action: { inspection_item_id: string | null; description: string | null; id: string }) => action.inspection_item_id === matchingItem.id);
-
-                if (matchingAction) {
-                  // Complete the action with resolution comment
-                  await supabase
-                    .from('actions')
-                    .update({
-                      status: 'completed',
-                      actioned: true,
-                      actioned_at: new Date().toISOString(),
-                      actioned_by: user!.id,
-                      description: `${matchingAction.description || ''}\n\nResolution: ${resolutionComment}`
-                    })
-                    .eq('id', matchingAction.id);
-
-                  console.log(`✅ Auto-completed action ${matchingAction.id} for resolved item ${itemNum}`);
-                }
-              }
-            }
-          }
+          const response = await fetch(`/api/van-inspections/${inspection.id}/resolve-defects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ resolutions: Array.from(resolvedItems, ([key, comment]) => {
+              const itemNumber = Number(key.split('-')[1]);
+              return { itemNumber, itemDescription: currentChecklist[itemNumber - 1], comment };
+            }) }),
+          });
+          if (!response.ok) throw new Error('Failed to complete resolved defect tasks');
         } catch (err) {
           console.error('Error completing resolved actions:', err);
-          // Don't throw - we don't want to fail the inspection if this fails
+          toast.warning('Daily Check saved, but resolved defect tasks could not be completed. Reconcile them in Workshop.');
         }
       }
 
@@ -1997,6 +1946,7 @@ function NewInspectionContent() {
             assetId: vehicleId,
             assignedTo: selectedEmployeeId,
             draftInspectionId: inspection.id,
+            inspectionId: inspection.id,
           });
         } catch (reminderError) {
           console.warn('Reminder completion skipped after van daily check submission:', reminderError);

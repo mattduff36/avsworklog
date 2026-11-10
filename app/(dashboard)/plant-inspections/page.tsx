@@ -589,8 +589,7 @@ function PlantInspectionsContent() {
       canManageInspections,
     });
 
-  const canDeleteInspection = (inspection: Pick<InspectionWithPlant, 'status' | 'user_id'>) =>
-    canDeleteInspections && canEditInspection(inspection);
+  const canDeleteInspection = () => canDeleteInspections;
 
   const getInspectionHref = (inspection: Pick<InspectionWithPlant, 'id' | 'status' | 'user_id'>) =>
     canEditInspection(inspection)
@@ -664,7 +663,9 @@ function PlantInspectionsContent() {
         throw new Error(data.error || 'Failed to delete inspection');
       }
 
+      const result = await response.json();
       toast.success('Plant inspection deleted successfully');
+      for (const warning of result.warnings ?? []) toast.warning(warning, { duration: 15000 });
       setDeleteDialogOpen(false);
       setInspectionToDelete(null);
       fetchInspections();
@@ -905,7 +906,7 @@ function PlantInspectionsContent() {
                   </div>
                   <div className="flex items-center gap-2">
                     {getStatusBadge(inspection.status)}
-                    {canDeleteInspection(inspection) && (
+                    {canDeleteInspection() && (
                       <Button
                         onClick={(e) => openDeleteDialog(e, inspection)}
                         variant="ghost"
@@ -974,7 +975,7 @@ function PlantInspectionsContent() {
               <span className="font-semibold">{inspectionToDelete?.date}</span>?
               <br />
               <br />
-              This action cannot be undone. All inspection items will be permanently deleted.
+              This action cannot be undone. The check and its items will be permanently deleted. Proven effects will be reversed without overwriting later changes. Missing history will be flagged for reconciliation.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

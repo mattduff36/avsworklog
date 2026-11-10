@@ -58,6 +58,20 @@ provenance checks remain mandatory; default-suite success is not native DB evide
 
 The native runner discovers a complete installation under `C:\Program Files\PostgreSQL\<major>\bin`, creates a sentinel-owned data directory below the current user's temporary directory, starts `pg_ctl` with `-h 127.0.0.1` and the checkout-derived port, runs one target, stops the server, proves the port is closed, and removes only that owned data directory. It never installs or starts a Windows service.
 
+### Daily Check deletion and correction
+
+Run these focused targets separately, never concurrently in the same checkout:
+
+```powershell
+$env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
+npx tsx scripts\local-native-test-postgres.ts one-shot --target tests/db/inspection-deletion.test.ts
+npx tsx scripts\local-native-test-postgres.ts one-shot --target tests/db/inspection-meter-correction.test.ts
+```
+
+The `--target` values are exact allowlist identifiers, not filesystem paths. The deletion fixture loads the forward deletion migration, actual HGV save function, audit function, and production completed-workshop/service, category, plant-job/missing-site and account-merge guards into a disposable schema. It covers all asset types/statuses, field-delta replay, verified legacy recovery, missing/null baselines, durable exceptional reconciliation, independent inputs, correction/deletion chains, rollback, synchronized competing sessions, retained workshop evidence and durable cleanup. Photo coverage includes signed/encoded/relative aliases and every guarded writer during Storage removal. Auth/catalogue dependencies are fixture-mocked and Storage responses are mocked; this does not prove full Supabase or browser behavior.
+
+The application requires `20261110_daily_check_deletion_effects.sql` before using the new deletion and source-attribution paths. Applying it requires separate authorization. Its checked HGV RPC augmentation deliberately rejects an unexpected deployed `save_hgv_inspection` definition; review that discrepancy rather than weakening the guard. Privileged deletion connections use only `POSTGRES_URL_NON_POOLING`, verify PostgreSQL TLS certificates and hostnames, and accept a validated hosted PEM CA bundle from `POSTGRES_SSL_CA_PEM`, then `SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM`, then a `PGSSLROOTCERT` file (otherwise system trust). No Fixerrors database URL or login is reused. The focused database unit target covers bundle validation and precedence; hosted live TLS remains deployment acceptance. Legacy ownership requires a unique unrevised audit transaction, not matching values or timestamps alone; unprovable cases have permanent reconciliation instructions.
+
 Manual sequence when you need to inspect the instance between steps:
 
 1. `npm run test:db:local:start`

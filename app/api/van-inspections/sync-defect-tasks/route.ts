@@ -10,6 +10,7 @@ import {
   normalizeInspectionDefectSignature,
 } from '@/lib/utils/inspectionDefectSignature';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+import { dailyCheckEffectSource } from '@/lib/inspections/deletion';
 
 type ActionInsert = Database['public']['Tables']['actions']['Insert'];
 type ActionUpdate = Database['public']['Tables']['actions']['Update'];
@@ -313,6 +314,7 @@ export async function POST(request: NextRequest) {
         const keeperTask = sortTasksByCreatedAt(activeTasksForDefect)[0];
         const originalComment = extractCommentFromDescription(keeperTask.description) || comment || '';
         const updates: ActionUpdate = {
+          ...dailyCheckEffectSource('van', inspectionId),
           title,
           description: buildDescriptionWithComment(originalComment),
           van_id: vehicleId,
@@ -326,7 +328,7 @@ export async function POST(request: NextRequest) {
 
         if (updateError) {
           console.error(`Error updating active vehicle task ${keeperTask.id}:`, updateError);
-          skipped++;
+          return NextResponse.json({ error: 'Failed to update defect tasks. Refresh before retrying.' }, { status: 409 });
         } else {
           updated++;
         }
@@ -359,6 +361,7 @@ export async function POST(request: NextRequest) {
         if (activeTask) {
           const originalComment = extractCommentFromDescription(activeTask.description) || comment || '';
           const updates: ActionUpdate = {
+            ...dailyCheckEffectSource('van', inspectionId),
             title,
             description: buildDescriptionWithComment(originalComment),
             van_id: vehicleId,
@@ -372,6 +375,7 @@ export async function POST(request: NextRequest) {
 
           if (updateError) {
             console.error(`Error updating task ${activeTask.id}:`, updateError);
+            return NextResponse.json({ error: 'Failed to update defect tasks. Refresh before retrying.' }, { status: 409 });
           } else {
             updated++;
           }
@@ -402,6 +406,7 @@ export async function POST(request: NextRequest) {
 
           if (insertError) {
             console.error(`Error recreating task for ${signature}:`, insertError);
+            return NextResponse.json({ error: 'Failed to create defect tasks. Refresh before retrying.' }, { status: 409 });
           } else {
             created++;
           }
@@ -429,6 +434,7 @@ export async function POST(request: NextRequest) {
 
         if (insertError) {
           console.error(`Error creating task for ${signature}:`, insertError);
+          return NextResponse.json({ error: 'Failed to create defect tasks. Refresh before retrying.' }, { status: 409 });
         } else {
           created++;
         }

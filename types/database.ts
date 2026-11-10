@@ -807,6 +807,8 @@ export type Database = {
       }
       actions: {
         Row: {
+          daily_check_source_id: string | null
+          daily_check_source_type: string | null
           id: string
           inspection_id: string | null
           inspection_item_id: string | null
@@ -838,6 +840,8 @@ export type Database = {
           asset_meter_unit: string | null
         }
         Insert: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           inspection_id?: string | null
           inspection_item_id?: string | null
@@ -869,6 +873,8 @@ export type Database = {
           asset_meter_unit?: string | null
         }
         Update: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           inspection_id?: string | null
           inspection_item_id?: string | null
@@ -2556,6 +2562,8 @@ export type Database = {
       }
       hgvs: {
         Row: {
+          daily_check_source_id: string | null
+          daily_check_source_type: string | null
           id: string
           reg_number: string
           category_id: string
@@ -2567,6 +2575,8 @@ export type Database = {
           retire_reason: string | null
         }
         Insert: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           reg_number: string
           category_id: string
@@ -2578,6 +2588,8 @@ export type Database = {
           retire_reason?: string | null
         }
         Update: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           reg_number?: string
           category_id?: string
@@ -4656,6 +4668,8 @@ export type Database = {
       }
       maintenance_history: {
         Row: {
+          daily_check_id: string | null
+          daily_check_type: string | null
           id: string
           van_id: string | null
           maintenance_category_id: string | null
@@ -4671,6 +4685,8 @@ export type Database = {
           hgv_id: string | null
         }
         Insert: {
+          daily_check_id?: string | null
+          daily_check_type?: string | null
           id?: string
           van_id?: string | null
           maintenance_category_id?: string | null
@@ -4686,6 +4702,8 @@ export type Database = {
           hgv_id?: string | null
         }
         Update: {
+          daily_check_id?: string | null
+          daily_check_type?: string | null
           id?: string
           van_id?: string | null
           maintenance_category_id?: string | null
@@ -7797,6 +7815,8 @@ export type Database = {
       }
       reminder_actions: {
         Row: {
+          daily_check_source_id: string | null
+          daily_check_source_type: string | null
           id: string
           workflow_key: string
           source_type: 'system_generated' | 'manager_created'
@@ -7824,6 +7844,8 @@ export type Database = {
           ignored_by: string | null
         }
         Insert: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           workflow_key: string
           source_type?: 'system_generated' | 'manager_created'
@@ -7851,6 +7873,8 @@ export type Database = {
           ignored_by?: string | null
         }
         Update: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           workflow_key?: string
           source_type?: 'system_generated' | 'manager_created'
@@ -7962,6 +7986,8 @@ export type Database = {
       }
       reminders: {
         Row: {
+          daily_check_source_id: string | null
+          daily_check_source_type: string | null
           id: string
           action_id: string
           assigned_to: string
@@ -7975,6 +8001,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           action_id: string
           assigned_to: string
@@ -7988,6 +8016,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           action_id?: string
           assigned_to?: string
@@ -10285,6 +10315,8 @@ export type Database = {
       }
       vehicle_maintenance: {
         Row: {
+          daily_check_source_id: string | null
+          daily_check_source_type: string | null
           id: string
           van_id: string | null
           tax_due_date: string | null
@@ -10355,6 +10387,8 @@ export type Database = {
           next_service_rotation_step_id: string | null
         }
         Insert: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           van_id?: string | null
           tax_due_date?: string | null
@@ -10425,6 +10459,8 @@ export type Database = {
           next_service_rotation_step_id?: string | null
         }
         Update: {
+          daily_check_source_id?: string | null
+          daily_check_source_type?: string | null
           id?: string
           van_id?: string | null
           tax_due_date?: string | null
@@ -11306,6 +11342,47 @@ export type Database = {
           requires_subcategories?: boolean
         }
         Relationships: [
+        ]
+      }
+      workshop_task_check_photos: {
+        Row: {
+          task_id: string
+          id: string
+          inspection_id: string
+          item_number: number | null
+          day_of_week: number | null
+          photo_url: string
+          caption: string | null
+          created_at: string | null
+        }
+        Insert: {
+          task_id: string
+          id: string
+          inspection_id: string
+          item_number?: number | null
+          day_of_week?: number | null
+          photo_url: string
+          caption?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          task_id?: string
+          id?: string
+          inspection_id?: string
+          item_number?: number | null
+          day_of_week?: number | null
+          photo_url?: string
+          caption?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'workshop_task_check_photos_task_id_fkey'
+            columns: ['task_id']
+            isOneToOne: false
+            referencedRelation: 'actions'
+            referencedColumns: ['id']
+          },
         ]
       }
       workshop_task_comments: {

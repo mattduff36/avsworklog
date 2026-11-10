@@ -58,6 +58,7 @@ export const DAILY_ALLOCATION_SESSION_TARGET_TEST_FILE =
 export const ALLOWED_TARGET_TEST_FILES = [
   'tests/db/account-merge-runtime.test.ts',
   'tests/db/inspection-meter-correction.test.ts',
+  'tests/db/inspection-deletion.test.ts',
   'tests/db/van-service-runtime.test.ts',
   'tests/unit/fixerrors-close-stale-postgres.test.ts',
   'tests/unit/fixerrors-lifecycle-postgres.test.ts',

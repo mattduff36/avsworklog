@@ -1,58 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createAdminClient } from '@/lib/supabase/admin';
-import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
-import { logServerError } from '@/lib/utils/server-error-logger';
+import { NextRequest } from 'next/server';
+import { handleInspectionDeletion } from '@/lib/server/inspection-deletion-route';
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const { access, errorResponse } = await getInspectionRouteActorAccess('plant-inspections');
-    if (errorResponse || !access) {
-      return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    if (!access.canDeleteInspections) {
-      return NextResponse.json(
-        { error: 'Forbidden: plant inspection management access required' },
-        { status: 403 }
-      );
-    }
-
-    const inspectionId = (await params).id;
-    const admin = createAdminClient();
-
-    // Delete plant inspection (cascade will delete items and daily hours)
-    // Include both owned plant (plant_id not null) and hired plant inspections
-    const { error: deleteError } = await admin
-      .from('plant_inspections')
-      .delete()
-      .eq('id', inspectionId);
-
-    if (deleteError) {
-      console.error('Delete error:', deleteError);
-      return NextResponse.json(
-        { error: 'Failed to delete plant inspection' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting plant inspection:', error);
-
-    await logServerError({
-      error: error as Error,
-      request,
-      componentName: '/api/plant-inspections/[id]/delete',
-      additionalData: {
-        endpoint: '/api/plant-inspections/[id]/delete',
-      },
-    });
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  return handleInspectionDeletion(request, params, 'plant');
 }

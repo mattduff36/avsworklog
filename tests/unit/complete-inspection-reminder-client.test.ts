@@ -6,6 +6,14 @@ describe('completeInspectionReminder', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+  it('carries the submitted check ID for causal reminder completion', async () => {
+    const fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+    vi.stubGlobal('fetch', fetch);
+    await completeInspectionReminder({
+      assetType: 'hgv', assetId: 'hgv-1', assignedTo: 'inspector-1', inspectionId: 'check-1',
+    });
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ inspectionId: 'check-1', assetType: 'hgv' });
+  });
 
   it('throws a status error with string API messages', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

@@ -416,13 +416,16 @@ function HgvInspectionsContent() {
     try {
       const response = await fetch(`/api/hgv-inspections/${inspectionId}/delete`, { method: 'DELETE' });
       if (!response.ok) {
-        throw new Error('Delete failed');
+        const result = await response.json();
+        throw new Error(result.error || 'Delete failed');
       }
+      const result = await response.json();
       toast.success('Daily check deleted');
+      for (const warning of result.warnings ?? []) toast.warning(warning, { duration: 15000 });
       fetchInspections();
     } catch (error) {
       console.error('Error deleting HGV inspection:', error, { errorContextId });
-      toast.error('Failed to delete inspection', { id: errorContextId });
+      toast.error(error instanceof Error ? error.message : 'Failed to delete inspection', { id: errorContextId });
     } finally {
       setDeleting(null);
     }
@@ -460,8 +463,7 @@ function HgvInspectionsContent() {
     }
   }
 
-  const canDeleteInspection = (inspection: Pick<HgvInspectionWithRelations, 'status' | 'user_id'>) =>
-    canDeleteInspections && canEditInspection(inspection);
+  const canDeleteInspection = () => canDeleteInspections;
 
   const getInspectionHref = (inspection: Pick<HgvInspectionWithRelations, 'id' | 'status' | 'user_id'>) =>
     canEditInspection(inspection)
@@ -670,7 +672,7 @@ function HgvInspectionsContent() {
                     >
                       {inspection.status === 'submitted' ? 'Submitted' : 'Draft'}
                     </Badge>
-                    {canDeleteInspection(inspection) && (
+                    {canDeleteInspection() && (
                       <Button
                         variant="ghost"
                         size="sm"

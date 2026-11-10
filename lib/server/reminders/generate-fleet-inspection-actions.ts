@@ -57,7 +57,7 @@ interface OverdueAsset {
   priority: ReminderPriority;
 }
 
-interface ReminderActionRowWithReminders extends ReminderActionRow {
+interface ReminderActionRowWithReminders extends Omit<ReminderActionRow, 'daily_check_source_id' | 'daily_check_source_type'> {
   reminders?: Array<Pick<ReminderRow, 'id' | 'status'>> | null;
 }
 

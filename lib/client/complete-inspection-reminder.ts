@@ -6,6 +6,7 @@ interface CompleteInspectionReminderInput {
   assetId: string;
   assignedTo: string;
   draftInspectionId?: string;
+  inspectionId?: string;
 }
 
 function getReminderResponseErrorMessage(payload: unknown): string {
@@ -33,6 +34,7 @@ export async function completeInspectionReminder({
   assetId,
   assignedTo,
   draftInspectionId,
+  inspectionId,
 }: CompleteInspectionReminderInput): Promise<void> {
   const response = await fetch('/api/reminders/complete-inspection-action', {
     method: 'POST',
@@ -44,6 +46,7 @@ export async function completeInspectionReminder({
       assetId,
       assignedTo,
       draftInspectionId,
+      inspectionId,
     }),
   });
 

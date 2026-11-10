@@ -5,6 +5,7 @@ import {
 } from '@/lib/config/reminder-workflows';
 import { getVanDraftSubmissionDedupeKey } from '@/lib/utils/van-draft-submission-reminders';
 import type { ReminderAssetType } from '@/types/reminders';
+import { dailyCheckEffectSource } from '@/lib/inspections/deletion';
 
 type AdminClient = ReturnType<typeof createAdminClient>;
 
@@ -15,6 +16,7 @@ export interface CompleteReminderActionInput {
   assignedTo: string;
   actionedBy: string;
   nowIso?: string;
+  inspectionId?: string;
 }
 
 export interface CompleteReminderActionResult {
@@ -44,6 +46,7 @@ export async function completeReminderActionForAsset({
   assignedTo,
   actionedBy,
   nowIso = new Date().toISOString(),
+  inspectionId,
 }: CompleteReminderActionInput): Promise<CompleteReminderActionResult> {
   const assetColumn = getReminderAssetIdColumn(assetType);
   const { data: actions, error: actionsError } = await admin
@@ -68,6 +71,7 @@ export async function completeReminderActionForAsset({
   const { data: actionedRows, error: actionedError } = await admin
     .from('reminders')
     .update({
+      ...(inspectionId ? dailyCheckEffectSource(assetType, inspectionId) : {}),
       status: 'actioned',
       action_note: 'Completed by submitted daily check.',
       actioned_at: nowIso,
@@ -85,6 +89,7 @@ export async function completeReminderActionForAsset({
   const { data: cancelledRows, error: cancelledError } = await admin
     .from('reminders')
     .update({
+      ...(inspectionId ? dailyCheckEffectSource(assetType, inspectionId) : {}),
       status: 'cancelled',
       cancelled_at: nowIso,
       updated_at: nowIso,
@@ -98,6 +103,7 @@ export async function completeReminderActionForAsset({
   const { error: resolveError } = await admin
     .from('reminder_actions')
     .update({
+      ...(inspectionId ? dailyCheckEffectSource(assetType, inspectionId) : {}),
       status: 'resolved',
       resolved_at: nowIso,
       resolved_by: actionedBy,
@@ -143,6 +149,7 @@ export async function completeVanDraftSubmissionReminder({
   const { data: actionedRows, error: actionedError } = await admin
     .from('reminders')
     .update({
+      ...dailyCheckEffectSource('van', draftInspectionId),
       status: 'actioned',
       action_note: 'Completed by signed draft van daily check submission.',
       actioned_at: nowIso,
@@ -169,6 +176,7 @@ export async function completeVanDraftSubmissionReminder({
   const { error: resolveError } = await admin
     .from('reminder_actions')
     .update({
+      ...dailyCheckEffectSource('van', draftInspectionId),
       status: 'resolved',
       resolved_at: nowIso,
       resolved_by: actionedBy,

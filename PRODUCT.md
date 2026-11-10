@@ -93,6 +93,12 @@ Van, Plant and HGV Daily Check lists show the recorded miles, hours or kilometre
 
 Corrections change only the reading and retain the submitted check's answers, signature, submitter and status. Every correction records the previous and replacement readings, editor and time in the audit log; a reason/comment is optional. Stale edits are rejected. Linked asset readings are recalculated from the latest submitted check when the corrected reading was still current; a different current reading is preserved. Hired plant checks without a fleet link retain correction history without updating a fleet asset.
 
+## Daily Check deletion
+
+Workshop managers and existing full-access administrators with access to the relevant module may permanently delete Van, Plant and HGV Daily Checks in any status. Effective View As permissions apply; ordinary inspectors and managers outside Workshop gain no new deletion rights. Editing restrictions are unchanged.
+
+Deletion atomically removes the check and its check-specific children, reverses recorded causal field changes, and keeps permanent accountability. It restores verified previous check, workshop or manual meter inputs, including known null before-images, while preserving later independent inputs and equal-valued confirmations. Legacy recovery verifies the original inspection/asset audit transaction and replays surviving meter history; review timestamps or matching values alone do not establish ownership. If evidence is genuinely missing, revised or ambiguous, deletion retains the current reading and records a permanent RECONCILIATION REQUIRED warning in the deletion audit and asset maintenance history, directing an audited manual correction. Shared tasks, completed Service work requiring a workshop correction, and photo evidence survive. Storage cleanup protects surviving public/signed/encoded/relative photo references, runs after commit, remains durable when blocked or failed, and can be retried by repeating the authorized DELETE; pending cleanup is not reported as completed.
+
 ## Van service rotation
 
 Vans alternate Basic Service A and Full Service, with the next service due 10,000 miles after the actual completed service mileage. The existing van checklist remains the Full Service checklist. Basic Service A retains core checks and engine oil/filter servicing, but fuel, air, pollen and gearbox filter items are checks/cleaning rather than routine replacement.

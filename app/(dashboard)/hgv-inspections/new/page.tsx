@@ -1097,6 +1097,7 @@ function NewHgvInspectionContent() {
         try {
           await completeInspectionReminder({
             assetType: 'hgv',
+            inspectionId,
             assetId: hgvId,
             assignedTo: selectedEmployeeId,
           });
