@@ -2,6 +2,26 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.8.0
+
+**GIT COMMIT MESSAGE**
+`feat(db): update Data storage, Debug tools, Help and FAQ, and Daily Allocation`
+
+**PUSHED AT**
+2026-11-10T03:08:15.213Z
+
+**WHAT CHANGED**
+Update Data storage, Debug tools, Help and FAQ, and Daily Allocation.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+- Updated debug tools, with changes to background routes and app screens.
+- Updated Data storage, Debug tools, Help and FAQ, and Daily Allocation, with changes to automation scripts and data storage.
+- Updated daily allocation, with changes to background routes and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(db): update Data storage, Debug tools, Help and FAQ, and Daily Allocation`
+
 ## 1126.7.0
 
 **GIT COMMIT MESSAGE**

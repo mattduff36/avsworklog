@@ -1,5 +1,31 @@
 [
   {
+    "version": "1126.8.0",
+    "updateKind": "major",
+    "title": "Data storage update",
+    "description": "Updated Data storage, Debug tools, Help and FAQ, and Daily Allocation.",
+    "summary": "Updated Data storage, Debug tools, Help and FAQ, and Daily Allocation.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated debug tools, with changes to background routes and app screens.",
+      "Updated Data storage, Debug tools, Help and FAQ, and Daily Allocation, with changes to automation scripts and data storage.",
+      "Updated daily allocation, with changes to background routes and automated tests."
+    ],
+    "areas": [
+      "Data storage",
+      "Debug tools",
+      "Help",
+      "FAQ",
+      "Daily Allocation"
+    ],
+    "areaKeys": [
+      "data-storage",
+      "debug",
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-11-10T03:08:15.213Z"
+  },
+  {
     "version": "1126.7.0",
     "updateKind": "major",
     "title": "Background services update",
