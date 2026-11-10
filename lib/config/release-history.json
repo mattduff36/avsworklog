@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.8.2",
+    "updateKind": "minor",
+    "title": "Help and FAQ guidance update",
+    "description": "Updated help and FAQ.",
+    "summary": "Updated help and FAQ.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Help and FAQ"
+    ],
+    "areaKeys": [
+      "help"
+    ],
+    "pushedAt": "2026-11-10T12:39:03.955Z"
+  },
+  {
     "version": "1126.8.1",
     "updateKind": "minor",
     "title": "App reliability update",

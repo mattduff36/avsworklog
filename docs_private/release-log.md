@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.8.2
+
+**GIT COMMIT MESSAGE**
+`docs(help): update help and FAQ`
+
+**PUSHED AT**
+2026-11-10T12:39:03.955Z
+
+**WHAT CHANGED**
+Update help and FAQ.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `docs(help): update help and FAQ`
+
 ## 1126.8.1
 
 **GIT COMMIT MESSAGE**
