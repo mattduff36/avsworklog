@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FixerrorsControlPanel } from '@/app/(dashboard)/debug/components/FixerrorsControlPanel';
-import { FIXERRORS_LOCAL_ORIGIN, publicQueueState } from '@/lib/fixerrors/protocol';
+import { FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN, publicQueueState } from '@/lib/fixerrors/protocol';
 import { checkEvidenceDigest } from '@/lib/fixerrors/control';
 import { FixtureStore, harness } from '../unit/fixerrors-control-fixtures';
 
@@ -35,6 +35,20 @@ describe('Debug local Fixerrors controls', () => {
     render(<FixerrorsControlPanel />);
     await screen.findByText(/Disabled by default/);
     expect(screen.queryByRole('button', { name: 'Request bounded repair' })).toBeNull();
+  });
+
+  it('accepts an available production bridge without granting deployment approval', async () => {
+    const store = new FixtureStore();
+    const h = harness(store);
+    await h.testedRepair();
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) };
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => snapshot }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<FixerrorsControlPanel />);
+    await screen.findByText(/A device has reported bridge availability/);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirm Deploy for exact candidate' })).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 
   it('records no deploy approval until a separate exact-candidate confirmation is typed and submitted', async () => {

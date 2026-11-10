@@ -166,7 +166,7 @@ export type PublicQueueState = ReturnType<typeof publicQueueState>;
 export const adminResponseSchema = z.object({
   releaseNeedsReconciliation: z.boolean().default(false),
   enabled: z.boolean(),
-  executionAvailable: z.literal(false),
+  executionAvailable: z.boolean(),
   origin: z.enum([FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN]),
   devices: z.array(deviceSchema.omit({ credentialSha256: true })).max(20),
   jobs: z.array(jobSchema.omit({ lease: true }).extend({ leaseUntil: z.number().int().nullable() })).max(50),
