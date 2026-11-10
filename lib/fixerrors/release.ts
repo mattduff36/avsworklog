@@ -1,7 +1,7 @@
 import { createPrivateKey, createPublicKey, sign, verify, type KeyObject } from 'crypto';
 import { z } from 'zod';
 import { checkEvidenceDigest, hash } from './control';
-import { sameCandidate, sha256Schema, type FixerrorsJob } from './protocol';
+import { releaseModeSchema, sameCandidate, sha256Schema, type FixerrorsJob } from './protocol';
 
 const uuid = z.string().uuid().regex(/^[a-f0-9-]+$/u);
 const oid = z.string().regex(/^[a-f0-9]{40}$/u);
@@ -22,6 +22,7 @@ export const releaseTicketSchema = z.object({
   tree: oid,
   candidateSha256: sha256Schema,
   testEvidenceSha256: sha256Schema,
+  releaseMode: releaseModeSchema.optional(),
 }).strict();
 const envelopeSchema = z.object({
   version: z.literal(1), keyId: keyIdSchema,
@@ -110,6 +111,7 @@ export function issueStartedReleaseTicket(job: FixerrorsJob, nowMs: number, issu
     expiresAt: Math.min(now + 300, Math.floor(job.expiresAt / 1000)),
     approvedBy: job.approval.actorId, head: job.candidate.head, tree: job.candidate.tree,
     ...job.checks.release,
+    releaseMode: job.approval.releaseMode ?? 'full',
   });
   validTime(ticket, now);
   requireRelease(ticket.approvalId !== ticket.repairJobId, 'approval is not separate');
@@ -150,6 +152,7 @@ export function prepareReleaseDeviceProof(
     ticket.deviceId === job.deviceId && ticket.approvedBy === job.approval.actorId &&
     ticket.expiresAt <= Math.floor(job.expiresAt / 1000) &&
     ticket.head === job.candidate.head && ticket.tree === job.candidate.tree &&
+    (ticket.releaseMode ?? 'full') === (job.approval.releaseMode ?? 'full') &&
     sameCandidate(job.approval.candidate, job.candidate) &&
     checkEvidenceDigest(job.checks) === job.candidate.checksSha256 &&
     evidence.repairJobId === ticket.repairJobId && evidence.head === ticket.head &&

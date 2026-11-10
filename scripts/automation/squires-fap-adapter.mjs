@@ -13,11 +13,19 @@ const oid = /^[a-f0-9]{40}$/u;
 const deploymentIdPattern = /^dpl_[A-Za-z0-9]{1,120}$/u;
 const result = (status, deploymentId = null) => ({ status, deploymentId });
 
+export function releaseMode(ticket) {
+  const mode = ticket.releaseMode === undefined ? 'full' : ticket.releaseMode;
+  if (mode !== 'full' && mode !== 'targeted') throw new Error('Invalid release mode');
+  return mode;
+}
+
 export function approvedReleaseContext(ticket, expectedRemoteHead, nowSeconds) {
+  releaseMode(ticket);
   if (ticket?.version !== 1 || ticket?.audience !== 'squires-windows-fap' ||
       ticket?.job !== 'fap' || ticket?.environment !== 'squires-production' ||
       !Number.isSafeInteger(ticket.issuedAt) || !Number.isSafeInteger(ticket.expiresAt) ||
       ticket.issuedAt > nowSeconds || ticket.expiresAt <= nowSeconds ||
+      ticket.expiresAt <= ticket.issuedAt ||
       ticket.expiresAt - ticket.issuedAt > 300 ||
       ![ticket.head, ticket.tree, expectedRemoteHead].every((value) => typeof value === 'string' && oid.test(value)) ||
       ticket.head === expectedRemoteHead) {
@@ -40,6 +48,22 @@ export async function verifyLiveDeployment(head, read = readLive) {
     ? identity.deployment_id : null;
 }
 
+export async function pollLiveDeployment(head, { read = readLive, now = Date.now, sleep = delay } = {}) {
+  const deadline = now() + 8 * 60_000;
+  do {
+    const deploymentId = await verifyLiveDeployment(head, read).catch(() => null);
+    if (deploymentId) return deploymentId;
+    await sleep(Math.min(10_000, Math.max(0, deadline - now())));
+  } while (now() < deadline);
+  return null;
+}
+
+export function releaseArguments(ticket, npm) {
+  return releaseMode(ticket) === 'targeted'
+    ? ['--import=tsx', 'scripts\\automation\\fixerrors-targeted-release.ts']
+    : [npm, 'run', 'finalise:push', '--', '--guarded-push'];
+}
+
 function osEnvironment() {
   const keep = new Set(['SYSTEMROOT', 'WINDIR', 'PATH', 'PATHEXT', 'COMSPEC', 'TEMP', 'TMP',
     'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)']);
@@ -51,7 +75,7 @@ function osEnvironment() {
 async function run(ticket) {
   const npm = join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
   if (process.platform !== 'win32' || realpathSync(process.cwd()) !== workspace ||
-      !existsSync(gitExe) || !existsSync(npm)) return result('blocked');
+      !existsSync(gitExe) || (releaseMode(ticket) === 'full' && !existsSync(npm))) return result('blocked');
   const env = osEnvironment();
   const git = (...args) => execFileSync(gitExe, args, {
     cwd: workspace, env, encoding: 'utf8', timeout: 20_000,
@@ -62,9 +86,9 @@ async function run(ticket) {
   if (git('rev-parse', '--verify', 'HEAD') !== context.head ||
       git('rev-parse', '--verify', 'HEAD^{tree}') !== context.tree) return result('blocked');
   // The bridge already verified the signed ticket and consumed the one-use approval.
-  // finalise independently enforces the exact context before any push.
+  // Both release paths independently enforce the exact context before any push.
   const exit = await new Promise((resolveExit, reject) => {
-    const child = spawn(process.execPath, [npm, 'run', 'finalise:push', '--', '--guarded-push'], {
+    const child = spawn(process.execPath, releaseArguments(ticket, npm), {
       cwd: workspace, env: { ...env, SQUIRES_FINALISE_GUARDED_PUSH_CONTEXT: JSON.stringify(context) },
       windowsHide: true, stdio: 'ignore',
     });
@@ -75,13 +99,8 @@ async function run(ticket) {
     'ls-remote', '--refs', '--exit-code', remote, ref);
   if (remoteState === `${base}\t${ref}` && exit !== 0) return result('failed');
   if (remoteState !== `${context.head}\t${ref}`) return result('unknown');
-  const deadline = Date.now() + 5 * 60_000;
-  do {
-    const deploymentId = await verifyLiveDeployment(context.head).catch(() => null);
-    if (deploymentId) return result('released', deploymentId);
-    await delay(10_000);
-  } while (Date.now() < deadline);
-  return result('unknown');
+  const deploymentId = await pollLiveDeployment(context.head);
+  return deploymentId ? result('released', deploymentId) : result('unknown');
 }
 
 async function main() {

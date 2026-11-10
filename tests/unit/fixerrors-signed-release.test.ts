@@ -9,7 +9,7 @@ import {
   encodePreparedReleaseEvidence, issueStartedReleaseTicket, prepareReleaseDeviceProof, verifyReleaseTicket,
   type PreparedReleaseEvidence, type ReleaseIssuer,
 } from '@/lib/fixerrors/release';
-import type { CheckEvidence } from '@/lib/fixerrors/protocol';
+import type { CheckEvidence, ReleaseMode } from '@/lib/fixerrors/protocol';
 import { executeCompanionClaim, type TrustedFixerrorsExecutor } from '@/scripts/automation/fixerrors-companion';
 import { createSignedReleaseFixtureExecutor } from '@/scripts/automation/fixerrors-signed-release';
 import { actorId, checks, credential, deviceId, FixtureStore, now, workspace } from './fixerrors-control-fixtures';
@@ -43,7 +43,7 @@ const preparedChecks: CheckEvidence = {
 const candidate = { head: checks.head, tree: checks.tree, checksSha256: checkEvidenceDigest(preparedChecks) };
 const clean = { ...workspace, head: checks.head, tree: checks.tree };
 
-async function approved() {
+async function approved(releaseMode: ReleaseMode = 'full') {
   const store = new FixtureStore();
   const device = (command: Parameters<typeof applyDeviceCommand>[3], issue?: Parameters<typeof applyDeviceCommand>[5]) =>
     store.transact((tx) => applyDeviceCommand(tx, deviceId, credential, command, now, issue));
@@ -59,7 +59,7 @@ async function approved() {
   const approvalId = randomUUID();
   await admin({
     op: 'approve-deploy', requestId: approvalId, repairJobId: evidence.repairJobId,
-    candidate, confirmation: 'DEPLOY EXACT TESTED CANDIDATE',
+    candidate, confirmation: true, releaseMode,
   });
   const response = await device({ op: 'claim' });
   if (!('claim' in response) || !response.claim) throw new Error('Fixture deploy claim missing');
@@ -69,8 +69,8 @@ async function approved() {
   return { store, device, claim, start };
 }
 
-async function signed() {
-  const fixture = await approved();
+async function signed(mode: ReleaseMode = 'full') {
+  const fixture = await approved(mode);
   const result = await fixture.start();
   if (!('releaseTicket' in result) || !result.releaseTicket) throw new Error('Missing signed ticket');
   return { ...fixture, ticket: result.releaseTicket };
@@ -83,6 +83,37 @@ afterEach(() => {
 });
 
 describe('signed release handoff: no worker, fap, commits or push', () => {
+  function resign(ticket: Record<string, unknown>) {
+    const payload = Buffer.from(JSON.stringify(ticket)).toString('base64url');
+    return JSON.stringify({ version: 1, keyId: issuer.keyId, payload,
+      signature: sign(null, Buffer.from(`squires-windows-fap-v1\n${issuer.keyId}\n${payload}`), releaseKey.privateKey).toString('base64url') });
+  }
+
+  it.each(['full', 'targeted'] as const)('cryptographically binds %s, rejects mode tampering and mismatched local approvals', async (mode) => {
+    const f = await signed(mode);
+    const ticket = verifyReleaseTicket(f.ticket, verifier, now / 1000);
+    expect(ticket.releaseMode).toBe(mode);
+    const envelope = JSON.parse(f.ticket);
+    envelope.payload = Buffer.from(JSON.stringify({ ...ticket, releaseMode: mode === 'full' ? 'targeted' : 'full' })).toString('base64url');
+    expect(() => verifyReleaseTicket(JSON.stringify(envelope), verifier, now / 1000)).toThrow('signature');
+    expect(() => prepareReleaseDeviceProof(f.ticket, evidence, {
+      ...f.claim.job, approval: { ...f.claim.job.approval!, releaseMode: mode === 'full' ? 'targeted' : 'full' },
+    }, verifier, deviceKey.privateKey, now / 1000)).toThrow('mismatch');
+    expect(() => verifyReleaseTicket(resign({ ...ticket, releaseMode: 'fast' }), verifier, now / 1000)).toThrow();
+    expect(() => verifyReleaseTicket(resign({ ...ticket, releaseMode: null }), verifier, now / 1000)).toThrow();
+  });
+
+  it('accepts original canonical historical tickets as full-only, never targeted', async () => {
+    const f = await signed();
+    const { releaseMode: _mode, ...legacy } = verifyReleaseTicket(f.ticket, verifier, now / 1000);
+    const ticket = resign(legacy);
+    expect(verifyReleaseTicket(ticket, verifier, now / 1000).releaseMode).toBeUndefined();
+    expect(() => prepareReleaseDeviceProof(ticket, evidence, f.claim.job, verifier, deviceKey.privateKey, now / 1000)).not.toThrow();
+    delete f.claim.job.approval!.releaseMode;
+    expect(() => prepareReleaseDeviceProof(ticket, evidence, f.claim.job, verifier, deviceKey.privateKey, now / 1000)).not.toThrow();
+    f.claim.job.approval!.releaseMode = 'targeted';
+    expect(() => prepareReleaseDeviceProof(ticket, evidence, f.claim.job, verifier, deviceKey.privateKey, now / 1000)).toThrow('mismatch');
+  });
   it('issues only after the authenticated separate approval enters started state', async () => {
     const f = await approved();
     expect(() => issueStartedReleaseTicket(f.claim.job, now, issuer)).toThrow('started approval');
@@ -292,9 +323,9 @@ describe('signed release handoff: no worker, fap, commits or push', () => {
   });
 });
 
-const staged = 'D:\\_storage\\Codex-Documents\\2026-11-08\\check-the-logs-and-task-success\\work\\squires-worker-bridge\\scripts';
+const staged = path.resolve('scripts\\automation');
 it.skipIf(!existsSync(path.join(staged, 'squires_companion.py')))(
-  'interoperates with staged Python signatures and rejects candidate drift before replay or execution',
+  'interoperates with repository Python signatures and rejects candidate drift before replay or execution',
   async () => {
     const f = await signed();
     const proof = prepareReleaseDeviceProof(f.ticket, evidence, f.claim.job, verifier, deviceKey.privateKey, now / 1000);
@@ -313,6 +344,7 @@ it.skipIf(!existsSync(path.join(staged, 'squires_companion.py')))(
       'x=json.load(sys.stdin)',
       'body=s.signed_device(x["proof"].encode(),"release",x["config"])',
       'ticket=s.signed_ticket(body["ticket"],x["config"],"release",x["now"])',
+      'assert ticket["releaseMode"]=="full"',
       'assert s.sha(s.unb64(body["testEvidence"],s.MAX_PACKET))==ticket["testEvidenceSha256"]',
       'for at in (ticket["expiresAt"], ticket["issuedAt"]-1):',
       ' try: s.signed_ticket(body["ticket"],x["config"],"release",at)',
@@ -336,3 +368,28 @@ it.skipIf(!existsSync(path.join(staged, 'squires_companion.py')))(
     expect(JSON.parse(text)).toEqual({ approvalId: f.claim.job.id, negativeChecks: 4 });
   },
 );
+
+it.each(['targeted', 'full', undefined, 'fast', null])('native verifier validates canonical signed mode %s without a replay claim or launch', async (mode) => {
+  const f = await signed();
+  const ticket = verifyReleaseTicket(f.ticket, verifier, now / 1000);
+  const { releaseMode: _mode, ...legacy } = ticket;
+  const body = mode === undefined ? legacy : { ...legacy, releaseMode: mode };
+  const payload = Buffer.from(JSON.stringify(body)).toString('base64url');
+  const envelope = JSON.stringify({ version: 1, keyId: issuer.keyId, payload,
+    signature: sign(null, Buffer.from(`squires-windows-fap-v1\n${issuer.keyId}\n${payload}`), releaseKey.privateKey).toString('base64url') });
+  const config = { deviceId, environment: 'squires-production',
+    releaseIssuer: { keyId: issuer.keyId, publicKeyPem: releaseKey.publicKey.export({ type: 'spki', format: 'pem' }) } };
+  const script = [
+    'import sys,json', 'sys.path.insert(0,sys.argv[1])', 'import squires_companion as s', 'x=json.load(sys.stdin)',
+    'try:', ' t=s.signed_ticket(x["ticket"],x["config"],"release",x["now"])',
+    'except s.Denied:', ' assert not x["valid"]',
+    'else:', ' assert x["valid"] and t.get("releaseMode","full")==x["expected"]',
+    'print("mode verified")',
+  ].join('\n');
+  const native = await vi.importActual<typeof import('child_process')>('child_process');
+  expect(native.execFileSync('python', ['-I', '-B', '-c', script, staged], {
+    input: JSON.stringify({ ticket: envelope, config, now: now / 1000,
+      valid: mode === undefined || mode === 'full' || mode === 'targeted', expected: mode ?? 'full' }),
+    encoding: 'utf8', timeout: 10_000, windowsHide: true,
+  })).toContain('mode verified');
+});

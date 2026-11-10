@@ -521,15 +521,15 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
     <Card className="overflow-hidden border-avs-yellow/20 bg-slate-950/60">
       <div className="pointer-events-none h-1 bg-gradient-to-r from-orange-500 to-red-600" />
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
             <CardTitle className="flex items-center gap-2 text-lg">
               <XCircle className="h-5 w-5 text-red-400" />
               Application Error Log
             </CardTitle>
             <CardDescription>Track all application errors and exceptions (Last 200 entries)</CardDescription>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={() => setShowArchived((current) => !current)}
               variant="outline"

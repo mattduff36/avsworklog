@@ -1,8 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import {
-  checksSchema, FIXERRORS_DEPLOY_TIMEOUT_MS, sameCandidate, sameWorkspace,
+  checksSchema, FIXERRORS_DEPLOY_TIMEOUT_MS, releaseModeSchema, sameCandidate, sameWorkspace,
   type AdminCommand, type CheckEvidence, type DeviceCommand,
-  type Candidate, type FixerrorsDevice, type FixerrorsJob, type QueueState,
+  type Candidate, type FixerrorsDevice, type FixerrorsJob, type QueueState, type ReleaseMode,
 } from './protocol';
 
 export class FixerrorsControlError extends Error {
@@ -31,6 +31,7 @@ export interface AuditEvent {
   jobId: string | null;
   deviceId: string;
   candidate?: Candidate;
+  releaseMode?: ReleaseMode;
 }
 
 export interface QueueTransaction {
@@ -123,6 +124,9 @@ export function applyAdminCommand(tx: QueueTransaction, actor: string, command: 
 
   let parent: FixerrorsJob | undefined;
   if (command.op === 'approve-deploy') {
+    if (command.confirmation !== true || !releaseModeSchema.safeParse(command.releaseMode).success) {
+      deny('Explicit confirmation and a supported release mode are required', 400);
+    }
     parent = state.jobs.find((job) => job.id === command.repairJobId);
     if (!parent || parent.action !== 'repair' || parent.state !== 'tested' || !parent.candidate || !parent.checks ||
         !sameCandidate(parent.candidate, command.candidate) ||
@@ -148,14 +152,14 @@ export function applyAdminCommand(tx: QueueTransaction, actor: string, command: 
     parentRepairId: parent?.id ?? null,
     candidate: parent?.candidate ?? null, checks: parent?.checks ?? null,
     approval: command.op === 'approve-deploy'
-      ? { actorId: actor, confirmedAt: now, candidate: { ...command.candidate } } : null,
+      ? { actorId: actor, confirmedAt: now, candidate: { ...command.candidate }, releaseMode: command.releaseMode } : null,
     lease: null, reason: null,
   };
   state.jobs.push(job);
   tx.audit({
     at: now, actor, event: action === 'deploy' ? 'exact-candidate-deploy-confirmed' : `${action}-requested`,
     jobId: job.id, deviceId: device.id,
-    ...(job.approval ? { candidate: job.approval.candidate } : {}),
+    ...(job.approval ? { candidate: job.approval.candidate, releaseMode: job.approval.releaseMode } : {}),
   });
   return { ok: true as const, jobId: job.id };
 }

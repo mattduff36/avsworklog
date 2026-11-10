@@ -40,21 +40,22 @@ afterEach(async () => {
 });
 
 describe('private local queue persistence (PGlite adapter, not native concurrency proof)', () => {
-  it('persists replay ids, credential revocation and exact approval audit across clean restart', async () => {
+  it.each(['full', 'targeted'] as const)('persists %s approval mode, replay ids and credential revocation across clean restart', async (releaseMode) => {
     const h = harness(localFixerrorsStore);
     const id = await h.testedRepair();
-    await h.approve(id);
+    await h.approve(id, releaseMode);
     await h.admin({ op: 'revoke-device', deviceId });
     await database.close();
     database = new PGlite({ dataDir: directory, database: 'squires_fixerrors_local', relaxedDurability: false });
     const snapshot = await localFixerrorsStore.transact((tx) => tx.state);
     expect(snapshot.jobs).toHaveLength(2);
+    expect(snapshot.jobs[1].approval?.releaseMode).toBe(releaseMode);
     expect(snapshot.devices[0]).toMatchObject({ revoked: true, credentialSha256: hash(credential) });
     await expect(h.enqueue('repair', id)).rejects.toThrow('Duplicate');
     const audit = await database.query<{ candidate: unknown }>(
       "SELECT candidate FROM private.fixerrors_local_audit WHERE event = 'exact-candidate-deploy-confirmed'",
     );
-    expect(audit.rows).toEqual([{ candidate }]);
+    expect(audit.rows).toEqual([{ candidate: { ...candidate, releaseMode } }]);
     expect(adapter.query).toHaveBeenCalledWith('SELECT state FROM private.fixerrors_local_state WHERE id = 1 FOR UPDATE');
   });
 

@@ -117,7 +117,7 @@ it('keeps the disposable remote unchanged until a fresh exact release is approve
     };
     const approve = ({ id, candidate }: Awaited<ReturnType<typeof repair>>) => queue.admin({
       op: 'approve-deploy', requestId: randomUUID(), repairJobId: id, candidate,
-      confirmation: 'DEPLOY EXACT TESTED CANDIDATE',
+      confirmation: true, releaseMode: 'full',
     });
 
     const first = await repair();

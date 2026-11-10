@@ -144,8 +144,12 @@ def signed_ticket(raw, cfg, action, now):
     body = unb64(env['payload'],2048)
     verify_key(issuer['publicKeyPem'],f"{audience}-v1\n{env['keyId']}\n{env['payload']}".encode('ascii'),
                unb64(env['signature'],64))
-    ticket = fields(decode_json(body),REPAIR_FIELDS if action=='repair' else RELEASE_FIELDS)
-    require(tuple(ticket)==(REPAIR_FIELDS if action=='repair' else RELEASE_FIELDS) and encoded(ticket)==body,
+    ticket = decode_json(body)
+    keys = REPAIR_FIELDS if action=='repair' else RELEASE_FIELDS
+    if action != 'repair' and isinstance(ticket, dict) and 'releaseMode' in ticket:
+        keys += ('releaseMode',)
+    fields(ticket, keys)
+    require(tuple(ticket)==keys and encoded(ticket)==body,
             'noncanonical_ticket')
     require(type(ticket['version']) is int and ticket['version']==1 and ticket['audience']==audience
             and ticket['job']==('fixerrors' if action=='repair' else 'fap')
@@ -156,6 +160,7 @@ def signed_ticket(raw, cfg, action, now):
         require(uuid_text(ticket['jobId']) and identifier(ticket['packetSha256'],HEX)
                 and ticket['authority'] in ('read-only','bounded-repair'), 'invalid_job')
     else:
+        require(ticket.get('releaseMode', 'full') in ('full', 'targeted'), 'invalid_release_mode')
         require(uuid_text(ticket['approvalId']) and uuid_text(ticket['repairJobId'])
                 and ticket['approvalId'] != ticket['repairJobId']
                 and identifier(ticket['approvedBy'],re.compile(r'[A-Za-z0-9_-]{1,100}'))

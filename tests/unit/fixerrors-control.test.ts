@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { describe, expect, it } from 'vitest';
 import {
-  adminCommandSchema, deviceCommandSchema, publicQueueState,
+  adminCommandSchema, deviceCommandSchema, publicQueueState, queueStateSchema,
 } from '@/lib/fixerrors/protocol';
 import {
   actorId, candidate, checks, credential, deviceId, FixtureStore, harness, workspace,
@@ -141,7 +141,7 @@ describe('local Fixerrors durable queue contract (transaction fixture)', () => {
     await expect(h.admin({
       op: 'approve-deploy', requestId: randomUUID(), repairJobId,
       candidate: { ...candidate, [field]: 'f'.repeat(field === 'checksSha256' ? 64 : 40) },
-      confirmation: 'DEPLOY EXACT TESTED CANDIDATE',
+      confirmation: true, releaseMode: 'full',
     })).rejects.toThrow('mismatch');
   });
 
@@ -205,5 +205,28 @@ describe('local Fixerrors durable queue contract (transaction fixture)', () => {
       op: 'complete', jobId: randomUUID(), leaseToken: credential,
       result: { status: 'tested', candidate, checks: { ...checks, checks: [] } },
     }).success).toBe(false);
+  });
+
+  it.each(['full', 'targeted'] as const)('stores explicit %s consent in the approval, audit and leased job', async (mode) => {
+    const store = new FixtureStore();
+    const h = harness(store);
+    await h.approve(await h.testedRepair(), mode);
+    expect(store.state.jobs[1].approval?.releaseMode).toBe(mode);
+    expect(store.events.at(-1)?.releaseMode).toBe(mode);
+    expect((await h.claim()).job.approval?.releaseMode).toBe(mode);
+  });
+
+  it('requires true consent and a known explicit mode, while preserving historical full-only jobs', async () => {
+    const store = new FixtureStore();
+    const h = harness(store);
+    const repairJobId = await h.testedRepair();
+    const input = { op: 'approve-deploy', requestId: randomUUID(), repairJobId, candidate, confirmation: true, releaseMode: 'full' };
+    for (const change of [{ confirmation: false }, { confirmation: undefined }, { confirmation: 'DEPLOY EXACT TESTED CANDIDATE' }, { releaseMode: undefined }, { releaseMode: 'fast' }, { releaseMode: null }]) {
+      expect(adminCommandSchema.safeParse({ ...input, ...change }).success).toBe(false);
+    }
+    await h.approve(repairJobId);
+    delete store.state.jobs[1].approval!.releaseMode;
+    expect(queueStateSchema.parse(store.state).jobs[1].approval?.releaseMode).toBeUndefined();
+    expect((await h.claim()).job.approval?.releaseMode ?? 'full').toBe('full');
   });
 });

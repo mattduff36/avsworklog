@@ -31,6 +31,8 @@ export const checksSchema = z.object({
   }).strict().optional(),
 }).strict();
 export const actionSchema = z.enum(['review', 'repair', 'deploy']);
+export const releaseModeSchema = z.enum(['full', 'targeted']);
+export type ReleaseMode = z.infer<typeof releaseModeSchema>;
 export const jobStateSchema = z.enum(['queued', 'leased', 'reviewed', 'tested', 'blocked', 'failed', 'expired', 'deployed', 'unknown']);
 export const blockReasonSchema = z.enum([
   'bridge-unavailable', 'local-opt-out', 'checkout-drift', 'lease-lost', 'timeout', 'execution-failed', 'release-unconfirmed',
@@ -51,6 +53,7 @@ export const jobSchema = z.object({
     actorId: z.string().uuid(),
     confirmedAt: z.number().int(),
     candidate: candidateSchema,
+    releaseMode: releaseModeSchema.optional(),
   }).strict().nullable(),
   lease: z.object({
     tokenSha256: sha256Schema,
@@ -88,7 +91,8 @@ export const adminCommandSchema = z.discriminatedUnion('op', [
     requestId: z.string().uuid(),
     repairJobId: z.string().uuid(),
     candidate: candidateSchema,
-    confirmation: z.literal('DEPLOY EXACT TESTED CANDIDATE'),
+    confirmation: z.literal(true),
+    releaseMode: releaseModeSchema,
   }).strict(),
   z.object({ op: z.literal('revoke-device'), deviceId: z.string().uuid() }).strict(),
 ]);

@@ -5,7 +5,7 @@ import {
 } from '@/lib/fixerrors/control';
 import {
   queueStateSchema, type AdminCommand, type Candidate, type CheckEvidence,
-  type DeviceCommand, type QueueState, type Workspace,
+  type DeviceCommand, type QueueState, type ReleaseMode, type Workspace,
 } from '@/lib/fixerrors/protocol';
 
 export const deviceId = '43c518b9-41be-4a11-bb3f-8706e00a9384';
@@ -84,9 +84,9 @@ export function harness(store: QueueStore = new FixtureStore()) {
     });
     return id;
   };
-  const approve = (repairJobId: string) => admin({
+  const approve = (repairJobId: string, releaseMode: ReleaseMode = 'full') => admin({
     op: 'approve-deploy', requestId: randomUUID(), repairJobId, candidate,
-    confirmation: 'DEPLOY EXACT TESTED CANDIDATE',
+    confirmation: true, releaseMode,
   });
   return { admin, device, enqueue, claim, testedRepair, approve, advance: (ms: number) => { time += ms; } };
 }

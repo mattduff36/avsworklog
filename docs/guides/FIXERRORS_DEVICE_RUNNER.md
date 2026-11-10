@@ -224,9 +224,12 @@ Evidence contains hashes only, never test output or commands. The real bridge
 must map those fixed IDs to its locally trusted scoped check receipts; the
 site cannot choose checks.
 
-The user must open the separate inline confirmation, inspect all three
-digests, type `DEPLOY EXACT TESTED CANDIDATE` and submit. That creates a distinct,
-five-minute job with an independent audit event and frozen candidate approval.
+The user must open the separate inline confirmation, inspect the tested commit
+(full digests are under **Technical candidate details**), choose the release mode,
+check the initially unchecked exact-candidate approval checkbox and submit.
+Changing mode, cancelling/reopening or refreshing to a changed candidate resets
+consent. This creates a distinct, five-minute job with an independent audit event
+and frozen candidate approval, including the selected mode.
 The same actual SuperAdmin may request repair and later confirm Deploy; this
 is separate explicit consent, not a two-person approval policy. No repair or
 review result triggers this step automatically. Duplicate approval, stale
@@ -375,10 +378,37 @@ Use separate production keys and leave the flag off until enrollment is verified
 
 The production adapter source is `scripts/automation/squires-fap-adapter.mjs`.
 The installed copy must be outside the checkout and SHA-pinned by the trusted
-Python bridge. It passes the prepared commit and its base to the guarded fap
-path, which retains the release checks and permits only the exact fast-forward
-to Squires GitHub main. The adapter requires the approved SHA and a valid
-deployment ID on the live Squires origin before reporting success.
+Python bridge. **Full checks (fap)** is the default and retains the existing
+guarded finalise-and-push gates. **Targeted checks (urgent)** reuses genuine,
+candidate-bound `targeted-tests`, `typecheck` and `lint` receipts already validated
+by the native bridge, without running local full fap/build again. This is not an
+untested push and does not skip Vercel's build.
+
+Both modes require the signed, one-use approval, clean exact HEAD/tree and prepared
+two-commit candidate, unchanged expected remote base, canonical fetch/push
+destination and ancestor proof. Targeted uses `fixerrors-targeted-release.ts` and
+the same exact-SHA guarded push/expected-base lease as full, never plain `git push`.
+It permits only modifications of existing ordinary source/unit-test files in
+approved roots, plus the three existing generated release metadata files.
+Additions, deletions, renames, links, mode changes, migrations, configuration,
+API/server, security/permissions, financial and release-infrastructure paths fail
+closed. Only the two exact synthetic acceptance fixture paths are exempt from the
+`fixerrors` name hold. This release-machinery change itself requires full mode.
+An ineligible urgent approval never silently downgrades/upgrades or falls back:
+the parent must reconcile the failed job and separately approve a permitted release.
+
+The selected `releaseMode` is stored with the approval and append-only candidate
+audit, appended to the canonical signed release ticket and verified natively.
+Historical stored approvals/tickets without it mean **full only**. Unknown modes,
+mode tampering and mismatch with the local approval fail closed; older installed
+verifiers reject new tickets until the owner installs and repins reviewed code.
+No database schema change is needed for these existing JSON fields.
+
+After either push, the adapter polls the fixed live identity endpoint for up to
+**eight minutes**, requiring both the exact approved SHA and a valid Vercel
+deployment ID before success. A timeout remains unknown, not successful. The
+five-minute approval/admission expiry and 25-minute execution ceiling are
+unchanged; neither mode authorizes installed-runtime changes or production setup.
 
 Production still requires device enrollment and an owner-reviewed installed bridge
 transport. Local mode continues to use the unavailable executor. Production
@@ -460,7 +490,7 @@ validated decision, enrolled check derivation and receipts at separate Deploy.
 Legacy/unprepared artifacts cannot be promoted by adding invented receipt fields.
 
 The four ordered SHA pins are `squires-windows-release.py`, `squires_release.py`,
-unchanged `squires_companion.py`, then `squires_repair.py`. Existing three-pin
+`squires_companion.py`, then `squires_repair.py`. Existing three-pin
 enrollment fails closed until the owner installs and repins. The check catalogue
 contains only absolute enrolled Node plus the fixed scoped wrapper and check ID;
 validated unit-test/lint paths are appended locally. Typecheck takes no paths.
@@ -640,6 +670,9 @@ $cfg=Get-Content -LiteralPath $cfgPath -Raw | ConvertFrom-Json
 if ((Get-FileHash -LiteralPath (Join-Path $bridge 'squires_companion.py') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $e.bridgeHashes[2]) {
   throw 'Existing admission verifier pin changed; investigate before installation'
 }
+if ((Get-FileHash -LiteralPath $cfg.releaseAdapter.script -Algorithm SHA256).Hash.ToLowerInvariant() -ne $cfg.releaseAdapter.sha256) {
+  throw 'Existing release adapter pin changed; investigate before installation'
+}
 function Replace-PrivateJson($file,$text) {
   $pending=$file+'.reviewed-repin-pending'
   $stream=[IO.File]::Open($pending,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
@@ -656,6 +689,8 @@ foreach ($name in @('squires-windows-release.py','squires_release.py','squires_c
 }
 $names=@('squires-windows-release.py','squires_release.py','squires_companion.py','squires_repair.py')
 $e.bridgeHashes=@($names | ForEach-Object { (Get-FileHash -LiteralPath (Join-Path $bridge $_) -Algorithm SHA256).Hash.ToLowerInvariant() })
+Copy-Item -LiteralPath (Join-Path $repo 'scripts\automation\squires-fap-adapter.mjs') -Destination $cfg.releaseAdapter.script -Force
+$cfg.releaseAdapter.sha256=(Get-FileHash -LiteralPath $cfg.releaseAdapter.script -Algorithm SHA256).Hash.ToLowerInvariant()
 $catalogue=[ordered]@{}
 foreach ($id in @('targeted-tests','typecheck','lint')) {
   $catalogue[$id]=[ordered]@{argv=@($cfg.releaseAdapter.nodeExe,'scripts/automation/fixerrors-scoped-check.mjs',$id);timeout_seconds=120;description=('Trusted scoped '+$id)}
@@ -713,8 +748,9 @@ held, revoked, replayed or expired run is a failed acceptance, not a success to 
 
 Only after inspecting that exact evidence may the owner independently enable
 `allowRelease=true` and `SQUIRES_FIXERRORS_ALLOW_DEPLOY=1`, restart, and use Debug's
-separate confirmation to type `DEPLOY EXACT TESTED CANDIDATE`. That is a new signed
-release approval, not part of repair acceptance. Require the exact approved SHA
+separate confirmation to select the intended mode, check exact-candidate consent
+and submit. Full remains the default; urgent requires its own explicit selection.
+That is a new signed release approval, not part of repair acceptance. Require the exact approved SHA
 and deployment ID on the fixed live origin before calling it deployed. This work
 does not execute that step. Native PostgreSQL concurrency/fault, DPAPI lifecycle,
 Windows cancellation/crash and real premium-worker/live-release acceptance remain
