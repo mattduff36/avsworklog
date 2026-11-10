@@ -4,13 +4,15 @@ import {
   closeSync, copyFileSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync,
   realpathSync, renameSync, unlinkSync, writeFileSync,
 } from 'node:fs';
-import { homedir } from 'node:os';
+import { userInfo } from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 export const WORKSPACE = String.raw`D:\Websites\avsworklog`;
-export const CACHE_ROOT = path.join(homedir(), '.codex', 'cursor-worker', 'squires-typecheck-cache');
+// The check runner deliberately redirects HOME/USERPROFILE. Resolve the enrolled
+// Windows account profile from the OS token, never those caller environment values.
+export const CACHE_ROOT = path.join(userInfo().homedir, '.codex', 'cursor-worker', 'squires-typecheck-cache');
 const sha = value => createHash('sha256').update(value).digest('hex');
 const encoded = value => JSON.stringify(value);
 const fail = reason => { throw new Error(`Typecheck cache: ${reason}`); };

@@ -3,7 +3,7 @@ import {
   chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
   rmSync, symlinkSync, unlinkSync, writeFileSync,
 } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { tmpdir, userInfo } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { createTypecheckCache } from '../../scripts/automation/fixerrors-typecheck-cache.mjs';
@@ -54,6 +54,15 @@ function fixture() {
 }
 
 describe('protected full application-project TypeScript cache (disposable actual compiler)', () => {
+  it('keeps the OS-account cache path when the check runner redirects home variables', () => {
+    const isolated = path.join(tmpdir(), 'synthetic-worker-profile');
+    const output = execFileSync(process.execPath, ['--input-type=module', '-e',
+      'import {CACHE_ROOT} from "./scripts/automation/fixerrors-typecheck-cache.mjs"; console.log(CACHE_ROOT);'],
+    { encoding: 'utf8', windowsHide: true,
+      env: { ...process.env, HOME: isolated, USERPROFILE: isolated, HOMEDRIVE: 'Z:', HOMEPATH: '\\synthetic-worker-profile' } });
+    expect(output.trim()).toBe(path.join(userInfo().homedir, '.codex', 'cursor-worker', 'squires-typecheck-cache'));
+  });
+
   it('requires parent warmup, never checkout tsbuildinfo, and catches edits and unchanged importer errors', async () => {
     const f = fixture();
     expect(() => f.cache.check()).toThrow();

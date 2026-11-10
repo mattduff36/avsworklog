@@ -60,7 +60,7 @@ with tempfile.TemporaryDirectory(prefix='SquiresRepairFixture-') as temporary:
         helper = (checkout / r.CACHE_SCRIPT).read_text(encoding='utf-8')
         helper = helper.replace('export const WORKSPACE = String.raw`D:\\Websites\\avsworklog`;',
                                 'export const WORKSPACE = ' + json.dumps(str(checkout)) + ';')
-        helper = helper.replace("export const CACHE_ROOT = path.join(homedir(), '.codex', 'cursor-worker', 'squires-typecheck-cache');",
+        helper = helper.replace("export const CACHE_ROOT = path.join(userInfo().homedir, '.codex', 'cursor-worker', 'squires-typecheck-cache');",
                                 'export const CACHE_ROOT = ' + json.dumps(str(cache_root)) + ';')
         write(r.CACHE_SCRIPT, helper)
         write('lib/config/release-version.json', '{"mmyy":"1126","major":1,"minor":0,"lastProcessedSha":""}')
