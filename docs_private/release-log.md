@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.8.7
+
+**GIT COMMIT MESSAGE**
+`fix: add guarded release choices and simplify Fixerrors approval`
+
+**PUSHED AT**
+2026-11-10T16:08:59.951Z
+
+**WHAT CHANGED**
+Add guarded release choices and simplify Fixerrors approval.
+
+**VERSION HISTORY DETAILS**
+- Updated debug tools, with changes to app screens.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix: add guarded release choices and simplify Fixerrors approval`
+
 ## 1126.8.6
 
 **GIT COMMIT MESSAGE**
