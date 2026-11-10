@@ -149,8 +149,15 @@ CREATE TRIGGER daily_check_workshop_photo_guard BEFORE INSERT OR UPDATE ON publi
 FOR EACH ROW EXECUTE FUNCTION private.daily_check_workshop_photo_guard();
 CREATE TRIGGER daily_check_workshop_photo_guard BEFORE INSERT OR UPDATE ON public.workshop_task_attachments
 FOR EACH ROW EXECUTE FUNCTION private.daily_check_workshop_photo_guard();
-CREATE TRIGGER daily_check_workshop_photo_guard BEFORE INSERT OR UPDATE ON public.workshop_attachment_responses
-FOR EACH ROW EXECUTE FUNCTION private.daily_check_workshop_photo_guard();
+-- Legacy optional table: absent on current production installations.
+DO $optional_photo_guard$
+BEGIN
+  IF to_regclass('public.workshop_attachment_responses') IS NOT NULL THEN
+    CREATE TRIGGER daily_check_workshop_photo_guard BEFORE INSERT OR UPDATE ON public.workshop_attachment_responses
+    FOR EACH ROW EXECUTE FUNCTION private.daily_check_workshop_photo_guard();
+  END IF;
+END;
+$optional_photo_guard$;
 CREATE TRIGGER daily_check_workshop_photo_guard BEFORE INSERT OR UPDATE ON public.workshop_attachment_field_responses
 FOR EACH ROW EXECUTE FUNCTION private.daily_check_workshop_photo_guard();
 CREATE TRIGGER daily_check_workshop_photo_guard BEFORE INSERT OR UPDATE ON public.workshop_task_check_photos

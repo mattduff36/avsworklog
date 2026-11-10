@@ -72,10 +72,18 @@ async function isPhotoReferenced(client: QueryClient, photoPath: string) {
   try {
     await client.query("SET LOCAL lock_timeout = '10s'; SET LOCAL statement_timeout = '20s'");
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('daily-check-workshop-photos', 0))");
+    const optional = await client.query<{ present: boolean; guarded: boolean }>(`SELECT
+      to_regclass('public.workshop_attachment_responses') IS NOT NULL AS present,
+      EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = to_regclass('public.workshop_attachment_responses')
+        AND tgname = 'daily_check_workshop_photo_guard' AND tgenabled IN ('O', 'A')
+        AND tgfoid = 'private.daily_check_workshop_photo_guard()'::regprocedure) AS guarded`);
+    // If a future migration adds the legacy table, cleanup stays pending until its guard is installed.
+    if (optional.rows[0].present && !optional.rows[0].guarded) throw new Error('Optional photo reference table is not guarded');
+    const tables = ['inspection_photos', 'workshop_task_check_photos',
+      'workshop_attachment_field_responses', 'workshop_task_comments', 'workshop_task_attachments', 'actions'];
+    if (optional.rows[0].present) tables.push('workshop_attachment_responses');
     const shared = await client.query(`SELECT 1 WHERE
-      ${['inspection_photos', 'workshop_task_check_photos', 'workshop_attachment_responses',
-    'workshop_attachment_field_responses', 'workshop_task_comments', 'workshop_task_attachments', 'actions']
-    .map(table => `EXISTS (SELECT 1 FROM public.${table} t
+      ${tables.map(table => `EXISTS (SELECT 1 FROM public.${table} t
         WHERE strpos(private.daily_check_photo_text(to_jsonb(t)::text), $1) > 0)`).join(' OR ')}`, [photoPath]);
     // The committed outbox rejects new references, so no lock is held during the Storage request.
     await client.query('COMMIT');

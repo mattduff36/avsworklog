@@ -107,7 +107,6 @@ local('Daily Check deletion disposable PostgreSQL', () => {
       CREATE TABLE public.asset_service_events (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), task_id uuid, event_type text);
       CREATE TABLE public.workshop_task_comments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), task_id uuid REFERENCES public.actions ON DELETE CASCADE, comment text);
       CREATE TABLE public.workshop_task_attachments (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), task_id uuid REFERENCES public.actions ON DELETE CASCADE, file_url text);
-      CREATE TABLE public.workshop_attachment_responses (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), response_value text);
       CREATE TABLE public.workshop_attachment_field_responses (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), response_value text, response_json jsonb);
       CREATE TABLE public.reminder_actions (
         id uuid PRIMARY KEY DEFAULT gen_random_uuid(), asset_type text, van_id uuid, plant_id uuid, hgv_id uuid, status text,
@@ -142,6 +141,10 @@ local('Daily Check deletion disposable PostgreSQL', () => {
     await db.query(readHgvInspectionSaveFunctionSql());
     await db.query(sql('20260322_split_maintenance_mileage_triggers.sql'));
     await db.query(sql('20261110_daily_check_deletion_effects.sql'));
+    // Production lacks the legacy response table; apply the full migration in that layout first.
+    await db.query('CREATE TABLE public.workshop_attachment_responses (id uuid PRIMARY KEY DEFAULT gen_random_uuid(), response_value text)');
+    await db.query(sql('20261110_daily_check_deletion_effects.sql').match(/DO \$optional_photo_guard\$[\s\S]*?\$optional_photo_guard\$;/u)![0]);
+
     for (const [file, name] of [
       ['enable-audit-logging.sql', 'log_audit_changes'],
       ['20260114_workshop_task_taxonomy.sql', 'sync_workshop_category_from_subcategory'],
@@ -676,6 +679,31 @@ local('Daily Check deletion disposable PostgreSQL', () => {
       vi.unstubAllEnvs();
     }
   });
+  it.each([false, true])('handles optional photo table absent or unguarded: %s', async unguarded => {
+    const id = await check('van');
+    const photo = `https://fixture.test/storage/v1/object/public/inspection-photos/${id}/optional.jpg`;
+    await db.query('INSERT INTO inspection_photos (inspection_id, photo_url) VALUES ($1, $2)', [id, photo]);
+    await deleteInspection(db, 'van', id, actor);
+    await db.query(unguarded
+      ? 'ALTER TABLE workshop_attachment_responses DISABLE TRIGGER daily_check_workshop_photo_guard'
+      : 'ALTER TABLE workshop_attachment_responses RENAME TO optional_responses_fixture');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://fixture.test');
+    const remove = vi.fn().mockResolvedValue({ error: null });
+    try {
+      const cleanup = cleanupInspectionStorage(db, 'van', id, { from: () => ({ remove }) });
+      if (unguarded) {
+        await expect(cleanup).rejects.toThrow('Optional photo reference table is not guarded');
+        expect((await db.query('SELECT 1 FROM private.daily_check_storage_cleanup WHERE source_id = $1 AND completed_at IS NULL', [id])).rowCount).toBe(1);
+      } else expect(await cleanup).toBe(0);
+      expect(remove).toHaveBeenCalledTimes(unguarded ? 0 : 1);
+    } finally {
+      await db.query(unguarded
+        ? 'ALTER TABLE workshop_attachment_responses ENABLE TRIGGER daily_check_workshop_photo_guard'
+        : 'ALTER TABLE optional_responses_fixture RENAME TO workshop_attachment_responses');
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('rejects JSON evidence inserted after the cleanup reference check', async () => {
     const id = await check('van');
     const photo = `https://fixture.test/storage/v1/object/public/inspection-photos/${id}/late.jpg`;
