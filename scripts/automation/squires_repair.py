@@ -344,8 +344,8 @@ def execute(raw, cfg):
         decision = s.decode_json(text)
         validated = boundary(cfg, 'decision', body['packet'], decision)
         exclusive_json(run / 'validated-decision.json', validated['decision'])
-    validated = boundary(cfg, 'decision', body['packet'], decision)
     if not repair:
+        validated = boundary(cfg, 'decision', body['packet'], decision)
         guard()
         remember_review(ticket, run, inspected['packet'])
         return {'status': 'reviewed'}
@@ -358,7 +358,8 @@ def execute(raw, cfg):
         guard()
         s.require(boundary(cfg, 'repair', body['packet'], decision) == validated, 'decision_drift')
         typecheck_ready(cfg)
-    repair_launch_guard()
+    # The native before_launch hook runs this after funding refresh, immediately
+    # before model execution; do not duplicate the same expensive checks here.
     run, state, after = dispatch(cfg, ticket, req, repair_launch_guard)
     exclusive_json(run / 'validated-decision.json', validated['decision'])
     return prepare(cfg, ticket, req, run, state, after)

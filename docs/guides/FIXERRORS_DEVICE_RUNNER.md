@@ -193,7 +193,7 @@ writer. A stale lock requires owner investigation, not automatic deletion.
 Renewals and terminal status updates require the same device and fresh lease.
 Unknown network/commit outcomes stop polling rather than retrying work.
 Execution rechecks consent, checkout and lease immediately before use.
-Review is capped at 120 seconds; repair at 240 seconds, shortened by remaining
+Review is capped at 120 seconds; repair at 290 seconds, shortened by remaining
 job expiry. A deployment must explicitly start
 within the five-minute approval window. Once started, it has a 25-minute
 execution cap, a renewable 60-second lease and up to 30 seconds to settle and
@@ -472,7 +472,7 @@ The root project excludes unit tests; this is application-project typechecking,
 not a claim that unit tests were typechecked. Worker artifacts, decisions, metadata
 diagnostics and all receipt bytes remain in the private native run directory.
 
-Review is capped at 120 seconds; repair including preparation is capped at 240
+Review is capped at 120 seconds; repair including preparation is capped at 290
 seconds and additionally at ten seconds before the original job expiry. Native
 analysis/repair stages have one/two-minute bounds. The signed admission and queue
 still expire within five minutes; no new long-running repair lease is introduced.

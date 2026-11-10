@@ -108,6 +108,23 @@ describe('outbound companion: fake executors only, never real fap', () => {
     expect(deps.complete).toHaveBeenCalledWith({ status: 'blocked', reason: 'timeout' });
   });
 
+  it('permits repair preparation after four minutes but stops before the signed window ends', async () => {
+    vi.useFakeTimers();
+    const { claim, deps, executor } = await setup();
+    vi.setSystemTime(claim.job.expiresAt - 300_000);
+    executor.execute = vi.fn<TrustedFixerrorsExecutor['execute']>((_job, signal) => new Promise((resolve) => {
+      signal.addEventListener('abort', () => resolve({ status: 'blocked', reason: 'timeout' }), { once: true });
+    }));
+    const running = executeCompanionClaim(claim, deps);
+    await vi.advanceTimersByTimeAsync(240_000);
+    expect(deps.complete).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(49_999);
+    expect(deps.complete).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await running;
+    expect(deps.complete).toHaveBeenCalledWith({ status: 'blocked', reason: 'timeout' });
+  });
+
   it('refuses dispatch when the lease is lost or checkout drifts during renewal', async () => {
     const { claim, deps, executor } = await setup();
     deps.renew = vi.fn(async () => { throw new Error('Lease lost'); });
