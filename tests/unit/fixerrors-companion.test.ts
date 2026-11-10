@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  executeCompanionClaim, inspectCompanionWorkspace, unavailableFixerrorsExecutor,
+  createManagedCompanionStopHandler, executeCompanionClaim, inspectCompanionWorkspace, releaseOwnedCompanionLock, unavailableFixerrorsExecutor,
   type CompanionDependencies, type TrustedFixerrorsExecutor,
 } from '@/scripts/automation/fixerrors-companion';
 import { candidate, FixtureStore, harness, workspace } from './fixerrors-control-fixtures';
@@ -9,11 +9,20 @@ import { createHash } from 'crypto';
 
 const packetFixture = vi.hoisted(() => ({
   bytes: Buffer.from('{}'), initialSize: 2, largestRead: 0, closed: false,
+  packetHead: 'a'.repeat(40), packetTree: '', replacedLock: false, removedLock: false,
+}));
+vi.mock('@/scripts/automation/fixerrors-companion-packet', () => ({
+  parseCompanionPacket: () => ({ retrieval: {
+    baseHead: packetFixture.packetHead,
+    treeFingerprint: packetFixture.packetTree || createHash('sha256').update(`${'b'.repeat(40)}\n`).digest('hex'),
+  } }),
 }));
 vi.mock('fs', async (importOriginal) => ({
   ...await importOriginal<typeof import('fs')>(),
   openSync: () => 7,
-  fstatSync: () => ({ isFile: () => true, size: packetFixture.initialSize }),
+  fstatSync: () => ({ isFile: () => true, size: packetFixture.initialSize, dev: 1, ino: 7 }),
+  lstatSync: () => ({ isFile: () => true, isSymbolicLink: () => false, dev: 1, ino: packetFixture.replacedLock ? 8 : 7 }),
+  unlinkSync: () => { packetFixture.removedLock = true; },
   readSync: (_file: number, buffer: Buffer, offset: number, length: number, position: number) => {
     packetFixture.largestRead = Math.max(packetFixture.largestRead, length);
     return packetFixture.bytes.copy(buffer, offset, position, position + length);
@@ -54,6 +63,29 @@ async function setup(action: 'review' | 'repair' | 'deploy' = 'repair') {
 afterEach(() => vi.useRealTimers());
 
 describe('outbound companion: fake executors only, never real fap', () => {
+  it('handles fragmented managed stop input with bounded state and stops exactly once', () => {
+    const stop = vi.fn();
+    const input = createManagedCompanionStopHandler(stop);
+    input(Buffer.from('SQUIRES_'));
+    input(Buffer.from('RUNNER_STOP'));
+    expect(stop).not.toHaveBeenCalled();
+    input(Buffer.from('\n'));
+    input(Buffer.from('SQUIRES_RUNNER_STOP\n'));
+    expect(stop).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed on invalid managed input without echoing its contents', () => {
+    const stop = vi.fn();
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      createManagedCompanionStopHandler(stop)(Buffer.from('synthetic-private-input'));
+      expect(stop).toHaveBeenCalledOnce();
+      expect(error).toHaveBeenCalledWith('Managed companion input invalid; stopping without dispatch.');
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it('hashes only the bounded fixed packet and closes its descriptor', () => {
     packetFixture.bytes = Buffer.from('{}');
     packetFixture.initialSize = 2;
@@ -72,6 +104,29 @@ describe('outbound companion: fake executors only, never real fap', () => {
     expect(() => inspectCompanionWorkspace()).toThrow('changed or too large');
     expect(packetFixture.largestRead).toBe(96 * 1024 + 1);
     expect(packetFixture.closed).toBe(true);
+  });
+
+  it('retains the original packet digest after repair prepares a new clean candidate', () => {
+    packetFixture.bytes = Buffer.from('{}');
+    packetFixture.initialSize = 2;
+    packetFixture.packetHead = 'c'.repeat(40);
+    expect(inspectCompanionWorkspace()).toEqual({
+      ...workspace, packetSha256: createHash('sha256').update(packetFixture.bytes).digest('hex'),
+    });
+    packetFixture.packetHead = 'a'.repeat(40);
+    packetFixture.packetTree = 'd'.repeat(64);
+    expect(inspectCompanionWorkspace()?.head).toBe(workspace.head);
+    packetFixture.packetTree = '';
+  });
+
+  it('never deletes another process lock, including a replacement at the same path', () => {
+    packetFixture.replacedLock = true;
+    packetFixture.removedLock = false;
+    expect(() => releaseOwnedCompanionLock(7, 'fixture.lock')).toThrow('identity changed');
+    expect(packetFixture.removedLock).toBe(false);
+    packetFixture.replacedLock = false;
+    releaseOwnedCompanionLock(7, 'fixture.lock');
+    expect(packetFixture.removedLock).toBe(true);
   });
 
   it('has no installed bridge and always refuses the live execution path', async () => {
@@ -218,6 +273,61 @@ describe('outbound companion: fake executors only, never real fap', () => {
     const running = executeCompanionClaim(claim, deps);
     const rejected = expect(running).rejects.toThrow('lock retained');
     await vi.advanceTimersByTimeAsync(5100);
+    await rejected;
+    expect(deps.complete).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch an already stopped claim or acknowledge an interrupted running claim', async () => {
+    const { claim, deps, executor } = await setup();
+    const shutdown = new AbortController();
+    deps.signal = shutdown.signal;
+    shutdown.abort();
+    await expect(executeCompanionClaim(claim, deps)).rejects.toThrow('lock retained');
+    expect(executor.execute).not.toHaveBeenCalled();
+    expect(deps.complete).not.toHaveBeenCalled();
+
+    const activeShutdown = new AbortController();
+    deps.signal = activeShutdown.signal;
+    executor.execute = vi.fn<TrustedFixerrorsExecutor['execute']>((_job, signal) => new Promise((resolve) => {
+      signal.addEventListener('abort', () => resolve({ status: 'reviewed' }), { once: true });
+      activeShutdown.abort();
+    }));
+    await expect(executeCompanionClaim(claim, deps)).rejects.toThrow('lock retained');
+    expect(deps.complete).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch when stopped during renewal or a deployment start transaction', async () => {
+    const { claim, deps, executor } = await setup('deploy');
+    const shutdown = new AbortController();
+    deps.signal = shutdown.signal;
+    deps.renew = vi.fn(async () => { shutdown.abort(); });
+    await expect(executeCompanionClaim(claim, deps)).rejects.toThrow('lock retained');
+    expect(deps.startDeploy).not.toHaveBeenCalled();
+    expect(executor.execute).not.toHaveBeenCalled();
+
+    const deployShutdown = new AbortController();
+    deps.signal = deployShutdown.signal;
+    deps.renew = vi.fn(async () => {});
+    deps.startDeploy = vi.fn(async () => { deployShutdown.abort(); });
+    await expect(executeCompanionClaim(claim, deps)).rejects.toThrow('lock retained');
+    expect(executor.execute).not.toHaveBeenCalled();
+    expect(deps.complete).not.toHaveBeenCalled();
+  });
+
+  it('keeps shutdown authoritative when a pending renewal also fails', async () => {
+    vi.useFakeTimers();
+    const { claim, deps, executor } = await setup();
+    const shutdown = new AbortController();
+    deps.signal = shutdown.signal;
+    deps.renew = vi.fn().mockResolvedValueOnce(undefined).mockImplementation(async () => {
+      shutdown.abort();
+      throw new Error('synthetic lease failure');
+    });
+    executor.execute = vi.fn<TrustedFixerrorsExecutor['execute']>((_job, signal) => new Promise((resolve) => {
+      signal.addEventListener('abort', () => resolve({ status: 'reviewed' }), { once: true });
+    }));
+    const rejected = expect(executeCompanionClaim(claim, deps)).rejects.toThrow('lock retained');
+    await vi.advanceTimersByTimeAsync(15_000);
     await rejected;
     expect(deps.complete).not.toHaveBeenCalled();
   });

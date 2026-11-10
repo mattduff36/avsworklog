@@ -755,3 +755,108 @@ and deployment ID on the fixed live origin before calling it deployed. This work
 does not execute that step. Native PostgreSQL concurrency/fault, DPAPI lifecycle,
 Windows cancellation/crash and real premium-worker/live-release acceptance remain
 parent-owned checks; synthetic fixture success cannot substitute for them.
+
+## Windows terminal/service manager
+
+`scripts\automation\windows-runner` supplies an opt-in manager for the existing
+production companion, not another queue, worker transport or release authority.
+The small .NET Framework host uses native Windows APIs because a detached
+PowerShell process is not an SCM service and does not reliably contain its tree.
+It requires 64-bit Windows 10/11 (atomic process-to-Job assignment), the installed
+Framework compiler, Node and the existing accepted checkout/dependencies.
+
+After reviewing these sources, the parent can inspect the default, non-mutating
+installation plan, then separately install from an **elevated Windows PowerShell
+as the same enrolled `MPDEE-SERVER\mattd` account**:
+
+```powershell
+& 'D:\Websites\avsworklog\scripts\automation\windows-runner\Install.ps1'
+# Explicit parent-approved installation only:
+powershell.exe -NoProfile -ExecutionPolicy RemoteSigned -File 'D:\Websites\avsworklog\scripts\automation\windows-runner\Install.ps1' -Install
+```
+
+The installer resolves the account SID and real profile; it never hardcodes a SID.
+A new service requires a secure same-account Windows password prompt. The password
+is passed directly to Windows SCM via zeroed unmanaged memory, never argv, JSON,
+environment or logs. If `SeServiceLogonRight` is absent, installation requires the
+parent's separate `GRANT` confirmation; it never silently grants that right.
+Cancellation or partial installation is a held state for owner reconciliation,
+not automatic rollback, removal or re-enrollment.
+
+The administrator-owned, protected package is installed at
+`C:\Program Files\Squires\FixerrorsRunner`, with owner-only lifecycle data under
+the real profile's `.codex\cursor-worker\squires-runner-manager`. Existing package,
+parent-directory, account/configuration and private-data ACL drift fail closed.
+Close every manager/console and stop the service before an update. The installer
+refuses unrelated services or Desktop files. It adds **Squires Runner.cmd** to
+the owner's Desktop, pointing to the absolute installed launcher; working
+directory does not matter. It does not start the service or change enrollment,
+production flags, packet, keys, replay storage or existing check/release gates.
+
+Run the Desktop launcher **without elevation**. Its four numbered actions are:
+
+| Action | Behaviour |
+| --- | --- |
+| 1 Terminal | Opens a standard Windows PowerShell console hosting the companion; closing it stops its contained tree. |
+| 2 Service | Starts the genuine `SquiresFixerrorsRunner` SCM service with the selected runtime permission. |
+| 3 Stop | Stops the authenticated managed host and its Job Object descendants, waits for confirmation and reports retained locks. |
+| 4 Status | Reads public enrollment booleans, actual SCM state and authenticated running/readiness state; never decrypts credentials or writes control-plane state. |
+
+The service is **Manual**, with no triggers, recovery restart, scheduled task or
+autostart. It runs as the enrolled owner, loads that owner's profile for DPAPI and
+creates a verified non-admin, medium-integrity companion token. The privileged
+host does not execute companion code under its own unrestricted token. Child
+environment comes from Windows' owner environment with an explicit safe allowlist,
+fixed PowerShell/Git paths and no inherited editor/model/Node injection variables.
+Existing protected opt-ins remain authoritative: a running host can be
+`idle-enrollment-disabled`, with **no child and ready=false**.
+
+Review is the runtime default. Repair requires its own runtime choice plus the
+existing protected repair opt-in. Deploy requires an additional explicit local
+confirmation and existing prepared candidate, and still requires the protected
+release opt-in, exact-candidate Debug consent, signed admission, genuine receipts,
+budget and release gates. Runtime permission is not job or Deploy approval.
+
+A cross-session mutex prevents simultaneous terminal/service hosts. A local-only,
+ACL-protected named pipe accepts only status/stop from the enrolled owner or
+System; clients verify the server's fixed executable using limited process-query
+rights. Readiness requires a valid packet structure, a clean checkout, an available
+trusted bridge, a successful companion heartbeat and telemetry younger than
+**15 seconds**. Missing IPC with
+a matching executable is **running/unresponsive, not stopped**. Readiness is not
+proof of a successful worker, available budget or release approval. Each action independently checks its signed packet or exact prepared candidate; creating a repair candidate does not invalidate release readiness. Stale packets
+are held for explicit owner reconciliation; the manager never regenerates them.
+
+The child is atomically assigned to a non-inheritable kill-on-close Job Object
+at creation, remains suspended until membership is checked, and cannot break away.
+Normal stop asks the companion to abort, then enforces bounded whole-tree
+termination. Host death closes the Job Object too. An interrupted claimed job is
+never acknowledged as success; uncertain execution retains the checkout lock for
+owner investigation. Idle cleanup checks the held lock's file identity and will
+not delete a replaced lock. The manager never deletes stale locks or guesses that
+an arbitrary Node/Python process belongs to this runner: unverifiable/unmanaged
+processes are not killed, and unresolved locks prevent a clean-stop claim.
+Only fixed lifecycle codes are logged; child output and exception text are not
+copied into logs. The optional log menu and Debug link confer no extra authority.
+
+Focused offline verification (no installed service, enrollment or live job):
+
+```powershell
+& .\scripts\automation\windows-runner\Test-Runner.ps1
+$env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
+npx vitest run tests\unit\fixerrors-companion.test.ts tests\unit\fixerrors-companion-packet.test.ts
+npx eslint scripts\automation\fixerrors-companion.ts tests\unit\fixerrors-companion.test.ts
+```
+
+Native fixtures compile production/fixture hosts with warnings as errors and use
+only GUID-named disposable directories and fake children. They cover restricted
+tokens, disabled/idle status, clean owner environment, freshness, duplicate hosts,
+authenticated stop, real descendant termination, abrupt host death, real
+`CTRL_BREAK`, redaction, installer/service plans and PowerShell parsing. Where
+the noninteractive desktop does not deliver an actual console-window Close, the
+fixture invokes the same native close handler and labels that limitation; it
+does not claim interactive Close acceptance. Parent-approved real installation,
+SCM start/stop, service-logon/profile/DPAPI access, terminal Close in the owner's
+desktop, logoff/reboot behaviour and genuine worker cancellation remain separate
+Windows acceptance gates. No service or production activation is performed by
+these checks.

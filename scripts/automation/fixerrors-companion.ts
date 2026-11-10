@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { FIXERRORS_COMPANION_PACKET_MAX_BYTES } from '../../lib/fixerrors/admission';
 import { execFileSync } from 'child_process';
-import { openSync, closeSync, readSync, fstatSync, unlinkSync, writeSync } from 'fs';
+import { openSync, closeSync, readSync, fstatSync, lstatSync, unlinkSync, writeSync } from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { z } from 'zod';
@@ -13,6 +13,7 @@ import {
 import { checkEvidenceDigest } from '../../lib/fixerrors/control';
 import { FIXERRORS_WORKSPACE, inspectFixedFixerrorsWorkspace } from './fixerrors-device-admission';
 import { createProductionReleaseBridge, parseProductionBridgeEnrollment } from './fixerrors-production-bridge';
+import { parseCompanionPacket } from './fixerrors-companion-packet';
 
 export interface CompanionConsent {
   allowReadOnly: boolean;
@@ -42,6 +43,7 @@ export interface CompanionDependencies {
   renew(): Promise<void>;
   complete(result: ExecutionResult): Promise<void>;
   timeoutMs?: number;
+  signal?: AbortSignal;
 }
 
 function consentAllows(consent: CompanionConsent, action: FixerrorsJob['action']): boolean {
@@ -49,6 +51,10 @@ function consentAllows(consent: CompanionConsent, action: FixerrorsJob['action']
 }
 
 export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDependencies): Promise<void> {
+  const assertNotStopping = () => {
+    if (deps.signal?.aborted) throw new UnsafeCompanionStop();
+  };
+  assertNotStopping();
   const { job } = claim;
   let releaseTicket: string | undefined;
   let early: ExecutionResult | null = null;
@@ -67,6 +73,7 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
   }
   // An uncertain renew never dispatches. The server owns expiry and lease ownership.
   await deps.renew();
+  assertNotStopping();
   if (early) {
     await deps.complete(early);
     return;
@@ -85,6 +92,7 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
     }
     // Claiming alone does not consume the start window or authorize execution.
     const started = await deps.startDeploy();
+    assertNotStopping();
     releaseTicket = started?.releaseTicket;
     const startedWorkspace = deps.inspect();
     if (!startedWorkspace || !sameWorkspace(startedWorkspace, job.workspace) || !deps.consent().allowDeploy) {
@@ -96,14 +104,17 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
   let heartbeat: ReturnType<typeof setTimeout> | undefined;
   let pendingRenewal: Promise<void> | undefined;
   let settling = false;
-  let stopped: 'timeout' | 'lease-lost' | null = null;
+  let stopped: 'timeout' | 'lease-lost' | 'shutdown' | null = null;
   let stop!: (result: ExecutionResult) => void;
   const stopSignal = new Promise<ExecutionResult>((resolve) => { stop = resolve; });
-  const abort = (reason: 'timeout' | 'lease-lost') => {
-    stopped = reason;
+  const abort = (reason: 'timeout' | 'lease-lost' | 'shutdown') => {
+    if (!stopped || reason === 'shutdown') stopped = reason;
     controller.abort();
-    stop({ status: 'blocked', reason });
+    stop({ status: 'blocked', reason: reason === 'shutdown' ? 'execution-failed' : reason });
   };
+  const shutdown = () => abort('shutdown');
+  deps.signal?.addEventListener('abort', shutdown, { once: true });
+  if (deps.signal?.aborted) shutdown();
   const scheduleRenewal = () => {
     heartbeat = setTimeout(() => { pendingRenewal = renew(); }, 15_000);
   };
@@ -121,9 +132,10 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
   const unconfirmed = { status: 'unknown', reason: 'release-unconfirmed' } as const;
   const timeout = setTimeout(() => abort('timeout'), Math.min(deps.timeoutMs ?? maxRuntime, maxRuntime));
   let executionSettled = false;
-  const execution = Promise.resolve().then(() => deps.executor.execute(
-    Object.freeze(structuredClone(job)), controller.signal, releaseTicket, claim.admissionTicket,
-  ))
+  const execution = Promise.resolve().then(() => {
+    assertNotStopping();
+    return deps.executor.execute(Object.freeze(structuredClone(job)), controller.signal, releaseTicket, claim.admissionTicket);
+  })
     .catch((): ExecutionResult => job.action === 'deploy' ? unconfirmed : { status: 'failed', reason: 'execution-failed' })
     .finally(() => { executionSettled = true; });
   try {
@@ -142,9 +154,11 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
         }),
       ]);
       if (stopped === 'lease-lost') throw new Error('Companion lease lost; result not acknowledged');
+      if (stopped === 'shutdown') throw new UnsafeCompanionStop();
       if (job.action === 'deploy') result = unconfirmed;
     } else {
       await deps.renew();
+      assertNotStopping();
       if (job.action === 'deploy' && result.status === 'deployed') {
         const after = deps.inspect();
         if (!after || !job.candidate || after.head !== job.candidate.head || after.tree !== job.candidate.tree) {
@@ -152,16 +166,18 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
         }
       }
     }
+    assertNotStopping();
     await deps.complete(result);
   } finally {
     controller.abort();
     clearTimeout(heartbeat);
     clearTimeout(timeout);
+    deps.signal?.removeEventListener('abort', shutdown);
   }
 }
 
 class UnsafeCompanionStop extends Error {
-  constructor() { super('Executor did not acknowledge cancellation; checkout lock retained for owner investigation'); }
+  constructor() { super('Claimed execution stopped without a confirmed result; checkout lock retained for owner investigation'); }
 }
 
 const localCredentialSchema = z.object({
@@ -205,6 +221,10 @@ export function inspectCompanionWorkspace(): Workspace | null {
       size += count;
     }
     if (size > FIXERRORS_COMPANION_PACKET_MAX_BYTES || fstatSync(file).size !== size) throw new Error('Sanitized packet changed or too large');
+    // A successful repair retains its original packet while preparing two new
+    // commits. Per-action signed/native guards validate review/repair binding;
+    // deployment validates the exact prepared candidate and check evidence.
+    parseCompanionPacket(bytes.subarray(0, size));
     return { head: evidence.head, tree: evidence.tree, clean: true, packetSha256: createHash('sha256').update(bytes.subarray(0, size)).digest('hex') };
   } finally {
     closeSync(file);
@@ -246,17 +266,31 @@ export async function companionDeviceRequest(
   return deviceResponseSchema.parse(JSON.parse(Buffer.concat(chunks).toString('utf8')));
 }
 
-export async function runFixerrorsCompanion(): Promise<void> {
+export function releaseOwnedCompanionLock(lock: number, lockPath: string): void {
+  const held = fstatSync(lock, { bigint: true });
+  const current = lstatSync(lockPath, { bigint: true });
+  if (!current.isFile() || current.isSymbolicLink() || held.dev !== current.dev || held.ino !== current.ino) {
+    throw new Error('Companion lock identity changed; not removed');
+  }
+  unlinkSync(lockPath);
+}
+
+export async function runFixerrorsCompanion(signal?: AbortSignal): Promise<void> {
   if (process.platform !== 'win32' || process.env.SQUIRES_FIXERRORS_COMPANION_ENABLED !== '1') {
     throw new Error('Companion requires explicit local Windows opt-in');
   }
+  if (signal?.aborted) return;
   // Inspect the fixed checkout before creating its lock; no site-supplied paths.
   inspectFixedFixerrorsWorkspace();
   const lockPath = path.win32.join(FIXERRORS_WORKSPACE, '.git\\squires-fixerrors-companion.lock');
   const lock = openSync(lockPath, 'wx');
-  writeSync(lock, JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
   let unsafe = false;
+  let activeClaim = false;
+  const state = (value: 'ready' | 'packet-blocked' | 'bridge-blocked' | 'polling' | 'active' | 'stopping') => {
+    if (process.env.SQUIRES_FIXERRORS_MANAGED_STDIN === '1') console.info(`SQUIRES_RUNNER_STATE:${value}`);
+  };
   try {
+    writeSync(lock, JSON.stringify({ pid: process.pid, startedAt: Date.now() }));
     const production = process.env.SQUIRES_FIXERRORS_COMPANION_PRODUCTION === '1';
     const enrollment = production
       ? parseProductionBridgeEnrollment(readProtectedEnrollment('production-device.dpapi'))
@@ -273,7 +307,8 @@ export async function runFixerrorsCompanion(): Promise<void> {
     });
     console.info(production ? 'MPDEE Worker companion: production signed review/repair/release polling enabled.'
       : 'MPDEE Worker companion: local polling enabled; execution blocked.');
-    for (;;) {
+    while (!signal?.aborted) {
+      state('polling');
       let workspace: Workspace | null = null;
       try {
         workspace = inspectCompanionWorkspace();
@@ -284,34 +319,86 @@ export async function runFixerrorsCompanion(): Promise<void> {
       await request({
         op: 'heartbeat', workspace, ...optIns, bridgeAvailable: executor.available,
       });
+      if (signal?.aborted) break;
+      if (!workspace) state('packet-blocked');
+      else state(executor.available ? 'ready' : 'bridge-blocked');
       if (workspace) {
         const response = await request({ op: 'claim' });
         if (response.claim) {
+          activeClaim = true;
+          // An interrupted claim is uncertain, never retried or acknowledged as success.
+          if (signal?.aborted) throw new UnsafeCompanionStop();
+          state('active');
           const claim = response.claim;
           const lease = { jobId: claim.job.id, leaseToken: claim.leaseToken };
           await executeCompanionClaim(claim, {
-            executor, consent, inspect: inspectCompanionWorkspace,
+            executor, consent, inspect: inspectCompanionWorkspace, signal,
             startDeploy: () => request({ op: 'start-deploy', ...lease }),
             renew: async () => { await request({ op: 'renew', ...lease }); },
             complete: async (result) => { await request({ op: 'complete', ...lease, result }); },
           });
+          activeClaim = false;
           console.info(`MPDEE Worker companion: reported result for ${claim.job.id}.`);
         }
       }
-      await new Promise((resolve) => setTimeout(resolve, 10_000));
+      await new Promise<void>((resolve) => {
+        const wake = () => { clearTimeout(timer); signal?.removeEventListener('abort', wake); resolve(); };
+        const timer = setTimeout(wake, 10_000);
+        signal?.addEventListener('abort', wake, { once: true });
+        if (signal?.aborted) wake();
+      });
     }
   } catch (error) {
-    unsafe = error instanceof UnsafeCompanionStop;
+    unsafe = activeClaim || error instanceof UnsafeCompanionStop;
     throw error;
   } finally {
-    closeSync(lock);
-    if (!unsafe) unlinkSync(lockPath);
+    state('stopping');
+    try {
+      if (!unsafe) releaseOwnedCompanionLock(lock, lockPath);
+    } finally {
+      closeSync(lock);
+    }
   }
 }
 
+export function createManagedCompanionStopHandler(stop: () => void): (chunk: Buffer) => void {
+  const command = Buffer.from('SQUIRES_RUNNER_STOP\n', 'ascii');
+  let matched = 0;
+  return (chunk) => {
+    if (matched === command.length) return;
+    for (const byte of chunk) {
+      if (byte !== command[matched]) {
+        console.error('Managed companion input invalid; stopping without dispatch.');
+        matched = command.length;
+        stop();
+        return;
+      }
+      if (++matched === command.length) {
+        stop();
+        return;
+      }
+    }
+  };
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runFixerrorsCompanion().catch(() => {
+  const shutdown = new AbortController();
+  const stop = () => shutdown.abort();
+  process.once('SIGINT', stop);
+  process.once('SIGTERM', stop);
+  const managedInput = createManagedCompanionStopHandler(stop);
+  if (process.env.SQUIRES_FIXERRORS_MANAGED_STDIN === '1') {
+    process.stdin.on('data', managedInput);
+    process.stdin.once('end', stop);
+  }
+  runFixerrorsCompanion(shutdown.signal).catch(() => {
     console.error('MPDEE Worker companion stopped. Check local enrollment, TLS, checkout and lease. No automatic retry or execution.');
     process.exitCode = 1;
+  }).finally(() => {
+    process.removeListener('SIGINT', stop);
+    process.removeListener('SIGTERM', stop);
+    process.stdin.removeListener('data', managedInput);
+    process.stdin.removeListener('end', stop);
+    process.stdin.pause();
   });
 }
