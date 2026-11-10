@@ -282,6 +282,35 @@ export interface AutoRunResult {
   clusters: AutoClusterResult[];
   decisions: DecisionCluster[];
 }
+export function parseAutomaticFixerrorsRetrieval(input: unknown): AutoRetrieval {
+  const retrieval = retrievalSchema.parse(input);
+  rejectSensitiveDocument(retrieval, 'automatic retrieval');
+  if (new Set(retrieval.clusters.map(cluster => cluster.id)).size !== retrieval.clusters.length ||
+      retrieval.clusters.some((cluster, index) => !cluster.held && retrieval.clusters.slice(0, index).some(entry => entry.held))) {
+    throw new Error('Duplicate cluster or new groups ordered after held cases');
+  }
+  return retrieval;
+}
+
+export function assertAutomaticFixerrorsRepair(
+  decision: DecisionCluster, evidence: AutoRetrieval['clusters'][number], used: ReadonlySet<string> = new Set(),
+): void {
+  if (decision.action !== 'fix' || decision.lane === 'critical' || decision.lane === 'report-only' ||
+      evidence.advisoryLane === 'critical' || !decision.evidenceEnrichmentAttempted) {
+    throw new Error(decision.action === 'fix' ? 'Critical repair requires explicit owner approval' : decision.nextStep ?? 'Evidence enrichment required');
+  }
+  if (evidence.existingState === 'awaiting-deployment') {
+    throw new Error('Deploy the verified local candidate through the separately approved release flow and verify its original failure live');
+  }
+  if (!decision.files.some(file => evidence.sourceFiles.includes(file)) ||
+      decision.files.some(file => !evidence.sourceFiles.includes(file) && !file.startsWith('tests/unit/')) ||
+      decision.files.some(file => used.has(file)) ||
+      decision.requiredTestIds.some(test => !/^tests\/unit\/[A-Za-z0-9_/[.\]-]+\.test\.tsx?$/u.test(test))) {
+    throw new Error('Repair is not an independent exact source/unit-test scope');
+  }
+  [...decision.files, ...decision.requiredTestIds].forEach(assertAutomaticPath);
+}
+
 function safeReason(error: unknown): string {
   const text = sanitizeKnowledgeText(error instanceof Error ? error.message : 'Automatic investigation failed');
   try { rejectSensitiveText(text, 'automatic result'); return text; }
@@ -299,12 +328,7 @@ export async function runAutomaticFixerrors(input: {
   retrieval: unknown; snapshotChecksum: string; cwd?: string; adapters?: AutoAdapters;
 }): Promise<AutoRunResult> {
   const cwd = input.cwd ?? process.cwd();
-  const retrieval = retrievalSchema.parse(input.retrieval);
-  rejectSensitiveDocument(retrieval, 'automatic retrieval');
-  if (new Set(retrieval.clusters.map(cluster => cluster.id)).size !== retrieval.clusters.length ||
-      retrieval.clusters.some((cluster, index) => !cluster.held && retrieval.clusters.slice(0, index).some(entry => entry.held))) {
-    throw new Error('Duplicate cluster or new groups ordered after held cases');
-  }
+  const retrieval = parseAutomaticFixerrorsRetrieval(input.retrieval);
   const adapters = input.adapters ?? createAutoAdapters(cwd);
   const candidate = adapters.candidate();
   if (!sameCandidate(candidate, retrieval)) throw new Error('Capture candidate drift before automatic analysis');
@@ -366,16 +390,7 @@ export async function runAutomaticFixerrors(input: {
           tests: [], evidence: decision.evidencePaths,
         });
       } else {
-        if (decision.action !== 'fix' || decision.lane === 'critical' || decision.lane === 'report-only' ||
-            evidence.advisoryLane === 'critical' || !decision.evidenceEnrichmentAttempted) {
-          throw new Error(decision.action === 'fix' ? 'Critical repair requires explicit owner approval' : decision.nextStep ?? 'Evidence enrichment required');
-        }
-        if (!decision.files.some(file => evidence.sourceFiles.includes(file)) ||
-            decision.files.some(file => !evidence.sourceFiles.includes(file) && !file.startsWith('tests/unit/')) ||
-            decision.files.some(file => used.has(file)) ||
-            decision.requiredTestIds.some(test => !/^tests\/unit\/[A-Za-z0-9_/[.\]-]+\.test\.tsx?$/u.test(test))) {
-          throw new Error('Repair is not an independent exact source/unit-test scope');
-        }
+        assertAutomaticFixerrorsRepair(decision, evidence, used);
         adapters.assertRepairScope([...new Set([...decision.files, ...decision.requiredTestIds])]);
         repair = makeRequest(cwd, `${result.runId}-${evidence.id}`, 'implement', [
           'Implement only this validated bounded repair in this local main checkout. No worktrees.',

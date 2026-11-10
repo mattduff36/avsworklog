@@ -33,6 +33,7 @@ import {
 } from '@/lib/utils/error-log-filters';
 import { ErrorLogEntry } from '../types';
 import { errorLogCardClass, errorLogMessageClass, getErrorLogTone } from '@/lib/utils/error-log-triage';
+import { FixerrorsControlPanel } from './FixerrorsControlPanel';
 
 type ErrorSeverity = 'urgent' | 'important' | 'medium' | 'low';
 type ErrorSummaryTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
@@ -545,6 +546,9 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
         </div>
       </CardHeader>
       <CardContent>
+        <div className="mb-4">
+          <FixerrorsControlPanel />
+        </div>
         <div className="mb-4 rounded-xl border border-slate-700/70 bg-slate-950/35">
           <button
             type="button"

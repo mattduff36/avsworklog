@@ -1,0 +1,614 @@
+# Squires Windows Fixerrors admission
+
+`scripts/automation/fixerrors-device-admission.ts` is an offline core for the
+future local companion, not a launcher, scheduler, queue, enrollment endpoint or
+production adapter. No application auth, billing or installed runner settings
+are changed. Even successful admission returns `launchAuthorized: false`.
+
+## Admission contract
+
+The locally enrolled, explicitly enabled device pins one Ed25519 public key and
+key ID, its device UUID and `squires-production` environment. Read-only and
+bounded-repair opt-ins are independent; worker eligibility must be explicit.
+Enrollment and dependency implementations are trusted local inputs, never
+downloaded ticket fields. Protect enrollment, verifier code, replay storage and
+the fixed checkout from untrusted local modification. Device UUID binding is an
+enrollment match, **not hardware attestation** or proof of Windows parent identity.
+
+The issuer constructs the strict `FixerrorsDeviceJob`, encodes it with
+`encodeFixerrorsDeviceJob`, signs `fixerrorsDeviceSigningBytes(keyId, payload)`
+with Ed25519, then serializes exactly `{version: 1, keyId, payload, signature}`
+in that order, without whitespace. Payload and signature use unpadded canonical
+base64url. Version, audience, fixed job, environment, device, authority, unique
+job UUID, integer UTC validity window, exact clean HEAD/tree and sanitized packet
+SHA-256 are signed. Maximum lifetime is 300 seconds; expiry is exclusive, with
+no future-issued grace. Envelope is limited to 4096 UTF-8 bytes. Unknown fields,
+duplicate keys, reordered/noncanonical JSON and arbitrary command, path, prompt
+or credential fields fail closed. Tickets contain no DB/model credentials.
+The companion must bound input **before** buffering and use reliable UTC time;
+offline validation cannot detect immediate server revocation or clock rollback.
+
+Only `D:\Websites\avsworklog`, ordinary `.git` checkout, clean `main`, the signed
+HEAD/tree and exact locally hashed sanitized packet can pass. Both authorities
+require a clean checkout at entry. The native probe uses fixed absolute Git and
+read-only argument arrays with a minimal environment, a timeout/output limit,
+and no shell. It does not read private records or dotenv. Read-only maps only to
+`review-sanitized-packet`; repair maps only to `repair-validated-cluster`.
+Neither is a shell command or a whole `npm run fixerrors` invocation.
+
+## Durable replay interface (required before integration)
+
+`DurableFixerrorsReplayStore.claimOnce` is deliberately an interface, not an
+in-memory production implementation. The companion must provide an atomic,
+durably committed insert-if-absent keyed by `(namespace, jobId)`, shared across
+processes and restarts, including key rotations. Store the ticket hash and
+expiry. Return true only after durable commit, false on any existing ID, and
+throw on storage failure/uncertain commit. No release/retry after partial failure
+or expired admission. Keep tombstones forever, or until expiry only with a
+rollback-resistant clock. Reset/restore of storage must disable admission until
+re-enrollment or server reconciliation prevents old jobs being replayed.
+The unit fixture tests concurrent claims and re-signing, **not crash durability**.
+The production implementation still needs cross-process, crash/restart,
+disk-full, uncertain-commit and rollback tests.
+
+## Installed transport boundary and next phase
+
+Read-only inspection on 2026-11-09 of
+`C:\Users\mattd\.codex\skills\cursor-worker\scripts` found:
+
+- `parent_access.py`: `verify` requires live native unrestricted Codex ancestry,
+  environment and active-turn evidence. `_fixerrors_shell` additionally checks
+  exact npm/tsx ancestry and still returns to that native Codex check. A service
+  or companion is not that parent.
+- `chatgpt_parent.py`: separate owner-enabled `origin=chatgpt` transport requires
+  its configured Desktop Commander ancestry/token. It is not a generic service
+  escape hatch.
+- `run_worker.py`: origin routing admits Codex/ChatGPT; existing verification,
+  scoped checks and handoff remain authoritative.
+- `budget_guard.py`: fresh provider observations, credential attribution and
+  budget reservation precede dispatch; runtime monitoring retains API-credit,
+  timeout and repeated-failure gates.
+
+Before unattended launch is authorized, the installed runner needs a separately
+owner-approved **new transport**, distinct from both existing origins. It must
+verify enrollment, explicit opt-ins and this signed admission at its trusted
+boundary, own the durable claim, bind an immutable admission to one exact scoped
+request, and authenticate the local companion using an explicitly designed
+Windows IPC/process/service boundary. This core does not supply that identity.
+Do not forge Codex environment/ancestry, relabel as ChatGPT, monkeypatch
+verification, copy live credentials, or treat a receipt/UUID as parent authority.
+An alternative today is an actual authorized interactive Codex parent using
+the unchanged existing transport; that is not unattended execution.
+
+Integrate these functions into that companion rather than adding another queue.
+Hold a one-writer checkout lock, recheck candidate/opt-in/expiry at use time, and
+fail on drift between inspection and launch. Locally define the fixed prompt,
+commands and packet source; never accept those from the ticket. Read-only must
+have no edit authority; repair must use existing validated decisions, exact
+eligible source/test scope, candidate-bound required checks and receipts, and
+CRITICAL holds (`fixerrors-auto.ts` / `fixerrors-decision.ts`). Preserve existing
+budget eligibility/reservation/runtime guards and worker no-delegation,
+no-commit/push/deploy/migration/production-mutation policies. A ticket is neither
+budget approval nor authorization for capture/lifecycle SQL. Production adapters,
+device enrollment issuance, key rotation/revocation, durable replay and transport
+authorization require the next separately approved phase.
+
+Targeted offline check (does not load `.env.local`):
+
+```powershell
+$env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
+npx vitest run tests\unit\fixerrors-device-admission.test.ts
+```
+
+## Local control-plane prototype (no production activation)
+
+Debug > Error Log now includes a **Local Fixerrors companion** card. It has a
+separate server-side actual-SuperAdmin check, rejects View As, and does not
+inherit Debug's support-user exception. Existing error-log endpoints and
+triage behaviour are unchanged. The card is disabled unless
+`SQUIRES_FIXERRORS_LOCAL_ENABLED=1`, and the server forcibly disables it for
+`NODE_ENV=production` or any Vercel environment. There is no public feature flag.
+
+This phase is deliberately loopback-only. Both the site and companion use the
+fixed `https://localhost:4443` origin. An owner-managed, locally trusted HTTPS
+reverse proxy to the existing development server on port 4000 is required;
+certificate/proxy setup is not provided. Do not disable TLS verification,
+forward this endpoint publicly, or change the origin to production as a shortcut.
+Browser writes require that exact Origin. The outbound device endpoint is
+`POST /api/fixerrors-device`, independently authenticated by a provisioned
+revocable device credential; browser sessions and Origin-bearing device calls
+are not accepted as device authority.
+
+### Dedicated private local storage
+
+The queue uses the repository's `pg` transaction pattern, but **not** its
+production database connection or application tables. Set
+`SQUIRES_FIXERRORS_LOCAL_DATABASE_URL` locally to a dedicated PostgreSQL database
+named `squires_fixerrors_local` on `localhost`, `127.0.0.1` or `::1`.
+Remote hosts, other database names and URL query options are rejected.
+Do not put connection strings or device credentials in site inputs or tickets.
+These scripts do not load dotenv; configuration must be explicitly provided
+in the local process environment.
+
+`scripts/automation/local-migrations/20261109_fixerrors_control.sql` is a
+forward-only **local** migration, intentionally outside production migration
+discovery. It is never run by finalise. It creates private, RLS-enabled
+queue/audit tables with no browser policies or PUBLIC grants. The queue locks
+its singleton state row; request IDs remain tombstones, leases are hashed,
+expired/lost leases are terminal and never requeued, and state plus append-only
+audit commit together with synchronous commit enabled. There is a deliberate
+capacity hold at 20 devices/500 jobs; there is no automatic pruning or database
+reset. Approvals append the exact HEAD/tree/check digest as audit evidence.
+Database owners remain privileged; this is not a tamper-proof audit against
+the machine/database owner.
+
+After separately provisioning the dedicated local database, an owner can
+explicitly install this local schema and enroll the current Windows user:
+
+```powershell
+# Local process configuration only; never source production dotenv.
+$env:SQUIRES_FIXERRORS_LOCAL_ENABLED='1'
+# Provide SQUIRES_FIXERRORS_LOCAL_DATABASE_URL securely, without logging it.
+$env:SQUIRES_FIXERRORS_LOCAL_SCHEMA_APPLY='1'
+node --conditions=react-server --import=tsx scripts\automation\setup-fixerrors-local.ts
+node --conditions=react-server --import=tsx scripts\automation\provision-fixerrors-local-device.ts
+```
+
+The `react-server` condition permits the scripts to use the server-only store.
+No production schema is created or applied by these commands. Setup replay
+fails instead of resetting existing state. Provisioning generates a random
+credential locally, stores only its SHA-256 in the dedicated database and
+writes DPAPI CurrentUser-encrypted enrollment to
+`%LOCALAPPDATA%\Squires\Fixerrors\device.dpapi` in an owner-only directory.
+The secret crosses a local child-process stdin pipe, not argv or console.
+The site never accepts or displays keys. Revoke the device through the card.
+Rotation/re-enrollment and recovery after an uncertain provisioning commit
+are owner operations, not automatic retries; do not delete replay state to
+recover. Never share, back up into source control, or copy enrollment to
+another Windows identity.
+
+### Manual companion and executor boundary
+
+```powershell
+$env:SQUIRES_FIXERRORS_COMPANION_ENABLED='1'
+$env:SQUIRES_FIXERRORS_ALLOW_READ_ONLY='1'
+# Independent local opt-ins, both off unless explicitly set:
+# $env:SQUIRES_FIXERRORS_ALLOW_REPAIR='1'
+# $env:SQUIRES_FIXERRORS_ALLOW_DEPLOY='1'
+node --import=tsx scripts\automation\fixerrors-companion.ts
+```
+
+This is a manually started foreground Node process, not a service, tray app,
+installer or autostart task. It polls outbound HTTPS only, refuses redirects,
+bounds input/output and timeouts, and never accepts server-provided paths,
+prompts, shell commands or argv. It pins `D:\Websites\avsworklog`, ordinary
+`.git`, clean `main`, HEAD/tree and a bounded locally hashed sanitized packet
+at `.git\squires-fixerrors\sanitized-packet.json`. Packet creation/sanitization
+must be trusted local work; this prototype does not fetch production records
+or manufacture a sanitized packet. Without it the device reports no usable
+checkout and cannot receive work.
+
+An exclusive `.git\squires-fixerrors-companion.lock` permits one companion
+writer. A stale lock requires owner investigation, not automatic deletion.
+Renewals and terminal status updates require the same device and fresh lease.
+Unknown network/commit outcomes stop polling rather than retrying work.
+Execution rechecks consent, checkout and lease immediately before use.
+Review is capped at 120 seconds; repair at 240 seconds, shortened by remaining
+job expiry. A deployment must explicitly start
+within the five-minute approval window. Once started, it has a 25-minute
+execution cap, a renewable 60-second lease and up to 30 seconds to settle and
+report its result. Cancellation must settle within five seconds or the checkout
+lock is retained. A started deployment that times out, loses its lease or is
+revoked requires reconciliation before another repair or deployment. The local
+prototype has no reconciliation action. A real bridge must supply reliable
+process-tree cancellation and candidate-bound required-check evidence. A lost
+lease cannot report success.
+
+**The only wired executor is `unavailableFixerrorsExecutor`. Every live job
+reports `blocked / bridge-unavailable`; no worker, fixerrors command, fap,
+commit, push, migration or deploy is launched.** There is no dynamic bridge
+loader or environment flag that turns this into execution. The separate
+installed MPDEE Worker bridge workstream must establish the trusted transport,
+v1 signed admission and durable replay described above. Queue authentication
+does not replace that admission or authorize deployment. The v1 signed ticket
+format and admission checks are unchanged; a Deploy approval is a separate
+control-plane record, not a new v1 authority.
+
+### Separate exact-candidate Deploy confirmation
+
+Only a repair's terminal `tested` result, with passing `targeted-tests`,
+`typecheck`, and `lint` evidence, can expose **Deploy: review exact candidate**.
+The check digest is SHA-256 of the strict, fixed-order `checksSchema` JSON:
+HEAD, tree, then those three ordered check IDs, output SHA-256 and passed=true.
+Evidence contains hashes only, never test output or commands. The real bridge
+must map those fixed IDs to its locally trusted scoped check receipts; the
+site cannot choose checks.
+
+The user must open the separate inline confirmation, inspect all three
+digests, type `DEPLOY EXACT TESTED CANDIDATE` and submit. That creates a distinct,
+five-minute job with an independent audit event and frozen candidate approval.
+The same actual SuperAdmin may request repair and later confirm Deploy; this
+is separate explicit consent, not a two-person approval policy. No repair or
+review result triggers this step automatically. Duplicate approval, stale
+HEAD/tree, changed check digest, offline/revoked device and absent local
+Deploy opt-in fail closed. Claim and companion recheck the exact candidate;
+the companion additionally requires locally held matching test evidence.
+There is no live tested candidate or working deployment in this prototype:
+those states are exercised only with clearly named fake executors.
+
+### Verification and remaining integration gates
+
+Offline fixtures (all commands skip `.env.local`):
+
+```powershell
+$env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
+npx vitest run tests\unit\fixerrors-control.test.ts tests\unit\fixerrors-companion.test.ts tests\unit\fixerrors-local-store.test.ts tests\integration\api\fixerrors-local-route.test.ts tests\ui\fixerrors-control-panel.test.tsx tests\unit\fixerrors-device-admission.test.ts tests\integration\api\debug-error-logs-route.test.ts
+```
+
+The queue tests use transaction fixtures; storage tests run the real local SQL
+and store through a disk-backed PGlite adapter, including clean close/reopen,
+rollback, append-only audit and RLS checks. They do **not** establish native
+PostgreSQL cross-process locking, crash durability, disk-full or uncertain
+commit behaviour. No actual worker or fap runs in tests. UI tests prove
+separate confirmation and authorization gating, not browser visual acceptance.
+
+Before any broader use: owner-reviewed trusted bridge integration and real
+scoped receipt mapping; durable v1 replay; native PostgreSQL concurrency and
+fault tests; DPAPI/ACL lifecycle and Windows termination testing; trusted local
+TLS setup; real-browser responsive/keyboard/contrast checks; and a separately
+approved production persistence/transport/enrollment design. No production
+activation, installed-runner change or release authority is supplied here.
+The native read-only Git probe additionally pins `NODE_ENV=production` to
+satisfy Next.js's required
+`ProcessEnv` typing without inheriting the parent environment.
+
+### Signed release handoff library (isolated fixtures only)
+
+The default foreground companion above still uses only the unavailable executor.
+No Python process launcher, installed-runner change, pairing, service or fap
+adapter is supplied or activated by this library.
+
+`lib/fixerrors/release.ts` implements the staged Python bridge's distinct v1
+`squires-windows-fap` issuer ticket and `squires-companion-release-v1` device
+proof. Release and repair issuer IDs and Ed25519 keys must differ; the device
+key must differ from both. Canonical field order, base64url, separate approval
+and repair UUIDs, exclusive expiry, no future grace and the 300-second maximum
+are enforced. This does not change the repair admission format.
+
+Prepared checks may additionally contain
+`release: {candidateSha256, testEvidenceSha256}`. The existing checks digest
+covers that extension, so both values are frozen by the separate Debug
+confirmation and are displayed there. `candidateSha256` is the worker snapshot
+digest, **not** the Git tree or the control-plane checks digest.
+`testEvidenceSha256` hashes `encodePreparedReleaseEvidence`'s exact UTF-8 bytes:
+`repairJobId`, `head`, `tree`, `candidateSha256`, `allChecksPassed`,
+`workerResultSha256`, then `preparedChecks`. The latter has exactly
+`targeted-tests`, `typecheck`, `lint`, in that order, each containing
+`{receiptId,sha256}`. Each receipt hash must also equal that check's
+`outputSha256`. Preparation and genuine candidate-bound receipts remain trusted
+local work, never browser input. Python must independently validate the actual
+worker result, prepared files and receipt contents; these hashes alone do not
+establish that checks ran.
+
+The authenticated device `start-deploy` transaction can return `releaseTicket`
+only after verifying ownership of the fresh lease and recording the start.
+Signing failure rolls back the start and audit; a ticket is returned only after
+the store commits. The browser approval endpoint never issues tickets.
+The ticket expires no later than the original five-minute approval, even though
+the started job has a longer execution deadline. Repeated start is rejected.
+No signing material or device proof is stored in browser-visible queue state.
+
+For a **separately prepared disposable run**, the lead can enable only this
+server-side fixture signer with both
+`SQUIRES_FIXERRORS_SIGNED_RELEASE_FIXTURE_ENABLED=1` and
+`SQUIRES_FIXERRORS_SIGNED_RELEASE_FIXTURE_ROOT`. The root must be an ordinary
+direct child of the canonical Windows temporary directory named
+`SquiresSignedReleaseFixture-<UUID>`, containing ordinary `checkout\.git` and
+bare `remote.git` directories. The clean `main` checkout must have only
+`origin`, with exactly that absolute filesystem path for both fetch and push.
+The production checkout, URLs, alternate push URLs and linked directories fail
+closed. Existing local-only/production/Vercel gates still apply.
+
+The lead supplies `issuer.json` in that disposable root, with exact fields
+`version:1`, `fixtureOnly:true`, `gitExe` (the fixed
+`C:\Program Files\Git\cmd\git.exe`), `keyId`, `privateKeyPem`, `repairKeyId`,
+`repairPublicKeyPem`. Use newly generated disposable keys only; never point at
+installed enrollment/signing material. This file is not generated, provisioned
+or read by default. Protect it locally and remove it after the fixture.
+
+`createSignedReleaseFixtureExecutor` in
+`scripts/automation/fixerrors-signed-release.ts` is the paired companion
+interface. Supply `enabled:true`, the same fixture `scope`, pinned release and
+repair public keys, a separate disposable device private key, trusted local
+`evidence()` and `testedCandidate()` readers, `nowSeconds()`, and a reviewed
+`PairedReleaseFixtureTransport`. Pass this executor to `executeCompanionClaim`,
+with fixture-only inspection and existing authenticated device requests for
+renew/complete. Its `startDeploy` callback must return the parsed **actual**
+`start-deploy` response rather than discarding it. The executor forwards no
+proof without that signed response. It rechecks clean candidate, filesystem
+remote, expiry, approved digests and prepared receipt references, then passes
+the canonical stdin buffer and fixed checkout/remote to `transport.invoke`.
+Aborted or mismatched results cannot report deployment success.
+
+**Remaining integration:** the lead must provide a separately reviewed,
+hash-pinned disposable Python transport and through-push adapter with reliable
+process-tree cancellation, protected durable replay/result persistence and a
+guarded filesystem-only remote for the entire execution, not just preflight.
+The staged Python entrypoint still pins the real checkout/enrollment; it must
+not be invoked unchanged as a fixture launcher or pointed at installed secrets.
+No dynamic command/path loader or automatic fallback is provided here. A
+successful fake transport result is not a tested fap or end-to-end release.
+The focused interoperability test calls the actual staged signature verifier
+and candidate-drift preflight only, with ephemeral keys and no replay claim,
+worker, Git write or fap.
+
+Focused offline checks:
+
+```powershell
+$env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
+npx vitest run tests\unit\fixerrors-signed-release.test.ts tests\unit\fixerrors-companion.test.ts tests\unit\fixerrors-control.test.ts tests\integration\api\fixerrors-local-route.test.ts tests\ui\fixerrors-control-panel.test.tsx
+```
+
+## Production release foundations
+
+The production control plane is disabled unless the production Vercel environment
+sets `SQUIRES_FIXERRORS_PRODUCTION_ENABLED=1`. Preview deployments cannot enable
+it. Production requests use only `https://www.squiresapp.com`. A dedicated
+PostgreSQL login accesses the private production queue and append-only audit,
+using `SQUIRES_FIXERRORS_PRODUCTION_DATABASE_URL` with certificate verification.
+The schema migration creates the role without login access. It remains blocked
+by the separately identified PUBLIC security-definer exposure; no migration or
+production permission change is authorized by this work.
+
+If the dedicated database requires a private CA, set the server-only
+`SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM` to an owner-verified PEM certificate
+bundle (maximum 64 KiB). Invalid or non-certificate content fails closed. Omitting
+it retains Node's default trust store. Both paths require certificate and
+hostname verification (`rejectUnauthorized: true`); URL query options cannot
+override TLS. Do not disable verification to diagnose the connection.
+
+The server pins the enrolled device with `SQUIRES_FIXERRORS_PRODUCTION_DEVICE_ID`.
+The release issuer uses `SQUIRES_FIXERRORS_RELEASE_PRIVATE_KEY` and the distinct
+`SQUIRES_FIXERRORS_REPAIR_PUBLIC_KEY`, each containing base64url-encoded PEM.
+Only the authenticated deploy-start transaction can issue a release ticket.
+Use separate production keys and leave the flag off until enrollment is verified.
+
+The production adapter source is `scripts/automation/squires-fap-adapter.mjs`.
+The installed copy must be outside the checkout and SHA-pinned by the trusted
+Python bridge. It passes the prepared commit and its base to the guarded fap
+path, which retains the release checks and permits only the exact fast-forward
+to Squires GitHub main. The adapter requires the approved SHA and a valid
+deployment ID on the live Squires origin before reporting success.
+
+Production still requires device enrollment and an owner-reviewed installed bridge
+transport. Local mode continues to use the unavailable executor. Production
+selects the separately pinned bridge; read-only, repair and Deploy each require
+their own process opt-in plus the corresponding protected enrollment opt-in.
+Repository source changes alone neither install nor activate that bridge.
+
+### Staged production review/repair integration
+
+The shared v1 repair encoding now lives in `lib/fixerrors/admission.ts`; the
+offline admission script re-exports its existing interface. An authenticated
+production device claim can return `claim.admissionTicket` for its exact leased
+review/repair. Signing occurs inside the queue transaction; a signing or commit
+failure cannot expose a successful claim. No ticket is stored in browser-visible
+state. The repair issuer uses server-only base64url PEM
+`SQUIRES_FIXERRORS_REPAIR_PRIVATE_KEY` plus
+`SQUIRES_FIXERRORS_RELEASE_PUBLIC_KEY`, with distinct Ed25519 keys and IDs.
+The signed UUID/device, authority, candidate and packet hash retain the v1
+format and five-minute/exclusive expiry. This adds admission, **not** worker
+launch authority, a replay store or a deployment approval.
+
+`scripts/automation/fixerrors-companion-packet.ts` supplies explicit trusted-local
+packet preparation from stdin, not production capture or sanitization:
+
+```powershell
+# Pipe only an already reviewed sanitized JSON object; never raw error records.
+# Fields: schemaVersion:1, snapshotChecksum, retrieval (the strict automatic
+# fixerrors retrieval, including snapshotId, baseHead and treeFingerprint).
+node --import=tsx scripts\automation\fixerrors-companion-packet.ts --prepare-local-sanitized-packet
+```
+
+Both preparation and companion reads are capped at 96 KiB, matching the
+installed Python transport. Preparation requires the fixed clean ordinary main
+checkout, exact candidate fingerprint and the companion writer lock. It writes
+canonical bytes with exclusive creation, fsync and readback to the fixed
+`.git\squires-fixerrors\sanitized-packet.json`; it never replaces an existing
+packet, deletes another lock, captures production, loads dotenv or launches
+execution. Interrupted/failed writes and existing packets need owner
+reconciliation, not an automatic overwrite. The sensitive-content check is a
+backstop, not proof that arbitrary input is sanitized. The trusted preparer owns
+that review and the original snapshot checksum.
+
+`validateCompanionRepairDecision` reuses `validateDecision` and the extracted
+automatic repair guard. It binds one exact cluster/candidate, holds CRITICAL
+advisories or decisions, pending deployment, missing enrichment and sensitive
+or unrelated source/unit-test scope. It derives only paths, the fixed check IDs
+and the canonical validated-decision hash. This non-executable plan contains
+neither commands nor receipt passes. The staged trusted boundary now invokes
+these shared guards before production dispatch.
+
+`squires-windows-release.py repair` selects the staged `squires_repair.py`.
+The device proof contains exactly `{ticket,packet}`, never a supplied plan,
+command or decision hash. Existing `squires_companion.py` verifies the distinct
+repair/device signatures and atomically consumes its existing SQLite replay
+claim. The new orchestrator uses the native premium runner's authenticated
+`squires-companion` boundary, budget reservation and runtime monitoring unchanged.
+It does not impersonate Codex/ChatGPT or broaden worker tools.
+
+A read-only premium analysis must return actual strict decision JSON without
+changing the checkout. `fixerrors-bridge-boundary.ts` independently binds that
+decision to the one signed cluster/current candidate, applies shared CRITICAL,
+pending-deployment and automatic-scope guards, intersects paths with the installed
+runner's narrower root allowlist, and inspects tracked ordinary
+existing source/tests for sensitive contents. A repair request is derived only
+from the validated decision. The native runner must report success, no issues
+or out-of-scope changes, an unchanged HEAD/branch/index and genuine passing
+file-scoped receipts matching the final worker result. No model prose or caller
+hash substitutes for those artifacts.
+
+Trusted preparation reacquires the native checkout lock and compares the exact
+native snapshot before writing. It commits only actual allowed repair changes,
+then calls the existing deterministic release metadata generator with no provider
+credentials. It commits only the metadata allowlist. Git hooks are not skipped.
+It reruns the three fixed checks with `candidate_scope=worktree` **after both
+commits**, verifies receipt bytes/config/commands/termination/candidate stability,
+and exclusively fsyncs `.git\squires-fixerrors\prepared-release.json`.
+The staged `squires_release.py` independently rechecks the two-commit chain,
+validated decision, enrolled check derivation and receipts at separate Deploy.
+Legacy/unprepared artifacts cannot be promoted by adding invented receipt fields.
+
+The four ordered SHA pins are `squires-windows-release.py`, `squires_release.py`,
+unchanged `squires_companion.py`, then `squires_repair.py`. Existing three-pin
+enrollment fails closed until the owner installs and repins. The check catalogue
+contains only absolute enrolled Node plus the fixed scoped wrapper and check ID;
+validated unit-test/lint paths are appended locally. Typecheck takes no paths.
+The wrapper sets `AVSWORKLOG_TEST_SKIP_DOTENV=1`, does not use a shell/npx, and
+disables TypeScript incremental output. Worker artifacts, decisions, metadata
+diagnostics and all receipt bytes remain in the private native run directory.
+
+Review is capped at 120 seconds; repair including preparation is capped at 240
+seconds and additionally at ten seconds before the original job expiry. Native
+analysis/repair stages have one/two-minute bounds. The signed admission and queue
+still expire within five minutes; no new long-running repair lease is introduced.
+Slow work fails closed, never becomes tested evidence, and needs owner
+reconciliation rather than automatic replay/requeue. Preparation failures retain
+the native lock; abrupt cancellation during a write also leaves that lock.
+The Windows Job Object contains descendants, while lease loss/cancellation
+prevents the companion from acknowledging success. These are operational
+boundaries, not an OS sandbox for trusted repository test code.
+
+No installed files, enrollment, replay state, credentials, production checkout
+commits, production records or deployment are changed by editing these sources.
+
+Focused offline checks (the name filter excludes disposable Git-write fixtures):
+
+```powershell
+$env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
+npx vitest run tests\unit\fixerrors-production-bridge.test.ts tests\unit\fixerrors-controlled-acceptance.test.ts tests\unit\fixerrors-production-config.test.ts tests\unit\fixerrors-production-admission.test.ts tests\unit\fixerrors-companion-packet.test.ts tests\unit\fixerrors-device-admission.test.ts tests\unit\fixerrors-auto.test.ts tests\unit\fixerrors-companion.test.ts tests\unit\fixerrors-control.test.ts tests\unit\fixerrors-signed-release.test.ts tests\integration\api\fixerrors-local-route.test.ts tests\ui\fixerrors-control-panel.test.tsx -t '^(?!.*clean local main only)'
+npm run typecheck
+```
+
+Scoped ESLint should cover the changed Fixerrors source and test paths; do not
+invoke a build, finalise, production capture or a release fixture for this check.
+
+Packet-write tests use an in-memory filesystem, not the live checkout. The new
+Python interoperability fixture uses explicitly **synthetic worker state** in a
+disposable checkout, makes two real local fixture commits with the real metadata
+generator, runs real Vitest/TypeScript/ESLint subprocesses and checks their actual
+whole-worktree receipts (including tamper/drift negatives and TypeScript digest
+interoperability). It uses the installed runner modules read-only, never enrollment,
+replay storage or model credentials. Its dependency-only temporary junction is
+removed without following it. This proves preparation/receipt mechanics, **not**
+that a premium worker ran or a production candidate was accepted.
+Queue fixtures are not native PostgreSQL crash/concurrency evidence.
+
+### Parent installation, repinning and controlled live acceptance
+
+These are **owner/parent operations, not authorization supplied by this document**.
+First review/accept the staged code and its source candidate, resolve existing
+work and stop the manually started companion by its known PID. Verify no child
+remains; investigate any existing checkout/check/replay lock or prepared candidate,
+never delete it to make the next command pass. Integrate the accepted source through
+the parent's normal gates so the fixed checkout is clean `main` with the reviewed
+scripts before any worker starts. Keep production queue activation and Deploy off.
+
+For an existing enrollment, preserve its device/key/enrollment IDs and replay DB.
+Do not rerun fresh provisioning or generate replacement keys. From an owner-controlled
+PowerShell, with the accepted checkout at `D:\Websites\avsworklog`, use this explicit
+installation/repin sequence (no secret is printed):
+
+```powershell
+$ErrorActionPreference='Stop'
+$repo='D:\Websites\avsworklog'
+$bridge=Join-Path $env:USERPROFILE '.codex\cursor-worker\squires-production-bridge'
+$device=Join-Path $env:LOCALAPPDATA 'Squires\Fixerrors\production-device.dpapi'
+$cfgPath=Join-Path $env:USERPROFILE '.codex\cursor-worker\squires-companion\enrollment.json'
+$secure=Get-Content -LiteralPath $device -Raw | ConvertTo-SecureString
+$b=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
+try { $e=[Runtime.InteropServices.Marshal]::PtrToStringBSTR($b) | ConvertFrom-Json }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($b) }
+$cfg=Get-Content -LiteralPath $cfgPath -Raw | ConvertFrom-Json
+if ((Get-FileHash -LiteralPath (Join-Path $bridge 'squires_companion.py') -Algorithm SHA256).Hash.ToLowerInvariant() -ne $e.bridgeHashes[2]) {
+  throw 'Existing admission verifier pin changed; investigate before installation'
+}
+function Replace-PrivateJson($file,$text) {
+  $pending=$file+'.reviewed-repin-pending'
+  $stream=[IO.File]::Open($pending,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+  try { $bytes=[Text.Encoding]::UTF8.GetBytes($text); $stream.Write($bytes,0,$bytes.Length); $stream.Flush($true) }
+  finally { $stream.Dispose() }
+  [IO.File]::Replace($pending,$file,[System.Management.Automation.Language.NullString]::Value)
+}
+# Fail closed before changing executable files. These remain off after repinning.
+$cfg.enabled=$false; $cfg.workerEligible=$false
+$cfg.allowReadOnly=$false; $cfg.allowBoundedRepair=$false; $cfg.allowRelease=$false
+Replace-PrivateJson $cfgPath ($cfg | ConvertTo-Json -Depth 20 -Compress)
+foreach ($name in @('squires-windows-release.py','squires_release.py','squires_repair.py')) {
+  Copy-Item -LiteralPath (Join-Path $repo ('scripts\automation\'+$name)) -Destination (Join-Path $bridge $name) -Force
+}
+$names=@('squires-windows-release.py','squires_release.py','squires_companion.py','squires_repair.py')
+$e.bridgeHashes=@($names | ForEach-Object { (Get-FileHash -LiteralPath (Join-Path $bridge $_) -Algorithm SHA256).Hash.ToLowerInvariant() })
+$catalogue=[ordered]@{}
+foreach ($id in @('targeted-tests','typecheck','lint')) {
+  $catalogue[$id]=[ordered]@{argv=@($cfg.releaseAdapter.nodeExe,'scripts/automation/fixerrors-scoped-check.mjs',$id);timeout_seconds=120;description=('Trusted scoped '+$id)}
+}
+$cfg.checks=$catalogue
+Replace-PrivateJson $cfgPath ($cfg | ConvertTo-Json -Depth 20 -Compress)
+$cipher=($e | ConvertTo-Json -Depth 20 -Compress | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString)
+Replace-PrivateJson $device $cipher
+Remove-Variable e,secure,cipher,cfg -ErrorAction SilentlyContinue
+```
+
+Preserve owner-only ACLs and confirm all installed dependency files are the reviewed
+runner version. Do not patch `parent_access`, budgets or enrollment verification.
+A failed/partial repin is an owner-held disabled state, never permission to reset
+enrollment or claims. For a genuinely new, separately approved device only, the
+existing `provision-fixerrors-production-device.ts --prepare-local-production-enrollment
+<absolute-python.exe>` prepares the four pins/check catalogue with every opt-in off;
+registration and production activation are still separate owner operations.
+
+After separately reviewing the production persistence exposure/permissions, TLS/CA,
+issuer configuration and device registration, prepare the harmless controlled packet:
+
+```powershell
+node --import=tsx scripts\automation\fixerrors-controlled-acceptance.ts --prepare-synthetic-test-only-packet
+```
+
+It creates no production records. The clearly labelled, application-unimported
+`lib\utils\fixerrors-controlled-acceptance.ts` is exercised only by
+`tests\unit\fixerrors-controlled-acceptance.test.ts`; its intentional `it.fails`
+demonstrates a synthetic trim fixture. A repair must change that fixture function
+to trim both ends and remove `it.fails`, preserving the expected value. It is not
+an application defect or evidence about customer incidents. Existing packets are
+never overwritten; an owner must reconcile any previous packet/candidate first.
+
+For read-only acceptance, the owner sets `enabled=true`, `workerEligible=true`,
+`allowReadOnly=true` in protected `enrollment.json`, retaining repair/release false
+(use the same atomic replacement helper above). Start the foreground process with:
+
+```powershell
+$env:SQUIRES_FIXERRORS_COMPANION_ENABLED='1'
+$env:SQUIRES_FIXERRORS_COMPANION_PRODUCTION='1'
+$env:SQUIRES_FIXERRORS_ALLOW_READ_ONLY='1'
+# Keep SQUIRES_FIXERRORS_ALLOW_REPAIR and SQUIRES_FIXERRORS_ALLOW_DEPLOY unset.
+node --import=tsx scripts\automation\fixerrors-companion.ts
+```
+
+From production Debug, request **review** for the enrolled device. Require a real
+premium native run, validated synthetic decision, no checkout changes and terminal
+`reviewed`; inspect the actual private artifacts, model identity and budget receipt.
+Then stop the process normally, separately enable `allowBoundedRepair=true` and
+`SQUIRES_FIXERRORS_ALLOW_REPAIR=1` (Deploy remains off), restart and request **repair**.
+Require the genuine implementation run, exact two-file synthetic change, two local commits,
+real post-metadata receipts and terminal `tested`. An over-budget, slow, partial,
+held, revoked, replayed or expired run is a failed acceptance, not a success to relabel.
+
+Only after inspecting that exact evidence may the owner independently enable
+`allowRelease=true` and `SQUIRES_FIXERRORS_ALLOW_DEPLOY=1`, restart, and use Debug's
+separate confirmation to type `DEPLOY EXACT TESTED CANDIDATE`. That is a new signed
+release approval, not part of repair acceptance. Require the exact approved SHA
+and deployment ID on the fixed live origin before calling it deployed. This work
+does not execute that step. Native PostgreSQL concurrency/fault, DPAPI lifecycle,
+Windows cancellation/crash and real premium-worker/live-release acceptance remain
+parent-owned checks; synthetic fixture success cannot substitute for them.

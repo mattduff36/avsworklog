@@ -15,6 +15,34 @@ Browser identity is the **app-session cookie**, not a Supabase Auth session.
 
 Middleware rejects unauthenticated non-public routes, clears legacy `sb-*-auth-token` cookies, and allows cron routes only with `Authorization: Bearer $CRON_SECRET`.
 
+The exact `/api/fixerrors-device` path is independently authenticated, not an
+app-session or cron exception granting data access. Its local-only prototype
+requires an explicitly provisioned, revocable device credential and rejects
+browser Origin headers. Both it and `/api/debug/fixerrors` are disabled by
+default and restricted to loopback in local mode. A separate production flag,
+fixed Squires origin, pinned enrolled device and dedicated verified-TLS database
+login gate production; previews remain disabled.
+Debug controls require actual SuperAdmin outside View As (no support-user
+exception). Queue storage is a dedicated private local database; credentials
+use Windows CurrentUser DPAPI, never site entry. The local companion executor refuses
+all real repair/deploy execution. The production transport requires owner-installed
+SHA-pinned Python sources and independent read-only/repair/release opt-ins.
+Its staged orchestrator validates the signed packet and actual decision through
+shared CRITICAL/scope guards before premium dispatch, preserves native budget and
+durable replay checks, and verifies native state and genuine receipts. Trusted
+preparation, not the worker, creates two local commits and reruns whole-worktree
+checks. Partial preparation, expired leases or uncertain cancellation cannot become
+Deploy evidence. See `docs/guides/FIXERRORS_DEVICE_RUNNER.md`;
+these controls do not authorize a production transport or bypass signed
+admission, scoped checks or separate exact-candidate Deploy consent.
+An additional default-off **disposable fixture** signer may return the distinct
+release ticket only from the authenticated, committed `start-deploy`
+transaction. It binds the worker snapshot and prepared-receipt evidence into
+the browser-approved checks digest. Its library executor requires an isolated
+temporary checkout and bare filesystem remote, independently of production. Never use installed signing material
+for that fixture. The guide documents its explicit configuration and remaining
+transport, durable replay and through-push gates.
+
 PostgREST calls use a server-minted **data token** (`lib/server/app-auth/supabase-token.ts`): `role=authenticated`, empty `user_metadata`, 1 hour TTL. Browser `lib/supabase/client.ts` fetches `/api/auth/data-token`.
 
 `getCurrentAuthenticatedProfile` prefers the app session and can fall back to `supabase.auth.getUser()`. Do not add new features that depend on that fallback. Do not persist Supabase Auth cookies as a second session.

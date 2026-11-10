@@ -357,13 +357,6 @@ function liveSchemaFingerprint(): string {
   const connectionString = process.env.POSTGRES_URL_NON_POOLING;
   if (!connectionString) return 'unavailable';
   try {
-    // Lazy require keeps unit tests free of pg unless the env is present.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Client } = require('pg') as typeof import('pg');
-    const client = new Client({
-      connectionString,
-      ssl: { rejectUnauthorized: false },
-    });
     // Synchronous fingerprint via child process would be safer; use spawn of a tiny query.
     const result = spawnSync(
       process.execPath,
@@ -371,7 +364,17 @@ function liveSchemaFingerprint(): string {
         '-e',
         `
         const { Client } = require('pg');
-        const client = new Client({ connectionString: process.env.POSTGRES_URL_NON_POOLING, ssl: { rejectUnauthorized: false } });
+        const url = new URL(process.env.POSTGRES_URL_NON_POOLING);
+        const client = new Client({
+          host: url.hostname, port: Number(url.port) || 5432,
+          database: url.pathname.slice(1), user: url.username,
+          password: url.password ? decodeURIComponent(url.password) : undefined,
+          ssl: {
+            rejectUnauthorized: true,
+            ...(process.env.SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM
+              ? { ca: process.env.SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM } : {}),
+          },
+        });
         (async () => {
           await client.connect();
           await client.query('BEGIN TRANSACTION READ ONLY');
@@ -394,7 +397,6 @@ function liveSchemaFingerprint(): string {
         timeout: 15_000,
       }
     );
-    void client;
     if (result.status !== 0) return 'unavailable';
     const fp = (result.stdout || '').trim();
     return fp || 'unavailable';

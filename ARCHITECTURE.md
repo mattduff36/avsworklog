@@ -165,6 +165,28 @@ Daily Allocation has stronger product/transaction invariants than a normal CRUD 
 
 Representative server entry points: `app/api/me/permissions`, `app/api/auth/session`, `app/api/auth/data-token`, `app/api/daily-allocation/*`, `app/api/inventory/*`, `app/api/quotes/*`. Cron/scheduled routes stay on the allowlist in `lib/supabase/middleware.ts` and require `CRON_SECRET`.
 
+Local Fixerrors controls are a deliberately isolated development prototype:
+`app/api/debug/fixerrors` requires actual SuperAdmin outside View As;
+`app/api/fixerrors-device` has separate revocable device authentication.
+`lib/server/fixerrors` keeps its private queue separate from application storage.
+Local mode uses dedicated loopback PostgreSQL and a refusal-only executor.
+Production is separately default-off, requires its dedicated verified-TLS login,
+and pins the public Squires origin and enrolled device; preview stays disabled.
+The production companion selects a SHA-pinned Windows transport. Staged Python
+sources independently validate signed review/repair admission, packet and decision,
+dispatch scoped premium workers through the existing budget/replay boundary,
+prepare two local commits and genuine post-metadata whole-worktree check receipts.
+Only separate exact-candidate Deploy consent can enter the distinct release transport.
+Repository sources do not install, repin or activate that transport. Local schema, protocol,
+separate candidate approval and pending integration gates are documented in
+`docs/guides/FIXERRORS_DEVICE_RUNNER.md`.
+The default-off signed release fixture library adds canonical issuer/device
+proofs and prepared-evidence hashes at the transactional deploy-start boundary.
+Its isolated-checkout executor accepts a locally reviewed fixture transport,
+not site-provided commands; no native Python launcher is wired. The existing
+local foreground companion remains refusal-only. See the guide for owner installation
+and live acceptance gates; offline synthetic artifacts are not real worker acceptance.
+
 ## Code placement
 
 | New work | Put it here |

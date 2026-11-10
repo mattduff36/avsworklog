@@ -27,6 +27,14 @@ import {
 import { appendWorkflowAnomalySignal } from './automation/workflow-events';
 import { checkFinaliseBlockingActivity, formatBlockingActivity } from './finalise-activity-guard';
 import {
+  assertGuardedPushCandidate,
+  assertGuardedPushReady,
+  GUARDED_PUSH_CONTEXT_ENV,
+  pushGuardedCandidate,
+  resolveGuardedPushContext,
+  type GuardedPushGit,
+} from './finalise-push-guard';
+import {
   getSkippableFinaliseTasks,
   type FinaliseTaskKey,
   type RecentFinaliseTaskRun,
@@ -67,6 +75,8 @@ import {
 } from './automation/tee-parallel-verify';
 import { formatDurationMs, notifyDisplayProgress, resolveInteractiveProgress } from './automation/tee-progress';
 
+// Guard context is supplied by the trusted caller, never by repository dotenv.
+const guardedPushContextInput = process.env[GUARDED_PUSH_CONTEXT_ENV];
 config({ path: path.resolve(process.cwd(), '.env.local') });
 
 const { Client } = pg;
@@ -804,7 +814,11 @@ async function createDbClient(): Promise<pg.Client> {
     database: url.pathname.slice(1),
     user: url.username,
     password: url.password ? decodeURIComponent(url.password) : undefined,
-    ssl: { rejectUnauthorized: false },
+    ssl: {
+      rejectUnauthorized: true,
+      ...(process.env.SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM
+        ? { ca: process.env.SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM } : {}),
+    },
   });
 
   await client.connect();
@@ -1137,13 +1151,37 @@ function pushCurrentBranch(): string {
   return branch;
 }
 
+const guardedPushGit: GuardedPushGit = {
+  run(args) {
+    // Do not persist configuration output: it can contain credential-bearing URLs.
+    const result = spawnSync(getExecutable('git'), args, {
+      cwd: REPO_ROOT,
+      env: { ...process.env, GIT_NO_REPLACE_OBJECTS: '1' },
+      shell: false,
+      encoding: 'utf8',
+      timeout: 120_000,
+      maxBuffer: 1024 * 1024,
+    });
+    return { status: result.status, stdout: result.stdout ?? '' };
+  },
+};
+
 function printHelp(): void {
-  console.log(`Usage: npx tsx scripts/finalise.ts [--full] [--push] [--dry-run]
+  console.log(`Usage: npx tsx scripts/finalise.ts [--full] [--push] [--dry-run] [--guarded-push]
 
 Variants:
   --full     Run the full automated test suite after the clean build
   --push     Push the current branch after commit
   --dry-run  Print the planned actions without changing anything
+  --guarded-push  Require trusted exact-candidate context (with --push)
+
+Guarded adapter interface (not deployment authorization):
+  Set ${GUARDED_PUSH_CONTEXT_ENV} in the caller's process environment to JSON
+  with exactly {head, tree, remote, ref, expectedRemoteHead}; SHAs are full Git SHA-1s.
+  remote must be https://github.com/mattduff36/avsworklog.git; ref must be refs/heads/main.
+  main must be clean and match head/tree at entry and push. Release metadata must
+  already be prepared: any new change or commit requires a new reviewed candidate.
+  Existing workflow, migration, build, test and release gates still apply.
 `);
 }
 
@@ -1170,6 +1208,10 @@ function assertNoBlockingCursorActivity(): void {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+  const guardedPushContext = resolveGuardedPushContext(process.argv.slice(2), guardedPushContextInput);
+  if (guardedPushContext) {
+    assertGuardedPushReady(guardedPushContext, guardedPushGit);
+  }
   const finaliseMode = getFinaliseModeKey(options);
   const run = new AutomationRun({
     scriptName: 'finalise',
@@ -1532,6 +1574,7 @@ async function main(): Promise<void> {
 
     console.log('\n==> Commit workspace changes');
     printProgress('Committing workspace changes if needed...', 90);
+    if (guardedPushContext) assertGuardedPushCandidate(guardedPushContext, guardedPushGit);
     const committed = await timeFinaliseStep(timingEntries, 'Commit workspace changes', () =>
       commitAllChanges(changeSummary.commitMessage)
     );
@@ -1560,6 +1603,7 @@ async function main(): Promise<void> {
       (committed ? changeSummary.commitMessage : null);
     const releaseVersion = await timeFinaliseStep(timingEntries, 'Bump release version locally', () => {
       runCommand('npm', ['run', 'version:bump', '--', releaseBeforeSha, releaseAfterSha]);
+      if (guardedPushContext) assertGuardedPushCandidate(guardedPushContext, guardedPushGit);
       return commitReleaseVersionChanges(releasePrimaryCommitMessage);
     });
     if (releaseVersion) {
@@ -1579,7 +1623,9 @@ async function main(): Promise<void> {
     if (options.push) {
       console.log('\n==> Push current branch');
       printProgress(`Pushing branch ${branch || '(detached HEAD)'}...`, 97);
-      pushedBranch = await timeFinaliseStep(timingEntries, 'Push current branch', () => pushCurrentBranch());
+      pushedBranch = await timeFinaliseStep(timingEntries, 'Push current branch', () =>
+        guardedPushContext ? pushGuardedCandidate(guardedPushContext, guardedPushGit) : pushCurrentBranch()
+      );
       printProgress(`Pushed ${pushedBranch}.`, 99);
     } else {
       console.log('\n==> Push current branch');

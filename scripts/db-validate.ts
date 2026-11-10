@@ -9,7 +9,7 @@
  * What this script checks:
  *   1. Trigger functions — scans every TRIGGER function body for NEW.col / OLD.col
  *      patterns and verifies those columns exist in the tables the trigger is
- *      attached to.
+ *      attached to, excluding only provably unreachable schema-only IF branches.
  *   2. Trigger functions — checks UPDATE OF col_list in trigger definitions for
  *      stale column names.
  *   3. Key FK relationships used by application queries (e.g. plant → van_categories).
@@ -26,6 +26,7 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import pg from 'pg';
 import { AutomationRun } from './automation/logger';
+import { extractTriggerColumnReferences } from './db-trigger-column-references';
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
@@ -182,7 +183,11 @@ async function main(): Promise<number> {
     database: url.pathname.slice(1),
     user: url.username,
     password: url.password ? decodeURIComponent(url.password) : undefined,
-    ssl: { rejectUnauthorized: false },
+    ssl: {
+      rejectUnauthorized: true,
+      ...(process.env.SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM
+        ? { ca: process.env.SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM } : {}),
+    },
   });
   client = dbClient;
 
@@ -231,11 +236,7 @@ async function main(): Promise<number> {
     const tableCols = colsByTable.get(table_name);
     if (!tableCols) continue; // table might be a view — skip
 
-    // Extract NEW.col and OLD.col references (case-insensitive: PL/pgSQL allows new/old/New/etc.)
-    const refs = new Set<string>();
-    for (const m of fn_body.matchAll(/\b(?:NEW|OLD)\.(\w+)/gi)) {
-      refs.add(m[1].toLowerCase());
-    }
+    const refs = extractTriggerColumnReferences(fn_body, 'public');
 
     for (const col of refs) {
       if (!tableCols.has(col)) {

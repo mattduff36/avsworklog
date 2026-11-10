@@ -35,6 +35,7 @@ export function isPublicBrowserPath(path: string): boolean {
 
 export function isPublicRequestPath(path: string): boolean {
   return (
+    getPathname(path) === '/api/fixerrors-device' ||
     isPublicBrowserPath(path) ||
     PUBLIC_API_ROUTE_PREFIXES.some((prefix) => pathMatchesRoutePrefix(path, prefix))
   );

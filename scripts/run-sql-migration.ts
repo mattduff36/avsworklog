@@ -382,7 +382,11 @@ export async function defaultCreateMigrationClient(
     database: url.pathname.slice(1),
     user: url.username,
     password: url.password ? decodeURIComponent(url.password) : undefined,
-    ssl: { rejectUnauthorized: false },
+    ssl: {
+      rejectUnauthorized: true,
+      ...(process.env.SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM
+        ? { ca: process.env.SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM } : {}),
+    },
   });
   await client.connect();
   return client;

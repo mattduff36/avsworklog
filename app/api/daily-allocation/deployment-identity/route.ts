@@ -14,8 +14,9 @@ export async function GET() {
       { status: 503, headers: NO_STORE_HEADERS }
     );
   }
+  const deploymentId = process.env.VERCEL_DEPLOYMENT_ID;
   return NextResponse.json(
-    { commit_sha: commitSha },
+    { commit_sha: commitSha, ...(/^dpl_[A-Za-z0-9]{1,120}$/u.test(deploymentId ?? '') ? { deployment_id: deploymentId } : {}) },
     { headers: NO_STORE_HEADERS }
   );
 }
