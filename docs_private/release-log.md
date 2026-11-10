@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.8.5
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): allow bounded repair verification to finish`
+
+**PUSHED AT**
+2026-11-10T15:00:18.678Z
+
+**WHAT CHANGED**
+Allow bounded repair verification to finish.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): allow bounded repair verification to finish`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 1126.8.4
 
 **GIT COMMIT MESSAGE**

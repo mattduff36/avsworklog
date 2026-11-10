@@ -1,5 +1,18 @@
 [
   {
+    "version": "1126.8.5",
+    "updateKind": "minor",
+    "title": "Fixerrors improvements",
+    "description": "Allow bounded repair verification to finish.",
+    "summary": "Allow bounded repair verification to finish.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-10T15:00:18.678Z"
+  },
+  {
     "version": "1126.8.4",
     "updateKind": "minor",
     "title": "Help and FAQ guidance update",
