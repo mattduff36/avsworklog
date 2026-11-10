@@ -12,6 +12,7 @@ import squires_companion as s
 CHECK_IDS = ('targeted-tests', 'typecheck', 'lint')
 BOUNDARY = 'scripts/automation/fixerrors-bridge-boundary.ts'
 CHECK_SCRIPT = 'scripts/automation/fixerrors-scoped-check.mjs'
+CACHE_SCRIPT = 'scripts/automation/fixerrors-typecheck-cache.mjs'
 METADATA = ('lib/config/release-version.json', 'lib/config/release-history.json', 'docs_private/release-log.md')
 ANALYSIS = (
     'Investigate the single sanitized packet cluster from its named source and existing unit tests. '
@@ -74,6 +75,13 @@ def scoped_checks(cfg, tests, paths):
         args = tests if check_id == 'targeted-tests' else paths if check_id == 'lint' else []
         result[check_id] = {**definition, 'argv': definition['argv'] + args}
     return result
+
+
+def typecheck_ready(cfg):
+    result = subprocess.run([node(cfg), CACHE_SCRIPT, 'ready'], cwd=s.WORKSPACE,
+                            env=local_env(), stdin=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
+    s.require(result.returncode == 0, 'typecheck_cache_not_ready_parent_warmup_required')
 
 
 def read_json(path, limit=1024 * 1024):
@@ -214,7 +222,7 @@ def prepare(cfg, ticket, req, run, state, after):
             s.time_valid(ticket, int(time.time()))
             receipt = server.call({'check_id': check_id})
             s.require(receipt['passed'] is True and receipt['termination_confirmed'] is True,
-                      'prepared_check_failed')
+                      'prepared_check_failed:' + check_id)
             raw = (server.receipts / (receipt['receipt_id'] + '.json')).read_bytes()
             selected[check_id] = dict(receiptId=receipt['receipt_id'], sha256=s.sha(raw))
         s.require(s.config() == cfg and snapshot(s.WORKSPACE) == actual, 'prepared_checks_candidate_changed')
@@ -244,6 +252,55 @@ def exclusive_json(path, value):
     s.require(path.read_bytes() == raw, 'artifact_writeback_failed')
 
 
+REVIEW_ARTIFACTS = ('request.json', 'before.json', 'after.json', 'state.json', 'validated-decision.json')
+
+
+def review_record(packet_sha):
+    s.require(s.identifier(packet_sha, s.HEX), 'invalid_review_packet')
+    return s.WORKSPACE / '.git/squires-fixerrors' / ('reviewed-' + packet_sha + '.json')
+
+
+def reuse_review(ticket, packet):
+    """Evidence only: the current signed repair admission and replay claim remain mandatory."""
+    from run_worker import ROOT
+    record = review_record(ticket['packetSha256'])
+    if not record.exists():
+        return None
+    value = s.fields(read_json(record), ('jobId', 'packetSha256', 'artifacts'))
+    s.require(s.uuid_text(value['jobId']) and value['packetSha256'] == ticket['packetSha256'],
+              'review_identity_changed')
+    digests = s.fields(value['artifacts'], REVIEW_ARTIFACTS)
+    run = ROOT / 'runs' / ('squires-fixerrors-' + value['jobId'] + '-analysis') / '1'
+    artifacts = {}
+    for name in REVIEW_ARTIFACTS:
+        artifacts[name] = read_json(run / name, 8 * 1024 * 1024)
+        s.require(s.identifier(digests[name], s.HEX) and s.sha((run / name).read_bytes()) == digests[name],
+                  'review_artifact_changed')
+    req = artifacts['request.json']
+    s.require(req.get('origin') == s.ORIGIN and req.get('mode') == 'ask'
+              and req.get('task_id') == 'squires-fixerrors-' + value['jobId'] + '-analysis'
+              and req.get('attempt') == 1 and req.get('workspace') == str(s.WORKSPACE)
+              and req.get('editable_paths') == [] and req.get('checks') == {}
+              and req.get('squires_packet') == packet
+              and req.get('squires_job', {}).get('jobId') == value['jobId']
+              and req.get('squires_job', {}).get('packetSha256') == ticket['packetSha256'],
+              'review_request_changed')
+    successful_run(run, req, artifacts['before.json'], True)
+    return artifacts['validated-decision.json']
+
+
+def remember_review(ticket, run, packet):
+    record = review_record(ticket['packetSha256'])
+    if record.exists():
+        s.require(reuse_review(ticket, packet) is not None, 'existing_review_invalid')
+        return
+    artifacts = {}
+    for name in REVIEW_ARTIFACTS:
+        read_json(run / name, 8 * 1024 * 1024)
+        artifacts[name] = s.sha((run / name).read_bytes())
+    exclusive_json(record, dict(jobId=ticket['jobId'], packetSha256=ticket['packetSha256'], artifacts=artifacts))
+
+
 def execute(raw, cfg):
     s.local_runtime(cfg)
     body = s.fields(s.signed_device(raw, 'repair', cfg), ('ticket', 'packet'))
@@ -261,6 +318,7 @@ def execute(raw, cfg):
     if repair:
         s.require(not (s.WORKSPACE / '.git/squires-fixerrors/prepared-release.json').exists(),
                   'prepared_candidate_requires_reconciliation')
+        typecheck_ready(cfg)
     s.require(cfg['workerEligible'] is True and cfg['allowBoundedRepair' if repair else 'allowReadOnly'] is True,
               'local_opt_out')
     # One durable claim covers both stages and preparation; never release it on partial failure.
@@ -276,16 +334,20 @@ def execute(raw, cfg):
         s.repair_guard(cfg, ticket)
         s.require(local_packet.read_bytes() == packet, 'local_packet_changed')
     guard()
-    run, _, _ = dispatch(cfg, ticket, analysis, guard)
-    report = run / 'result.md'
-    s.require(report.stat().st_size <= s.MAX_PACKET, 'analysis_result_limit')
-    text = report.read_text(encoding='utf-8').strip()
-    text = re.sub(r'^```(?:json)?\s*([\s\S]*?)\s*```$', r'\1', text)
-    decision = s.decode_json(text)
+    decision = reuse_review(ticket, inspected['packet']) if repair else None
+    if decision is None:
+        run, _, _ = dispatch(cfg, ticket, analysis, guard)
+        report = run / 'result.md'
+        s.require(report.stat().st_size <= s.MAX_PACKET, 'analysis_result_limit')
+        text = report.read_text(encoding='utf-8').strip()
+        text = re.sub(r'^```(?:json)?\s*([\s\S]*?)\s*```$', r'\1', text)
+        decision = s.decode_json(text)
+        validated = boundary(cfg, 'decision', body['packet'], decision)
+        exclusive_json(run / 'validated-decision.json', validated['decision'])
     validated = boundary(cfg, 'decision', body['packet'], decision)
-    exclusive_json(run / 'validated-decision.json', validated['decision'])
     if not repair:
         guard()
+        remember_review(ticket, run, inspected['packet'])
         return {'status': 'reviewed'}
     validated = boundary(cfg, 'repair', body['packet'], decision)
     checks = scoped_checks(cfg, validated['tests'], validated['plan']['editablePaths'])
@@ -295,6 +357,7 @@ def execute(raw, cfg):
     def repair_launch_guard():
         guard()
         s.require(boundary(cfg, 'repair', body['packet'], decision) == validated, 'decision_drift')
+        typecheck_ready(cfg)
     repair_launch_guard()
     run, state, after = dispatch(cfg, ticket, req, repair_launch_guard)
     exclusive_json(run / 'validated-decision.json', validated['decision'])

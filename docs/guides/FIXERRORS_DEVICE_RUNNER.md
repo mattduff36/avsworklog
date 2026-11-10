@@ -464,8 +464,12 @@ unchanged `squires_companion.py`, then `squires_repair.py`. Existing three-pin
 enrollment fails closed until the owner installs and repins. The check catalogue
 contains only absolute enrolled Node plus the fixed scoped wrapper and check ID;
 validated unit-test/lint paths are appended locally. Typecheck takes no paths.
-The wrapper sets `AVSWORKLOG_TEST_SKIP_DOTENV=1`, does not use a shell/npx, and
-disables TypeScript incremental output. Worker artifacts, decisions, metadata
+The wrapper sets `AVSWORKLOG_TEST_SKIP_DOTENV=1` and does not use a shell/npx.
+Every typecheck runs the complete application `tsconfig.json` project with
+`tsc --project tsconfig.json --noEmit --incremental`, using only the protected
+external cache described below, never checkout `tsconfig.tsbuildinfo`.
+The root project excludes unit tests; this is application-project typechecking,
+not a claim that unit tests were typechecked. Worker artifacts, decisions, metadata
 diagnostics and all receipt bytes remain in the private native run directory.
 
 Review is capped at 120 seconds; repair including preparation is capped at 240
@@ -486,7 +490,7 @@ Focused offline checks (the name filter excludes disposable Git-write fixtures):
 
 ```powershell
 $env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
-npx vitest run tests\unit\fixerrors-production-bridge.test.ts tests\unit\fixerrors-controlled-acceptance.test.ts tests\unit\fixerrors-production-config.test.ts tests\unit\fixerrors-production-admission.test.ts tests\unit\fixerrors-companion-packet.test.ts tests\unit\fixerrors-device-admission.test.ts tests\unit\fixerrors-auto.test.ts tests\unit\fixerrors-companion.test.ts tests\unit\fixerrors-control.test.ts tests\unit\fixerrors-signed-release.test.ts tests\integration\api\fixerrors-local-route.test.ts tests\ui\fixerrors-control-panel.test.tsx -t '^(?!.*clean local main only)'
+npx vitest run --no-file-parallelism tests\unit\fixerrors-typecheck-cache.test.ts tests\unit\fixerrors-production-bridge.test.ts tests\unit\fixerrors-controlled-acceptance.test.ts tests\unit\fixerrors-production-config.test.ts tests\unit\fixerrors-production-admission.test.ts tests\unit\fixerrors-companion-packet.test.ts tests\unit\fixerrors-device-admission.test.ts tests\unit\fixerrors-auto.test.ts tests\unit\fixerrors-companion.test.ts tests\unit\fixerrors-control.test.ts tests\unit\fixerrors-signed-release.test.ts tests\integration\api\fixerrors-local-route.test.ts tests\ui\fixerrors-control-panel.test.tsx -t '^(?!.*clean local main only)'
 npm run typecheck
 ```
 
@@ -504,6 +508,84 @@ removed without following it. This proves preparation/receipt mechanics, **not**
 that a premium worker ran or a production candidate was accepted.
 Queue fixtures are not native PostgreSQL crash/concurrency evidence.
 
+### Protected full-project TypeScript cache
+
+Before requesting a repair, the owner must provision the fixed ordinary directory
+`%USERPROFILE%\.codex\cursor-worker\squires-typecheck-cache`, outside the checkout
+and worker candidate snapshot. Use an owner-only, inheritance-protected Windows
+DACL: current Windows user owns it and is the only allowed principal, including
+on its files. The helper checks ownership/ACLs at every use and rejects junctions,
+symlinks, hard-linked artifacts and redirected ancestors. Protect the parent
+directories, checkout, compiler and installed dependencies from untrusted writes
+as well. This is not an OS sandbox against the enrolled Windows user.
+
+For a **new directory only**, in an owner-controlled PowerShell:
+
+```powershell
+$cache=Join-Path $env:USERPROFILE '.codex\cursor-worker\squires-typecheck-cache'
+if (Test-Path -LiteralPath $cache) { throw 'Existing cache requires owner inspection' }
+New-Item -ItemType Directory -Path $cache -ErrorAction Stop | Out-Null
+$id=[Security.Principal.WindowsIdentity]::GetCurrent().User
+$acl=New-Object Security.AccessControl.DirectorySecurity
+$acl.SetOwner($id)
+$acl.SetAccessRuleProtection($true,$false)
+$acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($id,'FullControl','ContainerInherit,ObjectInherit','None','Allow'))
+Set-Acl -LiteralPath $cache -AclObject $acl
+```
+
+With the companion stopped and the accepted clean checkout current, the parent
+explicitly runs these fixed commands **before signed admission**:
+
+```powershell
+Set-Location -LiteralPath 'D:\Websites\avsworklog'
+$env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
+node scripts\automation\fixerrors-typecheck-cache.mjs warmup
+if ($LASTEXITCODE -ne 0) { throw 'Typecheck warmup failed' }
+node scripts\automation\fixerrors-typecheck-cache.mjs ready
+if ($LASTEXITCODE -ne 0) { throw 'Typecheck cache not ready' }
+```
+
+Warmup is trusted parent maintenance, never an enrolled worker check. The wrapper
+accepts only `typecheck` with no paths and cannot warm a missing/stale cache.
+The orchestrator checks readiness before either repair premium dispatch, including
+the internal analysis stage, without changing budget preflights, admission,
+leases or timeouts. Read-only review does not require this cache. All three genuine
+post-metadata worktree receipts and both actual worker stages remain required.
+
+A successful explicit review records hashes of its actual native request,
+before/after snapshots, successful worker result and validated decision in
+`.git/squires-fixerrors/reviewed-<packet SHA-256>.json`. A later repair may reuse
+that investigation only for the identical packet and unchanged worktree. It
+rechecks every artifact hash, the read-only result and current snapshot, then
+validates the decision again. The new signed repair admission, durable replay
+claim, local consent, fresh implementation budget preflight and all repair checks
+remain mandatory. The earlier review is evidence, never repair or Deploy authority.
+Changed or corrupted evidence fails closed; it is not silently replaced. Without
+an existing review, repair performs its own real investigation, but may exceed
+the unchanged deadline. Request and verify review first for the controlled live test.
+
+Readiness hashes the exact cache bytes, project/extended configuration, compiler
+and Node identities, lockfiles, consumed dependency files and their package
+manifests, plus the project source candidate. Compiler runs recheck those inputs
+before publication; source edits between checks are allowed, edits during a check
+fail closed. TypeScript still discovers and checks the full project and its imports;
+there is no changed-file compiler filter. New/unconsumed dependencies are checked
+by TypeScript on first use, not claimed as previously cached evidence.
+Installed dependencies (including any explicitly trusted fixture junction) remain
+trusted local inputs; cache paths never accept links or caller overrides.
+
+An exclusive lock serializes readiness, warmup and checks; no stale-lock stealing.
+Each successful invocation fsyncs temporary compiler output and atomically renames
+it and its matching manifest. An interrupted two-file publication leaves pending
+state or a hash mismatch and cannot be used. Compiler diagnostics retain the
+previous intact cache so a worker can repair and rerun, but return failure, never
+a passing receipt. Missing cache, changed configuration/dependencies or a changed
+pre-admission source candidate requires parent warmup. Tampering, pending files,
+or a leftover lock requires owner investigation with all users stopped; do not
+automatically delete locks or overwrite corrupted/orphaned state to force readiness.
+Native crash/disk durability and real production warm/cold timings remain parent
+acceptance checks; disposable compiler fixtures are not timing evidence.
+
 ### Parent installation, repinning and controlled live acceptance
 
 These are **owner/parent operations, not authorization supplied by this document**.
@@ -513,6 +595,31 @@ remains; investigate any existing checkout/check/replay lock or prepared candida
 never delete it to make the next command pass. Integrate the accepted source through
 the parent's normal gates so the fixed checkout is clean `main` with the reviewed
 scripts before any worker starts. Keep production queue activation and Deploy off.
+
+Install the complete reviewed native runner distribution, not just its Python
+files. In particular, `copilot_backend.py` requires its distribution's
+`../references/premium-policy.md` relative to that module. Copy that exact reviewed
+reference to the corresponding installed `references` directory and verify it
+exists and matches the reviewed version before enabling either worker stage.
+Do not invent a replacement policy or disable the lookup on a missing-file error.
+Preserve native budget/account eligibility preflights.
+
+Launch from an owner-controlled PowerShell. Reset any inherited PowerShell 7 or
+editor-specific process-only module path to the trusted Windows
+PowerShell defaults before launching Node, so nested PowerShell ACL probes and
+runner processes do not resolve editor-specific module locations:
+
+```powershell
+$env:PSModulePath=@(
+  (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'WindowsPowerShell\Modules'),
+  (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules'),
+  (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules')
+) -join ';'
+```
+
+Do not change machine/user persistent environment settings for this launch hygiene.
+Provision and warm the protected TypeScript cache above before admission; source
+integration, dependency installation or config changes can invalidate readiness.
 
 For an existing enrollment, preserve its device/key/enrollment IDs and replay DB.
 Do not rerun fresh provisioning or generate replacement keys. From an owner-controlled

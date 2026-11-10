@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { resolve } from 'node:path';
+import { CACHE_ROOT, WORKSPACE, createTypecheckCache } from './fixerrors-typecheck-cache.mjs';
 
 const [id, ...paths] = process.argv.slice(2);
 const safe = /^(?:app|components|lib|hooks|utils|services|tests\/unit)\/[A-Za-z0-9_()/.[\]-]+\.(?:ts|tsx)$/u;
@@ -11,13 +12,17 @@ if (!['targeted-tests', 'typecheck', 'lint'].includes(id) || paths.length > 40 |
 }
 const commands = {
   'targeted-tests': ['node_modules/vitest/vitest.mjs', 'run', ...paths],
-  typecheck: ['node_modules/typescript/bin/tsc', '--noEmit', '--incremental', 'false'],
   lint: ['node_modules/eslint/bin/eslint.js', ...paths],
 };
-const [script, ...args] = commands[id];
-const result = spawnSync(process.execPath, [resolve(script), ...args], {
-  cwd: process.cwd(), env: { ...process.env, AVSWORKLOG_TEST_SKIP_DOTENV: '1' },
-  stdio: 'inherit', shell: false, windowsHide: true,
-});
-if (result.error) throw result.error;
-process.exitCode = result.status ?? 2;
+if (id === 'typecheck') {
+  if (process.cwd() !== WORKSPACE) throw new Error('Typecheck requires fixed checkout');
+  process.exitCode = createTypecheckCache(WORKSPACE, CACHE_ROOT).check();
+} else {
+  const [script, ...args] = commands[id];
+  const result = spawnSync(process.execPath, [resolve(script), ...args], {
+    cwd: process.cwd(), env: { ...process.env, AVSWORKLOG_TEST_SKIP_DOTENV: '1' },
+    stdio: 'inherit', shell: false, windowsHide: true,
+  });
+  if (result.error) throw result.error;
+  process.exitCode = result.status ?? 2;
+}

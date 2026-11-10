@@ -1,8 +1,9 @@
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync, sign, verify } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { promisify } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { issueClaimedFixerrorsAdmission } from '@/lib/fixerrors/admission';
 import { checkEvidenceDigest } from '@/lib/fixerrors/control';
@@ -126,16 +127,16 @@ describe('production signed repair transport (offline; no model launch)', () => 
   const installed = 'C:\\Users\\mattd\\.codex\\cursor-worker\\squires-production-bridge';
   it.skipIf(!existsSync(path.join(installed, 'worker_checks.py')))(
     'prepares a synthetic two-commit candidate and real scoped/whole-worktree receipts in a disposable checkout, never a model or release',
-    () => {
-      const result = execFileSync('python', ['-I', '-B', path.resolve('tests\\fixtures\\fixerrors-repair-boundary.py'),
+    async () => {
+      const { stdout: result } = await promisify(execFile)('python', ['-I', '-B', path.resolve('tests\\fixtures\\fixerrors-repair-boundary.py'),
         installed, process.cwd(), process.execPath], {
-        encoding: 'utf8', timeout: 120_000, maxBuffer: 16_384, windowsHide: true,
+        encoding: 'utf8', timeout: 180_000, maxBuffer: 16_384, windowsHide: true,
         env: { ...process.env, AVSWORKLOG_TEST_SKIP_DOTENV: '1' },
       });
       const output = JSON.parse(result);
       expect(output).toMatchObject({
         fixtureOnly: true, modelLaunched: false, released: false, preparedCommits: 2,
-        realPreparedReceipts: 3, negativeChecks: 4,
+        realPreparedReceipts: 3, negativeChecks: 4, reviewReuseNegativeChecks: 7,
       });
       const tested = resultSchema.parse(output.result);
       expect(tested.status).toBe('tested');
@@ -145,6 +146,6 @@ describe('production signed repair transport (offline; no model launch)', () => 
       expect(tested.checks.release?.testEvidenceSha256).toBe(
         createHash('sha256').update(encodePreparedReleaseEvidence(evidence)).digest('hex'),
       );
-    }, 120_000,
+    }, 180_000,
   );
 });
