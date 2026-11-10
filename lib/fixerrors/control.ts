@@ -144,7 +144,7 @@ export function applyAdminCommand(tx: QueueTransaction, actor: string, command: 
   }
   const job: FixerrorsJob = {
     id: command.requestId, deviceId: device.id, action, state: 'queued', requestedBy: actor,
-    createdAt: now, expiresAt: now + 300_000, workspace: { ...workspace },
+    createdAt: now, expiresAt: now + (action === 'repair' ? 600_000 : 300_000), workspace: { ...workspace },
     parentRepairId: parent?.id ?? null,
     candidate: parent?.candidate ?? null, checks: parent?.checks ?? null,
     approval: command.op === 'approve-deploy'

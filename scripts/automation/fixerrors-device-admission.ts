@@ -12,7 +12,6 @@ export { encodeFixerrorsDeviceJob, fixerrorsDeviceSigningBytes, type FixerrorsDe
 export const FIXERRORS_WORKSPACE = 'D:\\Websites\\avsworklog';
 const audience = 'squires-windows-fixerrors';
 const maxTicketBytes = 4096;
-const maxLifetimeSeconds = 300;
 const identifier = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/u);
 const envelopeSchema = z.object({
   version: z.literal(1),
@@ -162,7 +161,8 @@ export async function admitFixerrorsDeviceJob(
   const assertTime = () => {
     const now = dependencies.nowSeconds();
     if (!Number.isSafeInteger(now) || now < 0 || job.issuedAt > now || job.expiresAt <= now ||
-        job.expiresAt <= job.issuedAt || job.expiresAt - job.issuedAt > maxLifetimeSeconds) fail('invalid validity window');
+        job.expiresAt <= job.issuedAt ||
+        job.expiresAt - job.issuedAt > (job.authority === 'bounded-repair' ? 600 : 300)) fail('invalid validity window');
   };
   assertTime();
   const workspace = dependencies.inspectWorkspace();

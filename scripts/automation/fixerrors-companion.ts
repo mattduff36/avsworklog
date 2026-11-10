@@ -117,7 +117,7 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
   };
   scheduleRenewal();
   const maxRuntime = job.action === 'deploy' ? FIXERRORS_DEPLOY_TIMEOUT_MS
-    : Math.min(job.action === 'repair' ? 290_000 : 120_000, Math.max(1, job.expiresAt - Date.now() - 10_000));
+    : Math.min(job.action === 'repair' ? 480_000 : 120_000, Math.max(1, job.expiresAt - Date.now() - 10_000));
   const unconfirmed = { status: 'unknown', reason: 'release-unconfirmed' } as const;
   const timeout = setTimeout(() => abort('timeout'), Math.min(deps.timeoutMs ?? maxRuntime, maxRuntime));
   let executionSettled = false;

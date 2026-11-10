@@ -32,6 +32,7 @@ describe('production review/repair signed admission (offline; never launches a w
     expect(verify(null, fixerrorsDeviceSigningBytes(envelope.keyId, envelope.payload), repairKey.publicKey,
       Buffer.from(envelope.signature, 'base64url'))).toBe(true);
     const payload = JSON.parse(Buffer.from(envelope.payload, 'base64url').toString('utf8'));
+    expect(payload.expiresAt - payload.issuedAt).toBe(action === 'repair' ? 600 : 300);
     expect(payload).toMatchObject({
       jobId: claim.job.id, deviceId, authority: action === 'review' ? 'read-only' : 'bounded-repair',
       head: workspace.head, tree: workspace.tree, packetSha256: workspace.packetSha256,

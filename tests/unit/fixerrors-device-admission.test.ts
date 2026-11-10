@@ -84,6 +84,20 @@ describe('offline fixed Fixerrors device admission', () => {
       .resolves.toMatchObject({ authority: 'bounded-repair', phase: 'repair-validated-cluster', launchAuthorized: false });
   });
 
+  it('allows ten minutes only for bounded repair and rejects longer or expired tickets', async () => {
+    const repairEnrollment = { ...enrollment, allowBoundedRepair: true };
+    const repairJob = { authority: 'bounded-repair' as const, issuedAt: now, expiresAt: now + 600 };
+    await expect(admitFixerrorsDeviceJob(ticket(repairJob), repairEnrollment, harness().dependencies))
+      .resolves.toMatchObject({ authority: 'bounded-repair' });
+    for (const change of [{ expiresAt: now + 601 }, { authority: 'read-only' as const }]) {
+      await expect(admitFixerrorsDeviceJob(ticket({ ...repairJob, ...change }), repairEnrollment, harness().dependencies))
+        .rejects.toThrow('window');
+    }
+    const expired = harness();
+    expired.dependencies.nowSeconds = () => now + 600;
+    await expect(admitFixerrorsDeviceJob(ticket(repairJob), repairEnrollment, expired.dependencies)).rejects.toThrow('window');
+  });
+
   it.each([
     { enabled: false }, { workerEligible: false }, { allowReadOnly: false },
     { deviceId: '9fa85697-cc2b-4e96-9baa-cfd87a934864' }, { keyId: 'other-key' },

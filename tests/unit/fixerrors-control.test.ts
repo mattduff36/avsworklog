@@ -110,7 +110,7 @@ describe('local Fixerrors durable queue contract (transaction fixture)', () => {
   it('expires queued jobs with no retry and consumes request ids permanently', async () => {
     const h = harness();
     const id = await h.enqueue();
-    h.advance(300_000);
+    h.advance(600_000);
     await h.device({ op: 'heartbeat', workspace, allowReadOnly: true, allowRepair: true, allowDeploy: true, bridgeAvailable: true });
     expect(await h.device({ op: 'claim' })).toMatchObject({ claim: null });
     await expect(h.enqueue('repair', id)).rejects.toThrow('Duplicate');

@@ -64,7 +64,8 @@ export function prepareProductionRepairProof(
       admitted.packetSha256 !== job.workspace.packetSha256 ||
       admitted.packetSha256 !== createHash('sha256').update(packet).digest('hex') ||
       !Number.isSafeInteger(now) || admitted.issuedAt > now || admitted.expiresAt <= now ||
-      admitted.expiresAt <= admitted.issuedAt || admitted.expiresAt - admitted.issuedAt > 300 ||
+      admitted.expiresAt <= admitted.issuedAt ||
+      admitted.expiresAt - admitted.issuedAt > (admitted.authority === 'bounded-repair' ? 600 : 300) ||
       admitted.expiresAt > Math.floor(job.expiresAt / 1000)) throw new Error('Repair admission binding mismatch');
   const device = createPrivateKey(enrollment.devicePrivateKeyPem);
   requireSeparateDevice(device, issuer, createPublicKey(enrollment.releasePublicKeyPem));

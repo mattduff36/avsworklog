@@ -21,7 +21,7 @@ with Ed25519, then serializes exactly `{version: 1, keyId, payload, signature}`
 in that order, without whitespace. Payload and signature use unpadded canonical
 base64url. Version, audience, fixed job, environment, device, authority, unique
 job UUID, integer UTC validity window, exact clean HEAD/tree and sanitized packet
-SHA-256 are signed. Maximum lifetime is 300 seconds; expiry is exclusive, with
+SHA-256 are signed. Maximum lifetime is 600 seconds for bounded repair and 300 seconds for review; expiry is exclusive, with
 no future-issued grace. Envelope is limited to 4096 UTF-8 bytes. Unknown fields,
 duplicate keys, reordered/noncanonical JSON and arbitrary command, path, prompt
 or credential fields fail closed. Tickets contain no DB/model credentials.
@@ -193,7 +193,7 @@ writer. A stale lock requires owner investigation, not automatic deletion.
 Renewals and terminal status updates require the same device and fresh lease.
 Unknown network/commit outcomes stop polling rather than retrying work.
 Execution rechecks consent, checkout and lease immediately before use.
-Review is capped at 120 seconds; repair at 290 seconds, shortened by remaining
+Review is capped at 120 seconds; repair at 480 seconds, shortened by remaining
 job expiry. A deployment must explicitly start
 within the five-minute approval window. Once started, it has a 25-minute
 execution cap, a renewable 60-second lease and up to 30 seconds to settle and
@@ -397,7 +397,7 @@ state. The repair issuer uses server-only base64url PEM
 `SQUIRES_FIXERRORS_REPAIR_PRIVATE_KEY` plus
 `SQUIRES_FIXERRORS_RELEASE_PUBLIC_KEY`, with distinct Ed25519 keys and IDs.
 The signed UUID/device, authority, candidate and packet hash retain the v1
-format and five-minute/exclusive expiry. This adds admission, **not** worker
+format and authority-specific exclusive expiry. This adds admission, **not** worker
 launch authority, a replay store or a deployment approval.
 
 `scripts/automation/fixerrors-companion-packet.ts` supplies explicit trusted-local
@@ -472,10 +472,10 @@ The root project excludes unit tests; this is application-project typechecking,
 not a claim that unit tests were typechecked. Worker artifacts, decisions, metadata
 diagnostics and all receipt bytes remain in the private native run directory.
 
-Review is capped at 120 seconds; repair including preparation is capped at 290
+Review is capped at 120 seconds; repair including preparation is capped at 480
 seconds and additionally at ten seconds before the original job expiry. Native
 analysis/repair stages have one/two-minute bounds. The signed admission and queue
-still expire within five minutes; no new long-running repair lease is introduced.
+expire within ten minutes for bounded repair and five minutes for review. Renewable 60-second leases, cancellation, replay protection and exclusive signed expiry remain mandatory.
 Slow work fails closed, never becomes tested evidence, and needs owner
 reconciliation rather than automatic replay/requeue. Preparation failures retain
 the native lock; abrupt cancellation during a write also leaves that lock.
@@ -651,7 +651,7 @@ function Replace-PrivateJson($file,$text) {
 $cfg.enabled=$false; $cfg.workerEligible=$false
 $cfg.allowReadOnly=$false; $cfg.allowBoundedRepair=$false; $cfg.allowRelease=$false
 Replace-PrivateJson $cfgPath ($cfg | ConvertTo-Json -Depth 20 -Compress)
-foreach ($name in @('squires-windows-release.py','squires_release.py','squires_repair.py')) {
+foreach ($name in @('squires-windows-release.py','squires_release.py','squires_companion.py','squires_repair.py')) {
   Copy-Item -LiteralPath (Join-Path $repo ('scripts\automation\'+$name)) -Destination (Join-Path $bridge $name) -Force
 }
 $names=@('squires-windows-release.py','squires_release.py','squires_companion.py','squires_repair.py')

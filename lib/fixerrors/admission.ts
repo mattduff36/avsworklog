@@ -3,6 +3,8 @@ import { z } from 'zod';
 import type { FixerrorsJob } from './protocol';
 
 export const FIXERRORS_COMPANION_PACKET_MAX_BYTES = 96 * 1024;
+export const FIXERRORS_REPAIR_LIFETIME_SECONDS = 600;
+export const FIXERRORS_REVIEW_LIFETIME_SECONDS = 300;
 
 export const fixerrorsDeviceJobSchema = z.object({
   version: z.literal(1),
@@ -49,7 +51,8 @@ export function issueClaimedFixerrorsAdmission(
     throw new Error('Fixerrors admission requires a fresh claimed review or repair');
   }
   const issuedAt = Math.floor(nowMs / 1000);
-  const expiresAt = Math.min(issuedAt + 300, Math.floor(job.expiresAt / 1000));
+  const lifetime = job.action === 'repair' ? FIXERRORS_REPAIR_LIFETIME_SECONDS : FIXERRORS_REVIEW_LIFETIME_SECONDS;
+  const expiresAt = Math.min(issuedAt + lifetime, Math.floor(job.expiresAt / 1000));
   if (expiresAt <= issuedAt) throw new Error('Fixerrors admission already expired');
   const payload = encodeFixerrorsDeviceJob({
     version: 1, audience: 'squires-windows-fixerrors', job: 'fixerrors',

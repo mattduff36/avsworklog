@@ -108,17 +108,17 @@ describe('outbound companion: fake executors only, never real fap', () => {
     expect(deps.complete).toHaveBeenCalledWith({ status: 'blocked', reason: 'timeout' });
   });
 
-  it('permits repair preparation after four minutes but stops before the signed window ends', async () => {
+  it('permits repair preparation beyond five minutes but stops at the eight-minute execution cap', async () => {
     vi.useFakeTimers();
     const { claim, deps, executor } = await setup();
-    vi.setSystemTime(claim.job.expiresAt - 300_000);
+    vi.setSystemTime(claim.job.expiresAt - 600_000);
     executor.execute = vi.fn<TrustedFixerrorsExecutor['execute']>((_job, signal) => new Promise((resolve) => {
       signal.addEventListener('abort', () => resolve({ status: 'blocked', reason: 'timeout' }), { once: true });
     }));
     const running = executeCompanionClaim(claim, deps);
-    await vi.advanceTimersByTimeAsync(240_000);
+    await vi.advanceTimersByTimeAsync(300_000);
     expect(deps.complete).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(49_999);
+    await vi.advanceTimersByTimeAsync(179_999);
     expect(deps.complete).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     await running;

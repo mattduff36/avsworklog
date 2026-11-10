@@ -31,6 +31,24 @@ const issuer = { keyId: 'squires-repair-v1', privateKey: repair.privateKey,
   releaseKeyId: 'squires-release-v1', releasePublicKey: release.publicKey };
 
 describe('production signed repair transport (offline; no model launch)', () => {
+  it('enforces authority-specific expiry in the actual pinned Python verifier', () => {
+    const script = [
+      'import sys',
+      'sys.path.insert(0, sys.argv[1])',
+      'import squires_companion as s',
+      "repair = dict(audience=s.REPAIR_AUD, authority='bounded-repair', issuedAt=1000, expiresAt=1600)",
+      's.time_valid(repair, 1000)',
+      "cases = [(dict(repair, expiresAt=1601),1000),(dict(repair, authority='read-only'),1000),(dict(repair, audience=s.RELEASE_AUD),1000),(repair,1600)]",
+      'for ticket, now in cases:',
+      '    try: s.time_valid(ticket, now)',
+      '    except s.Denied: pass',
+      "    else: raise AssertionError('Invalid native ticket accepted')",
+      "print('native expiry checks passed')",
+    ].join('\n');
+    expect(execFileSync('python', ['-I', '-B', '-c', script, path.resolve('scripts/automation')],
+      { encoding: 'utf8', windowsHide: true, timeout: 10_000 })).toContain('native expiry checks passed');
+  });
+
   async function fixture(action: 'review' | 'repair' = 'repair') {
     const h = harness();
     await h.enqueue(action);
