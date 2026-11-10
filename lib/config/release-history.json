@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.8.3",
+    "updateKind": "minor",
+    "title": "App reliability update",
+    "description": "Updated app reliability.",
+    "summary": "Updated app reliability.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [
+      "App reliability"
+    ],
+    "areaKeys": [
+      "app-reliability"
+    ],
+    "pushedAt": "2026-11-10T13:08:59.353Z"
+  },
+  {
     "version": "1126.8.2",
     "updateKind": "minor",
     "title": "Help and FAQ guidance update",
