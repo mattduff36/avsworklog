@@ -219,6 +219,7 @@ export function applyAdminCommand(
     approval: command.op === 'approve-deploy'
       ? { actorId: actor, confirmedAt: now, candidate: { ...command.candidate }, releaseMode: command.releaseMode } : null,
     lease: null, reason: null,
+    ...(command.op === 'enqueue' && command.requestedReleaseMode ? { requestedReleaseMode: command.requestedReleaseMode } : {}),
     ...(packet ? { packet } : {}),
     ...(evidence?.batch ? { privateBatch: evidence.batch } : {}),
   };

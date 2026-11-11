@@ -82,6 +82,8 @@ export const jobSchema = z.object({
   }).strict().nullable(),
   reason: blockReasonSchema.nullable(),
   diagnostic: nativeDiagnosticSchema.optional(),
+  // Validation preference only; this grants no deployment authority.
+  requestedReleaseMode: releaseModeSchema.optional(),
   // Private sanitized evidence, not browser-visible queue state or launch authority.
   packet: z.string().min(1).max(96 * 1024).optional(),
   batch: batchProgressSchema.optional(),
@@ -114,6 +116,7 @@ export const adminCommandSchema = z.discriminatedUnion('op', [
     deviceId: z.string().uuid(),
     action: z.enum(['review', 'repair']),
     reviewJobId: z.string().uuid().optional(),
+    requestedReleaseMode: releaseModeSchema.optional(),
     }).strict(),
   z.object({
     op: z.literal('approve-deploy'),

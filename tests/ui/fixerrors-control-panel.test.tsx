@@ -338,9 +338,9 @@ describe('Debug local Fixerrors controls', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying this exact tested candidate/ }));
     store.state.jobs[0].candidate = { ...store.state.jobs[0].candidate!, [field]: 'f'.repeat(field === 'checksSha256' ? 64 : 40) };
     fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
-    await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /I approve deploying/ })).toBeNull());
     await openDeploy();
-    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByRole('checkbox', { name: /I approve deploying/ }).getAttribute('aria-checked')).toBe('false');
   });
 
   it('clears consent when controls become unavailable or authorization changes', async () => {
@@ -352,24 +352,24 @@ describe('Debug local Fixerrors controls', () => {
     }) })));
     const view = render(<FixerrorsControlPanel />);
     await openDeploy();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying/ }));
     enabled = false;
     fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
-    await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /I approve deploying/ })).toBeNull());
     enabled = true;
     fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
     await screen.findByText('Online');
     await openDeploy();
-    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
-    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('checkbox', { name: /I approve deploying/ }).getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying/ }));
     auth.isViewingAs = true;
     view.rerender(<FixerrorsControlPanel />);
-    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: /I approve deploying/ })).toBeNull();
     await act(async () => {
       auth.isViewingAs = false;
       view.rerender(<FixerrorsControlPanel />);
     });
-    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('checkbox', { name: /I approve deploying/ })).toBeNull();
   });
 });
 
@@ -574,7 +574,7 @@ describe('Compact companion dialogs and preserved states', () => {
     render(<FixerrorsControlPanel />);
     await openDeploy();
     fireEvent.click(screen.getByRole('radio', { name: /Targeted checks/ }));
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying/ }));
     const dialog = screen.getByRole('dialog', { name: 'Separate Deploy confirmation' });
     expect(dialog.contains(document.activeElement)).toBe(true);
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -584,7 +584,7 @@ describe('Compact companion dialogs and preserved states', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Run Fixerrors' })));
     await openDeploy();
-    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByRole('checkbox', { name: /I approve deploying/ }).getAttribute('aria-checked')).toBe('false');
     expect((screen.getByRole('radio', { name: /Full checks/ }) as HTMLInputElement).checked).toBe(true);
     expect((screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }) as HTMLButtonElement).disabled).toBe(true);
     expect(fetcher).toHaveBeenCalledTimes(1);
@@ -666,7 +666,7 @@ describe('Compact companion dialogs and preserved states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start review and repair' }));
     await waitFor(() => expect(fetcher.mock.calls.some(call => call[1]?.method === 'POST')).toBe(true));
     expect(JSON.parse(String(fetcher.mock.calls.find(call => call[1]?.method === 'POST')?.[1]?.body))).toEqual({
-      op: 'enqueue', deviceId: secondId, action: 'repair', requestId: expect.any(String),
+      op: 'enqueue', deviceId: secondId, action: 'repair', requestId: expect.any(String), requestedReleaseMode: 'targeted',
     });
     await waitFor(() => expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(false));
     const runner = screen.getByRole('radio', { name: 'Use Second runner' }).closest('.border-t') as HTMLElement;
@@ -701,14 +701,14 @@ describe('Compact companion dialogs and preserved states', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
     await openDeploy();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying/ }));
     if (change === 'reconciliation') snapshot.releaseNeedsReconciliation = true;
     if (change === 'lifecycle') snapshot.jobs[0].batch = { captured: 1, rows: 1, processed: 1, remaining: 0,
       counts: { 'verified-local': 1, held: 0, 'report-only': 0, failed: 0 }, lifecycle: 'pending' };
     if (change === 'existing release') snapshot.jobs.push({ ...snapshot.jobs[0], id: crypto.randomUUID(), action: 'deploy', parentRepairId: snapshot.jobs[0].id });
     if (change === 'missing repair') snapshot.jobs = [];
     fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
-    await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('checkbox', { name: /I approve deploying/ })).toBeNull());
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(fetcher).toHaveBeenCalledTimes(2);
     if (change === 'reconciliation') {
@@ -730,12 +730,12 @@ describe('Compact companion dialogs and preserved states', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
     await openDeploy();
-    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }));
     const submitting = screen.getByRole('button', { name: 'Recording approval...' }) as HTMLButtonElement;
     expect(submitting.disabled).toBe(true);
     expect((screen.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByRole('checkbox').getAttribute('data-disabled')).not.toBeNull();
+    expect(screen.getByRole('checkbox', { name: /I approve deploying/ }).getAttribute('data-disabled')).not.toBeNull();
     await act(async () => { rejectApproval({ ok: false, json: async () => ({ error: 'candidate changed' }) }); });
     expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Refresh and inspect activity'));
     expect(screen.queryByText('candidate changed')).toBeNull();
@@ -753,10 +753,12 @@ describe('Compact companion dialogs and preserved states', () => {
       }));
       vi.stubGlobal('fetch', fetcher);
       const posts = () => fetcher.mock.calls.filter(call => call[1]?.method === 'POST').map(call => JSON.parse(String(call[1]?.body)));
-      const start = async () => {
+      const start = async (full = false) => {
         render(<FixerrorsControlPanel />);
         await openDetails('Activity');
         expect(posts()).toEqual([]);
+        expect(screen.getByRole('checkbox', { name: 'Run full checks (fap)' })).not.toBeChecked();
+        if (full) fireEvent.click(screen.getByRole('checkbox', { name: 'Run full checks (fap)' }));
         fireEvent.click(screen.getByRole('button', { name: 'Start review and repair' }));
         await waitFor(() => expect(store.state.jobs).toHaveLength(1));
         await waitFor(() => expect(screen.queryByText('Recording request...')).toBeNull());
@@ -764,10 +766,26 @@ describe('Compact companion dialogs and preserved states', () => {
       return { store, h, posts, start };
     }
 
+    it.each(['targeted', 'full'] as const)('remembers the %s checkbox preference without granting Deploy consent', async mode => {
+      const f = liveFixture();
+      await f.start(mode === 'full');
+      expect(f.store.state.jobs[0].requestedReleaseMode).toBe(mode);
+      expect(f.store.state.jobs[0].approval).toBeNull();
+      const claim = await f.h.claim();
+      await f.h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken,
+        result: { status: 'tested', candidate, checks } });
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+      await screen.findByText('Deploy-ready: inspect the exact tested candidate and separately confirm Deploy.');
+      fireEvent.click(screen.getByRole('button', { name: 'Deploy: review exact candidate' }));
+      expect(screen.getByRole('radio', { name: mode === 'full' ? /Full checks/ : /Targeted checks/ })).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: /I approve deploying/ })).not.toBeChecked();
+      expect(f.posts()).toHaveLength(1);
+    });
+
     it('records one full investigation-and-repair batch, never duplicating review or auto-Deploying', async () => {
       const f = liveFixture();
       await f.start();
-      expect(f.posts()).toEqual([{ op: 'enqueue', requestId: expect.any(String), deviceId: f.store.state.devices[0].id, action: 'repair' }]);
+      expect(f.posts()).toEqual([{ op: 'enqueue', requestId: expect.any(String), deviceId: f.store.state.devices[0].id, action: 'repair', requestedReleaseMode: 'targeted' }]);
       expect(f.posts()[0]).not.toHaveProperty('reviewJobId');
       fireEvent(window, new Event('focus'));
       fireEvent(window, new Event('online'));
@@ -778,7 +796,7 @@ describe('Compact companion dialogs and preserved states', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
       await screen.findByText('Deploy-ready: inspect the exact tested candidate and separately confirm Deploy.');
       expect(f.posts()).toHaveLength(1);
-      expect(screen.queryByRole('checkbox')).toBeNull();
+      expect(screen.queryByRole('checkbox', { name: /I approve deploying/ })).toBeNull();
       expect(screen.getByRole('button', { name: 'Deploy: review exact candidate' })).toBeDefined();
     });
 
@@ -827,10 +845,10 @@ describe('Compact companion dialogs and preserved states', () => {
       vi.stubGlobal('fetch', fetcher);
       render(<FixerrorsControlPanel />);
       await openDeploy();
-      fireEvent.click(screen.getByRole('checkbox'));
+      fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying/ }));
       failed = true;
       fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
-      await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull());
+      await waitFor(() => expect(screen.queryByRole('checkbox', { name: /I approve deploying/ })).toBeNull());
       await openDetails('Activity');
       expect(screen.getByText(/^Stale snapshot:/)).toBeDefined();
       expect(screen.getByText(store.state.jobs[0].id)).toBeDefined();
@@ -840,7 +858,7 @@ describe('Compact companion dialogs and preserved states', () => {
       await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
       expect(screen.getByText(/^Last successful update:/)).toBeDefined();
       expect(fetcher.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0);
-      expect(screen.queryByRole('checkbox')).toBeNull();
+      expect(screen.queryByRole('checkbox', { name: /I approve deploying/ })).toBeNull();
     });
 
     it('uses one non-overlapping polling loop, accelerates while connecting and aborts on unmount', async () => {
@@ -887,7 +905,7 @@ describe('Compact companion dialogs and preserved states', () => {
       }));
       render(<FixerrorsControlPanel />);
       await openDeploy();
-      fireEvent.click(screen.getByRole('checkbox'));
+      fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying/ }));
       fireEvent(window, new Event('focus'));
       fireEvent.click(screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }));
       await waitFor(() => expect(toast.error).toHaveBeenCalled());

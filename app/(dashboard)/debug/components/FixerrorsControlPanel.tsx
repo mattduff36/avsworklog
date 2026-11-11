@@ -104,6 +104,7 @@ export function FixerrorsControlPanel() {
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
   const [confirmed, setConfirmed] = useState(false);
   const [releaseMode, setReleaseMode] = useState<ReleaseMode>('full');
+  const [fullChecks, setFullChecks] = useState(false);
   const activityTrigger = useRef<HTMLButtonElement>(null);
   const openingDeploy = useRef(false);
   const posting = useRef(false);
@@ -284,7 +285,7 @@ export function FixerrorsControlPanel() {
     const requestId = crypto.randomUUID();
     setFlowNotice(null);
     setFlow({ deviceId: device.id, jobId: requestId });
-    void submit({ op: 'enqueue', requestId, deviceId: device.id, action: 'repair' }).then(result => {
+    void submit({ op: 'enqueue', requestId, deviceId: device.id, action: 'repair', requestedReleaseMode: fullChecks ? 'full' : 'targeted' }).then(result => {
       if (!result) setFlow(null);
     });
   };
@@ -355,7 +356,7 @@ export function FixerrorsControlPanel() {
                         openingDeploy.current = true;
                         setControlOpen(false);
                         setConfirmed(false);
-                        setReleaseMode('full');
+                        setReleaseMode(job.requestedReleaseMode ?? 'full');
                         setConfirmation({ repairJobId: job.id, candidate: job.candidate, release: job.checks?.release });
                       }
                     }}>Deploy: review exact candidate</Button>
@@ -433,8 +434,14 @@ export function FixerrorsControlPanel() {
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" className="h-auto min-h-9 whitespace-normal bg-avs-yellow text-slate-900 hover:bg-[#d1b82f]"
                       disabled={startDisabled} onClick={startRun}>{busy ? 'Recording request...' : 'Start review and repair'}</Button>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={fullChecks} disabled={busy || Boolean(flow)}
+                        onChange={event => setFullChecks(event.target.checked)} />
+                      Run full checks (fap)
+                    </label>
                     <Button size="sm" variant="outline" disabled title="A browser cannot securely inspect the installed Windows named pipe.">Launch local runner (unavailable)</Button>
                   </div>
+                  <p className="text-xs text-muted-foreground">Unchecked uses faster focused deployment checks. Full checks run fap after your separate Deploy confirmation; this choice does not approve deployment. Repairs always require their focused checks first.</p>
                   <p className="text-xs text-muted-foreground">Once recorded, the batch continues on the runner even if you close this page. All eligible errors are captured together; investigation and repair run sequentially. Use Cancel run below to stop an active job.</p>
                 </div>
                 <details className="rounded-lg border border-border p-3">

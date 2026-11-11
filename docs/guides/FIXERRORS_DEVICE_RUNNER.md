@@ -109,6 +109,12 @@ native engine investigates each case before applying an eligible repair, then
 prepares one tested candidate. It does not duplicate that investigation with a
 separate review job, send a legacy `reviewJobId`, or reuse single-packet evidence.
 
+The **Run full checks (fap)** checkbox is unchecked by default. Its validation
+preference is retained on the job and preselects focused or full checks in the
+separate Deploy dialog, including after a page reload. It grants no release
+authority: fap runs only after exact-candidate Deploy approval. Local repairs
+always pass the mandatory focused checks before becoming Deploy-ready.
+
 This workflow requires all three independent review/repair/deploy opt-ins
 (owner consent and runtime **D**), without falling back to review-only. On the
 enrolled Windows PC, stop the runner, choose **E / D**, confirm **SET DEPLOY**,
