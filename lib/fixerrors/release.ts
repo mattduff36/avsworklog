@@ -32,12 +32,17 @@ const envelopeSchema = z.object({
 const receiptSchema = z.object({
   receiptId: z.string().regex(/^[a-f0-9]{32}$/u), sha256: sha256Schema,
 }).strict();
+export const preparedBatchProofSchema = z.object({
+  version: z.literal(1), manifestSha256: sha256Schema, contributionsSha256: sha256Schema,
+  clusterCount: z.number().int().positive(), repairCount: z.number().int().positive(),
+}).strict().refine(value => value.repairCount <= value.clusterCount, 'Invalid batch coverage');
 export const preparedReleaseEvidenceSchema = z.object({
   repairJobId: uuid, head: oid, tree: oid, candidateSha256: sha256Schema,
   allChecksPassed: z.literal(true), workerResultSha256: sha256Schema,
   preparedChecks: z.object({
     'targeted-tests': receiptSchema, typecheck: receiptSchema, lint: receiptSchema,
   }).strict(),
+  batch: preparedBatchProofSchema.optional(),
 }).strict();
 export type PreparedReleaseEvidence = z.infer<typeof preparedReleaseEvidenceSchema>;
 export type ReleaseTicket = z.infer<typeof releaseTicketSchema>;

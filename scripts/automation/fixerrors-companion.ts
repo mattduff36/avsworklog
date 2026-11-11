@@ -1,19 +1,22 @@
 import { createHash } from 'crypto';
 import { FIXERRORS_COMPANION_PACKET_MAX_BYTES } from '../../lib/fixerrors/admission';
 import { execFileSync } from 'child_process';
-import { openSync, closeSync, readSync, fstatSync, lstatSync, unlinkSync, writeSync } from 'fs';
+import { openSync, closeSync, readSync, fstatSync, lstatSync, unlinkSync, writeSync, existsSync } from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 import { z } from 'zod';
 import {
   FIXERRORS_DEPLOY_TIMEOUT_MS, FIXERRORS_DEVICE_PATH, FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN, deviceResponseSchema,
   sameCandidate, sameWorkspace, type Candidate, type ClaimedJob, type DeviceCommand,
-  type ExecutionResult, type FixerrorsJob, type Workspace,
+  type Checkout, type ExecutionResult, type FixerrorsJob, type Workspace,
 } from '../../lib/fixerrors/protocol';
 import { checkEvidenceDigest } from '../../lib/fixerrors/control';
 import { FIXERRORS_WORKSPACE, inspectFixedFixerrorsWorkspace } from './fixerrors-device-admission';
 import { createProductionReleaseBridge, parseProductionBridgeEnrollment } from './fixerrors-production-bridge';
 import { parseCompanionPacket } from './fixerrors-companion-packet';
+import { prepareClaimPacket, reconcilePacketLifecycle, recordPacketCompletion } from './fixerrors-companion-lifecycle';
+import { BATCH_CHUNK_BYTES, batchDeliverySchema, batchHash, parseBatchBytes, type BatchCheckpoint } from '../../lib/fixerrors/batch';
+import { inspectBatchResume, recoverBatchCompletion } from './fixerrors-companion-lifecycle';
 
 export interface CompanionConsent {
   allowReadOnly: boolean;
@@ -25,8 +28,16 @@ export interface TrustedFixerrorsExecutor {
   readonly available: boolean;
   // A future bridge must verify v1 admission, durable replay and scoped checks here.
   // No downloaded module, command, prompt or argv is accepted by this interface.
-  execute(job: Readonly<FixerrorsJob>, signal: AbortSignal, releaseTicket?: string, admissionTicket?: string): Promise<ExecutionResult>;
+  execute(job: Readonly<FixerrorsJob>, signal: AbortSignal, releaseTicket?: string, admissionTicket?: string,
+    batch?: BatchExecutionContext): Promise<ExecutionResult>;
   localTestedCandidate(): Candidate | null;
+}
+export interface BatchExecutionContext {
+  manifest: Buffer;
+  lease(checkpoint: BatchCheckpoint): Promise<string>;
+  outcomeSha256?: string;
+  paused?: string;
+  stopped?: boolean;
 }
 
 export const unavailableFixerrorsExecutor: TrustedFixerrorsExecutor = Object.freeze({
@@ -44,6 +55,8 @@ export interface CompanionDependencies {
   complete(result: ExecutionResult): Promise<void>;
   timeoutMs?: number;
   signal?: AbortSignal;
+  batch?: BatchExecutionContext;
+  pause?(checkpointSha256: string): Promise<void>;
 }
 
 function consentAllows(consent: CompanionConsent, action: FixerrorsJob['action']): boolean {
@@ -60,13 +73,13 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
   let early: ExecutionResult | null = null;
   const workspace = deps.inspect();
   if (!consentAllows(deps.consent(), job.action)) early = { status: 'blocked', reason: 'local-opt-out' };
-  else if (!workspace || !sameWorkspace(workspace, job.workspace)) early = { status: 'blocked', reason: 'checkout-drift' };
+  else if (!claim.resume && (!workspace || !sameWorkspace(workspace, job.workspace))) early = { status: 'blocked', reason: 'checkout-drift' };
   else if (!deps.executor.available) early = { status: 'blocked', reason: 'bridge-unavailable' };
   else if (job.action === 'deploy') {
     const local = deps.executor.localTestedCandidate();
     if (!job.approval || !job.candidate || !job.checks || !local ||
         !sameCandidate(job.approval.candidate, job.candidate) || !sameCandidate(local, job.candidate) ||
-        job.candidate.head !== workspace.head || job.candidate.tree !== workspace.tree ||
+        !workspace || job.candidate.head !== workspace.head || job.candidate.tree !== workspace.tree ||
         checkEvidenceDigest(job.checks) !== job.candidate.checksSha256) {
       early = { status: 'blocked', reason: 'checkout-drift' };
     }
@@ -79,7 +92,7 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
     return;
   }
   const latestWorkspace = deps.inspect();
-  if (!latestWorkspace || !sameWorkspace(latestWorkspace, job.workspace) ||
+  if ((!claim.resume && (!latestWorkspace || !sameWorkspace(latestWorkspace, job.workspace))) ||
       !consentAllows(deps.consent(), job.action)) {
     await deps.complete({ status: 'blocked', reason: 'checkout-drift' });
     return;
@@ -130,11 +143,14 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
   const maxRuntime = job.action === 'deploy' ? FIXERRORS_DEPLOY_TIMEOUT_MS
     : Math.min(job.action === 'repair' ? 480_000 : 120_000, Math.max(1, job.expiresAt - Date.now() - 10_000));
   const unconfirmed = { status: 'unknown', reason: 'release-unconfirmed' } as const;
-  const timeout = setTimeout(() => abort('timeout'), Math.min(deps.timeoutMs ?? maxRuntime, maxRuntime));
+  // Batch execution has renewable authority and per-native-operation budgets,
+  // not the short one-use admission's whole-run deadline.
+  const timeout = claim.batch ? undefined :
+    setTimeout(() => abort('timeout'), Math.min(deps.timeoutMs ?? maxRuntime, maxRuntime));
   let executionSettled = false;
   const execution = Promise.resolve().then(() => {
     assertNotStopping();
-    return deps.executor.execute(Object.freeze(structuredClone(job)), controller.signal, releaseTicket, claim.admissionTicket);
+    return deps.executor.execute(Object.freeze(structuredClone(job)), controller.signal, releaseTicket, claim.admissionTicket, deps.batch);
   })
     .catch((): ExecutionResult => job.action === 'deploy' ? unconfirmed : { status: 'failed', reason: 'execution-failed' })
     .finally(() => { executionSettled = true; });
@@ -167,6 +183,11 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
       }
     }
     assertNotStopping();
+    if (deps.batch?.paused) {
+      if (!deps.pause) throw new Error('Confirmed batch checkpoint cannot be acknowledged');
+      await deps.pause(deps.batch.paused);
+      return;
+    }
     await deps.complete(result);
   } finally {
     controller.abort();
@@ -203,32 +224,73 @@ export function readProtectedFixerrorsCredential() {
   return localCredentialSchema.parse(readProtectedEnrollment('device.dpapi'));
 }
 
-export function inspectCompanionWorkspace(): Workspace | null {
+export function inspectCompanionCheckout(): Checkout | null {
   const evidence = inspectFixedFixerrorsWorkspace();
   if (evidence.branch !== 'main' || evidence.porcelain || evidence.workspace !== FIXERRORS_WORKSPACE ||
       evidence.topLevel !== FIXERRORS_WORKSPACE ||
       evidence.gitDirectory !== path.win32.join(FIXERRORS_WORKSPACE, '.git')) return null;
-  const packet = path.win32.join(FIXERRORS_WORKSPACE, '.git\\squires-fixerrors\\sanitized-packet.json');
+  return { head: evidence.head, tree: evidence.tree, clean: true };
+}
+
+export function inspectCompanionWorkspace(): Workspace | null {
+  const evidence = inspectCompanionCheckout();
+  if (!evidence) return null;
+  const directory = path.win32.join(FIXERRORS_WORKSPACE, '.git', 'squires-fixerrors');
+  const batch = existsSync(path.win32.join(directory, 'batch-manifest.json'));
+  const max = batch ? 16 * 1024 * 1024 : FIXERRORS_COMPANION_PACKET_MAX_BYTES;
+  const packet = path.win32.join(directory, batch ? 'batch-manifest.json' : 'sanitized-packet.json');
+  const before = lstatSync(packet);
+  if (!before.isFile() || before.isSymbolicLink()) throw new Error('Sanitized packet must be an ordinary file');
   const file = openSync(packet, 'r');
   try {
     const stat = fstatSync(file);
-    if (!stat.isFile() || stat.size > FIXERRORS_COMPANION_PACKET_MAX_BYTES) throw new Error('Sanitized packet must be a bounded local file');
-    const bytes = Buffer.alloc(FIXERRORS_COMPANION_PACKET_MAX_BYTES + 1);
+    if (!stat.isFile() || stat.dev !== before.dev || stat.ino !== before.ino ||
+        stat.size > max) throw new Error('Sanitized packet must be a bounded local file');
+    const bytes = Buffer.alloc(stat.size + 1);
     let size = 0;
     while (size < bytes.length) {
       const count = readSync(file, bytes, size, bytes.length - size, size);
       if (count === 0) break;
       size += count;
     }
-    if (size > FIXERRORS_COMPANION_PACKET_MAX_BYTES || fstatSync(file).size !== size) throw new Error('Sanitized packet changed or too large');
+    if (size > max || fstatSync(file).size !== size) throw new Error('Sanitized packet changed or too large');
     // A successful repair retains its original packet while preparing two new
     // commits. Per-action signed/native guards validate review/repair binding;
     // deployment validates the exact prepared candidate and check evidence.
-    parseCompanionPacket(bytes.subarray(0, size));
+    if (batch) parseBatchBytes(bytes.subarray(0, size));
+    else parseCompanionPacket(bytes.subarray(0, size));
     return { head: evidence.head, tree: evidence.tree, clean: true, packetSha256: createHash('sha256').update(bytes.subarray(0, size)).digest('hex') };
   } finally {
     closeSync(file);
   }
+}
+
+export async function receiveCompanionBatch(
+    claim: ClaimedJob, request: (command: DeviceCommand) => Promise<z.infer<typeof deviceResponseSchema>>,
+    signal?: AbortSignal,
+  ): Promise<Buffer> {
+    const description = batchDeliverySchema.parse(claim.batch);
+    if (description.manifestSha256 !== claim.job.workspace.packetSha256 ||
+        description.chunks !== Math.ceil(description.bytes / BATCH_CHUNK_BYTES)) throw new Error('Batch delivery binding mismatch');
+    const chunks: Buffer[] = [];
+    const lease = { jobId: claim.job.id, leaseToken: claim.leaseToken };
+    for (let index = 0; index < description.chunks; index++) {
+      if (signal?.aborted) throw new Error('Batch download cancelled');
+      await request({ op: 'renew', ...lease });
+      const { chunk } = await request({ op: 'batch-chunk', ...lease, index });
+      if (!chunk || chunk.index !== index) throw new Error('Incomplete batch delivery');
+      const bytes = Buffer.from(chunk.data, 'base64url');
+      if (bytes.toString('base64url') !== chunk.data || batchHash(bytes) !== chunk.sha256 ||
+          bytes.length !== Math.min(BATCH_CHUNK_BYTES, description.bytes - index * BATCH_CHUNK_BYTES)) {
+        throw new Error('Batch delivery chunk changed');
+      }
+      chunks.push(bytes);
+    }
+    const manifest = Buffer.concat(chunks);
+    const parsed = parseBatchBytes(manifest);
+    if (manifest.length !== description.bytes || batchHash(manifest) !== description.manifestSha256 ||
+        parsed.retrieval.clusters.length !== description.clusters) throw new Error('Batch delivery incomplete or changed');
+    return manifest;
 }
 
 export async function companionDeviceRequest(
@@ -253,7 +315,7 @@ export async function companionDeviceRequest(
       const item = await reader.read();
       if (item.done) break;
       length += item.value.byteLength;
-      if (length > 16_384) {
+      if (length > 256 * 1024) {
         await reader.cancel();
         throw new Error('Companion response exceeds limit');
       }
@@ -286,7 +348,8 @@ export async function runFixerrorsCompanion(signal?: AbortSignal): Promise<void>
   const lock = openSync(lockPath, 'wx');
   let unsafe = false;
   let activeClaim = false;
-  const state = (value: 'ready' | 'packet-blocked' | 'bridge-blocked' | 'polling' | 'active' | 'stopping') => {
+  let activeBatch: BatchExecutionContext | undefined;
+  const state = (value: 'ready' | 'waiting' | 'packet-blocked' | 'bridge-blocked' | 'polling' | 'active' | 'stopping') => {
     if (process.env.SQUIRES_FIXERRORS_MANAGED_STDIN === '1') console.info(`SQUIRES_RUNNER_STATE:${value}`);
   };
   try {
@@ -297,6 +360,7 @@ export async function runFixerrorsCompanion(signal?: AbortSignal): Promise<void>
       : null;
     const credential = enrollment ?? readProtectedFixerrorsCredential();
     const executor = enrollment ? createProductionReleaseBridge(enrollment) : unavailableFixerrorsExecutor;
+    const packetDirectory = path.win32.join(FIXERRORS_WORKSPACE, '.git', 'squires-fixerrors');
     const request = (command: DeviceCommand) => companionDeviceRequest(
       credential, command, production ? FIXERRORS_PRODUCTION_ORIGIN : FIXERRORS_LOCAL_ORIGIN,
     );
@@ -310,19 +374,28 @@ export async function runFixerrorsCompanion(signal?: AbortSignal): Promise<void>
     while (!signal?.aborted) {
       state('polling');
       let workspace: Workspace | null = null;
+      let checkout: Checkout | null = null;
+      let holdReason: 'checkout-unavailable' | 'packet-needs-reconciliation' | 'prepared-candidate' | null = null;
       try {
-        workspace = inspectCompanionWorkspace();
+        checkout = inspectCompanionCheckout();
+        await recoverBatchCompletion(packetDirectory, request);
+        holdReason = reconcilePacketLifecycle(packetDirectory, checkout);
+        if (!checkout) holdReason = 'checkout-unavailable';
+        if (existsSync(path.win32.join(packetDirectory, 'sanitized-packet.json')) ||
+            existsSync(path.win32.join(packetDirectory, 'batch-manifest.json'))) workspace = inspectCompanionWorkspace();
       } catch {
-        console.error('MPDEE Worker companion: clean checkout or bounded sanitized packet unavailable; no execution.');
+        holdReason = 'packet-needs-reconciliation';
+        console.error('MPDEE Worker companion: packet lifecycle requires owner reconciliation; evidence retained.');
       }
       const optIns = consent();
       await request({
-        op: 'heartbeat', workspace, ...optIns, bridgeAvailable: executor.available,
+        op: 'heartbeat', workspace, checkout, holdReason, ...optIns, bridgeAvailable: executor.available,
       });
       if (signal?.aborted) break;
-      if (!workspace) state('packet-blocked');
-      else state(executor.available ? 'ready' : 'bridge-blocked');
-      if (workspace) {
+      if (holdReason) state('packet-blocked');
+      else state(!executor.available ? 'bridge-blocked' : workspace ? 'ready' : 'waiting');
+      if (inspectBatchResume(packetDirectory) ||
+          checkout && (!holdReason || (holdReason === 'prepared-candidate' && workspace))) {
         const response = await request({ op: 'claim' });
         if (response.claim) {
           activeClaim = true;
@@ -331,13 +404,52 @@ export async function runFixerrorsCompanion(signal?: AbortSignal): Promise<void>
           state('active');
           const claim = response.claim;
           const lease = { jobId: claim.job.id, leaseToken: claim.leaseToken };
-          await executeCompanionClaim(claim, {
-            executor, consent, inspect: inspectCompanionWorkspace, signal,
-            startDeploy: () => request({ op: 'start-deploy', ...lease }),
-            renew: async () => { await request({ op: 'renew', ...lease }); },
-            complete: async (result) => { await request({ op: 'complete', ...lease, result }); },
-          });
+          if (claim.packet && !enrollment) {
+            await request({ op: 'complete', ...lease, result: { status: 'blocked', reason: 'bridge-unavailable' } });
+          } else {
+            const batch: BatchExecutionContext | undefined = claim.batch ? {
+              manifest: await receiveCompanionBatch(claim, request, signal),
+              lease: async checkpoint => {
+                const response = await request({ op: 'batch-lease', ...lease,
+                  checkpointSha256: checkpoint.checkpointSha256, cursor: checkpoint.cursor,
+                  resume: checkpoint.resume, outcome: checkpoint.outcome });
+                if (!response.batchLease) throw new Error('Batch execution authority missing');
+                return response.batchLease;
+              },
+            } : undefined;
+            activeBatch = batch;
+            if (claim.packet && enrollment) {
+              await request({ op: 'renew', ...lease });
+              prepareClaimPacket(claim, enrollment, packetDirectory, inspectCompanionCheckout);
+            }
+            await executeCompanionClaim(claim, {
+              executor, consent, signal, batch,
+              inspect: () => {
+                if (claim.batch && !claim.resume) {
+                  const current = inspectCompanionCheckout();
+                  return current ? { ...current, packetSha256: claim.job.workspace.packetSha256 } : null;
+                }
+                return inspectCompanionWorkspace();
+              },
+              pause: async checkpointSha256 => { await request({ op: 'pause-batch', ...lease, checkpointSha256 }); },
+              startDeploy: () => request({ op: 'start-deploy', ...lease }),
+              renew: async () => { await request({ op: 'renew', ...lease }); },
+              complete: async (result) => {
+                const response = await request({ op: 'complete', ...lease, result,
+                  ...(batch?.outcomeSha256 ? { outcomeSha256: batch.outcomeSha256 } : {}) });
+                if (claim.batch && response.lifecycle !== 'applied') {
+                  console.error('MPDEE Worker companion: batch lifecycle not applied; completed native evidence retained for retry.');
+                  return;
+                }
+                if (existsSync(path.win32.join(packetDirectory, 'active-packet.json'))) {
+                  recordPacketCompletion(packetDirectory, claim, result);
+                }
+              },
+            });
+          }
           activeClaim = false;
+          activeBatch = undefined;
+          reconcilePacketLifecycle(packetDirectory, inspectCompanionCheckout());
           console.info(`MPDEE Worker companion: reported result for ${claim.job.id}.`);
         }
       }
@@ -349,7 +461,7 @@ export async function runFixerrorsCompanion(signal?: AbortSignal): Promise<void>
       });
     }
   } catch (error) {
-    unsafe = activeClaim || error instanceof UnsafeCompanionStop;
+    unsafe = (activeClaim || error instanceof UnsafeCompanionStop) && !activeBatch?.stopped;
     throw error;
   } finally {
     state('stopping');

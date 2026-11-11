@@ -1,24 +1,30 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-import { generateKeyPairSync, verify } from 'node:crypto';
+import { createHash, generateKeyPairSync, randomUUID, verify } from 'node:crypto';
 
 vi.mock('@/lib/server/app-auth/session', () => ({ getCurrentAuthenticatedProfile: vi.fn() }));
 vi.mock('@/lib/utils/view-as', () => ({ getEffectiveRole: vi.fn() }));
 vi.mock('@/lib/server/fixerrors/store', () => ({
   localFixerrorsStore: { transact: vi.fn() }, productionFixerrorsStore: { transact: vi.fn() },
 }));
+const capture = vi.hoisted(() => ({ read: vi.fn() }));
+vi.mock('@/lib/server/fixerrors/evidence', () => ({ captureFreshFixerrorsEvidence: capture.read }));
+vi.mock('@/lib/server/fixerrors/batch-lifecycle', () => ({ reconcileBatchLifecycle: vi.fn() }));
 
 import { GET, POST } from '@/app/api/debug/fixerrors/route';
 import { POST as devicePost } from '@/app/api/fixerrors-device/route';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
 import { getEffectiveRole } from '@/lib/utils/view-as';
 import { localFixerrorsStore, productionFixerrorsStore } from '@/lib/server/fixerrors/store';
+import { reconcileBatchLifecycle } from '@/lib/server/fixerrors/batch-lifecycle';
+import { batchOutcomeHash } from '@/lib/fixerrors/batch';
 import { FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN } from '@/lib/fixerrors/protocol';
 import { fixerrorsDeviceSigningBytes } from '@/lib/fixerrors/admission';
 import { getFixerrorsLocalDatabaseUrl, getFixerrorsProductionDatabaseUrl, isFixerrorsLocalEnabled } from '@/lib/server/fixerrors/config';
 import { readBoundedJson } from '@/lib/server/fixerrors/http';
 import { isPublicRequestPath } from '@/lib/routes/public-routes';
-import { actorId, credential, deviceId, FixtureStore, harness, now } from '../../unit/fixerrors-control-fixtures';
+import { actorId, credential, deviceId, FixtureStore, harness, now, workspace } from '../../unit/fixerrors-control-fixtures';
+import { capturedBatch } from '../../unit/fixerrors-batch-fixtures';
 
 const baseRole = {
   role_id: 'role', role_name: 'super_admin', display_name: 'Super Admin', role_class: 'admin' as const,
@@ -44,6 +50,7 @@ beforeEach(() => {
   const store = new FixtureStore();
   vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
   vi.mocked(productionFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
+  capture.read.mockImplementation(async (id: string) => capturedBatch(id));
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 
@@ -121,8 +128,17 @@ describe('local-only Debug and outbound device routes', () => {
     vi.stubEnv('SQUIRES_FIXERRORS_RELEASE_PUBLIC_KEY',
       Buffer.from(release.publicKey.export({ type: 'spki', format: 'pem' })).toString('base64url'));
     const store = new FixtureStore();
-    const jobId = await harness(store).enqueue('repair');
+    store.state.devices[0].workspace = null;
+    store.state.devices[0].checkout = { head: workspace.head, tree: workspace.tree, clean: true };
     vi.mocked(productionFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
+    const jobId = randomUUID();
+    const queued = await POST(new NextRequest(`${FIXERRORS_PRODUCTION_ORIGIN}/api/debug/fixerrors`, {
+      method: 'POST', body: JSON.stringify({ op: 'enqueue', action: 'repair', deviceId, requestId: jobId }),
+      headers: { 'Content-Type': 'application/json', Origin: FIXERRORS_PRODUCTION_ORIGIN },
+    }));
+    expect(queued.status).toBe(200);
+    expect(capture.read).toHaveBeenCalledOnce();
+    expect(capture.read).toHaveBeenCalledWith(jobId, store.state.devices[0].checkout);
     const req = new NextRequest(`${FIXERRORS_PRODUCTION_ORIGIN}/api/fixerrors-device`, {
       method: 'POST', body: JSON.stringify({ op: 'claim' }),
       headers: { 'Content-Type': 'application/json', 'X-Squires-Device-Id': deviceId, Authorization: `Bearer ${credential}` },
@@ -135,12 +151,155 @@ describe('local-only Debug and outbound device routes', () => {
     expect(verify(null, fixerrorsDeviceSigningBytes(envelope.keyId, envelope.payload),
       repair.publicKey, Buffer.from(envelope.signature, 'base64url'))).toBe(true);
     expect(JSON.parse(Buffer.from(envelope.payload, 'base64url').toString())).toMatchObject({
-      jobId, deviceId, authority: 'bounded-repair',
+      jobId, deviceId, authority: 'bounded-repair', head: workspace.head, tree: workspace.tree,
+      packetSha256: store.state.jobs[0].privateBatch!.delivery.manifestSha256,
     });
+    expect(result.claim.job).not.toHaveProperty('packet');
+    expect(result.claim).not.toHaveProperty('packet');
+    expect(result.claim.job).not.toHaveProperty('privateBatch');
+    expect(result.claim.batch).toEqual(store.state.jobs[0].privateBatch!.delivery);
+    const chunkRequest = new NextRequest(`${FIXERRORS_PRODUCTION_ORIGIN}/api/fixerrors-device`, {
+      method: 'POST', body: JSON.stringify({ op: 'batch-chunk', jobId, leaseToken: result.claim.leaseToken, index: 0 }),
+      headers: req.headers,
+    });
+    const chunkResponse = await devicePost(chunkRequest);
+    expect(chunkResponse.status).toBe(200);
+    const { chunk } = await chunkResponse.json();
+    const bytes = Buffer.from(chunk.data, 'base64url');
+    expect(createHash('sha256').update(bytes).digest('hex')).toBe(chunk.sha256);
+    expect(JSON.parse(bytes.toString()).retrieval.snapshotId).toBe(jobId);
     const browserState = await GET(new NextRequest(`${FIXERRORS_PRODUCTION_ORIGIN}/api/debug/fixerrors`));
-    expect(await browserState.text()).not.toContain('admissionTicket');
+    const browserText = await browserState.text();
+    expect(browserText).not.toContain('admissionTicket');
+    expect(browserText).not.toContain('normalizedMessage');
     expect(JSON.stringify(store.state)).not.toContain('admissionTicket');
     expect(response.headers.get('cache-control')).toBe('no-store');
+    const outcome = {
+      runId: `fixerrors-${jobId}`, candidate: { baseHead: workspace.head, treeFingerprint: 'b'.repeat(64) },
+      clusters: [{ id: 'cluster-1', status: 'held', reason: 'Synthetic source investigation',
+        attempt: 'Inspected named source', tests: [], evidence: ['Source inspected'] }], decisions: [],
+    };
+    const send = (command: unknown, headers = req.headers) => devicePost(new NextRequest(
+      `${FIXERRORS_PRODUCTION_ORIGIN}/api/fixerrors-device`, {
+        method: 'POST', body: JSON.stringify(command), headers,
+      }));
+    const lease = { jobId, leaseToken: result.claim.leaseToken };
+    expect((await send({ op: 'batch-lease', ...lease, cursor: 1,
+      checkpointSha256: '1'.repeat(64), resume: false, outcome })).status).toBe(200);
+    vi.mocked(reconcileBatchLifecycle).mockImplementationOnce(async (queue, id) => {
+      expect(queue).toBe(productionFixerrorsStore);
+      expect(id).toBe(jobId);
+      expect(store.state.jobs[0]).toMatchObject({ state: 'no-change', privateBatch: { outcome } });
+      return 'blocked';
+    });
+    const completed = await send({ op: 'complete', ...lease, result: { status: 'no-change' },
+      outcomeSha256: batchOutcomeHash(outcome) });
+    expect(completed.status).toBe(200);
+    expect(await completed.json()).toMatchObject({ ok: true, lifecycle: 'blocked' });
+    expect(reconcileBatchLifecycle).toHaveBeenCalledOnce();
+    vi.mocked(reconcileBatchLifecycle).mockResolvedValueOnce('applied');
+    const reconciled = await send({ op: 'batch-reconcile', jobId });
+    expect(await reconciled.json()).toMatchObject({
+      lifecycle: 'applied', completion: { job: { id: jobId, state: 'no-change' },
+        outcomeSha256: batchOutcomeHash(outcome) },
+    });
+    const unauthorized = new Headers(req.headers);
+    unauthorized.delete('authorization');
+    expect((await send({ op: 'batch-reconcile', jobId }, unauthorized)).status).toBe(401);
+    expect(reconcileBatchLifecycle).toHaveBeenCalledTimes(2);
+  });
+
+  it('captures no data for denied, busy, duplicate, revoked or opted-out requests', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    const body = { op: 'enqueue', action: 'review', deviceId, requestId: randomUUID() };
+    vi.mocked(getEffectiveRole).mockResolvedValue({ ...baseRole, is_viewing_as: true });
+    expect((await POST(request(body))).status).toBe(403);
+    vi.mocked(getEffectiveRole).mockResolvedValue(baseRole);
+    expect((await POST(request(body, 'https://other.invalid'))).status).toBe(403);
+    const store = new FixtureStore();
+    vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
+    store.state.devices[0].allowReadOnly = false;
+    expect((await POST(request(body))).status).toBe(409);
+    store.state.devices[0].allowReadOnly = true;
+    store.state.devices[0].revoked = true;
+    expect((await POST(request(body))).status).toBe(403);
+    store.state.devices[0].revoked = false;
+    expect(capture.read).not.toHaveBeenCalled();
+    expect((await POST(request(body))).status).toBe(200);
+    expect((await POST(request(body))).status).toBe(409);
+    expect((await POST(request({ ...body, requestId: randomUUID() }))).status).toBe(409);
+    expect(capture.read).toHaveBeenCalledOnce();
+  });
+
+  it('returns no-work for an empty read, but never hides capture failures as success', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    capture.read.mockImplementation(async (id: string) => capturedBatch(id, 0));
+    const requestId = randomUUID();
+    expect(await (await POST(request({ op: 'enqueue', action: 'review', deviceId, requestId }))).json())
+      .toMatchObject({ ok: true, jobId: requestId, noWork: true });
+    const before = await (await GET(new NextRequest(`${FIXERRORS_LOCAL_ORIGIN}/api/debug/fixerrors`))).json();
+    expect(before.jobs).toHaveLength(1);
+    expect(before.jobs[0].state).toBe('no-work');
+    capture.read.mockRejectedValue(new Error('synthetic-private-database-error'));
+    const failed = await POST(request({ op: 'enqueue', action: 'review', deviceId, requestId: randomUUID() }));
+    expect(failed.status).toBe(503);
+    expect(await failed.text()).not.toContain('synthetic-private');
+    const after = await (await GET(new NextRequest(`${FIXERRORS_LOCAL_ORIGIN}/api/debug/fixerrors`))).json();
+    expect(after.jobs).toHaveLength(1);
+  });
+
+  it('rejects a candidate or device race between capture and enqueue without creating a job', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    for (const change of ['candidate', 'revocation'] as const) {
+      const store = new FixtureStore();
+      vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
+      capture.read.mockImplementationOnce(async () => {
+        if (change === 'candidate') store.state.devices[0].workspace = { ...workspace, tree: 'f'.repeat(40) };
+        else store.state.devices[0].revoked = true;
+        return capturedBatch(randomUUID(), 0);
+      });
+      expect((await POST(request({ op: 'enqueue', action: 'review', deviceId, requestId: randomUUID() }))).status)
+        .toBe(change === 'candidate' ? 409 : 403);
+      expect(store.state.jobs).toEqual([]);
+    }
+  });
+
+  it.each(['Invalid exact snapshot', 'Duplicate private binding', 'Batch coverage mismatch'])('fails closed on rejected capture: %s', async message => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    const store = new FixtureStore();
+    vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
+    capture.read.mockRejectedValue(new Error(message));
+    const response = await POST(request({ op: 'enqueue', action: 'review', deviceId, requestId: randomUUID() }));
+    expect(response.status).toBe(503);
+    expect(store.state.jobs).toEqual([]);
+  });
+
+  it('rejects legacy single-packet review reuse without capturing or creating another job', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    const store = new FixtureStore();
+    const h = harness(store);
+    vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
+    const reviewJobId = randomUUID();
+    await h.enqueue('review', reviewJobId);
+    const review = await h.claim();
+    await h.device({ op: 'complete', jobId: reviewJobId, leaseToken: review.leaseToken, result: { status: 'reviewed' } });
+    store.state.jobs[0].packet = 'Synthetic legacy private packet';
+    const result = await POST(request({ op: 'enqueue', action: 'repair', deviceId, requestId: randomUUID(), reviewJobId }));
+    expect(capture.read).not.toHaveBeenCalled();
+    expect(result.status).toBe(409);
+    expect(store.state.jobs).toHaveLength(1);
+  });
+
+  it('never exposes capture success when the final queue commit fails', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    const store = new FixtureStore();
+    vi.mocked(localFixerrorsStore.transact).mockImplementationOnce(store.transact.bind(store))
+      .mockRejectedValueOnce(new Error('Synthetic final commit failure'));
+    const result = await POST(request({ op: 'enqueue', action: 'review', deviceId, requestId: randomUUID() }));
+    expect(capture.read).toHaveBeenCalledOnce();
+    expect(result.status).toBe(503);
+    expect(await result.text()).not.toContain('normalizedMessage');
+    expect(store.state.jobs).toEqual([]);
   });
 
   it('requires the scoped production queue login and exact database target', () => {

@@ -9,7 +9,8 @@ import tempfile
 import time
 from unittest.mock import patch
 
-installed, repo, node = map(Path, sys.argv[1:])
+batch_mode = sys.argv[-1] == '--batch'
+installed, repo, node = map(Path, sys.argv[1:4])
 sys.path.insert(0, str(installed))
 sys.path.insert(0, str(repo / 'scripts/automation'))
 import squires_companion as s
@@ -28,7 +29,7 @@ with tempfile.TemporaryDirectory(prefix='SquiresRepairFixture-') as temporary:
         p.write_text(text, encoding='utf-8')
     def git(*args):
         return subprocess.check_output(['C:\\Program Files\\Git\\cmd\\git.exe', '-C', str(checkout), *args],
-                                       stderr=subprocess.DEVNULL).decode().strip()
+                                       stderr=subprocess.DEVNULL, env=r.local_env()).decode().strip()
     # The junction is dependency-only, ignored by Git, and removed without following it below.
     junction = checkout / 'node_modules'
     subprocess.run(['C:\\Windows\\System32\\cmd.exe', '/c', 'mklink', '/J', str(junction), str(repo / 'node_modules')],
@@ -53,9 +54,16 @@ with tempfile.TemporaryDirectory(prefix='SquiresRepairFixture-') as temporary:
         source, test = 'lib/utils/display-label.ts', 'tests/unit/display-label.test.ts'
         write(source, 'export function displayLabel(value) { return String(value); }\n')
         write(test, 'import {expect,it} from "vitest"; import {displayLabel} from "../../lib/utils/display-label"; it("synthetic label",()=>expect(displayLabel(" label ")).toBe(" label "));\n')
+        if batch_mode:
+            write('lib/utils/second-label.ts', 'export const secondLabel = value => String(value);\n')
+            write('tests/unit/second-label.test.ts', 'import {expect,it} from "vitest"; import {secondLabel} from "../../lib/utils/second-label"; it("second label",()=>expect(secondLabel(" label ")).toBe(" label "));\n')
         for name in (r.CHECK_SCRIPT, r.CACHE_SCRIPT, 'scripts/bump-release-version.ts', 'scripts/finalise-summary.ts',
                      'lib/config/release-version-logic.ts', 'lib/config/release-module-descriptors.ts', 'types/roles.ts'):
             write(name, (repo / name).read_text(encoding='utf-8'))
+        if batch_mode:
+            for name in ('scripts/fixerrors-auto.ts', 'scripts/fixerrors-decision.ts',
+                         'scripts/fixerrors-knowledge.ts', 'scripts/fixerrors-safety.ts'):
+                write(name, (repo / name).read_text(encoding='utf-8'))
         # Pin this copied fixture helper to disposable paths, never the production checkout/cache.
         helper = (checkout / r.CACHE_SCRIPT).read_text(encoding='utf-8')
         helper = helper.replace('export const WORKSPACE = String.raw`D:\\Websites\\avsworklog`;',
@@ -67,6 +75,8 @@ with tempfile.TemporaryDirectory(prefix='SquiresRepairFixture-') as temporary:
         write('lib/config/release-history.json', '[]')
         write('docs_private/release-log.md', '# Synthetic fixture only\n')
         git('init', '-b', 'main')
+        # Match the isolated native Git environment, not this owner's global EOL policy.
+        git('config', 'core.autocrlf', 'false')
         git('config', 'user.name', 'Synthetic fixture')
         git('config', 'user.email', 'fixture@localhost')
         git('add', '--all')
@@ -82,6 +92,11 @@ with tempfile.TemporaryDirectory(prefix='SquiresRepairFixture-') as temporary:
                 patch.object(worker, 'ROOT', root / 'runner'):
             (checkout / '.git/squires-fixerrors').mkdir()
             base = worker.snapshot(checkout)
+            if batch_mode:
+                sys.path.insert(0, str(repo / 'tests/fixtures'))
+                from fixerrors_batch_boundary import exercise_batch
+                exercise_batch(root, checkout, repo, node, cfg, write, git, base)
+                raise SystemExit(0)
             # Synthetic review receipts test reuse mechanics only, never model execution.
             review_job = 'edb867ce-734d-4d32-a658-830ba167b2f9'
             review_ticket = dict(jobId=review_job, packetSha256='a' * 64)

@@ -297,6 +297,8 @@ def release(raw, cfg, inspect_candidate, invoke_fap):
     review_fields = ('repairJobId','head','tree','candidateSha256','allChecksPassed','workerResultSha256')
     if isinstance(review,dict) and 'preparedChecks' in review:
         review_fields += ('preparedChecks',)
+    if isinstance(review,dict) and 'batch' in review:
+        review_fields += ('batch',)
     fields(review,review_fields)
     require(review['allChecksPassed'] is True and identifier(review['workerResultSha256'],HEX) and all(review[k]==ticket[k] for k in
             ('repairJobId','head','tree','candidateSha256')),'review_binding_mismatch')

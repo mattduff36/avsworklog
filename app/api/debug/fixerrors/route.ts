@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { adminCommandSchema, FIXERRORS_LOCAL_ORIGIN, publicQueueState } from '@/lib/fixerrors/protocol';
-import { applyAdminCommand, expireJobs } from '@/lib/fixerrors/control';
+import { applyAdminCommand, deny, expireJobs, type PreparedFixerrorsEvidence } from '@/lib/fixerrors/control';
+import { captureFreshFixerrorsEvidence } from '@/lib/server/fixerrors/evidence';
 import { getFixerrorsOrigin } from '@/lib/server/fixerrors/config';
 import { localFixerrorsStore, productionFixerrorsStore } from '@/lib/server/fixerrors/store';
 import {
@@ -38,7 +39,26 @@ export async function POST(request: NextRequest) {
     assertFixerrorsBrowserOrigin(request, scope);
     const command = adminCommandSchema.parse(await readBoundedJson(request));
     const store = scope === 'production' ? productionFixerrorsStore : localFixerrorsStore;
-    const result = await store.transact((tx) => applyAdminCommand(tx, actor, command, Date.now()));
+    let evidence: PreparedFixerrorsEvidence | undefined;
+    if (command.op === 'enqueue') {
+      const preparation = await store.transact((tx) => {
+        const device = tx.state.devices.find(item => item.id === command.deviceId);
+        const current = device?.checkout ?? device?.workspace;
+        if (!current) deny('Connected clean checkout required');
+        const clean = { head: current.head, tree: current.tree, clean: true as const };
+        // Preflight without persisting a job, then recheck under lock after the read.
+        applyAdminCommand({ state: structuredClone(tx.state), audit: () => {} }, actor, command, Date.now(),
+          { checkout: clean, packet: null });
+        return {
+          checkout: clean,
+          reviewPacket: command.reviewJobId ? tx.state.jobs.find(job => job.id === command.reviewJobId)?.packet : undefined,
+        };
+      });
+      if (command.reviewJobId) deny('Request a fresh full batch instead of reusing a single-packet review');
+      const batch = await captureFreshFixerrorsEvidence(command.requestId, preparation.checkout);
+      evidence = { checkout: preparation.checkout, packet: null, batch };
+    }
+    const result = await store.transact((tx) => applyAdminCommand(tx, actor, command, Date.now(), evidence));
     return fixerrorsJson(result);
   } catch (error) {
     return fixerrorsHttpError(error);

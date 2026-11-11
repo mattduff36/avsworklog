@@ -177,6 +177,42 @@ describe('automatic local fixerrors lifecycle investigation', () => {
     expect((await run(contradicted.adapters, retrieval)).clusters[0].status).toBe('held');
     expect(contradicted.adapters.learn).not.toHaveBeenCalled();
   });
+  it('investigates every new and held cluster without repairing under read-only authority', async () => {
+    const h = harness([cluster(), cluster('cluster-2')]);
+    const retrieval = packet(2);
+    retrieval.clusters[1].held = true;
+    const checkpoint = vi.fn();
+    h.adapters.checkpoint = checkpoint;
+    const result = await runAutomaticFixerrors({
+      retrieval, snapshotChecksum: 'c'.repeat(64), mode: 'review', adapters: h.adapters,
+    });
+    expect(h.requests.map(request => request.mode)).toEqual(['ask', 'ask']);
+    expect(result.clusters.map(entry => entry.status)).toEqual(['held', 'held']);
+    expect(h.adapters.verifyRepair).not.toHaveBeenCalled();
+    expect(checkpoint.mock.calls.map(([value]) => value.clusters.length)).toEqual([1, 2]);
+  });
+  it('resumes only completed prefixes, skips prior work and restores overlap protection', async () => {
+    const first = harness();
+    const resume = await runAutomaticFixerrors({
+      retrieval: packet(), snapshotChecksum: 'c'.repeat(64), runId: 'fixerrors-resume', adapters: first.adapters,
+    });
+    const next = harness([cluster('cluster-2')]);
+    const result = await runAutomaticFixerrors({
+      retrieval: packet(2), snapshotChecksum: 'c'.repeat(64), runId: resume.runId, resume, adapters: next.adapters,
+    });
+    expect(next.requests.map(request => request.task_id)).toEqual(['fixerrors-resume-cluster-2-analysis']);
+    expect(result.clusters.map(entry => entry.status)).toEqual(['verified-local', 'held']);
+    const invalid = structuredClone(resume);
+    invalid.clusters[0].id = 'cluster-2';
+    await expect(runAutomaticFixerrors({
+      retrieval: packet(2), snapshotChecksum: 'c'.repeat(64), resume: invalid, adapters: next.adapters,
+    })).rejects.toThrow('completed prefix');
+    await expect(runAutomaticFixerrors({
+      retrieval: packet(2), snapshotChecksum: 'c'.repeat(64), resume: {
+        ...resume, candidate: { ...candidate, treeFingerprint: 'd'.repeat(64) },
+      }, adapters: next.adapters,
+    })).rejects.toThrow('candidate drift');
+  });
   it('rejects private packets, unsafe source paths and malformed/live decisions before implementation', async () => {
     const h = harness();
     const retrieval = packet();

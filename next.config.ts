@@ -37,6 +37,12 @@ const nextConfig: NextConfig = {
   },
   // Externalize packages that have been unreliable in bundled server chunks on Windows.
   serverExternalPackages: ['exceljs', 'nuqs'],
+  outputFileTracingIncludes: {
+    '/api/debug/fixerrors': [
+      './{app,components,lib,hooks,utils,services}/**/*.{ts,tsx,js,jsx}',
+      './lib/config/fixerrors-knowledge.json',
+    ],
+  },
   eslint: {
     ignoreDuringBuilds: false,
   },

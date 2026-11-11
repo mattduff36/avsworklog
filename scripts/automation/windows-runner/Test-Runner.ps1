@@ -19,6 +19,10 @@ $oldNodeOptions=$env:NODE_OPTIONS
 $env:SystemDrive=[IO.Path]::GetPathRoot($env:SystemRoot).TrimEnd('\')
 $env:NODE_OPTIONS='synthetic-fixture-inheritance-must-be-removed'
 function Assert([bool]$Condition,[string]$Message) { if (-not $Condition) { throw $Message } }
+function Invoke-Consent([string]$Mode) {
+    $child=Start-Process -FilePath $exe -ArgumentList @('--fixture-consent',$Mode) -PassThru -Wait -WindowStyle Hidden -RedirectStandardError (Join-Path $root 'consent-error.txt')
+    return $child.ExitCode
+}
 function Await([scriptblock]$Condition,[string]$Message) {
     $deadline=[DateTime]::UtcNow.AddSeconds(15)
     while (-not (& $Condition)) { if ([DateTime]::UtcNow -ge $deadline) { throw $Message }; Start-Sleep -Milliseconds 100 }
@@ -70,6 +74,39 @@ try {
     $after=@(Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object { $_.FullName+':'+(Get-FileHash -LiteralPath $_.FullName).Hash })
     Assert (($before -join "`n") -eq ($after -join "`n")) 'Read-only status mutated files'
     Write-Output 'PASS production/fixture compilation; read-only stopped status has no file mutations'
+    $enrollment=Join-Path $root 'enrollment.json'
+    $flags=@('enabled','workerEligible','allowReadOnly','allowBoundedRepair','allowRelease')
+    [IO.File]::WriteAllText($enrollment,([ordered]@{
+        enabled=$false;workerEligible=$false;allowReadOnly=$false;allowBoundedRepair=$false;allowRelease=$false
+        fixtureIdentity='synthetic-unchanged';checks=@{fixture='unchanged'};pins=@('synthetic-pin-1','synthetic-pin-2')
+    } | ConvertTo-Json -Depth 8 -Compress))
+    $enrollmentAcl=Get-Acl -LiteralPath $enrollment
+    $originalAcl=$enrollmentAcl.Sddl
+    foreach ($mode in @('review','repair','deploy','disabled')) {
+        $exit=Invoke-Consent $mode
+        Assert ($exit -eq 0) "Disposable owner consent failed: $mode"
+        $value=Get-Content -LiteralPath $enrollment -Raw | ConvertFrom-Json
+        $expected=@(($mode -ne 'disabled'),($mode -ne 'disabled'),($mode -ne 'disabled'),($mode -in @('repair','deploy')),($mode -eq 'deploy'))
+        for ($index=0;$index -lt $flags.Count;$index++) {
+            Assert ($value.($flags[$index]) -is [bool] -and $value.($flags[$index]) -eq $expected[$index]) "Consent flag mismatch: $mode/$($flags[$index])"
+        }
+        Assert ($value.fixtureIdentity -eq 'synthetic-unchanged' -and $value.checks.fixture -eq 'unchanged' -and ($value.pins -join ',') -eq 'synthetic-pin-1,synthetic-pin-2') 'Consent changed non-flag configuration'
+        Assert ((Get-Acl -LiteralPath $enrollment).Sddl -eq $originalAcl) 'Consent changed enrollment ACL'
+    }
+    $unchanged=Get-Content -LiteralPath $enrollment -Raw
+    $exit=Invoke-Consent 'invalid'
+    Assert ($exit -ne 0 -and (Get-Content -LiteralPath $enrollment -Raw) -ceq $unchanged) 'Invalid consent mode changed enrollment'
+    $unsafeAcl=Get-Acl -LiteralPath $enrollment
+    $unsafeAcl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new('S-1-1-0'),'Read','Allow'))
+    Set-Acl -LiteralPath $enrollment -AclObject $unsafeAcl
+    $exit=Invoke-Consent 'review'
+    Assert ($exit -ne 0 -and (Get-Content -LiteralPath $enrollment -Raw) -ceq $unchanged) 'Unsafe enrollment ACL admitted consent'
+    Set-Acl -LiteralPath $enrollment -AclObject $enrollmentAcl
+    [IO.File]::WriteAllText($enrollment,'{"enabled":"invalid"}')
+    $exit=Invoke-Consent 'review'
+    Assert ($exit -ne 0 -and (Get-Content -LiteralPath $enrollment -Raw) -ceq '{"enabled":"invalid"}') 'Invalid enrollment flags changed'
+    [IO.File]::WriteAllText($enrollment,$unchanged)
+    Write-Output 'PASS owner-only atomic consent matrix; unrelated fields and ACL preserved; invalid mode/schema/ACL refused unchanged'
     $token=& $exe --fixture-token
     Assert ($LASTEXITCODE -eq 0 -and $token -eq 'restricted-medium-nonadmin') 'Native restricted token or privilege ABI failed'
     $disabled=Join-Path $root 'disabled.fixture'
@@ -98,11 +135,17 @@ try {
     Assert-TreeGone
     Remove-Item -LiteralPath $disabled
     Write-Output 'PASS live opt-out immediately removes readiness and stops the complete managed tree'
+    $waiting=Join-Path $root 'waiting.fixture'
+    [IO.File]::WriteAllText($waiting,'synthetic waiting without packet')
     Start-Fixture
     Await {
         $status=& $exe --status | ConvertFrom-Json
-        $LASTEXITCODE -eq 0 -and $status.running -and $status.ready -and $status.host -eq 'console'
+        $LASTEXITCODE -eq 0 -and $status.running -and $status.ready -and $status.host -eq 'console' -and $status.state -eq 'running-waiting'
     } 'Running status failed'
+    $exit=Invoke-Consent 'review'
+    Assert ($exit -ne 0 -and (Get-Content -LiteralPath $enrollment -Raw) -ceq $unchanged) 'Running host allowed persistent consent changes'
+    Remove-Item -LiteralPath $waiting
+    Write-Output 'PASS connected/waiting readiness without packet; running-host owner consent refused unchanged'
     $environment=Get-Content -LiteralPath (Join-Path $root 'environment.json') -Raw | ConvertFrom-Json
     Assert ($environment.profile -eq $ownerProfile -and $environment.drive -eq $env:SystemDrive -and -not $environment.inheritedUnsafe -and $environment.path -match 'WindowsPowerShell\\v1.0') 'Clean owner environment failed'
     $duplicate=Start-Process -FilePath $exe -ArgumentList '--console repair' -PassThru -Wait -WindowStyle Hidden
@@ -176,6 +219,10 @@ try {
             try { Assert-PackageAcl $root }
             catch { $rejected=$_.Exception.Message -eq 'Existing package ownership/ACL drift; investigate, do not overwrite' }
             Assert $rejected 'Installer did not reject user-owned package without mutation'
+        }
+        if ($script -eq 'Manager.ps1') {
+            $functions=@($parsed.EndBlock.Statements | Where-Object { $_ -is [Management.Automation.Language.FunctionDefinitionAst] })
+            Assert (@($functions | Where-Object { $_.Name -eq 'Set-OwnerConsent' }).Count -eq 1) 'Owner-consent menu helper must be top-level and callable'
         }
     }
     Write-Output 'PASS fixed safe lifecycle logs; pure manual-service plan; PowerShell syntax'

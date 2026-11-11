@@ -170,6 +170,15 @@ Local Fixerrors controls are a deliberately isolated development prototype:
 `app/api/fixerrors-device` has separate revocable device authentication.
 `lib/server/fixerrors` keeps its private queue separate from application storage.
 Local mode uses dedicated loopback PostgreSQL and a refusal-only executor.
+Connection readiness uses clean HEAD/tree without a precreated packet. An
+authorized same-origin Debug request reads one bounded active error through the
+existing application server client, projects fixed private diagnostics/source
+references, and rechecks the queue before committing candidate-bound evidence.
+Only the authenticated leased device receives the packet and signed admission.
+Review reuse requires same-device HEAD/tree, a 30-minute bound and a matching
+current evidence reread. Confirmed safe completion archives local packet evidence;
+prepared, inflight and unknown work remains held. The Windows manager's explicit
+owner consent changes only existing enrollment booleans; status stays read-only.
 Production is separately default-off, requires its dedicated verified-TLS login,
 and pins the public Squires origin and enrolled device; preview stays disabled.
 The production companion selects a SHA-pinned Windows transport. Staged Python
@@ -186,6 +195,17 @@ Its isolated-checkout executor accepts a locally reviewed fixture transport,
 not site-provided commands; no native Python launcher is wired. The existing
 local foreground companion remains refusal-only. See the guide for owner installation
 and live acceptance gates; offline synthetic artifacts are not real worker acceptance.
+
+The shared Fixerrors batch path lives in `scripts/fixerrors-capture.ts`
+and `scripts/fixerrors-retrieval.ts`. Debug and chat/worker CLI capture all new and
+old outstanding exact rows under one read-only repeatable-read boundary, then
+assemble sanitized new-first/oldest-held retrieval with private lifecycle bindings.
+The device route delivers authenticated chunks and renewable signed execution
+leases; the companion uses framed native batch execution, exact completed-prefix
+resume and at most one aggregate preparation. Server lifecycle reconciliation uses
+a separate application connection and durable private pre/post receipts, never
+the queue login. Debug exposes progress and separate exact-candidate Deploy consent.
+Source wiring does not install, repin, enable or approve the stopped owner runner.
 
 ## Code placement
 

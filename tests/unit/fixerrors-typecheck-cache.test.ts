@@ -5,11 +5,12 @@ import {
 } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTypecheckCache } from '../../scripts/automation/fixerrors-typecheck-cache.mjs';
 
 const temporary: string[] = [];
 afterEach(async () => {
+  vi.unstubAllEnvs();
   for (const root of temporary.splice(0)) {
     const dependencies = path.join(root, 'checkout', 'node_modules');
     if (existsSync(dependencies)) unlinkSync(dependencies);
@@ -54,6 +55,18 @@ function fixture() {
 }
 
 describe('protected full application-project TypeScript cache (disposable actual compiler)', () => {
+  it('checks under a deeply nested native receipt TEMP without Node compile-cache startup hangs', () => {
+    const f = fixture();
+    expect(f.cache.warmup()).toBe(0);
+    const base = path.join(f.root, 'native-receipts', 'tmp');
+    const isolated = path.join(f.root, 'native-receipts', 'a'.repeat(Math.max(1, 229 - base.length)), 'tmp');
+    mkdirSync(isolated, { recursive: true });
+    vi.stubEnv('TEMP', isolated);
+    vi.stubEnv('TMP', isolated);
+    f.write('api.ts', 'export const value: string = "edited";\n');
+    expect(f.cache.check()).toBe(0);
+  }, 30_000);
+
   it('keeps the OS-account cache path when the check runner redirects home variables', () => {
     const isolated = path.join(tmpdir(), 'synthetic-worker-profile');
     const output = execFileSync(process.execPath, ['--input-type=module', '-e',

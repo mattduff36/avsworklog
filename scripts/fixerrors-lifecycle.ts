@@ -169,7 +169,7 @@ export async function fetchLifecycleRecords(client: PgClientLike, ids?: string[]
 
 // This is a separate exact-row contract; the v5 snapshot/retention guard is unchanged.
 export async function applyLifecyclePlan(client: PgClientLike, input: LifecyclePlan, target: string, options: {
-  writer?: (file: string, contents: string) => void;
+  writer?: (file: string, contents: string) => void | Promise<void>;
   now?: () => Date;
 } = {}): Promise<{ updated: number; alreadyApplied: number }> {
   const plan = planSchema.parse(input);
@@ -247,7 +247,7 @@ export async function applyLifecyclePlan(client: PgClientLike, input: LifecycleP
       pending.push({ record, row });
     }
     if (alreadyApplied && pending.length) throw new Error('Mixed applied and unapplied lifecycle rows');
-    writer(`${receiptPath}.pre.json`, JSON.stringify({ planHash, plan, validatedAt: now().toISOString() }, null, 2));
+    await writer(`${receiptPath}.pre.json`, JSON.stringify({ planHash, plan, validatedAt: now().toISOString() }, null, 2));
     for (const { record, row } of pending) {
       const closing = row.metadata.state === 'resolved-no-fix' || row.metadata.state === 'fixed-live';
       const state = row.metadata.state === 'fixed-live' ? 'fixed_live' : closing ? 'no_fix_required' : 'outstanding';
@@ -283,7 +283,7 @@ export async function applyLifecyclePlan(client: PgClientLike, input: LifecycleP
     await client.query('COMMIT');
     committed = true;
     const result = { updated, alreadyApplied };
-    writer(`${receiptPath}.post.json`, JSON.stringify({ planHash, ...result, verifiedAt: now().toISOString() }, null, 2));
+    await writer(`${receiptPath}.post.json`, JSON.stringify({ planHash, ...result, verifiedAt: now().toISOString() }, null, 2));
     return result;
   } catch (error) {
     let cause = error;

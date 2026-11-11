@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CapturedBatch } from './batch';
 
 export const FIXERRORS_LOCAL_ORIGIN = 'https://localhost:4443';
 export const FIXERRORS_PRODUCTION_ORIGIN = 'https://www.squiresapp.com';
@@ -17,6 +18,8 @@ export const workspaceSchema = z.object({
   packetSha256: sha256Schema,
   clean: z.literal(true),
 }).strict();
+export const checkoutSchema = workspaceSchema.omit({ packetSha256: true });
+export const runnerHoldSchema = z.enum(['packet-needs-reconciliation', 'prepared-candidate', 'checkout-unavailable']);
 export const checksSchema = z.object({
   head: gitOid,
   tree: gitOid,
@@ -33,10 +36,24 @@ export const checksSchema = z.object({
 export const actionSchema = z.enum(['review', 'repair', 'deploy']);
 export const releaseModeSchema = z.enum(['full', 'targeted']);
 export type ReleaseMode = z.infer<typeof releaseModeSchema>;
-export const jobStateSchema = z.enum(['queued', 'leased', 'reviewed', 'tested', 'blocked', 'failed', 'expired', 'deployed', 'unknown']);
+export const jobStateSchema = z.enum(['queued', 'leased', 'paused', 'reviewed', 'tested', 'blocked', 'failed', 'expired', 'deployed', 'unknown', 'no-work', 'no-change']);
 export const blockReasonSchema = z.enum([
   'bridge-unavailable', 'local-opt-out', 'checkout-drift', 'lease-lost', 'timeout', 'execution-failed', 'release-unconfirmed',
 ]);
+export const batchProgressSchema = z.object({
+  captured: z.number().int().nonnegative(), rows: z.number().int().nonnegative(),
+  processed: z.number().int().nonnegative(), remaining: z.number().int().nonnegative(),
+  counts: z.object({
+    'verified-local': z.number().int().nonnegative(), held: z.number().int().nonnegative(),
+    'report-only': z.number().int().nonnegative(), failed: z.number().int().nonnegative(),
+  }).strict(),
+  lifecycle: z.enum(['pending', 'applied', 'blocked']),
+  lifecycleReason: z.enum(['conflict', 'schema', 'expired', 'uncertain', 'unavailable']).optional(),
+}).strict();
+const batchDelivery = z.object({
+  version: z.literal(1), manifestSha256: sha256Schema, bytes: z.number().int().positive(),
+  chunks: z.number().int().positive(), clusters: z.number().int().nonnegative(), rows: z.number().int().nonnegative(),
+}).strict();
 export const jobSchema = z.object({
   id: z.string().uuid(),
   deviceId: z.string().uuid(),
@@ -61,6 +78,11 @@ export const jobSchema = z.object({
     deployStartedAt: z.number().int().optional(),
   }).strict().nullable(),
   reason: blockReasonSchema.nullable(),
+  // Private sanitized evidence, not browser-visible queue state or launch authority.
+  packet: z.string().min(1).max(96 * 1024).optional(),
+  batch: batchProgressSchema.optional(),
+  // Trusted server retention only. Omitted from every public/claim projection.
+  privateBatch: z.custom<CapturedBatch>(value => typeof value === 'object' && value !== null).optional(),
 }).strict();
 export const deviceSchema = z.object({
   id: z.string().uuid(),
@@ -73,6 +95,8 @@ export const deviceSchema = z.object({
   allowRepair: z.boolean(),
   allowDeploy: z.boolean(),
   bridgeAvailable: z.boolean(),
+  checkout: checkoutSchema.nullable().optional(),
+  holdReason: runnerHoldSchema.nullable().optional(),
 }).strict();
 export const queueStateSchema = z.object({
   version: z.literal(1),
@@ -85,7 +109,8 @@ export const adminCommandSchema = z.discriminatedUnion('op', [
     requestId: z.string().uuid(),
     deviceId: z.string().uuid(),
     action: z.enum(['review', 'repair']),
-  }).strict(),
+    reviewJobId: z.string().uuid().optional(),
+    }).strict(),
   z.object({
     op: z.literal('approve-deploy'),
     requestId: z.string().uuid(),
@@ -95,6 +120,7 @@ export const adminCommandSchema = z.discriminatedUnion('op', [
     releaseMode: releaseModeSchema,
   }).strict(),
   z.object({ op: z.literal('revoke-device'), deviceId: z.string().uuid() }).strict(),
+  z.object({ op: z.literal('cancel'), jobId: z.string().uuid() }).strict(),
 ]);
 export const resultSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('blocked'), reason: blockReasonSchema }).strict(),
@@ -103,6 +129,7 @@ export const resultSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('tested'), candidate: candidateSchema, checks: checksSchema }).strict(),
   z.object({ status: z.literal('deployed'), candidate: candidateSchema }).strict(),
   z.object({ status: z.literal('unknown'), reason: z.literal('release-unconfirmed') }).strict(),
+  z.object({ status: z.literal('no-change') }).strict(),
 ]);
 const leasedCommand = {
   jobId: z.string().uuid(),
@@ -116,26 +143,46 @@ export const deviceCommandSchema = z.discriminatedUnion('op', [
     allowRepair: z.boolean(),
     allowDeploy: z.boolean(),
     bridgeAvailable: z.boolean(),
+    checkout: checkoutSchema.nullable().optional(),
+    holdReason: runnerHoldSchema.nullable().optional(),
   }).strict(),
   z.object({ op: z.literal('claim') }).strict(),
   z.object({ op: z.literal('renew'), ...leasedCommand }).strict(),
+  z.object({ op: z.literal('batch-chunk'), ...leasedCommand, index: z.number().int().nonnegative() }).strict(),
+  z.object({ op: z.literal('batch-lease'), ...leasedCommand,
+    checkpointSha256: sha256Schema, cursor: z.number().int().nonnegative(), outcome: z.unknown().optional(),
+    resume: z.boolean(),
+  }).strict(),
+  z.object({ op: z.literal('pause-batch'), ...leasedCommand, checkpointSha256: sha256Schema }).strict(),
+  z.object({ op: z.literal('batch-reconcile'), jobId: z.string().uuid() }).strict(),
   z.object({ op: z.literal('start-deploy'), ...leasedCommand }).strict(),
-  z.object({ op: z.literal('complete'), ...leasedCommand, result: resultSchema }).strict(),
+  z.object({ op: z.literal('complete'), ...leasedCommand, result: resultSchema, outcomeSha256: sha256Schema.optional() }).strict(),
 ]);
 export const claimSchema = z.object({
-  job: jobSchema,
+  job: jobSchema.omit({ packet: true, privateBatch: true }),
   leaseToken: leasedCommand.leaseToken,
   admissionTicket: z.string().min(1).max(4096).optional(),
+  packet: z.string().min(1).max(96 * 1024).optional(),
+  batch: batchDelivery.optional(),
+  resume: z.boolean().optional(),
 }).strict();
 export const deviceResponseSchema = z.object({
   claim: claimSchema.nullable().optional(),
   leaseUntil: z.number().int().optional(),
   releaseTicket: z.string().min(1).max(4096).optional(),
+  batchLease: z.string().min(1).max(4096).optional(),
+  chunk: z.object({ index: z.number().int().nonnegative(), sha256: sha256Schema, data: z.string().max(65536) }).strict().optional(),
+  lifecycle: z.enum(['pending', 'applied', 'blocked']).optional(),
+  completion: z.object({
+    job: jobSchema.omit({ packet: true, privateBatch: true }),
+    outcomeSha256: sha256Schema,
+  }).strict().optional(),
   ok: z.literal(true),
 }).strict();
 
 export type Candidate = z.infer<typeof candidateSchema>;
 export type Workspace = z.infer<typeof workspaceSchema>;
+export type Checkout = z.infer<typeof checkoutSchema>;
 export type CheckEvidence = z.infer<typeof checksSchema>;
 export type FixerrorsJob = z.infer<typeof jobSchema>;
 export type FixerrorsDevice = z.infer<typeof deviceSchema>;
@@ -158,9 +205,10 @@ export function publicQueueState(state: QueueState) {
   return {
     releaseNeedsReconciliation: state.jobs.some((job) => job.state === 'unknown'),
     devices: state.devices.map(({ credentialSha256: _credential, ...device }) => device),
-    jobs: state.jobs.slice(-50).reverse().map(({ lease, ...job }) => ({
+    jobs: state.jobs.slice().reverse().map(({ lease, packet: _packet, privateBatch: _batch, ...job }) => ({
       ...job,
       leaseUntil: lease?.until ?? null,
+      evidenceAvailable: Boolean(_packet || _batch),
     })),
   };
 }
@@ -173,5 +221,7 @@ export const adminResponseSchema = z.object({
   executionAvailable: z.boolean(),
   origin: z.enum([FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN]),
   devices: z.array(deviceSchema.omit({ credentialSha256: true })).max(20),
-  jobs: z.array(jobSchema.omit({ lease: true }).extend({ leaseUntil: z.number().int().nullable() })).max(50),
+  jobs: z.array(jobSchema.omit({ lease: true, packet: true, privateBatch: true }).extend({
+    leaseUntil: z.number().int().nullable(), evidenceAvailable: z.boolean().default(false),
+  })).max(500),
 }).strict();

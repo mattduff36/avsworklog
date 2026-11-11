@@ -27,6 +27,17 @@ exception). Queue storage is a dedicated private local database; credentials
 use Windows CurrentUser DPAPI, never site entry. The local companion executor refuses
 all real repair/deploy execution. The production transport requires owner-installed
 SHA-pinned Python sources and independent read-only/repair/release opt-ins.
+Clean-checkout connection readiness grants no execution authority. Only an
+authorized same-origin request reads bounded current error evidence through the
+application server client, not the queue login. Fixed diagnostics and allowlisted
+source paths replace raw prose, identities, URLs and additional data. Private
+packets reach only the authenticated leased device, with job/device/authority,
+expiry, clean HEAD/tree and hash verified through existing signed admission before
+local preparation. Review reuse also requires a matching current evidence reread
+within 30 minutes on that same device/candidate. Capture never changes incident
+lifecycle. Confirmed packet archival preserves replay/native artifacts; uncertain,
+inflight or prepared evidence stays held. Explicit stopped-owner consent changes
+only existing enrollment flags, not keys, credentials, check pins or Deploy approval.
 Its staged orchestrator validates the signed packet and actual decision through
 shared CRITICAL/scope guards before premium dispatch, preserves native budget and
 durable replay checks, and verifies native state and genuine receipts. Trusted

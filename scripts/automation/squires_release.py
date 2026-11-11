@@ -34,12 +34,15 @@ def prepared_candidate(run, request, after, actual, cfg):
     s.require({k: v for k, v in after['files'].items() if k not in RELEASE_METADATA} ==
               {k: v for k, v in actual['files'].items() if k not in RELEASE_METADATA},
               'prepared_candidate_changes_worker_result')
-    decision = read_json(run / 'validated-decision.json')
-    s.require(s.sha(s.encoded(decision)) == request['squires_job']['decisionSha256']
-              and len(decision['clusters']) == 1
-              and decision['clusters'][0]['files'] == request['editable_paths'],
-              'prepared_decision_changed')
-    expected_checks = scoped_checks(cfg, decision['clusters'][0]['requiredTestIds'], request['editable_paths'])
+    if (run / 'batch-proof.json').exists():
+        expected_checks = verify_batch_preparation(run, after, cfg)
+    else:
+        decision = read_json(run / 'validated-decision.json')
+        s.require(s.sha(s.encoded(decision)) == request['squires_job']['decisionSha256']
+                  and len(decision['clusters']) == 1
+                  and decision['clusters'][0]['files'] == request['editable_paths'],
+                  'prepared_decision_changed')
+        expected_checks = scoped_checks(cfg, decision['clusters'][0]['requiredTestIds'], request['editable_paths'])
     prep = run / 'prepared'
     path = prep / 'check-config.json'
     config = read_json(path)
@@ -48,6 +51,81 @@ def prepared_candidate(run, request, after, actual, cfg):
               and Path(config['run_dir']) == prep and config.get('checks') == checks == expected_checks,
               'prepared_check_config_changed')
     return CheckServer(path)
+
+
+def verify_batch_preparation(run, after, cfg):
+    from run_worker import ROOT
+    from squires_repair import (read_json, verify_batch_records, scoped_checks, aggregate_scoped_checks, batch_fingerprint,
+                                batch_code_sha, BATCH_ENGINE, local_env, node)
+    proof = read_json(run / 'batch-proof.json', 16 * 1024 * 1024)
+    s.fields(proof, ('version', 'manifestSha256', 'initial', 'after', 'records', 'outcome', 'paths', 'tests'))
+    journal = read_json(s.WORKSPACE / '.git/squires-fixerrors/active-packet.json', 16 * 1024 * 1024)
+    manifest_bytes = (s.WORKSPACE / '.git/squires-fixerrors/batch-manifest.json').read_bytes()
+    manifest = s.decode_json(manifest_bytes)
+    s.require(proof['version'] == 1 and s.sha(manifest_bytes) == proof['manifestSha256'] == journal['packetSha256']
+              and journal['batch']['codeSha256'] == batch_code_sha(cfg)
+              and proof['records'] == journal['batch']['records']
+              and proof['after'] == after == verify_batch_records(proof['records'])
+              and proof['initial'] == journal['batch']['initial']
+              and proof['initial']['head'] == journal['head'] and not proof['initial']['status']
+              and proof['outcome'] == journal['batch']['checkpoint']['outcome']
+              and proof['after'] == journal['batch']['checkpoint']['snapshot']
+              and proof['outcome']['runId'] == 'fixerrors-' + journal['jobId']
+              and proof['outcome']['candidate'] == batch_fingerprint(after, proof['initial'], journal['tree'])
+              and all(manifest['retrieval'][key] == value for key, value in
+                      batch_fingerprint(proof['initial'], proof['initial'], journal['tree']).items()),
+              'batch_preparation_evidence_changed')
+    paths, tests, contributions = set(), set(), []
+    previous = proof['initial']
+    for record in proof['records']:
+        worker = ROOT / 'runs' / record['taskId'] / '1'
+        req = read_json(worker / 'request.json')
+        before = read_json(worker / 'before.json', 8 * 1024 * 1024)
+        fingerprint = batch_fingerprint(before, proof['initial'], journal['tree'])
+        evidence = next((cluster for cluster in manifest['retrieval']['clusters']
+                         if cluster['id'] == record['clusterId']), None)
+        packet = dict(schemaVersion=1, snapshotChecksum=manifest['snapshotChecksum'],
+                      retrieval={**manifest['retrieval'], **fingerprint, 'clusters': [evidence]})
+        s.require(before == previous and req.get('origin') == s.ORIGIN
+                  and req['squires_job']['jobId'] == journal['jobId']
+                  and req['squires_job']['packetSha256'] == proof['manifestSha256']
+                  and evidence is not None and req.get('squires_packet') == packet
+                  and req.get('mode') == ('ask' if record['readonly'] else 'implement')
+                  and req.get('task_id') == 'sq-' + journal['jobId'] + '-'
+                      + record['clusterId'].removeprefix('cluster-') + ('-a' if record['readonly'] else '-r'),
+                  'batch_worker_binding_changed')
+        if record['readonly']:
+            s.require(req['editable_paths'] == [] and req['checks'] == {}
+                      and req['squires_job']['decisionSha256'] is None, 'batch_analysis_scope_changed')
+        else:
+            decision = read_json(worker / 'validated-decision.json')
+            cluster = decision['clusters'][0]
+            s.require(req['editable_paths'] == cluster['files'] and
+                      req['checks'] == scoped_checks(cfg, cluster['requiredTestIds'], cluster['files']),
+                      'batch_worker_scope_changed')
+            paths.update(cluster['files'])
+            tests.update(cluster['requiredTestIds'])
+            contributions.append(dict(decision=decision, candidate=fingerprint))
+        previous = read_json(worker / 'after.json', 8 * 1024 * 1024)
+    s.require(sorted(paths) == proof['paths'] and sorted(tests) == proof['tests'] and contributions,
+              'batch_union_scope_changed')
+    # Reapply the shared CRITICAL/overlap/domain policy independently at preparation and release.
+    with tempfile.TemporaryFile() as output:
+        result = subprocess.run([node(cfg), '--import=tsx', BATCH_ENGINE, '--verify-contributions'],
+                                cwd=s.WORKSPACE, input=s.encoded(dict(manifest=manifest, contributions=contributions,
+                                                                     outcome=proof['outcome'])),
+                                stdout=output, stderr=subprocess.DEVNULL, env=local_env(), timeout=30)
+    s.require(result.returncode == 0, 'batch_shared_policy_rejected')
+    config = read_json(run / 'aggregate/check-config.json')
+    expected_checks = aggregate_scoped_checks(cfg, proof['tests'], proof['paths'])
+    s.require(config.get('candidate_scope') == 'worktree' and config.get('checks') == expected_checks
+              and Path(config['workspace']) == s.WORKSPACE and Path(config['run_dir']) == run / 'aggregate',
+              'batch_final_union_checks_changed')
+    from worker_checks import CheckServer
+    server = CheckServer(run / 'aggregate/check-config.json')
+    selected = read_json(run / 'aggregate/receipts.json')
+    verify_prepared_checks(server, selected, after)
+    return expected_checks
 
 
 def verify_prepared_checks(server, selected, actual):
@@ -76,6 +154,22 @@ def candidate(cfg, ticket, review):
     s.require(s.config() == cfg, 'enrollment_changed')
     head, tree = s.inspect(cfg, False)
     run = ROOT / 'runs' / ('squires-fixerrors-' + ticket['repairJobId']) / '1'
+    if 'batch' in review:
+        s.fields(review['batch'], ('version', 'manifestSha256', 'contributionsSha256', 'clusterCount', 'repairCount'))
+        proof = read_json(run / 'batch-proof.json', 16 * 1024 * 1024)
+        s.require(review['batch'] == dict(version=1, manifestSha256=proof['manifestSha256'],
+                                        contributionsSha256=s.sha(s.encoded(proof['records'])),
+                                        clusterCount=len(proof['outcome']['clusters']),
+                                        repairCount=sum(not record['readonly'] for record in proof['records']))
+                  and s.sha((run / 'batch-proof.json').read_bytes()) == review['workerResultSha256'],
+                  'batch_release_proof_changed')
+        actual = snapshot(s.WORKSPACE)
+        expected = verify_batch_preparation(run, proof['after'], cfg)
+        checks = prepared_candidate(run, dict(checks=expected), proof['after'], actual, cfg)
+        verify_prepared_checks(checks, review['preparedChecks'], actual)
+        s.require((head, tree, actual['candidate_sha256']) ==
+                  (review['head'], review['tree'], review['candidateSha256']), 'prepared_batch_candidate_drift')
+        return head, tree, actual['candidate_sha256']
     raw = (run / 'state.json').read_bytes()
     s.require(len(raw) <= 1024 * 1024 and s.sha(raw) == review['workerResultSha256'], 'worker_result_changed')
     state = s.decode_json(raw)

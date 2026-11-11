@@ -84,6 +84,8 @@ export interface AutoAdapters {
   verifyRepair(request: WorkerRequest, result: WorkerResult, before: CandidateFingerprint): void;
   write(file: string, value: unknown): void;
   learn(retrieval: AutoRetrieval, cluster: DecisionCluster, outcome: IncidentOutcome, files: string[], tests: string[], summary?: string): void;
+  checkpoint?(result: AutoRunResult): void;
+  repairChecks?(tests: string[], paths: string[]): WorkerRequest['checks'];
 }
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }).trimEnd();
@@ -326,21 +328,31 @@ function makeRequest(cwd: string, task: string, mode: 'ask' | 'implement', objec
 }
 export async function runAutomaticFixerrors(input: {
   retrieval: unknown; snapshotChecksum: string; cwd?: string; adapters?: AutoAdapters;
+  mode?: 'review' | 'repair'; runId?: string; resume?: AutoRunResult;
 }): Promise<AutoRunResult> {
   const cwd = input.cwd ?? process.cwd();
   const retrieval = parseAutomaticFixerrorsRetrieval(input.retrieval);
   const adapters = input.adapters ?? createAutoAdapters(cwd);
   const candidate = adapters.candidate();
-  if (!sameCandidate(candidate, retrieval)) throw new Error('Capture candidate drift before automatic analysis');
-  const result: AutoRunResult = { runId: `fixerrors-${randomBytes(8).toString('hex')}`, candidate, clusters: [], decisions: [] };
+  if (!sameCandidate(candidate, input.resume?.candidate ?? retrieval)) throw new Error('Capture candidate drift before automatic analysis');
+  const result: AutoRunResult = input.resume ? structuredClone(input.resume) :
+    { runId: input.runId ?? `fixerrors-${randomBytes(8).toString('hex')}`, candidate, clusters: [], decisions: [] };
+  if ((input.runId && result.runId !== input.runId) || result.clusters.length > retrieval.clusters.length ||
+      result.clusters.some((cluster, index) => cluster.id !== retrieval.clusters[index].id) ||
+      new Set(result.decisions.map(cluster => cluster.id)).size !== result.decisions.length ||
+      result.decisions.some(cluster => !result.clusters.some(outcome => outcome.id === cluster.id))) {
+    throw new Error('Automatic checkpoint is not an exact completed prefix');
+  }
   const persist = () => {
     result.candidate = adapters.candidate();
     adapters.write(`${result.runId}.outcome.json`, result);
     adapters.write('fixerrors-auto-outcome.json', result);
   };
   const decisions = result.decisions;
-  const used = new Set<string>();
-  for (const evidence of retrieval.clusters) {
+  const used = new Set(decisions.filter(decision => result.clusters.some(cluster =>
+    cluster.id === decision.id && cluster.status === 'verified-local' && !cluster.reusedFrom)).flatMap(decision => decision.files));
+  const checkpoint = () => { persist(); adapters.checkpoint?.(structuredClone(result)); };
+  for (const evidence of retrieval.clusters.slice(result.clusters.length)) {
     adapters.assertUnchanged(result.candidate);
     const matching = evidence.held && evidence.matchingAllowed !== false ? retrieval.clusters.find(entry => !entry.held &&
       fingerprintIncident(entry.query) === fingerprintIncident(evidence.query)) : undefined;
@@ -349,7 +361,7 @@ export async function runAutomaticFixerrors(input: {
     if (reused && prior && evidence.existingState !== 'awaiting-deployment') {
       decisions.push({ ...prior, id: evidence.id });
       result.clusters.push({ ...reused, id: evidence.id, reusedFrom: matching.id });
-      persist();
+      checkpoint();
       continue;
     }
     const before = adapters.candidate();
@@ -389,6 +401,12 @@ export async function runAutomaticFixerrors(input: {
           id: evidence.id, status: 'report-only', reason: decision.rationale, attempt: 'Source and targeted test evidence enrichment',
           tests: [], evidence: decision.evidencePaths,
         });
+      } else if (input.mode === 'review') {
+        result.clusters.push({
+          id: evidence.id, status: 'held', reason: decision.nextStep ?? decision.rationale,
+          attempt: 'Read-only source and test investigation; no repair authority used',
+          tests: [], evidence: decision.evidencePaths,
+        });
       } else {
         assertAutomaticFixerrorsRepair(decision, evidence, used);
         adapters.assertRepairScope([...new Set([...decision.files, ...decision.requiredTestIds])]);
@@ -407,6 +425,7 @@ export async function runAutomaticFixerrors(input: {
             path.join(cwd, 'node_modules', 'vitest', 'vitest.mjs'), 'run', test],
           timeout_seconds: 300, description: `Focused regression ${test}`,
         };
+        if (adapters.repairChecks) repair.checks = adapters.repairChecks(decision.requiredTestIds, repair.editable_paths);
         const repaired = await adapters.dispatch(repair);
         const report = repairSchema.parse(repaired.outcome);
         rejectSensitiveDocument(report, 'repair result');
@@ -442,7 +461,7 @@ export async function runAutomaticFixerrors(input: {
         adapters.learn(retrieval, decision, repair ? 'fix_failed' : 'manual_evidence_gap', [], []);
       }
     }
-    persist();
+    checkpoint();
   }
   persist();
   return result;

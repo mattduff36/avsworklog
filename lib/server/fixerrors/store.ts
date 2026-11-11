@@ -1,6 +1,7 @@
 import 'server-only';
 import { Client } from 'pg';
 import { queueStateSchema } from '@/lib/fixerrors/protocol';
+import { parseCapturedBatch } from '@/lib/fixerrors/batch';
 import type { AuditEvent, QueueStore } from '@/lib/fixerrors/control';
 import { getFixerrorsLocalDatabaseUrl, getFixerrorsProductionDatabaseSsl, getFixerrorsProductionDatabaseUrl } from './config';
 
@@ -41,8 +42,14 @@ function queueStore(connect: () => Client, scope: 'local' | 'production'): Queue
         );
         if (row.rows.length !== 1) throw new Error('Fixerrors queue schema is not provisioned');
         const state = queueStateSchema.parse(row.rows[0].state);
+        for (const job of state.jobs) {
+          if (job.privateBatch) job.privateBatch = parseCapturedBatch(job.privateBatch, job.id);
+        }
         const events: AuditEvent[] = [];
         const result = work({ state, audit: (event) => events.push(event) });
+        for (const job of state.jobs) {
+          if (job.privateBatch) job.privateBatch = parseCapturedBatch(job.privateBatch, job.id);
+        }
         await client.query(`UPDATE ${stateTable} SET state = $1::jsonb WHERE id = 1`, [
           JSON.stringify(queueStateSchema.parse(state)),
         ]);

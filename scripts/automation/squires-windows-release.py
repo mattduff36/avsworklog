@@ -54,7 +54,7 @@ def contain_process_tree():
 
 
 def main():
-    if sys.platform != 'win32' or sys.argv[1:] not in ([], ['repair']):
+    if sys.platform != 'win32' or sys.argv[1:] not in ([], ['repair'], ['batch']):
         return 2
     try:
         job = contain_process_tree()
@@ -64,9 +64,9 @@ def main():
     if not job:
         return 2
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    if sys.argv[1:] == ['repair']:
+    if sys.argv[1:] in (['repair'], ['batch']):
         import squires_repair
-        return squires_repair.main()
+        return squires_repair.batch_main() if sys.argv[1:] == ['batch'] else squires_repair.main()
     import squires_release
     return squires_release.main()
 

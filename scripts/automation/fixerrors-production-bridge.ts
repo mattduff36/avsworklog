@@ -12,6 +12,8 @@ import { encodeFixerrorsDeviceJob, fixerrorsDeviceJobSchema, fixerrorsDeviceSign
 import { prepareReleaseDeviceProof, preparedReleaseEvidenceSchema } from '../../lib/fixerrors/release';
 import { FIXERRORS_WORKSPACE } from './fixerrors-device-admission';
 import type { TrustedFixerrorsExecutor } from './fixerrors-companion';
+import { BATCH_CHUNK_BYTES, batchHash, parseBatchBytes } from '../../lib/fixerrors/batch';
+import type { BatchExecutionContext } from './fixerrors-companion';
 
 export const productionBridgeFiles = ['squires-windows-release.py', 'squires_release.py', 'squires_companion.py', 'squires_repair.py'] as const;
 const protectedEnrollmentSchema = z.object({
@@ -45,7 +47,20 @@ const admissionEnvelopeSchema = z.object({
 export function prepareProductionRepairProof(
   ticket: string, packet: Buffer, job: Readonly<FixerrorsJob>, enrollment: ProductionBridgeEnrollment, now: number,
 ): Buffer {
-  if (Buffer.byteLength(ticket) > 4096 || !packet.length || packet.length > 96 * 1024) throw new Error('Repair input limit');
+  return prepareExecutionProof(ticket, packet, job, enrollment, now, false);
+}
+
+export function prepareProductionBatchProof(
+  ticket: string, manifest: Buffer, job: Readonly<FixerrorsJob>, enrollment: ProductionBridgeEnrollment, now: number,
+): Buffer {
+  parseBatchBytes(manifest);
+  return prepareExecutionProof(ticket, manifest, job, enrollment, now, true);
+}
+
+function prepareExecutionProof(
+  ticket: string, packet: Buffer, job: Readonly<FixerrorsJob>, enrollment: ProductionBridgeEnrollment, now: number, batch: boolean,
+): Buffer {
+  if (Buffer.byteLength(ticket) > 4096 || !packet.length || (!batch && packet.length > 96 * 1024)) throw new Error('Repair input limit');
   const envelope = admissionEnvelopeSchema.parse(JSON.parse(ticket));
   const payload = Buffer.from(envelope.payload, 'base64url');
   const signature = Buffer.from(envelope.signature, 'base64url');
@@ -69,10 +84,11 @@ export function prepareProductionRepairProof(
       admitted.expiresAt > Math.floor(job.expiresAt / 1000)) throw new Error('Repair admission binding mismatch');
   const device = createPrivateKey(enrollment.devicePrivateKeyPem);
   requireSeparateDevice(device, issuer, createPublicKey(enrollment.releasePublicKeyPem));
-  const body = Buffer.from(JSON.stringify({ ticket, packet: packet.toString('base64url') }), 'utf8').toString('base64url');
+  const body = Buffer.from(JSON.stringify(batch ? { ticket, manifestSha256: batchHash(packet) } :
+    { ticket, packet: packet.toString('base64url') }), 'utf8').toString('base64url');
   return Buffer.from(JSON.stringify({
     payload: body,
-    signature: sign(null, Buffer.from(`squires-companion-repair-v1\n${body}`, 'ascii'), device).toString('base64url'),
+    signature: sign(null, Buffer.from(`squires-companion-${batch ? 'batch' : 'repair'}-v1\n${body}`, 'ascii'), device).toString('base64url'),
   }), 'utf8');
 }
 
@@ -142,6 +158,94 @@ function invoke(exe: string, entry: string, proof: Buffer, signal: AbortSignal, 
   });
 }
 
+export async function invokeProductionBatch(
+  exe: string, entry: string, proof: Buffer, signal: AbortSignal, job: Readonly<FixerrorsJob>, context: BatchExecutionContext,
+): Promise<ExecutionResult> {
+  const keep = new Set(['SYSTEMROOT', 'WINDIR', 'PATH', 'PATHEXT', 'COMSPEC', 'TEMP', 'TMP',
+    'USERPROFILE', 'LOCALAPPDATA', 'APPDATA', 'PROGRAMFILES', 'PROGRAMFILES(X86)']);
+  const env: NodeJS.ProcessEnv = { ...Object.fromEntries(Object.entries(process.env).filter(([key]) => keep.has(key.toUpperCase()))),
+    NODE_ENV: 'production' };
+  if (signal.aborted) throw new Error('Batch cancelled');
+  const child = spawn(exe, ['-I', '-B', entry, 'batch'], {
+    cwd: FIXERRORS_WORKSPACE, env, windowsHide: true, stdio: ['pipe', 'pipe', 'ignore'],
+  });
+  const stop = () => { child.kill(); };
+  signal.addEventListener('abort', stop, { once: true });
+  if (signal.aborted) stop();
+  let pending = Buffer.alloc(0);
+  let chain = Promise.resolve();
+  let failure: unknown;
+  let result: ExecutionResult | undefined;
+  let cached: { hash: string; ticket: string; until: number } | undefined;
+  const write = (value: unknown) => new Promise<void>((resolve, reject) => {
+    child.stdin.write(`${JSON.stringify(value)}\n`, error => error ? reject(error) : resolve());
+  });
+  const handle = async (frame: unknown) => {
+    const lease = z.object({ lease: z.object({
+      runId: z.string().uuid(), deviceId: z.string().uuid(), manifestSha256: sha256Schema,
+      checkpointSha256: sha256Schema, cursor: z.number().int().nonnegative(),
+      resume: z.boolean(), outcome: z.unknown(),
+    }).strict() }).strict().safeParse(frame);
+    if (lease.success) {
+      const value = lease.data.lease;
+      if (result || context.paused || value.runId !== job.id || value.deviceId !== job.deviceId ||
+          value.manifestSha256 !== job.workspace.packetSha256) throw new Error('Native authority request changed');
+      const hash = batchHash(JSON.stringify(value));
+      if (!cached || cached.hash !== hash || cached.until <= Date.now()) {
+        const ticket = await context.lease(value);
+        cached = { hash, ticket, until: Date.now() + 10_000 };
+      }
+      await write({ lease: cached.ticket });
+      return;
+    }
+    const paused = z.object({ jobId: z.string().uuid(), paused: sha256Schema }).strict().safeParse(frame);
+    if (paused.success && paused.data.jobId === job.id && !result && !context.paused) {
+      context.paused = paused.data.paused;
+      return;
+    }
+    const completed = z.object({
+      jobId: z.string().uuid(), result: resultSchema, outcomeSha256: sha256Schema,
+    }).strict().parse(frame);
+    if (completed.jobId !== job.id || result || context.paused) throw new Error('Native batch result changed');
+    result = completed.result;
+    context.outcomeSha256 = completed.outcomeSha256;
+  };
+  child.stdin.on('error', error => { failure = error; stop(); });
+  child.stdout.on('data', (bytes: Buffer) => {
+    pending = Buffer.concat([pending, bytes]);
+    let end: number;
+    while ((end = pending.indexOf(10)) >= 0) {
+      const line = pending.subarray(0, end);
+      pending = pending.subarray(end + 1);
+      if (line.length > 192 * 1024) { failure = new Error('Batch frame too large'); stop(); return; }
+      chain = chain.then(() => handle(JSON.parse(line.toString('utf8')))).catch(error => { failure = error; stop(); });
+    }
+    if (pending.length > 192 * 1024) { failure = new Error('Batch frame too large'); stop(); }
+  });
+  const closed = new Promise<number | null>((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', code => resolve(code));
+  });
+  try {
+    await write({ proof: proof.toString('utf8'), bytes: context.manifest.length,
+      chunks: Math.ceil(context.manifest.length / BATCH_CHUNK_BYTES) });
+    for (let start = 0; start < context.manifest.length; start += BATCH_CHUNK_BYTES) {
+      await write({ index: start / BATCH_CHUNK_BYTES,
+        data: context.manifest.subarray(start, start + BATCH_CHUNK_BYTES).toString('base64url') });
+    }
+    const code = await closed;
+    await chain;
+    if (failure || signal.aborted || pending.length || (!result && !context.paused) ||
+        (result && code !== 0) || (context.paused && code !== 2)) throw new Error('Native batch completion unconfirmed');
+    context.stopped = true;
+    return result ?? { status: 'blocked', reason: 'execution-failed' };
+  } finally {
+    stop();
+    await closed;
+    signal.removeEventListener('abort', stop);
+  }
+}
+
 export function createProductionReleaseBridge(enrollment: ProductionBridgeEnrollment): TrustedFixerrorsExecutor {
   const root = path.join(homedir(), '.codex', 'cursor-worker', 'squires-production-bridge');
   if (process.platform !== 'win32' || !path.isAbsolute(enrollment.pythonExe) ||
@@ -164,22 +268,33 @@ export function createProductionReleaseBridge(enrollment: ProductionBridgeEnroll
       try { return preparedCandidate().candidate; }
       catch { return null; }
     },
-    async execute(job, signal, releaseTicket, admissionTicket): Promise<ExecutionResult> {
+    async execute(job, signal, releaseTicket, admissionTicket, batch): Promise<ExecutionResult> {
       verifyPins();
       if (job.action !== 'deploy') {
         if (!admissionTicket) return { status: 'blocked', reason: 'bridge-unavailable' };
-        const packetFile = path.join(FIXERRORS_WORKSPACE, '.git', 'squires-fixerrors', 'sanitized-packet.json');
-        pinnedFile(packetFile);
-        if (lstatSync(packetFile).size > 96 * 1024) throw new Error('Sanitized packet exceeds transport limit');
-        const proof = prepareProductionRepairProof(
-          admissionTicket, readFileSync(packetFile), job, enrollment, Math.floor(Date.now() / 1000),
-        );
-        const response = repairResponseSchema.safeParse(await invoke(enrollment.pythonExe, files[0], proof, signal, true));
-        if (!response.success || signal.aborted || response.data.jobId !== job.id) {
-          return { status: 'failed', reason: 'execution-failed' };
+        let nativeResult: ExecutionResult;
+        if (batch) {
+          const proof = prepareProductionBatchProof(
+            admissionTicket, batch.manifest, job, enrollment, Math.floor(Date.now() / 1000),
+          );
+          nativeResult = await invokeProductionBatch(enrollment.pythonExe, files[0], proof, signal, job, batch);
+          if (batch.paused) return nativeResult;
+        } else {
+          const packetFile = path.join(FIXERRORS_WORKSPACE, '.git', 'squires-fixerrors', 'sanitized-packet.json');
+          pinnedFile(packetFile);
+          if (lstatSync(packetFile).size > 96 * 1024) throw new Error('Sanitized packet exceeds transport limit');
+          const proof = prepareProductionRepairProof(
+            admissionTicket, readFileSync(packetFile), job, enrollment, Math.floor(Date.now() / 1000),
+          );
+          const response = repairResponseSchema.safeParse(await invoke(enrollment.pythonExe, files[0], proof, signal, true));
+          if (!response.success || signal.aborted || response.data.jobId !== job.id) {
+            return { status: 'failed', reason: 'execution-failed' };
+          }
+          nativeResult = response.data.result;
         }
-        const result = response.data.result;
+        const result = nativeResult;
         if (job.action === 'review' && result.status === 'reviewed') return result;
+        if (batch && job.action === 'repair' && result.status === 'no-change') return result;
         if (job.action === 'repair' && result.status === 'tested') {
           const prepared = preparedCandidate();
           if (result.candidate.checksSha256 === checkEvidenceDigest(result.checks) &&

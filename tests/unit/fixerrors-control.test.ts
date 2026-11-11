@@ -71,7 +71,7 @@ describe('local Fixerrors durable queue contract (transaction fixture)', () => {
     expect(publicQueueState(store.state).releaseNeedsReconciliation).toBe(true);
     await expect(h.device({ op: 'renew', ...lease })).rejects.toThrow('Lease lost');
     await expect(h.enqueue('repair')).rejects.toThrow('needs reconciliation');
-    await expect(h.enqueue('review')).resolves.toEqual(expect.any(String));
+    await expect(h.enqueue('review')).rejects.toThrow('tested candidate');
   });
 
   it('does not allow a claim to start after the original approval expires', async () => {

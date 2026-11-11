@@ -1,5 +1,136 @@
 # Squires Windows Fixerrors admission
 
+## Everyday runner implementation plan (MPDEE Worker)
+
+1. Separate clean-checkout connection readiness from packet readiness. Connect
+   without a precreated packet; preserve locks and uncertain/prepared work.
+2. On an actual-SuperAdmin, same-origin Debug request, read one current active
+   error through the existing server application client, never the queue login.
+   Project only bounded, privacy-safe diagnostics into the existing packet format.
+   Bind the request, device, clean HEAD/tree and packet hash through signed admission.
+3. Deliver that private packet only with its authenticated leased job. Verify the
+   issuer signature before exclusive local preparation, then reuse the unchanged
+   native review/repair and separate exact-candidate Deploy boundaries.
+4. Journal job/packet association and confirmed completion locally. Archive only
+   confirmed safe terminal packets; retain prepared, inflight and unknown outcomes.
+   Recover idempotently on restart without deleting replay state or guessing success.
+5. Add explicit owner-consented enrollment choices to the installed manager source,
+   while keeping status read-only and service/token/Job Object boundaries intact.
+6. Verify synthetic request-to-signature-to-adapter boundaries, privacy/authorization
+   negatives, sequential jobs, restart/retirement, and native manager fixtures.
+   Parent owns integration, installation/repinning and all live acceptance.
+
+This plan does not authorize capture, installed-file changes, production queries,
+incident lifecycle writes, migration, commit, push or deployment during development.
+
+**Development evidence (MPDEE Worker).** The final 11-file focused Vitest run passed
+212 tests, with one expected non-Windows-probe skip on Windows. It included actual
+disposable two-commit native preparation, signed admission/release negatives,
+request-time capture, review reuse and conservative lifecycle/linked-path cases.
+`npm run typecheck`, scoped ESLint and `git diff --check` passed. The disposable
+`scripts\automation\windows-runner\Test-Runner.ps1` harness passed production/fixture
+compilation, consent/ACL preservation, packet-free waiting, restricted-token,
+opt-out, duplicate-host and descendant-stop checks. Actual interactive window
+Close still needs desktop acceptance; the harness exercised the same handler.
+These are development results, not installed-service or live operational approval.
+
+## Everyday owner workflow (source ready; activation is parent-owned)
+
+1. Use the updated standard, non-elevated **Squires Runner** manager. Stop existing
+   hosts first. Choose **E**, select review consent and type **SET REVIEW**.
+   This atomically changes only the five existing enrollment opt-in booleans;
+   it preserves device identity, credentials, keys, checks and transport hashes.
+2. Start **1 Terminal** or **2 Service**, with review runtime permission. A clean
+   fixed `main` checkout, available pinned bridge and successful heartbeat can
+   report **Connected - waiting** without any precreated packet. Status remains
+   read-only. Retained packets, uncertain locks and prepared candidates are holds.
+3. As actual SuperAdmin outside View As, open Debug and choose **Review errors**.
+   The same-origin request checks queue/device/checkout eligibility, then reads
+   fresh evidence outside the queue lock and rechecks before committing a job.
+   An empty read records terminal **no-work**, with no signed claim or worker.
+4. For bounded repair, stop the runner, explicitly select **E / repair** with
+   **SET REPAIR**, and restart with repair runtime permission. Debug can reuse a
+   completed review only for that device and exact HEAD/tree, within 30 minutes,
+   after rereading current evidence and matching the canonical packet bytes.
+   Changed evidence requires a fresh review; empty evidence produces no-work.
+   A repair without eligible review captures fresh evidence under a new request.
+5. A tested candidate holds subsequent review/repair. Inspect its genuine receipts;
+   only then separately enable release consent (**SET DEPLOY**), start the Deploy
+   runtime, and use Debug's existing exact-candidate confirmation. Local opt-in
+   neither approves Deploy nor removes the signed start-deploy/release gates.
+
+**Capture scope and privacy.** The application server reads at most one oldest
+active error whose triage state is null/untriaged/outstanding, excluding the
+existing diagnostic account and localhost/loopback URLs. Timestamp and ID order
+make selection deterministic; IDs and URLs are not selected. Only error type,
+message, stack and triage state are selected through the existing authorized
+application client, never the dedicated queue login or worker. The packet retains
+fixed diagnostic vocabulary and up to eight allowlisted source paths, not raw
+prose, identities, URLs, headers, additional data or occurrence records. Inputs,
+stack lines, source paths, query time and packet size are bounded. Missing source
+or context is explicitly held, never inferred from a compiled bundle as an
+actionable defect. Sensitive evidence remains CRITICAL; network evidence remains
+report-only. Capture does not triage, archive, resolve, clean up or mutate incidents:
+Everyday Debug review/repair captures all eligible new and old held/outstanding
+errors in one run; there is no per-error selector. Previous Fixerrors activity is
+collapsed by default and includes all retained queue history; active and unresolved
+work stays visible. Legacy single-packet helpers below remain separate compatibility
+surfaces, not the everyday workflow.
+
+**Shared full-batch capture and execution.**
+`scripts/fixerrors-capture.ts` captures new exact rows and every active outstanding
+row inside the existing read-only repeatable-read export transaction. Keyset
+pages have no incident-count cap; cursor, unique-ID and expected-count checks
+reject partial capture. Raw lifecycle rows and their original hashes stay in
+trusted bindings. `scripts/fixerrors-retrieval.ts` owns the existing grouping,
+source extraction and sanitized context/knowledge projection; the chat/worker CLI
+uses this shared assembly, with new groups before oldest held cases. Capture-only
+keeps its existing export contract. Capture itself performs no lifecycle writes.
+
+Debug stores one canonical full-batch manifest and private exact-row bindings.
+The authenticated device route delivers ordered 48 KiB chunks with full-byte
+hash verification. The companion frames these into the native batch entry point,
+with renewable authenticated execution leases, exact completed-prefix checkpoints
+and at most one aggregate native preparation. Queue progress and cancellation,
+exact-row server lifecycle reconciliation, conservative retirement and separate
+candidate-bound Deploy are wired in source. Editing these sources neither
+activates nor installs the owner-controlled runner.
+Do not feed an oversized batch to the single-cluster executor or invoke it once
+per error; either would lose coverage or prepare multiple release candidates.
+
+The private job stores the canonical manifest, clean HEAD/tree and SHA-256.
+Only its authenticated leased device receives the manifest and v1 signed admission.
+Signature, job/device/authority, expiry, exact checkout, canonical bytes and hash
+are verified before exclusive local preparation. Browser state exposes only an
+evidence-available boolean, never the packet or admission ticket. Existing native
+scope, premium-budget, durable replay, receipt and release controls remain mandatory.
+
+**Restart and retirement.** The companion journals the packet association and
+writes local completion receipts only after the authenticated server transaction
+returns successfully. Confirmed reviewed/blocked/failed work retires only on its
+unchanged clean checkout with no prepared evidence. Confirmed deployed work also
+requires its distinct deployment, exact tested candidate and matching prepared
+file digest. Files move conservatively into
+`.git\squires-fixerrors\archive\<packet-job-uuid>`; exact partial copies can resume,
+conflicting bytes/links cannot. Replay and native review artifacts are untouched.
+Inflight, unknown, dirty, partial-preparation and pending-tested evidence remain held.
+A crash between server acknowledgement and the local receipt requires parent
+reconciliation; the runner does not guess success or delete a retained lock.
+
+**Upgrade prerequisites (do not execute as development verification).** The parent
+must integrate/release the server and checkout sources, then stop all terminal and
+SCM hosts and close manager windows before replacing the immutable Windows package
+through its reviewed installer. Review the existing transport/check SHA pins and
+typecheck-cache readiness against the accepted clean candidate; repin only when
+their trusted sources changed. Preserve existing device IDs, DPAPI enrollment,
+signing material, replay tombstones and receipts. New optional queue JSON fields
+need no SQL migration. Old synthetic/manual packets have no lifecycle journal and
+intentionally block: reconcile their actual job/candidate/lock outcome once, retaining
+evidence; never overwrite them to make readiness green. Explicit owner consent,
+installed ACL/DPAPI/service verification, PostgreSQL fault/concurrency evidence,
+real premium-worker acceptance and separately approved live Deploy remain
+parent-owned. This implementation does not install, repin, enable or run them.
+
 `scripts/automation/fixerrors-device-admission.ts` is an offline core for the
 future local companion, not a launcher, scheduler, queue, enrollment endpoint or
 production adapter. No application auth, billing or installed runner settings
@@ -183,10 +314,11 @@ installer or autostart task. It polls outbound HTTPS only, refuses redirects,
 bounds input/output and timeouts, and never accepts server-provided paths,
 prompts, shell commands or argv. It pins `D:\Websites\avsworklog`, ordinary
 `.git`, clean `main`, HEAD/tree and a bounded locally hashed sanitized packet
-at `.git\squires-fixerrors\sanitized-packet.json`. Packet creation/sanitization
-must be trusted local work; this prototype does not fetch production records
-or manufacture a sanitized packet. Without it the device reports no usable
-checkout and cannot receive work.
+at `.git\squires-fixerrors\sanitized-packet.json` when executing work. Connection
+readiness instead uses clean HEAD/tree without a packet. The authorized Debug
+request captures the fixed privacy projection above; its signed leased claim
+supplies the packet for exclusive local preparation. The companion itself has no
+application-record credentials or production capture command.
 
 An exclusive `.git\squires-fixerrors-companion.lock` permits one companion
 writer. A stale lock requires owner investigation, not automatic deletion.
@@ -204,15 +336,13 @@ prototype has no reconciliation action. A real bridge must supply reliable
 process-tree cancellation and candidate-bound required-check evidence. A lost
 lease cannot report success.
 
-**The only wired executor is `unavailableFixerrorsExecutor`. Every live job
-reports `blocked / bridge-unavailable`; no worker, fixerrors command, fap,
-commit, push, migration or deploy is launched.** There is no dynamic bridge
-loader or environment flag that turns this into execution. The separate
-installed MPDEE Worker bridge workstream must establish the trusted transport,
-v1 signed admission and durable replay described above. Queue authentication
-does not replace that admission or authorize deployment. The v1 signed ticket
-format and admission checks are unchanged; a Deploy approval is a separate
-control-plane record, not a new v1 authority.
+**Local mode remains refusal-only:** `unavailableFixerrorsExecutor` reports
+`blocked / bridge-unavailable`; no worker, fixerrors command, fap, commit, push,
+migration or deploy launches. Production uses only the separately enrolled,
+SHA-pinned bridge described below, with its independent opt-ins and durable replay.
+Queue authentication does not replace signed admission or authorize deployment.
+The v1 format is unchanged; Deploy approval is a separate control-plane record,
+not a new v1 authority.
 
 ### Separate exact-candidate Deploy confirmation
 
@@ -236,8 +366,8 @@ review result triggers this step automatically. Duplicate approval, stale
 HEAD/tree, changed check digest, offline/revoked device and absent local
 Deploy opt-in fail closed. Claim and companion recheck the exact candidate;
 the companion additionally requires locally held matching test evidence.
-There is no live tested candidate or working deployment in this prototype:
-those states are exercised only with clearly named fake executors.
+Local prototype tests exercise those states with clearly named fake executors;
+they do not establish production worker or release acceptance.
 
 ### Verification and remaining integration gates
 
@@ -292,6 +422,15 @@ digest, **not** the Git tree or the control-plane checks digest.
 local work, never browser input. Python must independently validate the actual
 worker result, prepared files and receipt contents; these hashes alone do not
 establish that checks ran.
+
+For native batch preparation only, the canonical evidence appends
+`batch: {version:1, manifestSha256, contributionsSha256, clusterCount, repairCount}`
+after `preparedChecks`. Both counts are positive and repair count cannot exceed
+cluster count. `workerResultSha256` then hashes the actual `batch-proof.json`,
+not a single worker's state. The existing evidence/checks digest includes this
+extension, without changing legacy encoding or separate Deploy consent. The
+release verifier independently checks the manifest, ordered contribution
+artifacts, decisions, intermediate candidates and final union receipts.
 
 The authenticated device `start-deploy` transaction can return `releaseTicket`
 only after verifying ownership of the fresh lease and recording the start.
@@ -430,8 +569,10 @@ The signed UUID/device, authority, candidate and packet hash retain the v1
 format and authority-specific exclusive expiry. This adds admission, **not** worker
 launch authority, a replay store or a deployment approval.
 
-`scripts/automation/fixerrors-companion-packet.ts` supplies explicit trusted-local
-packet preparation from stdin, not production capture or sanitization:
+`scripts/automation/fixerrors-companion-packet.ts` retains explicit trusted-local
+packet preparation from stdin for legacy/manual tooling, not the everyday Debug
+flow or production capture/sanitization. Such packets lack a request journal and
+are held for explicit reconciliation by the current companion:
 
 ```powershell
 # Pipe only an already reviewed sanitized JSON object; never raw error records.
@@ -440,8 +581,9 @@ packet preparation from stdin, not production capture or sanitization:
 node --import=tsx scripts\automation\fixerrors-companion-packet.ts --prepare-local-sanitized-packet
 ```
 
-Both preparation and companion reads are capped at 96 KiB, matching the
-installed Python transport. Preparation requires the fixed clean ordinary main
+These legacy single-packet preparation and companion reads remain capped at
+96 KiB; full-batch execution uses the separate chunked transport below.
+Preparation requires the fixed clean ordinary main
 checkout, exact candidate fingerprint and the companion writer lock. It writes
 canonical bytes with exclusive creation, fsync and readback to the fixed
 `.git\squires-fixerrors\sanitized-packet.json`; it never replaces an existing
@@ -502,8 +644,9 @@ The root project excludes unit tests; this is application-project typechecking,
 not a claim that unit tests were typechecked. Worker artifacts, decisions, metadata
 diagnostics and all receipt bytes remain in the private native run directory.
 
-Review is capped at 120 seconds; repair including preparation is capped at 480
-seconds and additionally at ten seconds before the original job expiry. Native
+On the existing single-cluster path, review is capped at 120 seconds; repair
+including preparation is capped at 480 seconds and additionally at ten seconds
+before the original job expiry. Native
 analysis/repair stages have one/two-minute bounds. The signed admission and queue
 expire within ten minutes for bounded repair and five minutes for review. Renewable 60-second leases, cancellation, replay protection and exclusive signed expiry remain mandatory.
 Slow work fails closed, never becomes tested evidence, and needs owner
@@ -537,6 +680,135 @@ replay storage or model credentials. Its dependency-only temporary junction is
 removed without following it. This proves preparation/receipt mechanics, **not**
 that a premium worker ran or a production candidate was accepted.
 Queue fixtures are not native PostgreSQL crash/concurrency evidence.
+
+### Native full-batch transport and aggregate preparation
+
+`squires_repair.execute_batch(device_proof, manifest_bytes, cfg, lease)` is the
+guarded native entry point, reached by the companion through framed `batch_main`.
+Its TypeScript adapter in
+`scripts/automation/fixerrors-batch-engine.ts` calls the shared
+`runAutomaticFixerrors`; it cannot fall back to direct CLI worker dispatch.
+The manifest has exactly `{schemaVersion:1,snapshotChecksum,retrieval}`, with
+unique clusters in new-before-held order. Its canonical bytes bind the clean
+initial candidate and complete sanitized retrieval. Raw rows and exact
+production lifecycle IDs stay on the trusted server.
+
+The existing short signed repair admission and durable SQLite replay claim
+remain mandatory. The separate device-proof domain is
+`squires-companion-batch-v1`, with exactly `{ticket,manifestSha256}` in its body.
+The injected `lease(expected)` callback must return a canonical issuer-signed
+envelope under `squires-fixerrors-batch-lease-v1`. Its ordered payload is
+`version,runId,deviceId,manifestSha256,checkpointSha256,leaseId,sequence,authority,issuedAt,expiresAt`.
+Version is 1, authority is `continue` or `resume`, and exclusive expiry is at
+most 60 seconds after issue. Identity/checkpoint changes, rollback, expired
+leases, changed enrollment or withdrawn consent stop execution. A safe resume
+requires fresh strictly advanced `resume` authority, a one-use lease claim and
+the original durable admission claim; it does not waive short admission expiry.
+The server must issue a fresh same-binding admission when needed.
+An authenticated recent heartbeat with no clean-checkout observation may resume
+only that same device's retained, confirmed stopped prefix. New admission still
+requires a clean HEAD/tree. Mutable consent flags do not change the preparation
+fingerprint; their live opt-ins remain mandatory, while immutable enrollment,
+source pins, keys, checks, artifacts and exact candidate changes still deny reuse.
+
+Analysis and implementation use the existing authenticated native premium
+dispatch, admission guard and budget checks, with only the selected cluster.
+Read-only mode investigates all clusters but never repairs or prepares. Empty
+review/repair returns a complete report/no-change result without commits.
+Independent unchanged failures remain recorded and processing continues;
+unverified mutation stops rather than becoming a resumable prefix.
+
+The existing `.git\squires-fixerrors\active-packet.json` gains a versioned
+`batch` extension, not another queue. It records immutable manifest/code/config
+hashes, ordered native artifact hashes, intermediate snapshots, cursor and
+outcomes. Resume requires the exact stopped completed prefix and unchanged
+candidate, artifacts and genuine receipts, without repeating completed workers.
+`.git\squires-fixerrors\batch-executor.lock` serializes execution. Inflight,
+preparing, completed replay, stale crash locks and uncertain cancellation require
+reconciliation; no automatic lock deletion or guessed completion is supplied.
+The legacy single-packet lifecycle adapter holds batch journals; the dedicated
+batch adapter handles confirmed completion and archival without deleting durable
+replay or native artifacts. Uncertain and inflight evidence remains held.
+
+Native manifests have a 16 MiB physical limit, not a row or cluster truncation
+rule; oversize evidence fails explicitly. Frames are bounded to 192 KiB. Every
+completed prefix is saved locally and acknowledged through signed server authority
+before it becomes a confirmed pause/resume boundary. Terminal completion binds the
+sorted full-outcome hash and a successful native process exit; confirmed pause
+requires the native pause exit code.
+
+The server persists one immutable exact-row lifecycle plan in its private queue.
+Its pre-receipt transaction must complete before application updates begin; its
+post-receipt is separately persisted after the application commit. Application
+access uses `POSTGRES_URL_NON_POOLING`, never the queue database login. Commit or
+post-receipt uncertainty retains the same plan for receipt-verified idempotent retry.
+Verified local repairs remain awaiting deployment, never fixed live. Conflicts,
+schema drift, expiry and unavailable storage remain visible lifecycle blockers.
+Completion acknowledgement lost after server commit can be reconciled against the
+retained exact outcome. Native completion with no committed server outcome, an
+unacknowledged checkpoint, stale crash locks or uncertain stop still requires
+owner reconciliation; no success or fresh execution authority is guessed.
+
+There is no whole-backlog single-cluster timeout. The parent rechecks renewable
+authority while each isolated operation runs, terminating its particular Windows
+PID tree on lease loss. Analysis/repair operation bounds are 180/480 seconds;
+preparation allows two complete enrolled check rounds plus 300 seconds of bounded
+Git/metadata/proof overhead. Isolated Python children receive only allowlisted
+runtime variables, without inherited worker overrides or trusted Git subprocess
+overrides; the normal runtime guard is not weakened. Isolated Python startup
+imports sibling modules only from the fixed script directory.
+
+All accepted independent repairs contribute to one `batch-proof.json`, binding
+the manifest, ordered decisions/artifacts, intermediate candidate chain and
+complete outcome. The union of required tests and editable paths is hash-bound
+in `.git\squires-fixerrors\batch-check-scope.json`. Targeted tests and ESLint
+run every path in chunks of 40; 40 remains a single-cluster limit, not a batch
+truncation rule. Complete application-project typecheck remains required.
+The optional Node V8 compile cache is disabled in check subprocesses to avoid
+deep Windows receipt-TEMP stalls; the protected TypeScript incremental cache
+and its candidate checks remain unchanged.
+
+Trusted preparation runs all three checks on the aggregate tree, creates
+exactly one product and one metadata commit, then reruns all three on that final
+candidate. Independent Python release verification rechecks shared
+CRITICAL/scope/overlap policy, exact final decisions, every contribution,
+two-commit ancestry and actual aggregate/prepared receipts. Preparation never
+pushes or grants Deploy authority.
+
+The focused native fixture is:
+
+```powershell
+$env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
+node .\node_modules\vitest\vitest.mjs run tests\unit\fixerrors-native-batch.test.ts
+```
+
+It uses disposable Ed25519 keys/replay storage, synthetic model decisions and
+native worker artifacts, real Vitest/TypeScript/ESLint receipts and two actual
+disposable commits. Two repairs plus two held clusters, stopped-prefix resume,
+empty/read-only runs, lease/consent/cancellation/admission failures and evidence
+tampering are covered. Separate cases verify isolated child bootstrap without
+enrollment and real ESLint coverage of path 41.
+The connected scenario captures 281 synthetic exact rows (280 new, one held)
+across two shared capture pages, delivers an authenticated manifest larger than
+96 KiB, resumes the server-confirmed prefix with a null-checkout heartbeat through
+native `batch_main` framing, and verifies the final cross-language outcome hash
+and all-row server completion. Its queue and capture SQL are in-memory fixtures;
+native stdin/stdout framing is connected in-process. Separate Node transport
+tests mock the spawned child, and lifecycle durability tests mock the application
+database. These are not live HTTP, real PostgreSQL locking/crash, browser visual
+or deployed-trace evidence.
+No model, production queue, installed enrollment or release is invoked. A skip
+because installed runner modules are missing is not passing native evidence.
+
+The Debug route's Next output tracing includes only source-code extensions beneath
+the allowed application roots and the exact checked-in knowledge JSON. Source-backed
+projection rejects missing files and symlink resolution rather than trusting runtime
+prose or route slugs. Config tests do not prove a built/deployed trace: the parent
+must inspect the authorized build output and deployed read-only capture before activation.
+
+Installation, SHA repinning, protected configuration, enrollment/consent and service
+activation remain owner actions. Source tests and disposable fixtures do not grant
+production execution authority or replace live acceptance and exact-candidate Deploy.
 
 ### Protected full-project TypeScript cache
 
@@ -710,51 +982,26 @@ existing `provision-fixerrors-production-device.ts --prepare-local-production-en
 <absolute-python.exe>` prepares the four pins/check catalogue with every opt-in off;
 registration and production activation are still separate owner operations.
 
-After separately reviewing the production persistence exposure/permissions, TLS/CA,
-issuer configuration and device registration, prepare the harmless controlled packet:
-
-```powershell
-node --import=tsx scripts\automation\fixerrors-controlled-acceptance.ts --prepare-synthetic-test-only-packet
-```
-
-It creates no production records. The clearly labelled, application-unimported
+The legacy controlled-packet helper creates no production records. Its clearly
+labelled, application-unimported
 `lib\utils\fixerrors-controlled-acceptance.ts` is exercised only by
 `tests\unit\fixerrors-controlled-acceptance.test.ts`; its intentional `it.fails`
 demonstrates a synthetic trim fixture. A repair must change that fixture function
 to trim both ends and remove `it.fails`, preserving the expected value. It is not
-an application defect or evidence about customer incidents. Existing packets are
-never overwritten; an owner must reconcile any previous packet/candidate first.
+an application defect or evidence about customer incidents. It no longer supplies
+production Debug requests: those always capture current evidence. Do not create a
+fixed-checkout synthetic packet as a connection prerequisite. Existing manual
+packets require one-time parent reconciliation, never automatic replacement.
 
-For read-only acceptance, the owner sets `enabled=true`, `workerEligible=true`,
-`allowReadOnly=true` in protected `enrollment.json`, retaining repair/release false
-(use the same atomic replacement helper above). Start the foreground process with:
-
-```powershell
-$env:SQUIRES_FIXERRORS_COMPANION_ENABLED='1'
-$env:SQUIRES_FIXERRORS_COMPANION_PRODUCTION='1'
-$env:SQUIRES_FIXERRORS_ALLOW_READ_ONLY='1'
-# Keep SQUIRES_FIXERRORS_ALLOW_REPAIR and SQUIRES_FIXERRORS_ALLOW_DEPLOY unset.
-node --import=tsx scripts\automation\fixerrors-companion.ts
-```
-
-From production Debug, request **review** for the enrolled device. Require a real
-premium native run, validated synthetic decision, no checkout changes and terminal
-`reviewed`; inspect the actual private artifacts, model identity and budget receipt.
-Then stop the process normally, separately enable `allowBoundedRepair=true` and
-`SQUIRES_FIXERRORS_ALLOW_REPAIR=1` (Deploy remains off), restart and request **repair**.
-Require the genuine implementation run, exact two-file synthetic change, two local commits,
-real post-metadata receipts and terminal `tested`. An over-budget, slow, partial,
-held, revoked, replayed or expired run is a failed acceptance, not a success to relabel.
-
-Only after inspecting that exact evidence may the owner independently enable
-`allowRelease=true` and `SQUIRES_FIXERRORS_ALLOW_DEPLOY=1`, restart, and use Debug's
-separate confirmation to select the intended mode, check exact-candidate consent
-and submit. Full remains the default; urgent requires its own explicit selection.
-That is a new signed release approval, not part of repair acceptance. Require the exact approved SHA
-and deployment ID on the fixed live origin before calling it deployed. This work
-does not execute that step. Native PostgreSQL concurrency/fault, DPAPI lifecycle,
-Windows cancellation/crash and real premium-worker/live-release acceptance remain
-parent-owned checks; synthetic fixture success cannot substitute for them.
+For future live acceptance follow the everyday workflow above, after separate
+approval of production persistence permissions, TLS/CA, issuer and device
+registration. Require a genuine premium read-only run with no checkout changes,
+then an independently opted-in bounded repair, two local prepared commits and
+real post-metadata receipts. Held, revoked, expired, partial or over-budget work
+is not successful acceptance. Only separately approved exact-candidate Deploy may
+push; require the matching approved SHA and deployment ID on the fixed live origin
+before claiming deployed. Native PostgreSQL fault tests and real worker/release
+acceptance remain parent-owned; synthetic fixtures do not substitute for them.
 
 ## Windows terminal/service manager
 
@@ -793,7 +1040,7 @@ the owner's Desktop, pointing to the absolute installed launcher; working
 directory does not matter. It does not start the service or change enrollment,
 production flags, packet, keys, replay storage or existing check/release gates.
 
-Run the Desktop launcher **without elevation**. Its four numbered actions are:
+Run the Desktop launcher **without elevation**. Its actions are:
 
 | Action | Behaviour |
 | --- | --- |
@@ -801,6 +1048,7 @@ Run the Desktop launcher **without elevation**. Its four numbered actions are:
 | 2 Service | Starts the genuine `SquiresFixerrorsRunner` SCM service with the selected runtime permission. |
 | 3 Stop | Stops the authenticated managed host and its Job Object descendants, waits for confirmation and reports retained locks. |
 | 4 Status | Reads public enrollment booleans, actual SCM state and authenticated running/readiness state; never decrypts credentials or writes control-plane state. |
+| E Owner consent | With all hosts stopped, explicit typed confirmation atomically changes only existing enrollment opt-ins, preserving ACLs and unrelated fields; no job or release approval. |
 
 The service is **Manual**, with no triggers, recovery restart, scheduled task or
 autostart. It runs as the enrolled owner, loads that owner's profile for DPAPI and
@@ -812,20 +1060,23 @@ Existing protected opt-ins remain authoritative: a running host can be
 `idle-enrollment-disabled`, with **no child and ready=false**.
 
 Review is the runtime default. Repair requires its own runtime choice plus the
-existing protected repair opt-in. Deploy requires an additional explicit local
-confirmation and existing prepared candidate, and still requires the protected
-release opt-in, exact-candidate Debug consent, signed admission, genuine receipts,
+existing protected repair opt-in. Deploy-capable mode can start and wait before
+a candidate exists. An actual deployment still requires the protected release
+opt-in, a tested candidate, exact-candidate Debug consent, signed admission, genuine receipts,
 budget and release gates. Runtime permission is not job or Deploy approval.
 
 A cross-session mutex prevents simultaneous terminal/service hosts. A local-only,
 ACL-protected named pipe accepts only status/stop from the enrolled owner or
 System; clients verify the server's fixed executable using limited process-query
-rights. Readiness requires a valid packet structure, a clean checkout, an available
+rights. Connected/waiting readiness requires a clean checkout, an available
 trusted bridge, a successful companion heartbeat and telemetry younger than
 **15 seconds**. Missing IPC with
 a matching executable is **running/unresponsive, not stopped**. Readiness is not
-proof of a successful worker, available budget or release approval. Each action independently checks its signed packet or exact prepared candidate; creating a repair candidate does not invalidate release readiness. Stale packets
-are held for explicit owner reconciliation; the manager never regenerates them.
+proof of a successful worker, available budget or release approval. No packet is
+needed merely to connect. Each action independently checks its signed packet or
+exact prepared candidate. Prepared work holds fresh review/repair but can enter
+separately approved Deploy. Stale/uncertain packets are held, never regenerated
+by status or overwritten by another job.
 
 The child is atomically assigned to a non-inheritable kill-on-close Job Object
 at creation, remains suspended until membership is checked, and cannot break away.
@@ -844,13 +1095,14 @@ Focused offline verification (no installed service, enrollment or live job):
 ```powershell
 & .\scripts\automation\windows-runner\Test-Runner.ps1
 $env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
-npx vitest run tests\unit\fixerrors-companion.test.ts tests\unit\fixerrors-companion-packet.test.ts
+npx vitest run tests\unit\fixerrors-fresh-evidence.test.ts tests\unit\fixerrors-companion.test.ts tests\unit\fixerrors-companion-packet.test.ts tests\integration\api\fixerrors-local-route.test.ts tests\ui\fixerrors-control-panel.test.tsx
 npx eslint scripts\automation\fixerrors-companion.ts tests\unit\fixerrors-companion.test.ts
 ```
 
 Native fixtures compile production/fixture hosts with warnings as errors and use
 only GUID-named disposable directories and fake children. They cover restricted
-tokens, disabled/idle status, clean owner environment, freshness, duplicate hosts,
+tokens, owner-consent flag/ACL preservation and refusal paths, packet-free waiting,
+disabled/idle status, clean owner environment, freshness, duplicate hosts,
 authenticated stop, real descendant termination, abrupt host death, real
 `CTRL_BREAK`, redaction, installer/service plans and PowerShell parsing. Where
 the noninteractive desktop does not deliver an actual console-window Close, the

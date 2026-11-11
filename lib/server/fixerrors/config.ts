@@ -3,7 +3,7 @@ import { X509Certificate } from 'node:crypto';
 import type { ConnectionOptions } from 'node:tls';
 import { FixerrorsControlError } from '@/lib/fixerrors/control';
 import { FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN } from '@/lib/fixerrors/protocol';
-const projectRef = 'lrhufzqfzeutgvudcowy';
+export const projectRef = 'lrhufzqfzeutgvudcowy';
 const productionQueueUser = 'squires_fixerrors_queue';
 
 export function isFixerrorsLocalEnabled(env: NodeJS.ProcessEnv = process.env): boolean {

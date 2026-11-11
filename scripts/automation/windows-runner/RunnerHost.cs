@@ -120,6 +120,86 @@ namespace Squires.WindowsRunner
         }
     }
 
+    public static class OwnerConsent
+    {
+        public static void Set(string mode)
+        {
+            var cfg = Config.Load();
+            Apply(cfg, Path.Combine(cfg.Profile, @".codex\cursor-worker\squires-companion\enrollment.json"), mode);
+        }
+#if RUNNER_FIXTURE
+        public static void SetFixture(string mode)
+        {
+            var cfg = Config.Load();
+            Apply(cfg, Path.Combine(cfg.Root, "enrollment.json"), mode);
+        }
+#endif
+        private static void PrivateAcl(string path, string sid, bool directory)
+        {
+            Native.Ordinary(path);
+            var acl = directory ? (FileSystemSecurity)Directory.GetAccessControl(path) : File.GetAccessControl(path);
+            if (acl.GetOwner(typeof(SecurityIdentifier)).Value != sid || (directory && !acl.AreAccessRulesProtected))
+                throw new InvalidOperationException("Enrollment must remain owner-only");
+            foreach (FileSystemAccessRule rule in acl.GetAccessRules(true, true, typeof(SecurityIdentifier)))
+                if (rule.AccessControlType == AccessControlType.Allow && rule.IdentityReference.Value != sid)
+                    throw new InvalidOperationException("Enrollment must remain owner-only");
+        }
+        private static void Apply(Config cfg, string file, string mode)
+        {
+            if (mode != "disabled" && mode != "review" && mode != "repair" && mode != "deploy")
+                throw new InvalidOperationException("Unknown consent mode");
+            if (new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
+                throw new InvalidOperationException("Standard enrolled owner required");
+            var security = new MutexSecurity();
+            foreach (string sid in new[] { cfg.Sid, "S-1-5-18", "S-1-5-32-544" })
+                security.AddAccessRule(new MutexAccessRule(new SecurityIdentifier(sid), MutexRights.FullControl, AccessControlType.Allow));
+            bool created;
+            using (var mutex = new Mutex(false, @"Global\" + cfg.Pipe, out created, security))
+            {
+                bool held = false;
+                try
+                {
+                    try { held = mutex.WaitOne(0); } catch (AbandonedMutexException) { held = true; }
+                    if (!held) throw new InvalidOperationException("Stop the managed host before changing consent");
+                    UpdateFile(cfg, file, mode);
+                }
+                finally { if (held) mutex.ReleaseMutex(); }
+            }
+        }
+        private static void UpdateFile(Config cfg, string file, string mode)
+        {
+#if !RUNNER_FIXTURE
+            if (File.Exists(Path.Combine(Config.Checkout, @".git\squires-fixerrors-companion.lock")))
+                throw new InvalidOperationException("Reconcile the companion lock before changing consent");
+#endif
+            string directory = Path.GetDirectoryName(file);
+            PrivateAcl(directory, cfg.Sid, true); PrivateAcl(file, cfg.Sid, false);
+            var data = Config.ReadJson(file, 65536);
+            string original = File.ReadAllText(file, new UTF8Encoding(false, true));
+            string[] flags = { "enabled", "workerEligible", "allowReadOnly", "allowBoundedRepair", "allowRelease" };
+            foreach (string flag in flags)
+                if (!data.ContainsKey(flag) || !(data[flag] is bool)) throw new InvalidOperationException("Invalid enrollment consent");
+            data["enabled"] = mode != "disabled"; data["workerEligible"] = mode != "disabled";
+            data["allowReadOnly"] = mode != "disabled"; data["allowBoundedRepair"] = mode == "repair" || mode == "deploy";
+            data["allowRelease"] = mode == "deploy";
+            byte[] bytes = new UTF8Encoding(false, true).GetBytes(Config.Json.Serialize(data));
+            if (bytes.Length > 65536) throw new InvalidOperationException("Enrollment size refused");
+            string pending = Path.Combine(directory, "consent-" + Guid.NewGuid().ToString("N") + ".pending");
+            using (var stream = new FileStream(pending, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                stream.Write(bytes, 0, bytes.Length); stream.Flush(true);
+            }
+            File.SetAccessControl(pending, File.GetAccessControl(file));
+            PrivateAcl(file, cfg.Sid, false);
+            if (File.ReadAllText(file, new UTF8Encoding(false, true)) != original)
+                throw new InvalidOperationException("Enrollment changed; pending consent retained for investigation");
+            File.Replace(pending, file, null);
+            PrivateAcl(file, cfg.Sid, false);
+            if (Config.Json.Serialize(Config.ReadJson(file, 65536)) != Config.Json.Serialize(data))
+                throw new InvalidOperationException("Enrollment consent writeback not confirmed");
+        }
+    }
+
     internal sealed class Runner : IDisposable
     {
         private readonly Config cfg;
@@ -346,7 +426,7 @@ namespace Squires.WindowsRunner
                         if (c == '\n')
                         {
                             string text = line.ToString().TrimEnd('\r');
-                            if (text == "SQUIRES_RUNNER_STATE:ready" || text == "SQUIRES_RUNNER_STATE:packet-blocked" || text == "SQUIRES_RUNNER_STATE:bridge-blocked" ||
+                            if (text == "SQUIRES_RUNNER_STATE:ready" || text == "SQUIRES_RUNNER_STATE:waiting" || text == "SQUIRES_RUNNER_STATE:packet-blocked" || text == "SQUIRES_RUNNER_STATE:bridge-blocked" ||
                                 text == "SQUIRES_RUNNER_STATE:polling" || text == "SQUIRES_RUNNER_STATE:active" || text == "SQUIRES_RUNNER_STATE:stopping")
                             {
                                 Interlocked.Exchange(ref lastTelemetry, Stopwatch.GetTimestamp());
@@ -399,7 +479,7 @@ namespace Squires.WindowsRunner
                             long last = Interlocked.Read(ref lastTelemetry);
                             bool fresh = last != 0 && Stopwatch.GetTimestamp() - last < Stopwatch.Frequency * 15L;
                             bool enabled = cfg.Eligibility(mode) == "eligible";
-                            byte[] response = Encoding.UTF8.GetBytes(Config.Json.Serialize(new { host = service ? "service" : "console", state = state, mode = mode, enabled = enabled, running = true, ready = enabled && state == "running-ready" && fresh, pid = Process.GetCurrentProcess().Id }));
+                            byte[] response = Encoding.UTF8.GetBytes(Config.Json.Serialize(new { host = service ? "service" : "console", state = state, mode = mode, enabled = enabled, running = true, ready = enabled && (state == "running-ready" || state == "running-waiting") && fresh, pid = Process.GetCurrentProcess().Id }));
                             var write = pipe.BeginWrite(response, 0, response.Length, null, null);
                             if (write.AsyncWaitHandle.WaitOne(1000)) pipe.EndWrite(write);
                             if (request == "stop") stop.Set();
@@ -479,7 +559,9 @@ namespace Squires.WindowsRunner
                     }));
                     Process.Start(new ProcessStartInfo(typeof(Program).Assembly.Location, "fixture-grandchild") { UseShellExecute = false, CreateNoWindow = true });
                     Console.WriteLine("Authorization: synthetic-fixture-not-a-secret");
-                    Console.WriteLine("SQUIRES_RUNNER_STATE:ready"); Thread.Sleep(Timeout.Infinite); return 0;
+                    Console.WriteLine(File.Exists(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "waiting.fixture"))
+                        ? "SQUIRES_RUNNER_STATE:waiting" : "SQUIRES_RUNNER_STATE:ready");
+                    Thread.Sleep(Timeout.Infinite); return 0;
                 }
                 if (args.Length == 1 && args[0] == "fixture-grandchild")
                 {
@@ -494,6 +576,10 @@ namespace Squires.WindowsRunner
                     try { reduced = Native.ReducedToken(token); Console.WriteLine("restricted-medium-nonadmin"); }
                     finally { if (reduced != IntPtr.Zero) Native.CloseHandle(reduced); Native.CloseHandle(token); }
                     return 0;
+                }
+                if (args.Length == 2 && args[0] == "--fixture-consent")
+                {
+                    OwnerConsent.SetFixture(args[1]); return 0;
                 }
 #endif
                 if (args.Length == 1 && args[0] == "--service") { ServiceBase.Run(new RunnerService()); return Failed ? 1 : 0; }
@@ -515,7 +601,7 @@ namespace Squires.WindowsRunner
             }
             catch (Exception)
             {
-                Console.Error.WriteLine("Runner operation failed closed. No enrollment, packet, replay or existing lock was changed.");
+                Console.Error.WriteLine("Runner operation not confirmed. Investigate before retry; evidence and existing locks were not automatically cleared.");
                 return 1;
             }
         }

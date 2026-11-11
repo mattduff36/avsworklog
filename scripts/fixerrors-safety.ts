@@ -12,7 +12,7 @@ import {
   writeFileSync,
 } from 'fs';
 import { dirname, resolve } from 'path';
-import type { ErrorLogEntry } from './fixerrors';
+import type { ErrorLogEntry } from './fixerrors-retrieval';
 import { TRUSTED_OPERATIONAL_ACTIONS } from './automation/trusted-operational-actions';
 
 export const ERROR_FETCH_PAGE_SIZE = 200;
@@ -459,6 +459,17 @@ export async function fetchProductionErrorSnapshot(
   databaseTargetFingerprint: string,
   now = new Date()
 ): Promise<ErrorSnapshotExport> {
+  return (await captureProductionErrorSnapshot(client, databaseTargetFingerprint, now, async () => undefined)).snapshot;
+}
+
+// Related exact-row reads must share the export's MVCC snapshot, not reread
+// after COMMIT and accidentally mix new arrivals or concurrent triage changes.
+export async function captureProductionErrorSnapshot<T>(
+  client: PgClientLike,
+  databaseTargetFingerprint: string,
+  now: Date,
+  readRelated: (client: PgClientLike, snapshot: Readonly<ErrorSnapshotExport>) => Promise<T>,
+): Promise<{ snapshot: ErrorSnapshotExport; related: T }> {
   await client.query('/* fixerrors:export-begin */ BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
   try {
     await client.query(
@@ -587,7 +598,6 @@ export async function fetchProductionErrorSnapshot(
       }
     }
 
-    await client.query('/* fixerrors:export-commit */ COMMIT');
     const exportedAt = now.toISOString();
     const snapshotWithoutManifest: Omit<
       ErrorSnapshotExport,
@@ -620,10 +630,13 @@ export async function fetchProductionErrorSnapshot(
       disposition: null,
       cleanup: emptyCleanup(),
     };
-    return {
+    const snapshot: ErrorSnapshotExport = {
       ...snapshotWithoutManifest,
       manifestChecksum: snapshotManifestChecksum(snapshotWithoutManifest),
     };
+    const related = await readRelated(client, snapshot);
+    await client.query('/* fixerrors:export-commit */ COMMIT');
+    return { snapshot, related };
   } catch (error) {
     try {
       await client.query('/* fixerrors:export-rollback */ ROLLBACK');

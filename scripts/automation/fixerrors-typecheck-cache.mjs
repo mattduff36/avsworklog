@@ -204,7 +204,8 @@ export function createTypecheckCache(workspace, root) {
       if (prior) copyFileSync(cache, pending);
       const result = spawnSync(process.execPath, [compiler, '--project', path.join(workspace, 'tsconfig.json'),
         '--noEmit', '--incremental', '--tsBuildInfoFile', pending], {
-        cwd: workspace, env: { ...process.env, AVSWORKLOG_TEST_SKIP_DOTENV: '1' },
+        // Node's optional V8 cache can hang on the runner's long Windows TEMP path.
+        cwd: workspace, env: { ...process.env, AVSWORKLOG_TEST_SKIP_DOTENV: '1', NODE_DISABLE_COMPILE_CACHE: '1' },
         stdio: 'inherit', shell: false, windowsHide: true, timeout: 120_000,
       });
       if (result.error || result.signal || result.status === null) fail('compiler interrupted; owner reconciliation required');

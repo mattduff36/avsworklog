@@ -36,7 +36,8 @@ function Show-Status {
     if (Test-Path -LiteralPath 'D:\Websites\avsworklog\.git\squires-fixerrors-companion.lock') {
         Write-Host 'Companion lock present. A stopped/unmanaged or interrupted job needs owner investigation; it is never deleted by this manager.'
     }
-    Write-Host 'Readiness is a fresh successful companion heartbeat plus local packet/candidate check, not worker success or Deploy approval.'
+    Write-Host 'running-waiting means Connected - waiting for an authorized Debug request; no packet is required to connect.'
+    Write-Host 'packet-blocked means retained/uncertain evidence or a tested candidate needs reconciliation or separate Deploy. Readiness is not worker success or Deploy approval.'
 }
 function Stop-Runner {
     $status=Get-HostStatus
@@ -104,13 +105,25 @@ function Choose-Mode {
     $selected=Read-Host 'Local runtime permission: Enter/R=review only; P=review + repair; D=review + repair + deploy (requires tested candidate and separate Debug approval)'
     switch ($selected.ToUpperInvariant()) {
         '' { return 'review' }; 'R' { return 'review' }; 'P' { return 'repair' }
-        'D' {
-            if (-not (Test-Path -LiteralPath 'D:\Websites\avsworklog\.git\squires-fixerrors\prepared-release.json')) { throw 'No locally prepared tested candidate; deploy runtime permission refused' }
-            if ((Read-Host 'Type DEPLOY to opt in locally; this does not approve any release') -cne 'DEPLOY') { throw 'Deploy opt-in cancelled' }
-            return 'deploy'
-        }
+        # D selects a runtime capability, not a release. Protected owner consent
+        # and exact tested-candidate Debug approval remain authoritative.
+        'D' { return 'deploy' }
         default { throw 'Unknown permission selection' }
     }
+}
+function Set-OwnerConsent {
+    $status=Get-HostStatus
+    if ($status.running) { throw 'Stop the runner before changing protected owner consent' }
+    $selected=Read-Host 'Persistent owner consent: X=disable all; R=review; P=review + bounded repair; D=review + repair + release transport'
+    $choice=switch ($selected.ToUpperInvariant()) {
+        'X' { 'disabled' }; 'R' { 'review' }; 'P' { 'repair' }; 'D' { 'deploy' }
+        default { throw 'Unknown consent selection; unchanged' }
+    }
+    Write-Host 'This changes only enabled, workerEligible, allowReadOnly, allowBoundedRepair and allowRelease in existing owner-only enrollment.'
+    Write-Host 'It does not provision credentials, change keys/checks/pins, start a job or approve Deploy. Runtime mode still narrows this permission.'
+    if ((Read-Host "Type SET $($choice.ToUpperInvariant()) to confirm") -cne "SET $($choice.ToUpperInvariant())") { throw 'Owner consent cancelled; unchanged' }
+    [Squires.WindowsRunner.OwnerConsent]::Set($choice)
+    Write-Host "OWNER CONSENT CONFIRMED: $choice. Start the chosen runtime separately; Debug authorization remains required."
 }
 if ($Action -eq 'Console') {
     & $hostExe --console $Mode
@@ -128,6 +141,7 @@ for (;;) {
     Write-Host '2  Start genuine manual Windows SCM service'
     Write-Host '3  Stop managed terminal/service and descendants'
     Write-Host '4  Read-only status / enabled / running / ready'
+    Write-Host 'E  Set explicit protected owner consent (runner must be stopped)'
     Write-Host 'D  Open Squires Debug    L  Show private lifecycle log    Q  Exit menu'
     try {
         switch ((Read-Host 'Choose').ToUpperInvariant()) {
@@ -135,13 +149,14 @@ for (;;) {
             '2' { $Mode=Choose-Mode; Start-Runner $true }
             '3' { Stop-Runner }
             '4' { Show-Status }
+            'E' { Set-OwnerConsent }
             'D' { Start-Process 'https://www.squiresapp.com/debug' }
             'L' {
                 $log=Join-Path $config.ownerProfile '.codex\cursor-worker\squires-runner-manager\runner.log'
                 if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log -Tail 40 } else { Write-Host 'No lifecycle log yet.' }
             }
             'Q' { return }
-            default { Write-Host 'Choose 1, 2, 3, 4, D, L or Q.' }
+            default { Write-Host 'Choose 1, 2, 3, 4, E, D, L or Q.' }
         }
     } catch { Write-Host "NOT CONFIRMED: $($_.Exception.Message)" -ForegroundColor Red }
 }

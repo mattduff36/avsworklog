@@ -8,6 +8,7 @@ import {
   groupIntoPatterns,
   splitLifecycleClusters,
   buildRetrievalCluster,
+  parseStackTrace,
   type ErrorLogEntry,
 } from '@/scripts/fixerrors';
 
@@ -42,6 +43,14 @@ function makeError(overrides: Partial<ErrorLogEntry>): ErrorLogEntry {
 }
 
 describe('fixerrors source extraction', () => {
+  it('preserves route-group parentheses in webpack and direct source references', () => {
+    const source = 'app/(dashboard)/debug/page.tsx';
+    expect(parseStackTrace(`at Page (webpack-internal:///(app-pages-browser)/./${source}:12:3)`))
+      .toEqual([{ file: source, line: 12, column: 3 }]);
+    expect(parseStackTrace(`at Page (/app/${source}:42:5)`))
+      .toEqual([{ file: source, line: 42, column: 5 }]);
+  });
+
   it('partitions automatic lifecycle evidence exactly instead of merging routes/statuses from the same source', () => {
     const root = createFixture({ 'lib/labels.ts': 'export const label = "safe";\n' });
     try {
