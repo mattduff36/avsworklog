@@ -101,7 +101,7 @@ describe('Debug local Fixerrors controls', () => {
     fireEvent.click(review);
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('No active untriaged or outstanding errors; no worker launched'));
     const posted = fetcher.mock.calls.find(call => call[1]?.method === 'POST');
-    expect(JSON.parse(String(posted?.[1]?.body))).toMatchObject({ op: 'enqueue', action: 'review' });
+    expect(JSON.parse(String(posted?.[1]?.body))).toMatchObject({ op: 'enqueue', action: 'repair' });
     expect(screen.getByText('No eligible errors; no worker launched.')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Confirm Deploy for exact candidate' })).toBeNull();
   });
@@ -137,7 +137,7 @@ describe('Debug local Fixerrors controls', () => {
     const posted = fetcher.mock.calls.find(call => call[1]?.method === 'POST');
     const body = JSON.parse(String(posted?.[1]?.body));
     expect(body).not.toHaveProperty('reviewJobId');
-    expect(body).toMatchObject({ op: 'enqueue', action: 'review' });
+    expect(body).toMatchObject({ op: 'enqueue', action: 'repair' });
   });
 
   it('accepts an available production bridge without granting deployment approval', async () => {
@@ -666,7 +666,7 @@ describe('Compact companion dialogs and preserved states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start review and repair' }));
     await waitFor(() => expect(fetcher.mock.calls.some(call => call[1]?.method === 'POST')).toBe(true));
     expect(JSON.parse(String(fetcher.mock.calls.find(call => call[1]?.method === 'POST')?.[1]?.body))).toEqual({
-      op: 'enqueue', deviceId: secondId, action: 'review', requestId: expect.any(String),
+      op: 'enqueue', deviceId: secondId, action: 'repair', requestId: expect.any(String),
     });
     await waitFor(() => expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(false));
     const runner = screen.getByRole('radio', { name: 'Use Second runner' }).closest('.border-t') as HTMLElement;
@@ -761,42 +761,33 @@ describe('Compact companion dialogs and preserved states', () => {
         await waitFor(() => expect(store.state.jobs).toHaveLength(1));
         await waitFor(() => expect(screen.queryByText('Recording request...')).toBeNull());
       };
-      const reviewed = async () => {
-        const claim = await h.claim();
-        await h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken, result: { status: 'reviewed' } });
-        fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
-      };
-      return { store, h, posts, start, reviewed };
+      return { store, h, posts, start };
     }
 
-    it('records one fresh review then one fresh repair, never auto-Deploying the tested result', async () => {
+    it('records one full investigation-and-repair batch, never duplicating review or auto-Deploying', async () => {
       const f = liveFixture();
       await f.start();
-      expect(f.posts()).toEqual([{ op: 'enqueue', requestId: expect.any(String), deviceId: f.store.state.devices[0].id, action: 'review' }]);
-      await f.reviewed();
-      await waitFor(() => expect(f.store.state.jobs).toHaveLength(2));
-      await waitFor(() => expect(screen.queryByText('Recording request...')).toBeNull());
-      expect(f.posts()[1]).toEqual({ op: 'enqueue', requestId: expect.any(String), deviceId: f.store.state.devices[0].id, action: 'repair' });
-      expect(f.posts()[1]).not.toHaveProperty('reviewJobId');
+      expect(f.posts()).toEqual([{ op: 'enqueue', requestId: expect.any(String), deviceId: f.store.state.devices[0].id, action: 'repair' }]);
+      expect(f.posts()[0]).not.toHaveProperty('reviewJobId');
       fireEvent(window, new Event('focus'));
       fireEvent(window, new Event('online'));
       await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
-      expect(f.posts()).toHaveLength(2);
+      expect(f.posts()).toHaveLength(1);
       const claim = await f.h.claim();
       await f.h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken, result: { status: 'tested', candidate, checks } });
       fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
       await screen.findByText('Deploy-ready: inspect the exact tested candidate and separately confirm Deploy.');
-      expect(f.posts()).toHaveLength(2);
+      expect(f.posts()).toHaveLength(1);
       expect(screen.queryByRole('checkbox')).toBeNull();
       expect(screen.getByRole('button', { name: 'Deploy: review exact candidate' })).toBeDefined();
     });
 
-    it.each(['opt-out', 'drift', 'retained hold', 'blocked review'] as const)('stops continuation after %s without a repair or silent retry', async change => {
+    it.each(['opt-out', 'drift', 'retained hold', 'blocked run'] as const)('never silently retries after %s', async change => {
       const f = liveFixture();
       await f.start();
       const claim = await f.h.claim();
       await f.h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken,
-        result: change === 'blocked review' ? { status: 'blocked', reason: 'execution-failed' } : { status: 'reviewed' } });
+        result: { status: 'blocked', reason: 'execution-failed' } });
       if (change === 'opt-out') f.store.state.devices[0].allowDeploy = false;
       if (change === 'drift') f.store.state.devices[0].workspace!.tree = 'f'.repeat(40);
       if (change === 'retained hold') f.store.state.devices[0].holdReason = 'packet-needs-reconciliation';
@@ -810,11 +801,11 @@ describe('Compact companion dialogs and preserved states', () => {
       expect(f.posts()).toHaveLength(1);
     });
 
-    it('waits for review lifecycle acknowledgement before requesting repair', async () => {
+    it('retains lifecycle-pending history without automatically starting another batch', async () => {
       const f = liveFixture();
       await f.start();
       const claim = await f.h.claim();
-      await f.h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken, result: { status: 'reviewed' } });
+      await f.h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken, result: { status: 'no-change' } });
       f.store.state.jobs[0].batch = { captured: 1, rows: 1, processed: 1, remaining: 0,
         counts: { 'verified-local': 0, held: 0, 'report-only': 1, failed: 0 }, lifecycle: 'pending' };
       fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
@@ -822,7 +813,8 @@ describe('Compact companion dialogs and preserved states', () => {
       expect(f.posts()).toHaveLength(1);
       f.store.state.jobs[0].batch.lifecycle = 'applied';
       fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
-      await waitFor(() => expect(f.posts()).toHaveLength(2));
+      await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
+      expect(f.posts()).toHaveLength(1);
     });
 
     it('keeps a failed-refresh snapshot visible, invalidates continuation and consent, then recovers without submission', async () => {

@@ -104,10 +104,10 @@ per error; either would lose coverage or prepare multiple release candidates.
 snapshot is loading. Opening it does not enqueue work. Runner settings, current
 status, counted activity filters and all retained attempts are in that same
 dialog; there is no separate settings/history modal or per-error picker.
-**Start review and repair** requests one fresh full-batch review, then requests
-one fresh full-batch repair only after that exact review completes, its lifecycle
-is applied, and the same runner/checkout remains eligible. It does not send a
-legacy `reviewJobId` or silently reuse single-packet evidence.
+**Start review and repair** requests one fresh full-batch repair workflow. Its
+native engine investigates each case before applying an eligible repair, then
+prepares one tested candidate. It does not duplicate that investigation with a
+separate review job, send a legacy `reviewJobId`, or reuse single-packet evidence.
 
 This workflow requires all three independent review/repair/deploy opt-ins
 (owner consent and runtime **D**), without falling back to review-only. On the
@@ -118,11 +118,10 @@ requires the separate, initially unchecked exact-candidate Deploy dialog and
 explicit full/targeted check mode. Candidate drift or unavailable state clears
 that decision.
 
-Keep the page open for sequential continuation. Closing the control-centre
-dialog does not cancel recorded work; **Stop automatic continuation** prevents
-the browser submitting the next stage, whereas **Cancel run** targets the
-recorded job. Reloading never resumes browser submission automatically. Failed
-refreshes, revoked D consent and retained-work/release holds stop continuation.
+After the request is recorded, the runner owns the sequential workflow; the page
+may be closed. **Cancel run** targets the recorded job. Reloading never submits
+another batch, and failed requests are never retried automatically. Revoked
+consent and retained-work/release holds continue to stop admission and execution.
 
 Polling is serialized (3 seconds active/connecting, 20 seconds idle), with
 focus/visibility/online refresh and a 10-second GET deadline. A failed refresh

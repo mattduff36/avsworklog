@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogScrollAre
 type Snapshot = z.infer<typeof adminResponseSchema>;
 type Confirmation = { repairJobId: string; candidate: Candidate; release?: CheckEvidence['release'] };
 type ActivityFilter = 'all' | 'attention' | 'previous';
-type RunFlow = { deviceId: string; jobId: string; stage: 'review' | 'repair' };
+type RunFlow = { deviceId: string; jobId: string };
 
 const REQUEST_FAILURE = 'Request not confirmed. Refresh and inspect activity before retrying; the server may have recorded it.';
 const REASON_HELP: Record<string, string> = {
@@ -129,7 +129,7 @@ export function FixerrorsControlPanel() {
         if (requestController.current !== controller) return;
         setFailure('Unable to refresh Fixerrors controls. Last successful snapshot is stale; actions are disabled. Existing error logs are unaffected.');
         setFlow(null);
-        setFlowNotice('Automatic continuation stopped because runner state could not be refreshed. Inspect activity before starting again.');
+        setFlowNotice('Live status is unavailable. Recorded work may still be running; inspect activity before requesting another run.');
         setConfirmation(null);
         setConfirmed(false);
       } finally {
@@ -244,45 +244,21 @@ export function FixerrorsControlPanel() {
     const runner = snapshot.devices.find(entry => entry.id === flow.deviceId);
     if (!runner || runner.revoked || !runner.allowReadOnly || !runner.allowRepair || !runner.allowDeploy) {
       setFlow(null);
-      setFlowNotice('Automatic continuation stopped: the selected runner or D consent is no longer available.');
+      setFlowNotice('The selected runner or D consent is no longer available. Inspect the recorded job before restarting.');
       return;
     }
     if (runner.holdReason || snapshot.releaseNeedsReconciliation) {
       setFlow(null);
-      setFlowNotice('Automatic continuation stopped at a retained runner or release hold. Preserve evidence for owner reconciliation.');
+      setFlowNotice('The runner reported a retained-work or release hold. Preserve evidence for owner reconciliation.');
       return;
     }
     const job = snapshot.jobs.find(entry => entry.id === flow.jobId);
     if (!job || ['queued', 'leased', 'paused'].includes(job.state)) return;
-    if (flow.stage === 'repair' || job.state !== 'reviewed') {
-      setFlow(null);
-      setFlowNotice(job.state === 'tested' ? 'Deploy-ready: inspect the exact tested candidate and separately confirm Deploy.'
-        : job.state === 'no-work' ? 'No eligible errors; no worker launched.'
-        : `Run stopped at ${job.state}. Inspect its diagnostics and retained attempts below.`);
-      return;
-    }
-    if (job.batch && job.batch.lifecycle !== 'applied') {
-      if (job.batch.lifecycle === 'blocked') {
-        setFlow(null);
-        setFlowNotice('Review lifecycle reconciliation is blocked. No repair was requested.');
-      }
-      return;
-    }
-    const current = runner.checkout ?? runner.workspace;
-    const state = deviceStatus(runner, snapshot.jobs);
-    if (!current || current.head !== job.workspace.head || current.tree !== job.workspace.tree) {
-      setFlow(null);
-      setFlowNotice('Review completed, but D consent or the exact reviewed checkout is no longer available. No repair was requested.');
-      return;
-    }
-    if (!state?.ready || state.active || state.pending || state.reconciling) return;
-    // Move the local intent before submitting; repeated polls cannot enqueue another repair.
-    const requestId = crypto.randomUUID();
-    setFlow({ ...flow, stage: 'repair', jobId: requestId });
-    void submit({ op: 'enqueue', requestId, deviceId: flow.deviceId, action: 'repair' }).then(result => {
-      if (!result) setFlow(null);
-    });
-  }, [flow, snapshot, failure, busy, submit]);
+    setFlow(null);
+    setFlowNotice(job.state === 'tested' ? 'Deploy-ready: inspect the exact tested candidate and separately confirm Deploy.'
+      : job.state === 'no-work' ? 'No eligible errors; no worker launched.'
+      : `Run stopped at ${job.state}. Inspect its diagnostics and retained attempts below.`);
+  }, [flow, snapshot, failure, busy]);
 
   function dismissConfirmation() {
     setConfirmation(null);
@@ -307,8 +283,8 @@ export function FixerrorsControlPanel() {
     if (startDisabled || !device) return;
     const requestId = crypto.randomUUID();
     setFlowNotice(null);
-    setFlow({ deviceId: device.id, stage: 'review', jobId: requestId });
-    void submit({ op: 'enqueue', requestId, deviceId: device.id, action: 'review' }).then(result => {
+    setFlow({ deviceId: device.id, jobId: requestId });
+    void submit({ op: 'enqueue', requestId, deviceId: device.id, action: 'repair' }).then(result => {
       if (!result) setFlow(null);
     });
   };
@@ -416,7 +392,7 @@ export function FixerrorsControlPanel() {
             onCloseAutoFocus={event => { if (openingDeploy.current) event.preventDefault(); }}>
             <DialogHeader className="shrink-0 pr-6 text-left">
               <DialogTitle>Fixerrors control centre</DialogTitle>
-              <DialogDescription>Review all new and outstanding errors, then request a fresh full-batch repair on the same runner. Stop at Deploy-ready; deployment always needs separate exact-candidate approval.</DialogDescription>
+              <DialogDescription>Investigate all new and outstanding errors, repair eligible cases, and test one candidate. Stop at Deploy-ready; deployment always needs separate exact-candidate approval.</DialogDescription>
             </DialogHeader>
             {snapshot?.enabled && (
               <div role="group" aria-label="Activity filters" className="flex shrink-0 flex-wrap gap-2">
@@ -440,7 +416,7 @@ export function FixerrorsControlPanel() {
                 <div className="space-y-3 rounded-lg border border-border p-3">
                   <h3 className="text-sm font-semibold">Run status</h3>
                   {!flow && <p className="text-sm text-muted-foreground">{status?.active ? 'A run is already active; its last reported stage is below.' : status?.ready ? 'Runner connected. Review and repair can start when all consent and retained-work gates are clear.' : 'Waiting for a ready, enrolled runner.'}</p>}
-                  {flow && <p role="status" className="text-sm">{flow.stage === 'review' ? 'Review requested; repair waits for verified review completion and runner readiness.' : 'Repair requested; waiting for the tested candidate. No Deploy is automatic.'}</p>}
+                  {flow && <p role="status" className="text-sm">Batch requested: the runner investigates each case before repair and testing. No Deploy is automatic.</p>}
                   {flowNotice && <p role="status" className="text-sm">{flowNotice}</p>}
                   {missingDConsent && <p role="alert" className="text-sm text-amber-300">D consent is required; no review-only fallback. On this Windows PC, stop Squires Runner, choose E / D, confirm SET DEPLOY, then start Terminal or Service with runtime D. This only enables the workflow, not Deploy approval.</p>}
                   {!status?.online && <p className="text-sm text-muted-foreground">Start Squires Runner on its enrolled Windows PC. Refresh detects its next authenticated heartbeat automatically.</p>}
@@ -457,10 +433,9 @@ export function FixerrorsControlPanel() {
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" className="h-auto min-h-9 whitespace-normal bg-avs-yellow text-slate-900 hover:bg-[#d1b82f]"
                       disabled={startDisabled} onClick={startRun}>{busy ? 'Recording request...' : 'Start review and repair'}</Button>
-                    {flow && <Button size="sm" variant="outline" onClick={() => { setFlow(null); setFlowNotice('Automatic continuation stopped. Any recorded run remains visible below.'); }}>Stop automatic continuation</Button>}
                     <Button size="sm" variant="outline" disabled title="A browser cannot securely inspect the installed Windows named pipe.">Launch local runner (unavailable)</Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Keep this page open for sequential continuation. Closing this dialog does not stop a run; reloading the page never silently resumes automatic submission. Review and repair each capture all eligible errors; no per-error selector or reused single packet.</p>
+                  <p className="text-xs text-muted-foreground">Once recorded, the batch continues on the runner even if you close this page. All eligible errors are captured together; investigation and repair run sequentially. Use Cancel run below to stop an active job.</p>
                 </div>
                 <details className="rounded-lg border border-border p-3">
                   <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Runner settings</summary>
