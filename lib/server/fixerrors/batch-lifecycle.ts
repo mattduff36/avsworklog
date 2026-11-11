@@ -83,7 +83,7 @@ export async function reconcileBatchLifecycle(store: QueueStore, jobId: string) 
     else current.reason = reason;
     job.batch.lifecycle = current.state;
     job.batch.lifecycleReason = current.reason;
-    audit({ at: Date.now(), actor: 'batch-lifecycle', event: applied ? 'batch-lifecycle-applied' : 'batch-lifecycle-blocked',
+    audit({ at: Date.now(), actor: job.deviceId, event: applied ? 'batch-lifecycle-applied' : 'batch-lifecycle-blocked',
       jobId, deviceId: job.deviceId });
     return current.state;
   });

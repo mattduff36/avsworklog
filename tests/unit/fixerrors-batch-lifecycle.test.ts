@@ -69,6 +69,20 @@ async function fixture() {
 }
 
 describe('server exact-row batch lifecycle durability (mock application DB)', () => {
+  it('records lifecycle audit events using the enrolled device UUID required by production', async () => {
+    const f = await fixture();
+    const transact = f.store.transact.bind(f.store);
+    vi.spyOn(f.store, 'transact').mockImplementation(work => transact(tx => work({ ...tx,
+      audit(event) {
+        expect(event.actor).toBe(deviceId);
+        expect(event.actor).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/u);
+        tx.audit(event);
+      },
+    })));
+    expect(await reconcileBatchLifecycle(f.store, f.id)).toBe('applied');
+    expect(f.store.events.at(-1)).toMatchObject({ actor: deviceId, event: 'batch-lifecycle-applied' });
+  });
+
   it('awaits durable queue pre-receipt persistence before the first application update', async () => {
     const f = await fixture();
     const transact = f.store.transact.bind(f.store);
