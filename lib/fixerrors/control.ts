@@ -344,8 +344,10 @@ export function applyDeviceCommand(
       if (outcome.clusters.length !== command.cursor) deny('Batch cursor coverage mismatch');
       if (previous?.outcome) {
         const priorOutcome = validateBatchOutcome(batch, previous.outcome, job.id, false);
-        if (JSON.stringify(outcome.clusters.slice(0, priorOutcome.clusters.length)) !== JSON.stringify(priorOutcome.clusters) ||
-            JSON.stringify(outcome.decisions.slice(0, priorOutcome.decisions.length)) !== JSON.stringify(priorOutcome.decisions)) {
+        // JSONB may reorder object keys. Bind the completed content, including
+        // array order, rather than the incidental serialization key order.
+        if (batchOutcomeHash(outcome.clusters.slice(0, priorOutcome.clusters.length)) !== batchOutcomeHash(priorOutcome.clusters) ||
+            batchOutcomeHash(outcome.decisions.slice(0, priorOutcome.decisions.length)) !== batchOutcomeHash(priorOutcome.decisions)) {
           deny('Completed batch prefix changed');
         }
       }

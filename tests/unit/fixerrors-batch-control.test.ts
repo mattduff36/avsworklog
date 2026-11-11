@@ -99,6 +99,28 @@ describe('authenticated retained batch control', () => {
     await expect(request({ op: 'claim' })).rejects.toThrow('checkout unavailable');
   });
 
+  it('renews identical decision content after JSONB-style key reordering and still rejects changed content', async () => {
+    const { store, claim, request, outcome } = await connected();
+    const decision = { id: 'cluster-1', lane: 'fast', action: 'manual-investigation', disposition: 'outstanding',
+      nextStep: 'Inspect the synthetic source failure', evidencePaths: ['lib/utils/display-label.ts'],
+      files: [], requiredTestIds: [], forbiddenChanges: ['suppress-logging', 'empty-success', 'weaken-authorization'],
+      rationale: 'Synthetic evidence requires investigation', priorIncidentIds: [], evidenceEnrichmentAttempted: true };
+    const full = { ...outcome, decisions: [decision] };
+    const command = { op: 'batch-lease' as const, jobId: claim.job.id, leaseToken: claim.leaseToken,
+      cursor: 1, checkpointSha256: batchHash('ordered keys'), resume: false, outcome: full };
+    await request(structuredClone(command));
+    const reorder = (value: unknown): unknown => Array.isArray(value) ? value.map(reorder) :
+      value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).sort(([a], [b]) =>
+        a.length - b.length || a.localeCompare(b)).map(([key, entry]) => [key, reorder(entry)])) : value;
+    const checkpoint = store.state.jobs[0].privateBatch!.checkpoint!;
+    checkpoint.outcome = reorder(checkpoint.outcome);
+    expect(JSON.stringify(checkpoint.outcome)).not.toBe(JSON.stringify(full));
+    await expect(request(structuredClone(command))).resolves.toMatchObject({ ok: true });
+    const changed = structuredClone(command);
+    changed.outcome.decisions[0].rationale = 'Changed evidence';
+    await expect(request(changed)).rejects.toThrow('Completed batch prefix changed');
+  });
+
   it('binds final completion to the exact full outcome and retains a strictly parsed private record set', async () => {
     const { store, id, claim, request, outcome } = await connected(1);
     const lease = { jobId: id, leaseToken: claim.leaseToken };
