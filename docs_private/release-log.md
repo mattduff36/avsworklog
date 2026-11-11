@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.10.6
+
+**GIT COMMIT MESSAGE**
+`fix(debug): collapse superseded Fixerrors attempts into history`
+
+**PUSHED AT**
+2026-11-11T03:55:59.816Z
+
+**WHAT CHANGED**
+Collapse superseded Fixerrors attempts into history.
+
+**VERSION HISTORY DETAILS**
+- Collapse superseded Fixerrors attempts into history, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(debug): collapse superseded Fixerrors attempts into history`
+
 ## 1126.10.5
 
 **GIT COMMIT MESSAGE**

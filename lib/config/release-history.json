@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.10.6",
+    "updateKind": "minor",
+    "title": "Debug tools improvements",
+    "description": "Collapse superseded Fixerrors attempts into history.",
+    "summary": "Collapse superseded Fixerrors attempts into history.",
+    "details": [
+      "Collapse superseded Fixerrors attempts into history, with changes to app screens."
+    ],
+    "areas": [
+      "Debug tools"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-11T03:55:59.816Z"
+  },
+  {
     "version": "1126.10.5",
     "updateKind": "minor",
     "title": "Fixerrors improvements",
