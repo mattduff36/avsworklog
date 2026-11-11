@@ -1,8 +1,23 @@
 [
   {
+    "version": "1126.10.0",
+    "updateKind": "major",
+    "title": "Fixerrors update",
+    "description": "Connect full error backlog to the Windows runner.",
+    "summary": "Connect full error backlog to the Windows runner.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated debug tools, with changes to background routes and app screens.",
+      "Updated actions, with changes to automated tests."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-11T02:43:54.728Z"
+  },
+  {
     "version": "1126.9.0",
     "updateKind": "major",
-    "title": "Daily Checks and Windows runner",
+    "title": "Fixerrors update",
     "description": "Workshop managers can delete Daily Checks in any status, including Submitted. Added Windows terminal and service runner controls.",
     "summary": "Workshop managers can delete Daily Checks in any status, including Submitted. Added Windows terminal and service runner controls.",
     "details": [
@@ -12,7 +27,9 @@
     ],
     "areas": [
       "Daily Tasks",
-      "Debug tools"
+      "Workshop managers can delete Daily Checks in any status",
+      "Including Submitted. Added Windows terminal",
+      "Service runner controls"
     ],
     "areaKeys": [
       "daily-tasks"

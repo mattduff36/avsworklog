@@ -2,6 +2,29 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.10.0
+
+**GIT COMMIT MESSAGE**
+`feat(fixerrors): connect full error backlog to the Windows runner`
+
+**PUSHED AT**
+2026-11-11T02:43:54.728Z
+
+**WHAT CHANGED**
+Connect full error backlog to the Windows runner.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+- Updated debug tools, with changes to background routes and app screens.
+- Updated actions, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(fixerrors): connect full error backlog to the Windows runner`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 1126.9.0
 
 **GIT COMMIT MESSAGE**
