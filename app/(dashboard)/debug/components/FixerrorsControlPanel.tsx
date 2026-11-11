@@ -199,7 +199,10 @@ export function FixerrorsControlPanel() {
                 {view === 'activity' ? `Activity (${activeJobs.length})` : view === 'history' ? `History (${previousJobs.length})` : 'Runner settings'}
               </Button>
             </DialogTrigger>
-            <DialogContent className={dialogContentViewportClassName({ size: '2xl' })}
+            <DialogContent className={dialogContentViewportClassName({
+              size: view === 'settings' ? '4xl' : '6xl',
+              className: 'sm:w-[calc(100vw-6rem)]',
+            })}
               onCloseAutoFocus={event => { if (openingDeploy.current) event.preventDefault(); }}>
               <DialogHeader>
                 <DialogTitle>{view === 'activity' ? 'Current Fixerrors activity' : view === 'history' ? 'Previous Fixerrors activity' : 'Fixerrors runner settings'}</DialogTitle>
@@ -257,7 +260,10 @@ export function FixerrorsControlPanel() {
       {failure && <p role="alert" className="max-w-md text-xs text-white">{failure}</p>}
       {snapshot?.releaseNeedsReconciliation && <p role="alert" className="max-w-md text-xs text-white">Deployment result unknown. Open Runner settings to reconcile before continuing.</p>}
       <Dialog open={Boolean(confirmation && confirmationValid)} onOpenChange={open => { if (!open) dismissConfirmation(); }}>
-        <DialogContent className={dialogContentViewportClassName({ size: '2xl' })}
+        <DialogContent className={dialogContentViewportClassName({
+          size: '4xl',
+          className: 'sm:w-[calc(100vw-6rem)]',
+        })}
           onCloseAutoFocus={event => {
             event.preventDefault();
             openingDeploy.current = false;
