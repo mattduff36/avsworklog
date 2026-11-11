@@ -1,5 +1,18 @@
 [
   {
+    "version": "1126.10.2",
+    "updateKind": "minor",
+    "title": "Fixerrors improvements",
+    "description": "Allow fresh requests after reconciled cancellation.",
+    "summary": "Allow fresh requests after reconciled cancellation.",
+    "details": [
+      "Updated debug tools, with changes to app screens."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-11T03:04:32.118Z"
+  },
+  {
     "version": "1126.10.1",
     "updateKind": "minor",
     "title": "Fixerrors improvements",
