@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.10.3
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): canonicalize persisted batch checkpoint comparisons`
+
+**PUSHED AT**
+2026-11-11T03:18:23.866Z
+
+**WHAT CHANGED**
+Canonicalize persisted batch checkpoint comparisons.
+
+**VERSION HISTORY DETAILS**
+- Updated app reliability, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): canonicalize persisted batch checkpoint comparisons`
+
 ## 1126.10.2
 
 **GIT COMMIT MESSAGE**

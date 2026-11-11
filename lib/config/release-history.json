@@ -1,5 +1,18 @@
 [
   {
+    "version": "1126.10.3",
+    "updateKind": "minor",
+    "title": "Fixerrors improvements",
+    "description": "Canonicalize persisted batch checkpoint comparisons.",
+    "summary": "Canonicalize persisted batch checkpoint comparisons.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-11T03:18:23.866Z"
+  },
+  {
     "version": "1126.10.2",
     "updateKind": "minor",
     "title": "Fixerrors improvements",
