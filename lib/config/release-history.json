@@ -1,5 +1,18 @@
 [
   {
+    "version": "1126.10.7",
+    "updateKind": "minor",
+    "title": "Runner improvements",
+    "description": "Isolate service child desktop initialization.",
+    "summary": "Isolate service child desktop initialization.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-11T18:00:08.601Z"
+  },
+  {
     "version": "1126.10.6",
     "updateKind": "minor",
     "title": "Debug tools improvements",

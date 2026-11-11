@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.10.7
+
+**GIT COMMIT MESSAGE**
+`fix(runner): isolate service child desktop initialization`
+
+**PUSHED AT**
+2026-11-11T18:00:08.601Z
+
+**WHAT CHANGED**
+Isolate service child desktop initialization.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(runner): isolate service child desktop initialization`
+
 ## 1126.10.6
 
 **GIT COMMIT MESSAGE**
