@@ -1,5 +1,6 @@
 /** @vitest-environment happy-dom */
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ComponentProps, CSSProperties } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FixerrorsControlPanel } from '@/app/(dashboard)/debug/components/FixerrorsControlPanel';
 import { toast } from 'sonner';
@@ -8,16 +9,28 @@ import { checkEvidenceDigest } from '@/lib/fixerrors/control';
 import { FixtureStore, harness, now } from '../unit/fixerrors-control-fixtures';
 
 const auth = vi.hoisted(() => ({ isActualSuperAdmin: true, isViewingAs: false }));
+const dialogContentProps = vi.hoisted(() => vi.fn<(props: { className?: string; style?: CSSProperties }) => void>());
 vi.mock('@/lib/hooks/useAuth', () => ({ useAuth: () => auth }));
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
+vi.mock('@/components/ui/dialog', async importOriginal => {
+  const dialog = await importOriginal<typeof import('@/components/ui/dialog')>();
+  return {
+    ...dialog,
+    DialogContent: (props: ComponentProps<typeof dialog.DialogContent>) => {
+      dialogContentProps(props);
+      return <dialog.DialogContent {...props} />;
+    },
+  };
+});
 beforeEach(() => {
   auth.isActualSuperAdmin = true;
   auth.isViewingAs = false;
+  dialogContentProps.mockClear();
   vi.spyOn(Date, 'now').mockReturnValue(now);
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
-async function openDetails(view: 'Activity' | 'History' | 'Runner settings') {
+async function openDetails(view: 'Activity' | 'Runner settings') {
   await waitFor(() => expect(screen.queryByText('Loading...')).toBeNull());
   fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${view}`) }));
 }
@@ -31,6 +44,17 @@ async function openDeploy() {
 
 function closeDetails() {
   fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+}
+
+function filterActivity(filter: 'All' | 'Needs attention' | 'Previous') {
+  const filters = screen.getByRole('group', { name: 'Activity filters' });
+  const button = within(filters).getByRole('button', { name: new RegExp(`^${filter} \\(`) });
+  fireEvent.click(button);
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+}
+
+function activityRows() {
+  return within(screen.getByRole('table', { name: 'Fixerrors activity runs' })).getAllByRole('row').slice(1);
 }
 
 describe('Debug local Fixerrors controls', () => {
@@ -181,7 +205,7 @@ describe('Debug local Fixerrors controls', () => {
     expect(button.disabled).toBe(required);
   });
 
-  it('collapses superseded partial attempts but keeps genuinely unresolved completed receipts visible', async () => {
+  it('keeps superseded attempts in All and Previous, and unresolved receipts in Needs attention', async () => {
     const store = new FixtureStore();
     const h = harness(store);
     await h.enqueue();
@@ -199,14 +223,16 @@ describe('Debug local Fixerrors controls', () => {
     render(<FixerrorsControlPanel />);
     await openDetails('Activity');
     await screen.findByText('7 / 7 cases processed; 0 remaining (7 error rows captured).');
+    expect(screen.getByText('1 / 7 cases processed; 6 remaining (7 error rows captured).')).toBeDefined();
+    filterActivity('Needs attention');
     expect(screen.queryByText('1 / 7 cases processed; 6 remaining (7 error rows captured).')).toBeNull();
-    closeDetails();
-    await openDetails('History');
+    filterActivity('Previous');
     expect(screen.getByText('1 / 7 cases processed; 6 remaining (7 error rows captured).')).toBeDefined();
     cleanup();
     snapshot.jobs.find(job => job.id === old.id)!.lifecycleReconciliationRequired = true;
     render(<FixerrorsControlPanel />);
     await openDetails('Activity');
+    filterActivity('Needs attention');
     await screen.findByText('1 / 7 cases processed; 6 remaining (7 error rows captured).');
   });
 
@@ -347,7 +373,7 @@ describe('Debug local Fixerrors controls', () => {
   });
 });
 
-it('shows all retained previous jobs in a separate History dialog and keeps uncertain work in Activity', async () => {
+it('shows all retained jobs once in one Activity log, attention first and previous newest-first, with counted filters reset on reopen', async () => {
   const store = new FixtureStore();
   const h = harness(store);
   await h.enqueue('review');
@@ -360,21 +386,169 @@ it('shows all retained previous jobs in a separate History dialog and keeps unce
   expect(snapshot.jobs).toHaveLength(56);
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
   render(<FixerrorsControlPanel />);
-  const toggle = await screen.findByRole('button', { name: 'History (55)' });
+  const toggle = await screen.findByRole('button', { name: 'Activity (56)' });
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  expect(screen.queryByRole('button', { name: /^History/ })).toBeNull();
   expect(screen.queryByText('reviewed')).toBeNull();
   await openDetails('Activity');
-  expect(screen.getByText('unknown')).toBeTruthy();
-  closeDetails();
-  fireEvent.click(toggle);
+  expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  expect(screen.getByRole('dialog', { name: 'Fixerrors activity log' })).toBeDefined();
   expect(toggle.getAttribute('aria-expanded')).toBe('true');
+  expect(screen.getByRole('button', { name: 'All (56)' }).getAttribute('aria-pressed')).toBe('true');
+  expect(screen.getByRole('button', { name: 'Needs attention (1)' })).toBeDefined();
+  expect(screen.getByRole('button', { name: 'Previous (55)' })).toBeDefined();
+  expect(screen.getByText('unknown')).toBeTruthy();
   expect(screen.getAllByText('reviewed')).toHaveLength(55);
+  const orderedIds = [store.state.jobs[55].id, ...store.state.jobs.slice(0, 55).map(job => job.id)];
+  const expectRows = (ids: string[]) => {
+    const rows = activityRows();
+    expect(rows).toHaveLength(ids.length);
+    rows.forEach((row, index) => expect(within(row).getByText(ids[index])).toBeDefined());
+  };
+  expectRows(orderedIds);
+  filterActivity('Needs attention');
+  expectRows(orderedIds.slice(0, 1));
+  expect(screen.queryByText('reviewed')).toBeNull();
+  filterActivity('Previous');
+  expectRows(orderedIds.slice(1));
+  expect(screen.queryByText('unknown')).toBeNull();
+  filterActivity('All');
+  expectRows(orderedIds);
+  filterActivity('Previous');
+  closeDetails();
+  await openDetails('Activity');
+  expect(screen.getByRole('button', { name: 'All (56)' }).getAttribute('aria-pressed')).toBe('true');
+  expectRows(orderedIds);
   closeDetails();
   expect(screen.queryByText('reviewed')).toBeNull();
+  expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
 });
 
 describe('Compact companion dialogs and preserved states', () => {
-  it.each(['Activity', 'History', 'Runner settings'] as const)('dismisses %s outside and with Escape without posting', async view => {
+  it.each(['full', 'targeted'] as const)('keeps mixed runs complete in labelled responsive columns, with one copy of each action and %s approval details', async releaseMode => {
+    const store = new FixtureStore();
+    await harness(store).testedRepair();
+    const template = store.state.jobs[0];
+    if (!template.candidate || !template.checks) throw new Error('Missing fixture candidate');
+    template.checks.release = { candidateSha256: '8'.repeat(64), testEvidenceSha256: '9'.repeat(64) };
+    template.createdAt = now - 4000;
+    const paused = { ...template, id: crypto.randomUUID(), createdAt: now - 3000, state: 'paused' as const, candidate: null, checks: null,
+      batch: { captured: 4, rows: 281, processed: 2, remaining: 2,
+        counts: { 'verified-local': 1, held: 1, 'report-only': 0, failed: 0 }, lifecycle: 'pending' as const } };
+    const deployed = { ...template, id: crypto.randomUUID(), createdAt: now - 2000, action: 'deploy' as const, state: 'deployed' as const,
+      parentRepairId: crypto.randomUUID(), approval: { actorId: template.requestedBy, candidate: template.candidate, confirmedAt: now - 2500, releaseMode } };
+    const failed = { ...template, id: crypto.randomUUID(), createdAt: now - 1000, state: 'failed' as const, reason: 'execution-failed' as const, candidate: null, checks: null };
+    const reviewed = { ...template, id: crypto.randomUUID(), createdAt: now, action: 'review' as const, state: 'reviewed' as const, candidate: null, checks: null };
+    store.state.jobs = [failed, template, reviewed, paused, deployed];
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
+    render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
+    const table = screen.getByRole('table', { name: 'Fixerrors activity runs' });
+    const labels = ['Run/date', 'Status', 'Runner', 'Progress/result', 'Actions/details'];
+    expect(within(table).getAllByRole('columnheader').map(header => header.textContent)).toEqual(labels);
+    const rows = activityRows();
+    const expectedIds = [paused.id, template.id, reviewed.id, failed.id, deployed.id];
+    expect(rows).toHaveLength(expectedIds.length);
+    expect(table.className).toContain('[overflow-wrap:anywhere]');
+    rows.forEach((row, index) => {
+      expect(within(row).getByText(expectedIds[index])).toBeDefined();
+      expect(row.className).toContain('grid-cols-1');
+      expect(row.className).toContain('lg:grid-cols-[minmax(0,1fr)');
+      const cells = within(row).getAllByRole('cell');
+      expect(cells).toHaveLength(5);
+      cells.forEach((cell, column) => {
+        expect(cell.className).toContain('min-w-0');
+        expect(within(cell).getByText(labels[column]).className).toContain('lg:hidden');
+      });
+    });
+    expect(within(rows[0]).getByText('2 / 4 cases processed; 2 remaining (281 error rows captured).')).toBeDefined();
+    expect(within(rows[0]).getByText(/1 verified locally \/ 1 held/)).toBeDefined();
+    expect(within(rows[0]).getByText(/Lifecycle: pending.*not confirmed reconciled/)).toBeDefined();
+    expect(within(rows[3]).getByText('execution-failed')).toBeDefined();
+    expect(within(rows[4]).getByText(`${releaseMode === 'full' ? 'Full checks (fap)' : 'Targeted checks (urgent)'} / separately confirmed ${new Date(deployed.approval.confirmedAt).toLocaleString('en-GB')}`)).toBeDefined();
+    expect(within(rows[1]).getByText('Technical candidate details')).toBeDefined();
+    expect(within(rows[1]).getByText(/Checks SHA-256/).textContent).toContain(template.candidate.checksSha256);
+    expect(within(rows[1]).getByText(/Worker candidate SHA-256/).textContent).toContain('8'.repeat(64));
+    expect(within(rows[1]).getByText(/Prepared evidence SHA-256/).textContent).toContain('9'.repeat(64));
+    expect(screen.getAllByRole('button', { name: 'Cancel run', hidden: true })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Deploy: review exact candidate', hidden: true })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Needs attention (2)' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Previous (3)' })).toBeDefined();
+    filterActivity('Previous');
+    expect(activityRows()).toHaveLength(3);
+    expect(screen.queryByRole('button', { name: 'Cancel run', hidden: true })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Deploy: review exact candidate', hidden: true })).toBeNull();
+    filterActivity('All');
+    expect(activityRows()).toHaveLength(5);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses consistent pixel and safe-area viewport bounds locally, keeping activity filters and refresh outside the scrolling entries', async () => {
+    const store = new FixtureStore();
+    await harness(store).testedRepair();
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
+    render(<FixerrorsControlPanel />);
+    const expectBounds = (dialog: HTMLElement, maxWidth: string) => {
+      expect(dialog.className).toContain(maxWidth);
+      expect(dialog.className).toContain('[--fixerrors-dialog-gutter:24px]');
+      expect(dialog.className).toContain('md:[--fixerrors-dialog-gutter:48px]');
+      expect(dialog.style.maxHeight).toContain('100dvh');
+      expect(dialog.style.maxHeight).toContain('var(--fixerrors-dialog-gutter)');
+      expect(dialog.style.maxHeight).toContain('env(safe-area-inset-top, 0px)');
+      expect(dialog.style.maxHeight).toContain('env(safe-area-inset-bottom, 0px)');
+      // Happy DOM drops nested CSS math for position/width; inspect props passed to the real dialog.
+      const props = dialogContentProps.mock.calls.filter(([props]) =>
+        props.className?.includes(maxWidth) && props.className.includes('overflow-hidden') === dialog.className.includes('overflow-hidden')).at(-1)?.[0];
+      if (!props?.style) throw new Error('Missing dialog viewport style');
+      expect(props.style.top).toContain('var(--fixerrors-dialog-gutter)');
+      expect(props.style.top).toContain('env(safe-area-inset-top, 0px)');
+      expect(props.style.top).toContain('env(safe-area-inset-bottom, 0px)');
+      expect(props.style.left).toContain('var(--fixerrors-dialog-gutter)');
+      expect(props.style.width).toContain('100vw');
+      expect(props.style.width).toContain('env(safe-area-inset-left, 0px)');
+      expect(props.style.width).toContain('env(safe-area-inset-right, 0px)');
+    };
+    await openDetails('Activity');
+    expectBounds(screen.getByRole('dialog'), 'max-w-6xl');
+    const entries = screen.getByLabelText('Activity entries');
+    expect(entries.className).toContain('min-h-0');
+    expect(entries.className).toContain('overflow-y-auto');
+    expect(entries.className).toContain('overflow-x-hidden');
+    expect(entries.contains(screen.getByRole('table'))).toBe(true);
+    expect(entries.contains(screen.getByRole('group', { name: 'Activity filters' }))).toBe(false);
+    expect(entries.contains(screen.getByRole('heading', { name: 'Fixerrors activity log' }))).toBe(false);
+    expect(entries.contains(screen.getByRole('button', { name: 'Refresh companion state' }))).toBe(false);
+    expect(entries.contains(screen.getByRole('button', { name: 'Close' }))).toBe(false);
+    closeDetails();
+    await openDetails('Runner settings');
+    expectBounds(screen.getByRole('dialog'), 'max-w-4xl');
+    closeDetails();
+    await openDeploy();
+    expectBounds(screen.getByRole('dialog'), 'max-w-4xl');
+    expect(screen.getByRole('dialog').className).toContain('overflow-y-auto');
+    expect(screen.getByRole('dialog').className).toContain('overflow-x-hidden');
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it('distinguishes empty All, Needs attention and Previous filters without changing queue state', async () => {
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(new FixtureStore().state) };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
+    render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
+    expect(screen.getByRole('button', { name: 'All (0)' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('No activity recorded.')).toBeDefined();
+    filterActivity('Needs attention');
+    expect(screen.getByText('No jobs need attention or deployment decisions.')).toBeDefined();
+    filterActivity('Previous');
+    expect(screen.getByText('No previous activity.')).toBeDefined();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['Activity', 'Runner settings'] as const)('dismisses %s outside and with Escape without posting', async view => {
     const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(new FixtureStore().state) };
     const fetcher = vi.fn(async () => ({ ok: true, json: async () => snapshot }));
     vi.stubGlobal('fetch', fetcher);

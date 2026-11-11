@@ -65,7 +65,9 @@ describe('Debug Fixerrors header', () => {
     expect(within(toolbar.children[0] as HTMLElement).getByRole('button', { name: 'Review' })).toBeDefined();
     expect(within(toolbar.children[0] as HTMLElement).getByRole('button', { name: 'Run batch' })).toBeDefined();
     expect(within(toolbar.children[1] as HTMLElement).getByRole('button', { name: 'Activity (0)' })).toBeDefined();
-    expect(within(toolbar.children[1] as HTMLElement).getByRole('button', { name: 'History (0)' })).toBeDefined();
+    expect(within(toolbar.children[1] as HTMLElement).getByRole('button', { name: 'Runner settings' })).toBeDefined();
+    expect(within(toolbar.children[1] as HTMLElement).getAllByRole('button')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: /^History/ })).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/debug/fixerrors')).toHaveLength(1);
     expect(timer.mock.calls.filter(([, delay]) => delay === 15_000)).toHaveLength(1);
