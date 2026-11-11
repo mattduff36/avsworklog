@@ -1058,6 +1058,8 @@ startup uses a dedicated non-interactive window station and desktop, with protec
 owner/System permissions and medium integrity. It never changes the interactive
 desktop's permissions. The private objects remain until the contained tree stops;
 native child initialization failures record only a numeric exit code.
+Only the reduced token's default object ACL is set to the enrolled owner and
+System and read back before launch; the privileged service token is unchanged.
 Child
 environment comes from Windows' owner environment with an explicit safe allowlist,
 fixed PowerShell/Git paths and no inherited editor/model/Node injection variables.

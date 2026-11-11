@@ -125,6 +125,23 @@ namespace Squires.WindowsRunner
             {
                 new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null).GetBinaryFormBytes(admin);
                 Check(CreateRestrictedToken(token, 1 | 4, 1, new[] { new SidAndAttributes { Sid = admin } }, 0, IntPtr.Zero, 0, IntPtr.Zero, out reduced));
+                // SCM defaults grant Administrators full access but its logon SID only
+                // read/execute. Once Administrators is deny-only, a child cannot manage
+                // its own newly created process/thread objects. Change only this copy.
+                using (var identity = new WindowsIdentity(reduced))
+                {
+                    var acl = ServiceDesktop.Security(identity.User.Value).DiscretionaryAcl;
+                    var aclBytes = new byte[acl.BinaryLength]; acl.GetBinaryForm(aclBytes, 0);
+                    IntPtr data = Marshal.AllocHGlobal(IntPtr.Size + aclBytes.Length);
+                    try
+                    {
+                        IntPtr aclPointer = IntPtr.Add(data, IntPtr.Size);
+                        Marshal.Copy(aclBytes, 0, aclPointer, aclBytes.Length); Marshal.WriteIntPtr(data, aclPointer);
+                        Check(SetTokenInformation(reduced, 6, data, (uint)IntPtr.Size));
+                        VerifyDefaultDacl(reduced, identity.User.Value);
+                    }
+                    finally { Marshal.FreeHGlobal(data); }
+                }
                 var medium = new SecurityIdentifier("S-1-16-8192");
                 byte[] bytes = new byte[medium.BinaryLength]; medium.GetBinaryForm(bytes, 0);
                 label = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(SidAndAttributes)) + bytes.Length);
@@ -141,6 +158,33 @@ namespace Squires.WindowsRunner
         private static void GetBinaryFormBytes(this SecurityIdentifier sid, IntPtr pointer)
         {
             var bytes = new byte[sid.BinaryLength]; sid.GetBinaryForm(bytes, 0); Marshal.Copy(bytes, 0, pointer, bytes.Length);
+        }
+        internal static void VerifyDefaultDacl(IntPtr token, string owner)
+        {
+            uint size; GetTokenInformation(token, 6, IntPtr.Zero, 0, out size);
+            if (size < IntPtr.Size) throw new InvalidOperationException("Token default ACL unavailable");
+            IntPtr data = Marshal.AllocHGlobal((int)size);
+            try
+            {
+                Check(GetTokenInformation(token, 6, data, size, out size));
+                IntPtr pointer = Marshal.ReadIntPtr(data);
+                if (pointer == IntPtr.Zero) throw new InvalidOperationException("Unrestricted token default ACL refused");
+                var bytes = new byte[(ushort)Marshal.ReadInt16(pointer, 2)]; Marshal.Copy(pointer, bytes, 0, bytes.Length);
+                var acl = new RawAcl(bytes, 0);
+                if (acl.Count != 2) throw new InvalidOperationException("Unexpected token default ACL");
+                bool user = false, system = false;
+                foreach (GenericAce entry in acl)
+                {
+                    var ace = entry as CommonAce;
+                    if (ace == null || ace.AceQualifier != AceQualifier.AccessAllowed || ace.AccessMask != 0x10000000 || ace.AceFlags != AceFlags.None)
+                        throw new InvalidOperationException("Unexpected token default ACE");
+                    if (ace.SecurityIdentifier.Value == owner) user = true;
+                    else if (ace.SecurityIdentifier.Value == "S-1-5-18") system = true;
+                    else throw new InvalidOperationException("Unexpected token default principal");
+                }
+                if (!user || !system) throw new InvalidOperationException("Missing token default principal");
+            }
+            finally { Marshal.FreeHGlobal(data); }
         }
         internal static void VerifyReduced(IntPtr token)
         {
