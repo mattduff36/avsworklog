@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.11.1",
+    "updateKind": "minor",
+    "title": "Debug tools improvements",
+    "description": "Widen Fixerrors dialogs on larger screens.",
+    "summary": "Widen Fixerrors dialogs on larger screens.",
+    "details": [
+      "Widen Fixerrors dialogs on larger screens, with changes to app screens."
+    ],
+    "areas": [
+      "Debug tools"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-11T20:12:25.833Z"
+  },
+  {
     "version": "1126.11.0",
     "updateKind": "major",
     "title": "Debug tools update",

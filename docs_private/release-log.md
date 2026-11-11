@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.11.1
+
+**GIT COMMIT MESSAGE**
+`fix(debug): widen Fixerrors dialogs on larger screens`
+
+**PUSHED AT**
+2026-11-11T20:12:25.833Z
+
+**WHAT CHANGED**
+Widen Fixerrors dialogs on larger screens.
+
+**VERSION HISTORY DETAILS**
+- Widen Fixerrors dialogs on larger screens, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(debug): widen Fixerrors dialogs on larger screens`
+
 ## 1126.11.0
 
 **GIT COMMIT MESSAGE**
