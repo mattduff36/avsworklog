@@ -1,5 +1,21 @@
 [
   {
+    "version": "1126.10.9",
+    "updateKind": "minor",
+    "title": "Runner improvements",
+    "description": "Share protected enrollment across desktop and service.",
+    "summary": "Share protected enrollment across desktop and service.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Share protected enrollment across desktop",
+      "Service"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-11-11T18:17:02.702Z"
+  },
+  {
     "version": "1126.10.8",
     "updateKind": "minor",
     "title": "Runner improvements",

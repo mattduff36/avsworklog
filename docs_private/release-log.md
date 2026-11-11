@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.10.9
+
+**GIT COMMIT MESSAGE**
+`fix(runner): share protected enrollment across desktop and service`
+
+**PUSHED AT**
+2026-11-11T18:17:02.702Z
+
+**WHAT CHANGED**
+Share protected enrollment across desktop and service.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(runner): share protected enrollment across desktop and service`
+
 ## 1126.10.8
 
 **GIT COMMIT MESSAGE**
