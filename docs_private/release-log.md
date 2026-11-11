@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.10.4
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): attribute lifecycle receipts to the paired device`
+
+**PUSHED AT**
+2026-11-11T03:41:58.684Z
+
+**WHAT CHANGED**
+Attribute lifecycle receipts to the paired device.
+
+**VERSION HISTORY DETAILS**
+- Updated background services, with changes to shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): attribute lifecycle receipts to the paired device`
+
 ## 1126.10.3
 
 **GIT COMMIT MESSAGE**

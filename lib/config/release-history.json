@@ -1,5 +1,18 @@
 [
   {
+    "version": "1126.10.4",
+    "updateKind": "minor",
+    "title": "Fixerrors improvements",
+    "description": "Attribute lifecycle receipts to the paired device.",
+    "summary": "Attribute lifecycle receipts to the paired device.",
+    "details": [
+      "Updated background services, with changes to shared logic."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-11T03:41:58.684Z"
+  },
+  {
     "version": "1126.10.3",
     "updateKind": "minor",
     "title": "Fixerrors improvements",
