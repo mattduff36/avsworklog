@@ -19,6 +19,7 @@ vi.mock('@/scripts/automation/fixerrors-companion-packet', () => ({
 }));
 vi.mock('fs', async (importOriginal) => ({
   ...await importOriginal<typeof import('fs')>(),
+  existsSync: () => false,
   openSync: () => 7,
   fstatSync: () => ({ isFile: () => true, size: packetFixture.initialSize, dev: 1, ino: 7 }),
   lstatSync: () => ({ isFile: () => true, isSymbolicLink: () => false, dev: 1, ino: packetFixture.replacedLock ? 8 : 7 }),
@@ -102,7 +103,7 @@ describe('outbound companion: fake executors only, never real fap', () => {
     packetFixture.largestRead = 0;
     packetFixture.closed = false;
     expect(() => inspectCompanionWorkspace()).toThrow('changed or too large');
-    expect(packetFixture.largestRead).toBe(96 * 1024 + 1);
+    expect(packetFixture.largestRead).toBe(packetFixture.initialSize + 1);
     expect(packetFixture.closed).toBe(true);
   });
 
@@ -155,7 +156,7 @@ describe('outbound companion: fake executors only, never real fap', () => {
     }));
     const running = executeCompanionClaim(claim, deps);
     await vi.advanceTimersByTimeAsync(0);
-    expect(executor.execute).toHaveBeenCalledWith(claim.job, expect.any(AbortSignal), undefined, claim.admissionTicket);
+    expect(executor.execute).toHaveBeenCalledWith(claim.job, expect.any(AbortSignal), undefined, claim.admissionTicket, undefined);
     await vi.advanceTimersByTimeAsync(19_999);
     expect(deps.complete).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);

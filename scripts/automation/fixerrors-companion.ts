@@ -298,8 +298,11 @@ export async function companionDeviceRequest(
   origin: typeof FIXERRORS_LOCAL_ORIGIN | typeof FIXERRORS_PRODUCTION_ORIGIN = FIXERRORS_LOCAL_ORIGIN,
 ): Promise<z.infer<typeof deviceResponseSchema>> {
   if (origin !== FIXERRORS_LOCAL_ORIGIN && origin !== FIXERRORS_PRODUCTION_ORIGIN) throw new Error('Unexpected Fixerrors origin');
+  // Final lifecycle settlement includes multiple durable queue/application writes.
+  // This is a receipt wait, not an extension of execution or admission authority.
+  const requestTimeout = command.op === 'complete' || command.op === 'batch-reconcile' ? 60_000 : 10_000;
   const response = await fetch(`${origin}${FIXERRORS_DEVICE_PATH}`, {
-    method: 'POST', redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(10_000),
+    method: 'POST', redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(requestTimeout),
     headers: {
       'Content-Type': 'application/json', 'X-Squires-Device-Id': enrollment.deviceId,
       Authorization: `Bearer ${enrollment.credential}`,
