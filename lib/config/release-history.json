@@ -1,5 +1,18 @@
 [
   {
+    "version": "1126.10.8",
+    "updateKind": "minor",
+    "title": "Runner improvements",
+    "description": "Bind child object permissions to enrolled owner.",
+    "summary": "Bind child object permissions to enrolled owner.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-11T18:07:18.426Z"
+  },
+  {
     "version": "1126.10.7",
     "updateKind": "minor",
     "title": "Runner improvements",

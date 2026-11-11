@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.10.8
+
+**GIT COMMIT MESSAGE**
+`fix(runner): bind child object permissions to enrolled owner`
+
+**PUSHED AT**
+2026-11-11T18:07:18.426Z
+
+**WHAT CHANGED**
+Bind child object permissions to enrolled owner.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(runner): bind child object permissions to enrolled owner`
+
 ## 1126.10.7
 
 **GIT COMMIT MESSAGE**
