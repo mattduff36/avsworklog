@@ -209,6 +209,7 @@ export function publicQueueState(state: QueueState) {
       ...job,
       leaseUntil: lease?.until ?? null,
       evidenceAvailable: Boolean(_packet || _batch),
+      lifecycleReconciliationRequired: Boolean(_batch?.outcome && job.batch?.lifecycle !== 'applied'),
     })),
   };
 }
@@ -223,5 +224,6 @@ export const adminResponseSchema = z.object({
   devices: z.array(deviceSchema.omit({ credentialSha256: true })).max(20),
   jobs: z.array(jobSchema.omit({ lease: true, packet: true, privateBatch: true }).extend({
     leaseUntil: z.number().int().nullable(), evidenceAvailable: z.boolean().default(false),
+    lifecycleReconciliationRequired: z.boolean().default(true),
   })).max(500),
 }).strict();

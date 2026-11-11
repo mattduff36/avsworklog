@@ -140,6 +140,22 @@ describe('Debug local Fixerrors controls', () => {
     });
   });
 
+  it.each([false, true])('gates a fresh run on completed lifecycle evidence, not a cancelled partial batch: %s', async required => {
+    const store = new FixtureStore();
+    await harness(store).enqueue();
+    store.state.jobs[0].state = 'blocked';
+    store.state.jobs[0].reason = 'local-opt-out';
+    store.state.jobs[0].batch = { captured: 7, rows: 7, processed: 3, remaining: 4,
+      counts: { 'verified-local': 0, held: 3, 'report-only': 0, failed: 0 }, lifecycle: 'pending' };
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) };
+    expect(snapshot.jobs[0].lifecycleReconciliationRequired).toBe(false);
+    snapshot.jobs[0].lifecycleReconciliationRequired = required;
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
+    render(<FixerrorsControlPanel />);
+    const button = await screen.findByRole('button', { name: 'Run error batch' }) as HTMLButtonElement;
+    expect(button.disabled).toBe(required);
+  });
+
   it('keeps paused batch coverage visible and sends cancellation for only that run', async () => {
     const store = new FixtureStore();
     const h = harness(store);

@@ -128,7 +128,7 @@ export function FixerrorsControlPanel() {
               const pending = snapshot.jobs.some(job => job.deviceId === device.id && job.state === 'tested' &&
                 !snapshot.jobs.some(release => release.parentRepairId === job.id && release.state === 'deployed'));
               const reconciling = snapshot.jobs.some(job => job.deviceId === device.id && job.batch &&
-                !['queued', 'leased', 'paused'].includes(job.state) && job.batch.lifecycle !== 'applied');
+                !['queued', 'leased', 'paused'].includes(job.state) && job.lifecycleReconciliationRequired);
               return (
                 <div key={device.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
                   <div className="min-w-0 space-y-2">
