@@ -909,8 +909,11 @@ def batch_operation_main():
     value = s.decode_json(sys.stdin.buffer.readline(16 * 1024 * 1024 + 1))
     cfg = s.config()
     s.local_runtime(cfg)
+    # dispatch captures private worker logs; protocol frames must retain the
+    # original pipe so the parent can acknowledge the final prelaunch guard.
+    protocol_stdout = sys.stdout
     def guard():
-        print('{"guard":true}', flush=True)
+        print('{"guard":true}', file=protocol_stdout, flush=True)
         s.require(s.decode_json(sys.stdin.buffer.readline(128)) == {'ok': True}, 'batch_host_lost')
     if value['operation'] == 'dispatch':
         payload = value['payload']

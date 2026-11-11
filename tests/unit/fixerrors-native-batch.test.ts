@@ -52,6 +52,38 @@ describe('native aggregate batch policy and evidence', () => {
     }
   });
 
+  it('keeps the prelaunch handshake outside redirected private worker output', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'SquiresBatchHandshake-'));
+    try {
+      writeFileSync(path.join(root, 'squires_repair.py'), readFileSync(path.resolve('scripts/automation/squires_repair.py')));
+      writeFileSync(path.join(root, 'squires_companion.py'), [
+        'import json', 'decode_json = json.loads', 'config = lambda: {}',
+        'local_runtime = lambda cfg: None',
+        'def require(ok, reason):', '    if not ok: raise RuntimeError(reason)',
+      ].join('\n'));
+      writeFileSync(path.join(root, 'result.md'), '{}');
+      const program = [
+        'import sys, io, json', 'from pathlib import Path', 'from contextlib import redirect_stdout',
+        'sys.path.insert(0, sys.argv[1])', 'import squires_repair as r',
+        'def dispatch(cfg, ticket, request, guard):',
+        '    with redirect_stdout(io.StringIO()):',
+        '        print("private worker progress")', '        guard()',
+        '    return Path(sys.argv[1]), {"changed_files": []}, {}',
+        'r.dispatch = dispatch', 'r.batch_operation_main()',
+      ].join('\n');
+      const output = execFileSync('python', ['-I', '-B', '-c', program, root], {
+        input: JSON.stringify({ operation: 'dispatch', payload: { ticket: {}, request: {} } }) + '\n{"ok":true}\n',
+        encoding: 'utf8', windowsHide: true, timeout: 10_000,
+      });
+      const frames = output.trim().split(/\r?\n/u).map(line => JSON.parse(line));
+      expect(frames[0]).toEqual({ guard: true });
+      expect(frames[1]).toMatchObject({ result: { outcome: {}, changedFiles: [] } });
+      expect(output).not.toContain('private worker progress');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('lints every path beyond the single-cluster limit and rejects changed aggregate scope', async () => {
     const root = mkdtempSync(path.join(tmpdir(), 'SquiresAggregateScope-'));
     const dependencies = path.join(root, 'node_modules');
