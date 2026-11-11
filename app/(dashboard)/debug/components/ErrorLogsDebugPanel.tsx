@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SelectableCard } from '@/components/ui/selectable-card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -33,7 +34,6 @@ import {
 } from '@/lib/utils/error-log-filters';
 import { ErrorLogEntry } from '../types';
 import { errorLogCardClass, errorLogMessageClass, getErrorLogTone } from '@/lib/utils/error-log-triage';
-import { FixerrorsControlPanel } from './FixerrorsControlPanel';
 
 type ErrorSeverity = 'urgent' | 'important' | 'medium' | 'low';
 type ErrorSummaryTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
@@ -231,6 +231,47 @@ function getErrorBadgeMeta(severity: ErrorSeverity): {
         description: 'Often API-side, background, or lower-urgency telemetry with less direct UI impact.',
       };
   }
+}
+
+export function ErrorBadgeKey() {
+  return (
+    <section aria-label="Error badge key" className="mb-4 space-y-1 rounded-xl border border-slate-700/70 bg-slate-950/35 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Badge Key</h3>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">Guide</Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-96 space-y-3" aria-label="Error badge guide">
+            <h4 className="text-sm font-semibold">Error badge guide</h4>
+            <p className="text-xs text-muted-foreground">
+              Filled error badges show severity, not a different error type. Outline badges show extra context like classification, component, or device.
+            </p>
+            {ERROR_SEVERITY_ORDER.map(severity => {
+              const meta = getErrorBadgeMeta(severity);
+              return (
+                <div key={severity} className="space-y-1">
+                  <Badge variant={meta.variant} className={meta.className}>{meta.label}</Badge>
+                  <p className="text-xs text-muted-foreground">{meta.description}</p>
+                </div>
+              );
+            })}
+          </PopoverContent>
+        </Popover>
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-2 lg:grid-cols-4">
+        {ERROR_SEVERITY_ORDER.map(severity => {
+          const meta = getErrorBadgeMeta(severity);
+          return (
+            <div key={severity} className="flex min-w-0 items-center gap-2">
+              <Badge variant={meta.variant} className={`${meta.className} shrink-0`}>Error</Badge>
+              <span className="text-xs leading-4 text-foreground">{meta.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 export function ErrorLogsDebugPanel() {
@@ -546,9 +587,6 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-4">
-          <FixerrorsControlPanel />
-        </div>
         <div className="mb-4 rounded-xl border border-slate-700/70 bg-slate-950/35">
           <button
             type="button"
@@ -745,35 +783,7 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
           )}
         </div>
 
-        <div className="mb-4 rounded-xl border border-slate-700/70 bg-slate-950/35 px-3 py-3">
-          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Badge Key</p>
-              <p className="text-xs text-muted-foreground">
-                Filled error badges show severity, not a different error type. Outline badges show extra context like classification, component, or device.
-              </p>
-            </div>
-          </div>
-          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {ERROR_SEVERITY_ORDER.map((severity) => {
-              const badgeMeta = getErrorBadgeMeta(severity);
-              return (
-                <div
-                  key={severity}
-                  className="flex items-start gap-2 rounded-md border border-slate-700/70 bg-slate-950/45 px-2.5 py-2"
-                >
-                  <Badge variant={badgeMeta.variant} className={`${badgeMeta.className} shrink-0`}>
-                    Error
-                  </Badge>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium text-foreground">{badgeMeta.label}</p>
-                    <p className="text-[11px] leading-4 text-muted-foreground">{badgeMeta.description}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <ErrorBadgeKey />
 
         {loadingErrorLogs ? (
           <PanelLoader message="Loading error logs..." accent="debug" className="py-8" />

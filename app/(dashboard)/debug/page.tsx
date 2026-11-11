@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart3, Bug, Car, FlaskConical, History, KeyRound, PackageOpen, RefreshCw, Send, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { canAccessDebugConsole } from '@/lib/utils/debug-access';
+import { FixerrorsControlPanel } from './components/FixerrorsControlPanel';
 
 const debugTabLoading = () => <PanelLoader message="Loading debug tab..." accent="debug" className="min-h-[320px]" />;
 
@@ -172,16 +173,25 @@ export default function DebugPage() {
     );
   }
 
+  const title = (
+    <div className="flex items-center gap-3">
+      <Bug className="h-6 w-6 md:h-8 md:w-8" />
+      <div>
+        <h1 className="mb-1 text-2xl font-bold md:mb-2 md:text-3xl">SuperAdmin Debug Console</h1>
+        <p className="text-sm text-red-50 md:text-base">Developer tools and operational diagnostics</p>
+      </div>
+    </div>
+  );
+
   return (
     <AppPageShell width="wide">
       <div className="rounded-lg bg-gradient-to-r from-red-600 to-orange-500 p-6 text-white shadow-sm">
-        <div className="flex items-center gap-3">
-          <Bug className="h-6 w-6 md:h-8 md:w-8" />
-          <div>
-            <h1 className="mb-1 text-2xl font-bold md:mb-2 md:text-3xl">SuperAdmin Debug Console</h1>
-            <p className="text-sm text-red-50 md:text-base">Developer tools and operational diagnostics</p>
+        {activeTab === 'error-log' ? (
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            {title}
+            <FixerrorsControlPanel />
           </div>
-        </div>
+        ) : title}
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => handleTabChange(value as DebugTab)} className="space-y-6">

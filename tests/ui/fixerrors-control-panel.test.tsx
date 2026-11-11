@@ -1,5 +1,5 @@
 /** @vitest-environment happy-dom */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FixerrorsControlPanel } from '@/app/(dashboard)/debug/components/FixerrorsControlPanel';
 import { toast } from 'sonner';
@@ -16,6 +16,22 @@ beforeEach(() => {
   vi.spyOn(Date, 'now').mockReturnValue(now);
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+async function openDetails(view: 'Activity' | 'History' | 'Runner settings') {
+  await waitFor(() => expect(screen.queryByText('Loading...')).toBeNull());
+  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${view}`) }));
+}
+
+async function openDeploy() {
+  await openDetails('Activity');
+  fireEvent.click(await screen.findByRole('button', { name: 'Deploy: review exact candidate' }));
+  expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  expect(screen.getByRole('dialog', { name: 'Separate Deploy confirmation' })).toBeDefined();
+}
+
+function closeDetails() {
+  fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+}
 
 describe('Debug local Fixerrors controls', () => {
   it('hides all controls for non-SuperAdmin and View As, without fetching', () => {
@@ -35,8 +51,10 @@ describe('Debug local Fixerrors controls', () => {
       ok: true, json: async () => ({ enabled: false, executionAvailable: false, origin: FIXERRORS_LOCAL_ORIGIN, devices: [], jobs: [] }),
     })));
     render(<FixerrorsControlPanel />);
+    await openDetails('Runner settings');
     await screen.findByText(/Disabled by default/);
-    expect(screen.queryByRole('button', { name: 'Run error batch' })).toBeNull();
+    closeDetails();
+    expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it('enables fresh requests when connected without a packet and reports no-work honestly', async () => {
@@ -50,8 +68,10 @@ describe('Debug local Fixerrors controls', () => {
     }));
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
+    await openDetails('Runner settings');
     await screen.findByText('Runner: Connected - waiting');
-    const review = screen.getByRole('button', { name: 'Review errors' }) as HTMLButtonElement;
+    closeDetails();
+    const review = screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement;
     expect(review.disabled).toBe(false);
     fireEvent.click(review);
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('No active untriaged or outstanding errors; no worker launched'));
@@ -67,9 +87,11 @@ describe('Debug local Fixerrors controls', () => {
       enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
     }) })));
     render(<FixerrorsControlPanel />);
+    await openDetails('Runner settings');
     await screen.findByText(`Runner: ${holdReason}`);
-    expect((screen.getByRole('button', { name: 'Review errors' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Run error batch' }) as HTMLButtonElement).disabled).toBe(true);
+    closeDetails();
+    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it.each([true, false])('requests a fresh full batch instead of reusing an old single-packet review: %s', async evidenceAvailable => {
@@ -85,7 +107,8 @@ describe('Debug local Fixerrors controls', () => {
     }));
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Run error batch' }));
+    await screen.findByText('Online');
+    fireEvent.click(screen.getByRole('button', { name: 'Run batch' }));
     await waitFor(() => expect(fetcher.mock.calls.some(call => call[1]?.method === 'POST')).toBe(true));
     const posted = fetcher.mock.calls.find(call => call[1]?.method === 'POST');
     const body = JSON.parse(String(posted?.[1]?.body));
@@ -103,6 +126,7 @@ describe('Debug local Fixerrors controls', () => {
     }));
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
+    await openDetails('Runner settings');
     await screen.findByText(/A device has reported bridge availability/);
     expect(screen.queryByRole('alert')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm Deploy for exact candidate' })).toBeNull();
@@ -119,7 +143,7 @@ describe('Debug local Fixerrors controls', () => {
     }));
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Deploy: review exact candidate' }));
+    await openDeploy();
     expect(fetcher).toHaveBeenCalledTimes(1);
     const confirm = screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }) as HTMLButtonElement;
     expect(confirm.disabled).toBe(true);
@@ -134,9 +158,9 @@ describe('Debug local Fixerrors controls', () => {
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
     const calls = vi.mocked(fetch).mock.calls;
     const posted = calls.find((call) => call[1]?.method === 'POST');
-    expect(JSON.parse(String(posted?.[1]?.body))).toMatchObject({
+    expect(JSON.parse(String(posted?.[1]?.body))).toEqual({
       op: 'approve-deploy', repairJobId: repairId, candidate: store.state.jobs[0].candidate,
-      confirmation: true, releaseMode: 'full',
+      confirmation: true, releaseMode: 'full', requestId: expect.any(String),
     });
   });
 
@@ -152,7 +176,8 @@ describe('Debug local Fixerrors controls', () => {
     snapshot.jobs[0].lifecycleReconciliationRequired = required;
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
     render(<FixerrorsControlPanel />);
-    const button = await screen.findByRole('button', { name: 'Run error batch' }) as HTMLButtonElement;
+    await screen.findByText('Online');
+    const button = screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement;
     expect(button.disabled).toBe(required);
   });
 
@@ -172,13 +197,16 @@ describe('Debug local Fixerrors controls', () => {
     const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) };
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
     render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
     await screen.findByText('7 / 7 cases processed; 0 remaining (7 error rows captured).');
     expect(screen.queryByText('1 / 7 cases processed; 6 remaining (7 error rows captured).')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /Previous Fixerrors activity/ }));
+    closeDetails();
+    await openDetails('History');
     expect(screen.getByText('1 / 7 cases processed; 6 remaining (7 error rows captured).')).toBeDefined();
     cleanup();
     snapshot.jobs.find(job => job.id === old.id)!.lifecycleReconciliationRequired = true;
     render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
     await screen.findByText('1 / 7 cases processed; 6 remaining (7 error rows captured).');
   });
 
@@ -195,6 +223,7 @@ describe('Debug local Fixerrors controls', () => {
     }));
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
     await screen.findByText('2 / 4 cases processed; 2 remaining (281 error rows captured).');
     expect(screen.getByText(/1 verified locally \/ 1 held/)).toBeDefined();
     expect(screen.getByText(/Lifecycle: pending.*not confirmed reconciled/)).toBeDefined();
@@ -214,6 +243,7 @@ describe('Debug local Fixerrors controls', () => {
       enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
     }) })));
     render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
     const deploy = await screen.findByRole('button', { name: 'Deploy: review exact candidate' }) as HTMLButtonElement;
     expect(deploy.disabled).toBe(lifecycle !== 'applied');
     if (lifecycle === 'blocked') expect(screen.getByText(/Lifecycle: blocked \(uncertain\)/)).toBeDefined();
@@ -234,9 +264,9 @@ describe('Debug local Fixerrors controls', () => {
     }));
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Deploy: review exact candidate' }));
-    expect(screen.getAllByText(/Worker candidate SHA-256/)).toHaveLength(2);
-    expect(screen.getAllByText(/Prepared evidence SHA-256/)).toHaveLength(2);
+    await openDeploy();
+    expect(screen.getAllByText(/Worker candidate SHA-256/)).toHaveLength(1);
+    expect(screen.getAllByText(/Prepared evidence SHA-256/)).toHaveLength(1);
     fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying this exact tested candidate/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }));
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(3));
@@ -253,15 +283,14 @@ describe('Debug local Fixerrors controls', () => {
     }));
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
-    const open = await screen.findByRole('button', { name: 'Deploy: review exact candidate' });
-    fireEvent.click(open);
+    await openDeploy();
     const consent = () => screen.getByRole('checkbox', { name: /I approve deploying this exact tested candidate/ });
     fireEvent.click(consent());
     fireEvent.click(screen.getByRole('radio', { name: /Targeted checks/ }));
     expect(consent().getAttribute('aria-checked')).toBe('false');
     fireEvent.click(consent());
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    fireEvent.click(open);
+    await openDeploy();
     expect(consent().getAttribute('aria-checked')).toBe('false');
     expect((screen.getByRole('radio', { name: /Full checks/ }) as HTMLInputElement).checked).toBe(true);
     fireEvent.click(screen.getByRole('radio', { name: /Targeted checks/ }));
@@ -279,12 +308,12 @@ describe('Debug local Fixerrors controls', () => {
     const snapshot = () => ({ enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) });
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot() })));
     render(<FixerrorsControlPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Deploy: review exact candidate' }));
+    await openDeploy();
     fireEvent.click(screen.getByRole('checkbox', { name: /I approve deploying this exact tested candidate/ }));
     store.state.jobs[0].candidate = { ...store.state.jobs[0].candidate!, [field]: 'f'.repeat(field === 'checksSha256' ? 64 : 40) };
     fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
     await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull());
-    fireEvent.click(screen.getByRole('button', { name: 'Deploy: review exact candidate' }));
+    await openDeploy();
     expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
   });
 
@@ -296,14 +325,15 @@ describe('Debug local Fixerrors controls', () => {
       enabled, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
     }) })));
     const view = render(<FixerrorsControlPanel />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Deploy: review exact candidate' }));
+    await openDeploy();
     fireEvent.click(screen.getByRole('checkbox'));
     enabled = false;
     fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
     await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull());
     enabled = true;
     fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Deploy: review exact candidate' }));
+    await screen.findByText('Online');
+    await openDeploy();
     expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
     fireEvent.click(screen.getByRole('checkbox'));
     auth.isViewingAs = true;
@@ -317,7 +347,7 @@ describe('Debug local Fixerrors controls', () => {
   });
 });
 
-it('shows all retained previous jobs in a collapsed card and keeps uncertain work visible', async () => {
+it('shows all retained previous jobs in a separate History dialog and keeps uncertain work in Activity', async () => {
   const store = new FixtureStore();
   const h = harness(store);
   await h.enqueue('review');
@@ -330,13 +360,214 @@ it('shows all retained previous jobs in a collapsed card and keeps uncertain wor
   expect(snapshot.jobs).toHaveLength(56);
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
   render(<FixerrorsControlPanel />);
-  const toggle = await screen.findByRole('button', { name: 'Previous Fixerrors activity (55)' });
+  const toggle = await screen.findByRole('button', { name: 'History (55)' });
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
   expect(screen.queryByText('reviewed')).toBeNull();
+  await openDetails('Activity');
   expect(screen.getByText('unknown')).toBeTruthy();
+  closeDetails();
   fireEvent.click(toggle);
   expect(toggle.getAttribute('aria-expanded')).toBe('true');
   expect(screen.getAllByText('reviewed')).toHaveLength(55);
-  fireEvent.click(toggle);
+  closeDetails();
   expect(screen.queryByText('reviewed')).toBeNull();
+});
+
+describe('Compact companion dialogs and preserved states', () => {
+  it.each(['Activity', 'History', 'Runner settings'] as const)('dismisses %s outside and with Escape without posting', async view => {
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(new FixtureStore().state) };
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => snapshot }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<FixerrorsControlPanel />);
+    for (const method of ['outside', 'Escape']) {
+      await openDetails(view);
+      expect(screen.getAllByRole('dialog')).toHaveLength(1);
+      await new Promise(resolve => setTimeout(resolve, 0));
+      if (method === 'outside') fireEvent.pointerDown(document.body, { button: 0 });
+      else fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: new RegExp(`^${view}`) })));
+    }
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['Escape', 'outside', 'Close'] as const)('clears deployment consent and release mode after %s dismissal', async method => {
+    const store = new FixtureStore();
+    await harness(store).testedRepair();
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => snapshot }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<FixerrorsControlPanel />);
+    await openDeploy();
+    fireEvent.click(screen.getByRole('radio', { name: /Targeted checks/ }));
+    fireEvent.click(screen.getByRole('checkbox'));
+    const dialog = screen.getByRole('dialog', { name: 'Separate Deploy confirmation' });
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    if (method === 'Escape') fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+    else if (method === 'outside') fireEvent.pointerDown(document.body, { button: 0 });
+    else fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Activity (1)' })));
+    await openDeploy();
+    expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
+    expect((screen.getByRole('radio', { name: /Full checks/ }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves initial loading and disabled actions, then shows a failed refresh and recovers explicitly', async () => {
+    let resolve!: (value: { ok: boolean }) => void;
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(new FixtureStore().state) };
+    const fetcher = vi.fn()
+      .mockImplementationOnce(() => new Promise(done => { resolve = done; }))
+      .mockResolvedValue({ ok: true, json: async () => snapshot });
+    vi.stubGlobal('fetch', fetcher);
+    render(<FixerrorsControlPanel />);
+    expect(screen.getByText('Loading...')).toBeDefined();
+    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Runner settings' }));
+    expect(screen.getByRole('dialog', { name: 'Fixerrors runner settings' })).toBeDefined();
+    await act(async () => { resolve({ ok: false }); });
+    expect(screen.getByRole('alert').textContent).toContain('Existing error logs are unaffected');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+    await screen.findByText('Runner: Connected - waiting');
+    closeDetails();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it.each(['offline', 'future heartbeat', 'revoked', 'bridge unavailable', 'checkout unavailable', 'no devices'] as const)(
+    'keeps enqueue actions disabled for %s', async state => {
+      const store = new FixtureStore();
+      const device = store.state.devices[0];
+      if (state === 'offline') device.lastSeenAt = now - 45_001;
+      if (state === 'future heartbeat') device.lastSeenAt = now + 1;
+      if (state === 'revoked') device.revoked = true;
+      if (state === 'bridge unavailable') device.bridgeAvailable = false;
+      if (state === 'checkout unavailable') device.workspace = null;
+      if (state === 'no devices') store.state.devices = [];
+      const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
+      render(<FixerrorsControlPanel />);
+      await waitFor(() => expect(screen.queryByText('Loading...')).toBeNull());
+      expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(true);
+      expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
+      await openDetails('Runner settings');
+      if (state === 'no devices') expect(screen.getByText('No enrolled devices.')).toBeDefined();
+      if (state === 'bridge unavailable') expect(screen.getByText('Runner: bridge unavailable')).toBeDefined();
+      if (state === 'checkout unavailable') expect(screen.getByText('Runner: checkout unavailable')).toBeDefined();
+      if (state === 'revoked') expect((screen.getByRole('button', { name: 'Revoke device' }) as HTMLButtonElement).disabled).toBe(true);
+    },
+  );
+
+  it.each(['allowReadOnly', 'allowRepair'] as const)('preserves independent local opt-in %s', async field => {
+    const store = new FixtureStore();
+    store.state.devices[0][field] = false;
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
+    render(<FixerrorsControlPanel />);
+    await screen.findByText('Online');
+    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(field === 'allowReadOnly');
+    expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(field === 'allowRepair');
+    await openDetails('Runner settings');
+    expect(screen.getByText(field === 'allowReadOnly' ? 'Local opt-ins: review off / repair on / deploy on' : 'Local opt-ins: review on / repair off / deploy on')).toBeDefined();
+  });
+
+  it('retains multiple runners, selects the intended device for enqueue and revokes only that device', async () => {
+    const store = new FixtureStore();
+    const secondId = crypto.randomUUID();
+    store.state.devices.push({ ...store.state.devices[0], id: secondId, name: 'Second runner', allowDeploy: false });
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
+    const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => ({
+      ok: true, json: async () => options?.method === 'POST' ? { ok: true } : snapshot,
+    }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<FixerrorsControlPanel />);
+    await openDetails('Runner settings');
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+    const second = screen.getByRole('radio', { name: 'Use Second runner' });
+    fireEvent.click(second);
+    expect(screen.getByText('Local opt-ins: review on / repair on / deploy off')).toBeDefined();
+    closeDetails();
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    await waitFor(() => expect(fetcher.mock.calls.some(call => call[1]?.method === 'POST')).toBe(true));
+    expect(JSON.parse(String(fetcher.mock.calls.find(call => call[1]?.method === 'POST')?.[1]?.body))).toEqual({
+      op: 'enqueue', deviceId: secondId, action: 'review', requestId: expect.any(String),
+    });
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(false));
+    await openDetails('Runner settings');
+    const runner = screen.getByRole('radio', { name: 'Use Second runner' }).closest('.rounded-lg') as HTMLElement;
+    fireEvent.click(within(runner).getByRole('button', { name: 'Revoke device' }));
+    await waitFor(() => expect(fetcher.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(2));
+    const posts = fetcher.mock.calls.filter(call => call[1]?.method === 'POST');
+    expect(JSON.parse(String(posts[1][1]?.body))).toEqual({ op: 'revoke-device', deviceId: secondId });
+  });
+
+  it.each(['removed', 'revoked'] as const)('never silently switches the selected runner when it is %s during polling', async state => {
+    const store = new FixtureStore();
+    store.state.devices.push({ ...store.state.devices[0], id: crypto.randomUUID(), name: 'Other runner' });
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => structuredClone(snapshot) })));
+    render(<FixerrorsControlPanel />);
+    await screen.findByRole('status', { name: 'Proof fixture: Online' });
+    if (state === 'removed') snapshot.devices.shift();
+    else snapshot.devices[0].revoked = true;
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+    await screen.findByText(state === 'removed' ? 'Runner unavailable' : 'Proof fixture: Revoked');
+    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
+    await openDetails('Runner settings');
+    fireEvent.click(screen.getByRole('radio', { name: 'Use Other runner' }));
+    closeDetails();
+    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it.each(['reconciliation', 'lifecycle', 'existing release', 'missing repair'] as const)('invalidates an open deployment decision after %s changes', async change => {
+    const store = new FixtureStore();
+    await harness(store).testedRepair();
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
+    const fetcher = vi.fn(async () => ({ ok: true, json: async () => structuredClone(snapshot) }));
+    vi.stubGlobal('fetch', fetcher);
+    render(<FixerrorsControlPanel />);
+    await openDeploy();
+    fireEvent.click(screen.getByRole('checkbox'));
+    if (change === 'reconciliation') snapshot.releaseNeedsReconciliation = true;
+    if (change === 'lifecycle') snapshot.jobs[0].batch = { captured: 1, rows: 1, processed: 1, remaining: 0,
+      counts: { 'verified-local': 1, held: 0, 'report-only': 0, failed: 0 }, lifecycle: 'pending' };
+    if (change === 'existing release') snapshot.jobs.push({ ...snapshot.jobs[0], id: crypto.randomUUID(), action: 'deploy', parentRepairId: snapshot.jobs[0].id });
+    if (change === 'missing repair') snapshot.jobs = [];
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+    await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull());
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    if (change === 'reconciliation') {
+      expect(screen.getByRole('alert').textContent).toContain('Deployment result unknown');
+      expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
+    }
+  });
+
+  it('shows a rejected approval without success and preserves busy/disabled submission gates', async () => {
+    const store = new FixtureStore();
+    await harness(store).testedRepair();
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
+    let rejectApproval!: (value: { ok: boolean; json: () => Promise<{ error: string }> }) => void;
+    const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => {
+      if (options?.method === 'POST') return new Promise(resolve => { rejectApproval = resolve; });
+      return { ok: true, json: async () => snapshot };
+    });
+    vi.stubGlobal('fetch', fetcher);
+    render(<FixerrorsControlPanel />);
+    await openDeploy();
+    fireEvent.click(screen.getByRole('checkbox'));
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }));
+    const submitting = screen.getByRole('button', { name: 'Recording approval...' }) as HTMLButtonElement;
+    expect(submitting.disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole('checkbox').getAttribute('data-disabled')).not.toBeNull();
+    await act(async () => { rejectApproval({ ok: false, json: async () => ({ error: 'candidate changed' }) }); });
+    expect(toast.error).toHaveBeenCalledWith('candidate changed');
+    expect(screen.getByRole('dialog', { name: 'Separate Deploy confirmation' })).toBeDefined();
+    expect((screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }) as HTMLButtonElement).disabled).toBe(false);
+  });
 });
