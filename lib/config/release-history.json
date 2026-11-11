@@ -1,5 +1,18 @@
 [
   {
+    "version": "1126.10.5",
+    "updateKind": "minor",
+    "title": "Fixerrors improvements",
+    "description": "Allow bounded durable receipt settlement.",
+    "summary": "Allow bounded durable receipt settlement.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-11T03:45:24.564Z"
+  },
+  {
     "version": "1126.10.4",
     "updateKind": "minor",
     "title": "Fixerrors improvements",

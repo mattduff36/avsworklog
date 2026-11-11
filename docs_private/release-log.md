@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.10.5
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): allow bounded durable receipt settlement`
+
+**PUSHED AT**
+2026-11-11T03:45:24.564Z
+
+**WHAT CHANGED**
+Allow bounded durable receipt settlement.
+
+**VERSION HISTORY DETAILS**
+- Updated app reliability, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): allow bounded durable receipt settlement`
+
 ## 1126.10.4
 
 **GIT COMMIT MESSAGE**
