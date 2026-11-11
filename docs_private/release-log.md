@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.10.1
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): preserve the native prelaunch handshake channel`
+
+**PUSHED AT**
+2026-11-11T02:55:24.197Z
+
+**WHAT CHANGED**
+Preserve the native prelaunch handshake channel.
+
+**VERSION HISTORY DETAILS**
+- Updated app reliability, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): preserve the native prelaunch handshake channel`
+
 ## 1126.10.0
 
 **GIT COMMIT MESSAGE**

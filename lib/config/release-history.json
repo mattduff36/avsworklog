@@ -1,5 +1,18 @@
 [
   {
+    "version": "1126.10.1",
+    "updateKind": "minor",
+    "title": "Fixerrors improvements",
+    "description": "Preserve the native prelaunch handshake channel.",
+    "summary": "Preserve the native prelaunch handshake channel.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-11T02:55:24.197Z"
+  },
+  {
     "version": "1126.10.0",
     "updateKind": "major",
     "title": "Fixerrors update",
