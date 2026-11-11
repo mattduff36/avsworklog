@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.11.0",
+    "updateKind": "major",
+    "title": "Debug tools update",
+    "description": "Compact Fixerrors controls into Error Log header.",
+    "summary": "Compact Fixerrors controls into Error Log header.",
+    "details": [
+      "Compact Fixerrors controls into Error Log header, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Debug tools"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-11T19:57:14.740Z"
+  },
+  {
     "version": "1126.10.9",
     "updateKind": "minor",
     "title": "Runner improvements",

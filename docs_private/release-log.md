@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.11.0
+
+**GIT COMMIT MESSAGE**
+`feat(debug): compact Fixerrors controls into Error Log header`
+
+**PUSHED AT**
+2026-11-11T19:57:14.740Z
+
+**WHAT CHANGED**
+Compact Fixerrors controls into Error Log header.
+
+**VERSION HISTORY DETAILS**
+- Compact Fixerrors controls into Error Log header, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(debug): compact Fixerrors controls into Error Log header`
+
 ## 1126.10.9
 
 **GIT COMMIT MESSAGE**
