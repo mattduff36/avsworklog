@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.12.0
+
+**GIT COMMIT MESSAGE**
+`feat(debug): unify Fixerrors activity in responsive log`
+
+**PUSHED AT**
+2026-11-11T21:04:19.904Z
+
+**WHAT CHANGED**
+Unify Fixerrors activity in responsive log.
+
+**VERSION HISTORY DETAILS**
+- Unify Fixerrors activity in responsive log, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(debug): unify Fixerrors activity in responsive log`
+
 ## 1126.11.1
 
 **GIT COMMIT MESSAGE**

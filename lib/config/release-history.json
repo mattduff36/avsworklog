@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.12.0",
+    "updateKind": "major",
+    "title": "Debug tools update",
+    "description": "Unify Fixerrors activity in responsive log.",
+    "summary": "Unify Fixerrors activity in responsive log.",
+    "details": [
+      "Unify Fixerrors activity in responsive log, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Debug tools"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-11T21:04:19.904Z"
+  },
+  {
     "version": "1126.11.1",
     "updateKind": "minor",
     "title": "Debug tools improvements",
