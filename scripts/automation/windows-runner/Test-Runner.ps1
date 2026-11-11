@@ -109,6 +109,8 @@ try {
     Write-Output 'PASS owner-only atomic consent matrix; unrelated fields and ACL preserved; invalid mode/schema/ACL refused unchanged'
     $token=& $exe --fixture-token
     Assert ($LASTEXITCODE -eq 0 -and $token -eq 'restricted-medium-nonadmin') 'Native restricted token or privilege ABI failed'
+    $desktopSecurity=& $exe --fixture-desktop-security
+    Assert ($LASTEXITCODE -eq 0 -and $desktopSecurity -eq 'private-owner-system-medium-desktop') 'Private service desktop ACL/integrity regression'
     $disabled=Join-Path $root 'disabled.fixture'
     [IO.File]::WriteAllText($disabled,'fixture opt-out')
     $process=Get-Process -Id ([SquiresRunnerTestConsole]::Start($exe))

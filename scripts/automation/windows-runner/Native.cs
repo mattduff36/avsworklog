@@ -17,6 +17,12 @@ namespace Squires.WindowsRunner
         internal delegate bool ConsoleHandler(uint signal);
         [DllImport("kernel32.dll", SetLastError = true)] internal static extern bool SetConsoleCtrlHandler(ConsoleHandler handler, bool add);
         [DllImport("kernel32.dll")] internal static extern IntPtr GetConsoleWindow();
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern IntPtr CreateWindowStation(string name, uint flags, uint access, ref SecurityAttributes attributes);
+        [DllImport("user32.dll", SetLastError = true)] internal static extern IntPtr GetProcessWindowStation();
+        [DllImport("user32.dll", SetLastError = true)] internal static extern bool SetProcessWindowStation(IntPtr station);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern IntPtr CreateDesktop(string name, IntPtr device, IntPtr mode, uint flags, uint access, ref SecurityAttributes attributes);
+        [DllImport("user32.dll", SetLastError = true)] internal static extern bool CloseDesktop(IntPtr desktop);
+        [DllImport("user32.dll", SetLastError = true)] internal static extern bool CloseWindowStation(IntPtr station);
         [DllImport("kernel32.dll")] internal static extern IntPtr GetCurrentProcess();
         [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool QueryFullProcessImageName(IntPtr process, uint flags, StringBuilder name, ref uint size);
@@ -165,6 +171,50 @@ namespace Squires.WindowsRunner
         }
     }
 
+    internal sealed class ServiceDesktop : IDisposable
+    {
+        private IntPtr station, desktop;
+        internal string Name { get; private set; }
+        internal static RawSecurityDescriptor Security(string owner)
+        {
+            var sid = new SecurityIdentifier(owner);
+            return new RawSecurityDescriptor("O:" + sid.Value + "G:" + sid.Value +
+                "D:P(A;;GA;;;" + sid.Value + ")(A;;GA;;;SY)S:(ML;;NW;;;ME)");
+        }
+        internal ServiceDesktop(string owner)
+        {
+            var security = Security(owner);
+            var bytes = new byte[security.BinaryLength]; security.GetBinaryForm(bytes, 0);
+            IntPtr descriptor = Marshal.AllocHGlobal(bytes.Length);
+            IntPtr original = Native.GetProcessWindowStation();
+            if (original == IntPtr.Zero) { Marshal.FreeHGlobal(descriptor); throw new Win32Exception(); }
+            try
+            {
+                Marshal.Copy(bytes, 0, descriptor, bytes.Length);
+                var attributes = new Native.SecurityAttributes { Length = Marshal.SizeOf(typeof(Native.SecurityAttributes)), Descriptor = descriptor, Inherit = false };
+                string name = "SquiresRunner_" + Guid.NewGuid().ToString("N");
+                // Create-only prevents adopting any pre-existing object. Never alter WinSta0.
+                station = Native.CreateWindowStation(name, 1, 0x000F037F, ref attributes);
+                if (station == IntPtr.Zero) throw new Win32Exception();
+                Native.Check(Native.SetProcessWindowStation(station));
+                try
+                {
+                    desktop = Native.CreateDesktop("Runner", IntPtr.Zero, IntPtr.Zero, 0, 0x000F01FF, ref attributes);
+                    if (desktop == IntPtr.Zero) throw new Win32Exception();
+                }
+                finally { Native.Check(Native.SetProcessWindowStation(original)); }
+                Name = name + "\\Runner";
+            }
+            catch { Dispose(); throw; }
+            finally { Marshal.FreeHGlobal(descriptor); }
+        }
+        public void Dispose()
+        {
+            if (desktop != IntPtr.Zero) { Native.Check(Native.CloseDesktop(desktop)); desktop = IntPtr.Zero; }
+            if (station != IntPtr.Zero) { Native.Check(Native.CloseWindowStation(station)); station = IntPtr.Zero; }
+        }
+    }
+
     internal sealed class ProcessTree : IDisposable
     {
         private readonly object gate = new object();
@@ -179,7 +229,7 @@ namespace Squires.WindowsRunner
             try { Marshal.StructureToPtr(limits, data, false); Native.Check(Native.SetInformationJobObject(job, 9, data, (uint)Marshal.SizeOf(limits))); }
             finally { Marshal.FreeHGlobal(data); }
         }
-        internal StreamReader Start(string exe, string arguments, string cwd, IntPtr token, IntPtr environment, bool service)
+        internal StreamReader Start(string exe, string arguments, string cwd, IntPtr token, IntPtr environment, bool service, string desktop = null)
         {
             IntPtr stdin = IntPtr.Zero, stdout = IntPtr.Zero, output = IntPtr.Zero;
             IntPtr attributes = IntPtr.Zero, jobList = IntPtr.Zero, handles = IntPtr.Zero;
@@ -203,7 +253,7 @@ namespace Squires.WindowsRunner
                 handles = Marshal.AllocHGlobal(IntPtr.Size * 2);
                 Marshal.WriteIntPtr(handles, stdin); Marshal.WriteIntPtr(handles, IntPtr.Size, stdout);
                 Native.Check(Native.UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x20002), handles, new IntPtr(IntPtr.Size * 2), IntPtr.Zero, IntPtr.Zero));
-                var si = new Native.StartupInfoEx { Startup = new Native.StartupInfo { Size = (uint)Marshal.SizeOf(typeof(Native.StartupInfoEx)), Flags = Native.STARTF_USESTDHANDLES, Input = stdin, Output = stdout, Error = stdout }, Attributes = attributes };
+                var si = new Native.StartupInfoEx { Startup = new Native.StartupInfo { Size = (uint)Marshal.SizeOf(typeof(Native.StartupInfoEx)), Desktop = desktop, Flags = Native.STARTF_USESTDHANDLES, Input = stdin, Output = stdout, Error = stdout }, Attributes = attributes };
                 var command = new StringBuilder("\"" + exe + "\" " + arguments);
                 if (service) Native.Check(Native.CreateProcessAsUser(token, exe, command, IntPtr.Zero, IntPtr.Zero, true, 4 | 0x400 | 0x80000 | 0x08000000, environment, cwd, ref si, out pi));
                 else
@@ -233,6 +283,7 @@ namespace Squires.WindowsRunner
             }
         }
         internal bool Exited { get { return process != IntPtr.Zero && Native.WaitForSingleObject(process, 0) == 0; } }
+        internal uint ExitCode { get { uint code; Native.Check(Native.GetExitCodeProcess(process, out code)); return code; } }
         internal uint Active
         {
             get { lock (gate) { if (job == IntPtr.Zero) return 0; Native.Accounting a; Native.Check(Native.QueryInformationJobObject(job, 1, out a, (uint)Marshal.SizeOf(typeof(Native.Accounting)), IntPtr.Zero)); return a.Active; } }

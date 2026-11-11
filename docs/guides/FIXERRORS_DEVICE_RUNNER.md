@@ -1054,6 +1054,11 @@ The service is **Manual**, with no triggers, recovery restart, scheduled task or
 autostart. It runs as the enrolled owner, loads that owner's profile for DPAPI and
 creates a verified non-admin, medium-integrity companion token. The privileged
 host does not execute companion code under its own unrestricted token. Child
+startup uses a dedicated non-interactive window station and desktop, with protected
+owner/System permissions and medium integrity. It never changes the interactive
+desktop's permissions. The private objects remain until the contained tree stops;
+native child initialization failures record only a numeric exit code.
+Child
 environment comes from Windows' owner environment with an explicit safe allowlist,
 fixed PowerShell/Git paths and no inherited editor/model/Node injection variables.
 Existing protected opt-ins remain authoritative: a running host can be

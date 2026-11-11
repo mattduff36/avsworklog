@@ -280,6 +280,7 @@ namespace Squires.WindowsRunner
             bool held = false;
             IntPtr token = IntPtr.Zero, reduced = IntPtr.Zero, environment = IntPtr.Zero;
             Native.ProfileInfo profile = new Native.ProfileInfo();
+            ServiceDesktop serviceDesktop = null;
             try
             {
                 try { held = singleton.WaitOne(0); } catch (AbandonedMutexException) { held = true; }
@@ -301,6 +302,7 @@ namespace Squires.WindowsRunner
                     Native.VerifyReduced(token);
                 }
                 environment = EnvironmentBlock(service ? reduced : token);
+                if (service) serviceDesktop = new ServiceDesktop(cfg.Sid);
                 pipeThread = new Thread(PipeLoop) { IsBackground = true }; pipeThread.Start();
                 state = "idle-" + cfg.Eligibility(mode);
                 Log(service ? "service-started" : "console-started");
@@ -319,7 +321,7 @@ namespace Squires.WindowsRunner
 #if RUNNER_FIXTURE
                         var output = tree.Start(typeof(Runner).Assembly.Location, "fixture-child", cfg.Root, token, environment, service);
 #else
-                        var output = tree.Start(cfg.Node, "--import=tsx scripts\\automation\\fixerrors-companion.ts", Config.Checkout, service ? reduced : token, environment, service);
+                        var output = tree.Start(cfg.Node, "--import=tsx scripts\\automation\\fixerrors-companion.ts", Config.Checkout, service ? reduced : token, environment, service, serviceDesktop == null ? null : serviceDesktop.Name);
 #endif
                         state = "running-starting";
                         new Thread(() => ReadOutput(output)) { IsBackground = true }.Start();
@@ -327,7 +329,7 @@ namespace Squires.WindowsRunner
                     else
                     {
                         if (eligibility != "eligible") { state = "stopping-opt-out"; stop.Set(); }
-                        if (tree.Exited) { state = "child-exited-owner-review"; Log("child-exited-owner-review"); Program.Failed = true; stop.Set(); }
+                        if (tree.Exited) { state = "child-exited-owner-review"; Log("child-exit-" + tree.ExitCode.ToString("X8")); Program.Failed = true; stop.Set(); }
                     }
                 }
                 if (tree != null)
@@ -357,6 +359,21 @@ namespace Squires.WindowsRunner
             finally
             {
                 stop.Set();
+                try
+                {
+                    if (serviceDesktop != null)
+                    {
+                        if (tree != null && tree.Active != 0)
+                        {
+                            tree.Kill();
+                            var until = DateTime.UtcNow.AddSeconds(3);
+                            while (tree.Active != 0 && DateTime.UtcNow < until) Thread.Sleep(25);
+                        }
+                        // If termination is uncertain, retain object handles until host exit.
+                        if (tree == null || tree.Active == 0) serviceDesktop.Dispose();
+                    }
+                }
+                catch { Program.Failed = true; Console.Error.WriteLine("Private service desktop cleanup not confirmed"); }
                 if (tree != null) tree.Dispose();
                 if (environment != IntPtr.Zero) Marshal.FreeHGlobal(environment);
                 loggingToken = IntPtr.Zero;
@@ -576,6 +593,21 @@ namespace Squires.WindowsRunner
                     try { reduced = Native.ReducedToken(token); Console.WriteLine("restricted-medium-nonadmin"); }
                     finally { if (reduced != IntPtr.Zero) Native.CloseHandle(reduced); Native.CloseHandle(token); }
                     return 0;
+                }
+                if (args.Length == 1 && args[0] == "--fixture-desktop-security")
+                {
+                    string owner = WindowsIdentity.GetCurrent().User.Value;
+                    var security = ServiceDesktop.Security(owner);
+                    if ((security.ControlFlags & ControlFlags.DiscretionaryAclProtected) == 0 || security.DiscretionaryAcl.Count != 2 || security.SystemAcl.Count != 1)
+                        throw new InvalidOperationException("Private desktop descriptor is not protected");
+                    foreach (CommonAce ace in security.DiscretionaryAcl)
+                        if (ace.AceQualifier != AceQualifier.AccessAllowed || (ace.SecurityIdentifier.Value != owner && ace.SecurityIdentifier.Value != "S-1-5-18"))
+                            throw new InvalidOperationException("Unexpected desktop principal");
+                    var label = security.SystemAcl[0];
+                    var labelBytes = new byte[label.BinaryLength]; label.GetBinaryForm(labelBytes, 0);
+                    if (new SecurityIdentifier(labelBytes, 8).Value != "S-1-16-8192" || BitConverter.ToInt32(labelBytes, 4) != 1 || (byte)label.AceType != 17)
+                        throw new InvalidOperationException("Medium no-write-up label required");
+                    Console.WriteLine("private-owner-system-medium-desktop"); return 0;
                 }
                 if (args.Length == 2 && args[0] == "--fixture-consent")
                 {
