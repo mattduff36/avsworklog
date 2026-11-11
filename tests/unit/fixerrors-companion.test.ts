@@ -64,6 +64,17 @@ async function setup(action: 'review' | 'repair' | 'deploy' = 'repair') {
 afterEach(() => vi.useRealTimers());
 
 describe('outbound companion: fake executors only, never real fap', () => {
+  it('projects a bounded native diagnostic without marking an uncertain batch stopped', async () => {
+    const { claim, deps, executor } = await setup();
+    deps.batch = { manifest: Buffer.from('{}'), lease: vi.fn(), diagnostic: 'native-import-unavailable' };
+    vi.mocked(executor.execute).mockRejectedValue(new Error('private native exception'));
+    await executeCompanionClaim(claim, deps);
+    expect(deps.complete).toHaveBeenCalledWith({
+      status: 'failed', reason: 'execution-failed', diagnostic: 'native-import-unavailable',
+    });
+    expect(deps.batch.stopped).not.toBe(true);
+  });
+
   it('handles fragmented managed stop input with bounded state and stops exactly once', () => {
     const stop = vi.fn();
     const input = createManagedCompanionStopHandler(stop);

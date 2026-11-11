@@ -8,7 +8,7 @@ import { z } from 'zod';
 import {
   FIXERRORS_DEPLOY_TIMEOUT_MS, FIXERRORS_DEVICE_PATH, FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN, deviceResponseSchema,
   sameCandidate, sameWorkspace, type Candidate, type ClaimedJob, type DeviceCommand,
-  type Checkout, type ExecutionResult, type FixerrorsJob, type Workspace,
+  type Checkout, type ExecutionResult, type FixerrorsJob, type Workspace, nativeDiagnosticSchema,
 } from '../../lib/fixerrors/protocol';
 import { checkEvidenceDigest } from '../../lib/fixerrors/control';
 import { FIXERRORS_WORKSPACE, inspectFixedFixerrorsWorkspace } from './fixerrors-device-admission';
@@ -17,6 +17,7 @@ import { parseCompanionPacket } from './fixerrors-companion-packet';
 import { prepareClaimPacket, reconcilePacketLifecycle, recordPacketCompletion } from './fixerrors-companion-lifecycle';
 import { BATCH_CHUNK_BYTES, batchDeliverySchema, batchHash, parseBatchBytes, type BatchCheckpoint } from '../../lib/fixerrors/batch';
 import { inspectBatchResume, recoverBatchCompletion } from './fixerrors-companion-lifecycle';
+import { prepareCompanionChecks, UncertainReadinessStop } from './fixerrors-companion-readiness';
 
 export interface CompanionConsent {
   allowReadOnly: boolean;
@@ -38,6 +39,7 @@ export interface BatchExecutionContext {
   outcomeSha256?: string;
   paused?: string;
   stopped?: boolean;
+  diagnostic?: z.infer<typeof nativeDiagnosticSchema>;
 }
 
 export const unavailableFixerrorsExecutor: TrustedFixerrorsExecutor = Object.freeze({
@@ -152,7 +154,9 @@ export async function executeCompanionClaim(claim: ClaimedJob, deps: CompanionDe
     assertNotStopping();
     return deps.executor.execute(Object.freeze(structuredClone(job)), controller.signal, releaseTicket, claim.admissionTicket, deps.batch);
   })
-    .catch((): ExecutionResult => job.action === 'deploy' ? unconfirmed : { status: 'failed', reason: 'execution-failed' })
+    .catch((): ExecutionResult => job.action === 'deploy' ? unconfirmed : {
+      status: 'failed', reason: 'execution-failed', ...(deps.batch?.diagnostic ? { diagnostic: deps.batch.diagnostic } : {}),
+    })
     .finally(() => { executionSettled = true; });
   try {
     let result = await Promise.race([execution, stopSignal]);
@@ -374,11 +378,13 @@ export async function runFixerrorsCompanion(signal?: AbortSignal): Promise<void>
     });
     console.info(production ? 'MPDEE Worker companion: production signed review/repair/release polling enabled.'
       : 'MPDEE Worker companion: local polling enabled; execution blocked.');
+    let checksIdentity = '';
+    let checksPrepared = false;
     while (!signal?.aborted) {
       state('polling');
       let workspace: Workspace | null = null;
       let checkout: Checkout | null = null;
-      let holdReason: 'checkout-unavailable' | 'packet-needs-reconciliation' | 'prepared-candidate' | null = null;
+      let holdReason: 'checkout-unavailable' | 'packet-needs-reconciliation' | 'prepared-candidate' | 'checks-preparing' | 'checks-unavailable' | null = null;
       try {
         checkout = inspectCompanionCheckout();
         await recoverBatchCompletion(packetDirectory, request);
@@ -391,6 +397,19 @@ export async function runFixerrorsCompanion(signal?: AbortSignal): Promise<void>
         console.error('MPDEE Worker companion: packet lifecycle requires owner reconciliation; evidence retained.');
       }
       const optIns = consent();
+      if (production && optIns.allowRepair && checkout && !holdReason && !workspace) {
+        const identity = `${checkout.head}:${checkout.tree}`;
+        if (checksIdentity !== identity) {
+          checksIdentity = identity;
+          const preparingHeartbeat = async () => {
+            await request({ op: 'heartbeat', workspace: null, checkout, holdReason: 'checks-preparing',
+              ...optIns, bridgeAvailable: executor.available });
+          };
+          await preparingHeartbeat();
+          checksPrepared = await prepareCompanionChecks(checkout, inspectCompanionCheckout, preparingHeartbeat);
+        }
+        if (!checksPrepared) holdReason = 'checks-unavailable';
+      }
       await request({
         op: 'heartbeat', workspace, checkout, holdReason, ...optIns, bridgeAvailable: executor.available,
       });
@@ -464,7 +483,7 @@ export async function runFixerrorsCompanion(signal?: AbortSignal): Promise<void>
       });
     }
   } catch (error) {
-    unsafe = (activeClaim || error instanceof UnsafeCompanionStop) && !activeBatch?.stopped;
+    unsafe = error instanceof UncertainReadinessStop || (activeClaim || error instanceof UnsafeCompanionStop) && !activeBatch?.stopped;
     throw error;
   } finally {
     state('stopping');

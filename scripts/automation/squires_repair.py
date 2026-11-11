@@ -775,6 +775,20 @@ class NativeBatchSession:
         return result
 
 
+class NativeBatchFailure(Exception):
+    def __init__(self, job_id, diagnostic):
+        super().__init__(diagnostic)
+        self.job_id, self.diagnostic = job_id, diagnostic
+
+
+def batch_failure_code(error, initialized):
+    if isinstance(error, ImportError):
+        return 'native-import-unavailable'
+    if isinstance(error, s.Denied) and str(error) == 'typecheck_cache_not_ready_parent_warmup_required':
+        return 'typecheck-cache-not-ready'
+    return 'batch-execution-unconfirmed' if initialized else 'batch-initialization-refused'
+
+
 def execute_batch(raw_device_proof, manifest, cfg, lease, operation=monitored_native_operation):
     """Library entry: caller owns chunk transport, authenticated lease endpoint and process cancellation."""
     s.local_runtime(cfg)
@@ -793,6 +807,9 @@ def execute_batch(raw_device_proof, manifest, cfg, lease, operation=monitored_na
     try:
         session = NativeBatchSession(cfg, ticket, manifest, lease, operation)
         return run_batch_engine(session)
+    except Exception as error:
+        # Export only fixed vocabulary, never exception text, paths, packet contents or credentials.
+        raise NativeBatchFailure(ticket['jobId'], batch_failure_code(error, session is not None)) from None
     finally:
         # Ambiguous model/preparation work stays held; a safe prefix can get fresh signed resume authority.
         if session is not None and session.batch['phase'] in ('checkpoint', 'completed'):
@@ -836,7 +853,7 @@ def batch_main(cfg=None, operation=monitored_native_operation):
         print(s.encoded(dict(jobId=journal['jobId'], result={k: v for k, v in result.items() if k != 'batch'},
                              outcomeSha256=outcome_hash)).decode(), flush=True)
         return 0
-    except BaseException:
+    except BaseException as error:
         # Only a stopped, verified checkpoint may receive new resume authority.
         try:
             directory = s.WORKSPACE / '.git/squires-fixerrors'
@@ -846,7 +863,10 @@ def batch_main(cfg=None, operation=monitored_native_operation):
             print(s.encoded(dict(jobId=journal['jobId'],
                                  paused=s.sha(s.encoded(journal['batch']['checkpoint'])))).decode(), flush=True)
         except BaseException:
-            print('{"status":"blocked","reason":"batch_execution_unconfirmed"}', flush=True)
+            if isinstance(error, NativeBatchFailure):
+                print(s.encoded(dict(jobId=error.job_id, diagnostic=error.diagnostic)).decode(), flush=True)
+            else:
+                print('{"status":"blocked","reason":"batch_execution_unconfirmed"}', flush=True)
         return 2
 
 

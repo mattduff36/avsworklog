@@ -4,9 +4,9 @@ import type { ComponentProps, CSSProperties } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FixerrorsControlPanel } from '@/app/(dashboard)/debug/components/FixerrorsControlPanel';
 import { toast } from 'sonner';
-import { FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN, publicQueueState } from '@/lib/fixerrors/protocol';
+import { adminCommandSchema, FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN, publicQueueState } from '@/lib/fixerrors/protocol';
 import { checkEvidenceDigest } from '@/lib/fixerrors/control';
-import { FixtureStore, harness, now } from '../unit/fixerrors-control-fixtures';
+import { candidate, checks, FixtureStore, harness, now } from '../unit/fixerrors-control-fixtures';
 
 const auth = vi.hoisted(() => ({ isActualSuperAdmin: true, isViewingAs: false }));
 const dialogContentProps = vi.hoisted(() => vi.fn<(props: { className?: string; style?: CSSProperties }) => void>());
@@ -32,7 +32,10 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 async function openDetails(view: 'Activity' | 'Runner settings') {
   await waitFor(() => expect(screen.queryByText('Loading...')).toBeNull());
-  fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${view}`) }));
+  fireEvent.click(screen.getByRole('button', { name: 'Run Fixerrors' }));
+  if (view === 'Runner settings' && screen.queryByText('Runner settings', { selector: 'summary' })) {
+    fireEvent.click(screen.getByText('Runner settings', { selector: 'summary' }));
+  }
 }
 
 async function openDeploy() {
@@ -77,8 +80,7 @@ describe('Debug local Fixerrors controls', () => {
     render(<FixerrorsControlPanel />);
     await openDetails('Runner settings');
     await screen.findByText(/Disabled by default/);
-    closeDetails();
-    expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: 'Start review and repair' })).toBeNull();
   });
 
   it('enables fresh requests when connected without a packet and reports no-work honestly', async () => {
@@ -94,13 +96,13 @@ describe('Debug local Fixerrors controls', () => {
     render(<FixerrorsControlPanel />);
     await openDetails('Runner settings');
     await screen.findByText('Runner: Connected - waiting');
-    closeDetails();
-    const review = screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement;
+    const review = screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement;
     expect(review.disabled).toBe(false);
     fireEvent.click(review);
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('No active untriaged or outstanding errors; no worker launched'));
     const posted = fetcher.mock.calls.find(call => call[1]?.method === 'POST');
     expect(JSON.parse(String(posted?.[1]?.body))).toMatchObject({ op: 'enqueue', action: 'review' });
+    expect(screen.getByText('No eligible errors; no worker launched.')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Confirm Deploy for exact candidate' })).toBeNull();
   });
 
@@ -113,12 +115,10 @@ describe('Debug local Fixerrors controls', () => {
     render(<FixerrorsControlPanel />);
     await openDetails('Runner settings');
     await screen.findByText(`Runner: ${holdReason}`);
-    closeDetails();
-    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it.each([true, false])('requests a fresh full batch instead of reusing an old single-packet review: %s', async evidenceAvailable => {
+  it.each([true, false])('starts a fresh review instead of reusing an old single-packet review: %s', async evidenceAvailable => {
     const store = new FixtureStore();
     const h = harness(store);
     const id = await h.enqueue('review');
@@ -131,13 +131,13 @@ describe('Debug local Fixerrors controls', () => {
     }));
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
-    await screen.findByText('Online');
-    fireEvent.click(screen.getByRole('button', { name: 'Run batch' }));
+    await openDetails('Activity');
+    fireEvent.click(screen.getByRole('button', { name: 'Start review and repair' }));
     await waitFor(() => expect(fetcher.mock.calls.some(call => call[1]?.method === 'POST')).toBe(true));
     const posted = fetcher.mock.calls.find(call => call[1]?.method === 'POST');
     const body = JSON.parse(String(posted?.[1]?.body));
     expect(body).not.toHaveProperty('reviewJobId');
-    expect(body).toMatchObject({ op: 'enqueue', action: 'repair' });
+    expect(body).toMatchObject({ op: 'enqueue', action: 'review' });
   });
 
   it('accepts an available production bridge without granting deployment approval', async () => {
@@ -200,8 +200,8 @@ describe('Debug local Fixerrors controls', () => {
     snapshot.jobs[0].lifecycleReconciliationRequired = required;
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
     render(<FixerrorsControlPanel />);
-    await screen.findByText('Online');
-    const button = screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement;
+    await openDetails('Activity');
+    const button = screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement;
     expect(button.disabled).toBe(required);
   });
 
@@ -386,13 +386,13 @@ it('shows all retained jobs once in one Activity log, attention first and previo
   expect(snapshot.jobs).toHaveLength(56);
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
   render(<FixerrorsControlPanel />);
-  const toggle = await screen.findByRole('button', { name: 'Activity (56)' });
+  const toggle = await screen.findByRole('button', { name: 'Run Fixerrors' });
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
   expect(screen.queryByRole('button', { name: /^History/ })).toBeNull();
   expect(screen.queryByText('reviewed')).toBeNull();
   await openDetails('Activity');
   expect(screen.getAllByRole('dialog')).toHaveLength(1);
-  expect(screen.getByRole('dialog', { name: 'Fixerrors activity log' })).toBeDefined();
+  expect(screen.getByRole('dialog', { name: 'Fixerrors control centre' })).toBeDefined();
   expect(toggle.getAttribute('aria-expanded')).toBe('true');
   expect(screen.getByRole('button', { name: 'All (56)' }).getAttribute('aria-pressed')).toBe('true');
   expect(screen.getByRole('button', { name: 'Needs attention (1)' })).toBeDefined();
@@ -518,12 +518,12 @@ describe('Compact companion dialogs and preserved states', () => {
     expect(entries.className).toContain('overflow-x-hidden');
     expect(entries.contains(screen.getByRole('table'))).toBe(true);
     expect(entries.contains(screen.getByRole('group', { name: 'Activity filters' }))).toBe(false);
-    expect(entries.contains(screen.getByRole('heading', { name: 'Fixerrors activity log' }))).toBe(false);
+    expect(entries.contains(screen.getByRole('heading', { name: 'Fixerrors control centre' }))).toBe(false);
     expect(entries.contains(screen.getByRole('button', { name: 'Refresh companion state' }))).toBe(false);
     expect(entries.contains(screen.getByRole('button', { name: 'Close' }))).toBe(false);
     closeDetails();
     await openDetails('Runner settings');
-    expectBounds(screen.getByRole('dialog'), 'max-w-4xl');
+    expectBounds(screen.getByRole('dialog'), 'max-w-6xl');
     closeDetails();
     await openDeploy();
     expectBounds(screen.getByRole('dialog'), 'max-w-4xl');
@@ -560,7 +560,7 @@ describe('Compact companion dialogs and preserved states', () => {
       if (method === 'outside') fireEvent.pointerDown(document.body, { button: 0 });
       else fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: new RegExp(`^${view}`) })));
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Run Fixerrors' })));
     }
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
@@ -582,7 +582,7 @@ describe('Compact companion dialogs and preserved states', () => {
     else if (method === 'outside') fireEvent.pointerDown(document.body, { button: 0 });
     else fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Activity (1)' })));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Run Fixerrors' })));
     await openDeploy();
     expect(screen.getByRole('checkbox').getAttribute('aria-checked')).toBe('false');
     expect((screen.getByRole('radio', { name: /Full checks/ }) as HTMLInputElement).checked).toBe(true);
@@ -599,16 +599,18 @@ describe('Compact companion dialogs and preserved states', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
     expect(screen.getByText('Loading...')).toBeDefined();
-    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Runner settings' }));
-    expect(screen.getByRole('dialog', { name: 'Fixerrors runner settings' })).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Run Fixerrors' }));
+    expect(screen.getByRole('dialog', { name: 'Fixerrors control centre' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Start review and repair' })).toBeNull();
     await act(async () => { resolve({ ok: false }); });
     expect(screen.getByRole('alert').textContent).toContain('Existing error logs are unaffected');
     fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+    await screen.findByRole('button', { name: 'Start review and repair' });
+    fireEvent.click(screen.getByText('Runner settings', { selector: 'summary' }));
     await screen.findByText('Runner: Connected - waiting');
+    expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(false);
     closeDetails();
     expect(screen.queryByRole('alert')).toBeNull();
-    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it.each(['offline', 'future heartbeat', 'revoked', 'bridge unavailable', 'checkout unavailable', 'no devices'] as const)(
@@ -625,9 +627,8 @@ describe('Compact companion dialogs and preserved states', () => {
       vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
       render(<FixerrorsControlPanel />);
       await waitFor(() => expect(screen.queryByText('Loading...')).toBeNull());
-      expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(true);
-      expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
       await openDetails('Runner settings');
+      expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(true);
       if (state === 'no devices') expect(screen.getByText('No enrolled devices.')).toBeDefined();
       if (state === 'bridge unavailable') expect(screen.getByText('Runner: bridge unavailable')).toBeDefined();
       if (state === 'checkout unavailable') expect(screen.getByText('Runner: checkout unavailable')).toBeDefined();
@@ -635,26 +636,25 @@ describe('Compact companion dialogs and preserved states', () => {
     },
   );
 
-  it.each(['allowReadOnly', 'allowRepair'] as const)('preserves independent local opt-in %s', async field => {
+  it.each(['allowReadOnly', 'allowRepair', 'allowDeploy'] as const)('requires every independent D opt-in: %s', async field => {
     const store = new FixtureStore();
     store.state.devices[0][field] = false;
     const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
     render(<FixerrorsControlPanel />);
-    await screen.findByText('Online');
-    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(field === 'allowReadOnly');
-    expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(field === 'allowRepair');
     await openDetails('Runner settings');
-    expect(screen.getByText(field === 'allowReadOnly' ? 'Local opt-ins: review off / repair on / deploy on' : 'Local opt-ins: review on / repair off / deploy on')).toBeDefined();
+    expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/D consent is required; no review-only fallback/)).toBeDefined();
+    expect(screen.getByText(`Local opt-ins: review ${field === 'allowReadOnly' ? 'off' : 'on'} / repair ${field === 'allowRepair' ? 'off' : 'on'} / deploy ${field === 'allowDeploy' ? 'off' : 'on'}`)).toBeDefined();
   });
 
   it('retains multiple runners, selects the intended device for enqueue and revokes only that device', async () => {
     const store = new FixtureStore();
     const secondId = crypto.randomUUID();
-    store.state.devices.push({ ...store.state.devices[0], id: secondId, name: 'Second runner', allowDeploy: false });
+    store.state.devices.push({ ...store.state.devices[0], id: secondId, name: 'Second runner' });
     const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
     const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => ({
-      ok: true, json: async () => options?.method === 'POST' ? { ok: true } : snapshot,
+      ok: true, json: async () => options?.method === 'POST' ? { ok: true, noWork: true } : snapshot,
     }));
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
@@ -662,16 +662,14 @@ describe('Compact companion dialogs and preserved states', () => {
     expect(screen.getAllByRole('radio')).toHaveLength(2);
     const second = screen.getByRole('radio', { name: 'Use Second runner' });
     fireEvent.click(second);
-    expect(screen.getByText('Local opt-ins: review on / repair on / deploy off')).toBeDefined();
-    closeDetails();
-    fireEvent.click(screen.getByRole('button', { name: 'Review' }));
+    expect((second as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Start review and repair' }));
     await waitFor(() => expect(fetcher.mock.calls.some(call => call[1]?.method === 'POST')).toBe(true));
     expect(JSON.parse(String(fetcher.mock.calls.find(call => call[1]?.method === 'POST')?.[1]?.body))).toEqual({
       op: 'enqueue', deviceId: secondId, action: 'review', requestId: expect.any(String),
     });
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(false));
-    await openDetails('Runner settings');
-    const runner = screen.getByRole('radio', { name: 'Use Second runner' }).closest('.rounded-lg') as HTMLElement;
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(false));
+    const runner = screen.getByRole('radio', { name: 'Use Second runner' }).closest('.border-t') as HTMLElement;
     fireEvent.click(within(runner).getByRole('button', { name: 'Revoke device' }));
     await waitFor(() => expect(fetcher.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(2));
     const posts = fetcher.mock.calls.filter(call => call[1]?.method === 'POST');
@@ -689,12 +687,10 @@ describe('Compact companion dialogs and preserved states', () => {
     else snapshot.devices[0].revoked = true;
     fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
     await screen.findByText(state === 'removed' ? 'Runner unavailable' : 'Proof fixture: Revoked');
-    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
     await openDetails('Runner settings');
+    expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('radio', { name: 'Use Other runner' }));
-    closeDetails();
-    expect((screen.getByRole('button', { name: 'Review' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it.each(['reconciliation', 'lifecycle', 'existing release', 'missing repair'] as const)('invalidates an open deployment decision after %s changes', async change => {
@@ -717,7 +713,8 @@ describe('Compact companion dialogs and preserved states', () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
     if (change === 'reconciliation') {
       expect(screen.getByRole('alert').textContent).toContain('Deployment result unknown');
-      expect((screen.getByRole('button', { name: 'Run batch' }) as HTMLButtonElement).disabled).toBe(true);
+      await openDetails('Activity');
+      expect((screen.getByRole('button', { name: 'Start review and repair' }) as HTMLButtonElement).disabled).toBe(true);
     }
   });
 
@@ -740,8 +737,197 @@ describe('Compact companion dialogs and preserved states', () => {
     expect((screen.getByRole('button', { name: 'Cancel' }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByRole('checkbox').getAttribute('data-disabled')).not.toBeNull();
     await act(async () => { rejectApproval({ ok: false, json: async () => ({ error: 'candidate changed' }) }); });
-    expect(toast.error).toHaveBeenCalledWith('candidate changed');
-    expect(screen.getByRole('dialog', { name: 'Separate Deploy confirmation' })).toBeDefined();
-    expect((screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Refresh and inspect activity'));
+    expect(screen.queryByText('candidate changed')).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Separate Deploy confirmation' })).toBeNull();
+  });
+
+  describe('Unified Fixerrors run and refresh safety', () => {
+    function liveFixture() {
+      const store = new FixtureStore();
+      const h = harness(store);
+      const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => ({
+        ok: true, json: async () => options?.method === 'POST'
+          ? h.admin(adminCommandSchema.parse(JSON.parse(String(options.body))))
+          : { enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) },
+      }));
+      vi.stubGlobal('fetch', fetcher);
+      const posts = () => fetcher.mock.calls.filter(call => call[1]?.method === 'POST').map(call => JSON.parse(String(call[1]?.body)));
+      const start = async () => {
+        render(<FixerrorsControlPanel />);
+        await openDetails('Activity');
+        expect(posts()).toEqual([]);
+        fireEvent.click(screen.getByRole('button', { name: 'Start review and repair' }));
+        await waitFor(() => expect(store.state.jobs).toHaveLength(1));
+        await waitFor(() => expect(screen.queryByText('Recording request...')).toBeNull());
+      };
+      const reviewed = async () => {
+        const claim = await h.claim();
+        await h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken, result: { status: 'reviewed' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+      };
+      return { store, h, posts, start, reviewed };
+    }
+
+    it('records one fresh review then one fresh repair, never auto-Deploying the tested result', async () => {
+      const f = liveFixture();
+      await f.start();
+      expect(f.posts()).toEqual([{ op: 'enqueue', requestId: expect.any(String), deviceId: f.store.state.devices[0].id, action: 'review' }]);
+      await f.reviewed();
+      await waitFor(() => expect(f.store.state.jobs).toHaveLength(2));
+      await waitFor(() => expect(screen.queryByText('Recording request...')).toBeNull());
+      expect(f.posts()[1]).toEqual({ op: 'enqueue', requestId: expect.any(String), deviceId: f.store.state.devices[0].id, action: 'repair' });
+      expect(f.posts()[1]).not.toHaveProperty('reviewJobId');
+      fireEvent(window, new Event('focus'));
+      fireEvent(window, new Event('online'));
+      await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
+      expect(f.posts()).toHaveLength(2);
+      const claim = await f.h.claim();
+      await f.h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken, result: { status: 'tested', candidate, checks } });
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+      await screen.findByText('Deploy-ready: inspect the exact tested candidate and separately confirm Deploy.');
+      expect(f.posts()).toHaveLength(2);
+      expect(screen.queryByRole('checkbox')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Deploy: review exact candidate' })).toBeDefined();
+    });
+
+    it.each(['opt-out', 'drift', 'retained hold', 'blocked review'] as const)('stops continuation after %s without a repair or silent retry', async change => {
+      const f = liveFixture();
+      await f.start();
+      const claim = await f.h.claim();
+      await f.h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken,
+        result: change === 'blocked review' ? { status: 'blocked', reason: 'execution-failed' } : { status: 'reviewed' } });
+      if (change === 'opt-out') f.store.state.devices[0].allowDeploy = false;
+      if (change === 'drift') f.store.state.devices[0].workspace!.tree = 'f'.repeat(40);
+      if (change === 'retained hold') f.store.state.devices[0].holdReason = 'packet-needs-reconciliation';
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+      await waitFor(() => expect(screen.queryByRole('button', { name: 'Stop automatic continuation' })).toBeNull());
+      expect(f.posts()).toHaveLength(1);
+      f.store.state.devices[0].allowDeploy = true;
+      f.store.state.devices[0].holdReason = undefined;
+      fireEvent(window, new Event('online'));
+      await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
+      expect(f.posts()).toHaveLength(1);
+    });
+
+    it('waits for review lifecycle acknowledgement before requesting repair', async () => {
+      const f = liveFixture();
+      await f.start();
+      const claim = await f.h.claim();
+      await f.h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken, result: { status: 'reviewed' } });
+      f.store.state.jobs[0].batch = { captured: 1, rows: 1, processed: 1, remaining: 0,
+        counts: { 'verified-local': 0, held: 0, 'report-only': 1, failed: 0 }, lifecycle: 'pending' };
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+      await screen.findByText(/Lifecycle: pending/);
+      expect(f.posts()).toHaveLength(1);
+      f.store.state.jobs[0].batch.lifecycle = 'applied';
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+      await waitFor(() => expect(f.posts()).toHaveLength(2));
+    });
+
+    it('keeps a failed-refresh snapshot visible, invalidates continuation and consent, then recovers without submission', async () => {
+      const store = new FixtureStore();
+      await harness(store).testedRepair();
+      let failed = false;
+      const fetcher = vi.fn(async (_url: unknown, _options?: RequestInit) => ({ ok: !failed, json: async () => ({
+        enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
+      }) }));
+      vi.stubGlobal('fetch', fetcher);
+      render(<FixerrorsControlPanel />);
+      await openDeploy();
+      fireEvent.click(screen.getByRole('checkbox'));
+      failed = true;
+      fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+      await waitFor(() => expect(screen.queryByRole('checkbox')).toBeNull());
+      await openDetails('Activity');
+      expect(screen.getByText(/^Stale snapshot:/)).toBeDefined();
+      expect(screen.getByText(store.state.jobs[0].id)).toBeDefined();
+      expect((screen.getByRole('button', { name: 'Deploy: review exact candidate' }) as HTMLButtonElement).disabled).toBe(true);
+      failed = false;
+      fireEvent(window, new Event('online'));
+      await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+      expect(screen.getByText(/^Last successful update:/)).toBeDefined();
+      expect(fetcher.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(0);
+      expect(screen.queryByRole('checkbox')).toBeNull();
+    });
+
+    it('uses one non-overlapping polling loop, accelerates while connecting and aborts on unmount', async () => {
+      const store = new FixtureStore();
+      store.state.devices[0].lastSeenAt = now - 50_000;
+      const timers = vi.spyOn(globalThis, 'setInterval');
+      const clears = vi.spyOn(globalThis, 'clearInterval');
+      let resolve!: (value: unknown) => void;
+      const fetcher = vi.fn().mockImplementation(() => new Promise(done => { resolve = done; }));
+      vi.stubGlobal('fetch', fetcher);
+      const view = render(<FixerrorsControlPanel />);
+      fireEvent(window, new Event('focus'));
+      fireEvent(window, new Event('online'));
+      fireEvent(document, new Event('visibilitychange'));
+      expect(fetcher).toHaveBeenCalledOnce();
+      const firstSignal = fetcher.mock.calls[0][1].signal as AbortSignal;
+      await act(async () => { resolve({ ok: true, json: async () => ({
+        enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
+      }) }); });
+      const connecting = timers.mock.calls.findIndex(([, delay]) => delay === 3_000);
+      expect(connecting).toBeGreaterThanOrEqual(0);
+      const callback = timers.mock.calls[connecting][0];
+      act(() => { if (typeof callback === 'function') { callback(); callback(); } });
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      const pendingSignal = fetcher.mock.calls[1][1].signal as AbortSignal;
+      view.unmount();
+      expect(firstSignal.aborted).toBe(false);
+      expect(pendingSignal.aborted).toBe(true);
+      expect(clears).toHaveBeenCalledWith(timers.mock.results[connecting].value);
+      fireEvent(window, new Event('online'));
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    });
+
+    it('ignores a pre-mutation refresh arriving after an uncertain POST failure', async () => {
+      const store = new FixtureStore();
+      await harness(store).testedRepair();
+      const body = { enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) };
+      let gets = 0;
+      let oldGet!: (value: unknown) => void;
+      vi.stubGlobal('fetch', vi.fn((_url: unknown, options?: RequestInit) => {
+        if (options?.method === 'POST') return Promise.reject(new Error('network lost'));
+        if (++gets === 1) return Promise.resolve({ ok: true, json: async () => body });
+        return new Promise(resolve => { oldGet = resolve; });
+      }));
+      render(<FixerrorsControlPanel />);
+      await openDeploy();
+      fireEvent.click(screen.getByRole('checkbox'));
+      fireEvent(window, new Event('focus'));
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm Deploy for exact candidate' }));
+      await waitFor(() => expect(toast.error).toHaveBeenCalled());
+      await act(async () => { oldGet({ ok: true, json: async () => body }); });
+      await openDetails('Activity');
+      expect(screen.getByText(/^Stale snapshot:/)).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Deploy: review exact candidate' })).toBeDisabled();
+    });
+
+    it('copies bounded correlation and fixed-code diagnostics, not packets, exception text or configuration', async () => {
+      const store = new FixtureStore();
+      const h = harness(store);
+      await h.enqueue();
+      const claim = await h.claim();
+      await h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken,
+        result: { status: 'failed', reason: 'execution-failed', diagnostic: 'native-import-unavailable' } });
+      store.state.jobs[0].packet = 'PRIVATE_PACKET_MUST_NOT_ESCAPE';
+      const writeText = vi.fn(async (_text: string) => {});
+      vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+      vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+        enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
+      }) })));
+      render(<FixerrorsControlPanel />);
+      await openDetails('Activity');
+      await screen.findByText(/Native diagnostic: native-import-unavailable/);
+      fireEvent.click(screen.getByRole('button', { name: `Copy diagnostics for ${claim.job.id}` }));
+      await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+      expect(JSON.parse(writeText.mock.calls[0][0])).toMatchObject({
+        jobId: claim.job.id, diagnostic: 'native-import-unavailable', state: 'failed', stale: false,
+      });
+      expect(writeText.mock.calls[0][0]).not.toMatch(/PRIVATE_PACKET|credential|privateBatch|exception|enrollment/);
+      expect(screen.getByText(/No completion ETA is reported/)).toBeDefined();
+    });
   });
 });

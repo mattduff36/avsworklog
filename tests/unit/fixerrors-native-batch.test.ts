@@ -32,6 +32,56 @@ function proof() {
 }
 
 describe('native aggregate batch policy and evidence', () => {
+  it('reports sanitized initialization codes while retaining the exclusive lock and no fabricated journal', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'SquiresBatchInitialization-'));
+    try {
+      writeFileSync(path.join(root, 'squires_repair.py'), readFileSync(path.resolve('scripts\\automation\\squires_repair.py')));
+      writeFileSync(path.join(root, 'squires_companion.py'), [
+        'import json', 'decode_json = json.loads', 'encoded = lambda v: json.dumps(v).encode()',
+        'class Denied(ValueError): pass',
+        'def require(ok, reason):', '    if not ok: raise Denied(reason)',
+      ].join('\n'));
+      const program = [
+        'import sys, json', 'from pathlib import Path', 'from unittest.mock import patch',
+        'sys.path.insert(0, sys.argv[1])', 'import squires_repair as r',
+        'root = Path(sys.argv[1])', '(root / ".git").mkdir()', 'r.s.WORKSPACE = root',
+        'r.s.local_runtime = lambda cfg: None', 'r.s.fields = lambda value, keys: value',
+        'job = "00000000-0000-4000-8000-000000000001"',
+        'r.s.signed_device = lambda *args: {"ticket": "fixture", "manifestSha256": "fixture"}',
+        'r.s.signed_ticket = lambda *args: {"jobId": job, "packetSha256": "fixture"}',
+        'r.s.sha = lambda raw: "fixture"',
+        'for error, code in [(ModuleNotFoundError("PRIVATE_SECRET"), "native-import-unavailable"),',
+        '    (r.s.Denied("typecheck_cache_not_ready_parent_warmup_required"), "typecheck-cache-not-ready"),',
+        '    (ValueError("PRIVATE_SECRET"), "batch-initialization-refused")]:',
+        '    with patch.object(r, "NativeBatchSession", side_effect=error):',
+        '        try: r.execute_batch(b"fixture", b"{}", {}, lambda _: None)',
+        '        except r.NativeBatchFailure as failure:',
+        '            assert failure.job_id == job and failure.diagnostic == code',
+        '            assert "PRIVATE_SECRET" not in str(failure)',
+        '        else: raise AssertionError("initialization accepted")',
+        '    lock = root / ".git/squires-fixerrors/batch-executor.lock"',
+        '    assert json.loads(lock.read_bytes())["jobId"] == job',
+        '    assert not (lock.parent / "active-packet.json").exists()',
+        '    lock.unlink()',
+        'failure = r.NativeBatchFailure(job, "native-import-unavailable")',
+        'r.s.config = lambda: {}', 'r.s.HOME_DIR = root',
+        'r.sys.stdin = __import__("io").TextIOWrapper(__import__("io").BytesIO(b\'{"proof":"fixture","bytes":1,"chunks":1}\\n{"index":0,"data":"eA"}\\n\'))',
+        'r.s.unb64 = lambda value, limit: b"x"',
+        'r.execute_batch = lambda *args: (_ for _ in ()).throw(failure)',
+        'assert r.batch_main() == 2',
+      ].join('\n');
+      const output = execFileSync('python', ['-I', '-B', '-c', program, root], {
+        encoding: 'utf8', windowsHide: true, timeout: 10_000,
+      });
+      expect(JSON.parse(output)).toEqual({
+        jobId: '00000000-0000-4000-8000-000000000001', diagnostic: 'native-import-unavailable',
+      });
+      expect(output).not.toContain('PRIVATE_SECRET');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('boots an isolated operation from its fixed script directory without reading enrollment', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'SquiresBatchBootstrap-'));
     try {

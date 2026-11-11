@@ -14,8 +14,33 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogScrollAre
 
 type Snapshot = z.infer<typeof adminResponseSchema>;
 type Confirmation = { repairJobId: string; candidate: Candidate; release?: CheckEvidence['release'] };
-type DetailView = 'activity' | 'settings';
 type ActivityFilter = 'all' | 'attention' | 'previous';
+type RunFlow = { deviceId: string; jobId: string; stage: 'review' | 'repair' };
+
+const REQUEST_FAILURE = 'Request not confirmed. Refresh and inspect activity before retrying; the server may have recorded it.';
+const REASON_HELP: Record<string, string> = {
+  'bridge-unavailable': 'The pinned execution bridge is unavailable. The owner must verify its installation and source pins.',
+  'local-opt-out': 'Local runtime or protected owner consent is missing. Stop the runner, choose E / D and SET DEPLOY, then restart with runtime D.',
+  'checkout-drift': 'The checkout or candidate changed. The owner must reconcile retained evidence before requesting a fresh run.',
+  'lease-lost': 'Execution authority was lost. Preserve locks and receipts; confirm the stopped outcome before recovery.',
+  timeout: 'An execution deadline elapsed. Inspect the private job receipts; do not remove retained locks.',
+  'execution-failed': 'Native execution failed or its result could not be verified. Inspect the job-correlated private receipts; no success is assumed.',
+  'release-unconfirmed': 'Deployment is unconfirmed. Verify the remote ref and live deployment identity before continuing.',
+};
+const DIAGNOSTIC_HELP: Record<NonNullable<Snapshot['jobs'][number]['diagnostic']>, string> = {
+  'native-import-unavailable': 'The owner must verify the pinned native runtime and its required installed modules before any retry.',
+  'typecheck-cache-not-ready': 'With the runner stopped, the parent must inspect and warm the protected TypeScript cache before fresh signed admission.',
+  'batch-initialization-refused': 'Native session initialization was refused. Preserve the retained lock and inspect the private admission, checkout and initialization evidence.',
+  'batch-execution-unconfirmed': 'A native execution result was not verified. Preserve locks and correlate the private receipts before recovery.',
+};
+
+function timestamp(value: number) {
+  return new Date(value).toLocaleString('en-GB');
+}
+
+function elapsed(createdAt: number, observedAt: number) {
+  return `${Math.max(0, Math.floor((observedAt - createdAt) / 1000))}s`;
+}
 
 const ACTIVITY_COLUMNS = 'lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_minmax(0,1.7fr)_minmax(0,1.7fr)]';
 const DIALOG_GUTTER_CLASSNAME = '[--fixerrors-dialog-gutter:24px] md:[--fixerrors-dialog-gutter:48px]';
@@ -69,7 +94,11 @@ export function FixerrorsControlPanel() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [detailView, setDetailView] = useState<DetailView | null>(null);
+  const [controlOpen, setControlOpen] = useState(false);
+  const [flow, setFlow] = useState<RunFlow | null>(null);
+  const [flowNotice, setFlowNotice] = useState<string | null>(null);
+  const [observedAt, setObservedAt] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [activityFilter, setActivityFilter] = useState<ActivityFilter>('all');
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -77,34 +106,79 @@ export function FixerrorsControlPanel() {
   const [releaseMode, setReleaseMode] = useState<ReleaseMode>('full');
   const activityTrigger = useRef<HTMLButtonElement>(null);
   const openingDeploy = useRef(false);
+  const posting = useRef(false);
+  const fetching = useRef<Promise<void> | null>(null);
+  const requestController = useRef<AbortController | null>(null);
   const refresh = useCallback(async () => {
-    try {
-      const response = await fetch('/api/debug/fixerrors', { cache: 'no-store' });
-      if (!response.ok) throw new Error('Fixerrors controls unavailable or access denied');
-      const nextSnapshot = adminResponseSchema.parse(await response.json());
-      setSnapshot(nextSnapshot);
-      setSelectedDeviceId(current => current ?? nextSnapshot.devices.find(device => !device.revoked)?.id ?? nextSnapshot.devices[0]?.id ?? null);
-      setFailure(null);
-    } catch {
-      setSnapshot(null);
-      setFailure('Unable to load Fixerrors controls. Existing error logs are unaffected.');
-    }
+    if (fetching.current) return fetching.current;
+    const controller = new AbortController();
+    requestController.current = controller;
+    setRefreshing(true);
+    const timeout = setTimeout(() => controller.abort(), 10_000);
+    const work = (async () => {
+      try {
+        const response = await fetch('/api/debug/fixerrors', { cache: 'no-store', signal: controller.signal });
+        if (!response.ok) throw new Error('Unavailable');
+        const nextSnapshot = adminResponseSchema.parse(await response.json());
+        if (controller.signal.aborted || requestController.current !== controller) return;
+        setSnapshot(nextSnapshot);
+        setObservedAt(Date.now());
+        setSelectedDeviceId(current => current ?? nextSnapshot.devices.find(device => !device.revoked)?.id ?? nextSnapshot.devices[0]?.id ?? null);
+        setFailure(null);
+      } catch {
+        if (requestController.current !== controller) return;
+        setFailure('Unable to refresh Fixerrors controls. Last successful snapshot is stale; actions are disabled. Existing error logs are unaffected.');
+        setFlow(null);
+        setFlowNotice('Automatic continuation stopped because runner state could not be refreshed. Inspect activity before starting again.');
+        setConfirmation(null);
+        setConfirmed(false);
+      } finally {
+        clearTimeout(timeout);
+        if (requestController.current === controller) {
+          fetching.current = null;
+          setRefreshing(false);
+        }
+      }
+    })();
+    fetching.current = work;
+    return work;
   }, []);
 
   useEffect(() => {
     if (!allowed) {
-      setDetailView(null);
+      setControlOpen(false);
+      setFlow(null);
+      setSnapshot(null);
       setConfirmation(null);
       setConfirmed(false);
       return;
     }
+    const wake = () => { void refresh(); };
+    const visible = () => { if (document.visibilityState === 'visible') wake(); };
     void refresh();
-    const timer = setInterval(() => { void refresh(); }, 15_000);
-    return () => clearInterval(timer);
+    window.addEventListener('focus', wake);
+    window.addEventListener('online', wake);
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      requestController.current?.abort();
+      requestController.current = null;
+      fetching.current = null;
+      window.removeEventListener('focus', wake);
+      window.removeEventListener('online', wake);
+      document.removeEventListener('visibilitychange', visible);
+    };
   }, [allowed, refresh]);
 
+  const fastPolling = Boolean(flow || snapshot?.jobs.some(job => ['queued', 'leased', 'paused'].includes(job.state)) ||
+    snapshot?.devices.some(device => deviceStatus(device, snapshot.jobs).online) === false);
+  useEffect(() => {
+    if (!allowed) return;
+    const timer = setInterval(() => { void refresh(); }, fastPolling ? 3_000 : 20_000);
+    return () => clearInterval(timer);
+  }, [allowed, fastPolling, refresh]);
+
   const currentRepair = confirmation && snapshot?.jobs.find((job) => job.id === confirmation.repairJobId);
-  const confirmationValid = Boolean(allowed && snapshot?.enabled && !snapshot.releaseNeedsReconciliation &&
+  const confirmationValid = Boolean(allowed && !failure && snapshot?.enabled && !snapshot.releaseNeedsReconciliation &&
     confirmation && currentRepair?.state === 'tested' && currentRepair.candidate &&
     sameCandidate(currentRepair.candidate, confirmation.candidate) &&
     (!currentRepair.batch || currentRepair.batch.lifecycle === 'applied') &&
@@ -116,28 +190,99 @@ export function FixerrorsControlPanel() {
     }
   }, [confirmation, confirmationValid]);
 
-  async function submit(command: AdminCommand) {
+  const submit = useCallback(async (command: AdminCommand) => {
+    const invalidateRefresh = () => {
+      requestController.current?.abort();
+      requestController.current = null;
+      fetching.current = null;
+      setRefreshing(false);
+    };
+    if (posting.current) return null;
+    posting.current = true;
+    invalidateRefresh();
     setBusy(true);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
     try {
       const response = await fetch('/api/debug/fixerrors', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(command), signal: controller.signal,
       });
       if (!response.ok) {
-        const body = z.object({ error: z.string() }).parse(await response.json());
-        throw new Error(body.error);
+        throw new Error(REQUEST_FAILURE);
       }
-      const result = z.object({ ok: z.literal(true), jobId: z.string().optional(), noWork: z.boolean().optional() }).parse(await response.json());
+      const result = z.object({ ok: z.literal(true), jobId: z.string().uuid().optional(), noWork: z.boolean().optional() }).parse(await response.json());
+      if (command.op === 'enqueue' && !result.noWork && result.jobId !== command.requestId) throw new Error(REQUEST_FAILURE);
+      if (command.op === 'enqueue' && result.noWork) {
+        setFlow(null);
+        setFlowNotice('No eligible errors; no worker launched.');
+      }
       toast.success(result.noWork ? 'No active untriaged or outstanding errors; no worker launched'
         : command.op === 'approve-deploy' ? 'Exact-candidate deployment approved for the selected checks' : 'Companion request recorded');
       setConfirmation(null);
       setConfirmed(false);
+      // A GET begun before this mutation cannot establish its accepted state.
+      invalidateRefresh();
       await refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Companion request failed');
+      return result;
+    } catch {
+      invalidateRefresh();
+      setFailure(REQUEST_FAILURE);
+      setFlow(null);
+      setFlowNotice(REQUEST_FAILURE);
+      setConfirmed(false);
+      toast.error(REQUEST_FAILURE);
+      return null;
     } finally {
+      clearTimeout(timeout);
+      posting.current = false;
       setBusy(false);
     }
-  }
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!flow || !snapshot || failure || busy) return;
+    const runner = snapshot.devices.find(entry => entry.id === flow.deviceId);
+    if (!runner || runner.revoked || !runner.allowReadOnly || !runner.allowRepair || !runner.allowDeploy) {
+      setFlow(null);
+      setFlowNotice('Automatic continuation stopped: the selected runner or D consent is no longer available.');
+      return;
+    }
+    if (runner.holdReason || snapshot.releaseNeedsReconciliation) {
+      setFlow(null);
+      setFlowNotice('Automatic continuation stopped at a retained runner or release hold. Preserve evidence for owner reconciliation.');
+      return;
+    }
+    const job = snapshot.jobs.find(entry => entry.id === flow.jobId);
+    if (!job || ['queued', 'leased', 'paused'].includes(job.state)) return;
+    if (flow.stage === 'repair' || job.state !== 'reviewed') {
+      setFlow(null);
+      setFlowNotice(job.state === 'tested' ? 'Deploy-ready: inspect the exact tested candidate and separately confirm Deploy.'
+        : job.state === 'no-work' ? 'No eligible errors; no worker launched.'
+        : `Run stopped at ${job.state}. Inspect its diagnostics and retained attempts below.`);
+      return;
+    }
+    if (job.batch && job.batch.lifecycle !== 'applied') {
+      if (job.batch.lifecycle === 'blocked') {
+        setFlow(null);
+        setFlowNotice('Review lifecycle reconciliation is blocked. No repair was requested.');
+      }
+      return;
+    }
+    const current = runner.checkout ?? runner.workspace;
+    const state = deviceStatus(runner, snapshot.jobs);
+    if (!current || current.head !== job.workspace.head || current.tree !== job.workspace.tree) {
+      setFlow(null);
+      setFlowNotice('Review completed, but D consent or the exact reviewed checkout is no longer available. No repair was requested.');
+      return;
+    }
+    if (!state?.ready || state.active || state.pending || state.reconciling) return;
+    // Move the local intent before submitting; repeated polls cannot enqueue another repair.
+    const requestId = crypto.randomUUID();
+    setFlow({ ...flow, stage: 'repair', jobId: requestId });
+    void submit({ op: 'enqueue', requestId, deviceId: flow.deviceId, action: 'repair' }).then(result => {
+      if (!result) setFlow(null);
+    });
+  }, [flow, snapshot, failure, busy, submit]);
 
   function dismissConfirmation() {
     setConfirmation(null);
@@ -148,13 +293,35 @@ export function FixerrorsControlPanel() {
   if (!allowed) return null;
   const device = snapshot?.devices.find(entry => entry.id === selectedDeviceId);
   const status = device && snapshot ? deviceStatus(device, snapshot.jobs) : null;
-  const connectionLabel = failure ? 'Unavailable' : !snapshot ? 'Loading...' : !snapshot.enabled ? 'Disabled'
+  const connectionLabel = failure ? snapshot ? 'Stale snapshot' : 'Unavailable' : !snapshot ? 'Loading...' : !snapshot.enabled ? 'Disabled'
     : !device ? selectedDeviceId ? 'Runner unavailable' : 'No devices' : device.revoked ? 'Revoked' : status?.online ? 'Online' : 'Offline';
   const newestJobs = [...(snapshot?.jobs ?? [])].sort((a, b) => b.createdAt - a.createdAt);
   const activeJobs = newestJobs.filter(job => needsAttention(job, newestJobs));
   const previousJobs = newestJobs.filter(job => !needsAttention(job, newestJobs));
   const visibleJobs = activityFilter === 'attention' ? activeJobs : activityFilter === 'previous' ? previousJobs : [...activeJobs, ...previousJobs];
-  const requestsDisabled = busy || !snapshot?.enabled || !status?.ready || status.active || status.pending || status.reconciling;
+  const requestsDisabled = busy || Boolean(failure) || Boolean(flow) || !snapshot?.enabled || !status?.ready || status.active || status.pending || status.reconciling || snapshot.releaseNeedsReconciliation;
+  const missingDConsent = device && (!device.allowReadOnly || !device.allowRepair || !device.allowDeploy);
+  const startDisabled = requestsDisabled || Boolean(missingDConsent);
+  const startRun = () => {
+    setActivityFilter('all');
+    if (startDisabled || !device) return;
+    const requestId = crypto.randomUUID();
+    setFlowNotice(null);
+    setFlow({ deviceId: device.id, stage: 'review', jobId: requestId });
+    void submit({ op: 'enqueue', requestId, deviceId: device.id, action: 'review' }).then(result => {
+      if (!result) setFlow(null);
+    });
+  };
+  const copyDiagnostics = async (job: Snapshot['jobs'][number]) => {
+    const diagnostic = {
+      jobId: job.id, deviceId: job.deviceId, action: job.action, state: job.state,
+      reason: job.reason, diagnostic: job.diagnostic ?? null, createdAt: job.createdAt, expiresAt: job.expiresAt,
+      leaseUntil: job.leaseUntil, snapshotAt: observedAt, stale: Boolean(failure), batch: job.batch,
+      candidate: job.candidate,
+    };
+    try { await navigator.clipboard.writeText(JSON.stringify(diagnostic, null, 2)); toast.success('Job diagnostics copied'); }
+    catch { toast.error('Unable to copy diagnostics. Select the visible job ID and diagnostic details instead.'); }
+  };
   const renderJobs = (jobs: Snapshot['jobs']) => (
     <div role="table" aria-label="Fixerrors activity runs" className="min-w-0 [overflow-wrap:anywhere]">
       <div role="rowgroup" className="sr-only lg:not-sr-only">
@@ -185,6 +352,11 @@ export function FixerrorsControlPanel() {
               <div role="cell" className="min-w-0 space-y-2">
                 <span className="block text-xs font-medium text-muted-foreground lg:hidden">Progress/result</span>
                 {job.reason && <p className="text-muted-foreground">{job.reason}</p>}
+                {job.reason && <p className="text-xs text-muted-foreground">{REASON_HELP[job.reason]}</p>}
+                {job.diagnostic && <p className="text-xs text-muted-foreground">Native diagnostic: {job.diagnostic}. {DIAGNOSTIC_HELP[job.diagnostic]} Private receipts remain on the runner; no raw error output is exposed.</p>}
+                <p className="text-xs text-muted-foreground">Stage: {job.state === 'leased' ? `${job.action} executing (operation detail not reported)` : job.state}.
+                  {['queued', 'leased', 'paused'].includes(job.state) && observedAt !== null && ` Elapsed at snapshot: ${elapsed(job.createdAt, observedAt)}.`}</p>
+                <p className="text-xs text-muted-foreground">{job.leaseUntil !== null ? `Lease deadline: ${timestamp(job.leaseUntil)}.` : `Admission / queued deadline: ${timestamp(job.expiresAt)}.`} No completion ETA is reported.</p>
                 {job.batch && <div className="space-y-1 text-xs text-muted-foreground" aria-label="Batch progress" role="status">
                   <p>{job.batch.processed} / {job.batch.captured} cases processed; {job.batch.remaining} remaining ({job.batch.rows} error rows captured).</p>
                   <p>{job.batch.counts['verified-local']} verified locally / {job.batch.counts.held} held / {job.batch.counts['report-only']} report only / {job.batch.counts.failed} failed.</p>
@@ -196,22 +368,23 @@ export function FixerrorsControlPanel() {
               <div role="cell" className="min-w-0 space-y-2">
                 <span className="block text-xs font-medium text-muted-foreground lg:hidden">Actions/details</span>
                 {canCancel && (
-                  <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal" disabled={busy}
-                    onClick={() => void submit({ op: 'cancel', jobId: job.id })}>Cancel run</Button>
+                  <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal" disabled={busy || Boolean(failure)}
+                    onClick={() => { setFlow(null); setFlowNotice('Automatic continuation cancelled.'); void submit({ op: 'cancel', jobId: job.id }); }}>Cancel run</Button>
                 )}
                 {job.candidate && <CandidateDetails candidate={job.candidate} release={job.checks?.release} />}
                 {canReviewDeploy && (
-                  <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal text-left" disabled={busy || snapshot?.releaseNeedsReconciliation || Boolean(job.batch && job.batch.lifecycle !== 'applied')}
+                  <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal text-left" disabled={busy || Boolean(failure) || snapshot?.releaseNeedsReconciliation || Boolean(job.batch && job.batch.lifecycle !== 'applied')}
                     onClick={() => {
                       if (job.candidate) {
                         openingDeploy.current = true;
-                        setDetailView(null);
+                        setControlOpen(false);
                         setConfirmed(false);
                         setReleaseMode('full');
                         setConfirmation({ repairJobId: job.id, candidate: job.candidate, release: job.checks?.release });
                       }
                     }}>Deploy: review exact candidate</Button>
                 )}
+                <Button variant="ghost" size="sm" className="h-auto whitespace-normal" onClick={() => void copyDiagnostics(job)}>Copy diagnostics for {job.id}</Button>
                 {!canCancel && !canReviewDeploy && !job.candidate && <p className="text-xs text-muted-foreground">No actions available.</p>}
               </div>
             </div>
@@ -230,104 +403,105 @@ export function FixerrorsControlPanel() {
             {connectionLabel}
           </span>
         </Badge>
-        <Button size="sm" variant="outline" className="border-white/30 bg-slate-900 text-slate-100 hover:bg-slate-800 hover:text-white"
-          disabled={requestsDisabled || !device?.allowReadOnly}
-          onClick={() => { if (device) void submit({ op: 'enqueue', requestId: crypto.randomUUID(), deviceId: device.id, action: 'review' }); }}>Review</Button>
-        <Button size="sm" className="bg-slate-900 text-white hover:bg-slate-800"
-          disabled={requestsDisabled || !device?.allowRepair || snapshot?.releaseNeedsReconciliation}
-          onClick={() => { if (device) void submit({ op: 'enqueue', requestId: crypto.randomUUID(), deviceId: device.id, action: 'repair' }); }}>Run batch</Button>
-        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white hover:bg-white/15 hover:text-white" aria-label="Refresh companion state" title="Refresh companion state"
-          disabled={busy} onClick={() => void refresh()}><RefreshCw className="h-4 w-4" /></Button>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {(['activity', 'settings'] as const).map(view => (
-          <Dialog key={view} open={detailView === view} onOpenChange={open => {
-            if (open && view === 'activity') setActivityFilter('all');
-            setDetailView(open ? view : null);
-          }}>
-            <DialogTrigger asChild>
-              <Button ref={view === 'activity' ? activityTrigger : undefined} size="sm" variant="ghost"
-                className="h-7 px-2 text-xs text-white hover:bg-white/15 hover:text-white">
-                {view === 'activity' ? `Activity (${newestJobs.length})` : 'Runner settings'}
-              </Button>
-            </DialogTrigger>
-            <DialogContent className={dialogContentViewportClassName({
-              size: view === 'settings' ? '4xl' : '6xl',
-              scroll: 'content',
-              className: `min-w-0 gap-4 ${DIALOG_GUTTER_CLASSNAME}`,
-            })}
-              style={DIALOG_VIEWPORT_STYLE}
-              onCloseAutoFocus={event => { if (openingDeploy.current) event.preventDefault(); }}>
-              <DialogHeader className="shrink-0 pr-6 text-left">
-                <DialogTitle>{view === 'activity' ? 'Fixerrors activity log' : 'Fixerrors runner settings'}</DialogTitle>
-                <DialogDescription>
-                  {view === 'settings' ? 'Run one full batch of new and outstanding errors on the connected Windows companion. Local opt-ins are controlled on each device.'
-                    : 'All runs, with work needing attention first. Progress includes held cases; local repairs await separate approval of the exact tested candidate.'}
-                </DialogDescription>
-              </DialogHeader>
-              {snapshot?.enabled && view === 'activity' && (
-                <div role="group" aria-label="Activity filters" className="flex shrink-0 flex-wrap gap-2">
-                  {([
-                    ['all', 'All', newestJobs.length],
-                    ['attention', 'Needs attention', activeJobs.length],
-                    ['previous', 'Previous', previousJobs.length],
-                  ] as const).map(([value, label, count]) => (
-                    <Button key={value} size="sm" variant="outline" aria-pressed={activityFilter === value}
-                      className={activityFilter === value ? 'border-white/80 bg-white text-slate-900 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
-                      onClick={() => setActivityFilter(value)}>{label} ({count})</Button>
-                  ))}
+        <Dialog open={controlOpen} onOpenChange={open => {
+          setControlOpen(open);
+          if (open) setActivityFilter('all');
+        }}>
+          <DialogTrigger asChild>
+            <Button ref={activityTrigger} size="sm" className="bg-slate-900 text-white hover:bg-slate-800">Run Fixerrors</Button>
+          </DialogTrigger>
+          <DialogContent className={dialogContentViewportClassName({
+            size: '6xl', scroll: 'content', className: `min-w-0 gap-4 ${DIALOG_GUTTER_CLASSNAME}`,
+          })} style={DIALOG_VIEWPORT_STYLE}
+            onCloseAutoFocus={event => { if (openingDeploy.current) event.preventDefault(); }}>
+            <DialogHeader className="shrink-0 pr-6 text-left">
+              <DialogTitle>Fixerrors control centre</DialogTitle>
+              <DialogDescription>Review all new and outstanding errors, then request a fresh full-batch repair on the same runner. Stop at Deploy-ready; deployment always needs separate exact-candidate approval.</DialogDescription>
+            </DialogHeader>
+            {snapshot?.enabled && (
+              <div role="group" aria-label="Activity filters" className="flex shrink-0 flex-wrap gap-2">
+                {([
+                  ['all', 'All', newestJobs.length],
+                  ['attention', 'Needs attention', activeJobs.length],
+                  ['previous', 'Previous', previousJobs.length],
+                ] as const).map(([value, label, count]) => (
+                  <Button key={value} size="sm" variant="outline" aria-pressed={activityFilter === value}
+                    className={activityFilter === value ? 'border-white/80 bg-white text-slate-900 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
+                    onClick={() => setActivityFilter(value)}>{label} ({count})</Button>
+                ))}
+              </div>
+            )}
+            <DialogScrollArea aria-label="Activity entries" className="min-w-0 space-y-4">
+              {failure && <p role="alert" className="text-sm text-destructive">{failure}</p>}
+              {!snapshot && !failure && <PanelLoader />}
+              {snapshot && !snapshot.enabled && <p className="text-sm text-muted-foreground">Disabled by default. Configuration and explicit device provisioning are required.</p>}
+              {observedAt !== null && <p className="text-xs text-muted-foreground">{failure ? 'Stale snapshot' : 'Last successful update'}: {timestamp(observedAt)}. Runner contact: {device?.lastSeenAt ? timestamp(device.lastSeenAt) : 'not reported'}.</p>}
+              {snapshot?.enabled && <>
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <h3 className="text-sm font-semibold">Run status</h3>
+                  {!flow && <p className="text-sm text-muted-foreground">{status?.active ? 'A run is already active; its last reported stage is below.' : status?.ready ? 'Runner connected. Review and repair can start when all consent and retained-work gates are clear.' : 'Waiting for a ready, enrolled runner.'}</p>}
+                  {flow && <p role="status" className="text-sm">{flow.stage === 'review' ? 'Review requested; repair waits for verified review completion and runner readiness.' : 'Repair requested; waiting for the tested candidate. No Deploy is automatic.'}</p>}
+                  {flowNotice && <p role="status" className="text-sm">{flowNotice}</p>}
+                  {missingDConsent && <p role="alert" className="text-sm text-amber-300">D consent is required; no review-only fallback. On this Windows PC, stop Squires Runner, choose E / D, confirm SET DEPLOY, then start Terminal or Service with runtime D. This only enables the workflow, not Deploy approval.</p>}
+                  {!status?.online && <p className="text-sm text-muted-foreground">Start Squires Runner on its enrolled Windows PC. Refresh detects its next authenticated heartbeat automatically.</p>}
+                  {status?.online && !device?.bridgeAvailable && <p role="alert" className="text-sm text-amber-300">{REASON_HELP['bridge-unavailable']}</p>}
+                  {status?.online && !(device?.checkout ?? device?.workspace) && <p className="text-sm text-muted-foreground">No clean checkout has been reported. Inspect local candidate/packet holds; do not delete their locks or replace evidence.</p>}
+                  {device?.holdReason && <p role="alert" className="text-sm text-amber-300">{device.holdReason === 'checks-preparing'
+                    ? 'Preparing local checks for this release. The runner will become ready automatically when validation finishes.'
+                    : device.holdReason === 'checks-unavailable'
+                      ? 'Local checks are not ready. Inspect the runner check cache or validation failure, then restart the runner. No batch has started.'
+                      : `Runner hold: ${device.holdReason}. Preserve operational locks and private receipts; the owner must reconcile the retained outcome.`}</p>}
+                  {status?.pending && <p className="text-sm text-muted-foreground">A tested candidate awaits separate Deploy. Inspect its activity row below; no fresh run can replace it.</p>}
+                  {status?.reconciling && <p role="alert" className="text-sm text-amber-300">Exact-row lifecycle reconciliation is required before another run.</p>}
+                  {snapshot.releaseNeedsReconciliation && <p role="alert" className="text-sm text-destructive">Deployment result unknown. Verify the remote Git ref and live release identity before another repair or deployment.</p>}
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" className="h-auto min-h-9 whitespace-normal bg-avs-yellow text-slate-900 hover:bg-[#d1b82f]"
+                      disabled={startDisabled} onClick={startRun}>{busy ? 'Recording request...' : 'Start review and repair'}</Button>
+                    {flow && <Button size="sm" variant="outline" onClick={() => { setFlow(null); setFlowNotice('Automatic continuation stopped. Any recorded run remains visible below.'); }}>Stop automatic continuation</Button>}
+                    <Button size="sm" variant="outline" disabled title="A browser cannot securely inspect the installed Windows named pipe.">Launch local runner (unavailable)</Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Keep this page open for sequential continuation. Closing this dialog does not stop a run; reloading the page never silently resumes automatic submission. Review and repair each capture all eligible errors; no per-error selector or reused single packet.</p>
                 </div>
-              )}
-              <DialogScrollArea aria-label={view === 'activity' ? 'Activity entries' : 'Runner settings'} className="min-w-0">
-                {failure && <p role="alert" className="text-sm text-destructive">{failure}</p>}
-                {!snapshot && !failure && <PanelLoader />}
-                {snapshot && !snapshot.enabled && (
-                  <p className="text-sm text-muted-foreground">Disabled by default. Configuration and explicit device provisioning are required.</p>
-                )}
-                {snapshot?.enabled && view === 'activity' && (
-                  visibleJobs.length ? renderJobs(visibleJobs) : <p className="text-sm text-muted-foreground">
-                    {activityFilter === 'attention' ? 'No jobs need attention or deployment decisions.' : activityFilter === 'previous' ? 'No previous activity.' : 'No activity recorded.'}
-                  </p>
-                )}
-                {snapshot?.enabled && view === 'settings' && <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    {snapshot.origin === FIXERRORS_PRODUCTION_ORIGIN ? 'Production controls.' : 'Local rehearsal controls.'}
-                    {' '}{snapshot.executionAvailable ? 'A device has reported bridge availability.' : 'No execution bridge has reported availability.'}
-                  </p>
-                  {snapshot.releaseNeedsReconciliation && (
-                    <p role="alert" className="text-sm text-destructive">A deployment result is unknown. Verify the remote Git ref and release record before attempting another repair or deployment.</p>
-                  )}
-                  {snapshot.devices.length === 0 && <p className="text-sm text-muted-foreground">No enrolled devices.</p>}
-                  {snapshot.devices.map((entry) => {
-                    const { online, ready, active, pending } = deviceStatus(entry, snapshot.jobs);
-                    return (
-                      <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <details className="rounded-lg border border-border p-3">
+                  <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Runner settings</summary>
+                  <div className="mt-3 space-y-3">
+                    <p className="text-sm text-muted-foreground">{snapshot.origin === FIXERRORS_PRODUCTION_ORIGIN ? 'Production controls.' : 'Local rehearsal controls.'} {snapshot.executionAvailable ? 'A device has reported bridge availability.' : 'No execution bridge has reported availability.'}</p>
+                    {snapshot.devices.length === 0 && <p className="text-sm text-muted-foreground">No enrolled devices.</p>}
+                    {snapshot.devices.map(entry => {
+                      const { online, ready, active, pending } = deviceStatus(entry, snapshot.jobs);
+                      return <div key={entry.id} className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
                         <div className="min-w-0 space-y-2">
-                          <div className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="[overflow-wrap:anywhere]">{entry.name}</span> <Badge variant="secondary">{entry.revoked ? 'Revoked' : online ? 'Online' : 'Offline'}</Badge></div>
+                          <div className="flex flex-wrap items-center gap-2 text-sm font-medium"><span className="[overflow-wrap:anywhere]">{entry.name}</span><Badge variant="secondary">{entry.revoked ? 'Revoked' : online ? 'Online' : 'Offline'}</Badge></div>
                           <p className="text-xs text-muted-foreground">Runner: {!online ? 'not connected' : active ? 'busy' : pending ? 'tested candidate awaits separate Deploy' : entry.holdReason ?? (!entry.bridgeAvailable ? 'bridge unavailable' : ready ? 'Connected - waiting' : 'checkout unavailable')}</p>
                           <p className="text-xs text-muted-foreground">Local opt-ins: review {entry.allowReadOnly ? 'on' : 'off'} / repair {entry.allowRepair ? 'on' : 'off'} / deploy {entry.allowDeploy ? 'on' : 'off'}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <label className="flex min-w-0 items-center gap-2 text-sm [overflow-wrap:anywhere]">
                             <input type="radio" name="fixerrors-runner" checked={entry.id === device?.id}
-                              onChange={() => setSelectedDeviceId(entry.id)} disabled={busy} />
+                              onChange={() => { setFlow(null); setSelectedDeviceId(entry.id); }} disabled={busy || Boolean(flow) || Boolean(failure)} />
                             <span className="min-w-0">Use {entry.name}</span>
                           </label>
-                          <Button size="sm" variant="ghost" disabled={busy || entry.revoked}
-                            onClick={() => void submit({ op: 'revoke-device', deviceId: entry.id })}>Revoke device</Button>
+                          <Button size="sm" variant="ghost" disabled={busy || Boolean(failure) || entry.revoked}
+                            onClick={() => { setFlow(null); void submit({ op: 'revoke-device', deviceId: entry.id }); }}>Revoke device</Button>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>}
-              </DialogScrollArea>
-              <Button size="sm" variant="outline" className="shrink-0" disabled={busy} onClick={() => void refresh()}>Refresh companion state</Button>
-            </DialogContent>
-          </Dialog>
-        ))}
+                      </div>;
+                    })}
+                  </div>
+                </details>
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold">Activity and history ({newestJobs.length})</h3>
+                  {visibleJobs.length ? renderJobs(visibleJobs) : <p className="text-sm text-muted-foreground">{activityFilter === 'attention' ? 'No jobs need attention or deployment decisions.' : activityFilter === 'previous' ? 'No previous activity.' : 'No activity recorded.'}</p>}
+                </div>
+              </>}
+            </DialogScrollArea>
+            <Button size="sm" variant="outline" className="shrink-0" disabled={busy || refreshing} onClick={() => void refresh()}>{refreshing ? 'Refreshing companion state...' : 'Refresh companion state'}</Button>
+          </DialogContent>
+        </Dialog>
+        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white hover:bg-white/15 hover:text-white" aria-label="Refresh companion state" title="Refresh companion state"
+          disabled={busy || refreshing} onClick={() => void refresh()}><RefreshCw className="h-4 w-4" /></Button>
       </div>
-      {failure && <p role="alert" className="max-w-md text-xs text-white">{failure}</p>}
-      {snapshot?.releaseNeedsReconciliation && <p role="alert" className="max-w-md text-xs text-white">Deployment result unknown. Open Runner settings to reconcile before continuing.</p>}
+      {failure && !controlOpen && <p role="alert" className="max-w-md text-xs text-white">{failure}</p>}
+      {snapshot?.releaseNeedsReconciliation && !controlOpen && <p role="alert" className="max-w-md text-xs text-white">Deployment result unknown. Open Run Fixerrors to inspect the retained outcome.</p>}
       <Dialog open={Boolean(confirmation && confirmationValid)} onOpenChange={open => { if (!open) dismissConfirmation(); }}>
         <DialogContent className={dialogContentViewportClassName({
           size: '4xl',
@@ -369,7 +543,7 @@ export function FixerrorsControlPanel() {
                   <span>I approve deploying this exact tested candidate using {releaseMode === 'full' ? 'Full checks (fap)' : 'Targeted checks (urgent)'}.</span>
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  <Button type="submit" className="h-auto min-h-9 whitespace-normal bg-avs-yellow text-slate-900 hover:bg-avs-yellow-hover text-center" disabled={busy || snapshot?.releaseNeedsReconciliation || !confirmed}>{busy ? 'Recording approval...' : 'Confirm Deploy for exact candidate'}</Button>
+                  <Button type="submit" className="h-auto min-h-9 whitespace-normal bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] text-center" disabled={busy || snapshot?.releaseNeedsReconciliation || !confirmed}>{busy ? 'Recording approval...' : 'Confirm Deploy for exact candidate'}</Button>
                   <Button type="button" variant="outline" disabled={busy} onClick={dismissConfirmation}>Cancel</Button>
                   <Button type="button" variant="ghost" disabled={busy} onClick={() => void refresh()}>Refresh companion state</Button>
                 </div>

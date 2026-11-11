@@ -8,6 +8,26 @@ import {
 } from './fixerrors-control-fixtures';
 
 describe('local Fixerrors durable queue contract (transaction fixture)', () => {
+  it('retains only a fixed diagnostic code on a failed job and projects no private evidence', async () => {
+    const store = new FixtureStore();
+    const h = harness(store);
+    await h.enqueue();
+    const claim = await h.claim();
+    await h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken,
+      result: { status: 'failed', reason: 'execution-failed', diagnostic: 'typecheck-cache-not-ready' } });
+    expect(queueStateSchema.parse(store.state).jobs[0].diagnostic).toBe('typecheck-cache-not-ready');
+    expect(publicQueueState(store.state).jobs[0]).toMatchObject({
+      state: 'failed', reason: 'execution-failed', diagnostic: 'typecheck-cache-not-ready',
+    });
+    expect(publicQueueState(store.state).jobs[0]).not.toHaveProperty('lease');
+    expect(deviceCommandSchema.safeParse({
+      op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken,
+      result: { status: 'failed', reason: 'execution-failed', diagnostic: 'private exception text' },
+    }).success).toBe(false);
+    expect(store.state.jobs).toHaveLength(1);
+    expect(store.state.jobs[0].approval).toBeNull();
+  });
+
   it('requires a distinct approval transaction after candidate-bound checks pass', async () => {
     const store = new FixtureStore();
     const h = harness(store);
@@ -214,6 +234,15 @@ describe('local Fixerrors durable queue contract (transaction fixture)', () => {
     expect(store.state.jobs[1].approval?.releaseMode).toBe(mode);
     expect(store.events.at(-1)?.releaseMode).toBe(mode);
     expect((await h.claim()).job.approval?.releaseMode).toBe(mode);
+  });
+
+  it('does not claim an approved deployment while an execution reconciliation hold remains', async () => {
+    const store = new FixtureStore();
+    const h = harness(store);
+    await h.approve(await h.testedRepair());
+    store.state.devices[0].holdReason = 'packet-needs-reconciliation';
+    await expect(h.claim()).rejects.toThrow('reconciliation');
+    expect(store.state.jobs[1].state).toBe('queued');
   });
 
   it('requires true consent and a known explicit mode, while preserving historical full-only jobs', async () => {

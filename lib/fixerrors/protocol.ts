@@ -19,7 +19,7 @@ export const workspaceSchema = z.object({
   clean: z.literal(true),
 }).strict();
 export const checkoutSchema = workspaceSchema.omit({ packetSha256: true });
-export const runnerHoldSchema = z.enum(['packet-needs-reconciliation', 'prepared-candidate', 'checkout-unavailable']);
+export const runnerHoldSchema = z.enum(['packet-needs-reconciliation', 'prepared-candidate', 'checkout-unavailable', 'checks-preparing', 'checks-unavailable']);
 export const checksSchema = z.object({
   head: gitOid,
   tree: gitOid,
@@ -39,6 +39,9 @@ export type ReleaseMode = z.infer<typeof releaseModeSchema>;
 export const jobStateSchema = z.enum(['queued', 'leased', 'paused', 'reviewed', 'tested', 'blocked', 'failed', 'expired', 'deployed', 'unknown', 'no-work', 'no-change']);
 export const blockReasonSchema = z.enum([
   'bridge-unavailable', 'local-opt-out', 'checkout-drift', 'lease-lost', 'timeout', 'execution-failed', 'release-unconfirmed',
+]);
+export const nativeDiagnosticSchema = z.enum([
+  'native-import-unavailable', 'typecheck-cache-not-ready', 'batch-initialization-refused', 'batch-execution-unconfirmed',
 ]);
 export const batchProgressSchema = z.object({
   captured: z.number().int().nonnegative(), rows: z.number().int().nonnegative(),
@@ -78,6 +81,7 @@ export const jobSchema = z.object({
     deployStartedAt: z.number().int().optional(),
   }).strict().nullable(),
   reason: blockReasonSchema.nullable(),
+  diagnostic: nativeDiagnosticSchema.optional(),
   // Private sanitized evidence, not browser-visible queue state or launch authority.
   packet: z.string().min(1).max(96 * 1024).optional(),
   batch: batchProgressSchema.optional(),
@@ -124,7 +128,7 @@ export const adminCommandSchema = z.discriminatedUnion('op', [
 ]);
 export const resultSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('blocked'), reason: blockReasonSchema }).strict(),
-  z.object({ status: z.literal('failed'), reason: z.literal('execution-failed') }).strict(),
+  z.object({ status: z.literal('failed'), reason: z.literal('execution-failed'), diagnostic: nativeDiagnosticSchema.optional() }).strict(),
   z.object({ status: z.literal('reviewed') }).strict(),
   z.object({ status: z.literal('tested'), candidate: candidateSchema, checks: checksSchema }).strict(),
   z.object({ status: z.literal('deployed'), candidate: candidateSchema }).strict(),

@@ -48,6 +48,36 @@ const pause = (id: string) => ({ jobId: id, paused: 'b'.repeat(64) });
 const wire = (...frames: unknown[]) => frames.map(frame => JSON.stringify(frame) + '\n').join('');
 
 describe('native framed batch terminal acknowledgement', () => {
+  it.each(['native-import-unavailable', 'typecheck-cache-not-ready', 'batch-initialization-refused', 'batch-execution-unconfirmed'])(
+    'retains only an allowlisted correlated failure diagnostic without confirming stop: %s', async diagnostic => {
+      const f = await fixture(job => wire({ jobId: job.id, diagnostic }), 2);
+      await expect(f.run()).rejects.toThrow('completion unconfirmed');
+      expect(f.context.diagnostic).toBe(diagnostic);
+      expect(f.context.stopped).not.toBe(true);
+    },
+  );
+
+  it.each([
+    { diagnostic: 'private exception text' },
+    { diagnostic: 'native-import-unavailable', jobId: '00000000-0000-4000-8000-000000000000' },
+    { diagnostic: 'native-import-unavailable', exception: 'private exception text' },
+  ])('rejects untrusted diagnostic contents and foreign job bindings: %j', async frame => {
+    const f = await fixture(job => wire({ jobId: job.id, ...frame }), 2);
+    await expect(f.run()).rejects.toThrow('completion unconfirmed');
+    expect(f.context.diagnostic).toBeUndefined();
+    expect(f.context.stopped).not.toBe(true);
+  });
+
+  it('never grants more authority after a failure diagnostic', async () => {
+    const f = await fixture(job => wire({ jobId: job.id, diagnostic: 'batch-initialization-refused' }, { lease: {
+      runId: job.id, deviceId: job.deviceId, manifestSha256: job.workspace.packetSha256,
+      checkpointSha256: 'c'.repeat(64), cursor: 0, resume: false, outcome: null,
+    } }), 2);
+    await expect(f.run()).rejects.toThrow('completion unconfirmed');
+    expect(f.context.lease).not.toHaveBeenCalled();
+    expect(f.context.stopped).not.toBe(true);
+  });
+
   it('delivers framed chunks and marks stopped only after completion and exit zero', async () => {
     const f = await fixture(job => wire(complete(job.id)));
     expect(await f.run()).toEqual({ status: 'no-change' });

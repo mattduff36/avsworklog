@@ -221,6 +221,10 @@ export function reconcilePacketLifecycle(
   const active = path.join(directory, 'active-packet.json');
   const packet = path.join(directory, 'sanitized-packet.json');
   const prepared = path.join(directory, 'prepared-release.json');
+  // Initialization can retain its exclusive lock before writing any journal.
+  if (existsSync(path.join(directory, 'batch-executor.lock'))) {
+    return 'packet-needs-reconciliation';
+  }
   if (!existsSync(active)) return existsSync(prepared) ? 'prepared-candidate'
     : existsSync(packet) || existsSync(path.join(directory, 'batch-manifest.json')) ? 'packet-needs-reconciliation' : null;
   const journalBytes = readLifecycleFile(active, 16 * 1024 * 1024);

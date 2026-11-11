@@ -67,6 +67,21 @@ async function connected() {
 }
 
 describe('fresh evidence -> signed job -> exclusive packet -> fake worker (offline)', () => {
+  it('holds a retained batch lock even without a journal or manifest and never removes evidence', () => {
+    const directory = disposable();
+    const lock = path.join(directory, 'batch-executor.lock');
+    const bytes = JSON.stringify({ pid: 2147483647, jobId: randomUUID() });
+    writeFileSync(lock, bytes);
+    expect(reconcilePacketLifecycle(directory, checkout)).toBe('packet-needs-reconciliation');
+    expect(reconcilePacketLifecycle(directory, null)).toBe('packet-needs-reconciliation');
+    expect(readFileSync(lock, 'utf8')).toBe(bytes);
+    expect(existsSync(path.join(directory, 'active-packet.json'))).toBe(false);
+    expect(existsSync(path.join(directory, 'archive'))).toBe(false);
+    writeFileSync(path.join(directory, 'prepared-release.json'), 'retained private fixture');
+    expect(reconcilePacketLifecycle(directory, checkout)).toBe('packet-needs-reconciliation');
+    expect(readFileSync(lock, 'utf8')).toBe(bytes);
+  });
+
   it('connects without any packet and crosses the actual signature and completion boundaries twice', async () => {
     const directory = disposable();
     const { store, h, enqueue, claim } = await connected();

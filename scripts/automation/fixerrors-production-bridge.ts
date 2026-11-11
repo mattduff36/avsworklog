@@ -5,7 +5,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { z } from 'zod';
 import {
-  candidateSchema, resultSchema, sha256Schema, type ExecutionResult, type FixerrorsJob,
+  candidateSchema, resultSchema, sha256Schema, nativeDiagnosticSchema, type ExecutionResult, type FixerrorsJob,
 } from '../../lib/fixerrors/protocol';
 import { checkEvidenceDigest } from '../../lib/fixerrors/control';
 import { encodeFixerrorsDeviceJob, fixerrorsDeviceJobSchema, fixerrorsDeviceSigningBytes } from '../../lib/fixerrors/admission';
@@ -181,6 +181,17 @@ export async function invokeProductionBatch(
     child.stdin.write(`${JSON.stringify(value)}\n`, error => error ? reject(error) : resolve());
   });
   const handle = async (frame: unknown) => {
+    if (context.diagnostic) throw new Error('Native frame after failure diagnostic');
+    const diagnostic = z.object({
+      jobId: z.string().uuid(), diagnostic: nativeDiagnosticSchema,
+    }).strict().safeParse(frame);
+    if (diagnostic.success) {
+      if (diagnostic.data.jobId !== job.id || result || context.paused || context.diagnostic) {
+        throw new Error('Native diagnostic binding changed');
+      }
+      context.diagnostic = diagnostic.data.diagnostic;
+      return;
+    }
     const lease = z.object({ lease: z.object({
       runId: z.string().uuid(), deviceId: z.string().uuid(), manifestSha256: sha256Schema,
       checkpointSha256: sha256Schema, cursor: z.number().int().nonnegative(),
@@ -235,7 +246,7 @@ export async function invokeProductionBatch(
     }
     const code = await closed;
     await chain;
-    if (failure || signal.aborted || pending.length || (!result && !context.paused) ||
+    if (failure || context.diagnostic || signal.aborted || pending.length || (!result && !context.paused) ||
         (result && code !== 0) || (context.paused && code !== 2)) throw new Error('Native batch completion unconfirmed');
     context.stopped = true;
     return result ?? { status: 'blocked', reason: 'execution-failed' };

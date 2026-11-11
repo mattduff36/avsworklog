@@ -273,6 +273,7 @@ export function applyDeviceCommand(
     if (!job) return { ok: true as const, claim: null };
     assertNoUnconfirmedRelease(state, job.action);
     assertOptIn(device, job.action);
+    if (job.action === 'deploy' && device.holdReason && device.holdReason !== 'prepared-candidate') deny('Runner execution outcome requires reconciliation');
     const current = device.checkout ?? device.workspace;
     const resuming = job.state === 'paused';
     if (resuming && (!job.privateBatch?.stopped || !job.privateBatch.checkpoint)) deny('Batch stop is not confirmed');
@@ -427,6 +428,7 @@ export function applyDeviceCommand(
         !sameCandidate(job.approval.candidate, result.candidate)) deny('Wrong deployed candidate');
   }
   job.state = result.status;
+  if (result.status === 'failed' && result.diagnostic) job.diagnostic = result.diagnostic;
   job.reason = result.status === 'blocked' || result.status === 'failed' || result.status === 'unknown' ? result.reason : null;
   job.lease = null;
   audit(`job-${job.state}`, job.id);

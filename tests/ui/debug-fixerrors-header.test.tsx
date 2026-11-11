@@ -61,16 +61,13 @@ describe('Debug Fixerrors header', () => {
     expect(within(banner as HTMLElement).getByText('Fixerrors')).toBeDefined();
     expect(screen.getAllByLabelText('Fixerrors companion')).toHaveLength(1);
     const toolbar = screen.getByLabelText('Fixerrors companion');
-    expect(toolbar.children).toHaveLength(2);
-    expect(within(toolbar.children[0] as HTMLElement).getByRole('button', { name: 'Review' })).toBeDefined();
-    expect(within(toolbar.children[0] as HTMLElement).getByRole('button', { name: 'Run batch' })).toBeDefined();
-    expect(within(toolbar.children[1] as HTMLElement).getByRole('button', { name: 'Activity (0)' })).toBeDefined();
-    expect(within(toolbar.children[1] as HTMLElement).getByRole('button', { name: 'Runner settings' })).toBeDefined();
-    expect(within(toolbar.children[1] as HTMLElement).getAllByRole('button')).toHaveLength(2);
+    expect(toolbar.children).toHaveLength(1);
+    expect(within(toolbar).getByRole('button', { name: 'Run Fixerrors' })).toBeDefined();
+    expect(within(toolbar).getAllByRole('button')).toHaveLength(2);
     expect(screen.queryByRole('button', { name: /^History/ })).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/debug/fixerrors')).toHaveLength(1);
-    expect(timer.mock.calls.filter(([, delay]) => delay === 15_000)).toHaveLength(1);
+    expect(timer.mock.calls.filter(([, delay]) => delay === 20_000)).toHaveLength(1);
     expect(toolbar.className).toContain('min-w-0');
     expect(toolbar.children[0].className).toContain('flex-wrap');
     expect(toolbar.parentElement?.className).toContain('flex-col');
@@ -82,7 +79,7 @@ describe('Debug Fixerrors header', () => {
     const clear = vi.spyOn(globalThis, 'clearInterval');
     const view = render(<DebugPage />);
     await screen.findByText('No errors logged');
-    const pollingIndex = timer.mock.calls.findIndex(([, delay]) => delay === 15_000);
+    const pollingIndex = timer.mock.calls.findIndex(([, delay]) => delay === 20_000);
     const callback = timer.mock.calls[pollingIndex][0];
     await act(async () => { if (typeof callback === 'function') callback(); });
     expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/debug/fixerrors')).toHaveLength(2);
@@ -97,7 +94,7 @@ describe('Debug Fixerrors header', () => {
     view.rerender(<DebugPage />);
     await screen.findByText('No errors logged');
     await waitFor(() => expect(vi.mocked(fetch).mock.calls.filter(([url]) => url === '/api/debug/fixerrors')).toHaveLength(3));
-    expect(timer.mock.calls.filter(([, delay]) => delay === 15_000)).toHaveLength(2);
+    expect(timer.mock.calls.filter(([, delay]) => delay === 20_000)).toHaveLength(2);
     expect(screen.getAllByLabelText('Fixerrors companion')).toHaveLength(1);
   });
 
@@ -115,7 +112,7 @@ describe('Debug Fixerrors header', () => {
       expect(screen.queryByText('Fixerrors')).toBeNull();
       await act(async () => {});
       expect(fetch).not.toHaveBeenCalled();
-      expect(timer.mock.calls.filter(([, delay]) => delay === 15_000)).toHaveLength(0);
+      expect(timer.mock.calls.filter(([, delay]) => delay === 20_000 || delay === 3_000)).toHaveLength(0);
     },
   );
 

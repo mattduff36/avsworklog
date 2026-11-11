@@ -44,7 +44,7 @@ These are development results, not installed-service or live operational approva
    fixed `main` checkout, available pinned bridge and successful heartbeat can
    report **Connected - waiting** without any precreated packet. Status remains
    read-only. Retained packets, uncertain locks and prepared candidates are holds.
-3. As actual SuperAdmin outside View As, open Debug and choose **Review errors**.
+3. As actual SuperAdmin outside View As, open Debug and choose **Run Fixerrors**.
    The same-origin request checks queue/device/checkout eligibility, then reads
    fresh evidence outside the queue lock and rechecks before committing a job.
    An empty read records terminal **no-work**, with no signed claim or worker.
@@ -73,8 +73,8 @@ actionable defect. Sensitive evidence remains CRITICAL; network evidence remains
 report-only. Capture does not triage, archive, resolve, clean up or mutate incidents:
 Everyday Debug review/repair captures all eligible new and old held/outstanding
 errors in one run; there is no per-error selector. Previous Fixerrors activity is
-collapsed by default and includes all retained queue history; active and unresolved
-work stays visible. Legacy single-packet helpers below remain separate compatibility
+inside the unified control centre and includes all retained queue history, with
+active and unresolved work ordered first. Legacy single-packet helpers below remain separate compatibility
 surfaces, not the everyday workflow.
 
 **Shared full-batch capture and execution.**
@@ -97,6 +97,57 @@ candidate-bound Deploy are wired in source. Editing these sources neither
 activates nor installs the owner-controlled runner.
 Do not feed an oversized batch to the single-cluster executor or invoke it once
 per error; either would lose coverage or prepare multiple release candidates.
+
+### Debug control centre
+
+**Run Fixerrors** opens one control centre immediately, even while its first
+snapshot is loading. Opening it does not enqueue work. Runner settings, current
+status, counted activity filters and all retained attempts are in that same
+dialog; there is no separate settings/history modal or per-error picker.
+**Start review and repair** requests one fresh full-batch review, then requests
+one fresh full-batch repair only after that exact review completes, its lifecycle
+is applied, and the same runner/checkout remains eligible. It does not send a
+legacy `reviewJobId` or silently reuse single-packet evidence.
+
+This workflow requires all three independent review/repair/deploy opt-ins
+(owner consent and runtime **D**), without falling back to review-only. On the
+enrolled Windows PC, stop the runner, choose **E / D**, confirm **SET DEPLOY**,
+then restart Terminal or Service with runtime **D**. This is workflow consent,
+not deployment approval. The tested result stops at **Deploy-ready** and still
+requires the separate, initially unchecked exact-candidate Deploy dialog and
+explicit full/targeted check mode. Candidate drift or unavailable state clears
+that decision.
+
+Keep the page open for sequential continuation. Closing the control-centre
+dialog does not cancel recorded work; **Stop automatic continuation** prevents
+the browser submitting the next stage, whereas **Cancel run** targets the
+recorded job. Reloading never resumes browser submission automatically. Failed
+refreshes, revoked D consent and retained-work/release holds stop continuation.
+
+Polling is serialized (3 seconds active/connecting, 20 seconds idle), with
+focus/visibility/online refresh and a 10-second GET deadline. A failed refresh
+retains and labels the last successful snapshot, disables unsafe actions and
+clears Deploy consent. POSTs are not retried automatically; an unconfirmed POST
+may already be recorded, so refresh and inspect activity before retrying.
+Progress shows only reported state, counts, actual runner contact, snapshot-relative
+elapsed time and lease/admission deadlines, not a fabricated operation stage or ETA.
+**Copy diagnostics** copies only correlation IDs, fixed codes, counts, deadlines,
+snapshot freshness and candidate hashes; never packets, enrollment, credentials
+or exception prose.
+
+Browser launch remains disabled. The installed same-user Windows named pipe
+supports authenticated status/stop, not browser discovery or starting a stopped
+host. No insecure protocol-handler fallback or browser-accessible listener is
+introduced; start the installed manager on the enrolled PC.
+
+Before a production repair-enabled companion admits work on a new clean commit,
+it reports `checks-preparing` and verifies its protected TypeScript cache. Ordinary
+source drift (including release metadata) runs the existing bounded `check`, then
+revalidates the cache and unchanged clean HEAD/tree. This never invokes parent-only
+`warmup`, replaces damaged cache state or bypasses checks. A failure reports
+`checks-unavailable` until the cause is repaired and the runner restarted. Preparation
+has no claimed job or signed execution deadline to consume; periodic authenticated
+heartbeats keep its preparation status visible.
 
 The private job stores the canonical manifest, clean HEAD/tree and SHA-256.
 Only its authenticated leased device receives the manifest and v1 signed admission.
@@ -734,6 +785,21 @@ candidate, artifacts and genuine receipts, without repeating completed workers.
 `.git\squires-fixerrors\batch-executor.lock` serializes execution. Inflight,
 preparing, completed replay, stale crash locks and uncertain cancellation require
 reconciliation; no automatic lock deletion or guessed completion is supplied.
+Initialization failures after the executor lock is acquired can retain that
+lock before any native run directory or journal exists. An absent PID alone
+does not prove the outcome or authorize lock deletion. The companion now reports
+an independent retained lock as a reconciliation hold even without a journal or
+manifest; it does not claim readiness or remove that lock. The framed transport
+can now report only job-bound `native-import-unavailable`,
+`typecheck-cache-not-ready`, `batch-initialization-refused` or
+`batch-execution-unconfirmed` diagnostics. These preserve failure/uncertainty;
+they are not a terminal success, stop acknowledgement or resume authority.
+Unknown exception messages, paths and tracebacks are not projected.
+Older failures cannot be diagnosed retroactively from this change. The owner
+must reconcile the exact job, stopped process tree, candidate, signed admission,
+private receipts and retained lock before a retry. Reviewed source must be
+installed and SHA-repinned through the existing installer before these new
+native diagnostics are available; repository edits do not update installed code.
 The legacy single-packet lifecycle adapter holds batch journals; the dedicated
 batch adapter handles confirmed completion and archival without deleting durable
 replay or native artifacts. Uncertain and inflight evidence remains held.
