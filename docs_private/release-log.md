@@ -2,6 +2,42 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.13.2
+
+**GIT COMMIT MESSAGE**
+`fix(debug): retain opt-in full validation choice for separate deployment`
+
+**PUSHED AT**
+2026-11-11T23:24:51.628Z
+
+**WHAT CHANGED**
+Retain opt-in full validation choice for separate deployment.
+
+**VERSION HISTORY DETAILS**
+- Retain opt-in full validation choice for separate deployment, with changes to app screens.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(debug): retain opt-in full validation choice for separate deployment`
+
+## 1126.13.1
+
+**GIT COMMIT MESSAGE**
+`fix(debug): run investigation and repair in one durable batch`
+
+**PUSHED AT**
+2026-11-11T23:21:15.773Z
+
+**WHAT CHANGED**
+Run investigation and repair in one durable batch.
+
+**VERSION HISTORY DETAILS**
+- Run investigation and repair in one durable batch, with changes to app screens.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix(debug): run investigation and repair in one durable batch`
+
 ## 1126.13.0
 
 **GIT COMMIT MESSAGE**

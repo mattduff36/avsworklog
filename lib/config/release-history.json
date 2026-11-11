@@ -1,5 +1,43 @@
 [
   {
+    "version": "1126.13.2",
+    "updateKind": "minor",
+    "title": "Debug tools improvements",
+    "description": "Retain opt-in full validation choice for separate deployment.",
+    "summary": "Retain opt-in full validation choice for separate deployment.",
+    "details": [
+      "Retain opt-in full validation choice for separate deployment, with changes to app screens.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Debug tools"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-11T23:24:51.628Z"
+  },
+  {
+    "version": "1126.13.1",
+    "updateKind": "minor",
+    "title": "Debug tools improvements",
+    "description": "Run investigation and repair in one durable batch.",
+    "summary": "Run investigation and repair in one durable batch.",
+    "details": [
+      "Run investigation and repair in one durable batch, with changes to app screens.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Debug tools",
+      "Run investigation",
+      "Repair in one durable batch"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-11T23:21:15.773Z"
+  },
+  {
     "version": "1126.13.0",
     "updateKind": "major",
     "title": "Debug tools update",
