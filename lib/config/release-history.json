@@ -1,5 +1,25 @@
 [
   {
+    "version": "1126.13.0",
+    "updateKind": "major",
+    "title": "Debug tools update",
+    "description": "Unify Fixerrors runs and prepare runner checks before admission.",
+    "summary": "Unify Fixerrors runs and prepare runner checks before admission.",
+    "details": [
+      "Unify Fixerrors runs and prepare runner checks before admission, with changes to app screens and automated tests.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "Debug tools",
+      "Unify Fixerrors runs",
+      "Prepare runner checks before admission"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-11T23:17:16.360Z"
+  },
+  {
     "version": "1126.12.0",
     "updateKind": "major",
     "title": "Debug tools update",

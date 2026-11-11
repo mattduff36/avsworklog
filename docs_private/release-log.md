@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.13.0
+
+**GIT COMMIT MESSAGE**
+`feat(debug): unify Fixerrors runs and prepare runner checks before admission`
+
+**PUSHED AT**
+2026-11-11T23:17:16.360Z
+
+**WHAT CHANGED**
+Unify Fixerrors runs and prepare runner checks before admission.
+
+**VERSION HISTORY DETAILS**
+- Unify Fixerrors runs and prepare runner checks before admission, with changes to app screens and automated tests.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(debug): unify Fixerrors runs and prepare runner checks before admission`
+
 ## 1126.12.0
 
 **GIT COMMIT MESSAGE**
