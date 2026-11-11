@@ -149,8 +149,8 @@ export function FixerrorsControlPanel() {
             })}
             {(() => {
               const attention = (job: Snapshot['jobs'][number]) => ['queued', 'leased', 'paused', 'unknown'].includes(job.state) ||
-                (job.batch && (job.batch.remaining > 0 || job.batch.lifecycle !== 'applied' ||
-                  ((job.batch.counts.held > 0 || job.batch.counts.failed > 0) && !snapshot.jobs.some(later =>
+                (job.batch && (job.lifecycleReconciliationRequired ||
+                  ((job.batch.remaining > 0 || job.batch.counts.held > 0 || job.batch.counts.failed > 0) && !snapshot.jobs.some(later =>
                     later.deviceId === job.deviceId && later.createdAt > job.createdAt && later.batch?.lifecycle === 'applied')))) ||
                 (job.state === 'tested' && !snapshot.jobs.some(release => release.parentRepairId === job.id && release.state === 'deployed'));
               const activeJobs = snapshot.jobs.filter(attention);

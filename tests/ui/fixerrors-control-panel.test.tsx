@@ -156,6 +156,32 @@ describe('Debug local Fixerrors controls', () => {
     expect(button.disabled).toBe(required);
   });
 
+  it('collapses superseded partial attempts but keeps genuinely unresolved completed receipts visible', async () => {
+    const store = new FixtureStore();
+    const h = harness(store);
+    await h.enqueue();
+    const old = store.state.jobs[0];
+    old.state = 'failed'; old.createdAt = now - 1000;
+    old.batch = { captured: 7, rows: 7, processed: 1, remaining: 6,
+      counts: { 'verified-local': 0, held: 1, 'report-only': 0, failed: 0 }, lifecycle: 'pending' };
+    await h.enqueue();
+    const latest = store.state.jobs[1];
+    latest.state = 'no-change';
+    latest.batch = { captured: 7, rows: 7, processed: 7, remaining: 0,
+      counts: { 'verified-local': 0, held: 7, 'report-only': 0, failed: 0 }, lifecycle: 'applied' };
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
+    render(<FixerrorsControlPanel />);
+    await screen.findByText('7 / 7 cases processed; 0 remaining (7 error rows captured).');
+    expect(screen.queryByText('1 / 7 cases processed; 6 remaining (7 error rows captured).')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Previous Fixerrors activity/ }));
+    expect(screen.getByText('1 / 7 cases processed; 6 remaining (7 error rows captured).')).toBeDefined();
+    cleanup();
+    snapshot.jobs.find(job => job.id === old.id)!.lifecycleReconciliationRequired = true;
+    render(<FixerrorsControlPanel />);
+    await screen.findByText('1 / 7 cases processed; 6 remaining (7 error rows captured).');
+  });
+
   it('keeps paused batch coverage visible and sends cancellation for only that run', async () => {
     const store = new FixtureStore();
     const h = harness(store);
