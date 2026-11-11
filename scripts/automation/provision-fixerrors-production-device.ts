@@ -7,7 +7,8 @@ import { writeProtectedFixerrorsEnrollment } from './provision-fixerrors-local-d
 import { productionBridgeFiles } from './fixerrors-production-bridge';
 
 const appData = process.env.LOCALAPPDATA ?? '';
-const protection = path.join(appData, 'Squires', 'Fixerrors');
+const protection = path.join(homedir(), '.codex', 'cursor-worker', 'squires-device-secrets');
+const legacyProtection = path.join(appData, 'Squires', 'Fixerrors');
 const bridge = path.join(homedir(), '.codex', 'cursor-worker', 'squires-production-bridge');
 const enrollment = path.join(homedir(), '.codex', 'cursor-worker', 'squires-companion');
 const gitExe = 'C:\\Program Files\\Git\\cmd\\git.exe';
@@ -30,7 +31,7 @@ function pair() {
   if (!path.isAbsolute(process.argv[3]) || path.basename(pythonExe).toLowerCase() !== 'python.exe') {
     throw new Error('A fixed Windows Python executable is required');
   }
-  if (existsSync(enrollment) || deviceFiles.some((file) => existsSync(path.join(protection, file)))) {
+  if (existsSync(enrollment) || deviceFiles.some((file) => existsSync(path.join(protection, file)) || existsSync(path.join(legacyProtection, file)))) {
     throw new Error('Existing enrollment requires owner review');
   }
   const bridgeHashes = productionBridgeFiles.map((file) => fileDigest(path.join(bridge, file)));

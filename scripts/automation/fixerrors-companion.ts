@@ -206,12 +206,12 @@ const localCredentialSchema = z.object({
   credential: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
 }).strict();
 
-function readProtectedEnrollment(file: 'device.dpapi' | 'production-device.dpapi'): unknown {
+export function readProtectedEnrollment(file: 'device.dpapi' | 'production-device.dpapi'): unknown {
   if (process.platform !== 'win32') throw new Error('Windows required');
   const powershell = path.win32.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32\\WindowsPowerShell\\v1.0\\powershell.exe');
   const text = execFileSync(powershell, [
     '-NoProfile', '-NonInteractive', '-Command',
-    `$ErrorActionPreference='Stop'; $p=Join-Path $env:LOCALAPPDATA 'Squires\\Fixerrors\\${file}'; ` +
+    `$ErrorActionPreference='Stop'; $p=Join-Path $env:USERPROFILE '.codex\\cursor-worker\\squires-device-secrets\\${file}'; ` +
     '$s=Get-Content -LiteralPath $p -Raw | ConvertTo-SecureString; ' +
     '$b=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($s); ' +
     'try {[Console]::Out.Write([Runtime.InteropServices.Marshal]::PtrToStringBSTR($b))} ' +

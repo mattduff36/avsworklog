@@ -290,7 +290,15 @@ No production schema is created or applied by these commands. Setup replay
 fails instead of resetting existing state. Provisioning generates a random
 credential locally, stores only its SHA-256 in the dedicated database and
 writes DPAPI CurrentUser-encrypted enrollment to
-`%LOCALAPPDATA%\Squires\Fixerrors\device.dpapi` in an owner-only directory.
+`%USERPROFILE%\.codex\cursor-worker\squires-device-secrets\device.dpapi` in an owner-only directory.
+Production uses `production-device.dpapi` and `production-issuers.dpapi` in that
+same directory. This location is shared by packaged Codex, ordinary terminals and
+SCM; `%LOCALAPPDATA%` may be redirected into Codex's private package cache.
+For an existing installation, stop all hosts and copy the existing encrypted
+files byte-for-byte into the new owner-only directory, verify matching hashes and
+retain the original as recovery evidence. Do not regenerate keys or pairing.
+Reads never fall back to another enrollment; provisioning refuses a legacy file
+instead of silently replacing its identity.
 The secret crosses a local child-process stdin pipe, not argv or console.
 The site never accepts or displays keys. Revoke the device through the card.
 Rotation/re-enrollment and recovery after an uncertain provisioning commit
@@ -932,7 +940,7 @@ installation/repin sequence (no secret is printed):
 $ErrorActionPreference='Stop'
 $repo='D:\Websites\avsworklog'
 $bridge=Join-Path $env:USERPROFILE '.codex\cursor-worker\squires-production-bridge'
-$device=Join-Path $env:LOCALAPPDATA 'Squires\Fixerrors\production-device.dpapi'
+$device=Join-Path $env:USERPROFILE '.codex\cursor-worker\squires-device-secrets\production-device.dpapi'
 $cfgPath=Join-Path $env:USERPROFILE '.codex\cursor-worker\squires-companion\enrollment.json'
 $secure=Get-Content -LiteralPath $device -Raw | ConvertTo-SecureString
 $b=[Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)

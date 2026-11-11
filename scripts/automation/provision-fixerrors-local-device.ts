@@ -19,8 +19,9 @@ export function writeProtectedFixerrorsEnrollment(
   // DPAPI CurrentUser plus an owner-only directory ACL. Secret travels over stdin,
   // never command-line arguments, browser, console or the database.
   execFileSync(powershell, ['-NoProfile', '-NonInteractive', '-Command',
-    "$ErrorActionPreference='Stop'; $dir=Join-Path $env:LOCALAPPDATA 'Squires\\Fixerrors'; " +
+    "$ErrorActionPreference='Stop'; $dir=Join-Path $env:USERPROFILE '.codex\\cursor-worker\\squires-device-secrets'; " +
     `$file=Join-Path $dir '${file}'; if(Test-Path -LiteralPath $file){throw 'Already provisioned'}; ` +
+    `if(Test-Path -LiteralPath (Join-Path $env:LOCALAPPDATA 'Squires\\Fixerrors\\${file}')){throw 'Existing legacy enrollment requires migration, not replacement'}; ` +
     '$sid=[Security.Principal.WindowsIdentity]::GetCurrent().User; ' +
     '$acl=New-Object Security.AccessControl.DirectorySecurity; $acl.SetOwner($sid); $acl.SetAccessRuleProtection($true,$false); ' +
     "$rule=New-Object Security.AccessControl.FileSystemAccessRule($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow'); " +
