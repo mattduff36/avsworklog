@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.17.1
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): keep preapproval heartbeats responsive`
+
+**PUSHED AT**
+2026-11-12T17:36:09.391Z
+
+**WHAT CHANGED**
+Keep preapproval heartbeats responsive.
+
+**VERSION HISTORY DETAILS**
+- Updated approvals, with changes to shared logic.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): keep preapproval heartbeats responsive`
+
 ## 1126.17.0
 
 **GIT COMMIT MESSAGE**
