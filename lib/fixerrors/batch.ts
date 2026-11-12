@@ -4,6 +4,7 @@ import { parseAutomaticFixerrorsRetrieval, type AutoRunResult } from '../../scri
 import { parseDecision } from '../../scripts/fixerrors-decision';
 import type { LifecycleBinding } from '../../scripts/fixerrors-lifecycle-run';
 import { parseLifecyclePlan, type LifecyclePlan, type LifecycleRecord } from '../../scripts/fixerrors-lifecycle';
+import { classifyIncident, triageSchema, timingsSchema } from './triage';
 
 export const BATCH_CHUNK_BYTES = 48 * 1024;
 export const batchHash = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -31,6 +32,7 @@ export const batchOutcomeSchema = z.object({
     id: z.string(), status: z.enum(['verified-local', 'held', 'report-only', 'failed']),
     reason: z.string(), attempt: z.string(), tests: z.array(z.string()), evidence: z.array(z.string()),
     reusedFrom: z.string().optional(),
+    triage: triageSchema.optional(), timings: timingsSchema.optional(),
   }).strict()),
   decisions: z.array(z.unknown()),
 }).strict();
@@ -133,6 +135,10 @@ export function validateBatchOutcome(batch: CapturedBatch, value: unknown, runId
       decisions.some(entry => !result.clusters.some(cluster => cluster.id === entry.id)) ||
       decisions.some(entry => entry.disposition === 'fixed_live')) throw new Error('Invalid batch decisions');
   for (const cluster of result.clusters) {
+    const evidence = expected.find(entry => entry.id === cluster.id)!;
+    if (cluster.triage && JSON.stringify(cluster.triage) !== JSON.stringify(classifyIncident(evidence.diagnostics))) {
+      throw new Error('Batch importance does not match captured evidence and policy');
+    }
     const decision = decisions.find(entry => entry.id === cluster.id);
     if ((cluster.status === 'verified-local' && decision?.action !== 'fix') ||
         (cluster.status === 'report-only' && decision?.action !== 'report-only')) {

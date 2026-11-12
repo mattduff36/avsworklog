@@ -47,7 +47,7 @@ with tempfile.TemporaryDirectory(prefix='SquiresRepairFixture-') as temporary:
                         '$id,"FullControl","ContainerInherit,ObjectInherit","None","Allow")); '
                         'Set-Acl -LiteralPath $args[0] -AclObject $acl }', str(cache_root)],
                        check=True, stdout=subprocess.DEVNULL, env=r.local_env())
-        write('.gitignore', 'node_modules/\n')
+        write('.gitignore', 'node_modules/\ndocs_private/fixerrors-runtime-knowledge.json*\n')
         write('package.json', '{"type":"module"}')
         write('tsconfig.json', '{"compilerOptions":{"target":"ES2022","module":"ESNext","moduleResolution":"Bundler","skipLibCheck":true},"include":["lib/utils/*.ts","tests/unit/*.ts"]}')
         write('eslint.config.mjs', 'export default [{files:["**/*.ts"], rules:{"no-debugger":"error"}}];')
@@ -57,13 +57,17 @@ with tempfile.TemporaryDirectory(prefix='SquiresRepairFixture-') as temporary:
         if batch_mode:
             write('lib/utils/second-label.ts', 'export const secondLabel = value => String(value);\n')
             write('tests/unit/second-label.test.ts', 'import {expect,it} from "vitest"; import {secondLabel} from "../../lib/utils/second-label"; it("second label",()=>expect(secondLabel(" label ")).toBe(" label "));\n')
-        for name in (r.CHECK_SCRIPT, r.CACHE_SCRIPT, 'scripts/bump-release-version.ts', 'scripts/finalise-summary.ts',
+        for name in (r.CHECK_SCRIPT, r.CACHE_SCRIPT, r.ANALYSIS_CATALOGUE, r.EFFORT_POLICY, 'lib/fixerrors/triage.ts',
+                     'scripts/bump-release-version.ts', 'scripts/finalise-summary.ts',
                      'lib/config/release-version-logic.ts', 'lib/config/release-module-descriptors.ts', 'types/roles.ts'):
             write(name, (repo / name).read_text(encoding='utf-8'))
         if batch_mode:
             for name in ('scripts/fixerrors-auto.ts', 'scripts/fixerrors-decision.ts',
                          'scripts/fixerrors-knowledge.ts', 'scripts/fixerrors-safety.ts'):
                 write(name, (repo / name).read_text(encoding='utf-8'))
+            write(r.ANALYSIS_CATALOGUE, json.dumps([
+                dict(source='lib/utils/display-label.ts', tests=['tests/unit/display-label.test.ts']),
+                dict(source='lib/utils/second-label.ts', tests=['tests/unit/second-label.test.ts'])]))
         # Pin this copied fixture helper to disposable paths, never the production checkout/cache.
         helper = (checkout / r.CACHE_SCRIPT).read_text(encoding='utf-8')
         helper = helper.replace('export const WORKSPACE = String.raw`D:\\Websites\\avsworklog`;',

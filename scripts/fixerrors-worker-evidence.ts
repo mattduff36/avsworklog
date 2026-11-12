@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
-import { basename, join, resolve, sep } from 'node:path';
+import { basename, join, posix, resolve, sep } from 'node:path';
 import type { AutoRetrieval } from './fixerrors-auto';
 import { isFixerrorsSourcePath } from './fixerrors-auto';
 import { retrieveIncidents, type KnowledgeStore } from './fixerrors-knowledge';
@@ -43,15 +43,33 @@ export function createWorkerEvidenceProjector(repoRoot = process.cwd()) {
   }
   return (cluster: Cluster, knowledge: KnowledgeStore): Cluster => {
     const sourceFiles = cluster.sourceFiles.filter(name => source(name) !== null);
+    const relatedSourceFiles = [...new Set(sourceFiles.flatMap(name => {
+      const imports = [...source(name)!.matchAll(/(?:from\s*|import\s*)['"]([^'"]+)['"]/gu)];
+      return imports.flatMap(([, specifier]) => {
+        const base = specifier.startsWith('@/') ? specifier.slice(2) : specifier.startsWith('.')
+          ? posix.normalize(posix.join(posix.dirname(name), specifier)) : '';
+        if (!base) return [];
+        const found = [base, `${base}.ts`, `${base}.tsx`, `${base}/index.ts`, `${base}/index.tsx`]
+          .find(candidate => source(candidate) !== null);
+        return found ? [found] : [];
+      });
+    }))].slice(0, 12);
     const content = sourceFiles.map(name => source(name)).join('\n');
     const literals = [...content.matchAll(/(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/gu)]
       .map(match => match[2]).filter(value => value.length >= 4 && value.length <= 200 && !/\\[rn]/u.test(value));
     const literal = (value: string | null) => value !== null && literals.includes(value);
     const message = (value: string) => {
+      const consoleValue = value.replace(/^(?:console\.error:?\s*|\[console\.error\]\s*)/iu, '');
       for (const template of literals) {
         const parts = template.split(/\$\{[^}]*\}/u);
         if (parts.join('').trim().length < 12) continue;
         if (new RegExp(`^${parts.map(escape).join('.*?')}$`, 'u').test(value)) return parts.join('[dynamic]');
+        if (parts.length === 1 && template.trim().length >= 12 &&
+            /(?:error|fail|unable|invalid)/iu.test(template) &&
+            consoleValue.startsWith(template) &&
+            /^(?:\s|:)/u.test(consoleValue.slice(template.length))) {
+          return `${template} [dynamic]`;
+        }
       }
       if (/cannot read properties of (?:undefined|null)/iu.test(value)) return 'Cannot read properties of an absent value';
       if (/is not a function/iu.test(value)) return 'Runtime value is not callable';
@@ -75,7 +93,10 @@ export function createWorkerEvidenceProjector(repoRoot = process.cwd()) {
       normalizedMessage: message(cluster.query.normalizedMessage), rootCauseFamily: family,
     };
     return {
-      ...cluster, rootCauseFamily: family, query, sourceFiles,
+      ...cluster, rootCauseFamily: family, query, sourceFiles, relatedSourceFiles,
+      ...(cluster.diagnostics ? { diagnostics: {
+        ...cluster.diagnostics, frames: cluster.diagnostics.frames.filter(frame => source(frame.file) !== null),
+      } } : {}),
       patterns: cluster.patterns.map(pattern => ({
         ...pattern, component: component(pattern.component),
         errorType: /^(?:Error|TypeError|ReferenceError|SyntaxError|RangeError|URIError|EvalError|ChunkLoadError)$/u

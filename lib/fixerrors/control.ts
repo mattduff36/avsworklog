@@ -1,5 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { batchOutcomeHash, readBatchChunk, validateBatchOutcome, type BatchCheckpoint, type CapturedBatch } from './batch';
+import { batchOutcomeHash, parseBatchBytes, readBatchChunk, validateBatchOutcome, type BatchCheckpoint, type CapturedBatch } from './batch';
 import {
   checksSchema, FIXERRORS_DEPLOY_TIMEOUT_MS, releaseModeSchema, sameCandidate, sameWorkspace,
   type AdminCommand, type CheckEvidence, type DeviceCommand,
@@ -110,6 +110,9 @@ function updateBatchProgress(job: FixerrorsJob): void {
   if (!batch) return;
   const outcomes = batch.outcome?.clusters ?? (batch.checkpoint?.outcome
     ? validateBatchOutcome(batch, batch.checkpoint.outcome, job.id, false).clusters : []);
+  const latest = outcomes.at(-1);
+  const latestEvidence = latest && parseBatchBytes(Buffer.from(batch.manifest)).retrieval.clusters
+    .find(entry => entry.id === latest.id);
   job.batch = {
     captured: batch.delivery.clusters, rows: batch.delivery.rows, processed: outcomes.length,
     remaining: batch.delivery.clusters - outcomes.length,
@@ -120,6 +123,16 @@ function updateBatchProgress(job: FixerrorsJob): void {
       failed: outcomes.filter(entry => entry.status === 'failed').length,
     },
     lifecycle: batch.lifecycle?.state ?? 'pending',
+    triage: {
+      Routine: outcomes.filter(entry => entry.triage?.importance === 'Routine').length,
+      Important: outcomes.filter(entry => !entry.triage || entry.triage.importance === 'Important').length,
+      Urgent: outcomes.filter(entry => entry.triage?.importance === 'Urgent').length,
+    },
+    ...(latest?.triage && latest.timings ? { latest: {
+      importance: latest.triage.importance, reason: latest.triage.reason, effort: latest.triage.effort,
+      route: latestEvidence?.existingState === 'awaiting-deployment' ? 'deployment-verification' as const : latest.status,
+      ...latest.timings,
+    } } : {}),
     ...(batch.lifecycle?.reason ? { lifecycleReason: batch.lifecycle.reason } : {}),
   };
 }

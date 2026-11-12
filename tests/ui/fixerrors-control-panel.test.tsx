@@ -242,7 +242,10 @@ describe('Debug local Fixerrors controls', () => {
     const id = await h.enqueue();
     store.state.jobs[0].state = 'paused';
     store.state.jobs[0].batch = { captured: 4, rows: 281, processed: 2, remaining: 2,
-      counts: { 'verified-local': 1, held: 1, 'report-only': 0, failed: 0 }, lifecycle: 'pending' };
+      counts: { 'verified-local': 1, held: 1, 'report-only': 0, failed: 0 }, lifecycle: 'pending',
+      triage: { Routine: 0, Important: 2, Urgent: 0 },
+      latest: { importance: 'Important', reason: 'impact-uncertain', effort: 'focused', route: 'deployment-verification',
+        analysisMs: 0, repairAndChecksMs: 0, totalMs: 2 } };
     const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) };
     const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => ({
       ok: true, json: async () => options?.method === 'POST' ? { ok: true } : snapshot,
@@ -253,6 +256,9 @@ describe('Debug local Fixerrors controls', () => {
     await screen.findByText('2 / 4 cases processed; 2 remaining (281 error rows captured).');
     expect(screen.getByText(/1 verified locally \/ 1 held/)).toBeDefined();
     expect(screen.getByText(/Lifecycle: pending.*not confirmed reconciled/)).toBeDefined();
+    expect(screen.getByText(/0 Routine \/ 2 Important \/ 0 Urgent/)).toBeDefined();
+    expect(screen.getByText(/Latest: Important.*deployment verification/)).toBeDefined();
+    expect(screen.getByText(/Measured analysis 0 ms.*case total 2 ms/)).toBeDefined();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel run' }));
     await waitFor(() => expect(fetcher.mock.calls.some(call => call[1]?.method === 'POST')).toBe(true));
     const posted = fetcher.mock.calls.find(call => call[1]?.method === 'POST');

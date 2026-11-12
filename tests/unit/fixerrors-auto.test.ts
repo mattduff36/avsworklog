@@ -70,6 +70,19 @@ const run = (adapters: AutoAdapters, retrieval = packet()) =>
   runAutomaticFixerrors({ retrieval, snapshotChecksum: 'c'.repeat(64), adapters });
 
 describe('automatic local fixerrors lifecycle investigation', () => {
+  it.each([
+    ['Routine', { classes: ['network'], operation: 'usage-analytics', stage: 'record-usage', noncriticalHandled: true, occurrences: 1, frames: [] }, 1, 2],
+    ['Important', undefined, 2, 3],
+    ['Urgent', { classes: ['service-outage'], operation: 'unknown', noncriticalHandled: false, occurrences: 1, frames: [] }, 3, 4],
+  ] as const)('applies %s budgets to the actual analysis and repair requests', async (_label, diagnostics, analysis, repair) => {
+    const h = harness();
+    const retrieval = packet();
+    retrieval.clusters[0].diagnostics = diagnostics ? JSON.parse(JSON.stringify(diagnostics)) : undefined;
+    await run(h.adapters, retrieval);
+    expect(h.requests.map(request => [request.mode, request.timeout_minutes])).toEqual([
+      ['ask', analysis], ['implement', repair],
+    ]);
+  });
   it('investigates new groups before held cases, reuses only exact new evidence and requires no routine approval', async () => {
     const h = harness([cluster(), cluster('cluster-2', { lane: 'critical' })]);
     const retrieval = packet(3);
@@ -168,14 +181,44 @@ describe('automatic local fixerrors lifecycle investigation', () => {
     retrieval.clusters[0].advisoryLane = 'fast';
     retrieval.clusters[0].held = true;
     retrieval.clusters[0].existingState = 'awaiting-deployment';
-    expect((await run(deployed.adapters, retrieval)).clusters[0].reason).toContain('separately approved');
-    expect(deployed.requests).toHaveLength(1);
+    const pending = (await run(deployed.adapters, retrieval)).clusters[0];
+    expect(pending.reason).toContain('missing or stale');
+    expect(pending.timings).toMatchObject({ analysisMs: 0, repairAndChecksMs: 0 });
+    expect(deployed.requests).toHaveLength(0);
     expect(deployed.adapters.learn).not.toHaveBeenCalled();
     const contradicted = harness([cluster('cluster-1', {
       action: 'report-only', disposition: 'no_fix_required', nextStep: null,
     })]);
     expect((await run(contradicted.adapters, retrieval)).clusters[0].status).toBe('held');
     expect(contradicted.adapters.learn).not.toHaveBeenCalled();
+  });
+  it('requires genuine named analysis receipts and reports measured effort without granting repair authority', async () => {
+    const h = harness([cluster('cluster-1', { action: 'report-only', disposition: 'no_fix_required', nextStep: null })]);
+    h.adapters.analysisChecks = () => ({
+      'targeted-tests': { argv: ['node', 'fixed-test', test], timeout_seconds: 120, description: 'Approved regression' },
+    });
+    expect((await run(h.adapters)).clusters[0]).toMatchObject({
+      status: 'held', reason: 'Analysis receipt verifier unavailable',
+      triage: { importance: 'Important', effort: 'focused' },
+      timings: { analysisMs: expect.any(Number), repairAndChecksMs: 0, totalMs: expect.any(Number) },
+    });
+    h.adapters.verifyAnalysis = vi.fn();
+    const result = await run(h.adapters);
+    expect(result.clusters[0].status).toBe('report-only');
+    expect(h.adapters.verifyAnalysis).toHaveBeenCalledOnce();
+    expect(h.requests.at(-1)?.checks).toHaveProperty('targeted-tests');
+    expect(h.requests.at(-1)?.objective).toContain('Related paths are investigation evidence');
+  });
+  it('does not reuse Urgent or changed diagnostic evidence', async () => {
+    for (const classes of [['network'], ['service-outage']] as const) {
+      const retrieval = packet(2);
+      retrieval.clusters[1] = { ...retrieval.clusters[0], id: 'cluster-2', held: true,
+        diagnostics: { classes: [...classes], operation: 'unknown', noncriticalHandled: false, occurrences: 1, frames: [] } };
+      const h = harness([cluster('cluster-1', { action: 'report-only', disposition: 'no_fix_required', nextStep: null }),
+        cluster('cluster-2', { action: 'report-only', disposition: 'no_fix_required', nextStep: null })]);
+      await run(h.adapters, retrieval);
+      expect(h.requests).toHaveLength(2);
+    }
   });
   it('investigates every new and held cluster without repairing under read-only authority', async () => {
     const h = harness([cluster(), cluster('cluster-2')]);

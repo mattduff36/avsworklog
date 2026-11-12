@@ -200,6 +200,21 @@ describe('native aggregate batch policy and evidence', () => {
   });
 
   const installed = 'C:\\Users\\mattd\\.codex\\cursor-worker\\squires-production-bridge';
+  it('requires all fixed repair checks even when analysis permits a narrower catalogue', () => {
+    const script = [
+      'import sys',
+      'from pathlib import Path',
+      'sys.path.insert(0, sys.argv[1])',
+      'import squires_repair as r',
+      'for checks in ({}, {"targeted-tests": {}}):',
+      '    try: r.successful_run(Path("unread-fixture"), {"checks": checks}, {})',
+      '    except r.s.Denied as error: assert str(error) == "missing_worker_repair_checks"',
+      '    else: raise AssertionError("Incomplete repair checks accepted")',
+      'print("repair catalogue negatives passed")',
+    ].join('\n');
+    expect(execFileSync('python', ['-I', '-B', '-c', script, path.resolve('scripts\\automation')],
+      { encoding: 'utf8', windowsHide: true, timeout: 10_000 })).toContain('repair catalogue negatives passed');
+  });
   it.skipIf(!existsSync(path.join(installed, 'worker_checks.py')))(
     'connects paginated capture, chunk delivery, framed resume and one genuine two-repair aggregate candidate',
     async () => {
@@ -213,11 +228,17 @@ describe('native aggregate batch policy and evidence', () => {
         fixtureOnly: true, modelLaunched: false, released: false, preparedCommits: 2, consentFingerprintVerified: true,
         connectedCapture: { pages: 2, rows: 281, newRows: 280, heldRows: 1,
           framed: true, nullCheckoutResume: true, crossLanguageOutcome: true },
-        counts: { analysis: 8, repair: 2, preparation: 1, receipts: 12, leaseNegatives: 2, resumeNegatives: 6,
-          nonRepairRuns: 3, revocation: 1, cancellation: 1, artifactNegatives: 2, admissionNegatives: 3 },
+        counts: { analysis: 8, repair: 2, preparation: 1, receipts: 20, leaseNegatives: 2, resumeNegatives: 7,
+          nonRepairRuns: 3, revocation: 1, cancellation: 1, artifactNegatives: 3, admissionNegatives: 3 },
         result: { status: 'tested', batch: { captured: 4, processed: 4, remaining: 0,
           counts: { 'verified-local': 2, held: 2, 'report-only': 0, failed: 0 } } },
       });
+      expect(output.measuredTimings).toHaveLength(4);
+      for (const timing of output.measuredTimings) {
+        expect(timing.analysisMs).toBeGreaterThan(0);
+        expect(timing.totalMs).toBeGreaterThanOrEqual(timing.analysisMs);
+        expect(timing.totalMs).toBeGreaterThanOrEqual(timing.repairAndChecksMs);
+      }
       expect(output.connectedCapture.bytes).toBeGreaterThan(96 * 1024);
       const evidence = preparedReleaseEvidenceSchema.parse(output.evidence);
       expect(evidence.batch).toMatchObject({ version: 1, clusterCount: 4, repairCount: 2 });

@@ -4,10 +4,11 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
-import { assertAutomaticPath, assertAutomaticFixerrorsRepair, parseAutomaticFixerrorsRetrieval, runAutomaticFixerrors,
+import { assertAutomaticPath, assertAutomaticFixerrorsRepair, learnAutomaticOutcome, parseAutomaticFixerrorsRetrieval, runAutomaticFixerrors,
   type AutoAdapters, type AutoRunResult, type WorkerRequest, type WorkerResult } from '../fixerrors-auto';
 import { captureCandidateFingerprint, parseDecision, validateDecision, type CandidateFingerprint } from '../fixerrors-decision';
 import { FIXERRORS_WORKSPACE } from './fixerrors-device-admission';
+import { triageSchema, timingsSchema } from '../../lib/fixerrors/triage';
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/u);
 export const batchManifestSchema = z.object({
@@ -99,10 +100,15 @@ export function nativeBatchAdapters(cwd: string, native: NativeBatchTransport): 
     },
     assertRepairScope(names) { assertNativeBatchScope(cwd, names); call('scope', names); },
     repairChecks: (tests, paths) => call<WorkerRequest['checks']>('checks', { tests, paths }),
+    analysisChecks: sourceFiles => call<WorkerRequest['checks']>('analysis-checks', sourceFiles),
     dispatch: async request => call<WorkerResult>('dispatch', request),
     verifyRepair: (request, result, before) => { call('verify', { request, result, before }); },
+    verifyAnalysis: (request, result, before) => { call('verify-analysis', { request, result, before }); },
     write: (file, value) => { call('write', { file, value }); },
-    learn: () => {}, // Lifecycle/knowledge application belongs to the server's exact-row binding.
+    learn: (...args) => {
+      call('unchanged', null);
+      learnAutomaticOutcome(cwd, ...args);
+    },
     checkpoint: result => { call('checkpoint', result); },
   };
 }
@@ -156,6 +162,7 @@ async function main() {
         id: z.string(), status: z.enum(['verified-local', 'held', 'report-only', 'failed']),
         reason: z.string(), attempt: z.string(), tests: z.array(z.string()), evidence: z.array(z.string()),
         reusedFrom: z.string().optional(),
+        triage: triageSchema.optional(), timings: timingsSchema.optional(),
       }).strict()),
       decisions: z.array(z.custom<AutoRunResult['decisions'][number]>(value => typeof value === 'object' && value !== null)),
     }).strict().nullable().optional().transform(value => value ?? undefined),

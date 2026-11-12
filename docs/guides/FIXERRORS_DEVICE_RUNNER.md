@@ -1,5 +1,94 @@
 # Squires Windows Fixerrors admission
 
+## Proportionate triage implementation plan (MPDEE Worker)
+
+1. Share deterministic Routine / Important / Urgent importance across capture,
+   automatic/native execution and Debug. Unknown impact is Important; source
+   sensitivity is repair risk, not proof of incident urgency.
+2. Project fixed diagnostic classes, operations/stages, validated context/status
+   codes, source frames and occurrence windows before discarding private details.
+   Keep arbitrary runtime prose, identities, URLs and payloads out of packets.
+3. Route awaiting-deployment records before dispatch to exact-candidate verification,
+   including missing/stale candidate evidence. A lifecycle label never authorizes
+   Deploy or proves a live resolution.
+4. Permit only enrolled fixed-command scoped analysis checks with genuine receipts;
+   retain sensitive repair guards and scope-specific escalation.
+5. Expose bounded importance/reason/effort and measured timings in existing progress;
+   fix typed generated-identifier privacy false positives without exempting prose.
+6. Verify focused TypeScript/Python boundaries, typecheck and scoped lint locally.
+   No enrollment, installed pin, production, lifecycle or release mutations.
+
+The source-owned `lib/config/fixerrors-effort-policy.json` sets actual worker
+budgets: Routine analysis/repair 1/2 minutes, Important 2/3, Urgent 3/4.
+Both chat-worker and native dispatch enforce these values. Native orchestration
+allows bounded startup/reporting overhead, while signed leases, cancellation and
+mandatory repair checks still take precedence. These are caps, not finish-time
+estimates or permission to skip checks. Routine gets one short evidence
+pass, at most one evidenced bounded repair and relevant checks; expected behavior
+is report-only, uncertainty stays held. Important gets focused investigation;
+Urgent requires stronger relevant checks and existing approvals. No cross-run
+Routine cache is introduced: knowledge remains advisory, not candidate-bound
+authorization. New occurrences and changed evidence must be reconsidered.
+
+### Proportionate triage contract and limits
+
+`lib/fixerrors/triage.ts` is the shared importance policy. Routine requires only
+network-class evidence, explicitly handled noncritical usage recording at the
+`record-usage` stage, and fewer than ten occurrences. Ten or more occurrences
+escalate to Important. Unknown, mixed, console-only, authentication or financial
+source evidence defaults to Important; it is not proof of an outage. Urgent
+requires a structured compromise, corruption or outage signal. Capture accepts
+only the fixed `additional_data.impact` enum values or recognized PostgreSQL
+corruption codes XX001/XX002; it never infers an outage from console prose or a
+401/403 alone. Such a signal prioritizes investigation, not proof that a reported
+compromise is confirmed, and grants no additional repair authority.
+
+Capture retains fixed diagnostic classes, operation, allowlisted stage, validated
+database code/status, source-validated context/template, bounded source frames,
+occurrence count and day window. Source console prefixes keep their static label
+while appended dynamic details are discarded. Direct relative and `@/` imports
+can contribute up to twelve existing one-hop source paths; they do not bypass
+sensitive-path/content guards or create broad edit permission. Unsupported or
+sensitive repair still needs scope-specific owner approval.
+
+The source-owned `lib/config/fixerrors-analysis-checks.json` registers only named
+offline tests. Its usage-route integration test mocks server dependencies; other
+integration paths are not generally authorized. Chat and native batch analysis
+require genuine supplied-check receipts and an unchanged candidate. Read-only
+file-scope receipts hash an empty editable scope; signed admission and unchanged
+HEAD/index/tree snapshots supply the full candidate binding. Native journals and
+independent preparation verification retain and revalidate analysis receipts.
+The older single-cluster saved-review contract remains checks-empty.
+
+Awaiting-deployment labels route to a held verification step before worker
+dispatch, even if the old local candidate link is null. They never authorize
+Deploy, close an incident or replace live verification. Exact in-run reuse
+requires matching diagnostics, policy and current candidate; Urgent, held and
+failed outcomes are not reused. Chat and native adapters persist the same
+privacy-validated advisory runtime knowledge. Server capture still uses the
+committed seed, not workstation runtime knowledge; promoting/transporting that
+learning is deliberately not automatic.
+
+Existing Debug progress shows processed importance counts and the latest fixed
+reason, effort, route and measured milliseconds. Analysis and repair/check timers
+measure their actual worker dispatches (including checks run there); case total
+includes local orchestration before checkpointing. They exclude capture,
+transport, release preparation and checkpoint persistence. No production speedup
+is claimed. The worker execution caps above are separate from these timings.
+
+Source changes to `squires_repair.py` and `squires_release.py` require an approved
+installed-source refresh and corresponding enrollment SHA-pin update before live
+use. This implementation performs neither installation nor repinning.
+
+**Proportionate implementation development evidence (MPDEE Worker).** Twenty
+focused Vitest files passed 312 tests across targeted runs, including the five
+registered offline analysis files through the fixed scoped-check entrypoint.
+The disposable native batch exercised eight analyses, two repairs, twenty genuine
+check receipts, append-only advisory learning, analysis-receipt tamper rejection
+on resume and preparation verification, and measured per-case timing fields.
+Application typecheck, scoped ESLint and `git diff --check` passed. These are
+synthetic development checks, not production incident repairs or live acceptance.
+
 ## Everyday runner implementation plan (MPDEE Worker)
 
 1. Separate clean-checkout connection readiness from packet readiness. Connect

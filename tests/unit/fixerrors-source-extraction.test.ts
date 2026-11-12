@@ -43,6 +43,27 @@ function makeError(overrides: Partial<ErrorLogEntry>): ErrorLogEntry {
 }
 
 describe('fixerrors source extraction', () => {
+  it('aggregates diagnostic windows and never treats mixed unknown or unhandled occurrences as Routine evidence', () => {
+    const source = 'app/api/me/usage-events/route.ts';
+    const root = createFixture({ [source]: 'export const label = "Usage recording failed";\n' });
+    try {
+      const patterns = groupIntoPatterns([
+        makeError({ error_message: 'Network request failed', error_stack: `at handler (/app/${source}:1:1)`,
+          timestamp: '2026-09-10T12:00:00.000Z', additional_data: { stage: 'record-usage', transient: true } }),
+        makeError({ id: 'second', error_message: 'Usage recording failed', error_stack: `at handler (/app/${source}:1:1)`,
+          timestamp: '2026-08-01T12:00:00.000Z' }),
+      ], root);
+      const cluster = buildRetrievalCluster({
+        id: 'cluster-1', rootCauseFamily: 'external-network', lane: 'standard', action: 'investigate',
+        patterns, occurrences: 2,
+      }, { version: 1, incidents: [] });
+      expect(cluster.diagnostics).toMatchObject({
+        classes: ['network', 'unknown'], operation: 'usage-analytics', noncriticalHandled: false,
+        firstDay: '2026-08-01', lastDay: '2026-09-10', occurrences: 2,
+      });
+      expect(cluster.diagnostics).not.toHaveProperty('stage');
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
   it('preserves route-group parentheses in webpack and direct source references', () => {
     const source = 'app/(dashboard)/debug/page.tsx';
     expect(parseStackTrace(`at Page (webpack-internal:///(app-pages-browser)/./${source}:12:3)`))

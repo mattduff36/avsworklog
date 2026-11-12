@@ -96,6 +96,26 @@ class BatchClient implements PgClientLike {
 }
 
 describe('shared full Fixerrors capture', () => {
+  it('retains fixed diagnostics and source labels without copying appended private console values', async () => {
+    const row = record(1);
+    row.error_message = 'console.error: Unable to render listing label: Error: validation failed person@example.invalid';
+    row.additional_data = { stage: 'validation', databaseCode: '23505', status: 400,
+      payload: 'person@example.invalid', errorContextId: 'listing-label' };
+    const capture = await fetchFixerrorsBatchSnapshot(new BatchClient([row]), 'c'.repeat(64), now);
+    const root = sourceFixture();
+    writeFileSync(join(root, 'lib', 'labels.ts'),
+      'import { format } from "./format";\nexport const label = "Unable to render listing label";\n');
+    writeFileSync(join(root, 'lib', 'format.ts'), 'export const format = (value: string) => value.trim();\n');
+    const cluster = buildFixerrorsBatchRetrieval({ ...capture, candidate, knowledge, repoRoot: root }).retrieval.clusters[0];
+    expect(cluster.query.normalizedMessage).toBe('Unable to render listing label [dynamic]');
+    expect(cluster.relatedSourceFiles).toEqual(['lib/format.ts']);
+    expect(cluster.diagnostics).toMatchObject({
+      classes: ['validation', 'runtime'], stage: 'validation', databaseCode: '23505',
+      occurrences: 1, frames: [{ file: 'lib/labels.ts', line: 1 }],
+      firstDay: '2026-09-10', lastDay: '2026-09-10',
+    });
+    expect(JSON.stringify(cluster)).not.toMatch(/person@|payload|console\.error/u);
+  });
   it('captures more than one page of new and held rows before the same repeatable-read COMMIT', async () => {
     const input = Array.from({ length: 850 }, (_, i) => record(i + 1, i >= 450));
     const client = new BatchClient(input, { afterBegin: rows => {

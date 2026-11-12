@@ -4,6 +4,7 @@ import { parseStackTrace, type SourceFileRef } from '../lib/fixerrors/stack';
 import { isFixerrorsSourcePath, type AutoRetrieval } from './fixerrors-auto';
 import { fingerprintIncident, retrieveIncidents, rejectSensitiveText, sanitizeKnowledgeText, type IncidentQuery, type KnowledgeStore } from './fixerrors-knowledge';
 import { type LifecycleRecord } from './fixerrors-lifecycle';
+import { type IncidentDiagnostics } from '../lib/fixerrors/triage';
 
 const ADMIN_EMAIL = 'admin@mpdee.co.uk';
 
@@ -578,16 +579,68 @@ export function buildRetrievalCluster(cluster: ErrorRootCauseCluster, knowledge:
       normalizedMessage: safeRetrievalText(pattern?.normalizedMessage ?? ''),
       rootCauseFamily: safeRetrievalText(cluster.rootCauseFamily),
     };
+    const files = [...new Set(cluster.patterns.flatMap(entry => entry.sourceFiles.map(source => source.file).filter(isFixerrorsSourcePath)))];
+    const operation: IncidentDiagnostics['operation'] = files.includes('app/api/me/usage-events/route.ts')
+      ? 'usage-analytics' : files.includes('app/api/messages/notifications/count/route.ts') ? 'notification-count'
+        : files.some(file => /(?:^|\/)timesheets?\//u.test(file)) ? 'timesheet-submit'
+          : files.some(file => /(?:^|\/)quotes\//u.test(file)) ? 'quotes' : 'unknown';
+    const classes = new Set<IncidentDiagnostics['classes'][number]>();
+    const occurrences = cluster.patterns.flatMap(item => item.occurrences);
+    for (const entry of occurrences) {
+      let known = false;
+      // Only fixed structured signals escalate. Ordinary 401/403, prose and
+      // console.error never establish an outage or security compromise.
+      const impact = entry.additional_data?.impact;
+      const serious = ['security-compromise', 'data-corruption', 'service-outage'] as const;
+      for (const value of serious) {
+        if (impact === value) { classes.add(value); known = true; }
+      }
+      if (['XX001', 'XX002'].includes(String(entry.additional_data?.databaseCode))) {
+        classes.add('data-corruption'); known = true;
+      }
+      if (/validation|invalid input|required field/iu.test(entry.error_message)) { classes.add('validation'); known = true; }
+      if (/failed to fetch|fetch failed|network|econnreset|etimedout|enotfound|socket hang up/iu.test(entry.error_message)) {
+        classes.add('network'); known = true;
+      }
+      if (/unauthorized|forbidden|permission denied/iu.test(entry.error_message)) { classes.add('authentication'); known = true; }
+      if (/^(?:TypeError|ReferenceError|RangeError)$/u.test(entry.error_type)) { classes.add('runtime'); known = true; }
+      if (!known) classes.add('unknown');
+    }
+    const stages = ['origin-check', 'authentication', 'record-usage', 'validation', 'submit'] as const;
+    const stage = stages.find(value => occurrences.every(entry => entry.additional_data?.stage === value));
+    const code = occurrences.every(entry => entry.additional_data?.databaseCode === additional?.databaseCode)
+      ? additional?.databaseCode : undefined;
+    const day = (value: string | undefined) => value && /^\d{4}-\d{2}-\d{2}T/u.test(value) &&
+      Number.isFinite(Date.parse(value)) ? new Date(value).toISOString().slice(0, 10) : undefined;
+    const frames = cluster.patterns.flatMap(entry => entry.sourceFiles).filter(frame => isFixerrorsSourcePath(frame.file))
+      .slice(0, 12).map(frame => ({
+        file: frame.file,
+        ...(frame.line && frame.line > 0 && frame.line <= 1_000_000 ? { line: frame.line } : {}),
+      }));
+    const firstDays = cluster.patterns.flatMap(entry => day(entry.firstSeen) ?? []).sort();
+    const lastDays = cluster.patterns.flatMap(entry => day(entry.lastSeen) ?? []).sort();
+    const diagnostics: IncidentDiagnostics = {
+      classes: classes.size ? [...classes] : ['unknown'], operation,
+      ...(stage ? { stage } : {}),
+      ...(typeof code === 'string' && /^(?:[A-Z0-9]{5}|PGRST[0-9]{3})$/u.test(code) ? { databaseCode: code } : {}),
+      noncriticalHandled: operation === 'usage-analytics' && stage === 'record-usage' &&
+        occurrences.every(entry => entry.additional_data?.transient === true),
+      occurrences: Math.max(1, cluster.occurrences),
+      ...(firstDays.length ? { firstDay: firstDays[0] } : {}),
+      ...(lastDays.length ? { lastDay: lastDays.at(-1) } : {}),
+      frames,
+    };
     return {
       id: cluster.id, rootCauseFamily: safeRetrievalText(cluster.rootCauseFamily),
       advisoryLane: cluster.lane, advisoryAction: cluster.action, query,
-      sourceFiles: [...new Set(cluster.patterns.flatMap(entry => entry.sourceFiles.map(source => source.file).filter(isFixerrorsSourcePath)))],
+      sourceFiles: files,
       patterns: cluster.patterns.map(entry => ({
         errorType: safeRetrievalText(entry.errorType), component: safeRetrievalText(entry.component),
         normalizedMessage: safeRetrievalText(entry.normalizedMessage),
         sourceFiles: entry.sourceFiles.map(source => source.file).filter(isFixerrorsSourcePath), occurrences: entry.occurrences.length,
       })),
       priorResolutions: retrieveIncidents(knowledge, query),
+      diagnostics,
     };
   }
 

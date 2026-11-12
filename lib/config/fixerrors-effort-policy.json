@@ -1,0 +1,5 @@
+{
+  "Routine": { "analysisMinutes": 1, "repairMinutes": 2 },
+  "Important": { "analysisMinutes": 2, "repairMinutes": 3 },
+  "Urgent": { "analysisMinutes": 3, "repairMinutes": 4 }
+}

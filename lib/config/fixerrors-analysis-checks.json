@@ -1,0 +1,18 @@
+[
+  {
+    "source": "app/api/me/usage-events/route.ts",
+    "tests": ["tests/unit/usage-events-route.test.ts", "tests/integration/api/usage-events-route.test.ts"]
+  },
+  {
+    "source": "app/api/messages/notifications/count/route.ts",
+    "tests": ["tests/unit/notifications-server.test.ts"]
+  },
+  {
+    "source": "app/(dashboard)/timesheets/new/page.tsx",
+    "tests": ["tests/unit/timesheet-submit-client.test.ts"]
+  },
+  {
+    "source": "app/(dashboard)/quotes/page.tsx",
+    "tests": ["tests/unit/quotes-overview.test.ts"]
+  }
+]

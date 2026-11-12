@@ -153,7 +153,8 @@ describe('capture, orchestration and recovery boundary', () => {
       } }], observedAt: start }], suppressed: [],
     })!;
     expect(retained.rows[0].metadata.state).toBe('awaiting-deployment');
-    expect(retained.rows[0].nextStep).toContain('separately approved');
+    expect(retained.rows[0].nextStep).toContain('separate exact-candidate approval');
+    expect(retained.rows[0].nextStep).toContain('missing or stale');
   });
   it('keeps independently blocked groups in review history and rejects incomplete coverage', () => {
     const { retrieval, result } = automatic();

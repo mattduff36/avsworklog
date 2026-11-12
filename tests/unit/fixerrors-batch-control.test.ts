@@ -7,6 +7,7 @@ import { deviceResponseSchema, publicQueueState, type DeviceCommand } from '@/li
 import { receiveCompanionBatch } from '@/scripts/automation/fixerrors-companion';
 import { capturedBatch } from './fixerrors-batch-fixtures';
 import { actorId, credential, deviceId, FixtureStore, now, workspace } from './fixerrors-control-fixtures';
+import { classifyIncident } from '@/lib/fixerrors/triage';
 
 const issuer = generateKeyPairSync('ed25519');
 const release = generateKeyPairSync('ed25519');
@@ -38,6 +39,22 @@ async function connected(count = 2) {
 }
 
 describe('authenticated retained batch control', () => {
+  it('projects bounded importance and timings, rejecting invented importance and private details', async () => {
+    const { store, claim, request, outcome } = await connected();
+    const enriched = { ...outcome, clusters: [{ ...outcome.clusters[0],
+      triage: classifyIncident(), timings: { analysisMs: 12, repairAndChecksMs: 0, totalMs: 14 } }] };
+    const command = { op: 'batch-lease' as const, jobId: claim.job.id, leaseToken: claim.leaseToken,
+      cursor: 1, checkpointSha256: batchHash('timed checkpoint'), resume: false, outcome: enriched };
+    const invented = structuredClone(enriched);
+    invented.clusters[0].triage = { ...classifyIncident(), importance: 'Routine' };
+    await expect(request({ ...command, outcome: invented })).rejects.toThrow('importance');
+    await request(command);
+    const progress = publicQueueState(store.state).jobs[0].batch;
+    expect(progress).toMatchObject({ triage: { Routine: 0, Important: 1, Urgent: 0 },
+      latest: { importance: 'Important', reason: 'impact-uncertain', effort: 'focused', route: 'held',
+        analysisMs: 12, repairAndChecksMs: 0, totalMs: 14 } });
+    expect(JSON.stringify(progress)).not.toMatch(/Synthetic hold|Source inspected|normalizedMessage/u);
+  });
   it('delivers every authenticated chunk above the old packet limit and never exposes private bindings', async () => {
     const { store, batch, claim, request } = await connected(240);
     expect(Buffer.byteLength(batch.manifest)).toBeGreaterThan(96 * 1024);

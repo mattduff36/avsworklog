@@ -5,6 +5,7 @@ import {
   type LifecyclePlan, type LifecycleRecord, type LifecycleReview,
 } from './fixerrors-lifecycle';
 import { renderFixerrorsRunSummary } from './fixerrors-summary';
+import { DEPLOYMENT_VERIFICATION_STEP } from '../lib/fixerrors/triage';
 
 export interface LifecycleBinding {
   clusterId: string;
@@ -44,7 +45,7 @@ export function buildAutomaticLifecyclePlan(input: {
       const state = prior?.state === 'awaiting-deployment' || record.triage_local_commit ? 'awaiting-deployment' :
         prior?.state === 'actionable' && proposedState !== 'awaiting-deployment' ? 'actionable' : proposedState;
       const nextStep = state === 'awaiting-deployment'
-        ? 'Deploy the verified local candidate through the separately approved release flow, then verify the original failure live.'
+        ? DEPLOYMENT_VERIFICATION_STEP
         : decision?.nextStep ?? (typeof record.triage_next_step === 'string' ? record.triage_next_step : null) ??
           'Inspect the scoped investigation receipt and add the named targeted diagnostic evidence.';
       rows.push(reviewLifecycleRow(record, {

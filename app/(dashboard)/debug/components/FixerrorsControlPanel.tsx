@@ -337,6 +337,9 @@ export function FixerrorsControlPanel() {
                 {job.batch && <div className="space-y-1 text-xs text-muted-foreground" aria-label="Batch progress" role="status">
                   <p>{job.batch.processed} / {job.batch.captured} cases processed; {job.batch.remaining} remaining ({job.batch.rows} error rows captured).</p>
                   <p>{job.batch.counts['verified-local']} verified locally / {job.batch.counts.held} held / {job.batch.counts['report-only']} report only / {job.batch.counts.failed} failed.</p>
+                  {job.batch.triage && <p>Importance (processed): {job.batch.triage.Routine} Routine / {job.batch.triage.Important} Important / {job.batch.triage.Urgent} Urgent. Importance does not grant repair or Deploy approval.</p>}
+                  {job.batch.latest && <p>Latest: {job.batch.latest.importance} ({job.batch.latest.reason.replaceAll('-', ' ')}); {job.batch.latest.effort} investigation; {job.batch.latest.route.replaceAll('-', ' ')}.
+                    {' '}Measured analysis {job.batch.latest.analysisMs} ms / repair and checks {job.batch.latest.repairAndChecksMs} ms / case total {job.batch.latest.totalMs} ms. Effort is guidance, not a hard limit.</p>}
                   <p>Lifecycle: {job.batch.lifecycle}{job.batch.lifecycleReason ? ` (${job.batch.lifecycleReason})` : ''}. {job.batch.lifecycle !== 'applied' ? 'Error records are not confirmed reconciled.' : 'Local verification is not a live fix.'}</p>
                 </div>}
                 {job.approval && <p className="text-xs text-muted-foreground">{(job.approval.releaseMode ?? 'full') === 'targeted' ? 'Targeted checks (urgent)' : 'Full checks (fap)'} / separately confirmed {new Date(job.approval.confirmedAt).toLocaleString('en-GB')}</p>}

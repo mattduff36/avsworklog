@@ -150,6 +150,16 @@ def _exercise_batch(root, checkout, repo, node, cfg, write, git, base, cleanup):
                             rationale='Synthetic whitespace regression', priorIncidentIds=[], evidenceEnrichmentAttempted=True)
             outcome = dict(schemaVersion=1, snapshotId=snapshot_id, analyst='MPDEE Worker',
                            **r.batch_fingerprint(before, base, ticket['tree']), clusters=[decision])
+            if req['checks']:
+                config_path = run / 'check-config.json'
+                r.exclusive_json(config_path, dict(workspace=str(checkout), run_dir=str(run), checks=req['checks'],
+                                                  candidate_scope='files', candidate_paths=[],
+                                                  lock_dir=str(root / 'checks')))
+                checks = CheckServer(config_path)
+                for name in req['checks']:
+                    receipt = checks.call(dict(check_id=name))
+                    assert receipt['passed'], 'Synthetic analysis check failed'
+                    counts['receipts'] += 1
         else:
             counts['repair'] += 1
             slot = index - 1
@@ -276,16 +286,18 @@ def _exercise_batch(root, checkout, repo, node, cfg, write, git, base, cleanup):
         assert session.batch['checkpoint']['cursor'] == 2 and counts['repair'] == 1
         resumed_claim = exchange(dict(op='pause', value=session.checkpoint_sha()))
         ticket = json.loads(s.unb64(json.loads(resumed_claim['ticket'])['payload'], 4096))
-        for mutate in ('manifest', 'candidate', 'code', 'inflight', 'receipt'):
+        for mutate in ('manifest', 'candidate', 'code', 'inflight', 'receipt', 'analysis-receipt'):
             journal = session.journal.read_bytes()
             if mutate == 'manifest':
                 manifest_path = session.directory / 'batch-manifest.json'
                 manifest_path.write_bytes(raw + b' ')
             elif mutate == 'candidate':
                 write(sources[1], 'export const secondLabel = value => "drift";\n')
-            elif mutate == 'receipt':
-                record = session.batch['records'][-1]
-                artifact = worker.ROOT / 'runs' / record['taskId'] / '1/check-config.json'
+            elif mutate in ('receipt', 'analysis-receipt'):
+                record = session.batch['records'][0] if mutate == 'analysis-receipt' else session.batch['records'][-1]
+                name = next(name for name in record['artifacts']
+                            if name.startswith('checks/') and not name.endswith('.state.json'))
+                artifact = worker.ROOT / 'runs' / record['taskId'] / '1' / name
                 original_artifact = artifact.read_bytes()
                 artifact.write_bytes(original_artifact + b' ')
             else:
@@ -302,7 +314,7 @@ def _exercise_batch(root, checkout, repo, node, cfg, write, git, base, cleanup):
                 manifest_path.write_bytes(raw)
             if mutate == 'candidate':
                 write(sources[1], 'export const secondLabel = value => String(value);\n')
-            if mutate == 'receipt':
+            if mutate in ('receipt', 'analysis-receipt'):
                 artifact.write_bytes(original_artifact)
         frames = deque([s.encoded(dict(proof=resumed_claim['proof'], bytes=len(raw),
                                         chunks=(len(raw) + 49151) // 49152)) + b'\n'])
@@ -341,7 +353,12 @@ def _exercise_batch(root, checkout, repo, node, cfg, write, git, base, cleanup):
         resumed.value = r.read_json(resumed.journal, 16 * 1024 * 1024)
         result = resumed.batch['result']
         assert result['status'] == 'tested' and counts['analysis'] == 8 and counts['repair'] == 2
-        assert counts['preparation'] == 1 and counts['receipts'] == 12
+        assert counts['preparation'] == 1 and counts['receipts'] == 20
+        learned = r.read_json(checkout / 'docs_private/fixerrors-runtime-knowledge.json')
+        assert len(learned['incidents']) == counts['analysis'], 'Advisory history count: ' + str(len(learned['incidents']))
+        assert {incident['sourceFile'] for incident in learned['incidents']} == set(sources)
+        assert any('candidate-bound analysis passed' in test for incident in learned['incidents']
+                   for test in incident['tests'])
         assert int(git('rev-list', '--count', base['head'] + '..HEAD')) == 2
         evidence = r.read_json(checkout / '.git/squires-fixerrors/prepared-release.json')['evidence']
         release.candidate(cfg, dict(repairJobId=ticket['jobId']), evidence)
@@ -367,9 +384,13 @@ def _exercise_batch(root, checkout, repo, node, cfg, write, git, base, cleanup):
             counts['resumeNegatives'] += 1
         repair_record = next(record for record in resumed.batch['records'] if not record['readonly'])
         repair_run = worker.ROOT / 'runs' / repair_record['taskId'] / '1'
-        for name in ('result.md', next(name for name in repair_record['artifacts']
-                                      if name.startswith('checks/') and not name.endswith('.state.json'))):
-            artifact = repair_run / name
+        analysis_record = next(record for record in resumed.batch['records'] if record['readonly'])
+        analysis_run = worker.ROOT / 'runs' / analysis_record['taskId'] / '1'
+        for artifact in (repair_run / 'result.md',
+                         repair_run / next(name for name in repair_record['artifacts']
+                                           if name.startswith('checks/') and not name.endswith('.state.json')),
+                         analysis_run / next(name for name in analysis_record['artifacts']
+                                             if name.startswith('checks/') and not name.endswith('.state.json'))):
             original_artifact = artifact.read_bytes()
             artifact.write_bytes(original_artifact + b' ')
             try:
@@ -385,6 +406,7 @@ def _exercise_batch(root, checkout, repo, node, cfg, write, git, base, cleanup):
             worker.ROOT / 'runs' / resumed.batch['records'][2]['taskId'] / '1/after.json',
             8 * 1024 * 1024)['candidate_sha256']
         print(json.dumps(dict(fixtureOnly=True, modelLaunched=False, released=False, preparedCommits=2,
+                              measuredTimings=[item['timings'] for item in resumed.batch['checkpoint']['outcome']['clusters']],
                               consentFingerprintVerified=True, connectedCapture=dict(
                                   pages=captured['pages'], rows=captured['rows'], bytes=captured['bytes'],
                                   newRows=captured['newRows'], heldRows=captured['heldRows'],

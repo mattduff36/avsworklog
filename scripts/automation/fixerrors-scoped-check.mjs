@@ -5,6 +5,8 @@ import { resolve } from 'node:path';
 import { CACHE_ROOT, WORKSPACE, createTypecheckCache } from './fixerrors-typecheck-cache.mjs';
 
 const [id, ...args] = process.argv.slice(2);
+const catalogue = JSON.parse(readFileSync(new URL('../../lib/config/fixerrors-analysis-checks.json', import.meta.url), 'utf8'));
+const approvedIntegration = catalogue.flatMap(entry => entry.tests).filter(name => name.startsWith('tests/integration/'));
 let paths = args;
 const aggregate = args[0] === '--aggregate';
 if (aggregate) {
@@ -26,9 +28,11 @@ if (aggregate) {
 const safe = /^(?:app|components|lib|hooks|utils|services|tests\/unit)\/[A-Za-z0-9_()/.[\]-]+\.(?:ts|tsx)$/u;
 if (!['targeted-tests', 'typecheck', 'lint'].includes(id) || (!aggregate && paths.length > 40) ||
     new Set(paths).size !== paths.length ||
-    paths.some(path => typeof path !== 'string' || !safe.test(path) || path.split('/').some(part => part.startsWith('.'))) ||
+    paths.some(path => typeof path !== 'string' ||
+      !(safe.test(path) || (id === 'targeted-tests' && approvedIntegration.includes(path))) ||
+      path.split('/').some(part => part.startsWith('.'))) ||
     (id === 'typecheck' ? paths.length !== 0 : paths.length === 0) ||
-    (id === 'targeted-tests' && paths.some(path => !/^tests\/unit\/.*\.test\.tsx?$/u.test(path)))) {
+    (id === 'targeted-tests' && paths.some(path => !/^tests\/unit\/.*\.test\.tsx?$/u.test(path) && !approvedIntegration.includes(path)))) {
   throw new Error('Invalid locally scoped check');
 }
 const commands = {

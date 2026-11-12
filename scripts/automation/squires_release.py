@@ -55,7 +55,7 @@ def prepared_candidate(run, request, after, actual, cfg):
 
 def verify_batch_preparation(run, after, cfg):
     from run_worker import ROOT
-    from squires_repair import (read_json, verify_batch_records, scoped_checks, aggregate_scoped_checks, batch_fingerprint,
+    from squires_repair import (read_json, verify_batch_records, scoped_checks, analysis_checks, aggregate_scoped_checks, batch_fingerprint,
                                 batch_code_sha, BATCH_ENGINE, local_env, node)
     proof = read_json(run / 'batch-proof.json', 16 * 1024 * 1024)
     s.fields(proof, ('version', 'manifestSha256', 'initial', 'after', 'records', 'outcome', 'paths', 'tests'))
@@ -95,7 +95,7 @@ def verify_batch_preparation(run, after, cfg):
                       + record['clusterId'].removeprefix('cluster-') + ('-a' if record['readonly'] else '-r'),
                   'batch_worker_binding_changed')
         if record['readonly']:
-            s.require(req['editable_paths'] == [] and req['checks'] == {}
+            s.require(req['editable_paths'] == [] and req['checks'] == analysis_checks(cfg, evidence['sourceFiles'])
                       and req['squires_job']['decisionSha256'] is None, 'batch_analysis_scope_changed')
         else:
             decision = read_json(worker / 'validated-decision.json')

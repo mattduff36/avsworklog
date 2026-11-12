@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from 'fs';
 import path from 'path';
+import { z } from 'zod';
 
 export const FIXERRORS_KNOWLEDGE_VERSION = 1;
 export const FIXERRORS_KNOWLEDGE_PATH = path.resolve(
@@ -127,6 +128,16 @@ export interface RetrievalMatch {
   contradictsEarlierSuccess: boolean;
 }
 
+export const retrievalMatchSchema = z.object({
+  incidentId: z.string().regex(/^fei_[a-f0-9]{16}$/u),
+  fingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+  match: z.enum(['exact', 'related']), advisory: z.boolean(), score: z.number().finite(),
+  confidence: z.enum(INCIDENT_CONFIDENCE), outcome: z.enum(INCIDENT_OUTCOMES),
+  diagnosis: z.string(), fixSummary: z.string().nullable(),
+  changedFiles: z.array(z.string()), tests: z.array(z.string()), updatedAt: z.string(),
+  contradictsEarlierSuccess: z.boolean(),
+}).strict();
+
 export interface RecordIncidentInput extends IncidentQuery {
   diagnosis: string;
   fixSummary: string | null;
@@ -156,17 +167,25 @@ export function isOperationalSnapshotId(value: string): boolean {
 }
 
 export function rejectSensitiveDocument(value: unknown, field: string): void {
-  const scan = JSON.parse(JSON.stringify(value)) as { snapshotId?: unknown; baseHead?: unknown; treeFingerprint?: unknown };
-  if (scan && typeof scan === 'object' && typeof scan.snapshotId === 'string' && isOperationalSnapshotId(scan.snapshotId)) {
+  const scan: unknown = JSON.parse(JSON.stringify(value));
+  if (isRecord(scan) && typeof scan.snapshotId === 'string' && isOperationalSnapshotId(scan.snapshotId)) {
     scan.snapshotId = 'snapshot-id';
   }
   // Only typed top-level candidate bindings are exempt from free-text scanning.
-  if (scan && typeof scan === 'object') {
+  if (isRecord(scan)) {
     if (typeof scan.baseHead === 'string' && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(scan.baseHead)) {
       scan.baseHead = 'git-head';
     }
     if (typeof scan.treeFingerprint === 'string' && /^[a-f0-9]{64}$/u.test(scan.treeFingerprint)) {
       scan.treeFingerprint = 'tree-fingerprint';
+    }
+    if (Array.isArray(scan.clusters)) for (const cluster of scan.clusters) {
+      if (!isRecord(cluster) || !Array.isArray(cluster.priorResolutions)) continue;
+      for (const match of cluster.priorResolutions) {
+        if (!retrievalMatchSchema.safeParse(match).success || !isRecord(match)) continue;
+        match.incidentId = 'incident-id';
+        match.fingerprint = 'incident-fingerprint';
+      }
     }
   }
   rejectSensitiveText(JSON.stringify(scan), field);
@@ -301,8 +320,8 @@ export function loadRuntimeKnowledgeStore(cwd = process.cwd()): KnowledgeStore {
 }
 
 export function assertNoSensitiveKnowledge(store: KnowledgeStore): void {
+  // parseIncident validates every prose field and the exact generated identifier shapes.
   parseKnowledgeStore(store);
-  assertSafeText(JSON.stringify(store), 'knowledge');
 }
 
 function incidentId(fingerprint: string, observedAt: string): string {

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { captureCandidateFingerprint, validateDecision } from '@/scripts/fixerrors-decision';
 import {
   applySnapshotAbsence,
+  assertNoSensitiveKnowledge,
   fingerprintIncident,
   isOperationalSnapshotId,
   loadKnowledgeStore,
@@ -60,6 +61,19 @@ function storeWith(entry: RecordIncidentInput, observedAt = entry.observedAt): K
 }
 
 describe('fixerrors learning knowledge', () => {
+  it('exempts only validated generated knowledge and retrieval identifiers from phone matching', () => {
+    const store = storeWith(input());
+    const incident = store.incidents[0];
+    incident.fingerprint = 'b02079460958' + 'b'.repeat(52);
+    incident.id = 'fei_a02079460958aaaa';
+    expect(() => assertNoSensitiveKnowledge(store)).not.toThrow();
+    const matches = retrieveIncidents(store, query());
+    expect(() => rejectSensitiveDocument({ clusters: [{ priorResolutions: matches }] }, 'retrieval')).not.toThrow();
+    matches[0].diagnosis = incident.fingerprint;
+    expect(() => rejectSensitiveDocument({ clusters: [{ priorResolutions: matches }] }, 'retrieval')).toThrow('Sensitive');
+    incident.diagnosis = incident.fingerprint;
+    expect(() => assertNoSensitiveKnowledge(store)).toThrow('Sensitive');
+  });
   it('FIXERR-KNOW-001 rejects malformed or sensitive committed knowledge', () => {
     expect(() => parseKnowledgeStore({ version: 1, incidents: [], email: 'person@example.com' })).toThrow(
       /allowlisted/u

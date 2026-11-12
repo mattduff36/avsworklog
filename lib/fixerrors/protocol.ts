@@ -52,6 +52,17 @@ export const batchProgressSchema = z.object({
   }).strict(),
   lifecycle: z.enum(['pending', 'applied', 'blocked']),
   lifecycleReason: z.enum(['conflict', 'schema', 'expired', 'uncertain', 'unavailable']).optional(),
+  triage: z.object({
+    Routine: z.number().int().nonnegative(), Important: z.number().int().nonnegative(), Urgent: z.number().int().nonnegative(),
+  }).strict().optional(),
+  latest: z.object({
+    importance: z.enum(['Routine', 'Important', 'Urgent']),
+    reason: z.enum(['serious-impact-signal', 'repeated-failure', 'handled-noncritical', 'impact-uncertain']),
+    effort: z.enum(['short', 'focused', 'strong']),
+    route: z.enum(['deployment-verification', 'report-only', 'verified-local', 'held', 'failed']),
+    analysisMs: z.number().int().nonnegative(), repairAndChecksMs: z.number().int().nonnegative(),
+    totalMs: z.number().int().nonnegative(),
+  }).strict().optional(),
 }).strict();
 const batchDelivery = z.object({
   version: z.literal(1), manifestSha256: sha256Schema, bytes: z.number().int().positive(),
