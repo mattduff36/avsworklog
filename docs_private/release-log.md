@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.14.0
+
+**GIT COMMIT MESSAGE**
+`feat(fixerrors): scale investigation effort to evidenced impact`
+
+**PUSHED AT**
+2026-11-12T01:12:23.512Z
+
+**WHAT CHANGED**
+Scale investigation effort to evidenced impact.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+- Updated actions, with changes to automated tests.
+- Updated debug tools, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(fixerrors): scale investigation effort to evidenced impact`
+
 ## 1126.13.2
 
 **GIT COMMIT MESSAGE**

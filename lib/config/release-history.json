@@ -1,5 +1,20 @@
 [
   {
+    "version": "1126.14.0",
+    "updateKind": "major",
+    "title": "Fixerrors update",
+    "description": "Scale investigation effort to evidenced impact.",
+    "summary": "Scale investigation effort to evidenced impact.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation.",
+      "Updated actions, with changes to automated tests.",
+      "Updated debug tools, with changes to app screens."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-12T01:12:23.512Z"
+  },
+  {
     "version": "1126.13.2",
     "updateKind": "minor",
     "title": "Debug tools improvements",
