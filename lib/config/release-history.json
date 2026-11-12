@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.19.2",
+    "updateKind": "minor",
+    "title": "Error reporting improvements",
+    "description": "Validated companion repair f5baa49d-88ae-4316-b0f0-ca025b398a9b.",
+    "summary": "Validated companion repair f5baa49d-88ae-4316-b0f0-ca025b398a9b.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [
+      "Error reporting"
+    ],
+    "areaKeys": [
+      "error-reporting"
+    ],
+    "pushedAt": "2026-11-12T21:47:31.695Z"
+  },
+  {
     "version": "1126.19.1",
     "updateKind": "minor",
     "title": "Debug tools improvements",
