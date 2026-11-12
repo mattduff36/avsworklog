@@ -1,5 +1,28 @@
 [
   {
+    "version": "1126.15.0",
+    "updateKind": "major",
+    "title": "Daily Allocation update",
+    "description": "Updated Daily Allocation, Navigation, and Data storage.",
+    "summary": "Updated Daily Allocation, Navigation, and Data storage.",
+    "details": [
+      "Updated Daily Allocation, Navigation, and Data storage, with changes to interface components, automated tests, and data storage.",
+      "Updated data storage, with changes to data storage.",
+      "Updated navigation, with changes to interface components."
+    ],
+    "areas": [
+      "Daily Allocation",
+      "Navigation",
+      "Data storage"
+    ],
+    "areaKeys": [
+      "daily-allocation",
+      "navigation",
+      "data-storage"
+    ],
+    "pushedAt": "2026-11-12T10:49:04.844Z"
+  },
+  {
     "version": "1126.14.0",
     "updateKind": "major",
     "title": "Fixerrors update",

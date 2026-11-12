@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.15.0
+
+**GIT COMMIT MESSAGE**
+`feat(daily-allocation): update Daily Allocation, Navigation, and Data storage`
+
+**PUSHED AT**
+2026-11-12T10:49:04.844Z
+
+**WHAT CHANGED**
+Update Daily Allocation, Navigation, and Data storage.
+
+**VERSION HISTORY DETAILS**
+- Updated Daily Allocation, Navigation, and Data storage, with changes to interface components, automated tests, and data storage.
+- Updated data storage, with changes to data storage.
+- Updated navigation, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `feat(daily-allocation): update Daily Allocation, Navigation, and Data storage`
+
 ## 1126.14.0
 
 **GIT COMMIT MESSAGE**
