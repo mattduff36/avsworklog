@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { syntheticDisplayLabel } from '@/lib/utils/fixerrors-controlled-acceptance';
 
 describe('SYNTHETIC Fixerrors controlled acceptance; not a production incident', () => {
-  it.fails('trims both ends', () => {
+  it('trims both ends', () => {
     expect(syntheticDisplayLabel(' fixture ')).toBe('fixture');
   });
 
-  it.fails('trims leading whitespace only', () => {
+  it('trims leading whitespace only', () => {
     expect(syntheticDisplayLabel(' \tfixture')).toBe('fixture');
   });
 
