@@ -1,18 +1,22 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
-import { RefreshCw } from 'lucide-react';
+import { Loader2, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { adminResponseSchema, FIXERRORS_PRODUCTION_ORIGIN, sameCandidate, type AdminCommand, type Candidate, type CheckEvidence, type ReleaseMode } from '@/lib/fixerrors/protocol';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
+import { Progress } from '@/components/ui/progress';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogScrollArea, DialogTitle, DialogTrigger, dialogContentViewportClassName } from '@/components/ui/dialog';
 
 type Snapshot = z.infer<typeof adminResponseSchema>;
+type Job = Snapshot['jobs'][number];
 type Confirmation = { repairJobId: string; candidate: Candidate; release?: CheckEvidence['release'] };
 type ActivityFilter = 'all' | 'attention' | 'previous';
 type RunFlow = { deviceId: string; jobId: string };
@@ -42,7 +46,21 @@ function elapsed(createdAt: number, observedAt: number) {
   return `${Math.max(0, Math.floor((observedAt - createdAt) / 1000))}s`;
 }
 
-const ACTIVITY_COLUMNS = 'lg:grid-cols-[minmax(0,1fr)_minmax(0,0.7fr)_minmax(0,0.9fr)_minmax(0,1.7fr)_minmax(0,1.7fr)]';
+const JOB_STATUS: Record<Job['state'], { label: string; tone: string; step: string }> = {
+  queued: { label: 'Queued', tone: 'border-yellow-400/40 bg-yellow-400/15 text-yellow-200', step: 'Waiting for the runner to claim this run.' },
+  leased: { label: 'Running\u2026', tone: 'border-yellow-400/40 bg-yellow-400/15 text-yellow-200', step: 'Executing on the runner. Operation detail is not reported.' },
+  paused: { label: 'Paused', tone: 'border-amber-400/40 bg-amber-400/15 text-amber-200', step: 'Paused. Inspect retained evidence before continuing.' },
+  reviewed: { label: 'Reviewed', tone: 'border-blue-400/40 bg-blue-400/15 text-blue-200', step: 'Review completed.' },
+  tested: { label: 'Tested', tone: 'border-blue-400/40 bg-blue-400/15 text-blue-200', step: 'Candidate tested. Deployment is not yet confirmed.' },
+  blocked: { label: 'Blocked', tone: 'border-amber-400/40 bg-amber-400/15 text-amber-200', step: 'Blocked. Resolve the reported hold before retrying.' },
+  failed: { label: 'Failed', tone: 'border-red-400/40 bg-red-400/15 text-red-200', step: 'Run failed. No successful outcome is assumed.' },
+  expired: { label: 'Expired', tone: 'border-amber-400/40 bg-amber-400/15 text-amber-200', step: 'The run expired. Inspect its retained outcome.' },
+  deployed: { label: 'Deployed', tone: 'border-emerald-400/40 bg-emerald-400/15 text-emerald-200', step: 'Live deployment confirmed.' },
+  unknown: { label: 'Unknown', tone: 'border-red-400/40 bg-red-400/15 text-red-200', step: 'Outcome unknown. Reconcile the retained evidence before continuing.' },
+  'no-work': { label: 'No work', tone: 'border-slate-600 bg-slate-800 text-slate-300', step: 'No eligible errors; no worker launched.' },
+  'no-change': { label: 'No change', tone: 'border-slate-600 bg-slate-800 text-slate-300', step: 'Run finished without a candidate change.' },
+};
+const PRIMARY_ACTION_CLASSNAME = 'bg-avs-yellow text-slate-900 hover:bg-[#d1b82f] focus-visible:ring-2 focus-visible:ring-[#F1D64A] focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900';
 const DIALOG_GUTTER_CLASSNAME = '[--fixerrors-dialog-gutter:24px] md:[--fixerrors-dialog-gutter:48px]';
 const dialogTop = 'max(var(--fixerrors-dialog-gutter), env(safe-area-inset-top, 0px))';
 const dialogBottom = 'max(var(--fixerrors-dialog-gutter), env(safe-area-inset-bottom, 0px))';
@@ -281,9 +299,10 @@ export function FixerrorsControlPanel() {
   const connectionLabel = failure ? snapshot ? 'Stale snapshot' : 'Unavailable' : !snapshot ? 'Loading...' : !snapshot.enabled ? 'Disabled'
     : !device ? selectedDeviceId ? 'Runner unavailable' : 'No devices' : device.revoked ? 'Revoked' : status?.online ? 'Online' : 'Offline';
   const newestJobs = [...(snapshot?.jobs ?? [])].sort((a, b) => b.createdAt - a.createdAt);
-  const activeJobs = newestJobs.filter(job => needsAttention(job, newestJobs));
-  const previousJobs = newestJobs.filter(job => !needsAttention(job, newestJobs));
-  const visibleJobs = activityFilter === 'attention' ? activeJobs : activityFilter === 'previous' ? previousJobs : [...activeJobs, ...previousJobs];
+  const [latestJob, ...historyJobs] = newestJobs;
+  const activeJobs = historyJobs.filter(job => needsAttention(job, newestJobs));
+  const previousJobs = historyJobs.filter(job => !needsAttention(job, newestJobs));
+  const visibleJobs = activityFilter === 'attention' ? activeJobs : activityFilter === 'previous' ? previousJobs : historyJobs;
   const requestsDisabled = busy || Boolean(failure) || Boolean(flow) || !snapshot?.enabled || !status?.ready || status.active || status.pending || status.reconciling || snapshot.releaseNeedsReconciliation;
   const missingDConsent = device && (!device.allowReadOnly || !device.allowRepair || !device.allowDeploy);
   const startDisabled = requestsDisabled || Boolean(missingDConsent);
@@ -310,107 +329,113 @@ export function FixerrorsControlPanel() {
     try { await navigator.clipboard.writeText(JSON.stringify(diagnostic, null, 2)); toast.success('Job diagnostics copied'); }
     catch { toast.error('Unable to copy diagnostics. Select the visible job ID and diagnostic details instead.'); }
   };
-  const renderJobs = (jobs: Snapshot['jobs']) => (
-    <div role="table" aria-label="Fixerrors activity runs" className="min-w-0 [overflow-wrap:anywhere]">
-      <div role="rowgroup" className="sr-only lg:not-sr-only">
-        <div role="row" className={`grid gap-4 border-b border-border pb-2 text-xs font-medium text-muted-foreground ${ACTIVITY_COLUMNS}`}>
-          {['Run/date', 'Status', 'Runner', 'Progress/result', 'Actions/details'].map(label => <div key={label} role="columnheader">{label}</div>)}
+  const renderJob = (job: Job, latest = false) => {
+    const canCancel = job.action !== 'deploy' && ['queued', 'leased', 'paused'].includes(job.state);
+    const canReviewDeploy = job.action === 'repair' && job.state === 'tested' && job.candidate && !snapshot?.jobs.some(entry => entry.parentRepairId === job.id);
+    const autoRelease = snapshot?.jobs.find(entry => entry.parentRepairId === job.id);
+    const canRevokePreapproval = job.autoDeployment && ['pending', 'consumed'].includes(job.autoDeployment.state) &&
+      (!autoRelease || (['queued', 'leased'].includes(autoRelease.state) && !autoRelease.deployStarted));
+    const active = ['queued', 'leased'].includes(job.state);
+    const presentation = JOB_STATUS[job.state];
+    return (
+      <Card key={job.id} role="article" aria-label={latest ? 'Latest run' : `${job.action} run ${job.id}`}
+        data-job-state={job.state}
+        className={`min-w-0 space-y-4 border-border p-4 text-sm [overflow-wrap:anywhere] ${active ? 'border-yellow-400/30 bg-[rgba(241,214,74,0.06)]' : ''}`}>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0 space-y-1">
+            {latest ? <h3 className="font-semibold">Latest run</h3> : <h4 className="font-semibold capitalize">{job.action} run</h4>}
+            <p className="text-xs text-muted-foreground"><span className="capitalize">{job.action}</span> / <time dateTime={new Date(job.createdAt).toISOString()}>{timestamp(job.createdAt)}</time></p>
+          </div>
+          <Badge variant="outline" className={`gap-1.5 ${presentation.tone}`}>
+            {job.state === 'leased' && <Loader2 aria-hidden="true" className="h-3 w-3 animate-spin" />}
+            {presentation.label}
+          </Badge>
         </div>
-      </div>
-      <div role="rowgroup" className="divide-y divide-border">
-        {jobs.map((job) => {
-          const canCancel = job.action !== 'deploy' && ['queued', 'leased', 'paused'].includes(job.state);
-          const canReviewDeploy = job.action === 'repair' && job.state === 'tested' && job.candidate && !snapshot?.jobs.some(entry => entry.parentRepairId === job.id);
-          const autoRelease = snapshot?.jobs.find(entry => entry.parentRepairId === job.id);
-          const canRevokePreapproval = job.autoDeployment && ['pending', 'consumed'].includes(job.autoDeployment.state) &&
-            (!autoRelease || (['queued', 'leased'].includes(autoRelease.state) && !autoRelease.deployStarted));
-          return (
-            <div key={job.id} role="row" className={`grid min-w-0 grid-cols-1 gap-3 py-4 text-sm lg:gap-4 ${ACTIVITY_COLUMNS}`}>
-              <div role="cell" className="min-w-0 space-y-1">
-                <span className="block text-xs font-medium text-muted-foreground lg:hidden">Run/date</span>
-                <p className="font-medium capitalize">{job.action}</p>
-                <time dateTime={new Date(job.createdAt).toISOString()} className="block text-xs text-muted-foreground">{new Date(job.createdAt).toLocaleString('en-GB')}</time>
-                <p className="break-all font-mono text-xs text-muted-foreground">{job.id}</p>
-              </div>
-              <div role="cell" className="min-w-0 space-y-1">
-                <span className="block text-xs font-medium text-muted-foreground lg:hidden">Status</span>
-                <Badge variant={job.state === 'failed' || job.state === 'unknown' ? 'destructive' : 'secondary'}>{job.state}</Badge>
-              </div>
-              <div role="cell" className="min-w-0 space-y-1">
-                <span className="block text-xs font-medium text-muted-foreground lg:hidden">Runner</span>
-                <p className="text-xs text-muted-foreground">{snapshot?.devices.find(entry => entry.id === job.deviceId)?.name ?? job.deviceId}</p>
-              </div>
-              <div role="cell" className="min-w-0 space-y-2">
-                <span className="block text-xs font-medium text-muted-foreground lg:hidden">Progress/result</span>
-                {job.reason && <p className="text-muted-foreground">{job.reason}</p>}
-                {job.reason && <p className="text-xs text-muted-foreground">{REASON_HELP[job.reason]}</p>}
-                {job.diagnostic && <p className="text-xs text-muted-foreground">Native diagnostic: {job.diagnostic}. {DIAGNOSTIC_HELP[job.diagnostic]} Private receipts remain on the runner; no raw error output is exposed.</p>}
-                <p className="text-xs text-muted-foreground">Stage: {job.state === 'leased' ? `${job.action} executing (operation detail not reported)` : job.state}.
-                  {['queued', 'leased', 'paused'].includes(job.state) && observedAt !== null && ` Elapsed at snapshot: ${elapsed(job.createdAt, observedAt)}.`}</p>
-                <p className="text-xs text-muted-foreground">{job.leaseUntil !== null ? `Lease deadline: ${timestamp(job.leaseUntil)}.` : `Admission / queued deadline: ${timestamp(job.expiresAt)}.`} No completion ETA is reported.</p>
-                {job.batch && <div className="space-y-1 text-xs text-muted-foreground" aria-label="Batch progress" role="status">
-                  <p>{job.batch.processed} / {job.batch.captured} cases processed; {job.batch.remaining} remaining ({job.batch.rows} error rows captured).</p>
-                  <p>{job.batch.counts['verified-local']} verified locally / {job.batch.counts.held} held / {job.batch.counts['report-only']} report only / {job.batch.counts.failed} failed.</p>
-                  {job.batch.triage && <p>Importance (processed): {job.batch.triage.Routine} Routine / {job.batch.triage.Important} Important / {job.batch.triage.Urgent} Urgent. Importance does not grant repair or Deploy approval.</p>}
-                  {job.batch.latest?.diagnostic && <p role="alert">{job.batch.latest.diagnostic === 'worker-provider-limit'
-                    ? 'The worker could not investigate: the AI provider spending limit was reached. Check the API organisation limit before retrying.'
-                    : 'The worker did not complete its investigation. Inspect the private execution receipts before retrying.'}</p>}
-                  {job.batch.latest && <p>Latest: {job.batch.latest.importance} ({job.batch.latest.reason.replaceAll('-', ' ')}); {job.batch.latest.effort} investigation; {job.batch.latest.route.replaceAll('-', ' ')}.
-                    {' '}Measured analysis {job.batch.latest.analysisMs} ms / repair and checks {job.batch.latest.repairAndChecksMs} ms / case total {job.batch.latest.totalMs} ms. Worker time limits apply; these timings are not a completion estimate.</p>}
-                  <p>Lifecycle: {job.batch.lifecycle}{job.batch.lifecycleReason ? ` (${job.batch.lifecycleReason})` : ''}. {job.batch.lifecycle !== 'applied' ? 'Error records are not confirmed reconciled.' : 'Local verification is not a live fix.'}</p>
-                </div>}
-                {job.approval && <p className="text-xs text-muted-foreground">{(job.approval.releaseMode ?? 'full') === 'targeted' ? 'Targeted checks (urgent)' : 'Full checks (fap)'} / {snapshot?.jobs.some(parent => parent.autoDeployment?.deployJobId === job.id) ? 'automatically approved from one-run consent' : 'separately confirmed'} {new Date(job.approval.confirmedAt).toLocaleString('en-GB')}</p>}
-                {job.requestedReleaseMode && <p className="text-xs text-muted-foreground">Requested validation: {job.requestedReleaseMode === 'full' ? 'full checks (fap)' : 'focused checks'}.</p>}
-                {job.autoDeployment && <p className="text-xs text-muted-foreground">One-run automatic Deploy: {job.autoDeployment.state}; {job.autoDeployment.releaseMode === 'full' ? 'full checks (fap)' : 'focused checks'}. Valid until {timestamp(job.autoDeployment.expiresAt)}. An already-started release cannot be undone here.</p>}
-                {!job.reason && !job.batch && !job.approval && <p className="text-xs text-muted-foreground">No additional result recorded.</p>}
-              </div>
-              <div role="cell" className="min-w-0 space-y-2">
-                <span className="block text-xs font-medium text-muted-foreground lg:hidden">Actions/details</span>
-                {canCancel && (
-                  <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal" disabled={busy || Boolean(failure)}
-                    onClick={() => { setFlow(null); setFlowNotice('Automatic continuation cancelled.'); void submit({ op: 'cancel', jobId: job.id }); }}>Cancel run</Button>
-                )}
-                {canRevokePreapproval && <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal"
-                  disabled={busy || Boolean(failure)} onClick={() => void submit({ op: 'revoke-preapproval', jobId: job.id })}>Revoke automatic Deploy</Button>}
-                {job.candidate && <CandidateDetails candidate={job.candidate} release={job.checks?.release} />}
-                {canReviewDeploy && (
-                  <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal text-left" disabled={busy || Boolean(failure) || snapshot?.releaseNeedsReconciliation || Boolean(job.batch && job.batch.lifecycle !== 'applied')}
-                    onClick={() => {
-                      if (job.candidate) {
-                        openingDeploy.current = true;
-                        setControlOpen(false);
-                        setConfirmed(false);
-                        setReleaseMode(job.requestedReleaseMode ?? 'full');
-                        setConfirmation({ repairJobId: job.id, candidate: job.candidate, release: job.checks?.release });
-                      }
-                    }}>Deploy: review exact candidate</Button>
-                )}
-                <Button variant="ghost" size="sm" className="h-auto whitespace-normal" onClick={() => void copyDiagnostics(job)}>Copy diagnostics for {job.id}</Button>
-                {!canCancel && !canReviewDeploy && !job.candidate && <p className="text-xs text-muted-foreground">No actions available.</p>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+        <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="min-w-0 space-y-2">
+            <h4 className="text-xs font-medium text-muted-foreground">Current step</h4>
+            <p>{job.state === 'tested' && autoRelease?.state === 'deployed' ? 'Candidate tested; deployment completed.' : presentation.step}</p>
+            <p className="text-xs text-muted-foreground">{snapshot?.devices.find(entry => entry.id === job.deviceId)?.name ?? 'Runner unavailable'}</p>
+          </div>
+          <div className="min-w-0 space-y-2" aria-label="Batch progress" role="status">
+            <h4 className="text-xs font-medium text-muted-foreground">Progress</h4>
+            {job.batch ? <>
+              <p>{job.batch.processed} / {job.batch.captured} cases processed; {job.batch.remaining} remaining ({job.batch.rows} error rows captured).</p>
+              <p className="text-xs text-muted-foreground">{job.batch.counts['verified-local']} verified locally / {job.batch.counts.held} held / {job.batch.counts['report-only']} report only / {job.batch.counts.failed} failed.</p>
+            </> : <p className="text-xs text-muted-foreground">{active ? 'Waiting for reported progress.' : 'No case progress reported.'}</p>}
+          </div>
+          <div className="min-w-0 space-y-2">
+            <h4 className="text-xs font-medium text-muted-foreground">Results</h4>
+            {job.reason && <p className={['failed', 'unknown'].includes(job.state) ? 'text-red-200' : 'text-amber-200'}>{REASON_HELP[job.reason]}</p>}
+            {job.batch?.latest?.diagnostic && <p role="alert">{job.batch.latest.diagnostic === 'worker-provider-limit'
+              ? 'The worker could not investigate: the AI provider spending limit was reached. Check the API organisation limit before retrying.'
+              : 'The worker did not complete its investigation. Inspect the private execution receipts before retrying.'}</p>}
+            {canReviewDeploy && <p className="text-blue-200">Deploy-ready: {job.autoDeployment?.state === 'pending'
+              ? 'conditional automatic Deploy awaits all gates. You can revoke it before deployment begins.'
+              : job.batch && job.batch.lifecycle !== 'applied' ? 'lifecycle reconciliation is required before Deploy.'
+              : 'review the exact tested candidate and confirm Deploy separately.'}</p>}
+            {job.autoDeployment && <p className="text-xs text-muted-foreground">One-run automatic Deploy: {job.autoDeployment.state}; {job.autoDeployment.releaseMode === 'full' ? 'full checks (fap)' : 'focused checks'}.</p>}
+            {job.batch && <p className="text-xs text-muted-foreground">Lifecycle: {job.batch.lifecycle}{job.batch.lifecycleReason ? ` (${job.batch.lifecycleReason})` : ''}. {job.batch.lifecycle !== 'applied' ? 'Error records are not confirmed reconciled.' : 'Local verification is not a live fix.'}</p>}
+            {!job.reason && !job.batch && !canReviewDeploy && <p className="text-xs text-muted-foreground">{job.state === 'deployed' ? 'Deployment verified.' : 'No additional result recorded.'}</p>}
+          </div>
+        </div>
+        {job.batch && job.batch.captured > 0 && <Progress
+          className="h-2" indicatorClassName="bg-avs-yellow"
+          aria-label="Errors reviewed" aria-valuenow={job.batch.processed} aria-valuemin={0} aria-valuemax={job.batch.captured}
+          value={Math.min(100, job.batch.processed / job.batch.captured * 100)} />}
+        <div className="flex flex-wrap gap-2">
+          {canCancel && (
+            <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal" disabled={busy || Boolean(failure)}
+              onClick={() => { setFlow(null); setFlowNotice('Automatic continuation cancelled.'); void submit({ op: 'cancel', jobId: job.id }); }}>Cancel run</Button>
+          )}
+          {canRevokePreapproval && <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal"
+            disabled={busy || Boolean(failure)} onClick={() => void submit({ op: 'revoke-preapproval', jobId: job.id })}>Revoke automatic Deploy</Button>}
+          {canReviewDeploy && (
+            <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal text-left" disabled={busy || Boolean(failure) || snapshot?.releaseNeedsReconciliation || Boolean(job.batch && job.batch.lifecycle !== 'applied')}
+              onClick={() => {
+                if (job.candidate) {
+                  openingDeploy.current = true;
+                  setControlOpen(false);
+                  setConfirmed(false);
+                  setReleaseMode(job.requestedReleaseMode ?? 'full');
+                  setConfirmation({ repairJobId: job.id, candidate: job.candidate, release: job.checks?.release });
+                }
+              }}>Deploy: review exact candidate</Button>
+          )}
+        </div>
+        <details className="text-xs text-muted-foreground">
+          <summary className="cursor-pointer rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Run details and diagnostics</summary>
+          <div className="mt-3 space-y-2">
+            <p className="break-all font-mono">Job {job.id}<br />Runner {job.deviceId}</p>
+            <p>Stage: {job.state === 'leased' ? `${job.action} executing (operation detail not reported)` : job.state}.
+              {['queued', 'leased', 'paused'].includes(job.state) && observedAt !== null && ` Elapsed at snapshot: ${elapsed(job.createdAt, observedAt)}.`}</p>
+            <p>{job.leaseUntil !== null ? `Lease deadline: ${timestamp(job.leaseUntil)}.` : `Admission / queued deadline: ${timestamp(job.expiresAt)}.`} No completion ETA is reported.</p>
+            {job.reason && <p>{job.reason}</p>}
+            {job.diagnostic && <p>Native diagnostic: {job.diagnostic}. {DIAGNOSTIC_HELP[job.diagnostic]} Private receipts remain on the runner; no raw error output is exposed.</p>}
+            {job.batch?.triage && <p>Importance (processed): {job.batch.triage.Routine} Routine / {job.batch.triage.Important} Important / {job.batch.triage.Urgent} Urgent. Importance does not grant repair or Deploy approval.</p>}
+            {job.batch?.latest && <p>Latest: {job.batch.latest.importance} ({job.batch.latest.reason.replaceAll('-', ' ')}); {job.batch.latest.effort} investigation; {job.batch.latest.route.replaceAll('-', ' ')}.
+              {' '}Measured analysis {job.batch.latest.analysisMs} ms / repair and checks {job.batch.latest.repairAndChecksMs} ms / case total {job.batch.latest.totalMs} ms. Worker time limits apply; these timings are not a completion estimate.</p>}
+            {job.approval && <p className="text-xs text-muted-foreground">{(job.approval.releaseMode ?? 'full') === 'targeted' ? 'Targeted checks (urgent)' : 'Full checks (fap)'} / {snapshot?.jobs.some(parent => parent.autoDeployment?.deployJobId === job.id) ? 'automatically approved from one-run consent' : 'separately confirmed'} {new Date(job.approval.confirmedAt).toLocaleString('en-GB')}</p>}
+            {job.requestedReleaseMode && <p className="text-xs text-muted-foreground">Requested validation: {job.requestedReleaseMode === 'full' ? 'full checks (fap)' : 'focused checks'}.</p>}
+            {job.autoDeployment && <p>Permission valid until {timestamp(job.autoDeployment.expiresAt)}. An already-started release cannot be undone here.</p>}
+            {job.candidate && <CandidateDetails candidate={job.candidate} release={job.checks?.release} />}
+            <Button variant="ghost" size="sm" className="h-auto whitespace-normal" aria-label={`Copy diagnostics for ${job.id}`} onClick={() => void copyDiagnostics(job)}>Copy diagnostics</Button>
+            {!canCancel && !canReviewDeploy && !job.candidate && <p className="text-xs text-muted-foreground">No actions available.</p>}
+          </div>
+        </details>
+      </Card>
+    );
+  };
   return (
     <div aria-label="Fixerrors companion" className="min-w-0 space-y-2 xl:shrink-0">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold">Fixerrors</span>
-        <Badge variant="secondary" title={device?.name} role="status" className="max-w-40" aria-label={device ? `${device.name}: ${connectionLabel}` : undefined}>
-          <span className="truncate">
-            {device && snapshot && snapshot.devices.length > 1 && `${device.name}: `}
-            {connectionLabel}
-          </span>
-        </Badge>
+      <div className="flex min-w-0 flex-col items-start gap-2">
         <Dialog open={controlOpen} onOpenChange={open => {
           setControlOpen(open);
           setAutoDeploy(false);
           if (open) setActivityFilter('all');
         }}>
           <DialogTrigger asChild>
-            <Button ref={activityTrigger} size="sm" className="bg-slate-900 text-white hover:bg-slate-800">Run Fixerrors</Button>
+            <Button ref={activityTrigger} className={PRIMARY_ACTION_CLASSNAME}>Open FixErrors Control</Button>
           </DialogTrigger>
           <DialogContent className={dialogContentViewportClassName({
             size: '6xl', scroll: 'content', className: `min-w-0 gap-4 ${DIALOG_GUTTER_CLASSNAME}`,
@@ -418,31 +443,41 @@ export function FixerrorsControlPanel() {
             onCloseAutoFocus={event => { if (openingDeploy.current) event.preventDefault(); }}>
             <DialogHeader className="shrink-0 pr-6 text-left">
               <DialogTitle>Fixerrors control centre</DialogTitle>
-              <DialogDescription>Investigate all new and outstanding errors, repair eligible cases, and test one candidate. Manual runs stop at Deploy-ready unless you explicitly pre-approve automatic Deploy for this run.</DialogDescription>
+              <DialogDescription>Review errors, repair eligible cases and test a candidate. Deploy requires explicit approval.</DialogDescription>
             </DialogHeader>
-            {snapshot?.enabled && (
-              <div role="group" aria-label="Activity filters" className="flex shrink-0 flex-wrap gap-2">
-                {([
-                  ['all', 'All', newestJobs.length],
-                  ['attention', 'Needs attention', activeJobs.length],
-                  ['previous', 'Previous', previousJobs.length],
-                ] as const).map(([value, label, count]) => (
-                  <Button key={value} size="sm" variant="outline" aria-pressed={activityFilter === value}
-                    className={activityFilter === value ? 'border-white/80 bg-white text-slate-900 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
-                    onClick={() => setActivityFilter(value)}>{label} ({count})</Button>
-                ))}
-              </div>
-            )}
             <DialogScrollArea aria-label="Activity entries" className="min-w-0 space-y-4">
               {failure && <p role="alert" className="text-sm text-destructive">{failure}</p>}
               {!snapshot && !failure && <PanelLoader />}
               {snapshot && !snapshot.enabled && <p className="text-sm text-muted-foreground">Disabled by default. Configuration and explicit device provisioning are required.</p>}
-              {observedAt !== null && <p className="text-xs text-muted-foreground">{failure ? 'Stale snapshot' : 'Last successful update'}: {timestamp(observedAt)}. Runner contact: {device?.lastSeenAt ? timestamp(device.lastSeenAt) : 'not reported'}.</p>}
+              {failure && observedAt !== null && <p className="text-xs text-muted-foreground">Stale snapshot: {timestamp(observedAt)}.</p>}
               {snapshot?.enabled && <>
                 <div className="space-y-3 rounded-lg border border-border p-3">
-                  <h3 className="text-sm font-semibold">Run status</h3>
-                  {!flow && <p className="text-sm text-muted-foreground">{status?.active ? 'A run is already active; its last reported stage is below.' : status?.ready ? 'Runner connected. Review and repair can start when all consent and retained-work gates are clear.' : 'Waiting for a ready, enrolled runner.'}</p>}
-                  {flow && <p role="status" className="text-sm">Batch requested: the runner investigates each case before repair and testing. Only explicit one-run pre-approval permits automatic Deploy.</p>}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-semibold">Run status</h3>
+                      <Badge variant="outline" className={status?.ready ? 'border-emerald-400/40 bg-emerald-400/15 text-emerald-200' : 'border-slate-600 text-slate-300'}>{connectionLabel}</Badge>
+                    </div>
+                    <Button size="sm" className={`h-auto min-h-9 whitespace-normal ${PRIMARY_ACTION_CLASSNAME}`}
+                      aria-label={busy ? 'Recording request...' : autoDeploy ? 'Confirm automatic Deploy and start this run' : 'Start review and repair'}
+                      aria-busy={busy} disabled={startDisabled} onClick={startRun}>
+                      {busy && <Loader2 aria-hidden="true" className="animate-spin" />}
+                      {busy ? 'Recording request...' : autoDeploy ? 'Confirm automatic Deploy and start this run' : 'Run Fixerrors'}
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+                    <label htmlFor="fixerrors-full-checks" className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Switch id="fixerrors-full-checks" aria-label="Run full checks (fap)" checked={fullChecks} disabled={busy || Boolean(flow)}
+                        onCheckedChange={checked => { setFullChecks(checked); setAutoDeploy(false); }} />
+                      Full checks (fap)
+                    </label>
+                    <label htmlFor="fixerrors-auto-deploy" className="flex cursor-pointer items-center gap-2 text-sm">
+                      <Switch id="fixerrors-auto-deploy" aria-label="Allow pre-approved automatic deployment after tests pass" checked={autoDeploy}
+                        disabled={startDisabled} onCheckedChange={setAutoDeploy} />
+                      Auto-deploy after tests
+                    </label>
+                  </div>
+                  {autoDeploy && <p role="alert" className="text-sm text-amber-300">Confirming starts one run and authorizes deployment of its future successful tested candidate without another click, using {fullChecks ? 'full checks (fap)' : 'focused checks'}. This conditional permission expires 4 hours after the request is recorded, applies only to this run and runner, and is not permission for future runs. You can revoke it before deployment begins; an already-started release cannot simply be undone.</p>}
+                  {flow && <p role="status" className="text-sm text-muted-foreground">Run requested; waiting for the runner&apos;s next update.</p>}
                   {flowNotice && <p role="status" className="text-sm">{flowNotice}</p>}
                   {missingDConsent && <p role="alert" className="text-sm text-amber-300">D consent is required; no review-only fallback. On this Windows PC, stop Squires Runner, choose E / D, confirm SET DEPLOY, then start Terminal or Service with runtime D. This only enables the workflow, not Deploy approval.</p>}
                   {!status?.online && <p className="text-sm text-muted-foreground">Start Squires Runner on its enrolled Windows PC. Refresh detects its next authenticated heartbeat automatically.</p>}
@@ -453,31 +488,37 @@ export function FixerrorsControlPanel() {
                     : device.holdReason === 'checks-unavailable'
                       ? 'Local checks are not ready. Inspect the runner check cache or validation failure, then restart the runner. No batch has started.'
                       : `Runner hold: ${device.holdReason}. Preserve operational locks and private receipts; the owner must reconcile the retained outcome.`}</p>}
-                  {status?.pending && <p className="text-sm text-muted-foreground">A tested candidate awaits Deploy. Inspect its activity row and any one-run pre-approval below; no fresh run can replace it.</p>}
+                  {status?.pending && <p className="text-sm text-blue-200">A tested candidate awaits Deploy. Inspect its run and any one-run pre-approval below; no fresh run can replace it.</p>}
                   {status?.reconciling && <p role="alert" className="text-sm text-amber-300">Exact-row lifecycle reconciliation is required before another run.</p>}
                   {snapshot.releaseNeedsReconciliation && <p role="alert" className="text-sm text-destructive">Deployment result unknown. Verify the remote Git ref and live release identity before another repair or deployment.</p>}
-                  <div className="flex flex-wrap gap-2">
-                    <Button size="sm" className="h-auto min-h-9 whitespace-normal bg-avs-yellow text-slate-900 hover:bg-[#d1b82f]"
-                      disabled={startDisabled} onClick={startRun}>{busy ? 'Recording request...' : autoDeploy ? 'Confirm automatic Deploy and start this run' : 'Start review and repair'}</Button>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={fullChecks} disabled={busy || Boolean(flow)}
-                        onChange={event => { setFullChecks(event.target.checked); setAutoDeploy(false); }} />
-                      Run full checks (fap)
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input type="checkbox" checked={autoDeploy} disabled={startDisabled}
-                        onChange={event => setAutoDeploy(event.target.checked)} />
-                      Allow pre-approved automatic deployment after tests pass
-                    </label>
-                    <Button size="sm" variant="outline" disabled title="A browser cannot securely inspect the installed Windows named pipe.">Launch local runner (unavailable)</Button>
-                  </div>
-                  <p className="text-xs text-muted-foreground">Unchecked full checks uses focused deployment validation. Repairs always require their focused checks first. Without automatic Deploy pre-approval, a separate exact-candidate confirmation is required.</p>
-                  {autoDeploy && <p role="alert" className="text-sm text-amber-300">Confirming starts one run and authorizes deployment of its future successful tested candidate without another click, using {fullChecks ? 'full checks (fap)' : 'focused checks'}. This conditional permission expires 4 hours after the request is recorded, applies only to this run and runner, and is not permission for future runs. You can revoke it before deployment begins; an already-started release cannot simply be undone.</p>}
-                  <p className="text-xs text-muted-foreground">Once recorded, the batch continues on the runner even if you close this page. All eligible errors are captured together; investigation and repair run sequentially. Use Cancel run below to stop an active job.</p>
                 </div>
+                {latestJob ? renderJob(latestJob, true) : <p className="text-sm text-muted-foreground">No activity recorded.</p>}
+                <details className="min-w-0 rounded-lg border border-border p-3">
+                  <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Previous activity ({historyJobs.length})</summary>
+                  <div className="mt-3 space-y-3">
+                    <div role="group" aria-label="Activity filters" className="flex flex-wrap gap-2">
+                      {([
+                        ['all', 'All', historyJobs.length],
+                        ['attention', 'Needs attention', activeJobs.length],
+                        ['previous', 'Previous', previousJobs.length],
+                      ] as const).map(([value, label, count]) => (
+                        <Button key={value} size="sm" variant="outline" aria-pressed={activityFilter === value}
+                          className={activityFilter === value ? 'border-white/80 bg-white text-slate-900 hover:bg-slate-200' : 'border-slate-600 text-muted-foreground hover:bg-slate-700/50'}
+                          onClick={() => setActivityFilter(value)}>{label} ({count})</Button>
+                      ))}
+                    </div>
+                    <div role="region" aria-label="Previous activity runs" className="space-y-3">
+                      {visibleJobs.length ? visibleJobs.map(job => renderJob(job)) : <p className="text-sm text-muted-foreground">{activityFilter === 'attention' ? 'No jobs need attention or deployment decisions.' : 'No previous activity.'}</p>}
+                    </div>
+                  </div>
+                </details>
                 <details className="rounded-lg border border-border p-3">
                   <summary className="cursor-pointer text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Runner settings</summary>
                   <div className="mt-3 space-y-3">
+                    {observedAt !== null && <p className="text-xs text-muted-foreground">Last successful update: {timestamp(observedAt)}. Runner contact: {device?.lastSeenAt ? timestamp(device.lastSeenAt) : 'not reported'}.</p>}
+                    <p className="text-xs text-muted-foreground">Unchecked full checks uses focused deployment validation. Repairs always require their focused checks first. Without automatic Deploy pre-approval, a separate exact-candidate confirmation is required.</p>
+                    <p className="text-xs text-muted-foreground">Once recorded, the batch continues on the runner even if you close this page. All eligible errors are captured together; investigation and repair run sequentially. Use Cancel run to stop an active job.</p>
+                    <Button size="sm" variant="outline" disabled title="A browser cannot securely inspect the installed Windows named pipe.">Launch local runner (unavailable)</Button>
                     <p className="text-sm text-muted-foreground">{snapshot.origin === FIXERRORS_PRODUCTION_ORIGIN ? 'Production controls.' : 'Local rehearsal controls.'} {snapshot.executionAvailable ? 'A device has reported bridge availability.' : 'No execution bridge has reported availability.'}</p>
                     {snapshot.devices.length === 0 && <p className="text-sm text-muted-foreground">No enrolled devices.</p>}
                     {snapshot.devices.map(entry => {
@@ -501,20 +542,24 @@ export function FixerrorsControlPanel() {
                     })}
                   </div>
                 </details>
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold">Activity and history ({newestJobs.length})</h3>
-                  {visibleJobs.length ? renderJobs(visibleJobs) : <p className="text-sm text-muted-foreground">{activityFilter === 'attention' ? 'No jobs need attention or deployment decisions.' : activityFilter === 'previous' ? 'No previous activity.' : 'No activity recorded.'}</p>}
-                </div>
               </>}
             </DialogScrollArea>
             <Button size="sm" variant="outline" className="shrink-0" disabled={busy || refreshing} onClick={() => void refresh()}>{refreshing ? 'Refreshing companion state...' : 'Refresh companion state'}</Button>
           </DialogContent>
         </Dialog>
-        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-white hover:bg-white/15 hover:text-white" aria-label="Refresh companion state" title="Refresh companion state"
-          disabled={busy || refreshing} onClick={() => void refresh()}><RefreshCw className="h-4 w-4" /></Button>
+        <div className="flex max-w-full items-center gap-1 rounded-md bg-white/85 px-2 text-slate-900">
+          <Badge variant="outline" title={device?.name} role="status" className="max-w-48 border-transparent px-0 text-slate-900" aria-label={device ? `${device.name}: ${connectionLabel}` : undefined}>
+            <span className="truncate">
+              {device && snapshot && snapshot.devices.length > 1 && `${device.name}: `}
+              {connectionLabel}
+            </span>
+          </Badge>
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-900 hover:bg-slate-900/10 hover:text-slate-900" aria-label="Refresh companion state" title="Refresh companion state"
+            disabled={busy || refreshing} onClick={() => void refresh()}><RefreshCw className="h-3 w-3" /></Button>
+        </div>
       </div>
       {failure && !controlOpen && <p role="alert" className="max-w-md text-xs text-white">{failure}</p>}
-      {snapshot?.releaseNeedsReconciliation && !controlOpen && <p role="alert" className="max-w-md text-xs text-white">Deployment result unknown. Open Run Fixerrors to inspect the retained outcome.</p>}
+      {snapshot?.releaseNeedsReconciliation && !controlOpen && <p role="alert" className="max-w-md text-xs text-white">Deployment result unknown. Open FixErrors Control to inspect the retained outcome.</p>}
       <Dialog open={Boolean(confirmation && confirmationValid)} onOpenChange={open => { if (!open) dismissConfirmation(); }}>
         <DialogContent className={dialogContentViewportClassName({
           size: '4xl',

@@ -33,7 +33,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 async function openDetails(view: 'Activity' | 'Runner settings') {
   await waitFor(() => expect(screen.queryByText('Loading...')).toBeNull());
-  fireEvent.click(screen.getByRole('button', { name: 'Run Fixerrors' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Open FixErrors Control' }));
   if (view === 'Runner settings' && screen.queryByText('Runner settings', { selector: 'summary' })) {
     fireEvent.click(screen.getByText('Runner settings', { selector: 'summary' }));
   }
@@ -51,6 +51,7 @@ function closeDetails() {
 }
 
 function filterActivity(filter: 'All' | 'Needs attention' | 'Previous') {
+  openHistory();
   const filters = screen.getByRole('group', { name: 'Activity filters' });
   const button = within(filters).getByRole('button', { name: new RegExp(`^${filter} \\(`) });
   fireEvent.click(button);
@@ -58,7 +59,14 @@ function filterActivity(filter: 'All' | 'Needs attention' | 'Previous') {
 }
 
 function activityRows() {
-  return within(screen.getByRole('table', { name: 'Fixerrors activity runs' })).getAllByRole('row').slice(1);
+  return within(screen.getByRole('region', { name: 'Previous activity runs' })).queryAllByRole('article');
+}
+
+function openHistory() {
+  const summary = screen.getByText(/^Previous activity \(/, { selector: 'summary' });
+  const details = summary.closest('details')!;
+  if (!details.open) fireEvent.click(summary);
+  expect(details.open).toBe(true);
 }
 
 describe('Debug local Fixerrors controls', () => {
@@ -224,6 +232,7 @@ describe('Debug local Fixerrors controls', () => {
     render(<FixerrorsControlPanel />);
     await openDetails('Activity');
     await screen.findByText('7 / 7 cases processed; 0 remaining (7 error rows captured).');
+    openHistory();
     expect(screen.getByText('1 / 7 cases processed; 6 remaining (7 error rows captured).')).toBeDefined();
     filterActivity('Needs attention');
     expect(screen.queryByText('1 / 7 cases processed; 6 remaining (7 error rows captured).')).toBeNull();
@@ -273,6 +282,9 @@ describe('Debug local Fixerrors controls', () => {
     render(<FixerrorsControlPanel />);
     await openDetails('Activity');
     await screen.findByText('2 / 4 cases processed; 2 remaining (281 error rows captured).');
+    const progress = screen.getByRole('progressbar', { name: 'Errors reviewed' });
+    expect(progress.getAttribute('aria-valuenow')).toBe('2');
+    expect(progress.getAttribute('aria-valuemax')).toBe('4');
     expect(screen.getByText(/1 verified locally \/ 1 held/)).toBeDefined();
     expect(screen.getByText(/Lifecycle: pending.*not confirmed reconciled/)).toBeDefined();
     expect(screen.getByText(/0 Routine \/ 2 Important \/ 0 Urgent/)).toBeDefined();
@@ -398,7 +410,7 @@ describe('Debug local Fixerrors controls', () => {
   });
 });
 
-it('shows all retained jobs once in one Activity log, attention first and previous newest-first, with counted filters reset on reopen', async () => {
+it('keeps the chronological latest run visible above collapsed history and applies counted filters only to older runs', async () => {
   const store = new FixtureStore();
   const h = harness(store);
   await h.enqueue('review');
@@ -406,51 +418,154 @@ it('shows all retained jobs once in one Activity log, attention first and previo
   store.state.jobs = Array.from({ length: 55 }, (_, index) => ({ ...template,
     id: crypto.randomUUID(), state: 'reviewed' as const, createdAt: now - index,
   }));
-  store.state.jobs.push({ ...template, id: crypto.randomUUID(), state: 'unknown', reason: 'release-unconfirmed' });
+  store.state.jobs.push({ ...template, id: crypto.randomUUID(), createdAt: now - 1000, state: 'unknown', reason: 'release-unconfirmed' });
   const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) };
   expect(snapshot.jobs).toHaveLength(56);
   vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
   render(<FixerrorsControlPanel />);
-  const toggle = await screen.findByRole('button', { name: 'Run Fixerrors' });
+  const toggle = await screen.findByRole('button', { name: 'Open FixErrors Control' });
   expect(toggle.getAttribute('aria-expanded')).toBe('false');
   expect(screen.queryByRole('button', { name: /^History/ })).toBeNull();
-  expect(screen.queryByText('reviewed')).toBeNull();
+  expect(screen.queryByText('Reviewed')).toBeNull();
   await openDetails('Activity');
   expect(screen.getAllByRole('dialog')).toHaveLength(1);
   expect(screen.getByRole('dialog', { name: 'Fixerrors control centre' })).toBeDefined();
   expect(toggle.getAttribute('aria-expanded')).toBe('true');
-  expect(screen.getByRole('button', { name: 'All (56)' }).getAttribute('aria-pressed')).toBe('true');
+  const latest = screen.getByRole('article', { name: 'Latest run' });
+  expect(within(latest).getByText(new RegExp(store.state.jobs[0].id), { selector: 'p' })).toBeDefined();
+  expect(within(latest).getByText('Reviewed')).toBeDefined();
+  expect(screen.getByText('Previous activity (55)', { selector: 'summary' }).closest('details')!.open).toBe(false);
+  expect(screen.getByText('Runner settings', { selector: 'summary' }).closest('details')!.open).toBe(false);
+  expect(screen.getByRole('region', { name: 'Previous activity runs' }).closest('details')!.open).toBe(false);
+  openHistory();
+  expect(screen.getByRole('button', { name: 'All (55)' }).getAttribute('aria-pressed')).toBe('true');
   expect(screen.getByRole('button', { name: 'Needs attention (1)' })).toBeDefined();
-  expect(screen.getByRole('button', { name: 'Previous (55)' })).toBeDefined();
-  expect(screen.getByText('unknown')).toBeTruthy();
-  expect(screen.getAllByText('reviewed')).toHaveLength(55);
-  const orderedIds = [store.state.jobs[55].id, ...store.state.jobs.slice(0, 55).map(job => job.id)];
+  expect(screen.getByRole('button', { name: 'Previous (54)' })).toBeDefined();
+  expect(screen.getByText('Unknown')).toBeTruthy();
+  expect(screen.getAllByText('Reviewed')).toHaveLength(55);
+  const orderedIds = [...store.state.jobs.slice(1, 55), store.state.jobs[55]].map(job => job.id);
   const expectRows = (ids: string[]) => {
     const rows = activityRows();
     expect(rows).toHaveLength(ids.length);
-    rows.forEach((row, index) => expect(within(row).getByText(ids[index])).toBeDefined());
+    rows.forEach((row, index) => expect(within(row).getByText(new RegExp(ids[index]), { selector: 'p' })).toBeDefined());
   };
   expectRows(orderedIds);
   filterActivity('Needs attention');
-  expectRows(orderedIds.slice(0, 1));
-  expect(screen.queryByText('reviewed')).toBeNull();
+  expectRows(orderedIds.slice(-1));
+  expect(screen.getByRole('article', { name: 'Latest run' })).toBe(latest);
+  expect(screen.getAllByText('Reviewed')).toHaveLength(1);
   filterActivity('Previous');
-  expectRows(orderedIds.slice(1));
-  expect(screen.queryByText('unknown')).toBeNull();
+  expectRows(orderedIds.slice(0, -1));
+  expect(screen.queryByText('Unknown')).toBeNull();
+  expect(screen.getByRole('article', { name: 'Latest run' })).toBe(latest);
   filterActivity('All');
   expectRows(orderedIds);
   filterActivity('Previous');
   closeDetails();
   await openDetails('Activity');
-  expect(screen.getByRole('button', { name: 'All (56)' }).getAttribute('aria-pressed')).toBe('true');
+  expect(screen.getByText('Previous activity (55)', { selector: 'summary' }).closest('details')!.open).toBe(false);
+  openHistory();
+  expect(screen.getByRole('button', { name: 'All (55)' }).getAttribute('aria-pressed')).toBe('true');
   expectRows(orderedIds);
   closeDetails();
-  expect(screen.queryByText('reviewed')).toBeNull();
+  expect(screen.queryByText('Reviewed')).toBeNull();
   expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
 });
 
+it('keeps an incoming latest run visible while a history filter remains selected', async () => {
+  const store = new FixtureStore();
+  await harness(store).enqueue('review');
+  const template = store.state.jobs[0];
+  store.state.jobs = [
+    { ...template, state: 'reviewed' },
+    { ...template, id: crypto.randomUUID(), createdAt: now - 1, state: 'reviewed' },
+  ];
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+    enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
+  }) })));
+  render(<FixerrorsControlPanel />);
+  await openDetails('Activity');
+  filterActivity('Previous');
+  const incomingId = crypto.randomUUID();
+  store.state.jobs.push({ ...template, id: incomingId, createdAt: now + 1, state: 'queued' });
+  fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
+  await waitFor(() => {
+    const latest = screen.getByRole('article', { name: 'Latest run' });
+    expect(within(latest).getByText(new RegExp(incomingId), { selector: 'p' })).toBeDefined();
+    expect(within(latest).getByText('Queued')).toBeDefined();
+  });
+  expect(screen.getByRole('button', { name: 'Previous (2)' }).getAttribute('aria-pressed')).toBe('true');
+  expect(activityRows()).toHaveLength(2);
+  expect(within(screen.getByRole('region', { name: 'Previous activity runs' })).queryByText('Queued')).toBeNull();
+});
+
 describe('Compact companion dialogs and preserved states', () => {
-  it.each(['full', 'targeted'] as const)('keeps mixed runs complete in labelled responsive columns, with one copy of each action and %s approval details', async releaseMode => {
+  it.each([
+    ['queued', 'Queued', 'yellow'],
+    ['leased', 'Running\u2026', 'yellow'],
+    ['paused', 'Paused', 'amber'],
+    ['reviewed', 'Reviewed', 'blue'],
+    ['tested', 'Tested', 'blue'],
+    ['blocked', 'Blocked', 'amber'],
+    ['failed', 'Failed', 'red'],
+    ['expired', 'Expired', 'amber'],
+    ['deployed', 'Deployed', 'emerald'],
+    ['unknown', 'Unknown', 'red'],
+    ['no-work', 'No work', 'slate'],
+    ['no-change', 'No change', 'slate'],
+  ] as const)('gives %s a semantic status and highlights only queued/executing cards', async (state, label, tone) => {
+    const store = new FixtureStore();
+    await harness(store).enqueue();
+    store.state.jobs[0].state = state;
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state),
+    }) })));
+    render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
+    const latest = screen.getByRole('article', { name: 'Latest run' });
+    expect(within(latest).getByText(label).className).toContain(`text-${tone}-`);
+    expect(latest.className.includes('bg-[rgba(241,214,74,0.06)]')).toBe(['queued', 'leased'].includes(state));
+    expect(latest.querySelector('.animate-spin') !== null).toBe(state === 'leased');
+    expect(latest.getAttribute('data-job-state')).toBe(state);
+    expect(within(latest).getByRole('heading', { name: 'Current step' })).toBeDefined();
+    expect(within(latest).getByRole('heading', { name: 'Progress' })).toBeDefined();
+    expect(within(latest).getByRole('heading', { name: 'Results' })).toBeDefined();
+  });
+
+  it('uses two shared switches, defaults both off, and shows disabled request feedback without changing consent semantics', async () => {
+    const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(new FixtureStore().state) };
+    let finish!: (value: { ok: boolean; json: () => Promise<{ ok: boolean; noWork: boolean }> }) => void;
+    const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => options?.method === 'POST'
+      ? new Promise(resolve => { finish = resolve; })
+      : { ok: true, json: async () => snapshot });
+    vi.stubGlobal('fetch', fetcher);
+    render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
+    const switches = screen.getAllByRole('switch');
+    expect(switches).toHaveLength(2);
+    switches.forEach(toggle => {
+      expect(toggle).not.toBeChecked();
+      expect(toggle.className).toContain('switch-root');
+    });
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    const run = screen.getByRole('button', { name: 'Start review and repair' });
+    expect(run.textContent).toBe('Run Fixerrors');
+    expect(run.className).toContain('bg-avs-yellow');
+    expect(run.className).toContain('text-slate-900');
+    expect(run.className).toContain('hover:bg-[#d1b82f]');
+    expect(run.className).toContain('focus-visible:ring-[#F1D64A]');
+    fireEvent.click(run);
+    const loading = screen.getByRole('button', { name: 'Recording request...' });
+    expect(loading).toBeDisabled();
+    expect(loading.getAttribute('aria-busy')).toBe('true');
+    expect(loading.querySelector('.animate-spin')).not.toBeNull();
+    switches.forEach(toggle => expect(toggle).toBeDisabled());
+    expect(fetcher.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(1);
+    await act(async () => { finish({ ok: true, json: async () => ({ ok: true, noWork: true }) }); });
+    expect(await screen.findByRole('button', { name: 'Start review and repair' })).not.toBeDisabled();
+  });
+
+  it.each(['full', 'targeted'] as const)('keeps mixed runs chronological in responsive cards, with one copy of each action and %s approval details', async releaseMode => {
     const store = new FixtureStore();
     await harness(store).testedRepair();
     const template = store.state.jobs[0];
@@ -469,47 +584,45 @@ describe('Compact companion dialogs and preserved states', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
     render(<FixerrorsControlPanel />);
     await openDetails('Activity');
-    const table = screen.getByRole('table', { name: 'Fixerrors activity runs' });
-    const labels = ['Run/date', 'Status', 'Runner', 'Progress/result', 'Actions/details'];
-    expect(within(table).getAllByRole('columnheader').map(header => header.textContent)).toEqual(labels);
+    const latest = screen.getByRole('article', { name: 'Latest run' });
+    expect(within(latest).getByText('Reviewed')).toBeDefined();
+    expect(within(latest).getByText(new RegExp(reviewed.id), { selector: 'p' })).toBeDefined();
+    openHistory();
     const rows = activityRows();
-    const expectedIds = [paused.id, template.id, reviewed.id, failed.id, deployed.id];
+    const expectedIds = [failed.id, deployed.id, paused.id, template.id];
     expect(rows).toHaveLength(expectedIds.length);
-    expect(table.className).toContain('[overflow-wrap:anywhere]');
     rows.forEach((row, index) => {
-      expect(within(row).getByText(expectedIds[index])).toBeDefined();
-      expect(row.className).toContain('grid-cols-1');
-      expect(row.className).toContain('lg:grid-cols-[minmax(0,1fr)');
-      const cells = within(row).getAllByRole('cell');
-      expect(cells).toHaveLength(5);
-      cells.forEach((cell, column) => {
-        expect(cell.className).toContain('min-w-0');
-        expect(within(cell).getByText(labels[column]).className).toContain('lg:hidden');
-      });
+      expect(within(row).getByText(new RegExp(expectedIds[index]), { selector: 'p' })).toBeDefined();
+      expect(row.className).toContain('[overflow-wrap:anywhere]');
+      const grid = within(row).getByRole('heading', { name: 'Current step' }).parentElement!.parentElement!;
+      expect(grid.className).toContain('grid-cols-1');
+      expect(grid.className).toContain('lg:grid-cols-3');
+      expect(within(grid).getAllByRole('heading').map(heading => heading.textContent)).toEqual(['Current step', 'Progress', 'Results']);
+      expect(within(row).getByText('Run details and diagnostics', { selector: 'summary' }).closest('details')!.open).toBe(false);
     });
-    expect(within(rows[0]).getByText('2 / 4 cases processed; 2 remaining (281 error rows captured).')).toBeDefined();
-    expect(within(rows[0]).getByText(/1 verified locally \/ 1 held/)).toBeDefined();
-    expect(within(rows[0]).getByText(/Lifecycle: pending.*not confirmed reconciled/)).toBeDefined();
-    expect(within(rows[3]).getByText('execution-failed')).toBeDefined();
-    expect(within(rows[4]).getByText(`${releaseMode === 'full' ? 'Full checks (fap)' : 'Targeted checks (urgent)'} / separately confirmed ${new Date(deployed.approval.confirmedAt).toLocaleString('en-GB')}`)).toBeDefined();
-    expect(within(rows[1]).getByText('Technical candidate details')).toBeDefined();
-    expect(within(rows[1]).getByText(/Checks SHA-256/).textContent).toContain(template.candidate.checksSha256);
-    expect(within(rows[1]).getByText(/Worker candidate SHA-256/).textContent).toContain('8'.repeat(64));
-    expect(within(rows[1]).getByText(/Prepared evidence SHA-256/).textContent).toContain('9'.repeat(64));
+    expect(within(rows[2]).getByText('2 / 4 cases processed; 2 remaining (281 error rows captured).')).toBeDefined();
+    expect(within(rows[2]).getByText(/1 verified locally \/ 1 held/)).toBeDefined();
+    expect(within(rows[2]).getByText(/Lifecycle: pending.*not confirmed reconciled/)).toBeDefined();
+    expect(within(rows[0]).getByText('execution-failed')).toBeDefined();
+    expect(within(rows[1]).getByText(`${releaseMode === 'full' ? 'Full checks (fap)' : 'Targeted checks (urgent)'} / separately confirmed ${new Date(deployed.approval.confirmedAt).toLocaleString('en-GB')}`)).toBeDefined();
+    expect(within(rows[3]).getByText('Technical candidate details')).toBeDefined();
+    expect(within(rows[3]).getByText(/Checks SHA-256/).textContent).toContain(template.candidate.checksSha256);
+    expect(within(rows[3]).getByText(/Worker candidate SHA-256/).textContent).toContain('8'.repeat(64));
+    expect(within(rows[3]).getByText(/Prepared evidence SHA-256/).textContent).toContain('9'.repeat(64));
     expect(screen.getAllByRole('button', { name: 'Cancel run', hidden: true })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'Deploy: review exact candidate', hidden: true })).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'Needs attention (2)' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Previous (3)' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Previous (2)' })).toBeDefined();
     filterActivity('Previous');
-    expect(activityRows()).toHaveLength(3);
+    expect(activityRows()).toHaveLength(2);
     expect(screen.queryByRole('button', { name: 'Cancel run', hidden: true })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Deploy: review exact candidate', hidden: true })).toBeNull();
     filterActivity('All');
-    expect(activityRows()).toHaveLength(5);
+    expect(activityRows()).toHaveLength(4);
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   });
 
-  it('uses consistent pixel and safe-area viewport bounds locally, keeping activity filters and refresh outside the scrolling entries', async () => {
+  it('preserves pixel and safe-area viewport bounds, with history filters inside scrolling entries and refresh outside', async () => {
     const store = new FixtureStore();
     await harness(store).testedRepair();
     const snapshot = { enabled: true, executionAvailable: true, origin: FIXERRORS_LOCAL_ORIGIN, ...publicQueueState(store.state) };
@@ -541,8 +654,9 @@ describe('Compact companion dialogs and preserved states', () => {
     expect(entries.className).toContain('min-h-0');
     expect(entries.className).toContain('overflow-y-auto');
     expect(entries.className).toContain('overflow-x-hidden');
-    expect(entries.contains(screen.getByRole('table'))).toBe(true);
-    expect(entries.contains(screen.getByRole('group', { name: 'Activity filters' }))).toBe(false);
+    expect(entries.contains(screen.getByRole('article', { name: 'Latest run' }))).toBe(true);
+    openHistory();
+    expect(entries.contains(screen.getByRole('group', { name: 'Activity filters' }))).toBe(true);
     expect(entries.contains(screen.getByRole('heading', { name: 'Fixerrors control centre' }))).toBe(false);
     expect(entries.contains(screen.getByRole('button', { name: 'Refresh companion state' }))).toBe(false);
     expect(entries.contains(screen.getByRole('button', { name: 'Close' }))).toBe(false);
@@ -563,13 +677,14 @@ describe('Compact companion dialogs and preserved states', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => snapshot })));
     render(<FixerrorsControlPanel />);
     await openDetails('Activity');
+    openHistory();
     expect(screen.getByRole('button', { name: 'All (0)' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByText('No activity recorded.')).toBeDefined();
     filterActivity('Needs attention');
     expect(screen.getByText('No jobs need attention or deployment decisions.')).toBeDefined();
     filterActivity('Previous');
     expect(screen.getByText('No previous activity.')).toBeDefined();
-    expect(screen.queryByRole('table')).toBeNull();
+    expect(screen.queryByRole('article')).toBeNull();
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   });
 
@@ -585,7 +700,7 @@ describe('Compact companion dialogs and preserved states', () => {
       if (method === 'outside') fireEvent.pointerDown(document.body, { button: 0 });
       else fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Run Fixerrors' })));
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open FixErrors Control' })));
     }
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
@@ -607,7 +722,7 @@ describe('Compact companion dialogs and preserved states', () => {
     else if (method === 'outside') fireEvent.pointerDown(document.body, { button: 0 });
     else fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Run Fixerrors' })));
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open FixErrors Control' })));
     await openDeploy();
     expect(screen.getByRole('checkbox', { name: /I approve deploying/ }).getAttribute('aria-checked')).toBe('false');
     expect((screen.getByRole('radio', { name: /Full checks/ }) as HTMLInputElement).checked).toBe(true);
@@ -624,7 +739,7 @@ describe('Compact companion dialogs and preserved states', () => {
     vi.stubGlobal('fetch', fetcher);
     render(<FixerrorsControlPanel />);
     expect(screen.getByText('Loading...')).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Run Fixerrors' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open FixErrors Control' }));
     expect(screen.getByRole('dialog', { name: 'Fixerrors control centre' })).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Start review and repair' })).toBeNull();
     await act(async () => { resolve({ ok: false }); });
@@ -789,8 +904,8 @@ describe('Compact companion dialogs and preserved states', () => {
         render(<FixerrorsControlPanel />);
         await openDetails('Activity');
         expect(posts()).toEqual([]);
-        expect(screen.getByRole('checkbox', { name: 'Run full checks (fap)' })).not.toBeChecked();
-        if (full) fireEvent.click(screen.getByRole('checkbox', { name: 'Run full checks (fap)' }));
+        expect(screen.getByRole('switch', { name: 'Run full checks (fap)' })).not.toBeChecked();
+        if (full) fireEvent.click(screen.getByRole('switch', { name: 'Run full checks (fap)' }));
         fireEvent.click(screen.getByRole('button', { name: 'Start review and repair' }));
         await waitFor(() => expect(store.state.jobs).toHaveLength(1));
         await waitFor(() => expect(screen.queryByText('Recording request...')).toBeNull());
@@ -818,10 +933,10 @@ describe('Compact companion dialogs and preserved states', () => {
       const f = liveFixture();
       render(<FixerrorsControlPanel />);
       await openDetails('Activity');
-      const permission = screen.getByRole('checkbox', { name: 'Allow pre-approved automatic deployment after tests pass' });
+      const permission = screen.getByRole('switch', { name: 'Allow pre-approved automatic deployment after tests pass' });
       expect(permission).not.toBeChecked();
-      expect(screen.getByRole('checkbox', { name: 'Run full checks (fap)' })).not.toBeChecked();
-      if (mode === 'full') fireEvent.click(screen.getByRole('checkbox', { name: 'Run full checks (fap)' }));
+      expect(screen.getByRole('switch', { name: 'Run full checks (fap)' })).not.toBeChecked();
+      if (mode === 'full') fireEvent.click(screen.getByRole('switch', { name: 'Run full checks (fap)' }));
       fireEvent.click(permission);
       expect(f.posts()).toEqual([]);
       expect(screen.getByRole('alert').textContent).toMatch(/without another click.*4 hours.*only to this run and runner/);
@@ -842,9 +957,9 @@ describe('Compact companion dialogs and preserved states', () => {
       f.store.state.devices.push({ ...f.store.state.devices[0], id: 'a6ca86fc-d7bd-4629-868f-a5e0cec75f48', name: 'Second runner' });
       render(<FixerrorsControlPanel />);
       await openDetails('Runner settings');
-      const permission = () => screen.getByRole('checkbox', { name: 'Allow pre-approved automatic deployment after tests pass' });
+      const permission = () => screen.getByRole('switch', { name: 'Allow pre-approved automatic deployment after tests pass' });
       fireEvent.click(permission());
-      fireEvent.click(screen.getByRole('checkbox', { name: 'Run full checks (fap)' }));
+      fireEvent.click(screen.getByRole('switch', { name: 'Run full checks (fap)' }));
       expect(permission()).not.toBeChecked();
       fireEvent.click(permission());
       fireEvent.click(screen.getByRole('radio', { name: 'Use Second runner' }));
@@ -866,10 +981,10 @@ describe('Compact companion dialogs and preserved states', () => {
       vi.stubGlobal('fetch', fetcher);
       render(<FixerrorsControlPanel />);
       await openDetails('Activity');
-      fireEvent.click(screen.getByRole('checkbox', { name: 'Allow pre-approved automatic deployment after tests pass' }));
+      fireEvent.click(screen.getByRole('switch', { name: 'Allow pre-approved automatic deployment after tests pass' }));
       fireEvent.click(screen.getByRole('button', { name: 'Confirm automatic Deploy and start this run' }));
       await waitFor(() => expect(toast.error).toHaveBeenCalled());
-      expect(screen.getByRole('checkbox', { name: 'Allow pre-approved automatic deployment after tests pass' })).not.toBeChecked();
+      expect(screen.getByRole('switch', { name: 'Allow pre-approved automatic deployment after tests pass' })).not.toBeChecked();
       fireEvent(window, new Event('online'));
       await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
       expect(fetcher.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(1);
@@ -945,7 +1060,7 @@ describe('Compact companion dialogs and preserved states', () => {
       await waitFor(() => expect(screen.queryByRole('checkbox', { name: /I approve deploying/ })).toBeNull());
       await openDetails('Activity');
       expect(screen.getByText(/^Stale snapshot:/)).toBeDefined();
-      expect(screen.getByText(store.state.jobs[0].id)).toBeDefined();
+      expect(screen.getByText(new RegExp(store.state.jobs[0].id), { selector: 'p' })).toBeDefined();
       expect((screen.getByRole('button', { name: 'Deploy: review exact candidate' }) as HTMLButtonElement).disabled).toBe(true);
       failed = false;
       fireEvent(window, new Event('online'));
@@ -1025,6 +1140,7 @@ describe('Compact companion dialogs and preserved states', () => {
       render(<FixerrorsControlPanel />);
       await openDetails('Activity');
       await screen.findByText(/Native diagnostic: native-import-unavailable/);
+      fireEvent.click(screen.getByText('Run details and diagnostics', { selector: 'summary' }));
       fireEvent.click(screen.getByRole('button', { name: `Copy diagnostics for ${claim.job.id}` }));
       await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
       expect(JSON.parse(writeText.mock.calls[0][0])).toMatchObject({
