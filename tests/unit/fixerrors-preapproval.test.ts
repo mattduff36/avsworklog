@@ -44,6 +44,8 @@ describe('one-run conditional automatic Deploy', () => {
       state: 'pending', releaseMode: mode, grantedAt: now, expiresAt: now + FIXERRORS_PREAPPROVAL_MS });
     expect(f.claimed.job).not.toHaveProperty('autoDeployPreapproval');
     await f.ready();
+    const batch = f.store.state.jobs[0].privateBatch!;
+    expect(batch.outcome!.candidate.treeFingerprint).not.toBe(JSON.parse(batch.manifest).retrieval.treeFingerprint);
     await Promise.all([f.fulfill(), f.fulfill(), f.fulfill()]);
     expect(f.store.state.jobs).toHaveLength(2);
     const deploy = f.store.state.jobs[1];

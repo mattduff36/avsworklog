@@ -143,7 +143,9 @@ export function fulfillPreapprovedDeploy(tx: QueueTransaction, jobId: string, ac
       batch.lifecycle !== 'applied' || job.privateBatch.lifecycle?.state !== 'applied') return;
   const outcome = validateBatchOutcome(job.privateBatch, job.privateBatch.outcome, job.id, true);
   const manifest = parseBatchBytes(Buffer.from(job.privateBatch.manifest)).retrieval;
-  if (outcome.candidate.baseHead !== manifest.baseHead || outcome.candidate.treeFingerprint !== manifest.treeFingerprint ||
+  // Outcome fingerprints describe the repaired working tree; the manifest describes
+  // the original tree. Native checkpoint/prepared proofs bind the final fingerprint.
+  if (outcome.candidate.baseHead !== manifest.baseHead ||
       manifest.baseHead !== grant.base.head || outcome.clusters.some(entry => entry.status === 'failed') ||
       !outcome.clusters.some(entry => entry.status === 'verified-local')) {
     revokePreapproval(tx, job, grant.actorId, now);

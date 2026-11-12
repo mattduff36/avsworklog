@@ -25,7 +25,7 @@ export async function preapprovedFixture(mode: ReleaseMode = 'targeted', count =
     applyDeviceCommand(tx, deviceId, credential, command, time));
   const claimed = deviceResponseSchema.parse(await send({ op: 'claim' })).claim!;
   const outcome = {
-    runId: `fixerrors-${id}`, candidate: { baseHead: workspace.head, treeFingerprint: 'b'.repeat(64) },
+    runId: `fixerrors-${id}`, candidate: { baseHead: workspace.head, treeFingerprint: 'c'.repeat(64) },
     clusters: Array.from({ length: count }, (_, index) => ({
       id: `cluster-${index + 1}`, status: 'verified-local' as const, reason: 'Synthetic repaired label',
       attempt: 'Synthetic source repair', tests: ['tests/unit/display-label.test.ts'], evidence: ['Synthetic receipts'],
