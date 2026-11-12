@@ -139,6 +139,9 @@ describe('native aggregate batch policy and evidence', () => {
     const dependencies = path.join(root, 'node_modules');
     symlinkSync(path.resolve('node_modules'), dependencies, 'junction');
     try {
+      execFileSync('git', ['init', '-q'], { cwd: root });
+      execFileSync('git', ['-c', 'user.name=Test', '-c', 'user.email=test@localhost', 'commit',
+        '--allow-empty', '-qm', 'Empty disposable baseline'], { cwd: root });
       mkdirSync(path.join(root, '.git', 'squires-fixerrors'), { recursive: true });
       mkdirSync(path.join(root, 'lib'));
       mkdirSync(path.join(root, 'tests', 'unit'), { recursive: true });

@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { assertClientRecoveryChange, isGuardedBusinessClient } from './fixerrors-client-recovery';
 import {
   assertGuardedPushReady, pushGuardedCandidate, resolveGuardedPushContext,
   type GuardedPushContext, type GuardedPushGit,
@@ -14,7 +15,7 @@ const synthetic = new Set([
 ]);
 const sensitive = /auth|permission|security|session|token|credential|secret|password|identity|role|access|policy|csrf|cors|xss|admin|debug|enroll|replay|bridge|automation|deploy|database|schema|persist|sql|storage|audit|crypto|encrypt|signing|certificate|rbac|middleware|migration|supabase|fixerrors|release|finalise|workflow|payroll|finance|payment|invoice|quote|billing|sage|kiosk|webauthn|(?:^|[./_-])db(?:[./_-]|$)/iu;
 
-export function assertTargetedReleasePaths(rawDiff: string): void {
+export function assertTargetedReleasePaths(rawDiff: string, readBlob?: (oid: string) => string): void {
   const entries = rawDiff.split('\0');
   if (entries.pop() !== '' || entries.length === 0 || entries.length % 2 !== 0) {
     throw new Error('Targeted release requires a bounded ordinary-file diff');
@@ -28,6 +29,12 @@ export function assertTargetedReleasePaths(rawDiff: string): void {
       throw new Error('Targeted release forbids additions, deletions, links and mode changes');
     }
     if (metadata.has(name)) continue;
+    if (isGuardedBusinessClient(name) && readBlob) {
+      const [, , oldOid, newOid] = header.split(' ');
+      assertClientRecoveryChange(name, readBlob(oldOid), readBlob(newOid));
+      repairs++;
+      continue;
+    }
     if (!synthetic.has(name) && (
       !/^(?:app|components|lib|hooks|actions|src|tests\/unit|__tests__)\/.+\.(?:ts|tsx|js|jsx|css)$/u.test(name) ||
       /^(?:app\/api|lib\/server|lib\/config)(?:\/|$)/u.test(name) || sensitive.test(name) ||
@@ -42,7 +49,11 @@ export function pushTargetedRelease(context: GuardedPushContext, git: GuardedPus
   assertGuardedPushReady(context, git);
   const diff = git.run(['diff', '--raw', '--no-abbrev', '--no-renames', '-z', context.expectedRemoteHead, context.head, '--']);
   if (diff.status !== 0) throw new Error('Targeted release diff unavailable');
-  assertTargetedReleasePaths(diff.stdout);
+  assertTargetedReleasePaths(diff.stdout, oid => {
+    const blob = git.run(['cat-file', 'blob', oid]);
+    if (blob.status !== 0) throw new Error('Guarded client recovery source unavailable');
+    return blob.stdout;
+  });
   pushGuardedCandidate(context, git);
 }
 

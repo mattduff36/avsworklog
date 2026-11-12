@@ -3,7 +3,7 @@ import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
-import { assertAutomaticPath, assertCleanLocalMain } from '../fixerrors-auto';
+import { assertAutomaticCheckPath, assertAutomaticPath, assertCleanLocalMain } from '../fixerrors-auto';
 import { captureCandidateFingerprint, validateDecision } from '../fixerrors-decision';
 import { parseCompanionPacket, validateCompanionRepairDecision } from './fixerrors-companion-packet';
 import { FIXERRORS_WORKSPACE } from './fixerrors-device-admission';
@@ -42,15 +42,16 @@ export function validateBridgeRepair(input: unknown, cwd = FIXERRORS_WORKSPACE) 
   const names = [...new Set([...plan.editablePaths, ...tests])];
   if (new Set(names.map(name => name.toLowerCase())).size !== names.length) throw new Error('Case-alias scope');
   for (const name of names) {
-    assertAutomaticPath(name);
-    if (!/^(?:app|components|lib|hooks|tests\/unit)\//u.test(name)) throw new Error('Native repair path unsupported');
+    const editable = plan.editablePaths.includes(name);
+    if (editable) assertAutomaticPath(name); else assertAutomaticCheckPath(name);
+    if (editable && !/^(?:app|components|lib|hooks|tests\/unit)\//u.test(name)) throw new Error('Native repair path unsupported');
     const file = path.resolve(cwd, name);
     const stat = lstatSync(file);
     if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(file) !== file || stat.size > 1024 * 1024) {
       throw new Error('Repair requires bounded ordinary existing files');
     }
     execFileSync('git', ['ls-files', '--error-unmatch', '--', name], { cwd, stdio: 'ignore', timeout: 10_000 });
-    if (/\b(?:service_role|createAdminClient|require[A-Za-z]*Access|SUPABASE|POSTGRES|SECURITY DEFINER|BEGIN|COMMIT|FOR UPDATE)\b/u
+    if (editable && /\b(?:service_role|createAdminClient|require[A-Za-z]*Access|SUPABASE|POSTGRES|SECURITY DEFINER|BEGIN|COMMIT|FOR UPDATE)\b/u
       .test(readFileSync(file, 'utf8'))) throw new Error('Sensitive file contents require owner approval');
   }
   return { decision, plan, tests };

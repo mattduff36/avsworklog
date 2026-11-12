@@ -4,6 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { buildFixerrorsBatchRetrieval, fetchFixerrorsBatchSnapshot } from '@/scripts/fixerrors-capture';
 import { hashLifecycleRecord, type LifecycleRecord } from '@/scripts/fixerrors-lifecycle';
+import { clusterErrorPatterns, groupIntoPatterns, lifecycleErrorEntry } from '@/scripts/fixerrors-retrieval';
 import { recordIncidentOutcome } from '@/scripts/fixerrors-knowledge';
 import { type PgClientLike, verifyErrorSnapshot } from '@/scripts/fixerrors-safety';
 
@@ -116,6 +117,94 @@ describe('shared full Fixerrors capture', () => {
     });
     expect(JSON.stringify(cluster)).not.toMatch(/person@|payload|console\.error/u);
   });
+  it('recovers structured evidence for new and held console failures without exposing private arguments', async () => {
+    const root = sourceFixture();
+    const page = 'app/customers/[customerId]/page.tsx';
+    writeFileSync(join(root, page), [
+      "const errorContextId = 'customers-fetch-options';",
+      "console.error('Error fetching customer options:', error, { errorContextId });",
+      "toast.error('Unable to load customer options.', { id: errorContextId });",
+      "const button = <button>{loading ? 'Loading...' : 'New Quote'}</button>;",
+      "const privateExample = 'Example Person';",
+    ].join('\n'));
+    const rows = [record(1), record(2, true)];
+    for (const row of rows) {
+      row.error_type = 'Error';
+      row.component_name = 'Console Error';
+      row.page_url = 'https://example.invalid/customers/private-customer';
+      row.error_stack = 'at load (/app/app/customers/[customerId]/page.tsx:2:1)';
+      row.error_message = 'Console Error: Error fetching customer options: Error: sign-in needed for private-account';
+      row.additional_data = {
+        args: ['Error fetching customer options:', { cause: { error: 'private server message' }, status: 401 },
+          { errorContextId: 'customers-fetch-options' }],
+        userAction: { actionType: 'click', label: 'New Quote', ageMs: 868, href: '/private-customer' },
+        userMessage: 'Unable to load customer options.',
+      };
+    }
+    const capture = await fetchFixerrorsBatchSnapshot(new BatchClient(rows), 'c'.repeat(64), now);
+    const built = buildFixerrorsBatchRetrieval({ ...capture, candidate, knowledge, repoRoot: root });
+    expect(built.retrieval.clusters).toHaveLength(2);
+    for (const cluster of built.retrieval.clusters) {
+      expect(cluster.query).toMatchObject({ httpStatus: 401, errorContextId: 'customers-fetch-options',
+        normalizedMessage: 'Error fetching customer options: [dynamic]' });
+      expect(cluster.diagnostics).toMatchObject({ classes: ['authentication'],
+        recentAction: { kind: 'click', label: 'New Quote' }, visibleMessage: 'Unable to load customer options.' });
+    }
+    expect(JSON.stringify(built.retrieval)).not.toMatch(/private-account|private-customer|private server message/u);
+  });
+
+  it('keeps conflicting status and context ambiguous and drops unrelated private action and toast labels', async () => {
+    const root = sourceFixture();
+    const row = record(1, true);
+    row.error_type = 'Error';
+    row.error_message = 'Console Error: Unable to render listing label';
+    row.additional_data = { status: 403, errorContextId: 'listing-label',
+      args: ['Unable to render listing label', { status: 401, cause: {} }, { errorContextId: 'other-context' }],
+      userAction: { actionType: 'click', label: 'ListingLabel', ageMs: 5 },
+      userMessage: 'Unable to render listing label' };
+    const capture = await fetchFixerrorsBatchSnapshot(new BatchClient([row]), 'c'.repeat(64), now);
+    const cluster = buildFixerrorsBatchRetrieval({ ...capture, candidate, knowledge, repoRoot: root }).retrieval.clusters[0];
+    expect(cluster.query).toMatchObject({ httpStatus: null, errorContextId: null });
+    expect(cluster.diagnostics).not.toHaveProperty('recentAction');
+    expect(cluster.diagnostics).not.toHaveProperty('visibleMessage');
+  });
+
+  it.each([
+    { status: 500, context: 'listing-label', httpStatus: null, errorContextId: 'listing-label' },
+    { status: 401, context: 'other-context', httpStatus: 401, errorContextId: null },
+    { status: null, context: null, httpStatus: null, errorContextId: null },
+  ])('requires all grouped rows to support each HTTP field ($status, $context)', async ({ status, context, httpStatus, errorContextId }) => {
+    const rows = [record(1), record(2)];
+    rows[0].additional_data = { status: 401, errorContextId: 'listing-label' };
+    rows[1].additional_data = { status, errorContextId: context };
+    const root = sourceFixture();
+    const capture = await fetchFixerrorsBatchSnapshot(new BatchClient(rows), 'c'.repeat(64), now);
+    const input = { ...capture, candidate, knowledge, repoRoot: root };
+    expect(buildFixerrorsBatchRetrieval(input).retrieval.clusters).toHaveLength(2);
+    const clusters = clusterErrorPatterns(groupIntoPatterns(rows.map(lifecycleErrorEntry), root));
+    const grouped = buildFixerrorsBatchRetrieval({ ...input, clusters }).retrieval.clusters;
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0].diagnostics?.occurrences).toBe(2);
+    expect(grouped[0].query).toMatchObject({ httpStatus, errorContextId });
+  });
+
+  it('ignores status from request text, raw customer data and unrecognised or oversized argument lists', async () => {
+    const rows = [record(1, true), record(2, true), record(3, true)];
+    for (const row of rows) {
+      row.error_message = 'Console Error: Unable to render listing label HTTP 401';
+      row.additional_data = { args: ['Unable to render listing label', { status: 401, customer: 'private-account' },
+        { payload: { cause: {}, status: 500, errorContextId: 'listing-label' } }] };
+    }
+    rows[1].error_message = 'Error in plain application data';
+    rows[1].additional_data = { args: ['Unable to render listing label', { cause: {}, status: 401 }] };
+    rows[2].additional_data = { args: ['Unable to render listing label', { cause: {}, status: 401 }, ...Array(16).fill(null)] };
+    const capture = await fetchFixerrorsBatchSnapshot(new BatchClient(rows), 'c'.repeat(64), now);
+    const clusters = buildFixerrorsBatchRetrieval({ ...capture, candidate, knowledge, repoRoot: sourceFixture() }).retrieval.clusters;
+    expect(clusters).toHaveLength(3);
+    for (const cluster of clusters) expect(cluster.query).toMatchObject({ httpStatus: null, errorContextId: null });
+    expect(JSON.stringify(clusters)).not.toContain('private-account');
+  });
+
   it('captures more than one page of new and held rows before the same repeatable-read COMMIT', async () => {
     const input = Array.from({ length: 850 }, (_, i) => record(i + 1, i >= 450));
     const client = new BatchClient(input, { afterBegin: rows => {

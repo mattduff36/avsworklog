@@ -1,6 +1,7 @@
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import { basename, join, posix, resolve, sep } from 'node:path';
 import type { AutoRetrieval } from './fixerrors-auto';
+import type { ErrorLogEntry } from './fixerrors-retrieval';
 import { isFixerrorsSourcePath } from './fixerrors-auto';
 import { retrieveIncidents, type KnowledgeStore } from './fixerrors-knowledge';
 
@@ -41,7 +42,7 @@ export function createWorkerEvidenceProjector(repoRoot = process.cwd()) {
     if (!sources.has(name)) sources.set(name, readFileSync(file, 'utf8'));
     return sources.get(name)!;
   }
-  return (cluster: Cluster, knowledge: KnowledgeStore): Cluster => {
+  return (cluster: Cluster, knowledge: KnowledgeStore, occurrences: ErrorLogEntry[] = []): Cluster => {
     const sourceFiles = cluster.sourceFiles.filter(name => source(name) !== null);
     const relatedSourceFiles = [...new Set(sourceFiles.flatMap(name => {
       const imports = [...source(name)!.matchAll(/(?:from\s*|import\s*)['"]([^'"]+)['"]/gu)];
@@ -58,8 +59,32 @@ export function createWorkerEvidenceProjector(repoRoot = process.cwd()) {
     const literals = [...content.matchAll(/(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/gu)]
       .map(match => match[2]).filter(value => value.length >= 4 && value.length <= 200 && !/\\[rn]/u.test(value));
     const literal = (value: string | null) => value !== null && literals.includes(value);
+    // Emit UI observations only when every occurrence agrees and the label is
+    // explicitly present in the identified page's JSX or notification call.
+    const observedAction = ({ additional_data }: ErrorLogEntry) => {
+      const action = additional_data?.userAction;
+      if (!action || typeof action !== 'object' || Array.isArray(action)) return undefined;
+      const { actionType, ageMs, label } = action as Record<string, unknown>;
+      if ((actionType !== 'click' && actionType !== 'submit') ||
+          typeof ageMs !== 'number' || !Number.isInteger(ageMs) || ageMs < 0 || ageMs > 45_000 ||
+          typeof label !== 'string' || !/^[A-Za-z][A-Za-z -]{0,63}$/u.test(label)) return undefined;
+      return { kind: actionType, label } as const;
+    };
+    const action = occurrences.length ? observedAction(occurrences[0]) : undefined;
+    const actionLabel = action ? escape(action.label) : '';
+    const actionInJsx = new RegExp(
+      'aria-label\\s*=\\s*["\\x27]' + actionLabel + '["\\x27]|>\\s*' + actionLabel + '\\s*<|' +
+      '>\\s*\\{[^{}<>]{0,160}["\\x27]' + actionLabel + '["\\x27][^{}<>]{0,160}\\}\\s*<', 'u');
+    const recentAction = action && actionInJsx.test(content) && occurrences.every(entry => {
+      const other = observedAction(entry);
+      return other?.kind === action.kind && other.label === action.label;
+    }) ? action : undefined;
+    const feedback = occurrences[0]?.additional_data?.userMessage;
+    const visibleMessage = typeof feedback === 'string' && /^[A-Za-z][A-Za-z .,!?'-]{0,159}$/u.test(feedback) &&
+      new RegExp('\\btoast\\.(?:error|warning|info|success)\\(\\s*["\\x27]' + escape(feedback) + '["\\x27]', 'u').test(content) &&
+      occurrences.every(entry => entry.additional_data?.userMessage === feedback) ? feedback : undefined;
     const message = (value: string) => {
-      const consoleValue = value.replace(/^(?:console\.error:?\s*|\[console\.error\]\s*)/iu, '');
+      const consoleValue = value.replace(/^(?:console[. ]error:?\s*|\[console\.error\]\s*)/iu, '');
       for (const template of literals) {
         const parts = template.split(/\$\{[^}]*\}/u);
         if (parts.join('').trim().length < 12) continue;
@@ -88,14 +113,19 @@ export function createWorkerEvidenceProjector(repoRoot = process.cwd()) {
     const family = /^(?:auth-permissions-security|database-persistence|money-billing|concurrency-transaction|external-network|user-input)$/u
       .test(cluster.rootCauseFamily) ? cluster.rootCauseFamily : sourceFiles[0] ? `source:${sourceFiles[0]}` : 'runtime-error';
     const query = {
-      ...cluster.query, errorContextId: literal(cluster.query.errorContextId) ? cluster.query.errorContextId : null,
+      ...cluster.query, errorContextId: cluster.query.errorContextId && literal(cluster.query.errorContextId) &&
+        new RegExp('\\berrorContextId\\s*(?::|=)\\s*["\\x27]' + escape(cluster.query.errorContextId) + '["\\x27]', 'u').test(content)
+        ? cluster.query.errorContextId : null,
       route, component: component(cluster.query.component), sourceFile: sourceFiles[0] ?? null,
       normalizedMessage: message(cluster.query.normalizedMessage), rootCauseFamily: family,
     };
     return {
       ...cluster, rootCauseFamily: family, query, sourceFiles, relatedSourceFiles,
       ...(cluster.diagnostics ? { diagnostics: {
-        ...cluster.diagnostics, frames: cluster.diagnostics.frames.filter(frame => source(frame.file) !== null),
+        ...cluster.diagnostics,
+        ...(recentAction ? { recentAction } : {}),
+        ...(visibleMessage ? { visibleMessage } : {}),
+        frames: cluster.diagnostics.frames.filter(frame => source(frame.file) !== null),
       } } : {}),
       patterns: cluster.patterns.map(pattern => ({
         ...pattern, component: component(pattern.component),

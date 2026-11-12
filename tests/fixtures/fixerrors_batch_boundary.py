@@ -357,7 +357,7 @@ def _exercise_batch(root, checkout, repo, node, cfg, write, git, base, cleanup):
         learned = r.read_json(checkout / 'docs_private/fixerrors-runtime-knowledge.json')
         assert len(learned['incidents']) == counts['analysis'], 'Advisory history count: ' + str(len(learned['incidents']))
         assert {incident['sourceFile'] for incident in learned['incidents']} == set(sources)
-        assert any('candidate-bound analysis passed' in test for incident in learned['incidents']
+        assert any('baseline checks executed' in test for incident in learned['incidents']
                    for test in incident['tests'])
         assert int(git('rev-list', '--count', base['head'] + '..HEAD')) == 2
         evidence = r.read_json(checkout / '.git/squires-fixerrors/prepared-release.json')['evidence']

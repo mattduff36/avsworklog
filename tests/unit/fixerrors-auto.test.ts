@@ -96,8 +96,7 @@ describe('automatic local fixerrors lifecycle investigation', () => {
     expect(h.requests.every(request => request.acceptance.join(' ').includes('No delegation, worktrees'))).toBe(true);
     expect(h.requests.every(request => request.context.every(file => !file.startsWith('docs_private')))).toBe(true);
     expect(h.requests[1].checks['test-1'].argv).toEqual([
-      process.execPath, '--require', path.join(process.cwd(), 'scripts', 'testing', 'fixerrors-test-environment.cjs'),
-      path.join(process.cwd(), 'node_modules', 'vitest', 'vitest.mjs'), 'run', test,
+      process.execPath, path.join(process.cwd(), 'scripts', 'automation', 'fixerrors-scoped-check.mjs'), 'targeted-tests', test,
     ]);
     expect(h.adapters.learn).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 'cluster-1' }),
       'fix_verified_local', [source, test], [test], 'Guard label formatting');

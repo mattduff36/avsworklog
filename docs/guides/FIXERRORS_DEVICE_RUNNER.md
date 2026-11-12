@@ -51,14 +51,32 @@ can contribute up to twelve existing one-hop source paths; they do not bypass
 sensitive-path/content guards or create broad edit permission. Unsupported or
 sensitive repair still needs scope-specific owner approval.
 
-The source-owned `lib/config/fixerrors-analysis-checks.json` registers only named
-offline tests. Its usage-route integration test mocks server dependencies; other
-integration paths are not generally authorized. Chat and native batch analysis
-require genuine supplied-check receipts and an unchanged candidate. Read-only
-file-scope receipts hash an empty editable scope; signed admission and unchanged
-HEAD/index/tree snapshots supply the full candidate binding. Native journals and
-independent preparation verification retain and revalidate analysis receipts.
-The older single-cluster saved-review contract remains checks-empty.
+When the message alone is generic, capture checks the saved console arguments
+for an HTTP status and a source-confirmed diagnostic ID. A recent UI action or
+toast must match the application source before it enters the worker packet.
+Conflicting evidence stays uncertain. Raw console arguments, user-entered text
+and customer identifiers stay out of the packet. A valid server rejection and
+a broken client response to that rejection can have separate explanations.
+
+The source-owned `lib/config/fixerrors-analysis-checks.json` registers offline
+tests for specific sources. Quotes uses the New Quote UI and mocked metadata
+route suites. During read-only analysis the runner records completed failing
+assertions as reproduction evidence. A collection error, interrupted run or
+missing selected suite fails the check. After a repair the selected tests must
+pass. Registered UI and integration tests can run without granting the worker
+permission to edit them.
+
+The client page name alone does not decide whether an evidenced local recovery
+can proceed. The runner checks the actual client diff before running candidate
+checks. A change outside that recovery scope needs review. Server authentication,
+permissions and financial operations retain their existing protections.
+A locally passing repair still needs its normal release and deployment checks.
+
+Chat and native batch analysis require genuine supplied-check receipts and an
+unchanged candidate. Read-only file-scope receipts hash an empty editable scope.
+Signed admission and unchanged HEAD/index/tree snapshots bind the candidate.
+Native journals and independent preparation verification revalidate analysis
+receipts. The older single-cluster saved-review contract remains checks-empty.
 
 Awaiting-deployment labels route to a held verification step before worker
 dispatch, even if the old local candidate link is null. They never authorize

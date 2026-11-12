@@ -98,6 +98,10 @@ export function buildFixerrorsBatchRetrieval(input: {
 }): { retrieval: AutoRetrieval; bindings: LifecycleBinding[]; suppressed: LifecycleRecord[] } {
   const { snapshot, records, candidate, knowledge, repoRoot } = input;
   const project = createWorkerEvidenceProjector(repoRoot);
+  const projectCluster = (cluster: ErrorRootCauseCluster) => project(
+    buildRetrievalCluster(cluster, knowledge), knowledge,
+    cluster.patterns.flatMap(pattern => pattern.occurrences),
+  );
   assertLifecycleSnapshotRows(records.captured, snapshot.errors);
   const exact = new Map([...records.captured, ...records.held].map(record => [record.id, record]));
   if (exact.size !== records.captured.length + records.held.length) throw new Error('Duplicate private batch binding');
@@ -124,7 +128,7 @@ export function buildFixerrorsBatchRetrieval(input: {
   if (covered.size !== allowed.size) throw new Error('New batch groups omit eligible snapshot rows');
   const retrieval: AutoRetrieval = {
     schemaVersion: 1, snapshotId: snapshot.snapshotId, ...candidate, archiveMeansResolved: false,
-    clusters: clusters.map(cluster => project(buildRetrievalCluster(cluster, knowledge), knowledge)),
+    clusters: clusters.map(projectCluster),
   };
   let nextCluster = clusters.reduce((max, cluster) => Math.max(max, Number(cluster.id.slice('cluster-'.length))), 0) + 1;
   const held = [...records.held].sort((left, right) => {
@@ -139,7 +143,7 @@ export function buildFixerrorsBatchRetrieval(input: {
     if (record.status !== 'active' || record.triage_state !== 'outstanding') throw new Error('Invalid held batch binding');
     const historical = clusterErrorPatterns(groupIntoPatterns([lifecycleErrorEntry(record)], repoRoot))[0];
     if (!historical) throw new Error('Held error has no diagnostic pattern');
-    const entry = project(buildRetrievalCluster({ ...historical, id: `cluster-${nextCluster++}` }, knowledge), knowledge);
+    const entry = projectCluster({ ...historical, id: `cluster-${nextCluster++}` });
     const previous = readLifecycle(record);
     entry.held = true;
     entry.existingState = record.triage_local_commit ? 'awaiting-deployment' :

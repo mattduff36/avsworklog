@@ -10,6 +10,10 @@ export const diagnosticSchema = z.object({
   operation: z.enum(['unknown', 'usage-analytics', 'notification-count', 'timesheet-submit', 'quotes']),
   stage: z.enum(['origin-check', 'authentication', 'record-usage', 'validation', 'submit']).optional(),
   databaseCode: z.string().regex(/^(?:[A-Z0-9]{5}|PGRST[0-9]{3})$/u).optional(),
+  recentAction: z.object({
+    kind: z.enum(['click', 'submit']), label: z.string().min(1).max(64),
+  }).strict().optional(),
+  visibleMessage: z.string().min(1).max(160).optional(),
   noncriticalHandled: z.boolean(),
   occurrences: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   firstDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u).optional(),

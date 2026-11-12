@@ -4,7 +4,8 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
-import { assertAutomaticPath, assertAutomaticFixerrorsRepair, learnAutomaticOutcome, parseAutomaticFixerrorsRetrieval, runAutomaticFixerrors,
+import { assertWorktreeClientRecovery } from './fixerrors-client-recovery';
+import { assertAutomaticCheckPath, assertAutomaticPath, assertAutomaticFixerrorsRepair, learnAutomaticOutcome, parseAutomaticFixerrorsRetrieval, runAutomaticFixerrors,
   type AutoAdapters, type AutoRunResult, type WorkerRequest, type WorkerResult } from '../fixerrors-auto';
 import { captureCandidateFingerprint, parseDecision, validateDecision, type CandidateFingerprint } from '../fixerrors-decision';
 import { FIXERRORS_WORKSPACE } from './fixerrors-device-admission';
@@ -64,11 +65,13 @@ export function verifyBatchContributions(input: unknown): void {
   });
 }
 
-export function assertNativeBatchScope(cwd: string, names: string[]): void {
+export function assertNativeBatchScope(cwd: string, files: string[], tests: string[] = []): void {
+  const names = [...new Set([...files, ...tests])];
   if (new Set(names.map(name => name.toLowerCase())).size !== names.length) throw new Error('Case-alias scope');
   for (const name of names) {
-    assertAutomaticPath(name);
-    if (!/^(?:app|components|lib|hooks|tests\/unit)\//u.test(name)) throw new Error('Native repair path unsupported');
+    const editable = files.includes(name);
+    if (editable) assertAutomaticPath(name); else assertAutomaticCheckPath(name);
+    if (editable && !/^(?:app|components|lib|hooks|tests\/unit)\//u.test(name)) throw new Error('Native repair path unsupported');
     const file = path.resolve(cwd, name);
     const stat = lstatSync(file);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || realpathSync(file) !== file || stat.size > 1024 * 1024) {
@@ -78,7 +81,7 @@ export function assertNativeBatchScope(cwd: string, names: string[]): void {
     if (execFileSync('git', ['status', '--porcelain=v1', '--', name], { cwd, encoding: 'utf8', timeout: 10_000 })) {
       throw new Error('Independent repair target is not clean');
     }
-    if (/\b(?:service_role|createAdminClient|require[A-Za-z]*Access|SUPABASE|POSTGRES|SECURITY DEFINER|BEGIN|COMMIT|FOR UPDATE)\b/u
+    if (editable && /\b(?:service_role|createAdminClient|require[A-Za-z]*Access|SUPABASE|POSTGRES|SECURITY DEFINER|BEGIN|COMMIT|FOR UPDATE)\b/u
       .test(readFileSync(file, 'utf8'))) throw new Error('Sensitive source requires owner approval');
   }
 }
@@ -98,11 +101,14 @@ export function nativeBatchAdapters(cwd: string, native: NativeBatchTransport): 
       const actual = captureCandidateFingerprint(cwd);
       if (actual.baseHead !== before.baseHead || actual.treeFingerprint !== before.treeFingerprint) throw new Error('Batch candidate drift');
     },
-    assertRepairScope(names) { assertNativeBatchScope(cwd, names); call('scope', names); },
+    assertRepairScope(files, tests) { assertNativeBatchScope(cwd, files, tests); call('scope', files); },
     repairChecks: (tests, paths) => call<WorkerRequest['checks']>('checks', { tests, paths }),
     analysisChecks: sourceFiles => call<WorkerRequest['checks']>('analysis-checks', sourceFiles),
     dispatch: async request => call<WorkerResult>('dispatch', request),
-    verifyRepair: (request, result, before) => { call('verify', { request, result, before }); },
+    verifyRepair: (request, result, before) => {
+      call('verify', { request, result, before });
+      assertWorktreeClientRecovery(cwd, result.changedFiles);
+    },
     verifyAnalysis: (request, result, before) => { call('verify-analysis', { request, result, before }); },
     write: (file, value) => { call('write', { file, value }); },
     learn: (...args) => {

@@ -562,17 +562,57 @@ export function safeRetrievalText(value: string): string {
     catch { return '[redacted]'; }
   }
 
+function isDiagnosticObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+// The console logger serialises the HTTP error and its errorContextId argument
+// separately. Only inspect their known top-level fields, never payloads or prose.
+function retainedRequestFields(entry?: ErrorLogEntry): Pick<IncidentQuery, 'httpStatus' | 'errorContextId'> {
+  const data = entry?.additional_data;
+  const statuses = new Set<number>();
+  const contexts = new Set<string>();
+  const addStatus = (value: unknown) => {
+    if (typeof value === 'number' && Number.isInteger(value) && value >= 100 && value <= 599) statuses.add(value);
+  };
+  const addContext = (value: unknown) => {
+    if (typeof value === 'string' && /^[a-z][\w.-]{2,95}$/iu.test(value)) contexts.add(value);
+  };
+  addStatus(data?.status);
+  addContext(data?.errorContextId);
+  const args = data?.args;
+  const prefix = /^\[?console[. ](?:error|warn(?:ing)?)\]?\s*:\s*/iu.exec(entry?.error_message ?? '');
+  if (entry && prefix && Array.isArray(args) && args.length >= 2 && args.length <= 16 &&
+      typeof args[0] === 'string' && args[0].length >= 4 && args[0].length <= 200 &&
+      entry.error_message.startsWith(args[0], prefix[0].length)) {
+    for (const arg of args.slice(1)) {
+      if (!isDiagnosticObject(arg)) continue;
+      // A context marker and a serialised Error are the recognised envelopes.
+      // Do not harvest a similarly named field from arbitrary application data.
+      if (Object.hasOwn(arg, 'errorContextId')) addContext(arg.errorContextId);
+      if (Object.hasOwn(arg, 'cause') || arg.name === 'Error' ||
+          (typeof arg.message === 'string' && typeof arg.stack === 'string')) addStatus(arg.status);
+    }
+  }
+  return {
+    httpStatus: statuses.size === 1 ? [...statuses][0] : null,
+    errorContextId: contexts.size === 1 ? safeRetrievalText([...contexts][0]) : null,
+  };
+}
+
 export function buildRetrievalCluster(cluster: ErrorRootCauseCluster, knowledge: KnowledgeStore): AutoRetrieval['clusters'][number] {
     const pattern = cluster.patterns[0];
-    const occurrence = pattern?.occurrences[0];
+    const occurrences = cluster.patterns.flatMap(item => item.occurrences);
+    const occurrence = occurrences[0];
+    const requestFields = occurrences.map(retainedRequestFields);
+    const first = requestFields[0];
     const additional = occurrence?.additional_data;
     let route = 'NoPage';
     try { route = occurrence?.page_url ? new URL(occurrence.page_url).pathname : 'NoPage'; }
     catch { route = 'NoPage'; }
     const query: IncidentQuery = {
-      errorContextId: typeof additional?.errorContextId === 'string' ? safeRetrievalText(additional.errorContextId) : null,
-      httpStatus: typeof additional?.status === 'number' && Number.isInteger(additional.status) &&
-        additional.status >= 100 && additional.status <= 599 ? additional.status : null,
+      httpStatus: first && requestFields.every(entry => entry.httpStatus === first.httpStatus) ? first.httpStatus : null,
+      errorContextId: first && requestFields.every(entry => entry.errorContextId === first.errorContextId) ? first.errorContextId : null,
       route: safeRetrievalText(route),
       component: safeRetrievalText(pattern?.component ?? 'NoComponent'),
       sourceFile: pattern?.sourceFiles.map(source => source.file).find(isFixerrorsSourcePath) ?? null,
@@ -585,9 +625,10 @@ export function buildRetrievalCluster(cluster: ErrorRootCauseCluster, knowledge:
         : files.some(file => /(?:^|\/)timesheets?\//u.test(file)) ? 'timesheet-submit'
           : files.some(file => /(?:^|\/)quotes\//u.test(file)) ? 'quotes' : 'unknown';
     const classes = new Set<IncidentDiagnostics['classes'][number]>();
-    const occurrences = cluster.patterns.flatMap(item => item.occurrences);
-    for (const entry of occurrences) {
-      let known = false;
+    for (const [index, entry] of occurrences.entries()) {
+      const status = requestFields[index].httpStatus;
+      let known = status === 401 || status === 403;
+      if (known) classes.add('authentication');
       // Only fixed structured signals escalate. Ordinary 401/403, prose and
       // console.error never establish an outage or security compromise.
       const impact = entry.additional_data?.impact;

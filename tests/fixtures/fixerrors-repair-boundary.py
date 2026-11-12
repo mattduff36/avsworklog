@@ -58,6 +58,8 @@ with tempfile.TemporaryDirectory(prefix='SquiresRepairFixture-') as temporary:
             write('lib/utils/second-label.ts', 'export const secondLabel = value => String(value);\n')
             write('tests/unit/second-label.test.ts', 'import {expect,it} from "vitest"; import {secondLabel} from "../../lib/utils/second-label"; it("second label",()=>expect(secondLabel(" label ")).toBe(" label "));\n')
         for name in (r.CHECK_SCRIPT, r.CACHE_SCRIPT, r.ANALYSIS_CATALOGUE, r.EFFORT_POLICY, 'lib/fixerrors/triage.ts',
+                     'scripts/automation/fixerrors-observation-reporter.mjs',
+                     'scripts/automation/fixerrors-client-recovery.ts',
                      'scripts/bump-release-version.ts', 'scripts/finalise-summary.ts',
                      'lib/config/release-version-logic.ts', 'lib/config/release-module-descriptors.ts', 'types/roles.ts'):
             write(name, (repo / name).read_text(encoding='utf-8'))

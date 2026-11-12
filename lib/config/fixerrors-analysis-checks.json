@@ -13,6 +13,6 @@
   },
   {
     "source": "app/(dashboard)/quotes/page.tsx",
-    "tests": ["tests/unit/quotes-overview.test.ts"]
+    "tests": ["tests/ui/quotes-page-permissions.test.tsx", "tests/integration/api/quote-metadata-route.test.ts"]
   }
 ]
