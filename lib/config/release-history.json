@@ -1,5 +1,24 @@
 [
   {
+    "version": "1126.18.0",
+    "updateKind": "major",
+    "title": "Debug tools update",
+    "description": "Polish Fixerrors controls and prepare manual acceptance.",
+    "summary": "Polish Fixerrors controls and prepare manual acceptance.",
+    "details": [
+      "Polish Fixerrors controls and prepare manual acceptance, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Debug tools",
+      "Polish Fixerrors controls",
+      "Prepare manual acceptance"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-12T19:43:15.223Z"
+  },
+  {
     "version": "1126.17.5",
     "updateKind": "minor",
     "title": "Fixerrors improvements",

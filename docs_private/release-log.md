@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.18.0
+
+**GIT COMMIT MESSAGE**
+`feat(debug): polish Fixerrors controls and prepare manual acceptance`
+
+**PUSHED AT**
+2026-11-12T19:43:15.223Z
+
+**WHAT CHANGED**
+Polish Fixerrors controls and prepare manual acceptance.
+
+**VERSION HISTORY DETAILS**
+- Polish Fixerrors controls and prepare manual acceptance, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(debug): polish Fixerrors controls and prepare manual acceptance`
+
 ## 1126.17.5
 
 **GIT COMMIT MESSAGE**
