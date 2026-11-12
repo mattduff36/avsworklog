@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.19.4
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): investigate held client failures with relevant evidence and tests`
+
+**PUSHED AT**
+2026-11-12T23:20:56.097Z
+
+**WHAT CHANGED**
+Investigate held client failures with relevant evidence and tests.
+
+**VERSION HISTORY DETAILS**
+- Fixerrors now uses the recorded HTTP status, source diagnostic and recent action to investigate a held client error.
+- Fixerrors can repair a client recovery handler after reproducing the problem and passing the relevant UI and API tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): investigate held client failures with relevant evidence and tests`
+
 ## 1126.19.3
 
 **GIT COMMIT MESSAGE**

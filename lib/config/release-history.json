@@ -1,5 +1,21 @@
 [
   {
+    "version": "1126.19.4",
+    "updateKind": "minor",
+    "title": "Fixerrors improvements",
+    "description": "Investigate held client failures with relevant evidence and tests.",
+    "summary": "Investigate held client failures with relevant evidence and tests.",
+    "details": [
+      "Fixerrors now uses the recorded HTTP status, source diagnostic and recent action to investigate a held client error.",
+      "Fixerrors can repair a client recovery handler after reproducing the problem and passing the relevant UI and API tests."
+    ],
+    "areas": [
+      "Fixerrors"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-11-12T23:20:56.097Z"
+  },
+  {
     "version": "1126.19.3",
     "updateKind": "minor",
     "title": "Quotes improvements",
