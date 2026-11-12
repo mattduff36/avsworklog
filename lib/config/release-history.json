@@ -1,5 +1,23 @@
 [
   {
+    "version": "1126.17.0",
+    "updateKind": "major",
+    "title": "Fixerrors update",
+    "description": "Added one-run deployment preapproval and honest worker failures.",
+    "summary": "Added one-run deployment preapproval and honest worker failures.",
+    "details": [
+      "Updated approvals, with changes to shared logic and automated tests.",
+      "Updated debug tools, with changes to background routes and app screens.",
+      "Updated help and FAQ, with changes to documentation."
+    ],
+    "areas": [
+      "One-run deployment preapproval",
+      "Honest worker failures"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-11-12T17:24:14.041Z"
+  },
+  {
     "version": "1126.16.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",

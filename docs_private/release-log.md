@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.17.0
+
+**GIT COMMIT MESSAGE**
+`feat(fixerrors): add one-run deployment preapproval and honest worker failures`
+
+**PUSHED AT**
+2026-11-12T17:24:14.041Z
+
+**WHAT CHANGED**
+Add one-run deployment preapproval and honest worker failures.
+
+**VERSION HISTORY DETAILS**
+- Updated approvals, with changes to shared logic and automated tests.
+- Updated debug tools, with changes to background routes and app screens.
+- Updated help and FAQ, with changes to documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(fixerrors): add one-run deployment preapproval and honest worker failures`
+
 ## 1126.16.0
 
 **GIT COMMIT MESSAGE**
