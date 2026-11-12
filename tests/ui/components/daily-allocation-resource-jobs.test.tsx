@@ -80,7 +80,7 @@ describe('bounded draft resource lookup', () => {
     const select = vi.fn();
     render(<DraftJobPicker value={null} onSelect={select} />, { wrapper });
     fireEvent.click(screen.getByRole('button', { name: 'Select job code' }));
-    expect(await screen.findByText('Site address needed before publish')).toBeInTheDocument();
+    expect(await screen.findByText('Site address missing or unconfirmed')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /50075-LC/ }));
     expect(select).toHaveBeenCalledWith(expect.objectContaining({
       value: '50075-LC', source: 'project_number', sourceId: 'job-1', addressValid: false, blockReason: null,

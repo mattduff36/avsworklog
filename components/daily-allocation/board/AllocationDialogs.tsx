@@ -103,7 +103,7 @@ export function VisitEditorDialog({
             />
             {form.job && !form.job.addressValid ? (
               <p className="text-xs text-amber-600 dark:text-amber-400">
-                Draft planning is allowed. Update the canonical job source with a reliable site address before publishing.
+                Publishing is allowed without an address. Add it to the job when available.
               </p>
             ) : null}
           </div>

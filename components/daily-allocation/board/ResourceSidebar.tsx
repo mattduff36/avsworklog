@@ -373,8 +373,8 @@ export function ResourceSidebar({
                     selected={selectedResourceId === jobResourceKey(job)}
                     label={job.job_code}
                     subtitle={[job.customer_name, job.title].filter(Boolean).join(' · ') || 'Catalogue job'}
-                    metadata={(job.address_valid ?? isReliableSiteAddress(job.site_address)) ? job.site_address || undefined : 'Site address needed before publish'}
-                    warning={(job.address_valid ?? isReliableSiteAddress(job.site_address)) ? null : 'Update the canonical job source with a reliable site address before publishing.'}
+                    metadata={(job.address_valid ?? isReliableSiteAddress(job.site_address)) ? job.site_address || undefined : 'Site address missing or unconfirmed'}
+                    warning={(job.address_valid ?? isReliableSiteAddress(job.site_address)) ? null : 'Publishing is allowed without an address. Add it to the job when available.'}
                     tintClassName={boardControlStyles.resourceJob}
                     handleTestId={`daily-allocation-resource-drag-handle-job-${job.source_id}`}
                     onSelect={() => onSelectResource(source)}

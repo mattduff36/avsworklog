@@ -44,7 +44,7 @@ export function DraftJobPicker({ value, onSelect }: {
               }}>
               <span className="block font-medium">{job.job_code}</span>
               <span className="block text-muted-foreground">{[job.customer_name, job.title].filter(Boolean).join(' · ')}</span>
-              {!job.address_valid ? <span className="block text-amber-600 dark:text-amber-400">Site address needed before publish</span> : null}
+              {!job.address_valid ? <span className="block text-amber-600 dark:text-amber-400">Site address missing or unconfirmed</span> : null}
             </button>
           ))}
         </div>

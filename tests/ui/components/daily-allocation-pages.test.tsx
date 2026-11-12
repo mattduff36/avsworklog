@@ -1838,12 +1838,12 @@ describe('daily allocation manager board', () => {
 
     renderBoardPage();
     const resource = await screen.findByRole('button', { name: /Select 50075-LC/ });
-    expect(within(resource).getByText('Site address needed before publish')).toBeInTheDocument();
+    expect(within(resource).getByText('Site address missing or unconfirmed')).toBeInTheDocument();
     fireEvent.click(resource);
     fireEvent.click(screen.getByRole('button', { name: 'Add visit' }));
     const dialog = await screen.findByRole('dialog');
     expect(within(dialog).getByRole('button', { name: '50075-LC' })).toBeInTheDocument();
-    expect(within(dialog).getByText(/Draft planning is allowed/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Publishing is allowed without an address/)).toBeInTheDocument();
   });
 
   it.each([
@@ -1860,7 +1860,7 @@ describe('daily allocation manager board', () => {
     renderBoardPage();
     const cards = await screen.findAllByTestId('daily-allocation-visit-visit-1');
     for (const card of cards) {
-      expect(Boolean(within(card).queryByText('Site address needed before publish')))
+      expect(Boolean(within(card).queryByText('Site address missing or unconfirmed')))
         .toBe(!address.address_valid);
     }
   });
@@ -2200,7 +2200,7 @@ describe('my daily allocation', () => {
     expect(screen.getByText(/Revision 2/)).toBeInTheDocument();
   });
 
-  it('DA2-COMPAT-001 renders a v2 timed itinerary and selects ?publication=', async () => {
+  it.each(['1 Test Street', '', '   '])('DA2-COMPAT-001 renders a v2 timed itinerary with address %j and selects ?publication=', async (siteAddress) => {
     mocks.searchParams = 'publication=pub-v2';
     const current: DailyAllocationIssuedItem = {
       publication_id: 'pub-v2',
@@ -2235,7 +2235,7 @@ describe('my daily allocation', () => {
         published_visit_id: 'visit-1',
         sequence_no: 1,
         job_code: 'JOB-100',
-        site_address: '1 Test Street',
+        site_address: siteAddress,
         customer_name: 'Test Customer',
         title: 'Site works',
         starts_at: '2026-08-14T12:00:00.000Z',
@@ -2261,6 +2261,7 @@ describe('my daily allocation', () => {
     expect(await screen.findByTestId('daily-allocation-issued-v2')).toBeInTheDocument();
     expect(screen.getByText('Timed itinerary')).toBeInTheDocument();
     expect(screen.getByText('JOB-100')).toBeInTheDocument();
+    expect(screen.getByText(siteAddress.trim() || 'Site address not provided')).toBeInTheDocument();
     expect(screen.getAllByText('Medical (AM)').length).toBeGreaterThan(0);
     expect(screen.getByText('Earlier revisions')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(

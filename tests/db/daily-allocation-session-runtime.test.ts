@@ -161,6 +161,9 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     await setup.query(stripOuterMigrationTransaction(readFileSync(resolve(
       process.cwd(), 'supabase', 'migrations', '20261109_daily_allocation_draft_address.sql'
     ), 'utf8')));
+    await setup.query(stripOuterMigrationTransaction(readFileSync(resolve(
+      process.cwd(), 'supabase', 'migrations', '20261112_daily_allocation_publish_optional_address.sql'
+    ), 'utf8')));
     await setup.query(
       `UPDATE private.daily_allocation_v2_runtime
        SET board_enabled = TRUE, writes_enabled = TRUE, updated_at = NOW()
@@ -188,7 +191,7 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     return String(asObject(converted.rows[0]?.converted).plan_day_id);
   }
 
-  it('plans 50075-LC without an address, preserves replay/CAS, copies with warning, and publishes only after canonical repair', async () => {
+  it('publishes an addressless job with one itinerary per employee, replays safely and preserves earlier snapshots', async () => {
     const jobId = randomUUID();
     const sourcePlan = await convertPlan('2026-02-02');
     await setup.query(`INSERT INTO public.quote_project_numbers (id, project_reference, status, site_address)
@@ -212,23 +215,67 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     ) AS result`;
     const preview = asObject((await actor.query(copySql, [randomUUID(), false])).rows[0].result);
     expect(preview.warnings).toEqual(expect.arrayContaining([
-      expect.objectContaining({ label: '50075-LC', detail: expect.stringContaining('site address') }),
+      expect.objectContaining({ label: '50075-LC', detail: expect.stringContaining('Publishing is allowed') }),
     ]));
     const copied = asObject((await actor.query(copySql, [randomUUID(), true])).rows[0].result);
     expect(copied.applied).toBe(true);
     expect((await setup.query(`SELECT site_address FROM public.daily_allocation_visits
       WHERE work_date = '2026-02-03' AND job_source_id = $1`, [jobId])).rows).toEqual([{ site_address: '' }]);
-    await expect(actor.query(`SELECT public.publish_daily_allocation_plan_v2($1::uuid, $2::uuid, 2, $3::text, TRUE)`,
-      [randomUUID(), sourcePlan, randomUUID()])).rejects.toThrow(/JOB_MISSING_SITE/);
+    const publishSql = `SELECT public.publish_daily_allocation_plan_v2($1::uuid, $2::uuid, 2, $3::text, TRUE) AS result`;
+    const publishArgs = [randomUUID(), sourcePlan, randomUUID()];
+    await setup.query(`UPDATE public.quote_project_numbers SET status = 'cancelled' WHERE id = $1`, [jobId]);
+    await expect(actor.query(publishSql, publishArgs)).rejects.toThrow(/JOB_NOT_FOUND/);
+    await setup.query(`UPDATE public.quote_project_numbers SET status = 'open' WHERE id = $1`, [jobId]);
+    const duplicateId = randomUUID();
+    await setup.query(`INSERT INTO public.legacy_quotes (id, quote_reference) VALUES ($1, '50075-LC')`, [duplicateId]);
+    await expect(actor.query(publishSql, publishArgs)).rejects.toThrow(/JOB_AMBIGUOUS/);
+    await setup.query('DELETE FROM public.legacy_quotes WHERE id = $1', [duplicateId]);
     expect((await setup.query('SELECT COUNT(*)::integer AS count FROM public.daily_allocation_publications WHERE plan_day_id = $1', [sourcePlan])).rows[0].count).toBe(0);
+    const first = asObject((await actor.query(publishSql, publishArgs)).rows[0].result);
+    expect(first.publication_id).toBeTruthy();
+    expect(asObject((await actor.query(publishSql, publishArgs)).rows[0].result)).toEqual(first);
+    expect((await setup.query(`SELECT site_address FROM public.daily_allocation_published_visits
+      WHERE publication_id = $1`, [first.publication_id])).rows).toEqual([{ site_address: '' }]);
+    const notifications = await setup.query(`SELECT notifications.profile_id AS user_id, messages.body
+      FROM public.daily_allocation_publication_notifications notifications
+      JOIN public.messages ON messages.id = notifications.message_id
+      WHERE notifications.publication_id = $1`, [first.publication_id]);
+    expect(notifications.rows.length).toBeGreaterThan(0);
+    expect(new Set(notifications.rows.map((row) => row.user_id)).size).toBe(notifications.rows.length);
+    expect(notifications.rows.find((row) => row.user_id === DA2_ACTORS.employeeA)?.body)
+      .toContain('50075-LC (Site address not provided)');
+    expect((await setup.query('SELECT COUNT(*)::integer AS count FROM public.daily_allocation_publications WHERE plan_day_id = $1', [sourcePlan])).rows[0].count).toBe(1);
     await setup.query(`UPDATE public.quote_project_numbers SET site_address = '12 Canonical Site Road' WHERE id = $1`, [jobId]);
-    const published = await actor.query(`SELECT public.publish_daily_allocation_plan_v2($1::uuid, $2::uuid, 2, $3::text, TRUE) AS result`,
+    const published = await actor.query(`SELECT public.publish_daily_allocation_plan_v2($1::uuid, $2::uuid, 3, $3::text, TRUE) AS result`,
       [randomUUID(), sourcePlan, randomUUID()]);
     const publicationId = asObject(published.rows[0].result).publication_id;
     expect(publicationId).toBeTruthy();
     expect((await setup.query(`SELECT site_address FROM public.daily_allocation_published_visits
       WHERE publication_id = $1`, [publicationId])).rows).toEqual([{ site_address: '12 Canonical Site Road' }]);
     expect((await setup.query('SELECT site_address FROM public.daily_allocation_visits WHERE id = $1', [created.visit_id])).rows[0].site_address).toBe('');
+    expect((await setup.query(`SELECT site_address FROM public.daily_allocation_published_visits
+      WHERE publication_id = $1`, [first.publication_id])).rows).toEqual([{ site_address: '' }]);
+    await expect(actor.query(`UPDATE public.daily_allocation_published_visits SET site_address = 'Changed'
+      WHERE publication_id = $1`, [first.publication_id])).rejects.toThrow();
+  });
+
+  it.each([
+    { address: '', date: '2026-02-04' },
+    { address: '   ', date: '2026-02-05' },
+    { address: 'Unconfirmed', date: '2026-02-06' },
+  ])('publishes an available job with optional address $address', async ({ address, date }) => {
+    const jobId = randomUUID();
+    const planId = await convertPlan(date);
+    await setup.query(`INSERT INTO public.quote_project_numbers (id, project_reference, status, site_address)
+      VALUES ($1, $2, 'open', $3)`, [jobId, `OPTIONAL-${date}`, address]);
+    await actor.query(`SELECT public.create_daily_allocation_assigned_visit_v2(
+      $1::uuid, $2::uuid, 1, $3::uuid, 'project_number', $4::uuid, NULL,
+      $5::timestamptz, $6::timestamptz, NULL, NULL, NULL, NULL, NULL
+    )`, [randomUUID(), planId, DA2_ACTORS.employeeA, jobId, `${date} 07:00:00+00`, `${date} 16:30:00+00`]);
+    const published = asObject((await actor.query(`SELECT public.publish_daily_allocation_plan_v2(
+      $1::uuid, $2::uuid, 2, $3::text, TRUE
+    ) AS result`, [randomUUID(), planId, randomUUID()])).rows[0].result);
+    expect(published.publication_id).toBeTruthy();
   });
 
   it('edits and moves unreliable-address drafts, refreshes their source and rejects inactive or ambiguous jobs', async () => {

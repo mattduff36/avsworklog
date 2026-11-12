@@ -131,8 +131,8 @@ export function VisitCard({
           <span className="block truncate text-xs font-medium">{title || visit.job_code}</span>
           <span className="block truncate text-[11px] text-sky-100/80">{visit.site_address}</span>
           {!addressValid ? (
-            <span className="block text-[11px] text-amber-200" title="Update the canonical job source with a reliable site address, then refresh before publishing.">
-              Site address needed before publish
+            <span className="block text-[11px] text-amber-200" title="Publishing is allowed without an address. Add it to the job when available.">
+              Site address missing or unconfirmed
             </span>
           ) : null}
           {persistenceLabel ? (

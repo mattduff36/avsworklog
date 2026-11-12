@@ -33,7 +33,7 @@ function VisitRow({ visit }: { visit: DailyAllocationIssuedVisit }) {
       </div>
       {visit.customer_name ? <p className="text-xs text-muted-foreground">{visit.customer_name}</p> : null}
       {visit.title ? <p className="text-xs text-muted-foreground">{visit.title}</p> : null}
-      {visit.site_address ? <p><span className="text-xs text-muted-foreground">Site:</span> {visit.site_address}</p> : null}
+      <p><span className="text-xs text-muted-foreground">Site:</span> {visit.site_address?.trim() || 'Site address not provided'}</p>
       {visit.instructions.meeting_point ? <p><span className="text-xs text-muted-foreground">Meeting point:</span> {visit.instructions.meeting_point}</p> : null}
       {visit.instructions.meet_person ? <p><span className="text-xs text-muted-foreground">Meet:</span> {visit.instructions.meet_person}</p> : null}
       {visit.instructions.notes ? <p><span className="text-xs text-muted-foreground">Notes:</span> {visit.instructions.notes}</p> : null}
