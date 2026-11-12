@@ -304,7 +304,7 @@ export async function companionDeviceRequest(
   if (origin !== FIXERRORS_LOCAL_ORIGIN && origin !== FIXERRORS_PRODUCTION_ORIGIN) throw new Error('Unexpected Fixerrors origin');
   // Final lifecycle settlement includes multiple durable queue/application writes.
   // This is a receipt wait, not an extension of execution or admission authority.
-  const requestTimeout = command.op === 'complete' || command.op === 'batch-reconcile' ? 60_000 : 10_000;
+  const requestTimeout = ['complete', 'batch-reconcile', 'heartbeat'].includes(command.op) ? 60_000 : 10_000;
   const response = await fetch(`${origin}${FIXERRORS_DEVICE_PATH}`, {
     method: 'POST', redirect: 'error', credentials: 'omit', signal: AbortSignal.timeout(requestTimeout),
     headers: {

@@ -241,13 +241,12 @@ describe('local-only Debug and outbound device routes', () => {
 
   it.each(['active', 'role-lost', 'deleted', 'view-as', 'wrong-actor', 'read-error'] as const)(
     'rereads the original grant actor on device-only heartbeat with %s authority', async authority => {
-      vi.useFakeTimers(); vi.setSystemTime(now);
-      const store = new FixtureStore();
+      vi.useFakeTimers();
+      const f = await preapprovedFixture('targeted', 2);
+      await f.complete(); f.lifecycle();
+      vi.setSystemTime(now + 1);
+      const store = f.store;
       vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
-      const requestId = randomUUID();
-      expect((await POST(request({ op: 'enqueue', action: 'repair', deviceId, requestId,
-        requestedReleaseMode: 'targeted', autoDeployConfirmation: true }))).status).toBe(200);
-      expect(store.state.jobs[0].autoDeployPreapproval).toMatchObject({ state: 'pending', actorId });
       if (authority === 'role-lost') vi.mocked(getEffectiveRoleForUser).mockResolvedValue({ ...baseRole, is_actual_super_admin: false });
       if (authority === 'deleted') vi.mocked(getAppAuthProfile).mockResolvedValue({
         ...(await getAppAuthProfile(actorId, null)), deleted_at: '2027-01-01T00:00:00Z',
@@ -255,7 +254,7 @@ describe('local-only Debug and outbound device routes', () => {
       if (authority === 'view-as') vi.mocked(getEffectiveRoleForUser).mockResolvedValue({ ...baseRole, is_viewing_as: true });
       if (authority === 'wrong-actor') vi.mocked(getEffectiveRoleForUser).mockResolvedValue({ ...baseRole, user_id: randomUUID() });
       if (authority === 'read-error') vi.mocked(getAppAuthProfile).mockRejectedValue(new Error('Synthetic private lookup failure'));
-      const heartbeat = request({ op: 'heartbeat', workspace, checkout: { head: workspace.head, tree: workspace.tree, clean: true },
+      const heartbeat = request({ op: 'heartbeat', workspace: { ...workspace, head: f.candidate.head, tree: f.candidate.tree, packetSha256: store.state.jobs[0].workspace.packetSha256 }, checkout: { head: f.candidate.head, tree: f.candidate.tree, clean: true }, holdReason: 'prepared-candidate',
         allowReadOnly: true, allowRepair: true, allowDeploy: true, bridgeAvailable: true }, null, '/api/fixerrors-device');
       heartbeat.headers.set('X-Squires-Device-Id', deviceId);
       heartbeat.headers.set('Authorization', `Bearer ${credential}`);
@@ -263,12 +262,30 @@ describe('local-only Debug and outbound device routes', () => {
       expect(response.status).toBe(200);
       expect(getAppAuthProfile).toHaveBeenCalledWith(actorId, null);
       expect(store.state.jobs[0].autoDeployPreapproval?.state).toBe(
-        authority === 'active' || authority === 'read-error' ? 'pending' : 'revoked',
+        authority === 'active' ? 'consumed' : authority === 'read-error' ? 'pending' : 'revoked',
       );
-      expect(store.state.jobs).toHaveLength(1);
+      expect(store.state.jobs).toHaveLength(authority === 'active' ? 2 : 1);
       expect(await response.text()).not.toContain('Synthetic private lookup');
     },
   );
+
+  it('does not block queued-run heartbeats on deployment authority lookups', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    const store = new FixtureStore();
+    vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
+    expect((await POST(request({ op: 'enqueue', action: 'repair', deviceId, requestId: randomUUID(),
+      requestedReleaseMode: 'targeted', autoDeployConfirmation: true }))).status).toBe(200);
+    vi.mocked(getAppAuthProfile).mockRejectedValue(new Error('Unneeded authority lookup'));
+    const heartbeat = request({ op: 'heartbeat', workspace, checkout: { head: workspace.head, tree: workspace.tree, clean: true },
+      allowReadOnly: true, allowRepair: true, allowDeploy: true, bridgeAvailable: true }, null, '/api/fixerrors-device');
+    heartbeat.headers.set('X-Squires-Device-Id', deviceId);
+    heartbeat.headers.set('Authorization', `Bearer ${credential}`);
+    expect((await devicePost(heartbeat)).status).toBe(200);
+    expect(getAppAuthProfile).not.toHaveBeenCalled();
+    expect(getEffectiveRoleForUser).not.toHaveBeenCalled();
+    expect(store.state.jobs).toHaveLength(1);
+    expect(store.state.jobs[0].autoDeployPreapproval?.state).toBe('pending');
+  });
 
   it('automatically approves exactly once from the authenticated prepared heartbeat without an open browser', async () => {
     vi.useFakeTimers();

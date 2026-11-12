@@ -23,6 +23,7 @@ describe('companion receipt settlement deadlines', () => {
   const commands: DeviceCommand[] = [
     { op: 'complete', jobId: deviceId, leaseToken: 'a'.repeat(43), result: { status: 'no-change' } },
     { op: 'batch-reconcile', jobId: deviceId },
+    { op: 'heartbeat', workspace: null, allowReadOnly: true, allowRepair: true, allowDeploy: true, bridgeAvailable: true },
   ];
   it.each(commands)('allows durable settlement past the polling deadline: $op', async command => {
     delayedResponse(15_000);

@@ -8,7 +8,11 @@ import { isDeletedProfile } from '@/lib/users/deleted-user';
 export async function fulfillFixerrorsPreapprovals(store: QueueStore, deviceId: string): Promise<void> {
   const pending = await store.transact(tx => {
     expirePreapprovals(tx, Date.now());
-    return tx.state.jobs.filter(job => job.deviceId === deviceId && job.autoDeployPreapproval?.state === 'pending')
+    // Authority is reread immediately before fulfillment, not while queued or repairing.
+    // Unready jobs cannot release; avoid making every heartbeat wait on profile lookups.
+    return tx.state.jobs.filter(job => job.deviceId === deviceId && job.state === 'tested' &&
+      job.batch?.lifecycle === 'applied' && job.autoDeployPreapproval?.preparedHeartbeatAt !== undefined &&
+      job.autoDeployPreapproval.state === 'pending')
       .map(job => ({ id: job.id, actorId: job.autoDeployPreapproval!.actorId }));
   });
   for (const job of pending) {
