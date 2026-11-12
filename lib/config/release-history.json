@@ -1,5 +1,23 @@
 [
   {
+    "version": "1126.19.1",
+    "updateKind": "minor",
+    "title": "Debug tools improvements",
+    "description": "Reconcile verified synthetic repairs after deployment.",
+    "summary": "Reconcile verified synthetic repairs after deployment.",
+    "details": [
+      "Updated help and FAQ, with changes to documentation.",
+      "Reconcile verified synthetic repairs after deployment, with changes to app screens."
+    ],
+    "areas": [
+      "Debug tools"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-12T21:31:02.798Z"
+  },
+  {
     "version": "1126.19.0",
     "updateKind": "major",
     "title": "Debug tools update",

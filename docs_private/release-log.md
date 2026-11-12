@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.19.1
+
+**GIT COMMIT MESSAGE**
+`fix(debug): reconcile verified synthetic repairs after deployment`
+
+**PUSHED AT**
+2026-11-12T21:31:02.798Z
+
+**WHAT CHANGED**
+Reconcile verified synthetic repairs after deployment.
+
+**VERSION HISTORY DETAILS**
+- Updated help and FAQ, with changes to documentation.
+- Reconcile verified synthetic repairs after deployment, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(debug): reconcile verified synthetic repairs after deployment`
+
 ## 1126.19.0
 
 **GIT COMMIT MESSAGE**
