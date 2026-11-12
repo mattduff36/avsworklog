@@ -1,3 +1,4 @@
+import { effectivePlantServiceInterval, rebasePlantServiceSchedules } from '@/lib/server/plant-service-interval';
 import pg from 'pg';
 import {
   calculateNextDueMeter,
@@ -298,9 +299,10 @@ export async function saveServiceSettings(input: {
   linkedTemplateIds: string[];
   compactLabels: Record<string, string | null>;
   rotationTemplateIds: string[];
+  actorId?: string;
 }) {
-  if (!Number.isFinite(input.intervalValue) || input.intervalValue <= 0) {
-    throw new AssetServiceError('Interval must be a positive number');
+  if (!Number.isInteger(input.intervalValue) || input.intervalValue <= 0 || input.intervalValue > 1000000) {
+    throw new AssetServiceError('Interval must be a whole number from 1 to 1000000');
   }
   const expectedUnit = getDefaultMeterUnit(input.assetType);
   if (input.intervalUnit !== expectedUnit) {
@@ -376,6 +378,10 @@ export async function saveServiceSettings(input: {
       `,
       [config.maintenanceCategoryId, Math.trunc(input.intervalValue), input.intervalUnit],
     );
+
+    if (input.assetType === 'plant' && config.intervalValue !== Math.trunc(input.intervalValue)) {
+      await rebasePlantServiceSchedules(client, Math.trunc(input.intervalValue), input.actorId ?? null);
+    }
 
     await client.query(
       `DELETE FROM public.workshop_category_attachment_templates WHERE category_id = $1`,
@@ -738,7 +744,10 @@ export async function completeServiceWorkshopTask(input: CompleteServiceTaskInpu
     }
 
     const meterUnit = getDefaultMeterUnit(assetType);
-    const dueMeter = calculateNextDueMeter(input.completionMeter, config.intervalValue);
+    const intervalValue = assetType === 'plant'
+      ? await effectivePlantServiceInterval(client, assetId, config.intervalValue)
+      : config.intervalValue;
+    const dueMeter = calculateNextDueMeter(input.completionMeter, intervalValue);
     const dueColumn = assetType === 'plant' ? 'next_service_hours' : 'next_service_mileage';
     const lastColumn = assetType === 'plant' ? 'last_service_hours' : 'last_service_mileage';
     const currentColumn = assetType === 'plant' ? 'current_hours' : 'current_mileage';
@@ -815,7 +824,7 @@ export async function completeServiceWorkshopTask(input: CompleteServiceTaskInpu
         resolvedNext.id,
         Math.trunc(input.completionMeter),
         meterUnit,
-        config.intervalValue,
+        intervalValue,
         config.intervalUnit,
         dueMeter,
         input.actorId,
@@ -1064,7 +1073,10 @@ export async function correctServiceWorkshopTask(input: CorrectServiceTaskInput)
     }
 
     const meterUnit = getDefaultMeterUnit(assetType);
-    const dueMeter = calculateNextDueMeter(input.completionMeter, config.intervalValue);
+    const intervalValue = assetType === 'plant'
+      ? await effectivePlantServiceInterval(client, assetId, config.intervalValue)
+      : config.intervalValue;
+    const dueMeter = calculateNextDueMeter(input.completionMeter, intervalValue);
     const dueColumn = assetType === 'plant' ? 'next_service_hours' : 'next_service_mileage';
     const lastColumn = assetType === 'plant' ? 'last_service_hours' : 'last_service_mileage';
     const currentColumn = assetType === 'plant' ? 'current_hours' : 'current_mileage';
@@ -1139,7 +1151,7 @@ export async function correctServiceWorkshopTask(input: CorrectServiceTaskInput)
         resolvedNext.id,
         Math.trunc(input.completionMeter),
         meterUnit,
-        config.intervalValue,
+        intervalValue,
         config.intervalUnit,
         dueMeter,
         input.actorId,
@@ -1390,5 +1402,36 @@ export async function insertWorkshopTaskAttachmentExactOne(input: {
       [input.taskId, input.templateId, input.actorId, input.templateName],
     );
     return rows[0];
+  });
+}
+
+
+export async function plantServiceInterval(plantId: string, change?: { intervalHours: number | null; actorId: string }) {
+  return withTransaction(async (client) => {
+    const config = await loadServiceConfig(client, 'plant', true);
+    const plant = await client.query('SELECT id FROM public.plant WHERE id=$1', [plantId]);
+    if (!plant.rowCount) throw new AssetServiceError('Plant not found', 404);
+    const before = await client.query<{ interval_hours: number }>(
+      'SELECT interval_hours FROM public.plant_service_intervals WHERE plant_id=$1', [plantId]);
+    const previous = before.rows[0]?.interval_hours ?? null;
+    if (change && change.intervalHours !== previous) {
+      if (change.intervalHours !== null && (!Number.isInteger(change.intervalHours) || change.intervalHours < 1 || change.intervalHours > 1000000)) {
+        throw new AssetServiceError('Interval must be a whole number from 1 to 1000000 hours');
+      }
+      if (change.intervalHours === null) {
+        await client.query('DELETE FROM public.plant_service_intervals WHERE plant_id=$1', [plantId]);
+      } else {
+        await client.query(`INSERT INTO public.plant_service_intervals(plant_id,interval_hours) VALUES($1,$2)
+          ON CONFLICT(plant_id) DO UPDATE SET interval_hours=$2,updated_at=now()`, [plantId, change.intervalHours]);
+      }
+      await rebasePlantServiceSchedules(client, change.intervalHours ?? config.intervalValue, change.actorId, plantId);
+      await client.query(`INSERT INTO public.maintenance_history
+        (plant_id,field_name,old_value,new_value,value_type,comment,updated_by)
+        VALUES($1,'service_interval_hours',$2,$3,'text','Plant service interval override changed; empty uses global interval',$4)`,
+      [plantId, previous == null ? null : String(previous), change.intervalHours == null ? null : String(change.intervalHours), change.actorId]);
+    }
+    const override = change ? change.intervalHours : previous;
+    return { globalIntervalHours: config.intervalValue, overrideIntervalHours: override,
+      effectiveIntervalHours: override ?? config.intervalValue };
   });
 }

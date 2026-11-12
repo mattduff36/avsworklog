@@ -35,6 +35,7 @@ import { safeMaintenanceHistoryFieldName } from '@/lib/utils/maintenance-history
 import { toast } from 'sonner';
 import { normalizePlantSerialNumber, isValidPlantSerialNumber } from '@/lib/utils/plant-serial-number';
 import { buildPlantServiceStateWrite } from '@/lib/utils/plant-service-state-edit';
+import { PlantServiceIntervalControl } from '@/components/workshop-tasks/PlantServiceIntervalControl';
 import {
   DEFAULT_LOLER_PERIOD_LABEL,
   findLolerMaintenanceCategory,
@@ -953,6 +954,10 @@ export function EditPlantRecordDialog({
           </div>
 
           {/* LOLER THOROUGH EXAMINATION Compliance */}
+          {canEditServiceState && plant && open && (
+            <PlantServiceIntervalControl plantId={plant.id} disabled={isDirty || isSubmitting}
+              onSaved={() => { onSuccess?.(); onOpenChange(false); }} />
+          )}
           <div className="space-y-4">
             <h3 className="font-semibold text-lg border-b border-slate-700 pb-2">
               LOLER THOROUGH EXAMINATION Compliance

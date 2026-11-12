@@ -101,7 +101,7 @@ describe('workshop maintenance sync', () => {
     expect(plan?.maintenanceUpdates).toEqual({});
   });
 
-  it('uses the current hours to advance plant service due hours', () => {
+  it('does not overwrite Plant service schedules from a title or timestamp sync', () => {
     const plan = buildAutomaticMaintenancePlan({
       context: {
         title: 'Plant service completed',
@@ -126,10 +126,7 @@ describe('workshop maintenance sync', () => {
       completedAt: '2026-04-07T15:15:00.000Z',
     });
 
-    expect(plan?.maintenanceUpdates).toMatchObject({
-      last_service_hours: 1200,
-      next_service_hours: 1450,
-    });
+    expect(plan).toBeNull();
   });
 
   it('updates the unified HGV Service mileage field for major service tasks', () => {

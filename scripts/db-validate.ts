@@ -236,7 +236,7 @@ async function main(): Promise<number> {
     const tableCols = colsByTable.get(table_name);
     if (!tableCols) continue; // table might be a view — skip
 
-    const refs = extractTriggerColumnReferences(fn_body, 'public');
+    const refs = extractTriggerColumnReferences(fn_body, 'public', table_name);
 
     for (const col of refs) {
       if (!tableCols.has(col)) {

@@ -13,6 +13,7 @@ type Block =
     phase: 'condition' | 'body' | 'else';
     unreachable: boolean;
     alternative: boolean;
+    tableUnreachable: boolean;
   };
 
 function quotedToken(source: string, start: number, quote: string, escapes: boolean) {
@@ -118,7 +119,61 @@ function isOtherSchema(condition: Token[], schema: string): boolean {
     && condition[2].kind === 'literal' && condition[2].value !== schema;
 }
 
-function unreachableBranches(tokens: Token[], schema: string): Array<[number, number]> {
+// Table-name proofs are deliberately narrower than a general SQL evaluator.
+// A false equality in a top-level AND proves the body unreachable; OR, NOT,
+// CASE and unknown expression structure retain validation.
+function isOtherTable(condition: Token[], table: string): boolean {
+  while (condition[0]?.kind === 'symbol' && condition[0].value === '(' && condition.at(-1)?.value === ')') {
+    let depth = 0;
+    const wraps = condition.every((token, i) => {
+      if (token.kind === 'symbol' && token.value === '(') depth++;
+      if (token.kind === 'symbol' && token.value === ')') depth--;
+      return depth > 0 || i === condition.length - 1;
+    });
+    if (!wraps) break;
+    condition = condition.slice(1, -1);
+  }
+  let depth = 0;
+  const parts: Token[][] = [[]];
+  for (const token of condition) {
+    if (token.kind === 'word' && ['case', 'between'].includes(token.value)) return false;
+    if (token.kind === 'symbol' && ['(', '['].includes(token.value)) depth++;
+    if (token.kind === 'symbol' && [')', ']'].includes(token.value)) depth--;
+    if (depth === 0 && token.kind === 'word' && token.value === 'or') return false;
+    if (depth === 0 && token.kind === 'word' && token.value === 'and') parts.push([]);
+    else parts.at(-1)!.push(token);
+  }
+  if (parts.length > 1) return parts.every(part => part.length > 0) && parts.some(part => isOtherTable(part, table));
+  return condition.length === 3
+    && condition[0].kind === 'word' && condition[0].value === 'tg_table_name'
+    && condition[1].kind === 'symbol' && condition[1].value === '='
+    && condition[2].kind === 'literal' && condition[2].value !== table;
+}
+
+function trustedTableVariable(tokens: Token[]): boolean {
+  let declaration = false;
+  let statement: Token[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.kind === 'word' && token.value === 'declare') declaration = true;
+    if (token.kind === 'word' && token.value === 'begin') declaration = false;
+    if (token.kind === 'word' && token.value === 'call') return false;
+    if ((token.kind === 'word' || token.kind === 'identifier') && token.value.toLowerCase() === 'tg_table_name'
+      && tokens[i - 1]?.value !== '.') {
+      const next = tokens[i + 1]?.value;
+      const previous = tokens[i - 1]?.value;
+      if (declaration || next === ':' || ['for', 'foreach', 'diagnostics'].includes(previous ?? '') || (next === '=' && !['if', 'elsif', 'when', 'and', 'or', '(', 'not'].includes(previous ?? ''))) return false;
+      // SELECT/FETCH/EXECUTE INTO can assign trigger variables. INSERT INTO cannot.
+      if (statement.some((t, index) => t.kind === 'word' && t.value === 'into'
+        && !(statement[index - 1]?.kind === 'word' && statement[index - 1].value === 'insert'))) return false;
+    }
+    if (token.value === ';' && token.kind === 'symbol') statement = [];
+    else statement.push(token);
+  }
+  return true;
+}
+
+function unreachableBranches(tokens: Token[], schema: string, table?: string): Array<[number, number]> {
   const blocks: Block[] = [];
   const delimiters: string[] = [];
   const ranges: Array<[number, number]> = [];
@@ -148,7 +203,7 @@ function unreachableBranches(tokens: Token[], schema: string): Array<[number, nu
         if (block?.kind === 'if' && block.phase === 'condition') return [];
         blocks.push({
           kind: 'if', conditionStart: i + 1, bodyStart: -1,
-          phase: 'condition', unreachable: false, alternative: false,
+          phase: 'condition', unreachable: false, alternative: false, tableUnreachable: false,
         });
         break;
       case 'then':
@@ -158,12 +213,16 @@ function unreachableBranches(tokens: Token[], schema: string): Array<[number, nu
           block.unreachable = isOtherSchema(tokens.slice(block.conditionStart, i), schema);
           block.bodyStart = token.start + token.value.length;
         }
+        block.tableUnreachable = table !== undefined && isOtherTable(tokens.slice(block.conditionStart, i), table);
+        block.bodyStart = token.start + token.value.length;
         block.phase = 'body';
         break;
       case 'else':
       case 'elsif':
         if (block?.kind === 'case' && token.value === 'else') break;
         if (block?.kind !== 'if' || block.phase !== 'body') return [];
+        if (block.tableUnreachable) ranges.push([block.bodyStart, token.start]);
+        block.tableUnreachable = false;
         block.alternative = true;
         block.phase = token.value === 'else' ? 'else' : 'condition';
         block.conditionStart = i + 1;
@@ -190,7 +249,7 @@ function unreachableBranches(tokens: Token[], schema: string): Array<[number, nu
         }
         if (block.kind === 'if') {
           if (block.phase === 'condition' || tokens[i + 2]?.value !== ';') return [];
-          if (block.unreachable && !block.alternative) {
+          if ((block.unreachable && !block.alternative) || block.tableUnreachable) {
             ranges.push([block.bodyStart, token.start]);
           }
         }
@@ -205,11 +264,12 @@ function unreachableBranches(tokens: Token[], schema: string): Array<[number, nu
 
 /**
  * Only a balanced, pure TG_TABLE_SCHEMA = 'literal' IF without alternatives
- * proves a branch unreachable. Unknown control flow keeps column validation.
+ * proves a schema branch unreachable. Table-name equality/AND guards can also
+ * prove individual IF/ELSIF bodies unreachable. Unknown control flow keeps validation.
  */
-export function extractTriggerColumnReferences(source: string, tableSchema: string): Set<string> {
+export function extractTriggerColumnReferences(source: string, tableSchema: string, tableName?: string): Set<string> {
   const tokens = tokenize(source);
-  const excluded = tokens ? unreachableBranches(tokens, tableSchema) : [];
+  const excluded = tokens ? unreachableBranches(tokens, tableSchema, trustedTableVariable(tokens) ? tableName : undefined) : [];
   const references = new Set<string>();
   // Preserve scanning outside proven exclusions, including dynamic SQL text.
   // Unsupported syntax or malformed blocks therefore retain validation.

@@ -78,6 +78,7 @@ export async function PUT(request: NextRequest) {
 
     const settings = await saveServiceSettings({
       assetType,
+      actorId: auth.user.id,
       intervalValue: Number(body.intervalValue),
       intervalUnit,
       linkedTemplateIds: Array.isArray(body.linkedTemplateIds) ? body.linkedTemplateIds : [],

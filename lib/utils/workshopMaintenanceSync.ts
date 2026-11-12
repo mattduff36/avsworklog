@@ -158,6 +158,10 @@ export function buildAutomaticMaintenancePlan(params: {
   if (!link) {
     return null;
   }
+  // Plant service meters belong to the transactional service workflow, which uses
+  // the actual completion meter and per-asset interval. A title/timestamp edit
+  // must not recalculate them from today's meter and the global interval.
+  if (link.fieldName === 'next_service_hours') return null;
 
   const findApplicableCategory = (categoryName: string) => params.categories.find(
     (candidate) =>
@@ -211,14 +215,6 @@ export function buildAutomaticMaintenancePlan(params: {
     }
   }
 
-  if (category.type === 'hours' && params.state.currentHours != null) {
-    const nextDueHours = params.state.currentHours + category.period_value;
-
-    if (link.fieldName === 'next_service_hours') {
-      maintenanceUpdates.last_service_hours = params.state.currentHours;
-      maintenanceUpdates.next_service_hours = nextDueHours;
-    }
-  }
 
   if (
     Object.keys(maintenanceUpdates).length === 0 &&

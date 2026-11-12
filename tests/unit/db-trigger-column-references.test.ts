@@ -257,7 +257,7 @@ describe('db:validate wiring (offline)', () => {
   const source = readFileSync(resolve(process.cwd(), 'scripts', 'db-validate.ts'), 'utf8');
 
   it('uses schema-aware extraction and still reports missing columns as errors', () => {
-    expect(source).toContain("extractTriggerColumnReferences(fn_body, 'public')");
+    expect(source).toContain("extractTriggerColumnReferences(fn_body, 'public', table_name)");
     expect(source).not.toContain('fn_body.matchAll');
     expect(source).toMatch(/for \(const col of refs\)[\s\S]*?if \(!tableCols\.has\(col\)\)[\s\S]*?severity: 'ERROR'/);
   });
@@ -267,5 +267,52 @@ describe('db:validate wiring (offline)', () => {
     expect(source).toContain('ca: process.env.SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM');
     expect(source).not.toContain('rejectUnauthorized: false');
     expect(source).not.toContain('checkServerIdentity');
+  });
+});
+
+
+describe('table-specific trigger guards', () => {
+  const tableExtract = (source: string, table = 'vehicle_maintenance') =>
+    [...extractTriggerColumnReferences(source, 'public', table)].sort();
+  it('prunes each false IF/ELSIF arm independently and preserves unknown alternatives and conditions', () => {
+    expect(tableExtract(`BEGIN
+      IF TG_TABLE_NAME='actions' AND TG_OP='INSERT' AND NEW.condition IS NULL THEN PERFORM NEW.inspection_id;
+      ELSIF TG_TABLE_NAME='hgvs' THEN PERFORM NEW.current_mileage;
+      ELSIF mystery THEN PERFORM NEW.unknown;
+      ELSE PERFORM NEW.alternative; END IF;
+      PERFORM NEW.outside;
+    END;`)).toEqual(['alternative', 'condition', 'outside', 'unknown']);
+  });
+  it.each([
+    "TG_TABLE_NAME='actions' OR unknown_predicate",
+    "NOT (TG_TABLE_NAME='actions')",
+    "TG_TABLE_NAME='actions' AND value BETWEEN 1 AND 2",
+    "CASE WHEN TG_TABLE_NAME='actions' THEN true ELSE true END",
+    "TG_TABLE_NAME=E'actions'",
+  ])('does not prune unsupported predicate %s', condition => {
+    expect(tableExtract(`BEGIN IF ${condition} THEN PERFORM NEW.missing; END IF; END;`)).toContain('missing');
+  });
+  it.each([
+    "DECLARE TG_TABLE_NAME text := 'actions'; BEGIN",
+    'DECLARE "tg_table_name" text; BEGIN',
+    "BEGIN TG_TABLE_NAME := 'actions';",
+    "BEGIN TG_TABLE_NAME = 'actions';",
+    'BEGIN SELECT value INTO TG_TABLE_NAME FROM settings;',
+    'BEGIN SELECT a,b INTO other,TG_TABLE_NAME FROM settings;',
+    'BEGIN GET DIAGNOSTICS TG_TABLE_NAME = PG_CONTEXT;',
+    'BEGIN INSERT INTO settings(name) VALUES(1) RETURNING name INTO TG_TABLE_NAME;',
+    'BEGIN FOR TG_TABLE_NAME IN SELECT name FROM tables LOOP NULL; END LOOP;',
+    'BEGIN CALL change_name(TG_TABLE_NAME);',
+  ])('does not trust shadowed or mutated table names: %s', prefix => {
+    expect(tableExtract(`${prefix} IF TG_TABLE_NAME='actions' THEN PERFORM NEW.missing; END IF; END;`)).toContain('missing');
+  });
+  it('validates exact Daily Check journal body for every attached table and still detects reachable missing fields', () => {
+    const migration = readFileSync(resolve(process.cwd(), 'supabase/migrations/20261110_daily_check_deletion_effects.sql'), 'utf8');
+    const body = migration.split('CREATE FUNCTION private.journal_daily_check_effect()')[1].split('AS $$')[1].split('$$;')[0];
+    const common = ['daily_check_source_id', 'daily_check_source_type', 'id'];
+    for (const [table, extra] of Object.entries({ vehicle_maintenance: ['plant_id'], hgvs: ['current_mileage'], actions: ['inspection_id'], reminders: ['action_id'], reminder_actions: [] })) {
+      expect(tableExtract(body, table)).toEqual([...common, ...extra].sort());
+      expect(tableExtract(body.replace(/RETURN NEW;\s*END;\s*$/, 'PERFORM NEW.renamed_column; RETURN NEW; END;'), table)).toContain('renamed_column');
+    }
   });
 });

@@ -136,6 +136,11 @@ export function ServiceSettingsPanel({ assetType }: ServiceSettingsPanelProps) {
               value={intervalValue}
               onChange={(event) => setIntervalValue(event.target.value)}
             />
+            <p className="text-sm text-muted-foreground">
+              {assetType === 'plant'
+                ? 'Changing this interval recalculates existing Plant due readings from the recorded last service. Individual overrides are preserved.'
+                : 'Used when a service is completed or corrected. Existing due readings can be edited in Maintenance.'}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor={`${assetType}-interval-unit`}>Unit</Label>

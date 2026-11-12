@@ -4,7 +4,7 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ID, createFixtureSchema, seedReady, type FixtureDb } from './van-service-fixture';
 import { PROVENANCE_ENV_KEYS, validateLocalTestDatabaseUrl } from '../../scripts/local-test-postgres';
-import { loadServiceConfig, saveServiceSettings, completeServiceWorkshopTask, correctServiceWorkshopTask } from '../../lib/server/asset-service';
+import { loadServiceConfig, saveServiceSettings, completeServiceWorkshopTask, correctServiceWorkshopTask, plantServiceInterval } from '../../lib/server/asset-service';
 
 // Substitute transport only: all queries/locks run in real, provenance-checked PostgreSQL.
 vi.mock('pg', async (importOriginal) => {
@@ -54,6 +54,18 @@ suite('van service disposable PostgreSQL workflow', () => {
       CREATE TABLE maintenance_history(id uuid DEFAULT gen_random_uuid(),van_id uuid,hgv_id uuid,plant_id uuid,
         field_name text,old_value text,new_value text,value_type text,comment text,updated_by uuid);
     `);
+    await db.query(`
+      CREATE ROLE anon; CREATE ROLE authenticated;
+      CREATE TABLE plant(id uuid PRIMARY KEY);
+      ALTER TABLE maintenance_history ADD COLUMN maintenance_category_id uuid;
+      INSERT INTO plant(id) VALUES ('20000000-0000-4000-8000-000000000001'),('20000000-0000-4000-8000-000000000002');
+      INSERT INTO vehicle_maintenance(id,plant_id,current_hours,last_service_hours,next_service_hours) VALUES
+        ('20000000-0000-4000-8000-000000000011','20000000-0000-4000-8000-000000000001',2000,1000,1250),
+        ('20000000-0000-4000-8000-000000000012','20000000-0000-4000-8000-000000000002',2000,NULL,1250);
+    `);
+    await db.query('BEGIN');
+    await db.query(readFileSync('supabase/migrations/20261112_plant_service_500_hours.sql', 'utf8'));
+    await db.query('COMMIT');
     vi.stubEnv('POSTGRES_URL_NON_POOLING', process.env.TEST_DATABASE_URL!);
   }, 30000);
   afterAll(async () => { vi.unstubAllEnvs(); await db?.end(); });
@@ -67,6 +79,16 @@ suite('van service disposable PostgreSQL workflow', () => {
     return { taskId, actorId: actor, completionMeter: meter, confirmedNextTemplateId: nextId,
       completedComment: 'Completed fixture service', completedAt: new Date().toISOString(), statusHistoryJson: [] };
   }
+  it('repairs overdue Plant schedules without inventing missing last readings or changing current hours', async () => {
+    const rows = (await db.query("SELECT current_hours,last_service_hours,next_service_hours FROM vehicle_maintenance WHERE id::text LIKE '20000000%' ORDER BY id")).rows;
+    expect(rows).toEqual([
+      { current_hours: 2000, last_service_hours: 1000, next_service_hours: 1500 },
+      { current_hours: 2000, last_service_hours: null, next_service_hours: 1250 },
+    ]);
+    expect((await db.query("SELECT old_value,new_value FROM maintenance_history WHERE plant_id='20000000-0000-4000-8000-000000000001'")).rows).toEqual([{ old_value: '1250', new_value: '1500' }]);
+    expect((await db.query("SELECT relrowsecurity FROM pg_class WHERE oid='plant_service_intervals'::regclass")).rows[0].relrowsecurity).toBe(true);
+    expect((await db.query("SELECT has_table_privilege('authenticated','plant_service_intervals','INSERT') allowed")).rows[0].allowed).toBe(false);
+  });
   it('alternates at actual mileage plus 10000 and duplicate submissions advance once', async () => {
     const basicTask = await task(basicId);
     const results = await Promise.all([
@@ -153,4 +175,52 @@ suite('van service disposable PostgreSQL workflow', () => {
       await writer.end(); await migration.end();
     }
   }, 10000);
+
+  it('uses the saved 500-hour Plant interval for completion and correction instead of an old 250-hour due reading', async () => {
+    const plantId = randomUUID();
+    const maintenanceId = randomUUID();
+    const taskId = randomUUID();
+    await db.query('INSERT INTO plant(id) VALUES($1)', [plantId]);
+    await saveServiceSettings({ assetType: 'plant', intervalValue: 500, intervalUnit: 'hours',
+      linkedTemplateIds: [ID.plantTemplate], compactLabels: {}, rotationTemplateIds: [ID.plantTemplate] });
+    await db.query(`INSERT INTO vehicle_maintenance(id,plant_id,last_service_hours,next_service_hours)
+      VALUES($1,$2,1000,1250)`, [maintenanceId, plantId]);
+    await db.query(`INSERT INTO actions(id,status,workshop_category_id,plant_id,title)
+      VALUES($1,'pending',$2,$3,'Fixture plant service')`, [taskId, ID.plantWorkshop, plantId]);
+    await db.query(`INSERT INTO workshop_task_attachments(id,task_id,template_id,status,template_name_snapshot)
+      SELECT $1,$2,id,'completed',name FROM workshop_attachment_templates WHERE id=$3`,
+    [randomUUID(), taskId, ID.plantTemplate]);
+    await completeServiceWorkshopTask(completion(taskId, ID.plantTemplate, 1275));
+    const state = async () => (await db.query(
+      'SELECT last_service_hours,next_service_hours FROM vehicle_maintenance WHERE id=$1', [maintenanceId])).rows[0];
+    expect(await state()).toEqual({ last_service_hours: 1275, next_service_hours: 1775 });
+    expect((await db.query('SELECT interval_value,interval_unit FROM asset_service_events WHERE task_id=$1',
+      [taskId])).rows).toEqual([{ interval_value: 500, interval_unit: 'hours' }]);
+    await correctServiceWorkshopTask({ taskId, actorId: actor, completionMeter: 1280,
+      confirmedNextTemplateId: ID.plantTemplate, correctionComment: 'Corrected fixture hour meter' });
+    expect(await state()).toEqual({ last_service_hours: 1280, next_service_hours: 1780 });
+    await plantServiceInterval(plantId, { intervalHours: 250, actorId: actor });
+    expect(await state()).toEqual({ last_service_hours: 1280, next_service_hours: 1530 });
+    await correctServiceWorkshopTask({ taskId, actorId: actor, completionMeter: 1300,
+      confirmedNextTemplateId: ID.plantTemplate, correctionComment: 'Override correction fixture' });
+    expect(await state()).toEqual({ last_service_hours: 1300, next_service_hours: 1550 });
+    const nextTask = randomUUID();
+    await db.query(`INSERT INTO actions(id,status,workshop_category_id,plant_id,title)
+      VALUES($1,'pending',$2,$3,'Next plant service')`, [nextTask, ID.plantWorkshop, plantId]);
+    await db.query(`INSERT INTO workshop_task_attachments(id,task_id,template_id,status)
+      VALUES($1,$2,$3,'completed')`, [randomUUID(), nextTask, ID.plantTemplate]);
+    await completeServiceWorkshopTask(completion(nextTask, ID.plantTemplate, 1555));
+    expect(await state()).toEqual({ last_service_hours: 1555, next_service_hours: 1805 });
+    expect((await db.query('SELECT interval_value FROM asset_service_events WHERE task_id=$1', [nextTask])).rows[0].interval_value).toBe(250);
+    await saveServiceSettings({ assetType: 'plant', intervalValue: 600, intervalUnit: 'hours', actorId: actor,
+      linkedTemplateIds: [ID.plantTemplate], compactLabels: {}, rotationTemplateIds: [ID.plantTemplate] });
+    expect((await state()).next_service_hours).toBe(1805);
+    expect((await db.query("SELECT next_service_hours FROM vehicle_maintenance WHERE plant_id='20000000-0000-4000-8000-000000000001'")).rows[0].next_service_hours).toBe(1600);
+    expect((await db.query("SELECT next_service_hours FROM vehicle_maintenance WHERE plant_id='20000000-0000-4000-8000-000000000002'")).rows[0].next_service_hours).toBe(1250);
+    await plantServiceInterval(plantId, { intervalHours: null, actorId: actor });
+    expect((await state()).next_service_hours).toBe(2155);
+    expect(await plantServiceInterval(plantId)).toEqual({ globalIntervalHours: 600, overrideIntervalHours: null, effectiveIntervalHours: 600 });
+    await expect(plantServiceInterval(plantId, { intervalHours: 0, actorId: actor })).rejects.toThrow('whole number');
+
+  });
 });
