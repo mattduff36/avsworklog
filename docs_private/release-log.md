@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.17.5
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): retire deployed batch test scopes`
+
+**PUSHED AT**
+2026-11-12T18:35:21.839Z
+
+**WHAT CHANGED**
+Retire deployed batch test scopes.
+
+**VERSION HISTORY DETAILS**
+- Updated app reliability, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): retire deployed batch test scopes`
+
 ## 1126.17.4
 
 **GIT COMMIT MESSAGE**
