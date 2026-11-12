@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { GET } from '@/app/api/quotes/metadata/route';
 import { createInventoryKioskConfigTableMock } from '@/tests/utils/supabase-query-mock';
@@ -9,11 +9,13 @@ const {
   mockCreateAdminClient,
   mockFilterHiddenSystemTestAccountProfiles,
   mockListQuoteManagerOptions,
+  mockRequireSensitiveModuleAccess,
 } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
   mockCreateAdminClient: vi.fn(),
   mockFilterHiddenSystemTestAccountProfiles: vi.fn(),
   mockListQuoteManagerOptions: vi.fn(),
+  mockRequireSensitiveModuleAccess: vi.fn(),
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
@@ -33,7 +35,7 @@ vi.mock('@/lib/server/quote-workflow', () => ({
 }));
 
 vi.mock('@/lib/server/sensitive-module-access', () => ({
-  requireSensitiveModuleAccess: vi.fn().mockResolvedValue(null),
+  requireSensitiveModuleAccess: mockRequireSensitiveModuleAccess,
 }));
 
 function createOrderedQuery(rows: Array<Record<string, unknown>>) {
@@ -59,7 +61,50 @@ describe('GET /api/quotes/metadata', () => {
       },
     } as unknown as SupabaseClient);
     mockListQuoteManagerOptions.mockResolvedValue([]);
+    mockRequireSensitiveModuleAccess.mockResolvedValue(null);
     mockFilterHiddenSystemTestAccountProfiles.mockImplementation(async (_admin, profiles) => profiles);
+  });
+
+  it.each([
+    { user: null, error: null },
+    { user: { id: 'user-1' }, error: { message: 'Session unavailable' } },
+  ])('returns 401 before reading sensitive metadata when authentication fails: %j', async (auth) => {
+    mockCreateClient.mockResolvedValue({
+      auth: { getUser: vi.fn().mockResolvedValue({ data: { user: auth.user }, error: auth.error }) },
+    });
+    const response = await GET(new NextRequest('http://localhost/api/quotes/metadata?include_customers=true'));
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ error: 'You must be signed in to use quotes.' });
+    expect(mockRequireSensitiveModuleAccess).not.toHaveBeenCalled();
+    expect(mockCreateAdminClient).not.toHaveBeenCalled();
+    expect(mockListQuoteManagerOptions).not.toHaveBeenCalled();
+  });
+
+  it.each([403, 428])('preserves the sensitive-access HTTP %i response without reading metadata', async (status) => {
+    const error = status === 403 ? 'Forbidden' : 'Sensitive PIN required';
+    mockRequireSensitiveModuleAccess.mockResolvedValue(NextResponse.json({ error }, { status }));
+    const response = await GET(new NextRequest('http://localhost/api/quotes/metadata?include_customers=true'));
+
+    expect(response.status).toBe(status);
+    expect(await response.json()).toEqual({ error });
+    expect(mockRequireSensitiveModuleAccess).toHaveBeenCalledWith('quotes');
+    expect(mockCreateAdminClient).not.toHaveBeenCalled();
+    expect(mockListQuoteManagerOptions).not.toHaveBeenCalled();
+  });
+
+  it('reports unexpected metadata failures as 500 rather than returning empty successful data', async () => {
+    const error = new Error('Metadata query failed');
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    mockCreateAdminClient.mockImplementationOnce(() => { throw error; });
+    try {
+      const response = await GET(new NextRequest('http://localhost/api/quotes/metadata?include_customers=true'));
+      expect(response.status).toBe(500);
+      expect(await response.json()).toEqual({ error: 'Unable to load quote settings right now.' });
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error fetching quote metadata:', error);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 
   it('omits customers from metadata unless explicitly requested', async () => {

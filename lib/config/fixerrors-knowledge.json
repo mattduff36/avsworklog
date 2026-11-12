@@ -2,6 +2,42 @@
   "version": 1,
   "incidents": [
     {
+      "id": "fei_3ad43d4824fbe605",
+      "fingerprint": "302ee1944dc0d690dab8be395f2fd17a68163fc6cecf0498b29485437df881d0",
+      "errorContextId": "quotes-fetch-customers-error",
+      "httpStatus": 401,
+      "route": "/quotes",
+      "component": "Console Error",
+      "sourceFile": "app/(dashboard)/quotes/page.tsx",
+      "normalizedMessage": "Console Error: Error fetching quote customers: Error: You must be signed in to use quotes.",
+      "rootCauseFamily": "auth-permissions-security",
+      "diagnosis": "Retained console arguments confirm metadata HTTP 401 after New Quote; the page used generic error handling. The error row has no actor identity; private browser-session correlation is separate evidence. The cause of the missing authenticated session is unknown.",
+      "fixSummary": "Clear stale data and dialogs on 401, recover the session once, refetch after recovery and redirect on repeat denial. Preserve HTTP 403/500 reporting and 428 sensitive-PIN handling.",
+      "changedFiles": [
+        "app/(dashboard)/quotes/page.tsx",
+        "tests/ui/quotes-page-permissions.test.tsx",
+        "tests/integration/api/quote-metadata-route.test.ts"
+      ],
+      "tests": [
+        "tests/ui/quotes-page-permissions.test.tsx",
+        "tests/integration/api/quote-metadata-route.test.ts",
+        "tests/unit/http-error-transient-classification.test.ts",
+        "tests/unit/fetch-with-auth.test.ts",
+        "tests/unit/auth-recovery-bridge.test.ts",
+        "tests/unit/fixerrors-learning.test.ts",
+        "npm run typecheck",
+        "scoped ESLint"
+      ],
+      "confidence": "high",
+      "outcome": "fix_verified_local",
+      "lane": "guarded",
+      "firstSeen": "2026-11-11T15:04:36.942Z",
+      "lastSeen": "2026-11-11T15:04:36.942Z",
+      "occurrences": 1,
+      "recurrenceCount": 0,
+      "updatedAt": "2026-11-12T22:08:13.703Z"
+    },
+    {
       "id": "fei_e274a8e0f83917f0",
       "fingerprint": "9df355b034ba21b232d210398b8ef05fb4c1f46d216c2fbb169ff8999ca6d20c",
       "errorContextId": null,

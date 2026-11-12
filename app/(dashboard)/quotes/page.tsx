@@ -10,6 +10,7 @@ import { AppPageShell } from '@/components/layout/AppPageShell';
 import { Archive, BriefcaseBusiness, CalendarClock, LayoutDashboard, Plus, Receipt, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchAllPaginatedItems } from '@/lib/client/paginated-fetch';
+import { handleAuthFailureStatus } from '@/lib/app-auth/recovery-bridge';
 import { createStatusError, getErrorStatus, isNetworkFetchError } from '@/lib/utils/http-error';
 import { PageLoader } from '@/components/ui/page-loader';
 import { Button } from '@/components/ui/button';
@@ -292,7 +293,8 @@ function ManagerFilterTabs({
 export default function QuotesPage() {
   const { hasPermission: canViewQuotes, loading: permissionLoading } = usePermissionCheck('quotes', false);
   const { hasPermission: canViewCustomers, loading: customerPermissionLoading } = usePermissionCheck('customers', false);
-  const { isAdmin, isSuperAdmin, isActualSuperAdmin } = useAuth();
+  const { user, loading: authLoading, isAdmin, isSuperAdmin, isActualSuperAdmin, forceAuthRedirect } = useAuth();
+  const authReady = !authLoading && Boolean(user);
   const sensitiveAccess = useSensitiveModuleAccess('quotes');
   const refreshSensitiveAccess = sensitiveAccess.refresh;
   const router = useRouter();
@@ -324,6 +326,12 @@ export default function QuotesPage() {
   const [hasLoadedLegacyQuotes, setHasLoadedLegacyQuotes] = useState(false);
   const [hasLoadedProjectNumbers, setHasLoadedProjectNumbers] = useState(false);
   const [hasLoadedCustomers, setHasLoadedCustomers] = useState(false);
+  const [sessionRecovery, setSessionRecovery] = useState<'recovering' | 'redirecting' | null>(null);
+  const sessionRecoveryRef = useRef(false);
+  const recoveryAttemptedRef = useRef(false);
+  // Refetch even when React batches recovery start and success into one render.
+  const [requestGeneration, setRequestGeneration] = useState(0);
+  const requestGenerationRef = useRef(0);
 
   // Modals
   const [detailQuoteId, setDetailQuoteId] = useState<string | null>(null);
@@ -386,7 +394,52 @@ export default function QuotesPage() {
     toast.info('Quotes locked. Enter your sensitive PIN to continue.', { id: toastId });
   }, [refreshSensitiveAccess]);
 
+  const handleQuotesSessionRequired = useCallback(async () => {
+    if (sessionRecoveryRef.current) return;
+    sessionRecoveryRef.current = true;
+    requestGenerationRef.current += 1;
+    setRequestGeneration(requestGenerationRef.current);
+    setSessionRecovery('recovering');
+    setQuotes([]);
+    setLegacyQuotes([]);
+    setProjectNumbers([]);
+    setCustomers([]);
+    setManagerOptions([]);
+    setApprovers([]);
+    setHasLoadedCustomers(false);
+    setHasLoadedLegacyQuotes(false);
+    setHasLoadedProjectNumbers(false);
+    setCustomersLoading(false);
+    setLegacyLoading(false);
+    setProjectNumbersLoading(false);
+    setFormOpen(false);
+    setCustomerFormOpen(false);
+    setEditingQuote(null);
+    setCreatedQuoteCustomerId(null);
+    setDetailQuoteId(null);
+    setMergeGroupQuoteId(null);
+    fullQuoteOverrideId.current = null;
+
+    toast.info('Refreshing your session. Sign in again if prompted.', { id: 'quotes-session-required' });
+    if (recoveryAttemptedRef.current) {
+      await forceAuthRedirect(401);
+      setSessionRecovery('redirecting');
+      return;
+    }
+    recoveryAttemptedRef.current = true;
+    const recovered = await handleAuthFailureStatus(401);
+    if (recovered) {
+      setLoading(true);
+      sessionRecoveryRef.current = false;
+      setSessionRecovery(null);
+    } else {
+      setSessionRecovery('redirecting');
+    }
+  }, [forceAuthRedirect]);
+
   const fetchData = useCallback(async () => {
+    if (!authReady || sessionRecoveryRef.current) return;
+    const generation = requestGenerationRef.current;
     try {
       const url = customerId ? `/api/quotes?customer_id=${customerId}` : '/api/quotes';
       const [quotesResult, metadataRes] = await Promise.all([
@@ -397,12 +450,13 @@ export default function QuotesPage() {
         fetch('/api/quotes/metadata'),
       ]);
 
-      setQuotes(quotesResult.items);
+      if (generation === requestGenerationRef.current) setQuotes(quotesResult.items);
       if (!metadataRes.ok) {
         throw await buildResponseError(metadataRes, 'Failed to load quote metadata');
       }
       if (metadataRes.ok) {
         const data = await metadataRes.json();
+        if (generation !== requestGenerationRef.current) return;
         if (data.customers) {
           setCustomers(canViewCustomers ? data.customers || [] : []);
           setHasLoadedCustomers(canViewCustomers);
@@ -412,6 +466,10 @@ export default function QuotesPage() {
       }
     } catch (error) {
       const errorContextId = 'quotes-fetch-data-error';
+      if (getErrorStatus(error) === 401) {
+        if (generation === requestGenerationRef.current) await handleQuotesSessionRequired();
+        return;
+      }
       if (getErrorStatus(error) === 428) {
         setQuotes([]);
         await handleQuotesSensitiveAccessRequired(errorContextId);
@@ -421,21 +479,28 @@ export default function QuotesPage() {
       console.error('Error fetching data:', error, { errorContextId });
       toast.error('Unable to load quotes right now.', { id: errorContextId });
     } finally {
-      setLoading(false);
+      if (generation === requestGenerationRef.current) setLoading(false);
     }
-  }, [canViewCustomers, customerId, handleQuotesSensitiveAccessRequired]);
+  }, [authReady, canViewCustomers, customerId, handleQuotesSessionRequired, handleQuotesSensitiveAccessRequired]);
 
   const fetchLegacyQuotes = useCallback(async () => {
+    if (!authReady || sessionRecoveryRef.current) return;
+    const generation = requestGenerationRef.current;
     setLegacyLoading(true);
     try {
       const legacyQuotesResult = await fetchAllPaginatedItems<LegacyQuote>('/api/quotes/legacy', 'legacy_quotes', {
         limit: 250,
         errorMessage: 'Failed to load legacy quotes',
       });
+      if (generation !== requestGenerationRef.current) return;
       setLegacyQuotes(legacyQuotesResult.items);
       setHasLoadedLegacyQuotes(true);
     } catch (error) {
       const errorContextId = 'quotes-fetch-legacy-error';
+      if (getErrorStatus(error) === 401) {
+        if (generation === requestGenerationRef.current) await handleQuotesSessionRequired();
+        return;
+      }
       if (getErrorStatus(error) === 428) {
         setLegacyQuotes([]);
         setHasLoadedLegacyQuotes(false);
@@ -446,11 +511,13 @@ export default function QuotesPage() {
       console.error('Error fetching legacy quotes:', error, { errorContextId });
       toast.error('Unable to load legacy quotes right now.', { id: errorContextId });
     } finally {
-      setLegacyLoading(false);
+      if (generation === requestGenerationRef.current) setLegacyLoading(false);
     }
-  }, [handleQuotesSensitiveAccessRequired]);
+  }, [authReady, handleQuotesSessionRequired, handleQuotesSensitiveAccessRequired]);
 
   const fetchProjectNumbers = useCallback(async () => {
+    if (!authReady || sessionRecoveryRef.current) return;
+    const generation = requestGenerationRef.current;
     setProjectNumbersLoading(true);
     try {
       const projectNumbersRes = await fetch('/api/quotes/project-numbers');
@@ -459,10 +526,15 @@ export default function QuotesPage() {
       }
 
       const projectNumbersPayload = await projectNumbersRes.json() as { project_numbers?: QuoteProjectNumber[] };
+      if (generation !== requestGenerationRef.current) return;
       setProjectNumbers(projectNumbersPayload.project_numbers || []);
       setHasLoadedProjectNumbers(true);
     } catch (error) {
       const errorContextId = 'quotes-fetch-project-numbers-error';
+      if (getErrorStatus(error) === 401) {
+        if (generation === requestGenerationRef.current) await handleQuotesSessionRequired();
+        return;
+      }
       if (getErrorStatus(error) === 428) {
         setProjectNumbers([]);
         setHasLoadedProjectNumbers(false);
@@ -473,12 +545,13 @@ export default function QuotesPage() {
       console.error('Error fetching quote project numbers:', error, { errorContextId });
       toast.error('Unable to load quote projects right now.', { id: errorContextId });
     } finally {
-      setProjectNumbersLoading(false);
+      if (generation === requestGenerationRef.current) setProjectNumbersLoading(false);
     }
-  }, [handleQuotesSensitiveAccessRequired]);
+  }, [authReady, handleQuotesSessionRequired, handleQuotesSensitiveAccessRequired]);
 
   const fetchCustomers = useCallback(async () => {
-    if (!canViewCustomers) return false;
+    if (!authReady || !canViewCustomers || sessionRecoveryRef.current) return false;
+    const generation = requestGenerationRef.current;
 
     setCustomersLoading(true);
     try {
@@ -488,6 +561,7 @@ export default function QuotesPage() {
       }
 
       const data = await metadataRes.json() as { customers?: CustomerOption[]; managerOptions?: QuoteManagerOption[]; approvers?: ApproverOption[] };
+      if (generation !== requestGenerationRef.current) return false;
       setCustomers(data.customers || []);
       setManagerOptions(data.managerOptions || []);
       setApprovers(data.approvers || []);
@@ -495,6 +569,10 @@ export default function QuotesPage() {
       return true;
     } catch (error) {
       const errorContextId = 'quotes-fetch-customers-error';
+      if (getErrorStatus(error) === 401) {
+        if (generation === requestGenerationRef.current) await handleQuotesSessionRequired();
+        return false;
+      }
       if (getErrorStatus(error) === 428) {
         setCustomers([]);
         setHasLoadedCustomers(false);
@@ -502,15 +580,15 @@ export default function QuotesPage() {
         return false;
       }
 
-      if (!isNetworkFetchError(error)) {
+      if (getErrorStatus(error) !== null || !isNetworkFetchError(error)) {
         console.error('Error fetching quote customers:', error, { errorContextId });
       }
       toast.error('Unable to load customers right now.', { id: errorContextId });
       return false;
     } finally {
-      setCustomersLoading(false);
+      if (generation === requestGenerationRef.current) setCustomersLoading(false);
     }
-  }, [canViewCustomers, handleQuotesSensitiveAccessRequired]);
+  }, [authReady, canViewCustomers, handleQuotesSessionRequired, handleQuotesSensitiveAccessRequired]);
 
   const refreshProjectNumbersTab = useCallback(async () => {
     await Promise.all([
@@ -520,7 +598,7 @@ export default function QuotesPage() {
   }, [fetchData, fetchProjectNumbers]);
 
   useEffect(() => {
-    if (permissionLoading || customerPermissionLoading || sensitiveAccess.loading) return;
+    if (!authReady || sessionRecovery || permissionLoading || customerPermissionLoading || sensitiveAccess.loading) return;
     if (!canViewQuotes) {
       toast.error('You do not have access to quotes.', { id: 'quotes-access-denied' });
       router.push('/dashboard');
@@ -528,10 +606,10 @@ export default function QuotesPage() {
     }
     if (!sensitiveAccess.canAccess) return;
     fetchData();
-  }, [permissionLoading, customerPermissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewQuotes, router, fetchData]);
+  }, [authReady, sessionRecovery, requestGeneration, permissionLoading, customerPermissionLoading, sensitiveAccess.loading, sensitiveAccess.canAccess, canViewQuotes, router, fetchData]);
 
   useEffect(() => {
-    if (!sensitiveAccess.canAccess) return;
+    if (!authReady || sessionRecovery || permissionLoading || customerPermissionLoading || sensitiveAccess.loading || !canViewQuotes || !sensitiveAccess.canAccess) return;
     if (pageTab === 'legacy' && !hasLoadedLegacyQuotes && !legacyLoading) {
       fetchLegacyQuotes();
     }
@@ -542,6 +620,13 @@ export default function QuotesPage() {
       fetchCustomers();
     }
   }, [
+    authReady,
+    sessionRecovery,
+    requestGeneration,
+    permissionLoading,
+    customerPermissionLoading,
+    sensitiveAccess.loading,
+    canViewQuotes,
     canViewCustomers,
     customersLoading,
     fetchLegacyQuotes,
@@ -714,6 +799,7 @@ export default function QuotesPage() {
       const loaded = await fetchCustomers();
       if (!loaded) return;
     }
+    if (sessionRecoveryRef.current) return;
     setEditingQuote(quote);
     setFormOpen(true);
   }
@@ -748,7 +834,11 @@ export default function QuotesPage() {
     router.replace(`${pathname}?${nextParams.toString()}`, { scroll: false });
   }
 
-  if (permissionLoading || customerPermissionLoading || sensitiveAccess.loading || (sensitiveAccess.canAccess && loading)) {
+  if (sessionRecovery) {
+    return <PageLoader message={sessionRecovery === 'recovering' ? 'Refreshing your session...' : 'Redirecting to sign in...'} />;
+  }
+
+  if (!authReady || permissionLoading || customerPermissionLoading || sensitiveAccess.loading || (sensitiveAccess.canAccess && loading)) {
     return <PageLoader message="Loading quotes..." />;
   }
 
@@ -795,6 +885,7 @@ export default function QuotesPage() {
                     const loaded = await fetchCustomers();
                     if (!loaded) return;
                   }
+                  if (sessionRecoveryRef.current) return;
                   setEditingQuote(null);
                   setFormOpen(true);
                 }}
