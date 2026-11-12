@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.19.3
+
+**GIT COMMIT MESSAGE**
+`fix(quotes): recover customer loading after session denial`
+
+**PUSHED AT**
+2026-11-12T22:11:39.346Z
+
+**WHAT CHANGED**
+Recover customer loading after session denial.
+
+**VERSION HISTORY DETAILS**
+- Recover customer loading after session denial, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(quotes): recover customer loading after session denial`
+
 ## 1126.19.2
 
 **GIT COMMIT MESSAGE**

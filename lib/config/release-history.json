@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.19.3",
+    "updateKind": "minor",
+    "title": "Quotes improvements",
+    "description": "Recover customer loading after session denial.",
+    "summary": "Recover customer loading after session denial.",
+    "details": [
+      "Recover customer loading after session denial, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Quotes"
+    ],
+    "areaKeys": [
+      "quotes"
+    ],
+    "pushedAt": "2026-11-12T22:11:39.346Z"
+  },
+  {
     "version": "1126.19.2",
     "updateKind": "minor",
     "title": "Error reporting improvements",
