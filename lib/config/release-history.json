@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.17.4",
+    "updateKind": "minor",
+    "title": "Error reporting improvements",
+    "description": "Validated companion repair 20fedd8b-0bfd-4147-b14f-a0831b119380.",
+    "summary": "Validated companion repair 20fedd8b-0bfd-4147-b14f-a0831b119380.",
+    "details": [
+      "Updated app reliability, with changes to automated tests."
+    ],
+    "areas": [
+      "Error reporting"
+    ],
+    "areaKeys": [
+      "error-reporting"
+    ],
+    "pushedAt": "2026-11-12T18:24:19.883Z"
+  },
+  {
     "version": "1126.17.3",
     "updateKind": "minor",
     "title": "Fixerrors improvements",
