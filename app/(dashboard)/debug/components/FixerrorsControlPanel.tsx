@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
 import { Progress } from '@/components/ui/progress';
+import { FixerrorsDeploymentProgress } from './FixerrorsDeploymentProgress';
 import { PanelLoader } from '@/components/ui/panel-loader';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogScrollArea, DialogTitle, DialogTrigger, dialogContentViewportClassName } from '@/components/ui/dialog';
 
@@ -298,6 +299,9 @@ export function FixerrorsControlPanel() {
   const status = device && snapshot ? deviceStatus(device, snapshot.jobs) : null;
   const connectionLabel = failure ? snapshot ? 'Stale snapshot' : 'Unavailable' : !snapshot ? 'Loading...' : !snapshot.enabled ? 'Disabled'
     : !device ? selectedDeviceId ? 'Runner unavailable' : 'No devices' : device.revoked ? 'Revoked' : status?.online ? 'Online' : 'Offline';
+  const connectionTone = failure || device?.revoked ? 'border-red-400/40 bg-red-400/15 text-red-200'
+    : status?.online && !device?.holdReason ? 'border-emerald-400/40 bg-emerald-400/15 text-emerald-200'
+    : 'border-amber-400/40 bg-amber-400/15 text-amber-200';
   const newestJobs = [...(snapshot?.jobs ?? [])].sort((a, b) => b.createdAt - a.createdAt);
   const [latestJob, ...historyJobs] = newestJobs;
   const activeJobs = historyJobs.filter(job => needsAttention(job, newestJobs));
@@ -333,6 +337,12 @@ export function FixerrorsControlPanel() {
     const canCancel = job.action !== 'deploy' && ['queued', 'leased', 'paused'].includes(job.state);
     const canReviewDeploy = job.action === 'repair' && job.state === 'tested' && job.candidate && !snapshot?.jobs.some(entry => entry.parentRepairId === job.id);
     const autoRelease = snapshot?.jobs.find(entry => entry.parentRepairId === job.id);
+    const deploymentParent = job.action === 'deploy'
+      ? snapshot?.jobs.find(entry => entry.id === job.parentRepairId && entry.autoDeployment?.deployJobId === job.id)
+      : job;
+    const showDeploymentProgress = deploymentParent?.autoDeployment && deploymentParent.batch &&
+      deploymentParent.batch.remaining === 0 && deploymentParent.batch.processed === deploymentParent.batch.captured &&
+      deploymentParent.batch.counts['verified-local'] > 0 && deploymentParent.batch.counts.failed === 0;
     const canRevokePreapproval = job.autoDeployment && ['pending', 'consumed'].includes(job.autoDeployment.state) &&
       (!autoRelease || (['queued', 'leased'].includes(autoRelease.state) && !autoRelease.deployStarted));
     const active = ['queued', 'leased'].includes(job.state);
@@ -383,6 +393,10 @@ export function FixerrorsControlPanel() {
           className="h-2" indicatorClassName="bg-avs-yellow"
           aria-label="Errors reviewed" aria-valuenow={job.batch.processed} aria-valuemin={0} aria-valuemax={job.batch.captured}
           value={Math.min(100, job.batch.processed / job.batch.captured * 100)} />}
+        {showDeploymentProgress && deploymentParent?.autoDeployment && <FixerrorsDeploymentProgress
+          key={deploymentParent.id} mode={deploymentParent.autoDeployment.releaseMode}
+          release={job.action === 'deploy' ? job : autoRelease}
+          permission={['queued', 'leased', 'tested'].includes(deploymentParent.state) ? deploymentParent.autoDeployment.state : 'stopped'} stale={Boolean(failure)} />}
         <div className="flex flex-wrap gap-2">
           {canCancel && (
             <Button variant="outline" size="sm" className="h-auto min-h-8 whitespace-normal" disabled={busy || Boolean(failure)}
@@ -444,6 +458,10 @@ export function FixerrorsControlPanel() {
             <DialogHeader className="shrink-0 pr-6 text-left">
               <DialogTitle>Fixerrors control centre</DialogTitle>
               <DialogDescription>Review errors, repair eligible cases and test a candidate. Deploy requires explicit approval.</DialogDescription>
+              {!snapshot?.enabled && <Button size="sm" variant="ghost" className="ml-auto h-8 w-8 p-0" aria-label="Refresh companion state"
+                title="Refresh companion state" aria-busy={refreshing} disabled={busy || refreshing} onClick={() => void refresh()}>
+                <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin motion-reduce:animate-none' : ''}`} />
+              </Button>}
             </DialogHeader>
             <DialogScrollArea aria-label="Activity entries" className="min-w-0 space-y-4">
               {failure && <p role="alert" className="text-sm text-destructive">{failure}</p>}
@@ -455,14 +473,23 @@ export function FixerrorsControlPanel() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <h3 className="text-sm font-semibold">Run status</h3>
-                      <Badge variant="outline" className={status?.ready ? 'border-emerald-400/40 bg-emerald-400/15 text-emerald-200' : 'border-slate-600 text-slate-300'}>{connectionLabel}</Badge>
+                      {device?.holdReason === 'checks-preparing' && <span role="status" className="flex items-center gap-2 text-xs text-yellow-200">
+                        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" />Checking readiness…
+                      </span>}
+                      <Badge variant="outline" className={connectionTone}>{connectionLabel}</Badge>
                     </div>
+                    <div className="flex flex-col items-end gap-1" aria-label="Run actions">
                     <Button size="sm" className={`h-auto min-h-9 whitespace-normal ${PRIMARY_ACTION_CLASSNAME}`}
                       aria-label={busy ? 'Recording request...' : autoDeploy ? 'Confirm automatic Deploy and start this run' : 'Start review and repair'}
                       aria-busy={busy} disabled={startDisabled} onClick={startRun}>
                       {busy && <Loader2 aria-hidden="true" className="animate-spin" />}
                       {busy ? 'Recording request...' : autoDeploy ? 'Confirm automatic Deploy and start this run' : 'Run Fixerrors'}
                     </Button>
+                    <Button size="sm" variant="ghost" className="h-8 w-8 p-0" aria-label="Refresh companion state"
+                      title="Refresh companion state" aria-busy={refreshing} disabled={busy || refreshing} onClick={() => void refresh()}>
+                      <RefreshCw aria-hidden="true" className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin motion-reduce:animate-none' : ''}`} />
+                    </Button>
+                    </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                     <label htmlFor="fixerrors-full-checks" className="flex cursor-pointer items-center gap-2 text-sm">
@@ -544,7 +571,6 @@ export function FixerrorsControlPanel() {
                 </details>
               </>}
             </DialogScrollArea>
-            <Button size="sm" variant="outline" className="shrink-0" disabled={busy || refreshing} onClick={() => void refresh()}>{refreshing ? 'Refreshing companion state...' : 'Refresh companion state'}</Button>
           </DialogContent>
         </Dialog>
         <div className="flex max-w-full items-center gap-1 rounded-md bg-white/85 px-2 text-slate-900">

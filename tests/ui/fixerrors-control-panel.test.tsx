@@ -70,6 +70,52 @@ function openHistory() {
 }
 
 describe('Debug local Fixerrors controls', () => {
+  it.each([
+    ['online', 'Online', 'text-emerald-200'],
+    ['offline', 'Offline', 'text-amber-200'],
+    ['preparing', 'Online', 'text-amber-200'],
+    ['revoked', 'Revoked', 'text-red-200'],
+  ])('colours modal %s status without recolouring the title bar', async (state, label, tone) => {
+    const store = new FixtureStore();
+    const device = store.state.devices[0];
+    if (state === 'offline') device.lastSeenAt = now - 60_000;
+    if (state === 'preparing') device.holdReason = 'checks-preparing';
+    if (state === 'revoked') device.revoked = true;
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
+    }) })));
+    render(<FixerrorsControlPanel />);
+    await waitFor(() => expect(screen.queryByText('Loading...')).toBeNull());
+    expect(screen.getByRole('status').className).toContain('text-slate-900');
+    await openDetails('Activity');
+    const dialog = screen.getByRole('dialog');
+    const statusRow = within(dialog).getByRole('heading', { name: 'Run status' }).parentElement!;
+    expect(within(statusRow).getByText(label, { exact: true }).className).toContain(tone);
+    const refresh = within(dialog).getByRole('button', { name: 'Refresh companion state' });
+    expect(refresh.closest('[aria-label="Run actions"]')).not.toBeNull();
+    expect(refresh.textContent).toBe('');
+    if (state === 'preparing') {
+      expect(within(dialog).getByText('Checking readiness…').querySelector('.animate-spin')).not.toBeNull();
+      expect(within(dialog).getByRole('button', { name: 'Start review and repair' })).toBeDisabled();
+    }
+  });
+
+  it.each([false, true])('shows automatic progress only after all cases finish: %s', async complete => {
+    const store = new FixtureStore();
+    await harness(store).enqueue();
+    store.state.jobs[0].batch = { captured: 2, rows: 2, processed: complete ? 2 : 1, remaining: complete ? 0 : 1,
+      counts: { 'verified-local': 1, held: complete ? 1 : 0, 'report-only': 0, failed: 0 }, lifecycle: 'pending' };
+    const publicState = publicQueueState(store.state);
+    const job = { ...publicState.jobs[0], autoDeployment: { state: 'pending', grantedAt: now,
+      expiresAt: now + 14_400_000, releaseMode: 'targeted' } };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicState, jobs: [job],
+    }) })));
+    render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
+    expect(Boolean(screen.queryByRole('progressbar', { name: 'Automatic deployment estimate' }))).toBe(complete);
+  });
+
   it('hides all controls for non-SuperAdmin and View As, without fetching', () => {
     const fetcher = vi.fn();
     vi.stubGlobal('fetch', fetcher);
@@ -658,7 +704,7 @@ describe('Compact companion dialogs and preserved states', () => {
     openHistory();
     expect(entries.contains(screen.getByRole('group', { name: 'Activity filters' }))).toBe(true);
     expect(entries.contains(screen.getByRole('heading', { name: 'Fixerrors control centre' }))).toBe(false);
-    expect(entries.contains(screen.getByRole('button', { name: 'Refresh companion state' }))).toBe(false);
+    expect(entries.contains(screen.getByRole('button', { name: 'Refresh companion state' }))).toBe(true);
     expect(entries.contains(screen.getByRole('button', { name: 'Close' }))).toBe(false);
     closeDetails();
     await openDetails('Runner settings');
@@ -986,7 +1032,7 @@ describe('Compact companion dialogs and preserved states', () => {
       await waitFor(() => expect(toast.error).toHaveBeenCalled());
       expect(screen.getByRole('switch', { name: 'Allow pre-approved automatic deployment after tests pass' })).not.toBeChecked();
       fireEvent(window, new Event('online'));
-      await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh companion state' })).not.toBeDisabled());
       expect(fetcher.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(1);
       expect(screen.getByRole('button', { name: 'Start review and repair' })).toBeEnabled();
     });
@@ -998,7 +1044,7 @@ describe('Compact companion dialogs and preserved states', () => {
       expect(f.posts()[0]).not.toHaveProperty('reviewJobId');
       fireEvent(window, new Event('focus'));
       fireEvent(window, new Event('online'));
-      await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh companion state' })).not.toBeDisabled());
       expect(f.posts()).toHaveLength(1);
       const claim = await f.h.claim();
       await f.h.device({ op: 'complete', jobId: claim.job.id, leaseToken: claim.leaseToken, result: { status: 'tested', candidate, checks } });
@@ -1024,7 +1070,7 @@ describe('Compact companion dialogs and preserved states', () => {
       f.store.state.devices[0].allowDeploy = true;
       f.store.state.devices[0].holdReason = undefined;
       fireEvent(window, new Event('online'));
-      await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh companion state' })).not.toBeDisabled());
       expect(f.posts()).toHaveLength(1);
     });
 
@@ -1040,7 +1086,7 @@ describe('Compact companion dialogs and preserved states', () => {
       expect(f.posts()).toHaveLength(1);
       f.store.state.jobs[0].batch.lifecycle = 'applied';
       fireEvent.click(screen.getByRole('button', { name: 'Refresh companion state' }));
-      await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Refresh companion state' })).not.toBeDisabled());
       expect(f.posts()).toHaveLength(1);
     });
 
