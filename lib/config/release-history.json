@@ -1,5 +1,28 @@
 [
   {
+    "version": "1126.16.0",
+    "updateKind": "major",
+    "title": "Workshop Tasks update",
+    "description": "Updated Workshop Tasks, Maintenance, and Data storage.",
+    "summary": "Updated Workshop Tasks, Maintenance, and Data storage.",
+    "details": [
+      "Updated Workshop Tasks, Maintenance, and Data storage, with changes to background routes, interface components, shared logic, and automated tests.",
+      "Updated maintenance, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated data storage, with changes to data storage."
+    ],
+    "areas": [
+      "Workshop Tasks",
+      "Maintenance",
+      "Data storage"
+    ],
+    "areaKeys": [
+      "workshop-tasks",
+      "maintenance",
+      "data-storage"
+    ],
+    "pushedAt": "2026-11-12T13:58:35.332Z"
+  },
+  {
     "version": "1126.15.0",
     "updateKind": "major",
     "title": "Daily Allocation update",
