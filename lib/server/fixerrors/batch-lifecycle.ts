@@ -5,12 +5,12 @@ import { buildAutomaticLifecyclePlan } from '@/scripts/fixerrors-lifecycle-run';
 import { applyLifecyclePlan, hashLifecycleRecord } from '@/scripts/fixerrors-lifecycle';
 import { withFixerrorsApplicationDatabase } from './evidence';
 
-function lifecycleBlocker(error: unknown) {
+export function lifecycleBlocker(error: unknown) {
   const message = error instanceof Error ? error.message : '';
   if (/commit may have completed/u.test(message)) return 'uncertain' as const;
   if (/trigger\/schema|operational trust/u.test(message)) return 'schema' as const;
   if (/expired|expiry/u.test(message)) return 'expired' as const;
-  if (/row|fingerprint|state changed|coverage|transition|receipt/iu.test(message)) return 'conflict' as const;
+  if (/row|fingerprint|state changed|coverage|transition|receipt|candidate|binding/iu.test(message)) return 'conflict' as const;
   return 'unavailable' as const;
 }
 

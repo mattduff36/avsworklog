@@ -359,6 +359,27 @@ describe('Debug local Fixerrors controls', () => {
     if (lifecycle === 'applied') expect(screen.getByText(/Local verification is not a live fix/)).toBeDefined();
   });
 
+  it.each(['pending', 'blocked', 'applied'] as const)('shows exact live row counts separately from local lifecycle: %s', async state => {
+    const store = new FixtureStore();
+    const h = harness(store);
+    await h.testedRepair();
+    await h.approve(store.state.jobs[0].id);
+    store.state.jobs[1].state = 'deployed';
+    store.state.jobs[0].batch = { captured: 2, rows: 2, processed: 2, remaining: 0,
+      counts: { 'verified-local': 2, held: 0, 'report-only': 0, failed: 0 }, lifecycle: 'applied',
+      live: { state, verifiedRows: state === 'applied' ? 2 : 1, remainingRows: state === 'applied' ? 0 : 1,
+        ...(state === 'blocked' ? { reason: 'live-verification-required' as const } : {}) } };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
+    }) })));
+    render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
+    openHistory();
+    expect(screen.getByText(new RegExp(`Live verification: ${state}.*${state === 'applied' ? 2 : 1} exact error rows fixed live`))).toBeDefined();
+    filterActivity('Needs attention');
+    expect(Boolean(screen.queryByText(/Live verification:/))).toBe(state !== 'applied');
+  });
+
   it('displays the signed worker and prepared-evidence digests in the separate confirmation without posting extra fields', async () => {
     const store = new FixtureStore();
     const h = harness(store);

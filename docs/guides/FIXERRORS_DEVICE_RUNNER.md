@@ -89,6 +89,41 @@ on resume and preparation verification, and measured per-case timing fields.
 Application typecheck, scoped ESLint and `git diff --check` passed. These are
 synthetic development checks, not production incident repairs or live acceptance.
 
+## Exact incidents after deployment (MPDEE Worker)
+
+A committed `deployed` device receipt triggers a separate server-side exact-row
+lifecycle reconciliation on its original repair batch. Authenticated production
+heartbeats and `batch-reconcile` retry it; neither a deployment label nor the
+companion's local packet retirement proves that an incident is fixed live.
+The existing `lifecycle` response still acknowledges only the local transition.
+Debug separately exposes live reconciliation state, a fixed blocker reason and
+exact fixed-live / still-unverified locally repaired row counts. Held, failed,
+report-only and uncaptured rows are not promoted by this deployment step.
+
+Automatic original-error verification is currently limited to the controlled
+synthetic label fixture. It requires original first source frames and the
+source/test-bound verified-local outcome, the retained local lifecycle plan and
+its application/queue receipts, and the exact approved deployed candidate with
+its accepted targeted-test/typecheck/lint and native prepared-release digests.
+The actual server instance's `VERCEL_GIT_COMMIT_SHA` and deployment ID must match
+the fixed public HTTPS deployment-identity endpoint and approved candidate.
+The server then executes the imported formatter against fixed leading, trailing,
+whitespace-only, plain and empty cases. An old instance, mismatched identity or
+failed runtime case leaves the exact rows outstanding for a later retry.
+Other repaired sources remain outstanding with `live-verification-required`;
+successful deployment is not substituted for original-error verification.
+
+The new live plan is durably retained before application mutation. It reuses
+the lifecycle adapter's SERIALIZABLE exact-row locks, full expected-row and
+diagnostic hashes, audited trigger/schema guard, awaited pre/post receipts and
+embedded database receipts. Uncertain commits retry the identical plan without
+duplicating history or broadening row scope; unapplied expired or changed-row
+plans remain blocked. Queue/storage failure cannot undo a committed deployment
+receipt or present incident closure as successful. No native execution/ticket contract, installed
+Windows package, generated release metadata or synthetic fixture is changed.
+Development validation uses disposable in-memory queue/application DB fixtures;
+production execution and acceptance remain parent-owned.
+
 ## Everyday runner implementation plan (MPDEE Worker)
 
 1. Separate clean-checkout connection readiness from packet readiness. Connect

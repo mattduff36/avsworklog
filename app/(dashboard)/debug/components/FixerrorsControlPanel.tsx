@@ -88,7 +88,7 @@ function deviceStatus(device: Snapshot['devices'][number], jobs: Snapshot['jobs'
 
 function needsAttention(job: Snapshot['jobs'][number], jobs: Snapshot['jobs']) {
   return ['queued', 'leased', 'paused', 'unknown'].includes(job.state) ||
-    (job.batch && (job.lifecycleReconciliationRequired ||
+    (job.batch && (job.lifecycleReconciliationRequired || (job.batch.live && job.batch.live.state !== 'applied') ||
       ((job.batch.remaining > 0 || job.batch.counts.held > 0 || job.batch.counts.failed > 0) && !jobs.some(later =>
         later.deviceId === job.deviceId && later.createdAt > job.createdAt && later.batch?.lifecycle === 'applied')))) ||
     (job.state === 'tested' && !jobs.some(release => release.parentRepairId === job.id && release.state === 'deployed'));
@@ -386,6 +386,7 @@ export function FixerrorsControlPanel() {
               : 'review the exact tested candidate and confirm Deploy separately.'}</p>}
             {job.autoDeployment && <p className="text-xs text-muted-foreground">One-run automatic Deploy: {job.autoDeployment.state}; {job.autoDeployment.releaseMode === 'full' ? 'full checks (fap)' : 'focused checks'}.</p>}
             {job.batch && <p className="text-xs text-muted-foreground">Lifecycle: {job.batch.lifecycle}{job.batch.lifecycleReason ? ` (${job.batch.lifecycleReason})` : ''}. {job.batch.lifecycle !== 'applied' ? 'Error records are not confirmed reconciled.' : 'Local verification is not a live fix.'}</p>}
+            {job.batch?.live && <p className="text-xs text-muted-foreground">Live verification: {job.batch.live.state}{job.batch.live.reason ? ` (${job.batch.live.reason})` : ''}. {job.batch.live.verifiedRows} exact error rows fixed live; {job.batch.live.remainingRows} locally repaired rows still require original-error verification.</p>}
             {!job.reason && !job.batch && !canReviewDeploy && <p className="text-xs text-muted-foreground">{job.state === 'deployed' ? 'Deployment verified.' : 'No additional result recorded.'}</p>}
           </div>
         </div>

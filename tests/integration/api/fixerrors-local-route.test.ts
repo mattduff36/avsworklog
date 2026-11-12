@@ -11,6 +11,9 @@ vi.mock('@/lib/server/fixerrors/store', () => ({
 const capture = vi.hoisted(() => ({ read: vi.fn() }));
 vi.mock('@/lib/server/fixerrors/evidence', () => ({ captureFreshFixerrorsEvidence: capture.read }));
 vi.mock('@/lib/server/fixerrors/batch-lifecycle', () => ({ reconcileBatchLifecycle: vi.fn() }));
+vi.mock('@/lib/server/fixerrors/deployment-lifecycle', () => ({
+  reconcileDeployedBatchLifecycle: vi.fn(), reconcileDeviceDeployments: vi.fn(),
+}));
 
 import { GET, POST } from '@/app/api/debug/fixerrors/route';
 import { POST as devicePost } from '@/app/api/fixerrors-device/route';
@@ -19,6 +22,7 @@ import { getEffectiveRole, getEffectiveRoleForUser } from '@/lib/utils/view-as';
 import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { localFixerrorsStore, productionFixerrorsStore } from '@/lib/server/fixerrors/store';
 import { reconcileBatchLifecycle } from '@/lib/server/fixerrors/batch-lifecycle';
+import { reconcileDeployedBatchLifecycle, reconcileDeviceDeployments } from '@/lib/server/fixerrors/deployment-lifecycle';
 import { batchOutcomeHash } from '@/lib/fixerrors/batch';
 import { FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PREAPPROVAL_MS, FIXERRORS_PRODUCTION_ORIGIN } from '@/lib/fixerrors/protocol';
 import { fixerrorsDeviceSigningBytes } from '@/lib/fixerrors/admission';
@@ -215,6 +219,42 @@ describe('local-only Debug and outbound device routes', () => {
     unauthorized.delete('authorization');
     expect((await send({ op: 'batch-reconcile', jobId }, unauthorized)).status).toBe(401);
     expect(reconcileBatchLifecycle).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a committed deployment successful while deferring live closure and retries only authenticated production requests', async () => {
+    vi.useFakeTimers();
+    const f = await preapprovedFixture();
+    await f.ready();
+    await f.fulfill();
+    const claim = (await f.send({ op: 'claim' })) as { claim: { job: { id: string }; leaseToken: string } };
+    const jobId = claim.claim.job.id;
+    await f.send({ op: 'start-deploy', jobId, leaseToken: claim.claim.leaseToken });
+    vi.setSystemTime(now + 2);
+    vi.stubEnv('NODE_ENV', 'production'); vi.stubEnv('VERCEL', '1'); vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('SQUIRES_FIXERRORS_PRODUCTION_ENABLED', '1');
+    vi.stubEnv('SQUIRES_FIXERRORS_PRODUCTION_DEVICE_ID', deviceId);
+    vi.mocked(productionFixerrorsStore.transact).mockImplementation(f.store.transact.bind(f.store));
+    const send = (command: unknown, authenticated = true) => devicePost(new NextRequest(
+      `${FIXERRORS_PRODUCTION_ORIGIN}/api/fixerrors-device`, {
+        method: 'POST', body: JSON.stringify(command), headers: {
+          'Content-Type': 'application/json', 'X-Squires-Device-Id': deviceId,
+          ...(authenticated ? { Authorization: `Bearer ${credential}` } : {}),
+        },
+      }));
+    vi.mocked(reconcileDeployedBatchLifecycle).mockRejectedValueOnce(new Error('Synthetic queue outage'));
+    expect((await send({ op: 'complete', jobId, leaseToken: claim.claim.leaseToken,
+      result: { status: 'deployed', candidate: f.candidate } })).status).toBe(200);
+    expect(f.store.state.jobs[1].state).toBe('deployed');
+    expect(reconcileDeployedBatchLifecycle).toHaveBeenCalledWith(productionFixerrorsStore, jobId);
+    const recovery = await send({ op: 'batch-reconcile', jobId: f.id });
+    expect(await recovery.json()).toMatchObject({ completion: { job: { id: jobId, state: 'deployed' } } });
+    expect(reconcileDeployedBatchLifecycle).toHaveBeenLastCalledWith(productionFixerrorsStore, f.id);
+    const heartbeat = { op: 'heartbeat', workspace: null, checkout: null,
+      allowReadOnly: false, allowRepair: false, allowDeploy: false, bridgeAvailable: false };
+    expect((await send(heartbeat, false)).status).toBe(401);
+    expect(reconcileDeviceDeployments).not.toHaveBeenCalled();
+    expect((await send(heartbeat)).status).toBe(200);
+    expect(reconcileDeviceDeployments).toHaveBeenCalledWith(productionFixerrorsStore, deviceId);
   });
 
   it('captures no data for denied, busy, duplicate, revoked or opted-out requests', async () => {

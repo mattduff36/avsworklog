@@ -6,6 +6,7 @@ import { localFixerrorsStore, productionFixerrorsStore } from '@/lib/server/fixe
 import { issueLocalFixtureRelease } from '@/lib/server/fixerrors/release-fixture';
 import { issueProductionAdmission, issueProductionBatchLease, issueProductionRelease } from '@/lib/server/fixerrors/release-production';
 import { reconcileBatchLifecycle } from '@/lib/server/fixerrors/batch-lifecycle';
+import { reconcileDeployedBatchLifecycle, reconcileDeviceDeployments } from '@/lib/server/fixerrors/deployment-lifecycle';
 import { fulfillFixerrorsPreapprovals } from '@/lib/server/fixerrors/preapproval';
 import {
   assertFixerrorsRequest, fixerrorsHttpError, fixerrorsJson, readBoundedJson,
@@ -32,6 +33,19 @@ export async function POST(request: NextRequest) {
     ));
     const lifecycle = command.op === 'complete' || command.op === 'batch-reconcile'
       ? await reconcileBatchLifecycle(store, command.jobId) : undefined;
+    if (scope === 'production') {
+      try {
+        if (command.op === 'complete' || command.op === 'batch-reconcile') {
+          await reconcileDeployedBatchLifecycle(store, command.jobId);
+        } else if (command.op === 'heartbeat') {
+          await reconcileDeviceDeployments(store, id);
+        }
+      } catch {
+        // The deployment receipt is already durable; queue outages must not
+        // turn it into a failed release. Authenticated heartbeats retry closure.
+        console.error('Fixerrors live reconciliation deferred; deployment receipt retained.');
+      }
+    }
     if (command.op === 'heartbeat' || command.op === 'batch-reconcile') {
       try {
         await fulfillFixerrorsPreapprovals(store, id);

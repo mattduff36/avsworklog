@@ -167,6 +167,20 @@ export async function fetchLifecycleRecords(client: PgClientLike, ids?: string[]
   return result.rows.map(row => row.record);
 }
 
+export function hasAppliedLifecycleReceipt(
+  record: LifecycleRecord, row: LifecyclePlan['rows'][number], planHash: string,
+): boolean {
+  const receipts = dataObject(record.additional_data).fixerrorsLifecycleReceipts;
+  if (receipts !== undefined && !Array.isArray(receipts)) throw new Error('Invalid lifecycle receipts');
+  const priorReceipt = (receipts as unknown[] | undefined)?.find(value =>
+    value && typeof value === 'object' && (value as Record<string, unknown>).planHash === planHash);
+  if (!priorReceipt) return false;
+  const saved = dataObject(priorReceipt);
+  if (saved.beforeHash !== row.expectedRecordHash || saved.afterHash !== lifecycleStateHash(record) ||
+      diagnosticHash(record) !== row.diagnosticHash) throw new Error('Lifecycle retry state changed');
+  return true;
+}
+
 // This is a separate exact-row contract; the v5 snapshot/retention guard is unchanged.
 export async function applyLifecyclePlan(client: PgClientLike, input: LifecyclePlan, target: string, options: {
   writer?: (file: string, contents: string) => void | Promise<void>;
@@ -216,14 +230,7 @@ export async function applyLifecyclePlan(client: PgClientLike, input: LifecycleP
     const pending: { record: LifecycleRecord; row: LifecyclePlan['rows'][number] }[] = [];
     for (const { record } of locked.rows) {
       const row = plan.rows.find(entry => entry.id === record.id)!;
-      const receipts = dataObject(record.additional_data).fixerrorsLifecycleReceipts;
-      if (receipts !== undefined && !Array.isArray(receipts)) throw new Error('Invalid lifecycle receipts');
-      const priorReceipt = (receipts as unknown[] | undefined)?.find(value =>
-        value && typeof value === 'object' && (value as Record<string, unknown>).planHash === planHash);
-      if (priorReceipt) {
-        const saved = dataObject(priorReceipt);
-        if (saved.beforeHash !== row.expectedRecordHash || saved.afterHash !== lifecycleStateHash(record) ||
-            diagnosticHash(record) !== row.diagnosticHash) throw new Error('Lifecycle retry state changed');
+      if (hasAppliedLifecycleReceipt(record, row, planHash)) {
         alreadyApplied++;
         continue;
       }

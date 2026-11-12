@@ -57,6 +57,13 @@ export const blockReasonSchema = z.enum([
 export const nativeDiagnosticSchema = z.enum([
   'native-import-unavailable', 'typecheck-cache-not-ready', 'batch-initialization-refused', 'batch-execution-unconfirmed',
 ]);
+export const liveReconciliationSchema = z.object({
+  state: z.enum(['pending', 'applied', 'blocked']),
+  reason: z.enum(['live-verification-required', 'deployment-identity-mismatch', 'server-revision-mismatch',
+    'runtime-verification-failed', 'conflict', 'schema', 'expired', 'uncertain', 'unavailable']).optional(),
+  verifiedRows: z.number().int().nonnegative(),
+  remainingRows: z.number().int().nonnegative(),
+}).strict();
 export const batchProgressSchema = z.object({
   captured: z.number().int().nonnegative(), rows: z.number().int().nonnegative(),
   processed: z.number().int().nonnegative(), remaining: z.number().int().nonnegative(),
@@ -66,6 +73,7 @@ export const batchProgressSchema = z.object({
   }).strict(),
   lifecycle: z.enum(['pending', 'applied', 'blocked']),
   lifecycleReason: z.enum(['conflict', 'schema', 'expired', 'uncertain', 'unavailable']).optional(),
+  live: liveReconciliationSchema.optional(),
   triage: z.object({
     Routine: z.number().int().nonnegative(), Important: z.number().int().nonnegative(), Urgent: z.number().int().nonnegative(),
   }).strict().optional(),

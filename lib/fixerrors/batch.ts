@@ -5,6 +5,7 @@ import { parseDecision } from '../../scripts/fixerrors-decision';
 import type { LifecycleBinding } from '../../scripts/fixerrors-lifecycle-run';
 import { parseLifecyclePlan, type LifecyclePlan, type LifecycleRecord } from '../../scripts/fixerrors-lifecycle';
 import { classifyIncident, triageSchema, timingsSchema } from './triage';
+import { liveReconciliationSchema } from './protocol';
 
 export const BATCH_CHUNK_BYTES = 48 * 1024;
 export const batchHash = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -36,6 +37,11 @@ export const batchOutcomeSchema = z.object({
   }).strict()),
   decisions: z.array(z.unknown()),
 }).strict();
+const deploymentLifecycleSchema = liveReconciliationSchema.extend({
+  releaseJobId: z.string().uuid(), bindingSha256: digest,
+  plan: z.unknown().transform(input => input === null ? null : parseLifecyclePlan(input)),
+  planApplied: z.boolean(), receipts: z.record(z.string(), z.string()),
+}).strict();
 export interface CapturedBatch {
   manifest: string;
   target: string;
@@ -51,6 +57,7 @@ export interface CapturedBatch {
     state: 'pending' | 'applied' | 'blocked'; plan: LifecyclePlan | null; receipts: Record<string, string>;
     reason?: 'conflict' | 'schema' | 'expired' | 'uncertain' | 'unavailable';
   };
+  deployment?: z.infer<typeof deploymentLifecycleSchema>;
 }
 
 export function parseCapturedBatch(value: unknown, jobId: string): CapturedBatch {
@@ -72,6 +79,7 @@ export function parseCapturedBatch(value: unknown, jobId: string): CapturedBatch
       receipts: z.record(z.string(), z.string()),
       reason: z.enum(['conflict', 'schema', 'expired', 'uncertain', 'unavailable']).optional(),
     }).strict().optional(),
+    deployment: deploymentLifecycleSchema.optional(),
   }).strict().parse(value);
   const manifest = parseBatchBytes(Buffer.from(parsed.manifest));
   const delivery = describeBatch(parsed.manifest, parsed.delivery.rows);
