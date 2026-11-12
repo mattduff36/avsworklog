@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.19.0
+
+**GIT COMMIT MESSAGE**
+`feat(debug): clarify readiness and deployment progress`
+
+**PUSHED AT**
+2026-11-12T21:02:17.478Z
+
+**WHAT CHANGED**
+Clarify readiness and deployment progress.
+
+**VERSION HISTORY DETAILS**
+- Clarify readiness and deployment progress, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `feat(debug): clarify readiness and deployment progress`
+
 ## 1126.18.1
 
 **GIT COMMIT MESSAGE**

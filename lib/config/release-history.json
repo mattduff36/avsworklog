@@ -1,5 +1,24 @@
 [
   {
+    "version": "1126.19.0",
+    "updateKind": "major",
+    "title": "Debug tools update",
+    "description": "Clarify readiness and deployment progress.",
+    "summary": "Clarify readiness and deployment progress.",
+    "details": [
+      "Clarify readiness and deployment progress, with changes to app screens."
+    ],
+    "areas": [
+      "Debug tools",
+      "Clarify readiness",
+      "Deployment progress"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-12T21:02:17.478Z"
+  },
+  {
     "version": "1126.18.1",
     "updateKind": "minor",
     "title": "Error reporting improvements",
