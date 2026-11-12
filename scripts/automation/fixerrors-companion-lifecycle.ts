@@ -285,6 +285,16 @@ export function reconcilePacketLifecycle(
         journal.batch.manifestSha256 !== journal.packetSha256) throw new Error('Native batch retirement remains held');
   }
   if (digest(packetBytes) !== journal.packetSha256) throw new Error('Packet retirement digest changed');
+  const scope = path.join(directory, 'batch-check-scope.json');
+  const archivedScope = path.join(destination, 'batch-check-scope.json');
+  const scopeBytes = deployed && journal.batch && (existsSync(scope) || existsSync(archivedScope))
+    ? readLifecycleFile(existsSync(scope) ? scope : archivedScope, 16 * 1024 * 1024) : undefined;
+  // Retire only with verified deployed evidence. Preserve conflicts before moving
+  // any other artifacts, and support resuming after the scope was already moved.
+  if (scopeBytes && existsSync(archivedScope) &&
+      !readLifecycleFile(archivedScope, 16 * 1024 * 1024).equals(scopeBytes)) {
+    throw new Error('Batch check scope archive conflict');
+  }
   if (!existsSync(archive)) mkdirSync(archive);
   ordinaryDirectory(archive);
   if (!existsSync(destination)) mkdirSync(destination);
@@ -293,6 +303,7 @@ export function reconcilePacketLifecycle(
   if (preparedSha256) archiveFile(prepared, path.join(destination, 'prepared-release.json'), preparedSha256);
   archiveFile(terminal, archivedTerminal, digest(receiptBytes));
   if (testedBytes) archiveFile(tested, archivedTested, digest(testedBytes));
+  if (scopeBytes) archiveFile(scope, archivedScope, digest(scopeBytes), 16 * 1024 * 1024);
   archiveFile(active, path.join(destination, 'active-packet.json'), digest(journalBytes), 16 * 1024 * 1024);
   return null;
 }
