@@ -1,5 +1,18 @@
 [
   {
+    "version": "1126.17.3",
+    "updateKind": "minor",
+    "title": "Fixerrors improvements",
+    "description": "Allow verified repaired trees in preapproval.",
+    "summary": "Allow verified repaired trees in preapproval.",
+    "details": [
+      "Updated approvals, with changes to automated tests."
+    ],
+    "areas": [],
+    "areaKeys": [],
+    "pushedAt": "2026-11-12T18:03:17.126Z"
+  },
+  {
     "version": "1126.17.2",
     "updateKind": "minor",
     "title": "Error reporting improvements",

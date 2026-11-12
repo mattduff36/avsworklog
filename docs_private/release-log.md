@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.17.3
+
+**GIT COMMIT MESSAGE**
+`fix(fixerrors): allow verified repaired trees in preapproval`
+
+**PUSHED AT**
+2026-11-12T18:03:17.126Z
+
+**WHAT CHANGED**
+Allow verified repaired trees in preapproval.
+
+**VERSION HISTORY DETAILS**
+- Updated approvals, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(fixerrors): allow verified repaired trees in preapproval`
+
 ## 1126.17.2
 
 **GIT COMMIT MESSAGE**
