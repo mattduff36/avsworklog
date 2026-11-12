@@ -5,6 +5,7 @@ export const FIXERRORS_LOCAL_ORIGIN = 'https://localhost:4443';
 export const FIXERRORS_PRODUCTION_ORIGIN = 'https://www.squiresapp.com';
 export const FIXERRORS_DEVICE_PATH = '/api/fixerrors-device';
 export const FIXERRORS_DEPLOY_TIMEOUT_MS = 25 * 60_000;
+export const FIXERRORS_PREAPPROVAL_MS = 4 * 60 * 60_000;
 export const sha256Schema = z.string().regex(/^[a-f0-9]{64}$/u);
 const gitOid = z.string().regex(/^[a-f0-9]{40}$/u);
 export const candidateSchema = z.object({
@@ -36,6 +37,19 @@ export const checksSchema = z.object({
 export const actionSchema = z.enum(['review', 'repair', 'deploy']);
 export const releaseModeSchema = z.enum(['full', 'targeted']);
 export type ReleaseMode = z.infer<typeof releaseModeSchema>;
+export const preapprovalSchema = z.object({
+  version: z.literal(1),
+  actorId: z.string().uuid(), runId: z.string().uuid(), deviceId: z.string().uuid(),
+  base: checkoutSchema, manifestSha256: sha256Schema, releaseMode: releaseModeSchema,
+  grantedAt: z.number().int(), expiresAt: z.number().int(),
+  state: z.enum(['pending', 'revoked', 'expired', 'consumed']),
+  testedAt: z.number().int().optional(), testedCandidate: candidateSchema.optional(),
+  preparedHeartbeatAt: z.number().int().optional(),
+  deployJobId: z.string().uuid().optional(),
+}).strict();
+const publicPreapprovalSchema = preapprovalSchema.pick({
+  state: true, grantedAt: true, expiresAt: true, releaseMode: true, deployJobId: true,
+});
 export const jobStateSchema = z.enum(['queued', 'leased', 'paused', 'reviewed', 'tested', 'blocked', 'failed', 'expired', 'deployed', 'unknown', 'no-work', 'no-change']);
 export const blockReasonSchema = z.enum([
   'bridge-unavailable', 'local-opt-out', 'checkout-drift', 'lease-lost', 'timeout', 'execution-failed', 'release-unconfirmed',
@@ -60,6 +74,7 @@ export const batchProgressSchema = z.object({
     reason: z.enum(['serious-impact-signal', 'repeated-failure', 'handled-noncritical', 'impact-uncertain']),
     effort: z.enum(['short', 'focused', 'strong']),
     route: z.enum(['deployment-verification', 'report-only', 'verified-local', 'held', 'failed']),
+    diagnostic: z.enum(['worker-provider-limit', 'worker-execution-failed']).optional(),
     analysisMs: z.number().int().nonnegative(), repairAndChecksMs: z.number().int().nonnegative(),
     totalMs: z.number().int().nonnegative(),
   }).strict().optional(),
@@ -95,6 +110,8 @@ export const jobSchema = z.object({
   diagnostic: nativeDiagnosticSchema.optional(),
   // Validation preference only; this grants no deployment authority.
   requestedReleaseMode: releaseModeSchema.optional(),
+  // Conditional one-run authority; never accepted from the device or exposed in claims.
+  autoDeployPreapproval: preapprovalSchema.optional(),
   // Private sanitized evidence, not browser-visible queue state or launch authority.
   packet: z.string().min(1).max(96 * 1024).optional(),
   batch: batchProgressSchema.optional(),
@@ -128,7 +145,8 @@ export const adminCommandSchema = z.discriminatedUnion('op', [
     action: z.enum(['review', 'repair']),
     reviewJobId: z.string().uuid().optional(),
     requestedReleaseMode: releaseModeSchema.optional(),
-    }).strict(),
+    autoDeployConfirmation: z.literal(true).optional(),
+  }).strict(),
   z.object({
     op: z.literal('approve-deploy'),
     requestId: z.string().uuid(),
@@ -139,6 +157,7 @@ export const adminCommandSchema = z.discriminatedUnion('op', [
   }).strict(),
   z.object({ op: z.literal('revoke-device'), deviceId: z.string().uuid() }).strict(),
   z.object({ op: z.literal('cancel'), jobId: z.string().uuid() }).strict(),
+  z.object({ op: z.literal('revoke-preapproval'), jobId: z.string().uuid() }).strict(),
 ]);
 export const resultSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('blocked'), reason: blockReasonSchema }).strict(),
@@ -177,7 +196,7 @@ export const deviceCommandSchema = z.discriminatedUnion('op', [
   z.object({ op: z.literal('complete'), ...leasedCommand, result: resultSchema, outcomeSha256: sha256Schema.optional() }).strict(),
 ]);
 export const claimSchema = z.object({
-  job: jobSchema.omit({ packet: true, privateBatch: true }),
+  job: jobSchema.omit({ packet: true, privateBatch: true, autoDeployPreapproval: true }),
   leaseToken: leasedCommand.leaseToken,
   admissionTicket: z.string().min(1).max(4096).optional(),
   packet: z.string().min(1).max(96 * 1024).optional(),
@@ -192,7 +211,7 @@ export const deviceResponseSchema = z.object({
   chunk: z.object({ index: z.number().int().nonnegative(), sha256: sha256Schema, data: z.string().max(65536) }).strict().optional(),
   lifecycle: z.enum(['pending', 'applied', 'blocked']).optional(),
   completion: z.object({
-    job: jobSchema.omit({ packet: true, privateBatch: true }),
+    job: jobSchema.omit({ packet: true, privateBatch: true, autoDeployPreapproval: true }),
     outcomeSha256: sha256Schema,
   }).strict().optional(),
   ok: z.literal(true),
@@ -223,9 +242,14 @@ export function publicQueueState(state: QueueState) {
   return {
     releaseNeedsReconciliation: state.jobs.some((job) => job.state === 'unknown'),
     devices: state.devices.map(({ credentialSha256: _credential, ...device }) => device),
-    jobs: state.jobs.slice().reverse().map(({ lease, packet: _packet, privateBatch: _batch, ...job }) => ({
+    jobs: state.jobs.slice().reverse().map(({ lease, packet: _packet, privateBatch: _batch, autoDeployPreapproval: grant, ...job }) => ({
       ...job,
+      ...(grant ? { autoDeployment: publicPreapprovalSchema.parse({
+        state: grant.state, grantedAt: grant.grantedAt, expiresAt: grant.expiresAt,
+        releaseMode: grant.releaseMode, ...(grant.deployJobId ? { deployJobId: grant.deployJobId } : {}),
+      }) } : {}),
       leaseUntil: lease?.until ?? null,
+      deployStarted: lease?.deployStartedAt !== undefined,
       evidenceAvailable: Boolean(_packet || _batch),
       lifecycleReconciliationRequired: Boolean(_batch?.outcome && job.batch?.lifecycle !== 'applied'),
     })),
@@ -240,8 +264,10 @@ export const adminResponseSchema = z.object({
   executionAvailable: z.boolean(),
   origin: z.enum([FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN]),
   devices: z.array(deviceSchema.omit({ credentialSha256: true })).max(20),
-  jobs: z.array(jobSchema.omit({ lease: true, packet: true, privateBatch: true }).extend({
+  jobs: z.array(jobSchema.omit({ lease: true, packet: true, privateBatch: true, autoDeployPreapproval: true }).extend({
+    autoDeployment: publicPreapprovalSchema.optional(),
     leaseUntil: z.number().int().nullable(), evidenceAvailable: z.boolean().default(false),
+    deployStarted: z.boolean().default(false),
     lifecycleReconciliationRequired: z.boolean().default(true),
   })).max(500),
 }).strict();

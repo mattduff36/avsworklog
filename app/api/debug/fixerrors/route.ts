@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { adminCommandSchema, FIXERRORS_LOCAL_ORIGIN, publicQueueState } from '@/lib/fixerrors/protocol';
-import { applyAdminCommand, deny, expireJobs, type PreparedFixerrorsEvidence } from '@/lib/fixerrors/control';
+import { applyAdminCommand, deny, expireJobs, expirePreapprovals, type PreparedFixerrorsEvidence } from '@/lib/fixerrors/control';
 import { captureFreshFixerrorsEvidence } from '@/lib/server/fixerrors/evidence';
 import { getFixerrorsOrigin } from '@/lib/server/fixerrors/config';
 import { localFixerrorsStore, productionFixerrorsStore } from '@/lib/server/fixerrors/store';
@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const store = scope === 'production' ? productionFixerrorsStore : localFixerrorsStore;
     const state = await store.transact((tx) => {
       expireJobs(tx.state, Date.now());
+      expirePreapprovals(tx, Date.now());
       return publicQueueState(tx.state);
     });
     return fixerrorsJson({
@@ -46,8 +47,9 @@ export async function POST(request: NextRequest) {
         const current = device?.checkout ?? device?.workspace;
         if (!current) deny('Connected clean checkout required');
         const clean = { head: current.head, tree: current.tree, clean: true as const };
+        const { autoDeployConfirmation: _preapproval, ...preflightCommand } = command;
         // Preflight without persisting a job, then recheck under lock after the read.
-        applyAdminCommand({ state: structuredClone(tx.state), audit: () => {} }, actor, command, Date.now(),
+        applyAdminCommand({ state: structuredClone(tx.state), audit: () => {} }, actor, preflightCommand, Date.now(),
           { checkout: clean, packet: null });
         return {
           checkout: clean,

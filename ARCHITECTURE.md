@@ -185,7 +185,13 @@ The production companion selects a SHA-pinned Windows transport. Staged Python
 sources independently validate signed review/repair admission, packet and decision,
 dispatch scoped premium workers through the existing budget/replay boundary,
 prepare two local commits and genuine post-metadata whole-worktree check receipts.
-Only separate exact-candidate Deploy consent can enter the distinct release transport.
+Manual runs require separate exact-candidate Deploy consent. An explicitly confirmed,
+four-hour, one-run automatic grant can instead authorize that same exact-candidate
+approval after a complete successful batch, applied lifecycle and fresh prepared
+heartbeat. The server rereads the granting actor's active actual-SuperAdmin authority,
+then consumes the bound grant and creates at most one release in the same audited
+queue transaction. Grants are private, revocable before release start, and never
+accepted from device input. Neither path issues a release ticket before start-deploy.
 Repository sources do not install, repin or activate that transport. Local schema, protocol,
 separate candidate approval and pending integration gates are documented in
 `docs/guides/FIXERRORS_DEVICE_RUNNER.md`.
@@ -204,7 +210,8 @@ The device route delivers authenticated chunks and renewable signed execution
 leases; the companion uses framed native batch execution, exact completed-prefix
 resume and at most one aggregate preparation. Server lifecycle reconciliation uses
 a separate application connection and durable private pre/post receipts, never
-the queue login. Debug exposes progress and separate exact-candidate Deploy consent.
+the queue login. Debug exposes progress, manual exact-candidate Deploy consent and
+the optional, initially unchecked one-run automatic grant.
 Source wiring does not install, repin, enable or approve the stopped owner runner.
 
 ## Code placement

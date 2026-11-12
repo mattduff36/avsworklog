@@ -5,8 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FixerrorsControlPanel } from '@/app/(dashboard)/debug/components/FixerrorsControlPanel';
 import { toast } from 'sonner';
 import { adminCommandSchema, FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN, publicQueueState } from '@/lib/fixerrors/protocol';
-import { checkEvidenceDigest } from '@/lib/fixerrors/control';
-import { candidate, checks, FixtureStore, harness, now } from '../unit/fixerrors-control-fixtures';
+import { applyAdminCommand, checkEvidenceDigest } from '@/lib/fixerrors/control';
+import { actorId, candidate, checks, FixtureStore, harness, now, workspace } from '../unit/fixerrors-control-fixtures';
+import { capturedBatch } from '../unit/fixerrors-batch-fixtures';
 
 const auth = vi.hoisted(() => ({ isActualSuperAdmin: true, isViewingAs: false }));
 const dialogContentProps = vi.hoisted(() => vi.fn<(props: { className?: string; style?: CSSProperties }) => void>());
@@ -234,6 +235,24 @@ describe('Debug local Fixerrors controls', () => {
     await openDetails('Activity');
     filterActivity('Needs attention');
     await screen.findByText('1 / 7 cases processed; 6 remaining (7 error rows captured).');
+  });
+
+  it('explains a provider spending limit without suggesting the investigation succeeded', async () => {
+    const store = new FixtureStore();
+    await harness(store).enqueue();
+    store.state.jobs[0].state = 'failed';
+    store.state.jobs[0].batch = { captured: 1, rows: 1, processed: 1, remaining: 0,
+      counts: { 'verified-local': 0, held: 0, 'report-only': 0, failed: 1 }, lifecycle: 'applied',
+      latest: { importance: 'Important', reason: 'impact-uncertain', effort: 'focused', route: 'failed',
+        diagnostic: 'worker-provider-limit', analysisMs: 20, repairAndChecksMs: 0, totalMs: 30 } };
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({
+      enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
+    }) })));
+    render(<FixerrorsControlPanel />);
+    await openDetails('Activity');
+    expect(await screen.findByText(/The worker could not investigate: the AI provider spending limit/)).toBeDefined();
+    expect(screen.getByText(/0 verified locally \/ 0 held \/ 0 report only \/ 1 failed/)).toBeDefined();
+    expect(screen.queryByText(/Effort is guidance/)).toBeNull();
   });
 
   it('keeps paused batch coverage visible and sends cancellation for only that run', async () => {
@@ -753,9 +772,16 @@ describe('Compact companion dialogs and preserved states', () => {
       const store = new FixtureStore();
       const h = harness(store);
       const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => ({
-        ok: true, json: async () => options?.method === 'POST'
-          ? h.admin(adminCommandSchema.parse(JSON.parse(String(options.body))))
-          : { enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state) },
+        ok: true, json: async () => {
+          if (options?.method !== 'POST') return {
+            enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
+          };
+          const command = adminCommandSchema.parse(JSON.parse(String(options.body)));
+          return command.op === 'enqueue' && command.autoDeployConfirmation
+            ? store.transact(tx => applyAdminCommand(tx, actorId, command, now,
+              { checkout: workspace, packet: null, batch: capturedBatch(command.requestId) }))
+            : h.admin(command);
+        },
       }));
       vi.stubGlobal('fetch', fetcher);
       const posts = () => fetcher.mock.calls.filter(call => call[1]?.method === 'POST').map(call => JSON.parse(String(call[1]?.body)));
@@ -786,6 +812,68 @@ describe('Compact companion dialogs and preserved states', () => {
       expect(screen.getByRole('radio', { name: mode === 'full' ? /Full checks/ : /Targeted checks/ })).toBeChecked();
       expect(screen.getByRole('checkbox', { name: /I approve deploying/ })).not.toBeChecked();
       expect(f.posts()).toHaveLength(1);
+    });
+
+    it.each(['targeted', 'full'] as const)('requires an explicit one-run automatic confirmation for %s checks and exposes revoke', async mode => {
+      const f = liveFixture();
+      render(<FixerrorsControlPanel />);
+      await openDetails('Activity');
+      const permission = screen.getByRole('checkbox', { name: 'Allow pre-approved automatic deployment after tests pass' });
+      expect(permission).not.toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Run full checks (fap)' })).not.toBeChecked();
+      if (mode === 'full') fireEvent.click(screen.getByRole('checkbox', { name: 'Run full checks (fap)' }));
+      fireEvent.click(permission);
+      expect(f.posts()).toEqual([]);
+      expect(screen.getByRole('alert').textContent).toMatch(/without another click.*4 hours.*only to this run and runner/);
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm automatic Deploy and start this run' }));
+      await waitFor(() => expect(f.store.state.jobs).toHaveLength(1));
+      expect(f.posts()).toEqual([{ op: 'enqueue', requestId: expect.any(String), deviceId: f.store.state.devices[0].id,
+        action: 'repair', requestedReleaseMode: mode, autoDeployConfirmation: true }]);
+      await screen.findByText(/One-run automatic Deploy: pending/);
+      expect(permission).not.toBeChecked();
+      fireEvent.click(screen.getByRole('button', { name: 'Revoke automatic Deploy' }));
+      await screen.findByText(/One-run automatic Deploy: revoked/);
+      expect(f.store.state.jobs).toHaveLength(1);
+      expect(f.posts().at(-1)).toEqual({ op: 'revoke-preapproval', jobId: f.store.state.jobs[0].id });
+    });
+
+    it('clears automatic permission on validation change, runner change and close/reopen without submitting', async () => {
+      const f = liveFixture();
+      f.store.state.devices.push({ ...f.store.state.devices[0], id: 'a6ca86fc-d7bd-4629-868f-a5e0cec75f48', name: 'Second runner' });
+      render(<FixerrorsControlPanel />);
+      await openDetails('Runner settings');
+      const permission = () => screen.getByRole('checkbox', { name: 'Allow pre-approved automatic deployment after tests pass' });
+      fireEvent.click(permission());
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Run full checks (fap)' }));
+      expect(permission()).not.toBeChecked();
+      fireEvent.click(permission());
+      fireEvent.click(screen.getByRole('radio', { name: 'Use Second runner' }));
+      expect(permission()).not.toBeChecked();
+      fireEvent.click(permission());
+      closeDetails();
+      await openDetails('Activity');
+      expect(permission()).not.toBeChecked();
+      expect(f.posts()).toEqual([]);
+    });
+
+    it('clears a failed automatic submission and never retries or restores its permission', async () => {
+      const store = new FixtureStore();
+      const fetcher = vi.fn(async (_url: unknown, options?: RequestInit) => ({
+        ok: options?.method !== 'POST', json: async () => ({
+          enabled: true, executionAvailable: true, origin: FIXERRORS_PRODUCTION_ORIGIN, ...publicQueueState(store.state),
+        }),
+      }));
+      vi.stubGlobal('fetch', fetcher);
+      render(<FixerrorsControlPanel />);
+      await openDetails('Activity');
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Allow pre-approved automatic deployment after tests pass' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm automatic Deploy and start this run' }));
+      await waitFor(() => expect(toast.error).toHaveBeenCalled());
+      expect(screen.getByRole('checkbox', { name: 'Allow pre-approved automatic deployment after tests pass' })).not.toBeChecked();
+      fireEvent(window, new Event('online'));
+      await waitFor(() => expect(screen.queryByText('Refreshing companion state...')).toBeNull());
+      expect(fetcher.mock.calls.filter(call => call[1]?.method === 'POST')).toHaveLength(1);
+      expect(screen.getByRole('button', { name: 'Start review and repair' })).toBeEnabled();
     });
 
     it('records one full investigation-and-repair batch, never duplicating review or auto-Deploying', async () => {

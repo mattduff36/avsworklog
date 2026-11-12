@@ -56,8 +56,9 @@ function queueStore(connect: () => Client, scope: 'local' | 'production'): Queue
         for (const event of events) {
           await client.query(
             `INSERT INTO ${auditTable} (at_ms, actor, event, job_id, device_id, candidate) VALUES ($1,$2,$3,$4,$5,$6::jsonb)`,
-            [event.at, event.actor, event.event, event.jobId, event.deviceId, JSON.stringify(event.candidate
-              ? { ...event.candidate, ...(event.releaseMode ? { releaseMode: event.releaseMode } : {}) } : null)],
+            [event.at, event.actor, event.event, event.jobId, event.deviceId, JSON.stringify(event.preapproval
+              ? { preapproval: event.preapproval } : event.candidate
+                ? { ...event.candidate, ...(event.releaseMode ? { releaseMode: event.releaseMode } : {}) } : null)],
           );
         }
         await client.query('COMMIT');

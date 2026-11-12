@@ -1,10 +1,13 @@
 import { mkdtempSync, readFileSync, rmSync } from 'fs';
 import os from 'os';
 import path from 'path';
+import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { hash } from '@/lib/fixerrors/control';
-import { actorId, candidate, credential, deviceId, harness, initialState } from './fixerrors-control-fixtures';
+import { applyAdminCommand, fulfillPreapprovedDeploy, hash } from '@/lib/fixerrors/control';
+import { actorId, candidate, credential, deviceId, harness, initialState, now, workspace } from './fixerrors-control-fixtures';
+import { capturedBatch } from './fixerrors-batch-fixtures';
+import { preapprovedFixture } from './fixerrors-preapproval-fixtures';
 
 const adapter = vi.hoisted(() => ({ query: vi.fn() }));
 vi.mock('pg', () => ({
@@ -40,6 +43,62 @@ afterEach(async () => {
 });
 
 describe('private local queue persistence (PGlite adapter, not native concurrency proof)', () => {
+  it('atomically consumes persisted authority once after restart, with rollback on a consumed-audit failure', async () => {
+    const f = await preapprovedFixture();
+    await f.ready();
+    await database.query('UPDATE private.fixerrors_local_state SET state = $1::jsonb WHERE id = 1', [JSON.stringify(f.store.state)]);
+    await database.close();
+    database = new PGlite({ dataDir: directory, database: 'squires_fixerrors_local', relaxedDurability: false });
+    adapter.query.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.startsWith('INSERT INTO private.fixerrors_local_audit') && params?.[2] === 'deploy-preapproval-consumed') {
+        throw new Error('Synthetic consumed audit failure');
+      }
+      return database.query(sql, params);
+    });
+    const fulfill = () => localFixerrorsStore.transact(tx => fulfillPreapprovedDeploy(tx, f.id, true, f.time()));
+    await expect(fulfill()).rejects.toThrow('consumed audit failure');
+    expect(await localFixerrorsStore.transact(tx => ({
+      state: tx.state.jobs[0].autoDeployPreapproval?.state, count: tx.state.jobs.length,
+    }))).toEqual({ state: 'pending', count: 1 });
+    expect((await database.query('SELECT event FROM private.fixerrors_local_audit')).rows).toEqual([]);
+    adapter.query.mockImplementation((sql: string, params?: unknown[]) => database.query(sql, params));
+    await fulfill();
+    await database.close();
+    database = new PGlite({ dataDir: directory, database: 'squires_fixerrors_local', relaxedDurability: false });
+    await fulfill();
+    expect(await localFixerrorsStore.transact(tx => tx.state.jobs)).toHaveLength(2);
+    expect((await database.query("SELECT event FROM private.fixerrors_local_audit WHERE event = 'deploy-preapproval-consumed'")).rows)
+      .toHaveLength(1);
+  });
+
+  it('retains one-run authority and its audit across restart, rolling back both on an audit write failure', async () => {
+    const id = randomUUID();
+    await localFixerrorsStore.transact(tx => applyAdminCommand(tx, actorId, {
+      op: 'enqueue', action: 'repair', deviceId, requestId: id, requestedReleaseMode: 'targeted', autoDeployConfirmation: true,
+    }, now, { checkout: workspace, packet: null, batch: capturedBatch(id) }));
+    await database.close();
+    database = new PGlite({ dataDir: directory, database: 'squires_fixerrors_local', relaxedDurability: false });
+    const grant = await localFixerrorsStore.transact(tx => tx.state.jobs[0].autoDeployPreapproval);
+    expect(grant).toMatchObject({ state: 'pending', runId: id, actorId, releaseMode: 'targeted' });
+    const audit = await database.query<{ candidate: unknown }>(
+      "SELECT candidate FROM private.fixerrors_local_audit WHERE event = 'deploy-preapproval-granted'",
+    );
+    expect(audit.rows).toEqual([{ candidate: { preapproval: grant } }]);
+    adapter.query.mockImplementation(async (sql: string, params?: unknown[]) => {
+      if (sql.startsWith('INSERT INTO private.fixerrors_local_audit')) throw new Error('Synthetic audit write failure');
+      return database.query(sql, params);
+    });
+    await expect(localFixerrorsStore.transact(tx => applyAdminCommand(tx, actorId,
+      { op: 'revoke-preapproval', jobId: id }, now + 1))).rejects.toThrow('audit write failure');
+    adapter.query.mockImplementation((sql: string, params?: unknown[]) => database.query(sql, params));
+    expect(await localFixerrorsStore.transact(tx => tx.state.jobs[0].autoDeployPreapproval)).toEqual(grant);
+    await localFixerrorsStore.transact(tx => applyAdminCommand(tx, actorId,
+      { op: 'revoke-preapproval', jobId: id }, now + 2));
+    expect(await localFixerrorsStore.transact(tx => tx.state.jobs[0].autoDeployPreapproval?.state)).toBe('revoked');
+    expect((await database.query("SELECT event FROM private.fixerrors_local_audit WHERE event = 'deploy-preapproval-revoked'")).rows)
+      .toHaveLength(1);
+  });
+
   it.each(['full', 'targeted'] as const)('persists %s approval mode, replay ids and credential revocation across clean restart', async (releaseMode) => {
     const h = harness(localFixerrorsStore);
     const id = await h.testedRepair();

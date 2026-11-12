@@ -165,6 +165,21 @@ def successful_run(run, request, before, readonly=False, current=True):
     return state, after
 
 
+def worker_failure_code(run):
+    """Only fixed provider categories leave private worker receipts."""
+    events = run / 'events.jsonl'
+    if events.is_file() and not events.is_symlink() and events.stat().st_size <= 8 * 1024 * 1024:
+        for line in events.read_text(encoding='utf-8').splitlines():
+            try:
+                event = json.loads(line)
+                if event.get('type') == 'model.call_failure' and event.get('data', {}).get('errorCode') in (
+                        'organization_spend_limit_exceeded', 'insufficient_quota'):
+                    return 'worker-provider-limit'
+            except (ValueError, AttributeError):
+                continue
+    return 'worker-execution-failed'
+
+
 def dispatch(cfg, ticket, request, guard):
     from run_worker import ROOT, run, snapshot
     before = snapshot(s.WORKSPACE)
@@ -175,8 +190,8 @@ def dispatch(cfg, ticket, request, guard):
             code = run(request)
     finally:
         s.ACTIVE.reset(token)
-    s.require(code == 0, 'worker_failed')
     run_dir = ROOT / 'runs' / request['task_id'] / '1'
+    s.require(code == 0, worker_failure_code(run_dir) if code != 0 else 'worker-execution-failed')
     state, after = successful_run(run_dir, request, before, request['mode'] == 'ask')
     return run_dir, state, after
 
@@ -535,6 +550,9 @@ def monitored_native_operation(cfg, operation, payload, live, launch):
                 launch()
                 process.stdin.write(b'{"ok":true}\n')
                 process.stdin.flush()
+            elif isinstance(message, dict) and set(message) == {'failure'}:
+                s.require(message['failure'] in ('worker-provider-limit', 'worker-execution-failed'), 'invalid_worker_failure')
+                raise s.Denied(message['failure'])
             else:
                 s.fields(message, ('result',))
                 s.require(result is None, 'duplicate_batch_operation_result')
@@ -786,7 +804,8 @@ class NativeBatchSession:
         summary = dict(captured=len(clusters), processed=len(outcome['clusters']), remaining=0, counts=counts,
                        clusters=outcome['clusters'])
         if not changed:
-            result = dict(status='reviewed' if self.mode == 'review' else 'no-change', batch=summary)
+            result = (dict(status='failed', reason='execution-failed', batch=summary) if counts['failed'] else
+                      dict(status='reviewed' if self.mode == 'review' else 'no-change', batch=summary))
         else:
             s.require(self.mode == 'repair', 'read_only_batch_changed')
             repairs = []
@@ -959,8 +978,10 @@ def run_batch_engine(session):
             s.fields(message, ('id', 'method', 'value'))
             try:
                 response = dict(id=message['id'], ok=True, value=session.call(message['method'], message['value']))
-            except s.Denied:
+            except s.Denied as error:
                 response = dict(id=message['id'], ok=False)
+                if str(error) in ('worker-provider-limit', 'worker-execution-failed'):
+                    response['failure'] = str(error)
             process.stdin.write(s.encoded(response) + b'\n')
             process.stdin.flush()
     finally:
@@ -1083,5 +1104,7 @@ LAST_JOB = {}
 if __name__ == '__main__' and __import__('sys').argv[1:] == ['--batch-operation']:
     try:
         batch_operation_main()
-    except Exception:
+    except Exception as error:
+        if isinstance(error, s.Denied) and str(error) in ('worker-provider-limit', 'worker-execution-failed'):
+            print(s.encoded({'failure': str(error)}).decode(), flush=True)
         __import__('sys').exit(2)

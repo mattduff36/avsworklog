@@ -172,8 +172,10 @@ async function main() {
     call(method, value) {
       const id = ++sequence;
       writeSync(1, `${JSON.stringify({ id, method, value })}\n`);
-      const response = z.object({ id: z.literal(id), ok: z.boolean(), value: z.unknown().optional() }).strict().parse(line());
-      if (!response.ok) throw new Error('Native batch operation held; inspect private evidence');
+      const response = z.object({ id: z.literal(id), ok: z.boolean(), value: z.unknown().optional(),
+        failure: z.enum(['worker-provider-limit', 'worker-execution-failed']).optional(),
+      }).strict().parse(line());
+      if (!response.ok) throw new Error(response.failure ?? 'Native batch operation held; inspect private evidence');
       return response.value;
     },
   });

@@ -6,6 +6,7 @@ import { localFixerrorsStore, productionFixerrorsStore } from '@/lib/server/fixe
 import { issueLocalFixtureRelease } from '@/lib/server/fixerrors/release-fixture';
 import { issueProductionAdmission, issueProductionBatchLease, issueProductionRelease } from '@/lib/server/fixerrors/release-production';
 import { reconcileBatchLifecycle } from '@/lib/server/fixerrors/batch-lifecycle';
+import { fulfillFixerrorsPreapprovals } from '@/lib/server/fixerrors/preapproval';
 import {
   assertFixerrorsRequest, fixerrorsHttpError, fixerrorsJson, readBoundedJson,
 } from '@/lib/server/fixerrors/http';
@@ -31,6 +32,14 @@ export async function POST(request: NextRequest) {
     ));
     const lifecycle = command.op === 'complete' || command.op === 'batch-reconcile'
       ? await reconcileBatchLifecycle(store, command.jobId) : undefined;
+    if (command.op === 'heartbeat' || command.op === 'batch-reconcile') {
+      try {
+        await fulfillFixerrorsPreapprovals(store, id);
+      } catch {
+        // Retry on the next heartbeat without losing an already committed device receipt.
+        console.warn('Fixerrors preapproval fulfillment deferred');
+      }
+    }
     return fixerrorsJson({ ...result, ...(lifecycle ? { lifecycle } : {}) });
   } catch (error) {
     return fixerrorsHttpError(error);

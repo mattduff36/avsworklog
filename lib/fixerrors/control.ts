@@ -1,7 +1,7 @@
-import { createHash, randomBytes, timingSafeEqual } from 'crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'crypto';
 import { batchOutcomeHash, parseBatchBytes, readBatchChunk, validateBatchOutcome, type BatchCheckpoint, type CapturedBatch } from './batch';
 import {
-  checksSchema, FIXERRORS_DEPLOY_TIMEOUT_MS, releaseModeSchema, sameCandidate, sameWorkspace,
+  checksSchema, FIXERRORS_DEPLOY_TIMEOUT_MS, FIXERRORS_PREAPPROVAL_MS, releaseModeSchema, sameCandidate, sameWorkspace,
   type AdminCommand, type CheckEvidence, type DeviceCommand,
   type Candidate, type Checkout, type FixerrorsDevice, type FixerrorsJob, type QueueState, type ReleaseMode,
 } from './protocol';
@@ -33,6 +33,7 @@ export interface AuditEvent {
   deviceId: string;
   candidate?: Candidate;
   releaseMode?: ReleaseMode;
+  preapproval?: FixerrorsJob['autoDeployPreapproval'];
 }
 
 export interface QueueTransaction {
@@ -74,6 +75,109 @@ export function expireJobs(state: QueueState, now: number): void {
       job.lease = null;
     }
   }
+}
+
+function auditPreapproval(tx: QueueTransaction, job: FixerrorsJob, event: string, actor: string, now: number) {
+  tx.audit({ at: now, actor, event, jobId: job.id, deviceId: job.deviceId,
+    preapproval: structuredClone(job.autoDeployPreapproval) });
+}
+
+export function expirePreapprovals(tx: QueueTransaction, now: number): void {
+  for (const job of tx.state.jobs) {
+    const grant = job.autoDeployPreapproval;
+    if (grant?.state === 'pending' && (now < grant.grantedAt || now >= grant.expiresAt)) {
+      grant.state = 'expired';
+      auditPreapproval(tx, job, 'deploy-preapproval-expired', grant.actorId, now);
+    } else if (grant?.state === 'pending' && !['queued', 'leased', 'paused', 'tested'].includes(job.state)) {
+      revokePreapproval(tx, job, grant.actorId, now);
+    }
+  }
+}
+
+function revokePreapproval(tx: QueueTransaction, job: FixerrorsJob, actor: string, now: number): void {
+  const grant = job.autoDeployPreapproval;
+  if (!grant || grant.state === 'revoked' || grant.state === 'expired') return;
+  const release = tx.state.jobs.find(entry => entry.parentRepairId === job.id);
+  if (release && (release.lease?.deployStartedAt !== undefined || !['queued', 'leased'].includes(release.state))) {
+    deny('Deployment has already begun or ended; it cannot be undone by revoking pre-approval');
+  }
+  if (release) {
+    release.state = 'blocked';
+    release.reason = 'local-opt-out';
+    release.lease = null;
+  }
+  grant.state = 'revoked';
+  auditPreapproval(tx, job, 'deploy-preapproval-revoked', actor, now);
+}
+
+// Called only by the server after rereading the granting actor's current authority.
+export function fulfillPreapprovedDeploy(tx: QueueTransaction, jobId: string, actorAuthorized: boolean, now: number): void {
+  expireJobs(tx.state, now);
+  expirePreapprovals(tx, now);
+  const job = tx.state.jobs.find(entry => entry.id === jobId);
+  const grant = job?.autoDeployPreapproval;
+  if (!job || !grant || grant.state !== 'pending') return;
+  const device = tx.state.devices.find(entry => entry.id === job.deviceId);
+  if (!actorAuthorized || !device || device.revoked || !device.allowReadOnly || !device.allowRepair || !device.allowDeploy ||
+      job.action !== 'repair' || grant.actorId !== job.requestedBy || grant.runId !== job.id || grant.deviceId !== job.deviceId ||
+      grant.base.head !== job.workspace.head || grant.base.tree !== job.workspace.tree ||
+      grant.manifestSha256 !== job.workspace.packetSha256 ||
+      grant.manifestSha256 !== job.privateBatch?.delivery.manifestSha256 ||
+      grant.grantedAt !== job.createdAt || grant.expiresAt !== grant.grantedAt + FIXERRORS_PREAPPROVAL_MS ||
+      grant.releaseMode !== job.requestedReleaseMode ||
+      !['queued', 'leased', 'paused', 'tested'].includes(job.state)) {
+    revokePreapproval(tx, job, grant.actorId, now);
+    return;
+  }
+  if (job.state !== 'tested') return;
+  const candidate = job.candidate;
+  if (!candidate || !job.checks?.release || !grant.testedCandidate || grant.testedAt === undefined ||
+      !sameCandidate(candidate, grant.testedCandidate) || job.checks.head !== candidate.head ||
+      job.checks.tree !== candidate.tree || checkEvidenceDigest(job.checks) !== candidate.checksSha256) {
+    revokePreapproval(tx, job, grant.actorId, now);
+    return;
+  }
+  const batch = job.batch;
+  if (!job.privateBatch?.outcome || !batch || batch.remaining !== 0 || batch.counts.failed !== 0 ||
+      batch.processed !== batch.captured || batch.counts['verified-local'] < 1 ||
+      batch.lifecycle !== 'applied' || job.privateBatch.lifecycle?.state !== 'applied') return;
+  const outcome = validateBatchOutcome(job.privateBatch, job.privateBatch.outcome, job.id, true);
+  const manifest = parseBatchBytes(Buffer.from(job.privateBatch.manifest)).retrieval;
+  if (outcome.candidate.baseHead !== manifest.baseHead || outcome.candidate.treeFingerprint !== manifest.treeFingerprint ||
+      manifest.baseHead !== grant.base.head || outcome.clusters.some(entry => entry.status === 'failed') ||
+      !outcome.clusters.some(entry => entry.status === 'verified-local')) {
+    revokePreapproval(tx, job, grant.actorId, now);
+    return;
+  }
+  // Completion reports are not a substitute for a subsequent prepared-checkout heartbeat.
+  if (grant.preparedHeartbeatAt === undefined || grant.preparedHeartbeatAt <= grant.testedAt ||
+      now - grant.preparedHeartbeatAt >= 45_000 || grant.preparedHeartbeatAt > now ||
+      device.lastSeenAt === null || device.lastSeenAt <= grant.testedAt ||
+      device.lastSeenAt > now || now - device.lastSeenAt >= 45_000 || !device.bridgeAvailable ||
+      device.holdReason !== 'prepared-candidate') return;
+  if (!device.checkout || !device.workspace || device.checkout.head !== candidate.head ||
+      device.checkout.tree !== candidate.tree || device.workspace.head !== candidate.head ||
+      device.workspace.tree !== candidate.tree || device.workspace.packetSha256 !== grant.manifestSha256) {
+    revokePreapproval(tx, job, grant.actorId, now);
+    return;
+  }
+  if (tx.state.jobs.some(entry => entry.parentRepairId === job.id)) {
+    revokePreapproval(tx, job, grant.actorId, now);
+    return;
+  }
+  if (tx.state.jobs.length >= 500 || tx.state.jobs.some(entry => entry.state === 'unknown' ||
+      entry.lease?.deployStartedAt !== undefined || (entry.deviceId === device.id &&
+      ['queued', 'leased', 'paused'].includes(entry.state)))) return;
+  const requestId = randomUUID();
+  applyAdminCommand(tx, grant.actorId, {
+    op: 'approve-deploy', requestId, repairJobId: job.id, candidate,
+    confirmation: true, releaseMode: grant.releaseMode,
+  }, now, undefined, true);
+  grant.state = 'consumed';
+  grant.deployJobId = requestId;
+  auditPreapproval(tx, job, 'deploy-preapproval-consumed', grant.actorId, now);
+  tx.audit({ at: now, actor: grant.actorId, event: 'auto-exact-candidate-deploy-approved',
+    jobId: requestId, deviceId: job.deviceId, candidate, releaseMode: grant.releaseMode });
 }
 
 function deviceById(state: QueueState, id: string): FixerrorsDevice {
@@ -131,6 +235,8 @@ function updateBatchProgress(job: FixerrorsJob): void {
     ...(latest?.triage && latest.timings ? { latest: {
       importance: latest.triage.importance, reason: latest.triage.reason, effort: latest.triage.effort,
       route: latestEvidence?.existingState === 'awaiting-deployment' ? 'deployment-verification' as const : latest.status,
+      ...(latest.reason === 'worker-provider-limit' || latest.reason === 'worker-execution-failed'
+        ? { diagnostic: latest.reason } : {}),
       ...latest.timings,
     } } : {}),
     ...(batch.lifecycle?.reason ? { lifecycleReason: batch.lifecycle.reason } : {}),
@@ -139,12 +245,21 @@ function updateBatchProgress(job: FixerrorsJob): void {
 
 export function applyAdminCommand(
   tx: QueueTransaction, actor: string, command: AdminCommand, now: number, evidence?: PreparedFixerrorsEvidence,
+  automatic = false,
 ) {
   const { state } = tx;
   expireJobs(state, now);
+  expirePreapprovals(tx, now);
+  if (command.op === 'revoke-preapproval') {
+    const job = state.jobs.find(entry => entry.id === command.jobId);
+    if (!job?.autoDeployPreapproval) deny('Run has no automatic deployment pre-approval');
+    revokePreapproval(tx, job, actor, now);
+    return { ok: true as const };
+  }
   if (command.op === 'cancel') {
     const job = state.jobs.find(entry => entry.id === command.jobId);
     if (!job || !['queued', 'leased', 'paused'].includes(job.state) || job.action === 'deploy') deny('Run cannot be cancelled');
+    revokePreapproval(tx, job, actor, now);
     job.state = 'blocked';
     job.reason = 'local-opt-out';
     job.lease = null;
@@ -154,6 +269,12 @@ export function applyAdminCommand(
   if (command.op === 'revoke-device') {
     const device = deviceById(state, command.deviceId);
     device.revoked = true;
+    for (const job of state.jobs.filter(entry => entry.deviceId === device.id && entry.autoDeployPreapproval)) {
+      const release = state.jobs.find(entry => entry.parentRepairId === job.id);
+      if (!release || (['queued', 'leased'].includes(release.state) && release.lease?.deployStartedAt === undefined)) {
+        revokePreapproval(tx, job, actor, now);
+      }
+    }
     for (const job of state.jobs.filter((entry) => entry.deviceId === device.id && isActive(entry))) {
       if (job.lease?.deployStartedAt !== undefined) {
         endUnconfirmed(job);
@@ -192,6 +313,11 @@ export function applyAdminCommand(
   let packet: string | undefined;
   let workspace = device.workspace;
   if (command.op === 'enqueue') {
+    if (command.autoDeployConfirmation && (command.action !== 'repair' || !command.requestedReleaseMode ||
+        command.reviewJobId || !evidence?.batch)) deny('Pre-approval requires a fresh repair batch and explicit validation mode', 400);
+    if (command.autoDeployConfirmation && (!device.allowReadOnly || !device.allowDeploy || !device.bridgeAvailable)) {
+      deny('Automatic Deploy requires all device opt-ins and an available bridge');
+    }
     if (device.holdReason) deny(`Runner held: ${device.holdReason}`);
     if (state.jobs.some(job => job.deviceId === device.id && job.privateBatch?.outcome &&
         job.batch?.lifecycle !== 'applied')) deny('Previous batch lifecycle requires reconciliation');
@@ -236,14 +362,28 @@ export function applyAdminCommand(
     ...(packet ? { packet } : {}),
     ...(evidence?.batch ? { privateBatch: evidence.batch } : {}),
   };
+  if (automatic && parent?.autoDeployPreapproval) {
+    job.expiresAt = Math.min(job.expiresAt, parent.autoDeployPreapproval.expiresAt);
+  }
   if (evidence?.batch) {
     job.workspace.packetSha256 = evidence.batch.delivery.manifestSha256;
     if (job.state === 'no-work') evidence.batch.lifecycle = { state: 'applied', plan: null, receipts: {} };
     updateBatchProgress(job);
+    if (command.op === 'enqueue' && command.autoDeployConfirmation && command.requestedReleaseMode) {
+      job.autoDeployPreapproval = {
+        version: 1, actorId: actor, runId: job.id, deviceId: device.id,
+        base: { head: job.workspace.head, tree: job.workspace.tree, clean: true },
+        manifestSha256: evidence.batch.delivery.manifestSha256, releaseMode: command.requestedReleaseMode,
+        grantedAt: now, expiresAt: now + FIXERRORS_PREAPPROVAL_MS, state: 'pending',
+      };
+    }
   }
+  if (parent?.autoDeployPreapproval && !automatic) revokePreapproval(tx, parent, actor, now);
   state.jobs.push(job);
+  if (job.autoDeployPreapproval) auditPreapproval(tx, job, 'deploy-preapproval-granted', actor, now);
+  if (job.state === 'no-work') revokePreapproval(tx, job, actor, now);
   tx.audit({
-    at: now, actor, event: action === 'deploy' ? 'exact-candidate-deploy-confirmed'
+    at: now, actor, event: action === 'deploy' ? (automatic ? 'automatic-deploy-queued' : 'exact-candidate-deploy-confirmed')
       : `${action}-${job.state === 'no-work' ? 'no-work' : 'requested'}`,
     jobId: job.id, deviceId: device.id,
     ...(job.approval ? { candidate: job.approval.candidate, releaseMode: job.approval.releaseMode } : {}),
@@ -268,6 +408,7 @@ export function applyDeviceCommand(
   const { state } = tx;
   const device = authenticate(state, id, credential);
   expireJobs(state, now);
+  expirePreapprovals(tx, now);
   const audit = (event: string, jobId: string | null) => tx.audit({ at: now, actor: id, event, jobId, deviceId: id });
   if (command.op === 'heartbeat') {
     Object.assign(device, {
@@ -276,6 +417,23 @@ export function applyDeviceCommand(
       allowDeploy: command.allowDeploy, bridgeAvailable: command.bridgeAvailable,
       checkout: command.checkout ?? null, holdReason: command.holdReason ?? null,
     });
+    for (const job of state.jobs.filter(entry => entry.deviceId === id && entry.autoDeployPreapproval)) {
+      const grant = job.autoDeployPreapproval!;
+      if (!['pending', 'consumed'].includes(grant.state)) continue;
+      const release = state.jobs.find(entry => entry.parentRepairId === job.id);
+      if (release && (release.lease?.deployStartedAt !== undefined || !['queued', 'leased'].includes(release.state))) continue;
+      const candidate = grant.testedCandidate;
+      const changedCheckout = job.state === 'tested' && candidate && (!device.checkout ||
+        device.checkout.head !== candidate.head || device.checkout.tree !== candidate.tree ||
+        !device.workspace || device.workspace.head !== candidate.head || device.workspace.tree !== candidate.tree ||
+        device.workspace.packetSha256 !== grant.manifestSha256);
+      if (!device.allowReadOnly || !device.allowRepair || !device.allowDeploy || changedCheckout) {
+        revokePreapproval(tx, job, id, now);
+      } else if (grant.state === 'pending' && job.state === 'tested' && grant.testedAt !== undefined &&
+          now > grant.testedAt && device.holdReason === 'prepared-candidate' && device.bridgeAvailable) {
+        grant.preparedHeartbeatAt = now;
+      }
+    }
     audit('device-heartbeat', null);
     return { ok: true as const };
   }
@@ -310,7 +468,7 @@ export function applyDeviceCommand(
     const admissionTicket = job.action === 'deploy' ? undefined : issueAdmission?.(admittedJob, now);
     if (issueAdmission && job.action !== 'deploy' && !admissionTicket) deny('Signed admission unavailable', 503);
     audit('job-claimed', job.id);
-    const { packet: privatePacket, privateBatch, ...claimed } = structuredClone(job);
+    const { packet: privatePacket, privateBatch, autoDeployPreapproval: _grant, ...claimed } = structuredClone(job);
     if (resuming) claimed.expiresAt = admittedJob.expiresAt;
     return { ok: true as const, claim: { job: claimed, leaseToken,
       ...(privateBatch ? { batch: privateBatch.delivery, resume: resuming } : {}),
@@ -320,7 +478,7 @@ export function applyDeviceCommand(
     const job = state.jobs.find(entry => entry.id === command.jobId && entry.deviceId === id);
     if (!job?.privateBatch?.outcome || ['queued', 'leased', 'paused'].includes(job.state)) deny('Batch completion unavailable');
     const deployed = state.jobs.find(entry => entry.parentRepairId === job.id && entry.state === 'deployed');
-    const { packet: _packet, privateBatch: _batch, ...completion } = deployed ?? job;
+    const { packet: _packet, privateBatch: _batch, autoDeployPreapproval: _grant, ...completion } = deployed ?? job;
     return { ok: true as const, completion: {
       job: structuredClone(completion), outcomeSha256: batchOutcomeHash(job.privateBatch.outcome),
     } };
@@ -432,6 +590,10 @@ export function applyDeviceCommand(
         result.candidate.checksSha256 !== checkEvidenceDigest(result.checks)) deny('Invalid test evidence');
     job.candidate = result.candidate;
     job.checks = result.checks;
+    if (job.autoDeployPreapproval?.state === 'pending') {
+      job.autoDeployPreapproval.testedAt = now;
+      job.autoDeployPreapproval.testedCandidate = { ...result.candidate };
+    }
     device.workspace = { ...job.workspace, head: result.candidate.head, tree: result.candidate.tree };
     if (device.checkout) device.checkout = { head: result.candidate.head, tree: result.candidate.tree, clean: true };
   } else if (result.status === 'reviewed' && job.action !== 'review') {
@@ -442,6 +604,7 @@ export function applyDeviceCommand(
         !sameCandidate(job.approval.candidate, result.candidate)) deny('Wrong deployed candidate');
   }
   job.state = result.status;
+  if (!['tested', 'deployed'].includes(result.status)) revokePreapproval(tx, job, id, now);
   if (result.status === 'failed' && result.diagnostic) job.diagnostic = result.diagnostic;
   job.reason = result.status === 'blocked' || result.status === 'failed' || result.status === 'unknown' ? result.reason : null;
   job.lease = null;

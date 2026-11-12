@@ -440,11 +440,13 @@ export async function runAutomaticFixerrors(input: {
     let decision: DecisionCluster | null = null;
     let repair: WorkerRequest | null = null;
     let analysisVerified = false;
+    let analysisReturned = false;
     try {
       const analysisStarted = performance.now();
       let analyzed: WorkerResult;
       try { analyzed = await adapters.dispatch(request); }
       finally { analysisMs = Math.round(performance.now() - analysisStarted); }
+      analysisReturned = true;
       adapters.assertUnchanged(before);
       exactList(analyzed.changedFiles, [], 'Read-only analysis');
       if (Object.keys(request.checks).length) {
@@ -522,7 +524,7 @@ export async function runAutomaticFixerrors(input: {
       // A failed/blocked independent group is durable; a mutated unverified tree is never reused.
       adapters.write(`${request.task_id}.failure.json`, { id: evidence.id, reason });
       result.clusters.push({
-        id: evidence.id, status: repair ? 'failed' : 'held', reason,
+        id: evidence.id, status: repair || !analysisReturned ? 'failed' : 'held', reason,
         attempt: repair ? 'Bounded local repair attempted' : 'Scoped source and test evidence enrichment attempted',
         tests: repair ? Object.keys(repair.checks).map(id => `${id}: not verified`) :
           Object.keys(request.checks).map(id => `${id}: analysis ${analysisVerified ? 'passed' : 'not verified'}`),

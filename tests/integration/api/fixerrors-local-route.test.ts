@@ -3,7 +3,8 @@ import { NextRequest } from 'next/server';
 import { createHash, generateKeyPairSync, randomUUID, verify } from 'node:crypto';
 
 vi.mock('@/lib/server/app-auth/session', () => ({ getCurrentAuthenticatedProfile: vi.fn() }));
-vi.mock('@/lib/utils/view-as', () => ({ getEffectiveRole: vi.fn() }));
+vi.mock('@/lib/utils/view-as', () => ({ getEffectiveRole: vi.fn(), getEffectiveRoleForUser: vi.fn() }));
+vi.mock('@/lib/server/app-auth/profile', () => ({ getAppAuthProfile: vi.fn() }));
 vi.mock('@/lib/server/fixerrors/store', () => ({
   localFixerrorsStore: { transact: vi.fn() }, productionFixerrorsStore: { transact: vi.fn() },
 }));
@@ -14,17 +15,19 @@ vi.mock('@/lib/server/fixerrors/batch-lifecycle', () => ({ reconcileBatchLifecyc
 import { GET, POST } from '@/app/api/debug/fixerrors/route';
 import { POST as devicePost } from '@/app/api/fixerrors-device/route';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
-import { getEffectiveRole } from '@/lib/utils/view-as';
+import { getEffectiveRole, getEffectiveRoleForUser } from '@/lib/utils/view-as';
+import { getAppAuthProfile } from '@/lib/server/app-auth/profile';
 import { localFixerrorsStore, productionFixerrorsStore } from '@/lib/server/fixerrors/store';
 import { reconcileBatchLifecycle } from '@/lib/server/fixerrors/batch-lifecycle';
 import { batchOutcomeHash } from '@/lib/fixerrors/batch';
-import { FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PRODUCTION_ORIGIN } from '@/lib/fixerrors/protocol';
+import { FIXERRORS_LOCAL_ORIGIN, FIXERRORS_PREAPPROVAL_MS, FIXERRORS_PRODUCTION_ORIGIN } from '@/lib/fixerrors/protocol';
 import { fixerrorsDeviceSigningBytes } from '@/lib/fixerrors/admission';
 import { getFixerrorsLocalDatabaseUrl, getFixerrorsProductionDatabaseUrl, isFixerrorsLocalEnabled } from '@/lib/server/fixerrors/config';
 import { readBoundedJson } from '@/lib/server/fixerrors/http';
 import { isPublicRequestPath } from '@/lib/routes/public-routes';
 import { actorId, credential, deviceId, FixtureStore, harness, now, workspace } from '../../unit/fixerrors-control-fixtures';
 import { capturedBatch } from '../../unit/fixerrors-batch-fixtures';
+import { preapprovedFixture } from '../../unit/fixerrors-preapproval-fixtures';
 
 const baseRole = {
   role_id: 'role', role_name: 'super_admin', display_name: 'Super Admin', role_class: 'admin' as const,
@@ -47,6 +50,11 @@ beforeEach(() => {
   vi.stubEnv('NODE_ENV', 'test');
   vi.mocked(getCurrentAuthenticatedProfile).mockResolvedValue({ profile: { id: actorId } } as never);
   vi.mocked(getEffectiveRole).mockResolvedValue(baseRole);
+  vi.mocked(getEffectiveRoleForUser).mockResolvedValue(baseRole);
+  vi.mocked(getAppAuthProfile).mockResolvedValue({
+    id: actorId, full_name: 'Synthetic fixture', deleted_at: null, email: null,
+    phone_number: null, employee_id: null, avatar_url: null, must_change_password: false,
+  });
   const store = new FixtureStore();
   vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
   vi.mocked(productionFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
@@ -229,6 +237,82 @@ describe('local-only Debug and outbound device routes', () => {
     expect((await POST(request(body))).status).toBe(409);
     expect((await POST(request({ ...body, requestId: randomUUID() }))).status).toBe(409);
     expect(capture.read).toHaveBeenCalledOnce();
+  });
+
+  it.each(['active', 'role-lost', 'deleted', 'view-as', 'wrong-actor', 'read-error'] as const)(
+    'rereads the original grant actor on device-only heartbeat with %s authority', async authority => {
+      vi.useFakeTimers(); vi.setSystemTime(now);
+      const store = new FixtureStore();
+      vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
+      const requestId = randomUUID();
+      expect((await POST(request({ op: 'enqueue', action: 'repair', deviceId, requestId,
+        requestedReleaseMode: 'targeted', autoDeployConfirmation: true }))).status).toBe(200);
+      expect(store.state.jobs[0].autoDeployPreapproval).toMatchObject({ state: 'pending', actorId });
+      if (authority === 'role-lost') vi.mocked(getEffectiveRoleForUser).mockResolvedValue({ ...baseRole, is_actual_super_admin: false });
+      if (authority === 'deleted') vi.mocked(getAppAuthProfile).mockResolvedValue({
+        ...(await getAppAuthProfile(actorId, null)), deleted_at: '2027-01-01T00:00:00Z',
+      });
+      if (authority === 'view-as') vi.mocked(getEffectiveRoleForUser).mockResolvedValue({ ...baseRole, is_viewing_as: true });
+      if (authority === 'wrong-actor') vi.mocked(getEffectiveRoleForUser).mockResolvedValue({ ...baseRole, user_id: randomUUID() });
+      if (authority === 'read-error') vi.mocked(getAppAuthProfile).mockRejectedValue(new Error('Synthetic private lookup failure'));
+      const heartbeat = request({ op: 'heartbeat', workspace, checkout: { head: workspace.head, tree: workspace.tree, clean: true },
+        allowReadOnly: true, allowRepair: true, allowDeploy: true, bridgeAvailable: true }, null, '/api/fixerrors-device');
+      heartbeat.headers.set('X-Squires-Device-Id', deviceId);
+      heartbeat.headers.set('Authorization', `Bearer ${credential}`);
+      const response = await devicePost(heartbeat);
+      expect(response.status).toBe(200);
+      expect(getAppAuthProfile).toHaveBeenCalledWith(actorId, null);
+      expect(store.state.jobs[0].autoDeployPreapproval?.state).toBe(
+        authority === 'active' || authority === 'read-error' ? 'pending' : 'revoked',
+      );
+      expect(store.state.jobs).toHaveLength(1);
+      expect(await response.text()).not.toContain('Synthetic private lookup');
+    },
+  );
+
+  it('automatically approves exactly once from the authenticated prepared heartbeat without an open browser', async () => {
+    vi.useFakeTimers();
+    const f = await preapprovedFixture('full', 2);
+    await f.complete(); f.lifecycle();
+    vi.setSystemTime(now + 1);
+    vi.mocked(localFixerrorsStore.transact).mockImplementation(f.store.transact.bind(f.store));
+    const heartbeat = () => {
+      const req = request({ op: 'heartbeat', workspace: { ...workspace, head: f.candidate.head, tree: f.candidate.tree,
+        packetSha256: f.store.state.jobs[0].workspace.packetSha256 },
+      checkout: { head: f.candidate.head, tree: f.candidate.tree, clean: true }, holdReason: 'prepared-candidate',
+      allowReadOnly: true, allowRepair: true, allowDeploy: true, bridgeAvailable: true }, null, '/api/fixerrors-device');
+      req.headers.set('X-Squires-Device-Id', deviceId);
+      req.headers.set('Authorization', `Bearer ${credential}`);
+      return devicePost(req);
+    };
+    expect((await heartbeat()).status).toBe(200);
+    expect((await heartbeat()).status).toBe(200);
+    expect(f.store.state.jobs).toHaveLength(2);
+    expect(f.store.state.jobs[1]).toMatchObject({ action: 'deploy', parentRepairId: f.id,
+      approval: { actorId, candidate: f.candidate, releaseMode: 'full' } });
+    expect(f.store.state.jobs[0].autoDeployPreapproval?.state).toBe('consumed');
+    expect(getEffectiveRoleForUser).toHaveBeenCalledWith(actorId);
+    expect(getCurrentAuthenticatedProfile).not.toHaveBeenCalled();
+    expect(f.store.events.filter(event => event.event === 'auto-exact-candidate-deploy-approved')).toHaveLength(1);
+  });
+
+  it('persists expiry on reload without an authorizer read, and immediately withdraws empty-run authority', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(now);
+    const store = new FixtureStore();
+    vi.mocked(localFixerrorsStore.transact).mockImplementation(store.transact.bind(store));
+    const command = { op: 'enqueue', action: 'repair', deviceId, requestId: randomUUID(),
+      requestedReleaseMode: 'targeted', autoDeployConfirmation: true };
+    expect((await POST(request(command))).status).toBe(200);
+    vi.setSystemTime(now + FIXERRORS_PREAPPROVAL_MS);
+    const refreshed = await GET(new NextRequest(`${FIXERRORS_LOCAL_ORIGIN}/api/debug/fixerrors`));
+    expect(await refreshed.json()).toMatchObject({ jobs: [{ autoDeployment: { state: 'expired' } }] });
+    expect(store.events.filter(event => event.event === 'deploy-preapproval-expired')).toHaveLength(1);
+    expect(getAppAuthProfile).not.toHaveBeenCalled();
+    vi.setSystemTime(now);
+    store.state.jobs = [];
+    capture.read.mockImplementation(async (id: string) => capturedBatch(id, 0));
+    expect(await (await POST(request({ ...command, requestId: randomUUID() }))).json()).toMatchObject({ ok: true, noWork: true });
+    expect(store.state.jobs[0].autoDeployPreapproval?.state).toBe('revoked');
   });
 
   it('returns no-work for an empty read, but never hides capture failures as success', async () => {

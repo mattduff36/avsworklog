@@ -45,7 +45,17 @@ preparation, not the worker, creates two local commits and reruns whole-worktree
 checks. Partial preparation, expired leases or uncertain cancellation cannot become
 Deploy evidence. See `docs/guides/FIXERRORS_DEVICE_RUNNER.md`;
 these controls do not authorize a production transport or bypass signed
-admission, scoped checks or separate exact-candidate Deploy consent.
+admission, scoped checks or exact-candidate Deploy authorization. Manual runs
+still require separate confirmation. An explicit, initially unchecked automatic
+Deploy confirmation grants only one run/device/base/manifest/validation-mode-bound
+permission for four hours. After complete successful repair and applied lifecycle,
+the server requires a subsequent prepared-checkout heartbeat and rereads the
+authorizer's active database-backed actual-SuperAdmin authority outside View As.
+Grant consumption, exact-candidate approval, release creation and their audits
+commit atomically. Expiry, cancellation, opt-out, device revocation or checkout
+drift cannot become automatic approval; revocation before start blocks even a
+leased release. Started releases remain irreversible here. No private grant
+arrives in device input or claims, and native signing/replay/release guards remain.
 An additional default-off **disposable fixture** signer may return the distinct
 release ticket only from the authenticated, committed `start-deploy`
 transaction. It binds the worker snapshot and prepared-receipt evidence into

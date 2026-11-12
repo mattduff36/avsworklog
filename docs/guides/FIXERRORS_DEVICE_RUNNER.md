@@ -200,7 +200,7 @@ separate review job, send a legacy `reviewJobId`, or reuse single-packet evidenc
 
 The **Run full checks (fap)** checkbox is unchecked by default. Its validation
 preference is retained on the job and preselects focused or full checks in the
-separate Deploy dialog, including after a page reload. It grants no release
+manual Deploy dialog, including after a page reload. It grants no release
 authority: fap runs only after exact-candidate Deploy approval. Local repairs
 always pass the mandatory focused checks before becoming Deploy-ready.
 
@@ -208,10 +208,44 @@ This workflow requires all three independent review/repair/deploy opt-ins
 (owner consent and runtime **D**), without falling back to review-only. On the
 enrolled Windows PC, stop the runner, choose **E / D**, confirm **SET DEPLOY**,
 then restart Terminal or Service with runtime **D**. This is workflow consent,
-not deployment approval. The tested result stops at **Deploy-ready** and still
-requires the separate, initially unchecked exact-candidate Deploy dialog and
+not deployment approval. Without the optional one-run permission below, the tested
+result stops at **Deploy-ready** and still requires the separate, initially
+unchecked exact-candidate Deploy dialog and
 explicit full/targeted check mode. Candidate drift or unavailable state clears
 that decision.
+
+**Optional one-run automatic Deploy (local source; unpublished).** The separate
+**Allow pre-approved automatic deployment after tests pass** checkbox starts
+unchecked. Selecting it changes the start action to **Confirm automatic Deploy
+and start this run**, explicitly authorizing the future successful tested candidate
+without another click. It binds the authenticated actor, recorded run, selected
+runner, clean base HEAD/tree, captured manifest and focused/full validation mode
+for four hours from the committed request. It is not a saved preference or
+permission for another run. Changing runner or validation mode, closing/reopening,
+or an unconfirmed/failed submission clears the checkbox. The page may close.
+
+Server-side fulfillment requires a complete validated batch with no failed or
+remaining cases, at least one verified repair, applied lifecycle, frozen exact
+candidate/check/prepared-evidence hashes and a later fresh prepared-checkout
+heartbeat. The granting actor must still be active with database-backed actual
+SuperAdmin authority outside View As. Email-only legacy elevation is not used for
+unattended authorization; missing/read-error authority fails closed.
+One queue transaction consumes the grant, freezes the exact candidate into the
+existing release job (at most five minutes, never past the grant deadline) and
+appends grant-consumed/automatic-approval audits. Retries cannot create another
+release for that repair. Only authenticated
+`start-deploy` can issue its distinct signed release ticket; native proof, replay,
+TLS, remote/base/HEAD/tree/destination and release-mode checks are unchanged.
+
+Activity displays permission state and expiry. **Revoke automatic Deploy** works
+for pending/tested authority and queued or leased release before start, preserving
+history and blocking that release. Cancellation, opt-out, device revocation,
+expiry, changed evidence or checkout drift prevent automatic dispatch. A release
+already started cannot be undone here. Failure/no-change/no-work/paused/unknown,
+incomplete evidence and lifecycle holds do not grant automatic Deploy. Audit
+records distinguish granted, revoked, expired, consumed and automatic exact
+approval. Queue JSON retains these private fields; no database migration, installed
+runner update or production activation is part of this source change.
 
 After the request is recorded, the runner owns the sequential workflow; the page
 may be closed. **Cancel run** targets the recorded job. Reloading never submits
@@ -507,15 +541,16 @@ Evidence contains hashes only, never test output or commands. The real bridge
 must map those fixed IDs to its locally trusted scoped check receipts; the
 site cannot choose checks.
 
-The user must open the separate inline confirmation, inspect the tested commit
-(full digests are under **Technical candidate details**), choose the release mode,
+For manual runs, the user must open the separate inline confirmation, inspect the
+tested commit (full digests are under **Technical candidate details**), choose the release mode,
 check the initially unchecked exact-candidate approval checkbox and submit.
 Changing mode, cancelling/reopening or refreshing to a changed candidate resets
 consent. This creates a distinct, five-minute job with an independent audit event
 and frozen candidate approval, including the selected mode.
 The same actual SuperAdmin may request repair and later confirm Deploy; this
-is separate explicit consent, not a two-person approval policy. No repair or
-review result triggers this step automatically. Duplicate approval, stale
+is separate explicit consent, not a two-person approval policy. Without an explicit
+one-run automatic grant, no repair or review result triggers this step automatically.
+Duplicate approval, stale
 HEAD/tree, changed check digest, offline/revoked device and absent local
 Deploy opt-in fail closed. Claim and companion recheck the exact candidate;
 the companion additionally requires locally held matching test evidence.

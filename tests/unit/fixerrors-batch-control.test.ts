@@ -39,6 +39,17 @@ async function connected(count = 2) {
 }
 
 describe('authenticated retained batch control', () => {
+  it('exposes only a fixed provider failure code and counts the failed investigation', async () => {
+    const { store, claim, request, outcome } = await connected(1);
+    outcome.clusters[0] = { ...outcome.clusters[0], status: 'failed', reason: 'worker-provider-limit',
+      triage: classifyIncident(), timings: { analysisMs: 10, repairAndChecksMs: 0, totalMs: 12 } };
+    const lease = { jobId: claim.job.id, leaseToken: claim.leaseToken };
+    await request({ op: 'batch-lease', ...lease, cursor: 1, checkpointSha256: batchHash('failed'), resume: false, outcome });
+    await request({ op: 'complete', ...lease, result: { status: 'failed', reason: 'execution-failed' }, outcomeSha256: batchOutcomeHash(outcome) });
+    expect(publicQueueState(store.state).jobs[0]).toMatchObject({ state: 'failed', batch: {
+      counts: { failed: 1 }, latest: { route: 'failed', diagnostic: 'worker-provider-limit' },
+    } });
+  });
   it('projects bounded importance and timings, rejecting invented importance and private details', async () => {
     const { store, claim, request, outcome } = await connected();
     const enriched = { ...outcome, clusters: [{ ...outcome.clusters[0],

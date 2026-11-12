@@ -158,7 +158,7 @@ describe('automatic local fixerrors lifecycle investigation', () => {
       if (request.task_id.includes('cluster-1')) throw new Error('Scoped source evidence unavailable');
       return dispatch(request);
     });
-    expect((await run(invalid.adapters, packet(2))).clusters.map(entry => entry.status)).toEqual(['held', 'held']);
+    expect((await run(invalid.adapters, packet(2))).clusters.map(entry => entry.status)).toEqual(['failed', 'held']);
   });
   it('stops on an unverified mutated candidate instead of reusing it for another group', async () => {
     const h = harness([cluster(), cluster('cluster-2')]);
