@@ -338,8 +338,10 @@ export async function GET() {
       admin
         .from('hgv_inspections')
         .select('id, inspection_date, status')
+        .eq('record_kind', 'full_check')
         .eq('user_id', user.id)
         .order('inspection_date', { ascending: false })
+        .order('submitted_at', { ascending: false, nullsFirst: false })
         .limit(3),
       admin
         .from('absence_reasons')

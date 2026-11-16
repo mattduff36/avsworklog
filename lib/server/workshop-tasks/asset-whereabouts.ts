@@ -396,6 +396,7 @@ function submittedInspectionQuery(
     return admin
       .from('hgv_inspections')
       .select(VEHICLE_INSPECTION_SELECT)
+      .eq('record_kind', 'full_check')
       .eq('hgv_id', assetId);
   }
   return admin

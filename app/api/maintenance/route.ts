@@ -343,7 +343,9 @@ export async function GET() {
           )
         `)
         .eq('status', 'active')
+        .eq('hgv_inspections.record_kind', 'full_check')
         .order('inspection_date', { foreignTable: 'hgv_inspections', ascending: false })
+        .order('submitted_at', { foreignTable: 'hgv_inspections', ascending: false, nullsFirst: false })
         .limit(1, { foreignTable: 'hgv_inspections' }),
       admin
         .from('plant')

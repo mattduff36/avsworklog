@@ -1,9 +1,12 @@
 import { z } from 'zod';
+import { randomUUID } from 'node:crypto';
+import { hgvDailyCheckUpdatesEnabled } from '@/lib/server/hgv-update-capabilities';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import type { InspectionStatus } from '@/types/inspection';
 
 export const HGV_INSPECTION_SAVE_RPC = 'save_hgv_inspection_v2';
+export const HGV_INSPECTION_COMPAT_RPC = 'save_hgv_inspection_compat';
 export const HGV_INSPECTION_SAVE_FORBIDDEN = 'Forbidden: cannot save this inspection';
 
 const InspectionItemSchema = z
@@ -19,7 +22,7 @@ const InspectionItemSchema = z
 export const HgvInspectionSaveBodySchema = z
   .object({
     hintInspectionId: z.string().uuid().nullable().optional(),
-    requestId: z.string().uuid(),
+    requestId: z.string().uuid().optional(),
     recordKind: z.enum(['full_check', 'defect_report']).default('full_check'),
     parentCheckId: z.string().uuid().nullable().optional(),
     discoveredAt: z.string().datetime().nullable().optional(),
@@ -92,7 +95,7 @@ export type HgvInspectionSaveResolution = {
 };
 
 type AdminRpc = {
-  rpc(fn: typeof HGV_INSPECTION_SAVE_RPC, args: Record<string, unknown>): Promise<{ data: HgvInspectionSaveResult | null; error: { message: string } | null }>;
+  rpc(fn: typeof HGV_INSPECTION_SAVE_RPC | typeof HGV_INSPECTION_COMPAT_RPC, args: Record<string, unknown>): Promise<{ data: HgvInspectionSaveResult | null; error: { message: string } | null }>;
 };
 
 type LookupQuery = {
@@ -142,6 +145,8 @@ export function forbiddenHgvInspectionSaveError(): Error & { status: number; cod
 }
 
 export function mapHgvSaveRpcError(message: string): { status: number; error: string; code: string } {
+  if (message.includes('HGV_SAVE:COMPAT_CHECK_EXISTS')) return { status: 409, error: 'A check already exists for this HGV and date. Open it from HGV Daily Checks. Your new answers have not been saved.', code: 'COMPAT_CHECK_EXISTS' };
+  if (message.includes('HGV_SAVE:COMPAT_REFRESH_REQUIRED')) return { status: 409, error: 'This check has changed or more than one check exists. Refresh HGV Daily Checks and open the specific draft. Your new answers have not been saved.', code: 'COMPAT_REFRESH_REQUIRED' };
   if (message.includes('HGV_SAVE:FORBIDDEN_OWNER') || message.includes('HGV_SAVE:FORBIDDEN_SUBJECT')) {
     return { status: 403, error: HGV_INSPECTION_SAVE_FORBIDDEN, code: 'FORBIDDEN' };
   }
@@ -216,6 +221,13 @@ export async function saveHgvInspectionForActor(input: {
   body: HgvInspectionSaveBody;
   admin?: HgvInspectionSaveAdmin;
 }): Promise<HgvInspectionSaveResult> {
+  const updatesEnabled = hgvDailyCheckUpdatesEnabled();
+  if (!updatesEnabled && (input.body.recordKind !== 'full_check' || input.body.correctionReason || input.body.parentCheckId)) {
+    const error = new Error('Additional reports and corrections are not enabled on this site.') as Error & { status: number; code: string };
+    error.status = 403;
+    error.code = 'FEATURE_DISABLED';
+    throw error;
+  }
   const subjectAuthorization = authorizeHgvInspectionWrite({
     actorId: input.actorId,
     canManageOthers: input.canManageOthers,
@@ -242,14 +254,15 @@ export async function saveHgvInspectionForActor(input: {
   }
 
   const rpcClient = admin;
-  const { data, error } = await rpcClient.rpc(HGV_INSPECTION_SAVE_RPC, {
+  // An old cached form has no request ID: always use the locked compatibility adapter.
+  const { data, error } = await rpcClient.rpc(updatesEnabled && input.body.requestId ? HGV_INSPECTION_SAVE_RPC : HGV_INSPECTION_COMPAT_RPC, {
     p_actor_id: input.actorId,
     p_actor_can_manage_others: input.canManageOthers,
     p_subject_user_id: input.body.userId,
     p_hgv_id: input.body.hgvId,
     p_inspection_date: input.body.inspectionDate,
     p_hint_inspection_id: input.body.hintInspectionId ?? null,
-    p_request_id: input.body.requestId,
+    p_request_id: input.body.requestId ?? randomUUID(),
     p_record_kind: input.body.recordKind,
     p_parent_check_id: input.body.parentCheckId ?? null,
     p_discovered_at: input.body.discoveredAt ?? null,

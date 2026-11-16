@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PROVENANCE_ENV_KEYS, validateLocalTestDatabaseUrl } from '../../scripts/local-test-postgres';
-import { hgvInspectionSaveSchemaSql, readHgvInspectionSaveFunctionSql, HGV_SAVE_FIXTURE as F } from './hgv-inspection-save-rpc-harness';
+import { hgvInspectionSaveSchemaSql, readHgvInspectionSaveFunctionSql, HGV_SAVE_FIXTURE as F, hgvSaveCallSql } from './hgv-inspection-save-rpc-harness';
 import { TRUCK_CHECKLIST_ITEMS } from '../../lib/checklists/vehicle-checklists';
 
 const suite = process.env.TEST_DATABASE_URL ? describe : describe.skip;
@@ -55,7 +55,8 @@ suite('HGV same-day updates - disposable real PostgreSQL', () => {
       const start = deletion.indexOf(`CREATE FUNCTION private.${name}(`);
       await db.query(deletion.slice(start,deletion.indexOf('$$;',start)+3));
     }
-    await db.query(readFileSync('supabase/migrations/20261116_hgv_same_day_updates.sql','utf8'));
+    await db.query('GRANT EXECUTE ON FUNCTION public.save_hgv_inspection(uuid,boolean,uuid,uuid,date,uuid,uuid,text,integer,text,text,jsonb) TO anon,authenticated,service_role');
+    await db.query(readFileSync('supabase/migrations/20261116_hgv_compat_foundation.sql','utf8'));
     await db.query("INSERT INTO hgvs(id,reg_number,current_mileage) VALUES($1,'TEST HGV',100)",[F.hgv]);
     await db.query("INSERT INTO profiles(id,full_name) VALUES($1,'Test driver'),($2,'Other driver')",[F.actor,F.subject]);
     const clock = await db.query("SELECT to_char(clock_timestamp() AT TIME ZONE 'Europe/London','YYYY-MM-DD') AS date, extract(isodow FROM clock_timestamp() AT TIME ZONE 'Europe/London')::int AS day");
@@ -63,12 +64,55 @@ suite('HGV same-day updates - disposable real PostgreSQL', () => {
   });
   afterAll(async () => { for (const client of clients) await client.end(); });
   const fullItems = (defect = false) => TRUCK_CHECKLIST_ITEMS.map((label,index) => ({item_number:index+1,item_description:label,day_of_week:day,status:defect && index===0?'attention':'ok',comments:defect && index===0?'Fuel leak':null}));
-  type Input = { id?: string; hint?: string; actor?: string; owner?: string; kind?: string; parent?: string; items?: unknown[]; mileage?: number|null; reason?: string; revision?: number; status?: string; date?: string; inform?: boolean; notes?: string };
+  type Input = { compat?: boolean; id?: string; hint?: string; actor?: string; owner?: string; kind?: string; parent?: string; items?: unknown[]; mileage?: number|null; reason?: string; revision?: number; status?: string; date?: string; inform?: boolean; notes?: string };
   async function save(input: Input = {}, connection = db) {
     const values = [input.actor||F.actor,false,input.owner||F.actor,F.hgv,input.date||date,input.hint||null,input.status||'submitted',input.mileage===undefined?120:input.mileage,input.notes||null,'data:image/png;base64,TEST',JSON.stringify(input.items||fullItems()),input.id||randomUUID(),input.kind||'full_check',input.parent||null,input.kind==='defect_report'?new Date().toISOString():null,input.reason||null,input.revision??null,input.inform||false];
-    const result=await connection.query('SELECT public.save_hgv_inspection_v2($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) AS saved',values);
+    const result=await connection.query(`SELECT public.${input.compat ? 'save_hgv_inspection_compat' : 'save_hgv_inspection_v2'}($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) AS saved`,values);
     return result.rows[0].saved;
   }
+  it('foundation keeps the old server working, closes real legacy ACLs and serializes compatibility creation', async () => {
+    const legacy='public.save_hgv_inspection(uuid,boolean,uuid,uuid,date,uuid,uuid,text,integer,text,text,jsonb)';
+    for (const role of ['anon','authenticated']) {
+      expect((await db.query("SELECT has_function_privilege($1,$2,'EXECUTE') AS allowed",[role,legacy])).rows[0].allowed).toBe(false);
+      for (const name of ['save_hgv_inspection_v2','save_hgv_inspection_compat','inform_hgv_workshop_compat']) {
+        expect((await db.query("SELECT has_function_privilege($1,p.oid,'EXECUTE') AS allowed FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname=$2",[role,name])).rows[0].allowed).toBe(false);
+      }
+    }
+    expect((await db.query("SELECT has_function_privilege('service_role',$1,'EXECUTE') AS allowed",[legacy])).rows[0].allowed).toBe(true);
+    await db.query('SET ROLE service_role');
+    try { expect((await db.query(hgvSaveCallSql('draft', '[]'))).rows[0].save_hgv_inspection.id).toBeTruthy(); }
+    finally { await db.query('RESET ROLE'); }
+    const [a,b]=await Promise.all([save({compat:true,status:'draft'}),save({compat:true,status:'draft'},other)]);
+    expect(a.id).toBe(b.id);
+    const submitted=await save({compat:true,hint:a.id});
+    expect((await save({compat:true,hint:a.id})).id).toBe(submitted.id);
+    await expect(save({compat:true,hint:a.id,notes:'Different answers'})).rejects.toThrow('COMPAT_CHECK_EXISTS');
+    await expect(save({compat:true,status:'draft'})).rejects.toThrow('COMPAT_CHECK_EXISTS');
+    expect((await db.query("SELECT to_regclass('public.idx_unique_hgv_inspection_user_date') AS idx")).rows[0].idx).toBeTruthy();
+    await db.query(readFileSync('tests/fixtures/hgv-same-day-activation.sql','utf8'));
+    expect((await db.query("SELECT has_function_privilege('service_role',$1,'EXECUTE') AS allowed",[legacy])).rows[0].allowed).toBe(false);
+  });
+  it('compatibility refuses ambiguous/stale payloads after preview creates multiple records', async () => {
+    const a=await save(); const b=await save();
+    expect(a.id).not.toBe(b.id);
+    await expect(save({compat:true})).rejects.toThrow('COMPAT_REFRESH_REQUIRED');
+    const draft=await save({status:'draft'});
+    expect((await save({compat:true,hint:draft.id})).id).toBe(draft.id);
+    const corrected=await save({hint:a.id,reason:'Correct notes',revision:0,notes:'Corrected notes'});
+    expect(corrected.revision).toBe(1);
+    await expect(save({compat:true,hint:a.id})).rejects.toThrow('COMPAT_CHECK_EXISTS');
+    const report=await save({kind:'defect_report',parent:b.id,mileage:null,items:fullItems(true).slice(0,1)});
+    await expect(save({compat:true,hint:report.id})).rejects.toThrow('IDENTITY_CHANGED');
+  });
+  it('cached optional Workshop requests are idempotent and reject stale notes after correction', async () => {
+    const check=await save({notes:'Saved inspection notes'});
+    const params=[F.actor,false,check.id,F.hgv,'Saved inspection notes'];
+    const sql='SELECT public.inform_hgv_workshop_compat($1,$2,$3,$4,$5) AS id';
+    const [a,b]=await Promise.all([db.query(sql,params),other.query(sql,params)]);
+    expect(a.rows[0].id).toBe(b.rows[0].id);
+    await save({hint:check.id,reason:'Correct saved notes',revision:0,notes:'Updated inspection notes'});
+    await expect(db.query(sql,params)).rejects.toThrow('COMPAT_REFRESH_REQUIRED');
+  });
   it('allows independent same-day full checks and deduplicates simultaneous retries', async () => {
     const id=randomUUID();
     const [first,retry]=await Promise.all([save({id}),save({id},other)]);
