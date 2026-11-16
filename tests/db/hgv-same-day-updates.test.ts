@@ -57,6 +57,7 @@ suite('HGV same-day updates - disposable real PostgreSQL', () => {
     }
     await db.query('GRANT EXECUTE ON FUNCTION public.save_hgv_inspection(uuid,boolean,uuid,uuid,date,uuid,uuid,text,integer,text,text,jsonb) TO anon,authenticated,service_role');
     await db.query(readFileSync('supabase/migrations/20261116_hgv_compat_foundation.sql','utf8'));
+    await db.query(readFileSync('supabase/migrations/20261116_hgv_content_guard_split.sql','utf8'));
     await db.query("INSERT INTO hgvs(id,reg_number,current_mileage) VALUES($1,'TEST HGV',100)",[F.hgv]);
     await db.query("INSERT INTO profiles(id,full_name) VALUES($1,'Test driver'),($2,'Other driver')",[F.actor,F.subject]);
     const clock = await db.query("SELECT to_char(clock_timestamp() AT TIME ZONE 'Europe/London','YYYY-MM-DD') AS date, extract(isodow FROM clock_timestamp() AT TIME ZONE 'Europe/London')::int AS day");
@@ -70,6 +71,17 @@ suite('HGV same-day updates - disposable real PostgreSQL', () => {
     const result=await connection.query(`SELECT public.${input.compat ? 'save_hgv_inspection_compat' : 'save_hgv_inspection_v2'}($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) AS saved`,values);
     return result.rows[0].saved;
   }
+  it('binds content guards only to tables containing their referenced columns', async () => {
+    const guards=await db.query(`SELECT c.relname,p.prosrc,
+      ARRAY(SELECT attname FROM pg_attribute WHERE attrelid=c.oid AND attnum>0 AND NOT attisdropped) AS columns
+      FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_proc p ON p.oid=t.tgfoid
+      WHERE t.tgname='guard_hgv_submitted_content' AND NOT t.tgisinternal`);
+    expect(guards.rows).toHaveLength(2);
+    for (const guard of guards.rows) {
+      const references=[...guard.prosrc.matchAll(/\b(?:NEW|OLD)\.([a-z_]+)/gi)].map(match=>match[1]);
+      for (const column of references) expect(guard.columns).toContain(column);
+    }
+  });
   it('foundation keeps the old server working, closes real legacy ACLs and serializes compatibility creation', async () => {
     const legacy='public.save_hgv_inspection(uuid,boolean,uuid,uuid,date,uuid,uuid,text,integer,text,text,jsonb)';
     for (const role of ['anon','authenticated']) {
