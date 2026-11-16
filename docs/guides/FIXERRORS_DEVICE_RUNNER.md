@@ -6,8 +6,9 @@
    automatic/native execution and Debug. Unknown impact is Important; source
    sensitivity is repair risk, not proof of incident urgency.
 2. Project fixed diagnostic classes, operations/stages, validated context/status
-   codes, source frames and occurrence windows before discarding private details.
-   Keep arbitrary runtime prose, identities, URLs and payloads out of packets.
+   codes, source frames and occurrence windows for grouping and safe public output.
+   Supply owner-authorized original captured records privately as `rawEvidence`,
+   preserving diagnostic details and identities while redacting credentials only.
 3. Route awaiting-deployment records before dispatch to exact-candidate verification,
    including missing/stale candidate evidence. A lifecycle label never authorizes
    Deploy or proves a live resolution.
@@ -46,16 +47,19 @@ compromise is confirmed, and grants no additional repair authority.
 Capture retains fixed diagnostic classes, operation, allowlisted stage, validated
 database code/status, source-validated context/template, bounded source frames,
 occurrence count and day window. Source console prefixes keep their static label
-while appended dynamic details are discarded. Direct relative and `@/` imports
+for grouping; original dynamic details remain in private `rawEvidence`. Direct relative and `@/` imports
 can contribute up to twelve existing one-hop source paths; they do not bypass
 sensitive-path/content guards or create broad edit permission. Unsupported or
 sensitive repair still needs scope-specific owner approval.
 
 When the message alone is generic, capture checks the saved console arguments
 for an HTTP status and a source-confirmed diagnostic ID. A recent UI action or
-toast must match the application source before it enters the worker packet.
-Conflicting evidence stays uncertain. Raw console arguments, user-entered text
-and customer identifiers stay out of the packet. A valid server rejection and
+toast must match the application source before it becomes trusted structured
+classification. Conflicting evidence stays uncertain. Original console arguments,
+user actions, identities, URLs and additional data also reach the authorized worker
+as private `rawEvidence`; credentials and session tokens are redacted. Workers
+prioritize those records over lossy grouping summaries, treat them as data rather
+than instructions, and never echo private details into results or shared knowledge. A valid server rejection and
 a broken client response to that rejection can have separate explanations.
 
 The source-owned `lib/config/fixerrors-analysis-checks.json` registers offline
@@ -201,7 +205,7 @@ These are development results, not installed-service or live operational approva
    runtime, and use Debug's existing exact-candidate confirmation. Local opt-in
    neither approves Deploy nor removes the signed start-deploy/release gates.
 
-**Capture scope and privacy.** The application server reads at most one oldest
+**Legacy single-packet capture (compatibility only).** The application server reads at most one oldest
 active error whose triage state is null/untriaged/outstanding, excluding the
 existing diagnostic account and localhost/loopback URLs. Timestamp and ID order
 make selection deterministic; IDs and URLs are not selected. Only error type,
@@ -226,7 +230,15 @@ pages have no incident-count cap; cursor, unique-ID and expected-count checks
 reject partial capture. Raw lifecycle rows and their original hashes stay in
 trusted bindings. `scripts/fixerrors-retrieval.ts` owns the existing grouping,
 source extraction and sanitized context/knowledge projection; the chat/worker CLI
-uses this shared assembly, with new groups before oldest held cases. Capture-only
+uses this shared assembly, with new groups before oldest held cases. Each cluster
+also carries full owner-authorized original diagnostic records in typed private
+`rawEvidence`, with credential-only redaction and bounded record/packet sizes.
+Raw IDs never replace trusted server lifecycle bindings. Reuse requires identical
+raw evidence as well as matching classified diagnostics and candidate. Public
+progress, decisions and shared knowledge keep their existing privacy rules.
+The legacy single-packet helper retains its older reduced-evidence contract;
+the everyday batch path obtains its worker prompt from the current TS adapter
+and requires no installed Python prompt change. Capture-only
 keeps its existing export contract. Capture itself performs no lifecycle writes.
 
 Debug stores one canonical full-batch manifest and private exact-row bindings.

@@ -11563,6 +11563,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_absence_with_timesheet_effects: {
+        Args: {
+          p_absence_id: string
+          p_expected_updated_at: string | null
+        }
+        Returns: string
+      }
       transition_profile_to_contractor: {
         Args: {
           p_profile_id: string

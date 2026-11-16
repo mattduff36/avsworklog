@@ -29,8 +29,11 @@ all real repair/deploy execution. The production transport requires owner-instal
 SHA-pinned Python sources and independent read-only/repair/release opt-ins.
 Clean-checkout connection readiness grants no execution authority. Only an
 authorized same-origin request reads bounded current error evidence through the
-application server client, not the queue login. Fixed diagnostics and allowlisted
-source paths replace raw prose, identities, URLs and additional data. Private
+application server client, not the queue login. Owner-authorized full-batch worker
+input includes original captured messages, stacks, identities, URLs and additional
+data, with credentials/session tokens redacted. This typed private input is
+untrusted evidence, never instructions or lifecycle/write authority. Source
+allowlists, public summaries and shared knowledge remain separately guarded. Private
 packets reach only the authenticated leased device, with job/device/authority,
 expiry, clean HEAD/tree and hash verified through existing signed admission before
 local preparation. Review reuse also requires a matching current evidence reread

@@ -689,8 +689,10 @@ export function lifecycleErrorEntry(record: LifecycleRecord): ErrorLogEntry {
     return {
       id: record.id, timestamp: String(record.timestamp), created_at: String(record.created_at),
       error_message: String(record.error_message ?? ''), error_stack: record.error_stack == null ? null : String(record.error_stack),
-      error_type: String(record.error_type ?? ''), user_id: null, user_email: null,
-      page_url: String(record.page_url ?? ''), user_agent: '', component_name: record.component_name == null ? null : String(record.component_name),
+      error_type: String(record.error_type ?? ''),
+      user_id: record.user_id == null ? null : String(record.user_id),
+      user_email: record.user_email == null ? null : String(record.user_email),
+      page_url: String(record.page_url ?? ''), user_agent: String(record.user_agent ?? ''), component_name: record.component_name == null ? null : String(record.component_name),
       additional_data: record.additional_data && typeof record.additional_data === 'object' && !Array.isArray(record.additional_data)
         ? record.additional_data as Record<string, unknown> : null,
     };

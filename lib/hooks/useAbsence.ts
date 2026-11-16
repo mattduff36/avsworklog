@@ -1086,7 +1086,7 @@ export function useCancelAbsence() {
 }
 
 /**
- * Delete an absence (pending only)
+ * Delete an absence and reconcile its timesheet effects atomically.
  */
 export function useDeleteAbsence() {
   const queryClient = useQueryClient();
@@ -1115,6 +1115,7 @@ export function useDeleteAbsence() {
           is_bank_holiday,
           auto_generated,
           bulk_batch_id,
+          updated_at,
           absence_reasons(name),
           profile:profiles!absences_profile_id_fkey(full_name)
         `)
@@ -1142,21 +1143,13 @@ export function useDeleteAbsence() {
       );
       await assertAbsenceTimesheetChangesUnlocked(supabase, existingAbsence as AbsenceValidationShape);
 
-      const { error } = await supabase
-        .from('absences')
-        .delete()
-        .eq('id', id);
+      const { data: deletedId, error } = await supabase.rpc('delete_absence_with_timesheet_effects', {
+        p_absence_id: id,
+        p_expected_updated_at: existingAbsence.updated_at,
+      });
       
       if (error) throw error;
-      await removeLeaveTimesheetEffects(
-        supabase,
-        {
-          ...(existingAbsence as AbsenceValidationShape),
-          id,
-          allow_timesheet_work_on_leave: existingAbsence.allow_timesheet_work_on_leave,
-        },
-        user.id
-      );
+      if (deletedId !== id) throw new Error('Absence was not deleted. Refresh and try again.');
       await notifyProcessedAbsenceChange({
         absenceId: id,
         action: 'deleted',
@@ -1642,4 +1635,3 @@ export function useUpdateEmployeeAllowance() {
     },
   });
 }
-

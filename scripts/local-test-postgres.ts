@@ -63,6 +63,7 @@ export const ALLOWED_TARGET_TEST_FILES = [
   'tests/db/inspection-meter-correction.test.ts',
   'tests/db/inspection-deletion.test.ts',
   'tests/db/van-service-runtime.test.ts',
+  'tests/db/absence-delete-runtime.test.ts',
   'tests/unit/fixerrors-close-stale-postgres.test.ts',
   'tests/unit/fixerrors-lifecycle-postgres.test.ts',
   TARGET_TEST_FILE,

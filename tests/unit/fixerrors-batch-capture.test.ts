@@ -37,6 +37,8 @@ function record(index: number, held = false): LifecycleRecord {
     status: 'active', triage_state: held ? 'outstanding' : null, triage_local_commit: null,
   };
 }
+const summaries = (clusters: ReturnType<typeof buildFixerrorsBatchRetrieval>['retrieval']['clusters']) =>
+  clusters.map(({ rawEvidence: _raw, ...cluster }) => cluster);
 const compare = (left: LifecycleRecord, right: LifecycleRecord) =>
   String(left.created_at).localeCompare(String(right.created_at)) || left.id.localeCompare(right.id);
 
@@ -97,6 +99,31 @@ class BatchClient implements PgClientLike {
 }
 
 describe('shared full Fixerrors capture', () => {
+  it('retains full original diagnostic records for new and held occurrences', async () => {
+    const warning = '`DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.';
+    const rows = [record(91), record(92, true)];
+    for (const row of rows) {
+      row.error_message = warning;
+      row.additional_data = { args: [warning], userAction: { label: 'Select job code', ageMs: 8592 },
+        customer: 'Example Person', headers: { Authorization: 'Bearer fixture-secret' },
+        nested: [{ access_token: 'private-token', detail: 'original diagnostic detail' }] };
+    }
+    const capture = await fetchFixerrorsBatchSnapshot(new BatchClient(rows), 'c'.repeat(64), now);
+    const built = buildFixerrorsBatchRetrieval({ ...capture, candidate, knowledge, repoRoot: sourceFixture() });
+    expect(built.retrieval.clusters).toHaveLength(2);
+    for (const [index, cluster] of built.retrieval.clusters.entries()) {
+      expect(cluster.rawEvidence).toHaveLength(1);
+      expect(cluster.rawEvidence![0]).toMatchObject({ id: rows[index].id, error_message: warning,
+        error_stack: rows[index].error_stack, user_email: 'fixture@example.invalid',
+        additional_data: { args: [warning], customer: 'Example Person',
+          userAction: { label: 'Select job code', ageMs: 8592 },
+          headers: { Authorization: '[credential redacted]' },
+          nested: [{ access_token: '[credential redacted]', detail: 'original diagnostic detail' }] } });
+      expect(JSON.stringify(cluster.rawEvidence)).not.toMatch(/fixture-secret|private-token/u);
+    }
+    expect(rows[0].additional_data!.headers).toEqual({ Authorization: 'Bearer fixture-secret' });
+  });
+
   it('retains fixed diagnostics and source labels without copying appended private console values', async () => {
     const row = record(1);
     row.error_message = 'console.error: Unable to render listing label: Error: validation failed person@example.invalid';
@@ -115,7 +142,7 @@ describe('shared full Fixerrors capture', () => {
       occurrences: 1, frames: [{ file: 'lib/labels.ts', line: 1 }],
       firstDay: '2026-09-10', lastDay: '2026-09-10',
     });
-    expect(JSON.stringify(cluster)).not.toMatch(/person@|payload|console\.error/u);
+    expect(JSON.stringify(summaries([cluster]))).not.toMatch(/person@|payload|console\.error/u);
   });
   it('recovers structured evidence for new and held console failures without exposing private arguments', async () => {
     const root = sourceFixture();
@@ -150,7 +177,7 @@ describe('shared full Fixerrors capture', () => {
       expect(cluster.diagnostics).toMatchObject({ classes: ['authentication'],
         recentAction: { kind: 'click', label: 'New Quote' }, visibleMessage: 'Unable to load customer options.' });
     }
-    expect(JSON.stringify(built.retrieval)).not.toMatch(/private-account|private-customer|private server message/u);
+    expect(JSON.stringify(summaries(built.retrieval.clusters))).not.toMatch(/private-account|private-customer|private server message/u);
   });
 
   it('keeps conflicting status and context ambiguous and drops unrelated private action and toast labels', async () => {
@@ -202,7 +229,7 @@ describe('shared full Fixerrors capture', () => {
     const clusters = buildFixerrorsBatchRetrieval({ ...capture, candidate, knowledge, repoRoot: sourceFixture() }).retrieval.clusters;
     expect(clusters).toHaveLength(3);
     for (const cluster of clusters) expect(cluster.query).toMatchObject({ httpStatus: null, errorContextId: null });
-    expect(JSON.stringify(clusters)).not.toContain('private-account');
+    expect(JSON.stringify(summaries(clusters))).not.toContain('private-account');
   });
 
   it('captures more than one page of new and held rows before the same repeatable-read COMMIT', async () => {
@@ -245,7 +272,7 @@ describe('shared full Fixerrors capture', () => {
       route: '/listings', component: 'ListingLabel', sourceFile: 'lib/labels.ts',
       normalizedMessage: 'Unable to render listing label', errorContextId: 'listing-label', httpStatus: 500,
     });
-    const serialized = JSON.stringify(built.retrieval);
+    const serialized = JSON.stringify(summaries(built.retrieval.clusters));
     expect(serialized).not.toContain('fixture@example.invalid');
     expect(serialized).not.toContain('https://example.invalid');
     for (const row of input) expect(serialized).not.toContain(row.id);
@@ -308,7 +335,7 @@ describe('shared full Fixerrors capture', () => {
       });
       expect(cluster.patterns[0].errorType).toBe('Error');
     }
-    const serialized = JSON.stringify(built.retrieval);
+    const serialized = JSON.stringify(summaries(built.retrieval.clusters));
     for (const text of ['John Smith', 'John-Smith', 'Jane Doe', 'private-person-12345', 'PrivatePersonFailure']) {
       expect(serialized).not.toContain(text);
     }

@@ -2,14 +2,15 @@ import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from '
 import { basename, join, posix, resolve, sep } from 'node:path';
 import type { AutoRetrieval } from './fixerrors-auto';
 import type { ErrorLogEntry } from './fixerrors-retrieval';
+import { rawErrorEvidence } from './fixerrors-raw-evidence';
 import { isFixerrorsSourcePath } from './fixerrors-auto';
 import { retrieveIncidents, type KnowledgeStore } from './fixerrors-knowledge';
 
 type Cluster = AutoRetrieval['clusters'][number];
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 
-// Worker diagnostics are source templates, never arbitrary runtime prose or
-// customer URL segments. Exact row bindings remain private on the server.
+// Grouping/knowledge retain source templates. The owner-authorized raw diagnostic
+// records travel separately as private, untrusted model input, never write authority.
 export function createWorkerEvidenceProjector(repoRoot = process.cwd()) {
   const root = resolve(repoRoot);
   const sources = new Map<string, string>();
@@ -121,6 +122,7 @@ export function createWorkerEvidenceProjector(repoRoot = process.cwd()) {
     };
     return {
       ...cluster, rootCauseFamily: family, query, sourceFiles, relatedSourceFiles,
+      rawEvidence: occurrences.map(rawErrorEvidence),
       ...(cluster.diagnostics ? { diagnostics: {
         ...cluster.diagnostics,
         ...(recentAction ? { recentAction } : {}),

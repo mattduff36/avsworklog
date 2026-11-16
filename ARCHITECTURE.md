@@ -132,6 +132,8 @@ Current reality is mixed:
 
 Follow the module. Do not migrate a page to React Query “because the standards doc said so.”
 
+Single-absence deletion in `useAbsence` uses `delete_absence_with_timesheet_effects`, with the loaded `updated_at` as its concurrency token. The invoker RPC retains absence RLS and existing delete triggers; its scoped after-delete trigger reconciles entries, ordered job codes and snapshots in the same transaction. Cleanup runs after the row is deleted so entry guards cannot reapply that booking. Payroll locks or changed/incomplete restoration evidence abort the entire deletion. This requires `20261116_atomic_absence_delete.sql` before the updated hook is released; bulk/archive/year-undo and the separate update/cancel effect paths are unchanged. It does not serialize an already in-flight legacy timesheet-effects HTTP workflow.
+
 API input validation is inconsistent: some routes use shared Zod schemas, some inline Zod, some ad-hoc checks. New routes should validate with Zod and fail closed.
 
 ## State management

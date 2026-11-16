@@ -72,6 +72,15 @@ The `--target` values are exact allowlist identifiers, not filesystem paths. The
 
 The application requires `20261110_daily_check_deletion_effects.sql` before using the new deletion and source-attribution paths. Applying it requires separate authorization. Its checked HGV RPC augmentation deliberately rejects an unexpected deployed `save_hgv_inspection` definition; review that discrepancy rather than weakening the guard. Privileged deletion connections use only `POSTGRES_URL_NON_POOLING`, verify PostgreSQL TLS certificates and hostnames, and accept a validated hosted PEM CA bundle from `POSTGRES_SSL_CA_PEM`, then `SQUIRES_FIXERRORS_PRODUCTION_DATABASE_CA_PEM`, then a `PGSSLROOTCERT` file (otherwise system trust). No Fixerrors database URL or login is reused. The focused database unit target covers bundle validation and precedence; hosted live TLS remains deployment acceptance. Legacy ownership requires a unique unrevised audit transaction, not matching values or timestamps alone; unprovable cases have permanent reconciliation instructions.
 
+### Single-absence deletion
+
+```powershell
+$env:AVSWORKLOG_TEST_SKIP_DOTENV='1'
+npx tsx scripts\local-native-test-postgres.ts one-shot --target tests/db/absence-delete-runtime.test.ts
+```
+
+The fixture loads `20261116_atomic_absence_delete.sql` plus the production historic/year guards, timesheet authorisation helper, payroll entry/job-code guards and leave coercion. It covers atomic restoration/removal, rollback, RLS denial, protected records, stale snapshots and real competing absence/entry/payroll sessions. Identity, effective-role inputs and the minimal catalogue are fixture-mocked; this is not browser or full-Supabase acceptance. The migration is a predeploy prerequisite, not applied by application code. Existing update/cancel/apply HTTP workflows are outside this single-delete transaction.
+
 Manual sequence when you need to inspect the instance between steps:
 
 1. `npm run test:db:local:start`
