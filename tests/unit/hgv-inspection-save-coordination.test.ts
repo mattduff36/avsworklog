@@ -85,11 +85,13 @@ describe('HGV inspection save coordination', () => {
   let pg: PGlite | undefined;
 
   beforeEach(() => {
+    vi.stubEnv('HGV_DAILY_CHECK_UPDATES_ENABLED', 'true');
     vi.mocked(getInspectionRouteActorAccess).mockReset();
     vi.mocked(saveHgvInspectionForActor).mockReset();
   });
 
   afterEach(async () => {
+    vi.unstubAllEnvs();
     await pg?.close();
     pg = undefined;
   });

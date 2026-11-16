@@ -18,10 +18,10 @@ describe('HGV same-day rules', () => {
     expect(canCorrectHgvCheck(base, 'another-user', new Date('2026-07-01T23:30:00Z'))).toBe(false);
     expect(canCorrectHgvCheck({ ...base, status: 'draft' }, owner, new Date('2026-07-01T23:30:00Z'))).toBe(false);
   });
-  it('requires request identity, genuine full-check coverage and a fresh signature', () => {
+  it('accepts legacy payloads but requires full-check coverage and a fresh signature', () => {
     const body = { requestId: owner, hgvId: owner, userId: owner, inspectionDate: '2026-11-16', currentMileage: 100, status: 'submitted', inspectorComments: null, signatureData: 'data:image/png;base64,test', items: TRUCK_CHECKLIST_ITEMS.map((item,index) => ({ item_number:index+1,item_description:item,day_of_week:1,status:'ok',comments:null })) };
     expect(HgvInspectionSaveBodySchema.safeParse(body).success).toBe(true);
-    expect(HgvInspectionSaveBodySchema.safeParse({ ...body, requestId: undefined }).success).toBe(false);
+    expect(HgvInspectionSaveBodySchema.safeParse({ ...body, requestId: undefined }).success).toBe(true);
     expect(HgvInspectionSaveBodySchema.safeParse({ ...body, items: body.items.slice(0,1) }).success).toBe(false);
     expect(HgvInspectionSaveBodySchema.safeParse({ ...body, signatureData: null }).success).toBe(false);
   });

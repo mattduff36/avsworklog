@@ -45,6 +45,7 @@ export interface HgvCheckUpdateProps {
 }
 
 interface HistoryResponse {
+  updatesEnabled?: boolean;
 
   versions: HgvVersion[];
 
@@ -222,9 +223,9 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
 
       {check.parent_check_id && <Link className="text-sm underline" href={`/hgv-inspections/${check.parent_check_id}`}>View original daily check</Link>}
 
-      {owner && check.status === 'draft' && isReport && <Button onClick={() => open('defect')}>Resume defect report</Button>}
+      {history?.updatesEnabled && owner && check.status === 'draft' && isReport && <Button onClick={() => open('defect')}>Resume defect report</Button>}
 
-      {owner && check.status === 'submitted' && <div className="flex flex-wrap gap-2">
+      {history?.updatesEnabled && owner && check.status === 'submitted' && <div className="flex flex-wrap gap-2">
 
         {!isReport && <Button onClick={() => open('defect')}>Report a new defect</Button>}
 

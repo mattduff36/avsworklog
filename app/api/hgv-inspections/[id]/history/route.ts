@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { hgvDailyCheckUpdatesEnabled } from '@/lib/server/hgv-update-capabilities';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
@@ -20,5 +21,5 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     client.from('hgv_inspections').select('id,submitted_at,status,record_kind').eq('parent_check_id', id).order('submitted_at', { ascending: false }),
   ]);
   if (versions.error || observations.error || reports.error) return NextResponse.json({ error: 'Could not load check history' }, { status: 500 });
-  return NextResponse.json({ versions: versions.data, observations: observations.data, reports: reports.data });
+  return NextResponse.json({ versions: versions.data, observations: observations.data, reports: reports.data, updatesEnabled: hgvDailyCheckUpdatesEnabled() });
 }

@@ -306,6 +306,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Cached pre-compatibility forms still call this after saving. V2 has already
+    // committed the authoritative tasks; never replay an old client item set.
+    const { data: version, error: versionError } = await supabaseAdmin
+      .from('hgv_inspection_versions').select('inspection_id').eq('inspection_id', inspectionId).limit(1).maybeSingle();
+    if (versionError) return NextResponse.json({ error: 'Could not verify submitted check' }, { status: 503 });
+    if (version) return NextResponse.json({ success: true, created: 0, updated: 0, skipped: defects.length, dedupedClosed: 0, duplicates: [] });
+
     const { data: hgv } = await supabaseAdmin
       .from('hgvs')
       .select('reg_number')

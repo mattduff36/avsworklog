@@ -202,7 +202,7 @@ export async function loadLatestInspectionDates(
   let pageStart = 0;
 
   while (true) {
-    const { data, error } = await admin
+    let query = admin
       .from(tableName)
       .select(`${assetKey}, inspection_date`)
       .eq('status', 'submitted')
@@ -210,6 +210,11 @@ export async function loadLatestInspectionDates(
       .order(assetKey, { ascending: true })
       .order('inspection_date', { ascending: false })
       .range(pageStart, pageStart + INSPECTION_LOOKUP_PAGE_SIZE - 1);
+
+    if (tableName === 'hgv_inspections') {
+      query = query.eq('record_kind', 'full_check');
+    }
+    const { data, error } = await query;
 
     if (error) {
       throw error;

@@ -192,6 +192,16 @@ function createGenerationAdminMock() {
 }
 
 describe('fleet inspection actions', () => {
+  it('only counts full HGV checks towards inspection reminders', async () => {
+    const query = createThenableQuery({ data: [], error: null });
+    const admin = { from: vi.fn(() => query) };
+    await loadLatestInspectionDates(admin as never, 'hgv_inspections', 'hgv_id', ['hgv-1']);
+    expect(query.eq).toHaveBeenCalledWith('record_kind', 'full_check');
+    query.eq.mockClear();
+    await loadLatestInspectionDates(admin as never, 'van_inspections', 'van_id', ['van-1']);
+    expect(query.eq).not.toHaveBeenCalledWith('record_kind', 'full_check');
+  });
+
   it('pages submitted inspections so latest dates are not capped at the first 1000 rows', async () => {
     const firstPage = Array.from({ length: 1000 }, (_, index) => ({
       van_id: `older-van-${index}`,

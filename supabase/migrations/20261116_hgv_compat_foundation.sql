@@ -6,8 +6,7 @@ ALTER TABLE public.hgv_inspections
   ADD COLUMN discovered_at timestamptz,
   ADD COLUMN revision integer NOT NULL DEFAULT 0,
   ADD CONSTRAINT hgv_defect_report_no_meter CHECK (record_kind <> 'defect_report' OR current_mileage IS NULL);
-DROP INDEX IF EXISTS public.idx_unique_hgv_inspection_user_date;
-CREATE INDEX hgv_inspections_user_date ON public.hgv_inspections(hgv_id,user_id,inspection_date);
+-- Retain daily uniqueness until the compatibility app is verified in production.
 CREATE INDEX hgv_inspections_parent ON public.hgv_inspections(parent_check_id);
 
 -- No parent FK: evidence survives authorised deletion of the original check.
@@ -429,6 +428,104 @@ BEGIN
 END; $$;
 REVOKE ALL ON FUNCTION public.save_hgv_inspection_v2(uuid,boolean,uuid,uuid,date,uuid,text,integer,text,text,jsonb,uuid,text,uuid,timestamptz,text,integer,boolean) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.save_hgv_inspection_v2(uuid,boolean,uuid,uuid,date,uuid,text,integer,text,text,jsonb,uuid,text,uuid,timestamptz,text,integer,boolean) TO service_role;
--- Old date-key writes are unsafe after uniqueness is removed. New app uses explicit record identities.
-REVOKE EXECUTE ON FUNCTION public.save_hgv_inspection(uuid,boolean,uuid,uuid,date,uuid,uuid,text,integer,text,text,jsonb) FROM service_role;
+-- Close historical unsafe direct grants, retaining the old server during the deployment transition.
+REVOKE ALL ON FUNCTION public.save_hgv_inspection(uuid,boolean,uuid,uuid,date,uuid,uuid,text,integer,text,text,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.save_hgv_inspection(uuid,boolean,uuid,uuid,date,uuid,uuid,text,integer,text,text,jsonb) TO service_role;
+-- Production's compatibility API retains one-check-per-day semantics even after
+-- preview activation removes the index. Never select an arbitrary same-day row.
+CREATE FUNCTION public.save_hgv_inspection_compat(
+  p_actor_id uuid, p_actor_can_manage_others boolean, p_subject_user_id uuid,
+  p_hgv_id uuid, p_inspection_date date, p_hint_inspection_id uuid,
+  p_status text, p_current_mileage integer, p_inspector_comments text,
+  p_signature_data text, p_items jsonb, p_request_id uuid,
+  p_record_kind text, p_parent_check_id uuid, p_discovered_at timestamptz,
+  p_correction_reason text, p_expected_revision integer, p_inform_workshop boolean
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_row public.hgv_inspections%ROWTYPE;
+  v_ids uuid[];
+  v_hint uuid := p_hint_inspection_id;
+  v_request uuid := p_request_id;
+  v_items jsonb;
+  v_incoming jsonb;
+BEGIN
+  IF p_actor_id IS NULL OR p_subject_user_id IS NULL OR p_hgv_id IS NULL OR p_request_id IS NULL
+    OR p_inspection_date IS NULL OR p_record_kind IS DISTINCT FROM 'full_check'
+    OR p_parent_check_id IS NOT NULL OR p_correction_reason IS NOT NULL OR p_discovered_at IS NOT NULL THEN
+    RAISE EXCEPTION 'HGV_SAVE:INVALID_INPUT';
+  END IF;
+  IF p_subject_user_id <> p_actor_id AND NOT COALESCE(p_actor_can_manage_others,false) THEN
+    RAISE EXCEPTION 'HGV_SAVE:FORBIDDEN_SUBJECT';
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('hgv-check:' || p_hgv_id::text,0));
+  SELECT * INTO v_row FROM public.hgv_inspections WHERE id=COALESCE(v_hint,v_request) FOR UPDATE;
+  IF NOT FOUND THEN
+    IF v_hint IS NOT NULL THEN RAISE EXCEPTION 'HGV_SAVE:NOT_FOUND'; END IF;
+    SELECT array_agg(id) INTO v_ids FROM public.hgv_inspections
+      WHERE hgv_id=p_hgv_id AND user_id=p_subject_user_id AND inspection_date=p_inspection_date AND record_kind='full_check';
+    IF cardinality(v_ids)>1 THEN RAISE EXCEPTION 'HGV_SAVE:COMPAT_REFRESH_REQUIRED'; END IF;
+    IF cardinality(v_ids)=1 THEN
+      SELECT * INTO v_row FROM public.hgv_inspections WHERE id=v_ids[1] FOR UPDATE;
+    END IF;
+  END IF;
+  IF v_row.id IS NOT NULL THEN
+    IF v_row.user_id <> p_actor_id AND NOT COALESCE(p_actor_can_manage_others,false) THEN RAISE EXCEPTION 'HGV_SAVE:FORBIDDEN_OWNER'; END IF;
+    IF v_row.hgv_id IS DISTINCT FROM p_hgv_id OR v_row.user_id <> p_subject_user_id
+      OR v_row.inspection_date <> p_inspection_date OR v_row.record_kind <> 'full_check' THEN
+      RAISE EXCEPTION 'HGV_SAVE:IDENTITY_CHANGED';
+    END IF;
+    v_hint := v_row.id;
+    v_request := v_row.id;
+    IF v_row.status='submitted' THEN
+      -- Only an exact, uncorrected retry can acknowledge a completed legacy save.
+      -- A stale form must never silently claim that changed answers were saved.
+      SELECT jsonb_agg(jsonb_build_object('item_number',item_number,'item_description',item_description,
+        'day_of_week',day_of_week,'status',status,'comments',NULLIF(comments,'')) ORDER BY item_number)
+        INTO v_items FROM public.inspection_items WHERE inspection_id=v_row.id;
+      SELECT jsonb_agg(jsonb_build_object('item_number',(x->>'item_number')::int,'item_description',x->>'item_description',
+        'day_of_week',(x->>'day_of_week')::int,'status',x->>'status','comments',NULLIF(x->>'comments','')) ORDER BY (x->>'item_number')::int)
+        INTO v_incoming FROM jsonb_array_elements(p_items) x;
+      IF p_status <> 'submitted' OR v_row.revision <> 0 OR p_current_mileage IS DISTINCT FROM v_row.current_mileage
+        OR NULLIF(p_inspector_comments,'') IS DISTINCT FROM NULLIF(v_row.inspector_comments,'')
+        OR p_signature_data IS DISTINCT FROM v_row.signature_data OR v_items IS DISTINCT FROM v_incoming THEN
+        RAISE EXCEPTION 'HGV_SAVE:COMPAT_CHECK_EXISTS';
+      END IF;
+      RETURN jsonb_build_object('id',v_row.id,'status',v_row.status,'revision',v_row.revision,
+        'items',COALESCE((SELECT jsonb_agg(to_jsonb(i)) FROM public.inspection_items i WHERE inspection_id=v_row.id),'[]'::jsonb));
+    END IF;
+  END IF;
+  RETURN public.save_hgv_inspection_v2(p_actor_id,p_actor_can_manage_others,p_subject_user_id,p_hgv_id,
+    p_inspection_date,v_hint,p_status,p_current_mileage,p_inspector_comments,p_signature_data,p_items,v_request,
+    'full_check',NULL,NULL,NULL,NULL,p_inform_workshop);
+END; $$;
+REVOKE ALL ON FUNCTION public.save_hgv_inspection_compat(uuid,boolean,uuid,uuid,date,uuid,text,integer,text,text,jsonb,uuid,text,uuid,timestamptz,text,integer,boolean) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.save_hgv_inspection_compat(uuid,boolean,uuid,uuid,date,uuid,text,integer,text,text,jsonb,uuid,text,uuid,timestamptz,text,integer,boolean) TO service_role;
+-- Cached clients report optional inspector notes in a second request. Keep this
+-- safe/idempotent, and refuse stale notes after a preview correction.
+CREATE FUNCTION public.inform_hgv_workshop_compat(p_actor_id uuid,p_can_manage boolean,p_inspection_id uuid,p_hgv_id uuid,p_comments text)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_row public.hgv_inspections%ROWTYPE; v_task uuid; v_category uuid; v_reg text;
+BEGIN
+  IF p_actor_id IS NULL OR p_hgv_id IS NULL THEN RAISE EXCEPTION 'HGV_SAVE:FORBIDDEN_OWNER'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('hgv-check:'||p_hgv_id::text,0));
+  SELECT * INTO v_row FROM public.hgv_inspections WHERE id=p_inspection_id FOR UPDATE;
+  IF NOT FOUND OR v_row.hgv_id IS DISTINCT FROM p_hgv_id OR (v_row.user_id<>p_actor_id AND NOT COALESCE(p_can_manage,false)) THEN
+    RAISE EXCEPTION 'HGV_SAVE:FORBIDDEN_OWNER';
+  END IF;
+  IF v_row.status<>'submitted' OR v_row.record_kind<>'full_check' OR v_row.revision<>0
+    OR length(trim(COALESCE(p_comments,'')))<5 OR trim(p_comments) IS DISTINCT FROM trim(v_row.inspector_comments) THEN
+    RAISE EXCEPTION 'HGV_SAVE:COMPAT_REFRESH_REQUIRED';
+  END IF;
+  SELECT id INTO v_task FROM public.actions WHERE inspection_id=v_row.id AND action_type='workshop_vehicle_task' ORDER BY created_at,id LIMIT 1;
+  IF v_task IS NOT NULL THEN RETURN v_task; END IF;
+  SELECT reg_number INTO v_reg FROM public.hgvs WHERE id=p_hgv_id;
+  SELECT id INTO v_category FROM public.workshop_task_categories WHERE name IN ('Repair','Other') AND applies_to='hgv' AND is_active ORDER BY name LIMIT 1;
+  INSERT INTO public.actions(action_type,hgv_id,title,description,status,created_by,inspection_id,workshop_category_id,daily_check_source_id,daily_check_source_type)
+    VALUES('workshop_vehicle_task',p_hgv_id,'HGV '||v_reg||': Inspector Comments',trim(p_comments),'pending',p_actor_id,v_row.id,v_category,v_row.id,'hgv') RETURNING id INTO v_task;
+  INSERT INTO public.hgv_defect_observations(inspection_id,revision,item_number,task_id,comment)
+    VALUES(v_row.id,0,0,v_task,trim(p_comments));
+  RETURN v_task;
+END; $$;
+REVOKE ALL ON FUNCTION public.inform_hgv_workshop_compat(uuid,boolean,uuid,uuid,text) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.inform_hgv_workshop_compat(uuid,boolean,uuid,uuid,text) TO service_role;
 COMMIT;
