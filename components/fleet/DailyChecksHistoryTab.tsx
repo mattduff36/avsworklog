@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TabsContent } from '@/components/ui/tabs';
+import { guestInspectorName } from '@/lib/inspections/guest-plant';
 import { createClient } from '@/lib/supabase/client';
 import { formatDate, formatDateTime } from '@/lib/utils/date';
 import type {
@@ -127,6 +128,8 @@ export async function fetchDailyChecks(assetType: AssetType, assetId: string) {
         .from('plant_inspections')
         .select(`
           id,
+          guest_name,
+          guest_submission_id,
           inspection_date,
           inspection_end_date,
           submitted_at,
@@ -140,7 +143,7 @@ export async function fetchDailyChecks(assetType: AssetType, assetId: string) {
         .limit(50);
 
       if (error) throw error;
-      return addDefectCounts((data || []) as unknown as DailyCheckHistoryItem[]);
+      return addDefectCounts((data || []).map(row => ({ ...row, profile: row.guest_name ? { full_name: guestInspectorName(row) } : row.profile })) as unknown as DailyCheckHistoryItem[]);
     }
     case 'hgv': {
       const { data, error } = await supabase

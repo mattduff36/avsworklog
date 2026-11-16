@@ -1,6 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { usePathname } from 'next/navigation';
 import { Toaster } from '@/components/ui/sonner';
 import { PwaShellBridge } from '@/components/layout/PwaShellBridge';
 import { DatabaseOutageBlocker } from '@/components/system/DatabaseOutageBlocker';
@@ -33,6 +34,10 @@ interface AppProvidersProps {
 }
 
 export function AppProviders({ children, shouldLoadAnalytics }: AppProvidersProps) {
+  const pathname = usePathname();
+  // Guest capability fragments, names and signatures must never enter app analytics/error capture.
+  // No authenticated providers/data-token bootstrap are needed on this isolated public form.
+  if (pathname === '/guest-plant-checks') return <>{children}<Toaster /></>;
   return (
     <>
       <PwaShellBridge />

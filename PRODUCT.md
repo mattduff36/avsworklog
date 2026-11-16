@@ -103,6 +103,14 @@ Deletion atomically removes the check and its check-specific children, reverses 
 
 Plant services use the global hours interval in Workshop Service Settings unless a manager sets an individual interval override in the Plant maintenance record. A blank override follows the global interval. Interval changes recalculate the next due reading from the recorded last-service hours; global changes preserve individual overrides. Assets without recorded last-service hours retain their existing due reading. Service completion and correction use the effective interval and retain it in the service event history.
 
+## Temporary staff Plant Daily Checks
+
+Admin Settings → Daily Checks controls a shared QR code, disabled until an administrator enables it. Each sticker opens the same active company-plant picker (plant-type icon, fleet number and description). Hired plant and inventory small tools are excluded. Temporary staff enter their name and exact numeric job number, choose a matching active job, complete today's UK checklist and hours, and sign. Defect photos are optional; no account or site PIN is required.
+
+Checks submit immediately with Temporary staff attribution and the normal Workshop defect/meter effects. Different workers, including workers with the same name, may check the same plant on the same day. Retrying an uncertain submission returns the same receipt. An internet connection is required; answers remain in the open form during retries. Managers/supervisors with Plant Daily Checks access and authorised Workshop/admin users see guest checks independently of Daily Allocation assignments. Reconciliation groups multiple checks per asset/day so they do not multiply usage.
+
+Disabling access or replacing the QR invalidates active guest sessions; replacement requires new stickers. Existing submitted evidence is retained. Settings support QR SVG download and printable labels.
+
 ## Van service rotation
 
 Vans alternate Basic Service A and Full Service, with the next service due 10,000 miles after the actual completed service mileage. The existing van checklist remains the Full Service checklist. Basic Service A retains core checks and engine oil/filter servicing, but fuel, air, pollen and gearbox filter items are checks/cleaning rather than routine replacement.

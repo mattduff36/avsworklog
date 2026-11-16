@@ -1,3 +1,4 @@
+import { guestInspectorName } from '@/lib/inspections/guest-plant';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
@@ -95,6 +96,8 @@ export async function GET(
         actioned_at,
         logged_at,
         created_by,
+        daily_check_source_id,
+        daily_check_source_type,
         workshop_task_categories (
           name
         )
@@ -113,6 +116,10 @@ export async function GET(
     // Fetch profile names for workshop tasks using service role for consistency
     let tasksWithProfiles = workshopTasks || [];
     if (workshopTasks && workshopTasks.length > 0) {
+      const checkIds = workshopTasks.filter(t => t.daily_check_source_type === 'plant').map(t => t.daily_check_source_id).filter((id): id is string => Boolean(id));
+      // Normal client retains guest-check RLS, even though legacy workshop history uses service-role reads.
+      const { data: guestChecks } = checkIds.length ? await supabase.from('plant_inspections').select('id,guest_name').in('id',checkIds) : { data: [] };
+      const guestNames = new Map((guestChecks || []).filter(c => c.guest_name).map(c => [c.id,guestInspectorName(c)]));
       const userIds = [...new Set(workshopTasks.map(t => t.created_by).filter(Boolean))];
       
       if (userIds.length > 0) {
@@ -125,7 +132,7 @@ export async function GET(
         const profileMap = new Map((profiles || []).map(p => [p.id, p.full_name]));
         tasksWithProfiles = workshopTasks.map(task => ({
           ...task,
-          profiles: task.created_by ? { full_name: profileMap.get(task.created_by) || null } : null
+          profiles: task.created_by ? { full_name: (task.daily_check_source_type === 'plant' && task.daily_check_source_id ? guestNames.get(task.daily_check_source_id) : null) || profileMap.get(task.created_by) || null } : null
         }));
       } else {
         // No user IDs to fetch, but still need to add profiles property (as null) to each task

@@ -1,3 +1,4 @@
+import { guestInspectorName, guestPlantRoleCanRead } from '@/lib/inspections/guest-plant';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getVehicleCategoryName } from '@/lib/utils/deprecation-logger';
@@ -6,7 +7,7 @@ import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { buildSafeReportFilename, parseReportDateRange, validateRequiredReportDateRange } from '@/lib/server/report-date-range';
 import { getReportScopeContext, getScopedProfileIdsForModule } from '@/lib/server/report-scope';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { filterHiddenReportSubjects, getReportHiddenProfileIds } from '@/lib/server/system-accounts';
+import { filterHiddenReportSubjects, filterGuestPlantReportSubjects, getReportHiddenProfileIds } from '@/lib/server/system-accounts';
 import { 
   generateExcelFile, 
   formatExcelDate, 
@@ -52,6 +53,8 @@ type VanInspectionRow = {
 };
 
 type PlantInspectionRow = {
+  guest_name?: string | null;
+  guest_submission_id?: string | null;
   id: string;
   user_id: string;
   plant?: PlantAssetRow | null;
@@ -138,13 +141,14 @@ export async function GET(request: NextRequest) {
     }
 
     const scopeContext = await getReportScopeContext();
+    const allowGuestPlant = canAccessPlantChecks && guestPlantRoleCanRead(scopeContext.effectiveRole);
     const scopedModuleIds = await getScopedModuleProfileIds(availableModules, scopeContext);
 
     const hasAnyScope = availableModules.some((moduleName) => {
       const scoped = scopedModuleIds.get(moduleName);
       return scoped === null || (scoped?.size ?? 0) > 0;
     });
-    if (!hasAnyScope) {
+    if (!hasAnyScope && !allowGuestPlant) {
       return NextResponse.json({ error: 'No daily checks found for the specified criteria' }, { status: 404 });
     }
 
@@ -201,6 +205,8 @@ export async function GET(request: NextRequest) {
               .select(`
                 id,
                 user_id,
+                guest_name,
+                guest_submission_id,
                 inspection_date,
                 inspection_end_date,
                 status,
@@ -223,7 +229,7 @@ export async function GET(request: NextRequest) {
 
             if (dateFrom) query = query.gte('inspection_date', dateFrom);
             if (dateTo) query = query.lte('inspection_date', dateTo);
-            if (plantScope) query = query.in('user_id', Array.from(plantScope));
+            if (plantScope) query = allowGuestPlant ? query.or(`user_id.in.(${Array.from(plantScope).join(',') || '00000000-0000-0000-0000-000000000000'}),guest_submission_id.not.is.null`) : query.in('user_id', Array.from(plantScope));
 
             return query;
           })()
@@ -273,7 +279,7 @@ export async function GET(request: NextRequest) {
     }
 
     const visibleVan = filterHiddenReportSubjects((vanResult.data || []) as VanInspectionRow[], hiddenProfileIds);
-    const visiblePlant = filterHiddenReportSubjects((plantResult.data || []) as PlantInspectionRow[], hiddenProfileIds);
+    const visiblePlant = filterGuestPlantReportSubjects((plantResult.data || []) as PlantInspectionRow[], hiddenProfileIds, allowGuestPlant).map(row => ({ ...row, inspector: { ...row.inspector, full_name: guestInspectorName(row, row.inspector?.full_name || 'Unknown') } }));
     const visibleHgv = filterHiddenReportSubjects((hgvResult.data || []) as HgvInspectionRow[], hiddenProfileIds);
 
     const unifiedRows: UnifiedDailyCheckRow[] = [

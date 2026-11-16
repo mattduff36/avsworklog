@@ -1,4 +1,5 @@
 const PUBLIC_BROWSER_ROUTE_PREFIXES = [
+  '/guest-plant-checks',
   '/login',
   '/change-password',
   '/offline',
@@ -9,6 +10,7 @@ const PUBLIC_BROWSER_ROUTE_PREFIXES = [
 ] as const;
 
 const PUBLIC_API_ROUTE_PREFIXES = [
+  '/api/guest-plant-checks',
   '/api/display-board/',
   '/api/daily-allocation/deployment-identity',
   '/api/inventory/kiosk/pairing',

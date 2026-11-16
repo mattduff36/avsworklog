@@ -1,4 +1,5 @@
 'use client';
+import { guestInspectorName } from '@/lib/inspections/guest-plant';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
@@ -31,6 +32,8 @@ import { toast } from 'sonner';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 interface PlantInspectionWithDetails {
+  guest_name?: string | null;
+  guest_submission_id?: string | null;
   id: string;
   user_id: string;
   plant_id: string | null;
@@ -183,7 +186,7 @@ export default function ViewPlantInspectionPage() {
       
       if (
         inspectionData &&
-        !canAccessScopedInspection({
+        !(inspectionData.guest_submission_id && canViewCrossUserInspections) && !canAccessScopedInspection({
           ownerUserId: inspectionData.user_id,
           currentUserId: user?.id,
           canViewCrossUserInspections,
@@ -626,6 +629,7 @@ export default function ViewPlantInspectionPage() {
                   : formatDate(inspection.inspection_date)
                 }
               </p>
+              <p>{guestInspectorName(inspection, inspection.profiles?.full_name || 'Unknown')}</p>
               {inspection.job_code ? (
                 <p className="mt-1 text-sm text-muted-foreground">
                   Job {inspection.job_code}

@@ -196,6 +196,14 @@ Do not log cookies, Authorization headers, session secrets, passwords, PINs, or 
 
 Analytics metadata already redacts sensitive keys (`lib/analytics/events.ts`). Automation logs use `redactSensitiveText`. Application `logger.error` still forwards to the error logger — do not put secrets in `additionalData`.
 
+## Guest Plant Daily Checks boundary
+
+The public `/guest-plant-checks` route exchanges a random shared QR fragment for an HttpOnly, SameSite Strict cookie scoped to `/api/guest-plant-checks`. It does not issue an application login or Supabase token. The fragment is removed before requests and the route omits analytics/error providers. Server-side settings default off; disable/rotation invalidate sessions by generation. Database authorization lasts four hours; the 24-hour transport cookie additionally permits exact-payload receipt recovery after expiry, with no new write or history access.
+
+Private settings/session/upload/idempotency tables deny anonymous and authenticated database access. Same-origin checks, bounded bodies, rate limits, exact active job identity, active company asset validation, complete checklist validation, photo ownership and atomic submission enforce the boundary. Temporary names are self-declared, persisted immutably with a dedicated banned system ownership account and retained by deletion snapshots. Guest visibility adds no general exception for system-account employees: only explicit guest plant records are included for authorised Plant Daily Checks managers/supervisors and Workshop/admin access. Restrictive RLS also protects child evidence.
+
+Admin changes reuse the existing Level 5 Admin Settings and sensitive-access gate. QR tokens must not enter logs, analytics or audit changes. Photo staging is re-encoded and ownership-bound; abandoned uploads older than 24 hours are cleaned in bounded batches on valid QR entry or Admin Settings access, using row locks to exclude concurrent submissions.
+
 ## Tests
 
 For permission or authz changes, prove **allowed** and **denied** paths. `testsuite/` has role projects (employee/manager/admin) and permission tests. Unit tests around `lib/utils/rbac.ts`, `lib/server/team-permissions.ts`, and module `require*` helpers are the fast layer. Sensitive PIN flow is `lib/server/sensitive-pin.ts` plus `components/security/SensitiveModuleGate.tsx`.

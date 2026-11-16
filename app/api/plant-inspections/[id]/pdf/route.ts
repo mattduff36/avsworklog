@@ -1,3 +1,4 @@
+import { guestInspectorName } from '@/lib/inspections/guest-plant';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToStream } from '@react-pdf/renderer';
@@ -6,6 +7,7 @@ import { getProfileWithRole } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 
 interface PlantInspectionWithRelations {
+  guest_name?: string | null;
   id: string;
   user_id: string;
   inspection_date: string;
@@ -137,7 +139,7 @@ export async function GET(
             van_categories: inspectionWithRelations.plant?.van_categories || null,
           },
       operator: {
-        full_name: inspectionWithRelations.profile?.full_name || 'Unknown',
+        full_name: guestInspectorName(inspectionWithRelations, inspectionWithRelations.profile?.full_name || 'Unknown'),
       },
       items: items.map(item => ({
         item_number: item.item_number,

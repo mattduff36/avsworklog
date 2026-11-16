@@ -707,6 +707,9 @@ input[type="date"]::-webkit-datetime-edit-year-field {
 
 /* Mobile View - 20% scale reduction */
 @media (max-width: 768px) {
+  .guest-plant-checks input, .guest-plant-checks textarea { font-size: 16px !important; }
+  .guest-plant-checks button, .guest-plant-checks input:not([type="checkbox"]):not([type="file"]) { min-height: 48px; }
+  .guest-plant-checks input[type="checkbox"] { min-width: 22px; min-height: 22px; }
   html { font-size: 12.8px; }
   
   .h-10 { height: 2rem !important; }
@@ -1069,3 +1072,11 @@ body.app-widescreen-enabled main > .max-w-7xl {
   .bg-policies-procedures-dark { background-color: hsl(var(--policies-procedures-dark)); }
   .text-policies-procedures { color: hsl(var(--policies-procedures-primary)); }
   .border-policies-procedures { border-color: hsl(var(--policies-procedures-primary)); }
+
+/* Public inspection form deliberately opts out of dashboard mobile compression. */
+html.guest-plant-page { font-size: 16px !important; }
+.guest-plant-checks { padding: 20px 16px 40px; font-size: 16px; }
+.guest-plant-checks .text-sm { font-size: 14px !important; }
+.guest-plant-checks .text-xl { font-size: 20px !important; }
+.guest-plant-checks button { min-height: 48px; }
+.guest-plant-checks .grid > button.min-h-36 { min-height: 150px; }

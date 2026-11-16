@@ -1,3 +1,6 @@
+import { guestPlantRoleCanRead } from '@/lib/inspections/guest-plant';
+import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
+import { getEffectiveRole } from '@/lib/utils/view-as';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { normalizeHiredPlantSerial } from '@/lib/utils/job-catalogue';
@@ -135,6 +138,9 @@ export function reconcilePlant<T extends PlannedPlantInput>(
 
   for (const inspection of submitted) {
     if (usedInspectionIds.has(inspection.id)) continue;
+    const matchingChecks = submitted.filter(other => other.inspection_date === inspection.inspection_date && (inspection.plant_id ? other.plant_id === inspection.plant_id : other.is_hired_plant && other.hired_plant_id_serial === inspection.hired_plant_id_serial && other.hired_plant_hiring_company === inspection.hired_plant_hiring_company));
+    matchingChecks.forEach(other => usedInspectionIds.add(other.id));
+    const actualJobCodes = Array.from(new Set(matchingChecks.map(other => other.job_code).filter((code): code is string => Boolean(code))));
     const registered = inspection.plant_id ? plantById.get(inspection.plant_id) : null;
     rows.push({
       work_date: inspection.inspection_date,
@@ -149,9 +155,9 @@ export function reconcilePlant<T extends PlannedPlantInput>(
             nickname: registered?.nickname,
           }),
       planned_job_code: null,
-      actual_job_code: inspection.job_code,
+      actual_job_code: actualJobCodes.join(', ') || null,
       inspection_id: inspection.id,
-      status: inspection.job_code ? 'unplanned_actual' : 'unclassified_actual',
+      status: actualJobCodes.length > 1 ? 'job_conflict' : actualJobCodes.length ? 'unplanned_actual' : 'unclassified_actual',
     });
   }
 
@@ -292,6 +298,7 @@ export async function loadJobSheet(jobCode: string): Promise<DailyJobSheetPayloa
   const plantItems = (plantItemsForJob || []).filter((item) => latestV1Ids.has(item.publication_id));
   const v2PlantItems = (publishedPlantForJob || []).filter((item) => latestV2Ids.has(item.publication_id));
 
+  const includeGuestPlant = guestPlantRoleCanRead(await getEffectiveRole()) && await canEffectiveRoleAccessModule('plant-inspections');
   const scopedProfileIds = await loadScopedProfileIds(supabase, context.is_admin);
   const inspectionScope = scopedProfileIds.length
     ? scopedProfileIds
@@ -300,7 +307,7 @@ export async function loadJobSheet(jobCode: string): Promise<DailyJobSheetPayloa
     .from('plant_inspections')
     .select('id, user_id, inspection_date, plant_id, is_hired_plant, hired_plant_id_serial, hired_plant_hiring_company, hired_plant_description, job_code, status')
     .eq('job_code', canonicalJobCode)
-    .in('user_id', inspectionScope);
+    .or(`user_id.in.(${inspectionScope.join(',')})${includeGuestPlant ? ',guest_submission_id.not.is.null' : ''}`);
   const inspectionDates = Array.from(new Set((jobInspections || []).map((row) => row.inspection_date)));
   const workDates = Array.from(new Set([...relatedDates, ...inspectionDates]));
   const { data: inspections } = workDates.length
@@ -308,7 +315,7 @@ export async function loadJobSheet(jobCode: string): Promise<DailyJobSheetPayloa
         .from('plant_inspections')
         .select('id, user_id, inspection_date, plant_id, is_hired_plant, hired_plant_id_serial, hired_plant_hiring_company, hired_plant_description, job_code, status')
         .in('inspection_date', workDates)
-        .in('user_id', inspectionScope)
+        .or(`user_id.in.(${inspectionScope.join(',')})${includeGuestPlant ? ',guest_submission_id.not.is.null' : ''}`)
     : { data: jobInspections || [] };
 
   const { data: plants } = await admin
@@ -475,6 +482,7 @@ export async function loadPlantReconciliation(workDate: string): Promise<{
   const collapsedV2 = collapsePublishedPlantForDay(v2Plant || []);
   const planned = [...(v1Plant || []), ...collapsedV2];
 
+  const includeGuestPlant = guestPlantRoleCanRead(await getEffectiveRole()) && await canEffectiveRoleAccessModule('plant-inspections');
   const scopedProfileIds = await loadScopedProfileIds(supabase, context.is_admin);
   const inspectionScope = scopedProfileIds.length
     ? scopedProfileIds
@@ -483,7 +491,7 @@ export async function loadPlantReconciliation(workDate: string): Promise<{
     .from('plant_inspections')
     .select('id, user_id, inspection_date, plant_id, is_hired_plant, hired_plant_id_serial, hired_plant_hiring_company, hired_plant_description, job_code, status')
     .eq('inspection_date', workDate)
-    .in('user_id', inspectionScope);
+    .or(`user_id.in.(${inspectionScope.join(',')})${includeGuestPlant ? ',guest_submission_id.not.is.null' : ''}`);
   const { data: plants } = await admin
     .from('plant')
     .select('id, plant_id, nickname');

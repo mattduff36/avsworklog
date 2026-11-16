@@ -1,3 +1,4 @@
+import { isGuestPlantCheck } from '@/lib/inspections/guest-plant';
 import type { InspectionItem } from '@/types/inspection';
 import type { ModuleName } from '@/types/roles';
 import { filterHiddenReportSubjects } from '@/lib/server/system-accounts';
@@ -12,6 +13,8 @@ export interface InspectionExportManifestRow {
   user_id: string;
   inspection_date: string;
   source: InspectionExportSource;
+  guest_name?: string | null;
+  guest_submission_id?: string | null;
 }
 
 interface ProfileShape {
@@ -58,6 +61,8 @@ export interface VanInspectionWithRelations extends BaseInspectionShape {
 
 export interface PlantInspectionWithRelations extends BaseInspectionShape {
   source: 'plant';
+  guest_name?: string | null;
+  guest_submission_id?: string | null;
   plant?: PlantShape | null;
   profile?: ProfileShape | null;
   is_hired_plant?: boolean | null;
@@ -82,6 +87,7 @@ interface InspectionExportPage {
 }
 
 export interface InspectionExportQuery {
+  or?(filters: string): InspectionExportQuery;
   neq(column: string, value: string): InspectionExportQuery;
   gte(column: string, value: string): InspectionExportQuery;
   lte(column: string, value: string): InspectionExportQuery;
@@ -102,6 +108,7 @@ export interface InspectionExportScopeArgs {
   availableModules: readonly ModuleName[];
   scopedModuleIds: Map<ModuleName, Set<string> | null>;
   hiddenProfileIds: Set<string>;
+  includeGuestPlant?: boolean;
   signal?: AbortSignal;
   pageSize?: number;
 }
@@ -144,6 +151,7 @@ const VAN_DETAIL_SELECT = `
 `;
 
 const PLANT_DETAIL_SELECT = `
+  guest_name, guest_submission_id,
   id,
   user_id,
   inspection_date,
@@ -212,16 +220,18 @@ export function compareInspectionExportOrder(
 }
 
 export function heavyRowStillAuthorised(
-  row: { status?: string | null; inspection_date?: string | null; user_id?: string | null },
+  row: { status?: string | null; inspection_date?: string | null; user_id?: string | null; guest_name?: string | null; guest_submission_id?: string | null; source?: string },
   args: {
     dateFrom: string;
     dateTo: string;
     ownerScope: Set<string> | null;
+    includeGuestPlant?: boolean;
     hiddenProfileIds: Set<string>;
   },
 ): boolean {
   if (!row.user_id || !row.inspection_date || row.status == null || row.status === 'draft') return false;
   if (row.inspection_date < args.dateFrom || row.inspection_date > args.dateTo) return false;
+  if (args.includeGuestPlant && row.source === 'plant' && isGuestPlantCheck(row)) return true;
   if (args.hiddenProfileIds.has(row.user_id)) return false;
   if (args.ownerScope && !args.ownerScope.has(row.user_id)) return false;
   return true;
@@ -240,13 +250,14 @@ function applyListFilters(
   query: InspectionExportQuery,
   args: { dateFrom: string; dateTo: string },
   ownerScope: Set<string> | null,
+  includeGuests = false,
 ): InspectionExportQuery {
   let next = query
     .neq('status', 'draft')
     .gte('inspection_date', args.dateFrom)
     .lte('inspection_date', args.dateTo);
   if (ownerScope) {
-    next = next.in('user_id', [...ownerScope]);
+    next = includeGuests && next.or ? next.or(`user_id.in.(${[...ownerScope].join(',') || '00000000-0000-0000-0000-000000000000'}),guest_submission_id.not.is.null`) : next.in('user_id', [...ownerScope]);
   }
   return next
     .order('inspection_date', { ascending: true })
@@ -287,6 +298,7 @@ function asManifestRow(row: Record<string, unknown>, source: InspectionExportSou
     user_id: row.user_id,
     inspection_date: row.inspection_date,
     source,
+    ...(source === 'plant' ? { guest_name: typeof row.guest_name === 'string' ? row.guest_name : null, guest_submission_id: typeof row.guest_submission_id === 'string' ? row.guest_submission_id : null } : {}),
   };
 }
 
@@ -298,20 +310,21 @@ async function loadSourceManifest(
   const moduleName = SOURCE_MODULE[source];
   if (!args.availableModules.includes(moduleName)) return [];
   const ownerScope = ownerScopeFor(source, args.scopedModuleIds);
-  if (ownerScope && ownerScope.size === 0) return [];
+  if (ownerScope && ownerScope.size === 0 && !(source === 'plant' && args.includeGuestPlant)) return [];
 
   const pageSize = args.pageSize ?? INSPECTION_EXPORT_PAGE_SIZE;
   const rows = await readCompletePages(async (from, to) => {
     const query = applyListFilters(
-      reader.from(SOURCE_TABLE[source]).select('id, user_id, inspection_date'),
+      reader.from(SOURCE_TABLE[source]).select(source === 'plant' ? 'id, user_id, inspection_date, guest_name, guest_submission_id' : 'id, user_id, inspection_date'),
       args,
       ownerScope,
+      source === 'plant' && args.includeGuestPlant,
     );
     return query.range(from, to);
   }, args.signal, pageSize);
 
   const manifest = rows.map((row) => asManifestRow(row, source));
-  return filterHiddenReportSubjects(manifest, args.hiddenProfileIds);
+  return manifest.filter(row => source === 'plant' && args.includeGuestPlant && isGuestPlantCheck(row) || filterHiddenReportSubjects([row], args.hiddenProfileIds).length > 0);
 }
 
 export async function loadInspectionExportManifest(
@@ -347,12 +360,12 @@ async function loadSourceDetails(
   const ids = manifest.filter((row) => row.source === source).map((row) => row.id);
   if (ids.length === 0) return [];
   const ownerScope = ownerScopeFor(source, args.scopedModuleIds);
-  if (ownerScope && ownerScope.size === 0) return [];
+  if (ownerScope && ownerScope.size === 0 && !(source === 'plant' && args.includeGuestPlant)) return [];
 
   const pageSize = args.pageSize ?? INSPECTION_EXPORT_PAGE_SIZE;
   const rows = await readCompletePages(async (from, to) => {
     let query = reader.from(SOURCE_TABLE[source]).select(DETAIL_SELECT[source]).in('id', ids);
-    query = applyListFilters(query, args, ownerScope);
+    query = applyListFilters(query, args, ownerScope, source === 'plant' && args.includeGuestPlant);
     return query.range(from, to);
   }, args.signal, pageSize, ids.length);
 
@@ -363,8 +376,9 @@ async function loadSourceDetails(
       dateTo: args.dateTo,
       ownerScope,
       hiddenProfileIds: args.hiddenProfileIds,
+      includeGuestPlant: args.includeGuestPlant,
     }));
-  const visible = filterHiddenReportSubjects(authorised, args.hiddenProfileIds);
+  const visible = authorised.filter(row => row.source === 'plant' && args.includeGuestPlant && isGuestPlantCheck(row) || filterHiddenReportSubjects([row], args.hiddenProfileIds).length > 0);
   const visibleById = new Map(visible.map((row) => [row.id, row]));
   return ids.flatMap((id) => {
     const row = visibleById.get(id);

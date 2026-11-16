@@ -18,6 +18,7 @@ import {
 import { TimesheetTypeExceptionsCard } from './components/TimesheetTypeExceptionsCard';
 import { PayrollRulesSettingsCard } from './components/PayrollRulesSettingsCard';
 import { BankHolidaySelfOverrideCard } from './components/BankHolidaySelfOverrideCard';
+import { GuestPlantChecksSettingsCard } from './components/GuestPlantChecksSettingsCard';
 
 const SETTINGS_HELPER_TEXT_CLASS = 'text-sm leading-relaxed text-slate-400';
 
@@ -31,10 +32,10 @@ const PermissionsGuide = dynamic(
   { ssr: false, loading: () => <PanelLoader message="Loading permission guide..." className="py-12" /> }
 );
 
-type AdminSettingsTab = 'permissions' | 'permission-guide' | 'timesheets';
+type AdminSettingsTab = 'permissions' | 'permission-guide' | 'timesheets' | 'daily-checks';
 
 function isAdminSettingsTab(value: string | null): value is AdminSettingsTab {
-  return value === 'permissions' || value === 'permission-guide' || value === 'timesheets';
+  return value === 'permissions' || value === 'permission-guide' || value === 'timesheets' || value === 'daily-checks';
 }
 
 function AdminSettingsContent() {
@@ -115,7 +116,7 @@ function AdminSettingsContent() {
           if (isAdminSettingsTab(value)) handleSettingsTabChange(value);
         }}
       >
-        <TabsList className="grid w-full max-w-2xl grid-cols-3">
+        <TabsList className="grid h-auto w-full max-w-3xl grid-cols-2 sm:grid-cols-4">
           <TabsTrigger value="permissions" className="gap-2">
             <ShieldCheck className="h-4 w-4" />
             Permissions
@@ -125,6 +126,7 @@ function AdminSettingsContent() {
             Permission Guide
           </TabsTrigger>
           <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
+          <TabsTrigger value="daily-checks">Daily Checks</TabsTrigger>
         </TabsList>
 
         <TabsContent value="permissions" className="space-y-6">
@@ -135,6 +137,7 @@ function AdminSettingsContent() {
           <PermissionsGuide />
         </TabsContent>
 
+        <TabsContent value="daily-checks" className="space-y-6"><GuestPlantChecksSettingsCard /></TabsContent>
         <TabsContent value="timesheets" className="space-y-6">
           <Card className="overflow-hidden border-avs-yellow/25 bg-slate-900/80">
             <CardHeader className="border-b border-border bg-gradient-to-r from-avs-yellow/10 via-transparent to-transparent">

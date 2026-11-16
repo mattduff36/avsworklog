@@ -1,4 +1,5 @@
 'use client';
+import { guestInspectorName } from '@/lib/inspections/guest-plant';
 
 import { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { InspectionMeterCorrectionDialog, type InspectionMeterCorrectionTarget } from '@/components/inspections/InspectionMeterCorrectionDialog';
@@ -143,7 +144,7 @@ function PlantInspectionsContent() {
     shallow: false,
   });
   const normalizedEmployeeFilter =
-    selectedEmployeeId !== 'all' && !isUuid(selectedEmployeeId) ? 'all' : selectedEmployeeId;
+    selectedEmployeeId !== 'all' && selectedEmployeeId !== 'guest' && !isUuid(selectedEmployeeId) ? 'all' : selectedEmployeeId;
   const normalizedPlantFilter =
     plantFilter === 'all' || plantFilter === 'hired' || isUuid(plantFilter) ? plantFilter : 'all';
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -259,6 +260,8 @@ function PlantInspectionsContent() {
           id,
           plant_id,
           user_id,
+          guest_name,
+          guest_submission_id,
           inspection_date,
           inspection_end_date,
           current_mileage,
@@ -279,14 +282,16 @@ function PlantInspectionsContent() {
           query = query.eq('user_id', user.id);
         } else {
           const employeeFilter = normalizedEmployeeFilter || 'all';
-          if (employeeFilter !== 'all') {
+          if (employeeFilter === 'guest') {
+            query = query.not('guest_submission_id', 'is', null);
+          } else if (employeeFilter !== 'all') {
             if (!hasOrgWideInspectionVisibility && !scopedEmployeeIds.includes(employeeFilter)) {
               query = query.eq('user_id', user.id);
             } else {
               query = query.eq('user_id', employeeFilter);
             }
           } else if (hasTeamInspectionVisibility) {
-            query = query.in('user_id', scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]);
+            query = query.or(`user_id.in.(${(scopedEmployeeIds.length > 0 ? scopedEmployeeIds : [user.id]).join(',')}),guest_submission_id.not.is.null`);
           }
         }
 
@@ -436,7 +441,7 @@ function PlantInspectionsContent() {
       const enriched = visibleRows.map((row) => ({
         ...row,
         plant: row.plant_id && isUuid(row.plant_id) ? plantMap.get(row.plant_id) ?? null : null,
-        profile: profileMap.get(row.user_id) ?? null,
+        profile: row.guest_name ? { full_name: guestInspectorName(row) } : profileMap.get(row.user_id) ?? null,
         has_reported_defect: defectInspectionIds.has(row.id),
         has_inform_workshop_task: workshopTaskInspectionIds.has(row.id),
       }));
@@ -714,7 +719,7 @@ function PlantInspectionsContent() {
                   <SelectValue placeholder="Select employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Employees</SelectItem>
+                  <SelectItem value="all">All Employees</SelectItem><SelectItem value="guest">Temporary staff</SelectItem>
                   {employees.map((employee) => (
                     <SelectItem key={employee.id} value={employee.id} disabled={employee.has_module_access === false}>
                       {employee.full_name}

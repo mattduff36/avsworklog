@@ -20,6 +20,8 @@ export interface VanInspection {
 }
 
 export interface PlantInspection {
+  guest_name?: string | null;
+  guest_submission_id?: string | null;
   id: string;
   plant_id: string | null;
   user_id: string;

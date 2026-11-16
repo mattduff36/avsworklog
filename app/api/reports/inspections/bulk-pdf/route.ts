@@ -1,3 +1,4 @@
+import { guestInspectorName, guestPlantRoleCanRead } from '@/lib/inspections/guest-plant';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { renderToBuffer } from '@react-pdf/renderer';
@@ -153,7 +154,7 @@ function resolvePlantTemplate(
           van_categories: inspection.plant?.van_categories || null,
         },
     operator: {
-      full_name: inspection.profile?.full_name || 'Unknown',
+      full_name: guestInspectorName(inspection, inspection.profile?.full_name || 'Unknown'),
     },
     items: items.map((item) => ({
       item_number: item.item_number,
@@ -296,6 +297,7 @@ export async function POST(request: NextRequest) {
         }
 
         const scopeContext = await getReportScopeContext();
+        const includeGuestPlant = canAccessPlantChecks && guestPlantRoleCanRead(scopeContext.effectiveRole);
         throwIfAborted(control.signal);
         const scopedModuleIds = await getScopedModuleProfileIds(availableModules, scopeContext);
         throwIfAborted(control.signal);
@@ -303,7 +305,7 @@ export async function POST(request: NextRequest) {
           const scoped = scopedModuleIds.get(moduleName);
           return scoped === null || (scoped?.size ?? 0) > 0;
         });
-        if (!hasAnyScope) {
+        if (!hasAnyScope && !includeGuestPlant) {
           safeEnqueue({ error: 'No daily checks found in the selected date range' });
           safeClose();
           return;
@@ -317,6 +319,7 @@ export async function POST(request: NextRequest) {
           dateTo,
           availableModules,
           scopedModuleIds,
+          includeGuestPlant,
           hiddenProfileIds,
           signal: control.signal,
         });
@@ -351,6 +354,7 @@ export async function POST(request: NextRequest) {
             dateTo,
             availableModules,
             scopedModuleIds,
+          includeGuestPlant,
             hiddenProfileIds: partHiddenProfileIds,
             signal: control.signal,
           });

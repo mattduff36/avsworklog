@@ -5358,6 +5358,8 @@ export type Database = {
       }
       plant_inspections: {
         Row: {
+          guest_name: string | null
+          guest_submission_id: string | null
           id: string
           vehicle_id: string | null
           plant_id: string | null
@@ -5385,6 +5387,8 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          guest_name?: string | null
+          guest_submission_id?: string | null
           id?: string
           vehicle_id?: string | null
           plant_id?: string | null
@@ -5412,6 +5416,8 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          guest_name?: string | null
+          guest_submission_id?: string | null
           id?: string
           vehicle_id?: string | null
           plant_id?: string | null

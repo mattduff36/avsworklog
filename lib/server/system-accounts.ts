@@ -2,8 +2,14 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 import { isDeletedUserName } from '@/lib/users/deleted-user';
 import { isSystemAccountProfile, type SystemAccountCandidate } from '@/lib/utils/system-accounts';
+import { isGuestPlantCheck } from '@/lib/inspections/guest-plant';
 
 type SystemAccountAdminClient = Pick<SupabaseClient<Database>, 'from'>;
+
+// Explicit plant-only exception. Never use this for employee/absence/payroll subjects.
+export function filterGuestPlantReportSubjects<T extends { user_id?: string | null; guest_name?: string | null; guest_submission_id?: string | null; inspector?: { full_name?: string | null } | null }>(rows: T[], hidden: Set<string>, allowGuests: boolean): T[] {
+  return rows.filter(row => allowGuests && isGuestPlantCheck(row) || filterHiddenReportSubjects([row], hidden).length > 0);
+}
 
 export async function getSystemAccountIds(admin: SystemAccountAdminClient): Promise<Set<string>> {
   const ids = new Set<string>();
