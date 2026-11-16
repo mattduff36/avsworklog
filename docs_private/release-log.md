@@ -2,6 +2,28 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.22.0
+
+**GIT COMMIT MESSAGE**
+`feat(debug): reset test records and polish daily checks`
+
+**PUSHED AT**
+2026-11-16T20:23:16.419Z
+
+**WHAT CHANGED**
+Reset test records and polish daily checks.
+
+**VERSION HISTORY DETAILS**
+- Updated fleet, with changes to app screens, shared logic, automation scripts, automated tests, and data storage.
+- Reset test records and polish daily checks, with changes to background routes, app screens, and automated tests.
+- Updated daily tasks, with changes to interface components and shared logic.
+- Updated data storage, with changes to automation scripts, data storage, and documentation.
+- Updated sign in, with changes to shared logic and automated tests.
+- Updated help and FAQ, with changes to data storage and documentation.
+
+**COMMITS IN THIS RELEASE**
+- `feat(debug): reset test records and polish daily checks`
+
 ## 1126.21.0
 
 **GIT COMMIT MESSAGE**
