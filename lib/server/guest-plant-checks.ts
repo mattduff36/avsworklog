@@ -1,5 +1,6 @@
 import 'server-only';
 import { validGuestSignature } from '@/lib/server/guest-plant-signature';
+import { guestJobCodeMatches, searchGuestPlantJobs } from '@/lib/inspections/guest-plant-jobs';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import type pg from 'pg';
 import { NextRequest, NextResponse } from 'next/server';
@@ -138,6 +139,13 @@ export async function guestRead(request: NextRequest) {
       if (!asset.rows[0]) throw new GuestPlantError('Plant is unavailable.', 404);
       return { date: londonToday(), currentHours: asset.rows[0].current_hours, defects: await loadGuestDefects(client, plantId) };
     }
+    const search = request.nextUrl.searchParams.get('search');
+    if (search !== null) {
+      if (search.length > 100) throw new GuestPlantError('Use a shorter job search.');
+      if (search.trim().replace(/\s+/g, '').length < 3) return { jobs: [] };
+      await rateLimit(client, 'job-lookup:global', 120);
+      return { jobs: searchGuestPlantJobs(await loadJobCatalogueRecords(), search) };
+    }
     const job = request.nextUrl.searchParams.get('job');
     if (job !== null) {
       await rateLimit(client, 'job-lookup:global', 120);
@@ -177,7 +185,7 @@ export async function saveGuestPlantCheck(client: Client, sessionId: string, inp
     if (previousHours != null && (input.hours < previousHours || String(input.hours).length > String(previousHours).length) && !input.hoursConfirmed) throw new GuestPlantError('Confirm the changed hours reading before submitting.', 409);
     // Database job-field trigger resolves exact source identity and current eligibility atomically with insertion.
     const { rows: jobs } = await client.query<{ job_code: string }>('SELECT job_code FROM private.resolve_allocation_job($1, $2, NULL)', [input.jobSourceType, input.jobSourceId]);
-    if (!jobs[0]?.job_code || numericJobCode(jobs[0].job_code) !== input.jobNumber) throw new GuestPlantError('The selected job does not match the entered job number.', 409);
+    if (!jobs[0]?.job_code || !guestJobCodeMatches(jobs[0].job_code, input.jobNumber)) throw new GuestPlantError('The selected job does not match the entered job number.', 409);
     const defects = await loadGuestDefects(client, input.plantId, true);
     for (const item of input.items) {
       const state = defects[item.number - 1];

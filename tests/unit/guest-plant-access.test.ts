@@ -7,7 +7,8 @@ import { guestInspectorName, guestPlantRoleCanRead, londonToday, numericJobCode 
 import { filterGuestPlantReportSubjects, filterHiddenReportSubjects } from '@/lib/server/system-accounts';
 import { heavyRowStillAuthorised } from '@/lib/server/inspection-export-manifest';
 
-const state = vi.hoisted(() => ({ access: vi.fn(), database: vi.fn() }));
+const state = vi.hoisted(() => ({ access: vi.fn(), database: vi.fn(), catalogue: vi.fn() }));
+vi.mock('@/lib/server/job-catalogue', () => ({ loadJobCatalogueRecords: state.catalogue }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/server/admin-settings-access', () => ({ requireAdminSettingsAccess: state.access }));
 vi.mock('@/lib/server/inspection-deletion', () => ({ withInspectionDeletionDatabase: state.database }));
@@ -37,6 +38,19 @@ describe('Guest QR boundary and report access', () => {
       const req = request(); req.cookies.set('avs_guest_plant', 'a'.repeat(64));
       await expect(authorizeGuest({ query }, req)).rejects.toMatchObject({ status: 401 });
     }
+  });
+  it('requires a valid guest session for search and never loads the catalogue for short searches', async () => {
+    const unauthorised = new NextRequest('https://squires.test/api/guest-plant-checks?search=123');
+    await expect(guestRead(unauthorised)).rejects.toMatchObject({ status: 401 });
+    expect(state.catalogue).not.toHaveBeenCalled();
+    const req = new NextRequest('https://squires.test/api/guest-plant-checks?search=12');
+    req.cookies.set('avs_guest_plant', 'a'.repeat(64));
+    const query = vi.fn().mockResolvedValue({ rows: [{ count: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ enabled: true, generation: 1 }] })
+      .mockResolvedValueOnce({ rows: [{ id: 'session', generation: 1 }] });
+    state.database.mockImplementation(fn => fn({ query }));
+    expect(await guestRead(req)).toEqual({ jobs: [] });
+    expect(state.catalogue).not.toHaveBeenCalled();
   });
   it('honours the existing sensitive Admin Settings denial before reading or mutating QR settings', async () => {
     state.access.mockResolvedValue({ response: NextResponse.json({ error: 'denied' }, { status: 403 }) });

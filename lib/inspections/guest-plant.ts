@@ -25,7 +25,7 @@ export const GuestPlantSubmissionSchema = z.object({
   requestId: z.string().uuid(), plantId: z.string().uuid(),
   name: z.string().trim().min(2).max(100),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  jobNumber: z.string().regex(/^\d{1,12}$/),
+  jobNumber: z.string().min(1).max(32).regex(/^[A-Za-z0-9 -]+$/),
   jobSourceType: z.enum(['live_quote', 'legacy_quote', 'project_number']), jobSourceId: z.string().uuid(),
   hours: z.number().int().min(0).max(2147483647), hoursConfirmed: z.boolean(),
   signature: z.string().min(100).max(300000).regex(/^data:image\/png;base64,[A-Za-z0-9+/=]+$/),
@@ -42,5 +42,5 @@ export const GuestPlantSubmissionSchema = z.object({
 });
 export type GuestPlantSubmission = z.infer<typeof GuestPlantSubmissionSchema>;
 export type GuestPlantAsset = { id: string; plant_id: string; nickname: string | null; category: string | null };
-export type GuestPlantJob = { sourceType: 'live_quote' | 'legacy_quote' | 'project_number'; sourceId: string; code: string; title: string | null };
+export type GuestPlantJob = { sourceType: 'live_quote' | 'legacy_quote' | 'project_number'; sourceId: string; code: string; title: string | null; customerName?: string | null };
 export type GuestPlantDefect = { number: number; locked: boolean; recentlyCompleted: boolean };

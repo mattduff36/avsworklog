@@ -123,6 +123,16 @@ local('Guest plant checks: real disposable PostgreSQL', () => {
     await Promise.all([saveGuestPlantCheck(db, session, payload(),1),saveGuestPlantCheck(other, secondSession,payload(),1)]);
     expect((await db.query('SELECT count(*) FROM plant_inspections')).rows[0].count).toBe('2');
   });
+  it('accepts the selected full catalogue code and rejects a different suffix without writes', async () => {
+    const { rows } = await db.query('SELECT job_code FROM private.resolve_allocation_job($1,$2,NULL)', ['live_quote', job]);
+    const code = rows[0].job_code;
+    await expect(saveGuestPlantCheck(db, session, payload({ jobNumber: code + '-WRONG' }), 1)).rejects.toThrow('does not match');
+    expect((await db.query('SELECT count(*) FROM plant_inspections')).rows[0].count).toBe('0');
+    const input = payload({ jobNumber: code });
+    expect(GuestPlantSubmissionSchema.safeParse(input).success).toBe(true);
+    const receipt = await saveGuestPlantCheck(db, session, input, 1);
+    expect((await db.query('SELECT job_code FROM plant_inspections WHERE id=$1', [receipt.id])).rows[0].job_code).toBe(code);
+  });
   it('rolls back the parent, meter and items when a workshop task fails', async () => {
     await db.query("ALTER TABLE actions ADD CONSTRAINT fixture_failure CHECK(title='not a real title')");
     const input = payload(); input.items[1].status = 'attention'; input.items[1].comment = 'Wheel loose';

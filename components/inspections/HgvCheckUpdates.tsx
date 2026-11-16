@@ -283,7 +283,7 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
           <p className="text-sm text-muted-foreground">{mode === 'defect' ? 'New defects go to Workshop immediately on submission. No full check or countdown is needed.' : 'Review your changes before signing. Your previous submission stays in the history.'}</p>
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button variant="outline" className="min-h-[44px]" disabled={busy} onClick={() => setMode(null)}>Cancel</Button>
-            <Button className={`${primaryClass} gap-2`} disabled={busy || !answers.length} onClick={() => { const problem = validate(); setError(problem); if (!problem) setSignature(true); }}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}{busy ? 'Saving…' : 'Review and sign'}</Button>
+            <Button className={`${primaryClass} gap-2`} disabled={busy || !answers.length} onClick={() => { const problem = validate(); setError(problem); if (!problem) setSignature(true); }}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}{busy ? 'Saving...' : 'Review and sign'}</Button>
           </div>
         </div>
       </CardContent>
@@ -305,7 +305,7 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
               <Link className="flex min-h-[64px] items-center gap-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" href={`/hgv-inspections/new?hgvId=${check.hgv_id}`}><ClipboardList className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="flex-1"><span className="block font-medium">Start another full check</span><span className="block text-sm text-muted-foreground">Complete the checklist / 10-minute minimum</span></span><ChevronRight className="h-4 w-4 shrink-0" /></Link>
             </div>
           </>}
-          {!history && !historyError && <p role="status" className="text-sm text-muted-foreground">Loading available updates…</p>}
+          {!history && !historyError && <p role="status" className="text-sm text-muted-foreground">Loading available updates...</p>}
           {historyError && <p role="alert" className="text-sm text-red-300">{historyError}</p>}
           {history && history.reports.length > 0 && <div className="space-y-2 border-t border-border pt-4"><h3 className="font-medium">Additional defect reports</h3>{history.reports.map(report => <Link key={report.id} className="flex min-h-[44px] items-center gap-3 text-sm underline underline-offset-4" href={`/hgv-inspections/${report.id}`}><span className="flex-1">{report.submitted_at ? timeLabel(report.submitted_at) : 'Unsubmitted report'}</span><Badge variant="outline">{report.status === 'draft' ? 'Draft' : 'Submitted'}</Badge><ArrowRight className="h-4 w-4" /></Link>)}</div>}
         </CardContent>
