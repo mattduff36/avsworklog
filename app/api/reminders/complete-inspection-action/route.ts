@@ -51,6 +51,11 @@ export async function POST(request: NextRequest) {
       const { data: check, error } = await admin.from(table).select('user_id, status')
         .eq('id', sourceId).eq(`${assetType}_id`, parsed.data.assetId).maybeSingle();
       if (error) throw error;
+      if (assetType === 'hgv') {
+        const { data: hgvCheck, error: kindError } = await admin.from('hgv_inspections').select('record_kind').eq('id', sourceId).maybeSingle();
+        if (kindError) throw kindError;
+        if (hgvCheck?.record_kind !== 'full_check') return NextResponse.json({ error: 'A full Daily Check is required' }, { status: 400 });
+      }
       if (!check) return NextResponse.json({ error: 'Daily Check not found' }, { status: 404 });
       const { access, errorResponse } = await getInspectionRouteActorAccess(requiredModule);
       if (errorResponse || !access) return errorResponse ?? NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

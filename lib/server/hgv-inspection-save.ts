@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import type { InspectionStatus } from '@/types/inspection';
 
-export const HGV_INSPECTION_SAVE_RPC = 'save_hgv_inspection';
+export const HGV_INSPECTION_SAVE_RPC = 'save_hgv_inspection_v2';
 export const HGV_INSPECTION_SAVE_FORBIDDEN = 'Forbidden: cannot save this inspection';
 
 const InspectionItemSchema = z
@@ -18,6 +19,13 @@ const InspectionItemSchema = z
 export const HgvInspectionSaveBodySchema = z
   .object({
     hintInspectionId: z.string().uuid().nullable().optional(),
+    requestId: z.string().uuid(),
+    recordKind: z.enum(['full_check', 'defect_report']).default('full_check'),
+    parentCheckId: z.string().uuid().nullable().optional(),
+    discoveredAt: z.string().datetime().nullable().optional(),
+    correctionReason: z.string().trim().min(5).max(1000).nullable().optional(),
+    expectedRevision: z.number().int().nonnegative().nullable().optional(),
+    informWorkshop: z.boolean().default(false),
     hgvId: z.string().uuid(),
     userId: z.string().uuid(),
     inspectionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
@@ -29,9 +37,15 @@ export const HgvInspectionSaveBodySchema = z
   })
   .strict()
   .superRefine((body, ctx) => {
+    if (body.status === 'submitted') {
+      if (!body.signatureData?.startsWith('data:image/png;base64,')) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['signatureData'], message: 'Signature required' });
+      if (body.recordKind === 'full_check' && body.items.length !== TRUCK_CHECKLIST_ITEMS.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['items'], message: 'Complete all checklist items' });
+      if (body.recordKind === 'defect_report' && (!body.parentCheckId || !body.discoveredAt || !body.items.length || body.items.some(item => item.status !== 'attention'))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['items'], message: 'Report at least one defect' });
+    }
     const seen = new Set<string>();
     for (const item of body.items) {
-      const key = `${item.item_number}:${item.day_of_week}`;
+      if (TRUCK_CHECKLIST_ITEMS[item.item_number - 1] !== item.item_description) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['items'], message: 'Unknown checklist item' });
+      const key = `${item.item_number}`;
       if (seen.has(key)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
@@ -59,6 +73,7 @@ export type HgvInspectionSaveResult = {
   id: string;
   status: 'draft' | 'submitted';
   items: HgvInspectionSavedItem[];
+  revision: number;
 };
 
 export type HgvInspectionWriteAuthorization =
@@ -77,23 +92,7 @@ export type HgvInspectionSaveResolution = {
 };
 
 type AdminRpc = {
-  rpc(
-    fn: typeof HGV_INSPECTION_SAVE_RPC,
-    args: {
-      p_actor_id: string;
-      p_actor_can_manage_others: boolean;
-      p_subject_user_id: string;
-      p_hgv_id: string;
-      p_inspection_date: string;
-      p_hint_inspection_id: string | null;
-      p_expected_owner_id: string | null;
-      p_status: 'draft' | 'submitted';
-      p_current_mileage: number | null;
-      p_inspector_comments: string | null;
-      p_signature_data: string | null;
-      p_items: HgvInspectionSaveBody['items'];
-    }
-  ): Promise<{ data: HgvInspectionSaveResult | null; error: { message: string } | null }>;
+  rpc(fn: typeof HGV_INSPECTION_SAVE_RPC, args: Record<string, unknown>): Promise<{ data: HgvInspectionSaveResult | null; error: { message: string } | null }>;
 };
 
 type LookupQuery = {
@@ -146,10 +145,12 @@ export function mapHgvSaveRpcError(message: string): { status: number; error: st
   if (message.includes('HGV_SAVE:FORBIDDEN_OWNER') || message.includes('HGV_SAVE:FORBIDDEN_SUBJECT')) {
     return { status: 403, error: HGV_INSPECTION_SAVE_FORBIDDEN, code: 'FORBIDDEN' };
   }
+  if (message.includes('HGV_SAVE:CORRECTION_EXPIRED')) return { status: 409, error: 'Corrections are only allowed on the day the check was submitted (UK time).', code: 'CORRECTION_EXPIRED' };
+  if (message.includes('HGV_SAVE:REVISION_CONFLICT') || message.includes('HGV_SAVE:IDENTITY_CHANGED')) return { status: 409, error: 'This check has changed. Refresh it before trying again.', code: 'REVISION_CONFLICT' };
   if (message.includes('HGV_SAVE:SUBMITTED_CONFLICT')) {
     return {
       status: 409,
-      error: 'A daily check has already been submitted for this employee, HGV and date.',
+      error: 'This check is already submitted. View it to report a new defect, correct it, or start another check.',
       code: 'SUBMITTED_CONFLICT',
     };
   }
@@ -175,20 +176,6 @@ export async function resolveHgvInspectionForSave(
   input: Pick<HgvInspectionSaveBody, 'hgvId' | 'userId' | 'inspectionDate' | 'hintInspectionId'>,
   access: { actorId: string; canManageOthers: boolean }
 ): Promise<HgvInspectionSaveResolution> {
-  const { data: byKey, error: keyError } = await asLookupQuery(admin.from('hgv_inspections'))
-    .select('id, user_id, status')
-    .eq('hgv_id', input.hgvId)
-    .eq('user_id', input.userId)
-    .eq('inspection_date', input.inspectionDate)
-    .maybeSingle();
-
-  if (keyError) {
-    throw keyError;
-  }
-  if (byKey) {
-    return { existing: byKey, sanitizedHintId: null };
-  }
-
   if (!input.hintInspectionId) {
     return { existing: null, sanitizedHintId: null };
   }
@@ -206,10 +193,9 @@ export async function resolveHgvInspectionForSave(
   }
   if (
     !byHint ||
-    byHint.status !== 'draft' ||
     !actorCanWriteInspectionOwner(access.actorId, access.canManageOthers, byHint.user_id)
   ) {
-    return { existing: null, sanitizedHintId: null };
+    throw forbiddenHgvInspectionSaveError();
   }
 
   return { existing: byHint, sanitizedHintId: byHint.id };
@@ -262,8 +248,14 @@ export async function saveHgvInspectionForActor(input: {
     p_subject_user_id: input.body.userId,
     p_hgv_id: input.body.hgvId,
     p_inspection_date: input.body.inspectionDate,
-    p_hint_inspection_id: resolved.sanitizedHintId,
-    p_expected_owner_id: resolved.existing?.user_id ?? null,
+    p_hint_inspection_id: input.body.hintInspectionId ?? null,
+    p_request_id: input.body.requestId,
+    p_record_kind: input.body.recordKind,
+    p_parent_check_id: input.body.parentCheckId ?? null,
+    p_discovered_at: input.body.discoveredAt ?? null,
+    p_correction_reason: input.body.correctionReason ?? null,
+    p_expected_revision: input.body.expectedRevision ?? null,
+    p_inform_workshop: input.body.informWorkshop,
     p_status: input.body.status,
     p_current_mileage: input.body.currentMileage,
     p_inspector_comments: input.body.inspectorComments,

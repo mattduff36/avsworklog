@@ -48,6 +48,7 @@ interface HgvInspectionWithRelations {
   inspection_date: string;
   inspection_end_date: string | null;
   status: 'draft' | 'submitted';
+  record_kind?: 'full_check' | 'defect_report';
   submitted_at: string | null;
   hgv: { reg_number: string; nickname: string | null } | null;
   profile: { full_name: string } | null;
@@ -205,8 +206,9 @@ function HgvInspectionsContent() {
       const buildQuery = () => {
         let query = supabase
           .from('hgv_inspections')
-          .select('id, user_id, hgv_id, status, current_mileage, inspection_date, inspection_end_date, submitted_at', { count: 'exact' })
+          .select('id, user_id, hgv_id, status, current_mileage, inspection_date, inspection_end_date, submitted_at, record_kind', { count: 'exact' })
           .order('inspection_date', { ascending: false })
+          .order('submitted_at', { ascending: false, nullsFirst: false })
           .order('id', { ascending: false });
 
         if (!canViewCrossUserInspections) {
@@ -465,8 +467,8 @@ function HgvInspectionsContent() {
 
   const canDeleteInspection = () => canDeleteInspections;
 
-  const getInspectionHref = (inspection: Pick<HgvInspectionWithRelations, 'id' | 'status' | 'user_id'>) =>
-    canEditInspection(inspection)
+  const getInspectionHref = (inspection: Pick<HgvInspectionWithRelations, 'id' | 'status' | 'user_id' | 'record_kind'>) =>
+    inspection.record_kind !== 'defect_report' && canEditInspection(inspection)
       ? `/hgv-inspections/new?id=${inspection.id}`
       : `/hgv-inspections/${inspection.id}`;
 

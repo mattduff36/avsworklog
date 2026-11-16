@@ -33,6 +33,7 @@ interface InspectionReadingRow {
   version: string;
   status: string;
   asset_id: string | null;
+  record_kind?: string;
 }
 
 async function getRecordedMeterSource(client: QueryClient, table: 'vehicle_maintenance' | 'hgvs', id: string) {
@@ -46,10 +47,11 @@ async function getRecordedMeterSource(client: QueryClient, table: 'vehicle_maint
 
 async function readInspection(client: QueryClient, assetType: InspectionAssetType, id: string, lock = false) {
   const { rows } = await client.query<InspectionReadingRow>(
-    `SELECT current_mileage, updated_at::text AS version, status, ${assetType}_id AS asset_id
-     FROM public.${TABLES[assetType]} WHERE id = $1 ${lock ? 'FOR UPDATE' : ''}`, [id]);
+    `SELECT current_mileage, updated_at::text AS version, status, ${assetType}_id AS asset_id, to_jsonb(t)->>'record_kind' AS record_kind
+     FROM public.${TABLES[assetType]} t WHERE id = $1 ${lock ? 'FOR UPDATE' : ''}`, [id]);
   const row = rows[0];
   if (!row) throw new InspectionMeterCorrectionError('Daily Check not found.', 404);
+  if (row.record_kind === 'defect_report') throw new InspectionMeterCorrectionError('Additional defect reports have no meter reading.', 409);
   if (row.status !== 'submitted') throw new InspectionMeterCorrectionError('Only submitted Daily Checks can be corrected.', 409);
   return row;
 }

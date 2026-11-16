@@ -14,6 +14,7 @@ interface PhotoUploadProps {
   itemNumber: number;
   dayOfWeek?: number | null;
   onClose: () => void;
+  allowDelete?: boolean;
   onUploadComplete: () => void;
 }
 
@@ -29,6 +30,7 @@ export default function PhotoUpload({
   inspectionId,
   itemNumber,
   dayOfWeek = null,
+  allowDelete = true,
   onClose,
   onUploadComplete,
 }: PhotoUploadProps) {
@@ -274,6 +276,8 @@ export default function PhotoUpload({
                         variant="destructive"
                         size="sm"
                         className="flex-1"
+                        disabled={!allowDelete}
+                        title={!allowDelete ? 'Signed HGV photo evidence is retained' : undefined}
                         onClick={() => handleDelete(photo.id, photo.photo_url)}
                       >
                         <Trash2 className="mr-2 h-3 w-3" />

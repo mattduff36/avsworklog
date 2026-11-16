@@ -175,6 +175,10 @@ function resolveHgvTemplate(inspection: HgvInspectionWithRelations, items: Inspe
       inspector_comments: inspection.inspector_comments || null,
       signature_data: inspection.signature_data || null,
       signed_at: inspection.signed_at || null,
+      record_kind: inspection.record_kind,
+      submitted_at: inspection.submitted_at,
+      discovered_at: inspection.discovered_at,
+      revision: inspection.revision,
     },
     hgv: {
       reg_number: inspection.hgv?.reg_number || 'Unknown',

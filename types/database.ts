@@ -2481,8 +2481,72 @@ export type Database = {
         Relationships: [
         ]
       }
+      hgv_inspection_versions: {
+        Row: {
+          inspection_id: string
+          revision: number
+          request_id: string
+          actor_id: string
+          recorded_at: string
+          reason: string
+          snapshot: Json
+        }
+        Insert: {
+          inspection_id?: string
+          revision?: number
+          request_id?: string
+          actor_id?: string
+          recorded_at?: string
+          reason?: string
+          snapshot?: Json
+        }
+        Update: {
+          inspection_id?: string
+          revision?: number
+          request_id?: string
+          actor_id?: string
+          recorded_at?: string
+          reason?: string
+          snapshot?: Json
+        }
+        Relationships: []
+      }
+      hgv_defect_observations: {
+        Row: {
+          inspection_id: string
+          revision: number
+          item_number: number
+          workshop_comment_id: string | null
+          task_id: string
+          recorded_at: string
+          comment: string | null
+        }
+        Insert: {
+          inspection_id?: string
+          revision?: number
+          item_number?: number
+          workshop_comment_id?: string | null
+          task_id?: string
+          recorded_at?: string
+          comment?: string | null
+        }
+        Update: {
+          inspection_id?: string
+          revision?: number
+          item_number?: number
+          workshop_comment_id?: string | null
+          task_id?: string
+          recorded_at?: string
+          comment?: string | null
+        }
+        Relationships: []
+      }
       hgv_inspections: {
         Row: {
+          record_kind: 'full_check' | 'defect_report'
+          parent_check_id: string | null
+          discovered_at: string | null
+          revision: number
           id: string
           hgv_id: string | null
           user_id: string
@@ -2501,6 +2565,10 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          record_kind?: 'full_check' | 'defect_report'
+          parent_check_id?: string | null
+          discovered_at?: string | null
+          revision?: number
           id?: string
           hgv_id?: string | null
           user_id: string
@@ -2519,6 +2587,10 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          record_kind?: 'full_check' | 'defect_report'
+          parent_check_id?: string | null
+          discovered_at?: string | null
+          revision?: number
           id?: string
           hgv_id?: string | null
           user_id?: string

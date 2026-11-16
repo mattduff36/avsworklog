@@ -81,6 +81,8 @@ async function isPhotoReferenced(client: QueryClient, photoPath: string) {
     if (optional.rows[0].present && !optional.rows[0].guarded) throw new Error('Optional photo reference table is not guarded');
     const tables = ['inspection_photos', 'workshop_task_check_photos',
       'workshop_attachment_field_responses', 'workshop_task_comments', 'workshop_task_attachments', 'actions'];
+    const hgvHistory = await client.query<{ present: boolean }>("SELECT to_regclass('public.hgv_inspection_versions') IS NOT NULL AS present");
+    if (hgvHistory.rows[0].present) tables.push('hgv_inspection_versions');
     if (optional.rows[0].present) tables.push('workshop_attachment_responses');
     const shared = await client.query(`SELECT 1 WHERE
       ${tables.map(table => `EXISTS (SELECT 1 FROM public.${table} t
@@ -147,6 +149,11 @@ async function restoreTarget(client: QueryClient, target: Target, id: string, wa
   if (!next) {
     // Workshop work and attachments are never discarded just because their originating check was wrong.
     if (target === 'actions') {
+      const history = await client.query<{ present: boolean }>("SELECT to_regclass('public.hgv_defect_observations') IS NOT NULL AS present");
+      if (history.rows[0].present) {
+        const retained = await client.query('SELECT 1 FROM public.hgv_defect_observations WHERE task_id = $1 LIMIT 1', [id]);
+        if (retained.rowCount) next = { ...events[0].after_row };
+      }
       const { rows: work } = await client.query<{ has_work: boolean }>(
         `SELECT EXISTS (SELECT 1 FROM public.workshop_task_comments WHERE task_id = $1)
          OR EXISTS (SELECT 1 FROM public.workshop_task_attachments WHERE task_id = $1) AS has_work`, [id]);

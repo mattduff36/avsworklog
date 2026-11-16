@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid inspection save payload', code: 'INVALID_INPUT' }, { status: 400 });
     }
 
-    if (parsed.data.status === 'submitted' && parsed.data.currentMileage == null) {
+    if (parsed.data.status === 'submitted' && parsed.data.recordKind === 'full_check' && parsed.data.currentMileage == null) {
       return NextResponse.json({ error: 'Please enter a valid current KM', code: 'INVALID_INPUT' }, { status: 400 });
     }
 

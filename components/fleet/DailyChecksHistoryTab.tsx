@@ -15,7 +15,7 @@ import type {
 } from '@/lib/fleet/asset-history-events';
 
 type AssetType = AssetHistoryAssetType;
-export type DailyCheckHistoryItem = AssetHistoryDailyTaskSource;
+export type DailyCheckHistoryItem = AssetHistoryDailyTaskSource & { record_kind?: 'full_check' | 'defect_report' };
 
 interface DailyChecksHistoryTabProps {
   assetId: string;
@@ -150,6 +150,7 @@ export async function fetchDailyChecks(assetType: AssetType, assetId: string) {
           inspection_date,
           inspection_end_date,
           submitted_at,
+          record_kind,
           status,
           current_mileage,
           profile:profiles!hgv_inspections_user_id_fkey(full_name)
@@ -157,6 +158,7 @@ export async function fetchDailyChecks(assetType: AssetType, assetId: string) {
         .eq('hgv_id', assetId)
         .eq('status', 'submitted')
         .order('inspection_date', { ascending: false })
+        .order('submitted_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
@@ -234,7 +236,7 @@ export function DailyChecksHistoryTab({ assetId, assetType }: DailyChecksHistory
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <div className="text-sm font-semibold text-white">
-                        {formatDate(inspection.inspection_date)}
+                        {formatDate(inspection.inspection_date)}{inspection.record_kind === 'defect_report' ? ' · Additional defect report' : ''}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {inspection.profile?.full_name ? `${inspection.profile.full_name} - ` : ''}

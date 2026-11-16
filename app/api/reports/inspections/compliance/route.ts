@@ -250,6 +250,7 @@ export async function GET(request: NextRequest) {
                   employee_id
                 )
               `)
+              .eq('record_kind', 'full_check')
               .order('inspection_date', { ascending: false });
 
             if (dateFrom) query = query.gte('inspection_date', dateFrom);

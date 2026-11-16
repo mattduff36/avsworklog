@@ -185,9 +185,10 @@ function assertWindowQuery(entry: QueryLog) {
   });
   expect(entry.ops.filter((op) => op.kind === 'order')).toEqual([
     { kind: 'order', column: 'inspection_date', ascending: false },
+    { kind: 'order', column: 'submitted_at', ascending: false },
     { kind: 'order', column: 'id', ascending: false },
   ]);
-  expect(entry.select).toBe('id, user_id, hgv_id, status, current_mileage, inspection_date, inspection_end_date, submitted_at');
+  expect(entry.select).toBe('id, user_id, hgv_id, status, current_mileage, inspection_date, inspection_end_date, submitted_at, record_kind');
   expect(entry.countExact).toBe(true);
 }
 
@@ -486,7 +487,8 @@ describe('HGV inspection list pagination', () => {
     expect(titles.indexOf('EQ-HIGH')).toBeLessThan(titles.indexOf('EQ-LOW'));
     expect(inspectionQueries().at(-1)?.ops.filter((op) => op.kind === 'order')).toEqual([
       { kind: 'order', column: 'inspection_date', ascending: false },
-      { kind: 'order', column: 'id', ascending: false },
+      { kind: 'order', column: 'submitted_at', ascending: false },
+    { kind: 'order', column: 'id', ascending: false },
     ]);
   });
 
