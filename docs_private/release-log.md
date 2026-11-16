@@ -2,6 +2,34 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.20.0
+
+**GIT COMMIT MESSAGE**
+`feat(hgv): support additional checks and audited same-day updates`
+
+**PUSHED AT**
+2026-11-16T15:51:10.810Z
+
+**WHAT CHANGED**
+Support additional checks and audited same-day updates.
+
+**VERSION HISTORY DETAILS**
+- Updated daily tasks, with changes to background routes, app screens, interface components, shared logic, and automated tests.
+- Updated data storage, with changes to shared typing and data storage.
+- Updated workshop tasks, with changes to background routes and shared logic.
+- Updated PDF documents, with changes to background routes and shared logic.
+- Updated fleet, with changes to interface components, shared logic, and automated tests.
+- Updated reminders, with changes to background routes, shared logic, and automated tests.
+- Updated actions, with changes to background routes, shared logic, and automated tests.
+- Updated reports, with changes to background routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(hgv): support additional checks and audited same-day updates`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 1126.19.4
 
 **GIT COMMIT MESSAGE**
