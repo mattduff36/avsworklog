@@ -211,3 +211,9 @@ For permission or authz changes, prove **allowed** and **denied** paths. `testsu
 A passing happy-path UI check is not enough for a security change.
 
 If you find a probable live defect while following these rules, record it for a separately classified task. Do not silently “tighten” production auth, RLS, or data in a documentation or unrelated UI change.
+
+## Test Fleet reset boundary
+
+`/api/debug/test-vehicles` requires actual SuperAdmin outside View As; POST additionally requires the same origin. The server owns the exact TE57 VAN/HGV and TE57 plant allow-list. Execution revalidates a preview fingerprint under ordered locks and rejects shared or unknown ownership before deletion. Assets and their linked Inventory location entries, users, jobs and settings are retained; inventory contents block the reset and storage objects are not deleted. The reset retains its own audit receipt.
+
+HGV history remains append-only except DELETE by the database owner inside a private transaction-scoped reset list, with independently verified TE57 HGV ownership witnesses. Anonymous, authenticated and service roles cannot establish that scope; UPDATE has no exception. A targeted audit-reference index supports historical ownership discovery without scanning unrelated audit history.

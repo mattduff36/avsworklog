@@ -175,6 +175,7 @@ export async function saveGuestPlantCheck(client: Client, sessionId: string, inp
       if (prior.rows[0].payload_hash !== hash) throw new GuestPlantError('This submission was already used. Start another check.', 409);
       await client.query('COMMIT'); return { id: prior.rows[0].inspection_id, date: input.date };
     }
+    if (input.informWorkshop) throw new GuestPlantError('Sending additional comments to Workshop is only available to employed staff. Submit checklist defects instead.', 403);
     if (input.date !== londonToday()) throw new GuestPlantError('Guest checks must be submitted for today. Refresh the date and confirm your answers.', 409);
     // Shared meter/deletion lock serializes all guest submissions for this asset.
     await client.query("SELECT pg_advisory_xact_lock(hashtextextended('daily-check:plant:' || $1::text, 0))", [input.plantId]);
@@ -211,8 +212,6 @@ export async function saveGuestPlantCheck(client: Client, sessionId: string, inp
           `Item ${item.number} - ${description}\nComment: ${item.comment}\nReported by ${input.name} — Temporary staff`, settings.owner_id, id, itemId, categories[0]?.id ?? null]);
       }
     }
-    if (input.informWorkshop) await client.query(`INSERT INTO public.actions(action_type, plant_id, title, description, status, created_by, inspection_id, workshop_category_id, daily_check_source_id, daily_check_source_type)
-      VALUES('workshop_vehicle_task',$1,$2,$3,'pending',$4,$5,$6,$5,'plant')`, [input.plantId, `Plant ${plants[0].plant_id}: Inspector Comments`, `${input.comments}\nReported by ${input.name} — Temporary staff`, settings.owner_id, id, categories[0]?.id ?? null]);
     for (const photo of photos) await client.query(`INSERT INTO public.inspection_photos(inspection_id, item_number, day_of_week, photo_url) VALUES($1,$2,$3,$4)`, [id, photo.item_number, weekday, photo.photo_url]);
     await client.query('UPDATE private.guest_plant_uploads SET claimed = true WHERE id = ANY($1::uuid[])', [input.photoIds]);
     await client.query('INSERT INTO private.guest_plant_requests(session_id, request_id, payload_hash, inspection_id) VALUES($1,$2,$3,$4)', [sessionId, input.requestId, hash, id]);

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { PanelLoader } from '@/components/ui/panel-loader';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -231,8 +232,8 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
               const selected = answers.some(answer => answer.item_number === number);
               return <button type="button" key={number} aria-pressed={selected} disabled={busy}
                 onClick={() => { setError(''); setAnswers(previous => selected ? previous.filter(answer => answer.item_number !== number) : [...previous, { item_number: number, item_description: item, day_of_week: 1, status: 'attention', comments: '' }]); }}
-                className={`flex min-h-[64px] items-center gap-2 rounded-lg border-2 px-3 py-3 text-left text-[14px] leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${selected ? 'border-primary bg-primary/15 text-foreground' : 'border-slate-600 bg-slate-900/50 text-foreground hover:bg-slate-800'}`}>
-                <span className="min-w-0 flex-1 break-words">{item}</span>{selected && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
+                className={`relative flex min-h-[64px] items-center justify-center gap-2 rounded-lg border-2 px-6 py-3 text-center text-[14px] leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${selected ? 'border-primary bg-primary/15 text-foreground' : 'border-slate-600 bg-slate-900/50 text-foreground hover:bg-slate-800'}`}>
+                <span className="min-w-0 flex-1 break-words">{item}</span>{selected && <Check aria-hidden="true" className="absolute right-2 h-4 w-4" />}
               </button>;
             })}
           </div>
@@ -293,7 +294,7 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
               <Link className="flex min-h-[64px] items-center gap-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm" href={`/hgv-inspections/new?hgvId=${check.hgv_id}`}><ClipboardList className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="flex-1"><span className="block font-medium">Start another full check</span><span className="block text-sm text-muted-foreground">Complete the checklist / 10-minute minimum</span></span><ChevronRight className="h-4 w-4 shrink-0" /></Link>
             </div>
           </>}
-          {!history && !historyError && <p role="status" className="text-sm text-muted-foreground">Loading available updates...</p>}
+          {!history && !historyError && <PanelLoader accent="hgv-inspections" message="Loading available updates..." className="min-h-32" />}
           {historyError && <p role="alert" className="text-sm text-red-300">{historyError}</p>}
           {history && history.reports.length > 0 && <div className="space-y-2 border-t border-border pt-4"><h3 className="font-medium">Additional defect reports</h3>{history.reports.map(report => <Link key={report.id} className="flex min-h-[44px] items-center gap-3 text-sm underline underline-offset-4" href={`/hgv-inspections/${report.id}`}><span className="flex-1">{report.submitted_at ? timeLabel(report.submitted_at) : 'Unsubmitted report'}</span><Badge variant="outline">{report.status === 'draft' ? 'Draft' : 'Submitted'}</Badge><ArrowRight className="h-4 w-4" /></Link>)}</div>}
         </CardContent>

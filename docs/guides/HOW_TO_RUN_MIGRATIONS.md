@@ -114,3 +114,7 @@ Use a reviewed `scripts/run-<feature>-migration.ts` only when the generic runner
 See [`MIGRATIONS_GUIDE.md`](./MIGRATIONS_GUIDE.md) for file layout, ledger/checksum semantics, and forward-only correction.
 
 **Remember:** Run migrations with `POSTGRES_URL_NON_POOLING` and exact target confirmation. Do not execute SQL in the dashboard.
+
+## Test Fleet audit index
+
+Before releasing the Test Fleet reset, run `npx tsx scripts/run-test-fleet-audit-index-migration.ts` to validate its fixed definition without connecting. With production migration authorization, apply using `--apply --confirm-target <project-ref>`. This feature-specific runner uses the approved verified-TLS session connection and creates only `idx_audit_log_test_fleet_references` concurrently, outside a transaction. It checks the exact expression/predicate and ready/valid state, and reuses a matching index. A failed concurrent build can leave an invalid index: the runner stops rather than dropping or replacing it; inspect and explicitly review recovery. The separate dated reset-scope migration follows normal ledger-backed finalise. Neither migration executes a Test Fleet reset.

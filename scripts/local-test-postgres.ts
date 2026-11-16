@@ -56,6 +56,7 @@ export const INVENTORY_KIOSK_HARDWARE_TARGET_TEST_FILE =
 export const DAILY_ALLOCATION_SESSION_TARGET_TEST_FILE =
   'tests/db/daily-allocation-session-runtime.test.ts';
 export const ALLOWED_TARGET_TEST_FILES = [
+  'tests/db/test-fleet-reset.test.ts',
   'tests/db/guest-plant-checks-runtime.test.ts',
   'tests/db/hgv-same-day-updates.test.ts',
   'tests/db/account-merge-runtime.test.ts',

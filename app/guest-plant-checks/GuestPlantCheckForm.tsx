@@ -34,8 +34,9 @@ export function GuestPlantCheckForm() {
   const [hours, setHours] = useState(''); const [currentHours, setCurrentHours] = useState<number | null>(null); const [hoursConfirmed, setHoursConfirmed] = useState(false);
   const [defects, setDefects] = useState<GuestPlantDefect[]>([]); const [detailsReady, setDetailsReady] = useState(false);
   const [answers, setAnswers] = useState<Record<number, { status: string; comment: string; repeatConfirmed: boolean }>>({});
-  const [comments, setComments] = useState(''); const [informWorkshop, setInformWorkshop] = useState(false); const [signature, setSignature] = useState('');
+  const [comments, setComments] = useState(''); const [signature, setSignature] = useState('');
   const [photos, setPhotos] = useState<Array<{ id: string; itemNumber: number }>>([]); const [uploading, setUploading] = useState<number | null>(null); const [pendingPhoto, setPendingPhoto] = useState<{ file: File; itemNumber: number; id: string } | null>(null);
+  const [closeRequested, setCloseRequested] = useState(false);
   const [receipt, setReceipt] = useState<{ id: string; date: string } | null>(null);
   const requestId = useRef(''); const pendingPayload = useRef<unknown>(null); const inFlight = useRef(false); const assetGeneration = useRef(0); const bootStarted = useRef(false);
   useEffect(() => {
@@ -53,9 +54,10 @@ export function GuestPlantCheckForm() {
     return () => document.documentElement.classList.remove('guest-plant-page');
   }, []);
   const selectedAssetId = asset?.id;
+  const receiptId = receipt?.id;
   useEffect(() => {
-    if (selectedAssetId) window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [selectedAssetId]);
+    if (selectedAssetId || receiptId) window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [selectedAssetId, receiptId]);
   async function loadAsset(next: GuestPlantAsset) {
     const generation = ++assetGeneration.current; setAsset(next); setDetailsReady(false); setError('');
     try {
@@ -99,7 +101,7 @@ export function GuestPlantCheckForm() {
   async function submit(signatureValue = signature) {
     if (!asset || !job || !detailsReady || inFlight.current || pendingPhoto) return;
     const parsed = GuestPlantSubmissionSchema.safeParse({ requestId: requestId.current, plantId: asset.id, name, date, jobNumber, jobSourceType: job.sourceType, jobSourceId: job.sourceId,
-      hours: hours.trim() ? Number(hours) : -1, hoursConfirmed, signature: signatureValue, comments, informWorkshop,
+      hours: hours.trim() ? Number(hours) : -1, hoursConfirmed, signature: signatureValue, comments, informWorkshop: false,
       items: PLANT_INSPECTION_ITEMS.map((_, i) => ({ number: i + 1, status: answers[i + 1]?.status, comment: answers[i + 1]?.comment || '', repeatConfirmed: answers[i + 1]?.repeatConfirmed || false })), photoIds: photos.map(p => p.id) });
     if (!pendingPayload.current && !parsed.success) { setError(parsed.error.issues[0]?.message || 'Complete every item and sign.'); return; }
     inFlight.current = true; setBusy(true); setError('');
@@ -126,7 +128,6 @@ export function GuestPlantCheckForm() {
     else if (completed !== PLANT_INSPECTION_ITEMS.length) problem = 'Complete every checklist item.';
     else if (Object.values(answers).some(value => value.status === 'attention' && !value.comment.trim())) problem = 'Describe each defect.';
     else if (defects.some(state => !state.locked && state.recentlyCompleted && answers[state.number]?.status === 'attention' && !answers[state.number]?.repeatConfirmed)) problem = 'Confirm that the recently repaired item has a new defect.';
-    else if (informWorkshop && comments.trim().length < 10) problem = 'Add at least 10 characters for Workshop.';
     setError(problem);
     if (problem) { document.getElementById('guest-form-error')?.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
     setShowSignature(true);
@@ -168,7 +169,17 @@ export function GuestPlantCheckForm() {
     </div>;
   }
 
-  if (receipt) return <div className="guest-plant-checks" data-accent="plant-inspections"><AppPageShell width="narrow"><Card><CardContent className="p-6 space-y-4"><CheckCircle2 className="h-12 w-12 text-green-400" /><h1 className="text-2xl font-bold">Daily check submitted</h1><p>{asset?.plant_id} · {receipt.date}</p><p>{name} — Temporary staff</p><p className="break-all text-sm text-muted-foreground">Reference: {receipt.id}</p><Button className={primaryClass} onClick={() => window.location.reload()}>Check another plant</Button></CardContent></Card></AppPageShell></div>;
+  if (receipt) return <div className="guest-plant-checks flex min-h-[100dvh] items-center justify-center" data-accent="plant-inspections">
+    <Card className="w-full max-w-lg"><CardContent className="space-y-6 p-6 sm:p-8 text-center">
+      <CheckCircle2 className="mx-auto h-14 w-14 text-green-400" aria-hidden="true" />
+      <div className="space-y-2"><h1 className="text-2xl font-bold">Daily check submitted</h1><p className="text-sm text-muted-foreground">Thank you. Your check has been saved.</p></div>
+      <dl className="divide-y divide-border rounded-lg border border-border px-4 text-sm text-left">
+        {[['Plant', `${asset?.plant_id} · ${selectedDescription}`], ['Checked by', `${name} — Temporary staff`], ['Date', dateLabel], ['Job code', job?.code || ''], ['Hours', hours], ['Checklist', `${completed}/${PLANT_INSPECTION_ITEMS.length} complete · ${Object.values(answers).filter(item => item.status === 'attention').length} new defect(s)`], ['Photos', String(photos.length)]].map(([label, value]) => <div key={label} className="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 py-3"><dt className="text-muted-foreground">{label}</dt><dd className="break-words font-medium">{value}</dd></div>)}
+      </dl>
+      <p className="break-all text-xs text-muted-foreground">Reference: {receipt.id}</p>
+      {closeRequested ? <p role="status" className="text-sm">You can now close this browser tab.</p> : <Button className={`${primaryClass} w-full`} onClick={() => { setCloseRequested(true); window.close(); }}>Close</Button>}
+    </CardContent></Card>
+  </div>;
   return <div className="guest-plant-checks" data-accent="plant-inspections"><AppPageShell>
     <AppPageHeader title="New Plant Daily Check" description="Daily safety check · Temporary staff" titleClassName="text-xl md:text-3xl" actions={asset ? <div className="rounded-lg border border-plant-inspection/30 bg-plant-inspection/10 px-3 py-2"><div className="text-xs text-muted-foreground">Progress</div><p className="text-lg font-bold">{completed}/{PLANT_INSPECTION_ITEMS.length}</p></div> : undefined} footer={asset ? <div className="h-2 bg-slate-800" role="progressbar" aria-label="Checklist progress" aria-valuemin={0} aria-valuemax={PLANT_INSPECTION_ITEMS.length} aria-valuenow={completed}><div className="h-full bg-plant-inspection transition-all" style={{ width: `${completed / PLANT_INSPECTION_ITEMS.length * 100}%` }} /></div> : undefined} />
     <div id="guest-form-error">{error && <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300 space-y-3"><p>{error}</p>{asset && !lockedForRetry && <Button type="button" variant="outline" disabled={busy} onClick={() => void loadAsset(asset)}>Reload plant details</Button>}</div>}</div>
@@ -196,7 +207,7 @@ export function GuestPlantCheckForm() {
             <div className="hidden md:block overflow-x-auto"><table className="w-full border-collapse"><thead><tr className="border-b border-border text-sm"><th className="p-3 text-left font-medium">#</th><th className="p-3 text-left font-medium">Item</th><th className="p-3 text-center font-medium">Status</th><th className="p-3 text-left font-medium">Comments</th><th className="p-3 text-center font-medium">Photo</th></tr></thead><tbody>{PLANT_INSPECTION_ITEMS.map((description, i) => <tr key={i} className={`border-b border-border/50 ${defects[i]?.locked ? 'bg-red-500/5' : 'hover:bg-slate-800/30'}`}><td className="p-3 text-sm text-muted-foreground">{i + 1}</td><td className="p-3 text-sm"><span>{description}</span>{defects[i]?.locked && <Badge className="mt-2 border-red-500/30 bg-red-500/20 text-red-400">LOCKED</Badge>}</td><td className="p-3">{resultControls(i + 1, true)}</td><td className="min-w-48 p-3">{itemNotes(i + 1, true)}</td><td className="min-w-36 p-3">{photoControl(i + 1)}</td></tr>)}</tbody></table></div>
           </CardContent>
         </Card>
-        <Card><CardHeader><CardTitle>Additional Comments</CardTitle><CardDescription>Anything else to note about this plant.</CardDescription></CardHeader><CardContent className="space-y-4"><Textarea aria-label="Additional comments" className="min-h-[100px] bg-slate-900/50 border-slate-600 text-base" value={comments} maxLength={2000} placeholder="Optional comments…" onChange={e => setComments(e.target.value)} /><label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={informWorkshop} onChange={e => setInformWorkshop(e.target.checked)} /><span>Inform Workshop about these additional comments. Report checklist defects above.</span></label></CardContent></Card>
+        <Card><CardHeader><CardTitle>Additional Comments</CardTitle><CardDescription>Anything else to note about this plant.</CardDescription></CardHeader><CardContent className="space-y-4"><Textarea aria-label="Additional comments" className="min-h-[100px] bg-slate-900/50 border-slate-600 text-base" value={comments} maxLength={2000} placeholder="Optional comments…" onChange={e => setComments(e.target.value)} /></CardContent></Card>
       </fieldset>
       <div className="space-y-3"><p className="text-sm text-muted-foreground">Your name, signature, answers and photos will be recorded with this daily check. Keep this page open if your connection drops.</p><div className="fixed inset-x-0 bottom-0 z-20 border-t border-border/50 bg-slate-900/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"><Button className={`${primaryClass} w-full gap-2 md:w-auto`} disabled={busy || uploading !== null || pendingPhoto !== null || !detailsReady} onClick={() => lockedForRetry ? void submit() : review()}>{busy ? <><Loader2 className="h-4 w-4 animate-spin" />Submitting…</> : <><Send className="h-4 w-4" />{lockedForRetry ? 'Retry submission' : 'Review and sign'}</>}</Button></div><div aria-hidden="true" className="h-24 md:hidden" /></div>
       <Dialog open={showSignature} onOpenChange={open => { if (!busy) setShowSignature(open); }}><DialogContent data-accent="plant-inspections" mobileKeyboardSafe className={dialogContentViewportClassName({ size: 'lg', className: 'guest-plant-checks' })}><DialogHeader><DialogTitle>Sign Plant Daily Check</DialogTitle><DialogDescription>Confirm you have checked {asset.plant_id} today and that your answers are accurate.</DialogDescription></DialogHeader><div className="rounded-lg border border-border p-3 text-sm"><p className="font-medium">{name} — Temporary staff</p><p className="text-muted-foreground">{dateLabel} · {completed}/{PLANT_INSPECTION_ITEMS.length} items complete · {photos.length} photo(s)</p></div>{error && <p role="alert" className="text-sm text-red-300">{error}</p>}{lockedForRetry ? <Button className={primaryClass} disabled={busy} onClick={() => void submit()}>{busy ? 'Submitting…' : 'Retry submission'}</Button> : <SignaturePad initialValue={signature || null} disabled={busy} isSubmitting={busy} submitLabel="Submit daily check" onSave={value => { setSignature(value); void submit(value); }} onCancel={() => setShowSignature(false)} />}</DialogContent></Dialog>

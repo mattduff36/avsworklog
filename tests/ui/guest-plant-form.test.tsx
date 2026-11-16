@@ -22,6 +22,7 @@ beforeEach(() => {
   submissions = []; failSubmit = false; lockedFirst = false; failPhoto = false; searchHandler = undefined;
   Element.prototype.scrollIntoView = vi.fn();
   window.scrollTo = vi.fn();
+  window.close = vi.fn();
   vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
     if (url.includes('/photos')) return failPhoto ? response({ error: 'Photo upload failed' }, 503) : response({ id: jobId, itemNumber: 1 });
     if (options?.method === 'POST') {
@@ -59,6 +60,7 @@ describe('guest Plant form with the existing Plant layout', () => {
     expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'instant' });
     expect(screen.getByRole('button', { name: 'Review and sign' }).parentElement).toHaveClass('fixed', 'bottom-0', 'md:static');
     expect(screen.getByText('23-Point Plant Safety Check')).toBeInTheDocument();
+    expect(screen.queryByText(/Inform Workshop about these additional comments/)).not.toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('?search='))).toBe(false);
     let finishOld: (value: Response) => void = () => {};
     searchHandler = query => query === 'Old' ? new Promise(resolve => { finishOld = resolve; }) : Promise.resolve(response({ jobs: [job] }));
@@ -95,7 +97,11 @@ describe('guest Plant form with the existing Plant layout', () => {
     await screen.findByText('Daily check submitted');
     expect(submissions).toHaveLength(2);
     expect(submissions[1]).toEqual(submissions[0]);
-    expect(submissions[0]).toMatchObject({ jobNumber: '12345', jobSourceId: jobId, signature: fixture.signature, name: 'Temporary Worker' });
+    expect(submissions[0]).toMatchObject({ jobNumber: '12345', jobSourceId: jobId, signature: fixture.signature, name: 'Temporary Worker', informWorkshop: false });
+    expect(screen.queryByRole('button', { name: 'Check another plant' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close', exact: true }));
+    expect(window.close).toHaveBeenCalledOnce();
+    expect(screen.getByRole('status')).toHaveTextContent('You can now close this browser tab.');
   });
 
   it('keeps existing defects locked and prevents signing while a photo awaits retry', async () => {

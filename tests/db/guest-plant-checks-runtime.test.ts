@@ -123,6 +123,11 @@ local('Guest plant checks: real disposable PostgreSQL', () => {
     await Promise.all([saveGuestPlantCheck(db, session, payload(),1),saveGuestPlantCheck(other, secondSession,payload(),1)]);
     expect((await db.query('SELECT count(*) FROM plant_inspections')).rows[0].count).toBe('2');
   });
+  it('denies employee-only additional-comment Workshop notifications for guests', async () => {
+    await expect(saveGuestPlantCheck(db, session, payload({ informWorkshop: true, comments: 'A separate workshop request' }), 1)).rejects.toMatchObject({ status: 403 });
+    expect((await db.query('SELECT count(*) FROM plant_inspections')).rows[0].count).toBe('0');
+    expect((await db.query('SELECT count(*) FROM actions')).rows[0].count).toBe('0');
+  });
   it('accepts the selected full catalogue code and rejects a different suffix without writes', async () => {
     const { rows } = await db.query('SELECT job_code FROM private.resolve_allocation_job($1,$2,NULL)', ['live_quote', job]);
     const code = rows[0].job_code;
