@@ -52,6 +52,10 @@ export function GuestPlantCheckForm() {
     }; void boot();
     return () => document.documentElement.classList.remove('guest-plant-page');
   }, []);
+  const selectedAssetId = asset?.id;
+  useEffect(() => {
+    if (selectedAssetId) window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [selectedAssetId]);
   async function loadAsset(next: GuestPlantAsset) {
     const generation = ++assetGeneration.current; setAsset(next); setDetailsReady(false); setError('');
     try {
@@ -194,7 +198,7 @@ export function GuestPlantCheckForm() {
         </Card>
         <Card><CardHeader><CardTitle>Additional Comments</CardTitle><CardDescription>Anything else to note about this plant.</CardDescription></CardHeader><CardContent className="space-y-4"><Textarea aria-label="Additional comments" className="min-h-[100px] bg-slate-900/50 border-slate-600 text-base" value={comments} maxLength={2000} placeholder="Optional comments…" onChange={e => setComments(e.target.value)} /><label className="flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1" checked={informWorkshop} onChange={e => setInformWorkshop(e.target.checked)} /><span>Inform Workshop about these additional comments. Report checklist defects above.</span></label></CardContent></Card>
       </fieldset>
-      <div className="space-y-3"><p className="text-sm text-muted-foreground">Your name, signature, answers and photos will be recorded with this daily check. Keep this page open if your connection drops.</p><Button className={`${primaryClass} w-full gap-2 md:w-auto`} disabled={busy || uploading !== null || pendingPhoto !== null || !detailsReady} onClick={() => lockedForRetry ? void submit() : review()}>{busy ? <><Loader2 className="h-4 w-4 animate-spin" />Submitting…</> : <><Send className="h-4 w-4" />{lockedForRetry ? 'Retry submission' : 'Review and sign'}</>}</Button></div>
+      <div className="space-y-3"><p className="text-sm text-muted-foreground">Your name, signature, answers and photos will be recorded with this daily check. Keep this page open if your connection drops.</p><div className="fixed inset-x-0 bottom-0 z-20 border-t border-border/50 bg-slate-900/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:static md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none"><Button className={`${primaryClass} w-full gap-2 md:w-auto`} disabled={busy || uploading !== null || pendingPhoto !== null || !detailsReady} onClick={() => lockedForRetry ? void submit() : review()}>{busy ? <><Loader2 className="h-4 w-4 animate-spin" />Submitting…</> : <><Send className="h-4 w-4" />{lockedForRetry ? 'Retry submission' : 'Review and sign'}</>}</Button></div><div aria-hidden="true" className="h-24 md:hidden" /></div>
       <Dialog open={showSignature} onOpenChange={open => { if (!busy) setShowSignature(open); }}><DialogContent data-accent="plant-inspections" mobileKeyboardSafe className={dialogContentViewportClassName({ size: 'lg', className: 'guest-plant-checks' })}><DialogHeader><DialogTitle>Sign Plant Daily Check</DialogTitle><DialogDescription>Confirm you have checked {asset.plant_id} today and that your answers are accurate.</DialogDescription></DialogHeader><div className="rounded-lg border border-border p-3 text-sm"><p className="font-medium">{name} — Temporary staff</p><p className="text-muted-foreground">{dateLabel} · {completed}/{PLANT_INSPECTION_ITEMS.length} items complete · {photos.length} photo(s)</p></div>{error && <p role="alert" className="text-sm text-red-300">{error}</p>}{lockedForRetry ? <Button className={primaryClass} disabled={busy} onClick={() => void submit()}>{busy ? 'Submitting…' : 'Retry submission'}</Button> : <SignaturePad initialValue={signature || null} disabled={busy} isSubmitting={busy} submitLabel="Submit daily check" onSave={value => { setSignature(value); void submit(value); }} onCancel={() => setShowSignature(false)} />}</DialogContent></Dialog>
     </>}
   </AppPageShell></div>;

@@ -21,6 +21,7 @@ let searchHandler: ((query: string) => Promise<Response>) | undefined;
 beforeEach(() => {
   submissions = []; failSubmit = false; lockedFirst = false; failPhoto = false; searchHandler = undefined;
   Element.prototype.scrollIntoView = vi.fn();
+  window.scrollTo = vi.fn();
   vi.stubGlobal('fetch', vi.fn(async (url: string, options?: RequestInit) => {
     if (url.includes('/photos')) return failPhoto ? response({ error: 'Photo upload failed' }, 503) : response({ id: jobId, itemNumber: 1 });
     if (options?.method === 'POST') {
@@ -55,6 +56,8 @@ describe('guest Plant form with the existing Plant layout', () => {
   it('uses explicit job selection and ignores an obsolete search response', async () => {
     await openForm();
     expect(screen.getByText('Daily Check Details')).toBeInTheDocument();
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'instant' });
+    expect(screen.getByRole('button', { name: 'Review and sign' }).parentElement).toHaveClass('fixed', 'bottom-0', 'md:static');
     expect(screen.getByText('23-Point Plant Safety Check')).toBeInTheDocument();
     expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).includes('?search='))).toBe(false);
     let finishOld: (value: Response) => void = () => {};
