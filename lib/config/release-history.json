@@ -1,5 +1,23 @@
 [
   {
+    "version": "1126.22.1",
+    "updateKind": "minor",
+    "title": "App improvements",
+    "description": "Delete absences atomically and preserve full Fixerrors diagnostics.",
+    "summary": "Delete absences atomically and preserve full Fixerrors diagnostics.",
+    "details": [
+      "Updated absence and leave, with changes to shared logic, automated tests, and data storage.",
+      "Updated data storage, with changes to shared typing, data storage, and documentation.",
+      "Updated help and FAQ, with changes to data storage and documentation."
+    ],
+    "areas": [
+      "Delete absences atomically",
+      "Preserve full Fixerrors diagnostics"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-11-16T21:33:41.685Z"
+  },
+  {
     "version": "1126.22.0",
     "updateKind": "major",
     "title": "Debug tools update",

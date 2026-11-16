@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.22.1
+
+**GIT COMMIT MESSAGE**
+`fix: delete absences atomically and preserve full Fixerrors diagnostics`
+
+**PUSHED AT**
+2026-11-16T21:33:41.685Z
+
+**WHAT CHANGED**
+Delete absences atomically and preserve full Fixerrors diagnostics.
+
+**VERSION HISTORY DETAILS**
+- Updated absence and leave, with changes to shared logic, automated tests, and data storage.
+- Updated data storage, with changes to shared typing, data storage, and documentation.
+- Updated help and FAQ, with changes to data storage and documentation.
+
+**COMMITS IN THIS RELEASE**
+- `fix: delete absences atomically and preserve full Fixerrors diagnostics`
+
 ## 1126.22.0
 
 **GIT COMMIT MESSAGE**
