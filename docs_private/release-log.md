@@ -2,6 +2,35 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.21.0
+
+**GIT COMMIT MESSAGE**
+`feat(hgv): support additional checks and audited same-day updates`
+
+**PUSHED AT**
+2026-11-16T16:02:18.968Z
+
+**WHAT CHANGED**
+Support additional checks and audited same-day updates. Add guest QR daily checks.
+
+**VERSION HISTORY DETAILS**
+- Updated daily tasks, with changes to background routes, app screens, interface components, shared logic, and shared typing.
+- Updated data storage, with changes to shared typing and data storage.
+- Updated admin settings, with changes to background routes and app screens.
+- Updated reports, with changes to background routes.
+- Updated PDF documents, with changes to background routes.
+- Updated daily allocation, with changes to shared logic.
+- Updated navigation across 1 changed file.
+- Updated maintenance, with changes to background routes.
+
+**COMMITS IN THIS RELEASE**
+- `feat(hgv): support additional checks and audited same-day updates`
+- `feat(plant): add guest QR daily checks`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 1126.20.0
 
 **GIT COMMIT MESSAGE**
