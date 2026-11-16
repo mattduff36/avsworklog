@@ -28,6 +28,7 @@ describe('HGV same-day rules', () => {
   it('accepts explicit defect-only reports and rejects pretending partial answers are a full check', () => {
     const body = { requestId: owner, hgvId: owner, userId: owner, inspectionDate:'2026-11-16', currentMileage:null, status:'submitted', inspectorComments:null, recordKind:'defect_report', parentCheckId:owner, discoveredAt:'2026-11-16T10:00:00Z', signatureData:'data:image/png;base64,test',items:[{item_number:1,item_description:TRUCK_CHECKLIST_ITEMS[0],day_of_week:1,status:'attention',comments:'New leak'}] };
     expect(HgvInspectionSaveBodySchema.safeParse(body).success).toBe(true);
+    expect(HgvInspectionSaveBodySchema.safeParse({ ...body, discoveredAt: undefined }).success).toBe(true);
     expect(HgvInspectionSaveBodySchema.safeParse({ ...body, parentCheckId: null }).success).toBe(false);
     expect(HgvInspectionSaveBodySchema.safeParse({ ...body, items:[{...body.items[0],status:'ok'}] }).success).toBe(false);
   });

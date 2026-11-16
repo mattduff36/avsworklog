@@ -21,6 +21,27 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 describe('HGV update form', () => {
+  it('selects defects with two-column buttons and only asks for one note per item', async () => {
+    vi.mocked(requestHgvInspectionSave).mockRejectedValue(new Error('Retry test'));
+    render(<HgvCheckUpdates check={check} items={items} actorId="owner" onUpdated={() => {}} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Report a new defect' }));
+    const picker = screen.getByRole('group', { name: 'Checklist items' });
+    expect(picker).toHaveClass('grid-cols-2');
+    expect(within(picker).getAllByRole('button')).toHaveLength(26);
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/When did you notice/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Additional notes (optional)')).not.toBeInTheDocument();
+    fireEvent.click(within(picker).getByRole('button', { name: 'Fuel - and ad-blu' }));
+    expect(screen.getAllByRole('textbox')).toHaveLength(1);
+    fireEvent.change(screen.getByLabelText('Note (required)'), { target: { value: 'Fuel leak' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Review and sign' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Test sign' }));
+    await waitFor(() => expect(requestHgvInspectionSave).toHaveBeenCalledOnce());
+    expect(requestHgvInspectionSave).toHaveBeenCalledWith(expect.objectContaining({
+      recordKind: 'defect_report', discoveredAt: null, inspectorComments: null,
+      items: [expect.objectContaining({ item_number: 1, status: 'attention', comments: 'Fuel leak' })],
+    }));
+  });
   it('keeps disabled production updates and other users read-only', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({ ok: true, json: async () => ({ ...history, updatesEnabled: false }) } as Response);
     const view = render(<HgvCheckUpdates check={check} items={items} actorId="owner" onUpdated={() => {}} />);

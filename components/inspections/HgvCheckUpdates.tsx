@@ -13,11 +13,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, dialogContentViewportClassName } from '@/components/ui/dialog';
 
 import { AlertTriangle, ArrowLeft, ArrowRight, Camera, Check, ChevronRight, ClipboardList, FileDown, History, Loader2, Minus, Pencil, Trash2, X } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 
-import { Input } from '@/components/ui/input';
 
 import { Textarea } from '@/components/ui/textarea';
 
@@ -67,7 +65,6 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
 
   const [reason, setReason] = useState('');
 
-  const [discovered, setDiscovered] = useState('');
 
   const [signature, setSignature] = useState(false);
 
@@ -125,11 +122,6 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
     setExpandedNotes([]);
     setReason(''); setDraftId(isReport && check.status === 'draft' ? check.id : null); setError(''); setSignature(false); setPhotoItem(null);
 
-    // datetime-local uses the device's local zone; submission serialises the actual instant.
-
-    const now = isReport && check.discovered_at ? new Date(check.discovered_at) : new Date();
-
-    setDiscovered(new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16));
 
   }
 
@@ -148,7 +140,6 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
 
     if (mode === 'correction' && reason.trim().length < 5) return 'Enter a reason for this correction (at least 5 characters).';
 
-    if (mode === 'defect' && (!discovered || Number.isNaN(new Date(discovered).getTime()) || new Date(discovered).getTime() > Date.now())) return 'Enter when the defect was discovered, not a future time.';
 
     return '';
 
@@ -186,7 +177,7 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
 
         parentCheckId: mode === 'correction' ? check.parent_check_id || null : isReport ? check.parent_check_id || null : check.id,
 
-        discoveredAt: mode === 'correction' ? check.discovered_at || null : new Date(discovered).toISOString(),
+        discoveredAt: mode === 'correction' ? check.discovered_at || null : null,
 
         correctionReason: mode === 'correction' ? reason.trim() : null,
 
@@ -227,26 +218,23 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
         <div>
           <CardTitle className="text-xl text-foreground">{title}</CardTitle>
           <CardDescription className="mt-2">
-            {mode === 'defect' ? 'Select the affected item, describe the problem, then sign to send it to Workshop.' : 'Update the answers or notes that need correcting, then sign again.'}
+            {mode === 'defect' ? 'Choose an item, add a note and an optional photo, then submit.' : 'Update the answers or notes that need correcting, then sign again.'}
           </CardDescription>
         </div>
       </CardHeader>
       <CardContent className="space-y-6 p-4 pt-0 sm:p-6 sm:pt-0">
-        {mode === 'defect' ? <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="hgv-defect-discovered">When did you notice the defect?</Label>
-            <Input id="hgv-defect-discovered" className={`${fieldClass} min-w-0 w-full`} type="datetime-local" value={discovered} onChange={event => setDiscovered(event.target.value)} disabled={busy} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="hgv-defect-item">Affected checklist item</Label>
-            <Select value="" disabled={busy} onValueChange={value => {
-              const number = Number(value);
-              if (!number || answers.some(item => item.item_number === number)) return;
-              setAnswers(previous => [...previous, { item_number: number, item_description: TRUCK_CHECKLIST_ITEMS[number - 1], day_of_week: 1, status: 'attention', comments: '' }]);
-            }}>
-              <SelectTrigger id="hgv-defect-item" className={`${fieldClass} text-left`}><SelectValue placeholder={answers.length ? 'Add another affected item' : 'Select an item'} /></SelectTrigger>
-              <SelectContent>{TRUCK_CHECKLIST_ITEMS.map((item, index) => <SelectItem key={item} value={String(index + 1)} disabled={answers.some(answer => answer.item_number === index + 1)}>{index + 1}. {item}</SelectItem>)}</SelectContent>
-            </Select>
+        {mode === 'defect' ? <div className="space-y-3">
+          <h3 className="font-medium">Select the item(s) with a defect</h3>
+          <div role="group" aria-label="Checklist items" className="grid grid-cols-2 gap-2">
+            {TRUCK_CHECKLIST_ITEMS.map((item, index) => {
+              const number = index + 1;
+              const selected = answers.some(answer => answer.item_number === number);
+              return <button type="button" key={number} aria-pressed={selected} disabled={busy}
+                onClick={() => { setError(''); setAnswers(previous => selected ? previous.filter(answer => answer.item_number !== number) : [...previous, { item_number: number, item_description: item, day_of_week: 1, status: 'attention', comments: '' }]); }}
+                className={`flex min-h-[64px] items-center gap-2 rounded-lg border-2 px-3 py-3 text-left text-[14px] leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${selected ? 'border-primary bg-primary/15 text-foreground' : 'border-slate-600 bg-slate-900/50 text-foreground hover:bg-slate-800'}`}>
+                <span className="min-w-0 flex-1 break-words">{item}</span>{selected && <Check aria-hidden="true" className="h-4 w-4 shrink-0" />}
+              </button>;
+            })}
           </div>
         </div> : <p className="text-sm text-muted-foreground">Your original signed check is kept. KM corrections stay with a manager, and existing Workshop tasks remain open.</p>}
 
@@ -255,27 +243,27 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
           {answers.map(item => <div key={item.item_number} className="rounded-lg border border-border/50 bg-slate-900/30 p-4 space-y-3">
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-600 bg-slate-800 text-sm font-bold text-muted-foreground">{item.item_number}</span>
-              <h4 className="min-w-0 flex-1 text-base font-medium text-white">{item.item_description}</h4>
+              <h4 className="min-w-0 flex-1 text-[16px] font-medium text-white">{item.item_description}</h4>
               {mode === 'defect' && <Button variant="ghost" size="icon" className="min-h-[44px] min-w-[44px] text-muted-foreground" aria-label={`Remove ${item.item_description}`} disabled={busy} onClick={() => setAnswers(previous => previous.filter(answer => answer.item_number !== item.item_number))}><Trash2 className="h-4 w-4" /></Button>}
             </div>
             {mode === 'correction' && <div role="group" aria-label={`${item.item_description} result`} className="grid grid-cols-3 gap-2">
               {([{ value: 'ok', label: 'Pass', icon: Check }, { value: 'attention', label: 'Fail', icon: X }, { value: 'na', label: 'N/A', icon: Minus }] as const).map(option => <Button key={option.value} variant="outline" aria-pressed={item.status === option.value} disabled={busy} onClick={() => changeItem(item.item_number, { status: option.value })} className={`min-h-[48px] gap-2 border-2 ${item.status !== option.value ? 'border-slate-600 text-muted-foreground' : option.value === 'ok' ? 'border-green-500 bg-green-500/20 text-green-300 hover:bg-green-500/30' : option.value === 'attention' ? 'border-red-500 bg-red-500/20 text-red-300 hover:bg-red-500/30' : 'border-slate-400 bg-slate-700 text-white'}`}><option.icon className="h-4 w-4" />{option.label}</Button>)}
             </div>}
             {(item.status === 'attention' || item.comments || expandedNotes.includes(item.item_number)) ? <div className="space-y-2">
-              <Label htmlFor={`hgv-update-${item.item_number}`}>{item.status === 'attention' ? 'Describe the defect (required)' : 'Notes (optional)'}</Label>
-              <Textarea id={`hgv-update-${item.item_number}`} className={`${fieldClass} min-h-[88px]`} value={item.comments || ''} disabled={busy} onChange={event => changeItem(item.item_number, { comments: event.target.value })} placeholder={item.status === 'attention' ? 'What is wrong and where is it?' : 'Add details if needed'} />
+              <Label htmlFor={`hgv-update-${item.item_number}`}>{item.status === 'attention' ? (mode === 'defect' ? 'Note (required)' : 'Describe the defect (required)') : 'Notes (optional)'}</Label>
+              <Textarea id={`hgv-update-${item.item_number}`} className={`${fieldClass} min-h-[88px] text-[16px]`} value={item.comments || ''} disabled={busy} onChange={event => changeItem(item.item_number, { comments: event.target.value })} placeholder={item.status === 'attention' ? 'What is wrong and where is it?' : 'Add details if needed'} />
             </div> : <Button variant="ghost" className="min-h-[44px] px-0 text-muted-foreground" disabled={busy} onClick={() => setExpandedNotes(previous => [...previous, item.item_number])}>Add a note<span className="sr-only"> for {item.item_description}</span></Button>}
             {mode === 'defect' && <Button variant="outline" className="min-h-[44px] gap-2" disabled={busy} onClick={async () => { const savedId = await save('draft'); if (savedId) setPhotoItem(item.item_number); }}><Camera className="h-4 w-4" />Add photos</Button>}
           </div>)}
         </div>}
 
-        <div className="space-y-2">
+        {mode === 'correction' && <div className="space-y-2">
           <Label htmlFor="hgv-update-notes">Additional notes (optional)</Label>
-          <Textarea id="hgv-update-notes" className={`${fieldClass} min-h-[88px]`} placeholder="Anything else to add?" value={notes} onChange={event => setNotes(event.target.value)} disabled={busy} />
-        </div>
+          <Textarea id="hgv-update-notes" className={`${fieldClass} min-h-[88px] text-[16px]`} placeholder="Anything else to add?" value={notes} onChange={event => setNotes(event.target.value)} disabled={busy} />
+        </div>}
         {mode === 'correction' && <div className="space-y-2">
           <Label htmlFor="hgv-update-reason">Reason for correction (required)</Label>
-          <Textarea id="hgv-update-reason" className={`${fieldClass} min-h-[88px]`} placeholder="Explain what was recorded incorrectly" value={reason} onChange={event => setReason(event.target.value)} disabled={busy} />
+          <Textarea id="hgv-update-reason" className={`${fieldClass} min-h-[88px] text-[16px]`} placeholder="Explain what was recorded incorrectly" value={reason} onChange={event => setReason(event.target.value)} disabled={busy} />
           <p className="text-sm text-muted-foreground">This reason is saved with the correction history.</p>
         </div>}
         {error && !signature && <p role="alert" className="rounded-md border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{error}</p>}
@@ -291,7 +279,7 @@ export function HgvCheckUpdates({ check, items, actorId, onUpdated }: HgvCheckUp
       <Card>
         <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
           <CardTitle className="text-lg">{isReport ? 'Defect report' : history?.updatesEnabled && owner ? 'Need to update this check?' : 'Check activity'}</CardTitle>
-          <CardDescription>{isReport ? `Discovered ${timeLabel(check.discovered_at || null)}` : history?.updatesEnabled && owner ? 'Report a new problem or correct a mistake in your submitted check.' : `Submitted ${timeLabel(check.submitted_at)}`} </CardDescription>
+          <CardDescription>{isReport ? `Submitted ${timeLabel(check.submitted_at)}` : history?.updatesEnabled && owner ? 'Report a new problem or correct a mistake in your submitted check.' : `Submitted ${timeLabel(check.submitted_at)}`} </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 p-4 pt-0 sm:p-6 sm:pt-0">
           {check.parent_check_id && <Link className="inline-flex min-h-[44px] items-center gap-2 text-sm underline underline-offset-4" href={`/hgv-inspections/${check.parent_check_id}`}><ArrowLeft className="h-4 w-4" />View original daily check</Link>}

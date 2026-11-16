@@ -65,9 +65,9 @@ suite('HGV same-day updates - disposable real PostgreSQL', () => {
   });
   afterAll(async () => { for (const client of clients) await client.end(); });
   const fullItems = (defect = false) => TRUCK_CHECKLIST_ITEMS.map((label,index) => ({item_number:index+1,item_description:label,day_of_week:day,status:defect && index===0?'attention':'ok',comments:defect && index===0?'Fuel leak':null}));
-  type Input = { compat?: boolean; id?: string; hint?: string; actor?: string; owner?: string; kind?: string; parent?: string; items?: unknown[]; mileage?: number|null; reason?: string; revision?: number; status?: string; date?: string; inform?: boolean; notes?: string };
+  type Input = { discovered?: string|null; compat?: boolean; id?: string; hint?: string; actor?: string; owner?: string; kind?: string; parent?: string; items?: unknown[]; mileage?: number|null; reason?: string; revision?: number; status?: string; date?: string; inform?: boolean; notes?: string };
   async function save(input: Input = {}, connection = db) {
-    const values = [input.actor||F.actor,false,input.owner||F.actor,F.hgv,input.date||date,input.hint||null,input.status||'submitted',input.mileage===undefined?120:input.mileage,input.notes||null,'data:image/png;base64,TEST',JSON.stringify(input.items||fullItems()),input.id||randomUUID(),input.kind||'full_check',input.parent||null,input.kind==='defect_report'?new Date().toISOString():null,input.reason||null,input.revision??null,input.inform||false];
+    const values = [input.actor||F.actor,false,input.owner||F.actor,F.hgv,input.date||date,input.hint||null,input.status||'submitted',input.mileage===undefined?120:input.mileage,input.notes||null,'data:image/png;base64,TEST',JSON.stringify(input.items||fullItems()),input.id||randomUUID(),input.kind||'full_check',input.parent||null,input.discovered !== undefined ? input.discovered : input.kind==='defect_report'?new Date().toISOString():null,input.reason||null,input.revision??null,input.inform||false];
     const result=await connection.query(`SELECT public.${input.compat ? 'save_hgv_inspection_compat' : 'save_hgv_inspection_v2'}($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) AS saved`,values);
     return result.rows[0].saved;
   }
@@ -172,6 +172,19 @@ suite('HGV same-day updates - disposable real PostgreSQL', () => {
     expect((await save()).id).not.toBe(id);
     await expect(save({hint:id})).rejects.toThrow('SUBMITTED_CONFLICT');
     expect((await db.query('SELECT count(*)::int AS count FROM hgv_inspections WHERE id=$1',[id])).rows[0].count).toBe(1);
+  });
+  it('timestamps photo drafts at final report submission and retains that time on retry', async () => {
+    const parent = await save(); const id = randomUUID();
+    const report = { id, kind: 'defect_report', parent: parent.id, mileage: null, items: fullItems(true).slice(0,1) };
+    await save({ ...report, status: 'draft', discovered: null });
+    expect((await db.query('SELECT discovered_at FROM hgv_inspections WHERE id=$1',[id])).rows[0].discovered_at).toBeNull();
+    const submittedTime = new Date().toISOString();
+    await save({ ...report, hint:id, discovered:submittedTime });
+    await save({ ...report, hint:id, discovered:new Date().toISOString() });
+    const saved = (await db.query('SELECT discovered_at,submitted_at FROM hgv_inspections WHERE id=$1',[id])).rows[0];
+    expect(saved.discovered_at.toISOString()).toBe(submittedTime);
+    expect(Math.abs(saved.submitted_at.getTime()-saved.discovered_at.getTime())).toBeLessThan(5000);
+    expect((await db.query('SELECT count(*)::int AS count FROM hgv_inspection_versions WHERE inspection_id=$1',[id])).rows[0].count).toBe(1);
   });
   it('reports defects atomically, links repeated observations and never writes a report KM', async () => {
     const parent=await save({items:fullItems(true)});

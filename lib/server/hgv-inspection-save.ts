@@ -43,7 +43,7 @@ export const HgvInspectionSaveBodySchema = z
     if (body.status === 'submitted') {
       if (!body.signatureData?.startsWith('data:image/png;base64,')) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['signatureData'], message: 'Signature required' });
       if (body.recordKind === 'full_check' && body.items.length !== TRUCK_CHECKLIST_ITEMS.length) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['items'], message: 'Complete all checklist items' });
-      if (body.recordKind === 'defect_report' && (!body.parentCheckId || !body.discoveredAt || !body.items.length || body.items.some(item => item.status !== 'attention'))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['items'], message: 'Report at least one defect' });
+      if (body.recordKind === 'defect_report' && (!body.parentCheckId || !body.items.length || body.items.some(item => item.status !== 'attention'))) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['items'], message: 'Report at least one defect' });
     }
     const seen = new Set<string>();
     for (const item of body.items) {
@@ -265,7 +265,11 @@ export async function saveHgvInspectionForActor(input: {
     p_request_id: input.body.requestId ?? randomUUID(),
     p_record_kind: input.body.recordKind,
     p_parent_check_id: input.body.parentCheckId ?? null,
-    p_discovered_at: input.body.discoveredAt ?? null,
+    // New reports use server submission time, including drafts resumed after photo upload.
+    // Corrections preserve their immutable original timestamp; RPC retries return stored evidence.
+    p_discovered_at: input.body.recordKind === 'defect_report' && !input.body.correctionReason
+      ? (input.body.status === 'submitted' ? new Date().toISOString() : null)
+      : input.body.discoveredAt ?? null,
     p_correction_reason: input.body.correctionReason ?? null,
     p_expected_revision: input.body.expectedRevision ?? null,
     p_inform_workshop: input.body.informWorkshop,

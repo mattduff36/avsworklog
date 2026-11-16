@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { replaceEqualDeep, useQueryClient } from '@tanstack/react-query';
 import { type SupabaseClient, type User } from '@supabase/supabase-js';
 import {
   broadcastAuthStateChange,
@@ -349,8 +349,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [clearLocalAuthState]);
 
   const applySessionPayload = useCallback((payload: ClientAuthSessionResponse) => {
-    setUser(buildSyntheticUser(payload));
-    setProfile(payload.profile ? ({ ...payload.profile } as Profile) : null);
+    // A successful background check is not a new identity. Keep equal references so
+    // page effects (and View As metadata loading) do not remount an in-progress form.
+    // Compare the whole profile: real role/team/permission changes must still propagate.
+    setUser(previous => previous && previous.id === payload.user?.id
+      && previous.email === (payload.user.email || undefined)
+      ? previous : buildSyntheticUser(payload));
+    setProfile(previous => replaceEqualDeep(previous, payload.profile ? ({ ...payload.profile } as Profile) : null));
   }, []);
 
   const onAuthTransition = useCallback(async (
