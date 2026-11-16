@@ -528,4 +528,49 @@ BEGIN
 END; $$;
 REVOKE ALL ON FUNCTION public.inform_hgv_workshop_compat(uuid,boolean,uuid,uuid,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.inform_hgv_workshop_compat(uuid,boolean,uuid,uuid,text) TO service_role;
+-- Cached callbacks may target pre-foundation checks. Never reconcile outside
+-- the asset lock: their first correction can create the version concurrently.
+CREATE FUNCTION public.sync_hgv_defects_compat(p_actor_id uuid,p_can_manage boolean,p_inspection_id uuid,p_hgv_id uuid)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE v_row public.hgv_inspections%ROWTYPE; v_item public.inspection_items%ROWTYPE;
+  v_task uuid; v_category uuid; v_reg text; v_created integer:=0; v_skipped integer:=0;
+BEGIN
+  IF p_actor_id IS NULL THEN RAISE EXCEPTION 'HGV_SAVE:FORBIDDEN_OWNER'; END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended('hgv-check:'||p_hgv_id::text,0));
+  SELECT * INTO v_row FROM public.hgv_inspections WHERE id=p_inspection_id FOR UPDATE;
+  IF NOT FOUND OR v_row.hgv_id IS DISTINCT FROM p_hgv_id
+    OR (v_row.user_id<>p_actor_id AND NOT COALESCE(p_can_manage,false)) THEN
+    RAISE EXCEPTION 'HGV_SAVE:FORBIDDEN_OWNER';
+  END IF;
+  IF v_row.status<>'submitted' THEN RAISE EXCEPTION 'HGV_SAVE:INVALID_INPUT'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.hgv_inspection_versions WHERE inspection_id=v_row.id) THEN
+    SELECT reg_number INTO v_reg FROM public.hgvs WHERE id=p_hgv_id;
+    SELECT id INTO v_category FROM public.workshop_task_categories WHERE name='Repair' AND applies_to='hgv' AND is_active LIMIT 1;
+    FOR v_item IN SELECT * FROM public.inspection_items WHERE inspection_id=v_row.id AND status='attention' ORDER BY item_number LOOP
+      -- Replays never reopen completed work or rewrite another check's task.
+      IF EXISTS(SELECT 1 FROM public.hgv_defect_observations WHERE inspection_id=v_row.id AND revision=v_row.revision AND item_number=v_item.item_number) THEN
+        v_skipped:=v_skipped+1; CONTINUE;
+      END IF;
+      SELECT a.id INTO v_task FROM public.actions a WHERE a.hgv_id=p_hgv_id AND a.action_type='inspection_defect'
+        AND (a.status IN ('pending','logged','on_hold','in_progress') OR a.inspection_id=v_row.id)
+        AND lower(regexp_replace(trim(COALESCE(substring(a.description FROM 'Item[[:space:]]+[0-9]+[[:space:]]*-[[:space:]]*([^\n(]+)'),'')),'[[:space:]]+',' ','g'))
+          = lower(regexp_replace(trim(v_item.item_description),'[[:space:]]+',' ','g'))
+        ORDER BY a.created_at,a.id LIMIT 1 FOR UPDATE;
+      IF v_task IS NULL THEN
+        INSERT INTO public.actions(action_type,hgv_id,title,description,status,created_by,inspection_id,inspection_item_id,
+          workshop_category_id,daily_check_source_id,daily_check_source_type)
+        VALUES('inspection_defect',p_hgv_id,v_reg||' - '||v_item.item_description,
+          'HGV inspection defect found:'||E'\nItem '||v_item.item_number||' - '||v_item.item_description||E'\nComment: '||COALESCE(v_item.comments,''),
+          'pending',p_actor_id,v_row.id,v_item.id,v_category,v_row.id,'hgv') RETURNING id INTO v_task;
+        v_created:=v_created+1;
+      ELSE v_skipped:=v_skipped+1;
+      END IF;
+      INSERT INTO public.hgv_defect_observations(inspection_id,revision,item_number,task_id,comment)
+        VALUES(v_row.id,v_row.revision,v_item.item_number,v_task,v_item.comments);
+    END LOOP;
+  END IF;
+  RETURN jsonb_build_object('success',true,'created',v_created,'updated',0,'skipped',v_skipped,'dedupedClosed',0,'duplicates','[]'::jsonb);
+END; $$;
+REVOKE ALL ON FUNCTION public.sync_hgv_defects_compat(uuid,boolean,uuid,uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.sync_hgv_defects_compat(uuid,boolean,uuid,uuid) TO service_role;
 COMMIT;

@@ -74,7 +74,7 @@ suite('HGV same-day updates - disposable real PostgreSQL', () => {
     const legacy='public.save_hgv_inspection(uuid,boolean,uuid,uuid,date,uuid,uuid,text,integer,text,text,jsonb)';
     for (const role of ['anon','authenticated']) {
       expect((await db.query("SELECT has_function_privilege($1,$2,'EXECUTE') AS allowed",[role,legacy])).rows[0].allowed).toBe(false);
-      for (const name of ['save_hgv_inspection_v2','save_hgv_inspection_compat','inform_hgv_workshop_compat']) {
+      for (const name of ['save_hgv_inspection_v2','save_hgv_inspection_compat','inform_hgv_workshop_compat','sync_hgv_defects_compat']) {
         expect((await db.query("SELECT has_function_privilege($1,p.oid,'EXECUTE') AS allowed FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname=$2",[role,name])).rows[0].allowed).toBe(false);
       }
     }
@@ -91,6 +91,46 @@ suite('HGV same-day updates - disposable real PostgreSQL', () => {
     expect((await db.query("SELECT to_regclass('public.idx_unique_hgv_inspection_user_date') AS idx")).rows[0].idx).toBeTruthy();
     await db.query(readFileSync('tests/fixtures/hgv-same-day-activation.sql','utf8'));
     expect((await db.query("SELECT has_function_privilege('service_role',$1,'EXECUTE') AS allowed",[legacy])).rows[0].allowed).toBe(false);
+  });
+  it('serializes legacy callbacks against the first correction in both lock orders', async () => {
+    const observer = await connect();
+    const otherPid = (await other.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+    const sync = (id: string, client: Client) => client.query('SELECT public.sync_hgv_defects_compat($1,false,$2,$3) AS result',[F.actor,id,F.hgv]);
+    for (const correctionFirst of [true,false]) {
+      await db.query("UPDATE actions SET status='completed'");
+      const id=randomUUID();
+      await db.query("INSERT INTO hgv_inspections(id,hgv_id,user_id,inspection_date,status,current_mileage,submitted_at,signature_data) VALUES($1,$2,$3,$4,'submitted',120,now(),'legacy signature')",[id,F.hgv,F.actor,date]);
+      for (const item of fullItems(true)) {
+        await db.query('INSERT INTO inspection_items(inspection_id,item_number,item_description,day_of_week,status,comments) VALUES($1,$2,$3,$4,$5,$6)',[id,item.item_number,item.item_description,item.day_of_week,item.status,item.comments]);
+      }
+      const correctedItems=fullItems(true).map(item=>({...item,comments:item.status==='attention'?'Authoritative corrected observation':null}));
+      const correction={hint:id,reason:'Correct defect observation',revision:0,items:correctedItems};
+      await db.query('BEGIN');
+      let pending: Promise<unknown> | undefined;
+      try {
+        if (correctionFirst) await save(correction,db); else await sync(id,db);
+        pending=correctionFirst ? sync(id,other) : save(correction,other);
+        // Observe an actual blocked backend, not merely two Promise calls.
+        let blocked=false;
+        for (let attempt=0;attempt<100;attempt++) {
+          blocked=(await observer.query('SELECT cardinality(pg_blocking_pids($1))>0 AS blocked',[otherPid])).rows[0].blocked;
+          if (blocked) break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        expect(blocked).toBe(true);
+        await db.query('COMMIT');
+        await pending;
+      } finally {
+        await db.query('ROLLBACK');
+        if (pending) await pending.catch(()=>{});
+      }
+      const before=await db.query('SELECT id,title,description,status FROM actions WHERE inspection_id=$1 ORDER BY id',[id]);
+      expect(before.rows).toHaveLength(1);
+      expect((await db.query('SELECT comment FROM hgv_defect_observations WHERE inspection_id=$1 AND revision=1',[id])).rows[0].comment).toBe('Authoritative corrected observation');
+      expect((await sync(id,other)).rows[0].result.created).toBe(0);
+      expect((await db.query('SELECT id,title,description,status FROM actions WHERE inspection_id=$1 ORDER BY id',[id])).rows).toEqual(before.rows);
+      await expect(other.query('SELECT public.sync_hgv_defects_compat($1,false,$2,$3)',[F.subject,id,F.hgv])).rejects.toThrow('FORBIDDEN_OWNER');
+    }
   });
   it('compatibility refuses ambiguous/stale payloads after preview creates multiple records', async () => {
     const a=await save(); const b=await save();
