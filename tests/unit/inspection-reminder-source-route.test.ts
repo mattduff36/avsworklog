@@ -20,7 +20,7 @@ const id = '22222222-2222-4222-8222-222222222222';
 const request = (extra: Record<string, unknown> = {}) => new NextRequest('http://localhost/api/reminders/complete-inspection-action', {
   method: 'POST', body: JSON.stringify({ assetType: 'van', assetId: 'asset', assignedTo: actor, inspectionId: id, ...extra }),
 });
-const checkQuery = (check: { user_id: string; status: string } | null) =>
+const checkQuery = (check: { user_id: string; status: string; record_kind?: string } | null) =>
   createSupabaseQueryMock({ data: check, error: null }, ['select', 'eq', 'maybeSingle']);
 
 describe('Daily Check reminder causal-source validation', () => {
@@ -29,7 +29,7 @@ describe('Daily Check reminder causal-source validation', () => {
     mocks.current.mockResolvedValue({ profile: { id: actor } });
     mocks.module.mockResolvedValue(true);
     mocks.access.mockResolvedValue({ access: { userId: actor, canManageOthers: false }, errorResponse: null });
-    mocks.from.mockReturnValue(checkQuery({ user_id: actor, status: 'submitted' }));
+    mocks.from.mockReturnValue(checkQuery({ user_id: actor, status: 'submitted', record_kind: 'full_check' }));
     mocks.complete.mockResolvedValue({ actionedCount: 1, cancelledCount: 0, actionIds: ['action'] });
     mocks.draft.mockResolvedValue({ actionedCount: 0, cancelledCount: 0, actionIds: [] });
   });
@@ -41,6 +41,11 @@ describe('Daily Check reminder causal-source validation', () => {
     expect(query.eq).toHaveBeenCalledWith(`${assetType}_id`, 'asset');
     expect(query.eq).toHaveBeenCalledWith('id', id);
     expect(mocks.complete).toHaveBeenCalledWith(expect.objectContaining({ inspectionId: id, actionedBy: actor, assetType }));
+  });
+  it('does not complete a full-check reminder from an additional defect report', async () => {
+    mocks.from.mockReturnValue(checkQuery({ user_id: actor, status: 'submitted', record_kind: 'defect_report' }));
+    expect((await POST(request({ assetType: 'hgv' }))).status).toBe(400);
+    expect(mocks.complete).not.toHaveBeenCalled();
   });
   it('fails closed on missing session, module access and source access', async () => {
     mocks.current.mockResolvedValue(null);
@@ -64,7 +69,7 @@ describe('Daily Check reminder causal-source validation', () => {
   it('rejects an absent or wrong-asset check and mismatched assignee', async () => {
     mocks.from.mockReturnValue(checkQuery(null));
     expect((await POST(request())).status).toBe(404);
-    mocks.from.mockReturnValue(checkQuery({ user_id: actor, status: 'submitted' }));
+    mocks.from.mockReturnValue(checkQuery({ user_id: actor, status: 'submitted', record_kind: 'full_check' }));
     expect((await POST(request({ assignedTo: id }))).status).toBe(403);
     expect(mocks.complete).not.toHaveBeenCalled();
   });

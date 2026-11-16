@@ -30,6 +30,7 @@ interface HgvInspectionRow {
   id: string;
   user_id: string;
   status: 'draft' | 'submitted';
+  record_kind?: 'full_check' | 'defect_report';
   has_reported_defect?: boolean;
   has_inform_workshop_task?: boolean;
   inspection_date: string;
@@ -201,6 +202,7 @@ export function HgvInspectionsListTable({
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {formatInspectionRange(inspection.inspection_date, inspection.inspection_end_date)}
+                <div className="text-xs">{inspection.record_kind === 'defect_report' ? 'Additional defect report' : 'Full daily check'}{inspection.submitted_at ? ` · ${new Date(inspection.submitted_at).toLocaleTimeString('en-GB', { timeZone: 'Europe/London', hour: '2-digit', minute: '2-digit' })}` : ''}</div>
               </TableCell>
               <TableCell className="text-muted-foreground text-right tabular-nums whitespace-nowrap">
                 {formatInspectionMeter(inspection.current_mileage, 'hgv')}
@@ -215,7 +217,7 @@ export function HgvInspectionsListTable({
               )}
               <TableCell className="text-right">
                 <div className="flex items-center justify-end gap-2" onClick={(event) => event.stopPropagation()}>
-                  {canCorrectReadings && inspection.status === 'submitted' && (
+                  {canCorrectReadings && inspection.status === 'submitted' && inspection.record_kind !== 'defect_report' && (
                     <Button variant="outline" size="sm" aria-label={`Edit Daily Check on ${inspection.inspection_date}`}
                       className="gap-1 px-2 [@media(pointer:coarse)]:min-h-11 [[data-tablet-mode=on]_&]:min-h-11 [&_svg]:size-3.5"
                       onClick={() => onEditReading(inspection.id)}>

@@ -55,6 +55,9 @@ const invalidItems = JSON.stringify([
 ]);
 
 const validSaveBody = {
+  requestId: '77777777-7777-4777-8777-777777777777',
+  recordKind: 'full_check' as const,
+  informWorkshop: false,
   hgvId: HGV_SAVE_FIXTURE.hgv,
   userId: HGV_SAVE_FIXTURE.actor,
   inspectionDate: HGV_SAVE_FIXTURE.date,
@@ -392,34 +395,21 @@ describe('HGV inspection save coordination', () => {
         status: 'draft',
       },
     });
-    await saveHgvInspectionForActor({
+    await expect(saveHgvInspectionForActor({
       actorId: HGV_SAVE_FIXTURE.actor,
       canManageOthers: false,
-      body: {
-        ...validSaveBody,
-        hintInspectionId: HGV_SAVE_FIXTURE.stale,
-      },
+      body: { ...validSaveBody, hintInspectionId: HGV_SAVE_FIXTURE.stale },
       admin: knownHint as never,
-    });
-    expect(knownHint.rpc).toHaveBeenCalledWith(
-      'save_hgv_inspection',
-      expect.objectContaining({
-        p_hint_inspection_id: null,
-        p_expected_owner_id: null,
-      })
-    );
-
+    })).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    expect(knownHint.rpc).not.toHaveBeenCalled();
     const unknownHint = lookupAdmin({ byKey: null, byHint: null });
-    await saveHgvInspectionForActor({
+    await expect(saveHgvInspectionForActor({
       actorId: HGV_SAVE_FIXTURE.actor,
       canManageOthers: false,
-      body: {
-        ...validSaveBody,
-        hintInspectionId: '66666666-6666-4666-8666-666666666666',
-      },
+      body: { ...validSaveBody, hintInspectionId: '66666666-6666-4666-8666-666666666666' },
       admin: unknownHint as never,
-    });
-    expect(unknownHint.rpc.mock.calls[0]?.[1]).toEqual(knownHint.rpc.mock.calls[0]?.[1]);
+    })).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
+    expect(unknownHint.rpc).not.toHaveBeenCalled();
 
     const db = await startDb();
     await db.query(

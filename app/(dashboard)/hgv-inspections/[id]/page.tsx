@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { canAccessScopedInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
+import { HgvCheckUpdates } from '@/components/inspections/HgvCheckUpdates';
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,11 @@ interface HgvInspectionDetails {
   inspection_end_date: string | null;
   current_mileage: number | null;
   status: 'draft' | 'submitted';
+  submitted_at: string | null;
+  record_kind: 'full_check' | 'defect_report';
+  parent_check_id: string | null;
+  discovered_at: string | null;
+  revision: number;
   inspector_comments: string | null;
   hgv: {
     reg_number: string;
@@ -271,12 +277,13 @@ export default function ViewHgvInspectionPage() {
 
   return (
     <div className="space-y-6 max-w-6xl">
+      {(inspection.status === 'submitted' || inspection.record_kind === 'defect_report') && user && <HgvCheckUpdates check={inspection} actorId={user.id} items={items.map(item => ({ ...item, item_description: item.item_description || '', day_of_week: item.day_of_week || 1 }))} onUpdated={() => { void fetchInspection(inspection.id); }} />}
       <div className="bg-white dark:bg-slate-900 rounded-lg p-4 md:p-6 border border-border">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="flex items-center space-x-3 md:space-x-4">
             <BackButton fallbackHref="/hgv-inspections" />
             <div>
-              <h1 className="text-xl md:text-3xl font-bold text-foreground">HGV Daily Check</h1>
+              <h1 className="text-xl md:text-3xl font-bold text-foreground">{inspection.record_kind === 'defect_report' ? 'Additional HGV defect report' : 'HGV Daily Check'}</h1>
               <p className="text-sm md:text-base text-muted-foreground">
                 {formatFleetAssetLabel({
                   identifier: inspection.hgv?.reg_number || 'Unknown HGV',
@@ -536,6 +543,7 @@ export default function ViewHgvInspectionPage() {
 
       {photoUploadItem && (
         <PhotoUpload
+          allowDelete={!isSubmittedInspection}
           inspectionId={inspection.id}
           itemNumber={photoUploadItem.itemNumber}
           dayOfWeek={photoUploadItem.dayOfWeek}

@@ -14,9 +14,11 @@ interface SignaturePadProps {
   disabled?: boolean;
   variant?: 'default' | 'toolbox-talk';
   resetKey?: string;
+  submitLabel?: string;
+  isSubmitting?: boolean;
 }
 
-export function SignaturePad({ onSave, onCancel, initialValue, disabled = false, variant = 'default', resetKey }: SignaturePadProps) {
+export function SignaturePad({ onSave, onCancel, initialValue, disabled = false, variant = 'default', resetKey, submitLabel, isSubmitting = false }: SignaturePadProps) {
   const sigCanvas = useRef<SignatureCanvas>(null);
 
   const fillCanvasWhite = useCallback(() => {
@@ -102,13 +104,13 @@ export function SignaturePad({ onSave, onCancel, initialValue, disabled = false,
           onClick={handleSave}
           disabled={disabled}
           className={
-            variant === 'toolbox-talk'
+            submitLabel ? 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-70' : variant === 'toolbox-talk'
               ? 'border-red-600 text-red-600 hover:bg-red-600 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed'
               : 'border-rams text-rams hover:bg-rams hover:text-white disabled:opacity-50 disabled:cursor-not-allowed'
           }
         >
           <Check className="h-4 w-4 mr-2" />
-          Save Signature
+          {isSubmitting ? 'Submitting...' : submitLabel || 'Save Signature'}
         </Button>
       </div>
     </Card>

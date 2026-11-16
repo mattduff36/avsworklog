@@ -72,6 +72,7 @@ type PlantInspectionRow = {
 };
 
 type HgvInspectionRow = {
+  record_kind?: string;
   id: string;
   user_id: string;
   inspection_date: string;
@@ -231,6 +232,7 @@ export async function GET(request: NextRequest) {
               .from('hgv_inspections')
               .select(`
                 id,
+                record_kind,
                 user_id,
                 inspection_date,
                 status,
@@ -324,7 +326,7 @@ export async function GET(request: NextRequest) {
         }
 
         excelData.push({
-          'Check Type': source,
+          'Check Type': source === 'HGV' && (inspection as HgvInspectionRow).record_kind === 'defect_report' ? 'HGV additional defect report' : source,
           'Asset Reference': assetReference,
           'Asset Category': assetType,
           'Inspector': inspection.inspector?.full_name || 'Unknown',

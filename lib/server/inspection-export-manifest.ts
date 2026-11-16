@@ -75,6 +75,10 @@ export interface PlantInspectionWithRelations extends BaseInspectionShape {
 
 export interface HgvInspectionWithRelations extends BaseInspectionShape {
   source: 'hgv';
+  record_kind?: string;
+  submitted_at?: string | null;
+  discovered_at?: string | null;
+  revision?: number;
   hgv?: HgvShape | null;
   profile?: ProfileShape | null;
 }
@@ -176,6 +180,10 @@ const PLANT_DETAIL_SELECT = `
 
 const HGV_DETAIL_SELECT = `
   id,
+  record_kind,
+  submitted_at,
+  discovered_at,
+  revision,
   user_id,
   inspection_date,
   inspection_end_date,

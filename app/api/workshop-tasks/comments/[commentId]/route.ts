@@ -93,6 +93,7 @@ export async function PATCH(
     } | null;
 
     if (updateError) {
+      if (updateError.message.includes('HGV report observations are retained')) return NextResponse.json({ error: 'This submitted HGV report is retained as evidence. Add a new comment instead.' }, { status: 409 });
       throw updateError;
     }
 
@@ -184,6 +185,7 @@ export async function DELETE(
       .eq('id', commentId);
 
     if (deleteError) {
+      if (deleteError.message.includes('HGV report observations are retained')) return NextResponse.json({ error: 'This submitted HGV report is retained as evidence.' }, { status: 409 });
       throw deleteError;
     }
 

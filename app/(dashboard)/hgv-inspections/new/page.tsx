@@ -108,6 +108,8 @@ function NewHgvInspectionContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const draftId = searchParams.get('id');
+  const requestIdRef = useRef<string | null>(null);
+  if (typeof window !== 'undefined' && !requestIdRef.current) requestIdRef.current = crypto.randomUUID();
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
   if (typeof window !== 'undefined' && !supabaseRef.current) {
     supabaseRef.current = createClient();
@@ -127,7 +129,7 @@ function NewHgvInspectionContent() {
   const [recentHgvIds, setRecentHgvIds] = useState<string[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
-  const [hgvId, setHgvId] = useState('');
+  const [hgvId, setHgvId] = useState(searchParams.get('hgvId') || '');
   const [inspectionDate, setInspectionDate] = useState('');
   const [currentMileage, setCurrentMileage] = useState('');
   const [digitGrowthWarning, setDigitGrowthWarning] = useState<string | null>(null);
@@ -239,7 +241,7 @@ function NewHgvInspectionContent() {
     const { data, error } = await supabase
       .from('hgv_inspections')
       .select('id, status')
-      .eq('hgv_id', hgvId)
+      .eq('id', existingInspectionId || '00000000-0000-0000-0000-000000000000')
       .eq('user_id', selectedEmployeeId)
       .eq('inspection_date', inspectionDate)
       .limit(1)
@@ -315,6 +317,9 @@ function NewHgvInspectionContent() {
     }
 
     const saved = await requestHgvInspectionSave({
+      requestId: requestIdRef.current!,
+      recordKind: 'full_check',
+      informWorkshop,
       hintInspectionId: options.hintInspectionId ?? existingInspectionId,
       hgvId,
       userId: selectedEmployeeId,
@@ -336,6 +341,7 @@ function NewHgvInspectionContent() {
     hgvId,
     inspectionDate,
     inspectorComments,
+    informWorkshop,
     selectedEmployeeId,
   ]);
 
@@ -397,6 +403,7 @@ function NewHgvInspectionContent() {
       }
 
       if (existingInspectionId === inspectionId) {
+        requestIdRef.current = crypto.randomUUID();
         setExistingInspectionId(null);
         setPhotoUploadItem(null);
         window.history.replaceState(null, '', '/hgv-inspections/new');
@@ -538,7 +545,7 @@ function NewHgvInspectionContent() {
       setLoading(true);
       const { data: draft, error: draftError } = await supabase
         .from('hgv_inspections')
-        .select('id, hgv_id, user_id, inspection_date, current_mileage, inspector_comments')
+        .select('id, hgv_id, user_id, inspection_date, current_mileage, inspector_comments, record_kind')
         .eq('id', id)
         .eq('status', 'draft')
         .maybeSingle();
@@ -555,6 +562,12 @@ function NewHgvInspectionContent() {
         window.history.replaceState(null, '', '/hgv-inspections/new');
         setError('You do not have permission to edit this inspection');
         isDraftHydratedRef.current = true;
+        return;
+      }
+
+      if (draft.record_kind === 'defect_report') {
+        allowNavigationRef.current = true;
+        router.replace(`/hgv-inspections/${id}`);
         return;
       }
 
@@ -624,7 +637,7 @@ function NewHgvInspectionContent() {
       isDraftHydratedRef.current = true;
       setLoading(false);
     }
-  }, [canManageCrossUserInspections, supabase, user?.id]);
+  }, [router, canManageCrossUserInspections, supabase, user?.id]);
 
   useEffect(() => {
     if (authLoading || permissionLoading || !user) {
@@ -1057,42 +1070,6 @@ function NewHgvInspectionContent() {
       });
       const inspectionId = saved.id;
 
-      const failedItems = saved.items.filter((item) => item.status === 'attention');
-      if (status === 'submitted' && failedItems.length > 0) {
-        const defects = failedItems.map((item) => ({
-          item_number: item.item_number,
-          item_description: item.item_description || '',
-          dayOfWeek: item.day_of_week,
-          comment: item.comments || '',
-          primaryInspectionItemId: item.id,
-        }));
-
-        await fetch('/api/hgv-inspections/sync-defect-tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            inspectionId,
-            hgvId,
-            createdBy: user.id,
-            defects,
-            confirmedRepeatDefectSignatures: Array.from(confirmedRepeatDefects),
-          }),
-        });
-      }
-
-      if (status === 'submitted' && informWorkshop && inspectorComments.trim().length >= WORKSHOP_TASK_COMMENT_MIN_LENGTH) {
-        await fetch('/api/hgv-inspections/inform-workshop', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            inspectionId,
-            hgvId,
-            createdBy: user.id,
-            comments: inspectorComments.trim(),
-          }),
-        });
-      }
-
       if (status === 'submitted') {
         try {
           await completeInspectionReminder({
@@ -1116,19 +1093,9 @@ function NewHgvInspectionContent() {
       }
     } catch (err) {
       if (isHgvSubmittedConflictError(err)) {
-        const conflict = await findExistingInspectionConflict();
-        if (status === 'submitted' && conflict?.id) {
-          toast.success('HGV inspection submitted successfully');
-          if (typeof window !== 'undefined') {
-            window.sessionStorage.removeItem(getInspectionTimerStorageKey(conflict.id));
-          }
-          allowNavigationRef.current = true;
-          router.push(`/hgv-inspections/${conflict.id}`);
-          return;
-        }
-        if (conflict) {
-          handleInspectionConflict(conflict);
-        }
+        const conflict = existingInspectionId ? { id: existingInspectionId, status: 'submitted' as const } : await findExistingInspectionConflict();
+        setError('This check was submitted in another tab. Your new answers were not saved. View the submitted check to make a correction or start another check.');
+        if (conflict) handleInspectionConflict(conflict);
         return;
       }
       const errorContextId = 'hgv-inspections-new-save-inspection-error';
@@ -1209,7 +1176,14 @@ function NewHgvInspectionContent() {
   const handleUseDifferentDateForSubmittedConflict = () => {
     setShowSubmittedConflictDialog(false);
     setSubmittedConflictInspectionId(null);
-    setError('A daily check is already submitted for this employee, HGV and date. Choose a different date or employee to continue.');
+    requestIdRef.current = crypto.randomUUID();
+    setExistingInspectionId(null);
+    setCheckboxStates({});
+    setComments({});
+    setChecklistStarted(false);
+    setInspectionStartMs(null);
+    window.history.replaceState(null, '', '/hgv-inspections/new');
+    setError('');
     scrollAndHighlightValidationTarget(document.getElementById('inspectionDate'), STICKY_NAV_OFFSET_PX);
   };
 
@@ -1778,12 +1752,12 @@ function NewHgvInspectionContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Daily check already submitted</AlertDialogTitle>
             <AlertDialogDescription className="text-muted-foreground">
-              An HGV daily check already exists for this employee, vehicle and date. You can view the submitted check or pick another date.
+              This check has already been submitted. View it to report a new defect or make a same-day correction, or start another full check.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={handleUseDifferentDateForSubmittedConflict}>
-              Choose different date
+              Start another check
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleViewSubmittedConflictInspection}>
               View existing check

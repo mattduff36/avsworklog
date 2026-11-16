@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { createClient } from '@/lib/supabase/server';
-import { getProfileWithRole } from '@/lib/utils/permissions';
+import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
+import { createAdminClient } from '@/lib/supabase/admin';
+import type { HgvVersion } from '@/lib/inspections/hgv-updates';
 import { HgvInspectionPDF } from '@/lib/pdf/hgv-inspection-pdf';
 import { enrichDefectsWithWorkshopCompletion } from '@/lib/utils/hgvDefectWorkshopDetails';
 import {
@@ -18,6 +20,10 @@ interface HgvInspectionWithRelations {
   inspector_comments: string | null;
   signature_data: string | null;
   signed_at: string | null;
+  record_kind?: string;
+  submitted_at?: string | null;
+  revision?: number;
+  discovered_at?: string | null;
   hgv?: {
     reg_number: string;
     nickname: string | null;
@@ -29,17 +35,15 @@ interface HgvInspectionWithRelations {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
     const supabase = await createClient();
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { access, errorResponse } = await getInspectionRouteActorAccess('hgv-inspections');
+    if (!access || errorResponse) return errorResponse;
 
     const { data: inspection, error: inspectionError } = await supabase
       .from('hgv_inspections')
@@ -69,13 +73,13 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch inspection items' }, { status: 500 });
     }
 
-    const profile = await getProfileWithRole(user.id);
-    const isOwner = inspection.user_id === user.id;
-    const isManager = profile?.role?.is_manager_admin || false;
-    const isSupervisor = (profile?.role?.name || '').trim().toLowerCase() === 'supervisor';
-
-    if (!isOwner && !isManager && !isSupervisor) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    let version: HgvVersion | null = null;
+    const revision = request.nextUrl.searchParams.get('revision');
+    if (revision !== null) {
+      if (!/^\d+$/.test(revision)) return NextResponse.json({ error: 'Invalid revision' }, { status: 400 });
+      const { data, error } = await createAdminClient().from('hgv_inspection_versions').select('*').eq('inspection_id', id).eq('revision', Number(revision)).maybeSingle();
+      if (error || !data) return NextResponse.json({ error: 'Version not found' }, { status: 404 });
+      version = data as unknown as HgvVersion;
     }
 
     const itemIds = (items || []).map((item) => item.id);
@@ -94,19 +98,19 @@ export async function GET(
       linkedDefectTasks = (linkedDefectTaskRows || []) as InspectionCommentTask[];
     }
 
-    const displayItems = (items || []).map((item) => ({
+    const displayItems = (version ? version.snapshot.items : items || []).map((item) => ({
       ...item,
-      comments: getInspectionEnteredComment(item, linkedDefectTasks),
+      comments: version ? item.comments : getInspectionEnteredComment({ ...item, id: item.id || '' }, linkedDefectTasks),
     }));
 
-    const inspectionWithRelations = inspection as unknown as HgvInspectionWithRelations;
-    const defectsWithWorkshop = await enrichDefectsWithWorkshopCompletion(
+    const inspectionWithRelations = { ...inspection, ...(version?.snapshot.inspection || {}), ...(version?.snapshot.hgv ? { hgv: version.snapshot.hgv } : {}), ...(version?.snapshot.operator ? { profile: version.snapshot.operator } : {}) } as unknown as HgvInspectionWithRelations;
+    const defectsWithWorkshop = version ? [] : await enrichDefectsWithWorkshopCompletion(
       supabase,
       inspectionWithRelations.hgv_id,
       displayItems
         .filter((item) => item.status === 'attention')
         .map((item) => ({
-          id: item.id,
+          id: item.id || '',
           item_number: item.item_number,
           item_description: item.item_description || `Item ${item.item_number}`,
           comments: item.comments,
@@ -121,6 +125,11 @@ export async function GET(
         inspector_comments: inspectionWithRelations.inspector_comments,
         signature_data: inspectionWithRelations.signature_data,
         signed_at: inspectionWithRelations.signed_at,
+        record_kind: inspectionWithRelations.record_kind,
+        submitted_at: inspectionWithRelations.submitted_at,
+        revision: version?.revision ?? inspectionWithRelations.revision,
+        correction_reason: version?.reason,
+        discovered_at: inspectionWithRelations.discovered_at,
       },
       hgv: {
         reg_number: inspectionWithRelations.hgv?.reg_number || 'Unknown',
@@ -133,7 +142,7 @@ export async function GET(
       items: displayItems.map(item => ({
         item_number: item.item_number,
         item_description: item.item_description || `Item ${item.item_number}`,
-        day_of_week: item.day_of_week,
+        day_of_week: item.day_of_week ?? undefined,
         status: item.status as 'ok' | 'attention' | 'na',
         comments: item.comments,
       })),

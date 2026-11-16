@@ -160,6 +160,11 @@ interface HgvInspectionPDFProps {
     inspector_comments: string | null;
     signature_data?: string | null;
     signed_at?: string | null;
+    record_kind?: string;
+    submitted_at?: string | null;
+    discovered_at?: string | null;
+    revision?: number;
+    correction_reason?: string;
   };
   hgv: {
     reg_number: string;
@@ -254,7 +259,9 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWith
           </Text>
           <Text style={styles.companyPhone}>Telephone: SOUTHWELL (01636) 812227</Text>
           <Text style={styles.registeredNo}>Registered in England No. 1000918</Text>
-          <Text style={styles.pageTitle}>HGV INSPECTION PAD</Text>
+          <Text style={styles.pageTitle}>{inspection.record_kind === 'defect_report' ? 'ADDITIONAL HGV DEFECT REPORT' : 'HGV INSPECTION PAD'}</Text>
+          <Text style={styles.companyDetails}>Submitted: {formatSignedAt(inspection.submitted_at)} · Revision {inspection.revision || 0}{inspection.correction_reason ? ` · ${inspection.correction_reason}` : ''}</Text>
+          {inspection.record_kind === 'defect_report' && <Text style={styles.companyDetails}>Not a full daily check · Discovered: {formatSignedAt(inspection.discovered_at)}</Text>}
         </View>
 
         <View style={styles.topTable}>

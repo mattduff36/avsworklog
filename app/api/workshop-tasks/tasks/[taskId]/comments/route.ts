@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { userHasPermission } from '@/lib/utils/permissions';
 import { logServerError } from '@/lib/utils/server-error-logger';
 import { UUIDSchema, ListCommentsQuerySchema } from '@/lib/validation/schemas';
@@ -102,11 +103,12 @@ export async function GET(
     // Fetch the task (verify it exists and is a workshop task)
     const { data: task, error: taskError } = await supabase
       .from('actions')
-      .select('id, action_type, created_at, created_by, logged_at, logged_by, logged_comment, actioned_at, actioned_by, actioned_comment, actioned_signature_data, actioned_signed_at, status_history')
+      .select('id, hgv_id, action_type, created_at, created_by, logged_at, logged_by, logged_comment, actioned_at, actioned_by, actioned_comment, actioned_signature_data, actioned_signed_at, status_history')
       .eq('id', taskId)
       .single();
     const typedTask = task as {
       id: string;
+      hgv_id?: string | null;
       action_type: string;
       created_at: string;
       created_by: string | null;
@@ -244,6 +246,17 @@ export async function GET(
       }
     }
 
+    // The task was read through scoped RLS above. Observation comments are immutable evidence.
+    const protectedComments = new Set<string>();
+    if (typedTask.hgv_id) {
+      const { data: observations, error: observationError } = await createAdminClient()
+        .from('hgv_defect_observations').select('workshop_comment_id').eq('task_id', taskId);
+      if (observationError) throw observationError;
+      for (const observation of observations || []) {
+        if (observation.workshop_comment_id) protectedComments.add(observation.workshop_comment_id);
+      }
+    }
+
     // Add freeform comments
     if (typedComments.length > 0) {
       for (const comment of typedComments) {
@@ -258,8 +271,8 @@ export async function GET(
               }
             : null,
           body: comment.body,
-          can_edit: comment.author_id === user.id,
-          can_delete: comment.author_id === user.id,
+          can_edit: comment.author_id === user.id && !protectedComments.has(comment.id),
+          can_delete: comment.author_id === user.id && !protectedComments.has(comment.id),
         });
       }
     }
