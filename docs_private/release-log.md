@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.22.3
+
+**GIT COMMIT MESSAGE**
+`fix(workshop): remove category helper text`
+
+**PUSHED AT**
+2026-11-17T16:05:11.288Z
+
+**WHAT CHANGED**
+Remove category helper text.
+
+**VERSION HISTORY DETAILS**
+- Remove category helper text, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(workshop): remove category helper text`
+
 ## 1126.22.2
 
 **GIT COMMIT MESSAGE**

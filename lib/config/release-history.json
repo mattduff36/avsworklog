@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.22.3",
+    "updateKind": "minor",
+    "title": "Workshop Tasks improvements",
+    "description": "Remove category helper text.",
+    "summary": "Remove category helper text.",
+    "details": [
+      "Remove category helper text, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Workshop Tasks"
+    ],
+    "areaKeys": [
+      "workshop-tasks"
+    ],
+    "pushedAt": "2026-11-17T16:05:11.288Z"
+  },
+  {
     "version": "1126.22.2",
     "updateKind": "minor",
     "title": "App screens improvements",
