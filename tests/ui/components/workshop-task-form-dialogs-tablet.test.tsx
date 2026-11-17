@@ -422,7 +422,7 @@ describe('Workshop task dialog tablet safeguards', () => {
     );
 
     expect(screen.queryByRole('heading', { name: /Required form/ })).not.toBeInTheDocument();
-    expect(screen.getByText('Choose Repair for repair work. Service and inspection categories may require a checklist.')).toBeInTheDocument();
+    expect(screen.queryByText('Choose Repair for repair work. Service and inspection categories may require a checklist.')).not.toBeInTheDocument();
     view.unmount();
 
     props.selectedCategoryId = 'repair';
@@ -433,7 +433,7 @@ describe('Workshop task dialog tablet safeguards', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('This category does not require a form.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create Task' })).toBeEnabled();
     });
     expect(screen.queryByRole('heading', { name: /Required form/ })).not.toBeInTheDocument();
     expect(screen.queryByText('Van Checklist')).not.toBeInTheDocument();
@@ -475,7 +475,7 @@ describe('Workshop task dialog tablet safeguards', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Required form/ })).toBeInTheDocument();
     });
-    expect(screen.getByText('This category requires a form. Select the matching form below. Choose Repair instead if this is ordinary repair work.')).toBeInTheDocument();
+    expect(screen.queryByText('This category requires a form. Select the matching form below. Choose Repair instead if this is ordinary repair work.')).not.toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Van Service A' })).not.toBeChecked();
     expect(screen.getByRole('radio', { name: 'Van Service B' })).not.toBeChecked();
     expect(screen.queryByText('HGV Checklist')).not.toBeInTheDocument();
@@ -547,7 +547,7 @@ describe('Workshop task dialog tablet safeguards', () => {
       </TabletModeProvider>
     );
 
-    expect(screen.getByText("Checking this category's form requirement.")).toBeInTheDocument();
+    expect(screen.queryByText("Checking this category's form requirement.")).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: /Required form/ })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create Task' })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: 'Create Task' }));
@@ -560,7 +560,7 @@ describe('Workshop task dialog tablet safeguards', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('This category does not require a form.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create Task' })).toBeEnabled();
     });
     releaseStale?.({
       ok: true,
