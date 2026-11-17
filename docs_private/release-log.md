@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.22.2
+
+**GIT COMMIT MESSAGE**
+`fix(ui): keep expanding dialogs scrollable`
+
+**PUSHED AT**
+2026-11-17T15:48:43.739Z
+
+**WHAT CHANGED**
+Keep expanding dialogs scrollable.
+
+**VERSION HISTORY DETAILS**
+- Keep expanding dialogs scrollable, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `fix(ui): keep expanding dialogs scrollable`
+
 ## 1126.22.1
 
 **GIT COMMIT MESSAGE**

@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.22.2",
+    "updateKind": "minor",
+    "title": "App screens improvements",
+    "description": "Keep expanding dialogs scrollable.",
+    "summary": "Keep expanding dialogs scrollable.",
+    "details": [
+      "Keep expanding dialogs scrollable, with changes to interface components."
+    ],
+    "areas": [
+      "App screens"
+    ],
+    "areaKeys": [
+      "app-screens"
+    ],
+    "pushedAt": "2026-11-17T15:48:43.739Z"
+  },
+  {
     "version": "1126.22.1",
     "updateKind": "minor",
     "title": "App improvements",
