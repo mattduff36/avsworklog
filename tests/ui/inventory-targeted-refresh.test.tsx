@@ -147,6 +147,7 @@ vi.mock('@/app/(dashboard)/inventory/components/InventoryItemDialog', () => ({
 }));
 
 import InventoryPage from '@/app/(dashboard)/inventory/page';
+import { toast } from 'sonner';
 
 const fetchMock = vi.fn();
 const fixture = {
@@ -295,6 +296,79 @@ describe('inventory targeted refresh', () => {
     ];
     window.localStorage.setItem('inventory-role-view-mode', 'management');
     installFetch();
+  });
+
+  it.each([
+    '/api/inventory/context',
+    '/api/inventory/fleet-assets',
+    '/api/inventory/categories',
+    '/api/inventory/hardware',
+    '/api/inventory/groups',
+    '/api/inventory/site-assignments',
+  ].flatMap((requestPath) => [403, 500].map((status) => ({ requestPath, status }))))(
+    'records sanitized request details for $requestPath with HTTP $status while preserving the failure',
+    async ({ requestPath, status }) => {
+      const message = status === 403 ? 'Forbidden' : 'Synthetic server failure';
+      const normalFetch = fetchMock.getMockImplementation()!;
+      fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === requestPath) {
+          return jsonResponse({ error: message, privateDetail: 'must-not-enter-diagnostics' }, status);
+        }
+        const response = await normalFetch(input, init);
+        if (requestPath.endsWith('/site-assignments') && String(input).endsWith('/context')) {
+          return jsonResponse({ ...await response.json(), can_manage_site_locations: true });
+        }
+        return response;
+      });
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      vi.mocked(toast.error).mockClear();
+      const view = render(<InventoryPage />);
+      try {
+        expect(await screen.findByText('Inventory could not be loaded')).toBeInTheDocument();
+        expect(screen.queryByText('A-1')).not.toBeInTheDocument();
+        expect(toast.error).toHaveBeenCalledWith(message, { id: 'inventory-load-error' });
+        expect(consoleError).toHaveBeenCalledWith(
+          'Error fetching inventory data:',
+          expect.objectContaining({ message, status }),
+          {
+            errorContextId: 'inventory-load-error',
+            operation: 'inventory-load',
+            requestPath,
+            httpStatus: status,
+          },
+        );
+        expect(JSON.stringify(consoleError.mock.calls)).not.toContain('must-not-enter-diagnostics');
+      } finally {
+        view.unmount();
+        consoleError.mockRestore();
+      }
+    },
+  );
+
+  it('keeps unauthorized load failures visible through the existing non-fatal handling', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'Unauthorized' }, 401));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const view = render(<InventoryPage />);
+    try {
+      expect(await screen.findByText('Inventory could not be loaded')).toBeInTheDocument();
+      expect(screen.getByText('Your session could not be verified. Sign in again, then reload Inventory.')).toBeInTheDocument();
+      expect(consoleError).not.toHaveBeenCalled();
+      expect(consoleWarn).toHaveBeenCalledWith(
+        'Inventory data fetch skipped (non-fatal):',
+        expect.objectContaining({ message: 'Unauthorized', status: 401 }),
+        {
+          errorContextId: 'inventory-load-error',
+          operation: 'inventory-load',
+          requestPath: '/api/inventory/context',
+          httpStatus: 401,
+        },
+      );
+    } finally {
+      view.unmount();
+      consoleError.mockRestore();
+      consoleWarn.mockRestore();
+    }
   });
 
   it('refreshes hardware without rereading unrelated inventory collections', async () => {

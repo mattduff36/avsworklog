@@ -43,6 +43,7 @@ import {
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useModuleAccessLevel } from '@/lib/hooks/useModuleAccessLevel';
+import { getErrorStatus } from '@/lib/utils/http-error';
 import { AlertTriangle, Archive, Boxes, CheckCircle2, MapPin, PackageSearch, Plus, Settings, ShieldCheck, Truck, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { ChangeInventoryLocationDialog } from './components/ChangeInventoryLocationDialog';
@@ -315,7 +316,7 @@ export default function InventoryPage() {
         const contextResponse = await fetch('/api/inventory/context', { cache: 'no-store' });
         const contextPayload = await contextResponse.json();
         if (!contextResponse.ok) {
-          throw new Error(contextPayload.error || 'Failed to fetch inventory context');
+          throw new InventoryLoadError(contextPayload.error || 'Failed to fetch inventory context', contextResponse.status, '/api/inventory/context');
         }
         if (generation !== bundleGenerationRef.current) return;
 
@@ -406,29 +407,29 @@ export default function InventoryPage() {
 
         const fleetAssetsPayload = fleetAssetsResponse ? await fleetAssetsResponse.json() : { assets: [] };
         if (fleetAssetsResponse && !fleetAssetsResponse.ok) {
-          throw new Error(fleetAssetsPayload.error || 'Failed to fetch fleet assets');
+          throw new InventoryLoadError(fleetAssetsPayload.error || 'Failed to fetch fleet assets', fleetAssetsResponse.status, '/api/inventory/fleet-assets');
         }
 
         const categoriesPayload = categoriesResponse ? await categoriesResponse.json() : { categories: [] };
         if (categoriesResponse && !categoriesResponse.ok) {
-          throw new Error(categoriesPayload.error || 'Failed to fetch inventory categories');
+          throw new InventoryLoadError(categoriesPayload.error || 'Failed to fetch inventory categories', categoriesResponse.status, '/api/inventory/categories');
         }
 
         const hardwarePayload = hardwareResponse ? await hardwareResponse.json() : { items: [], balances: [] };
         if (hardwareResponse && !hardwareResponse.ok) {
-          throw new Error(hardwarePayload.error || 'Failed to fetch Hardware stock');
+          throw new InventoryLoadError(hardwarePayload.error || 'Failed to fetch Hardware stock', hardwareResponse.status, '/api/inventory/hardware');
         }
 
         const groupsPayload = groupsResponse ? await groupsResponse.json() : { groups: [] };
         if (groupsResponse && !groupsResponse.ok) {
-          throw new Error(groupsPayload.error || 'Failed to fetch inventory groups');
+          throw new InventoryLoadError(groupsPayload.error || 'Failed to fetch inventory groups', groupsResponse.status, '/api/inventory/groups');
         }
 
         const siteAssignmentsPayload = siteAssignmentsResponse
           ? await siteAssignmentsResponse.json()
           : { active_locations: [], users: [], assignments: [] };
         if (siteAssignmentsResponse && !siteAssignmentsResponse.ok) {
-          throw new Error(siteAssignmentsPayload.error || 'Failed to fetch location assignments');
+          throw new InventoryLoadError(siteAssignmentsPayload.error || 'Failed to fetch location assignments', siteAssignmentsResponse.status, '/api/inventory/site-assignments');
         }
 
         if (generation !== bundleGenerationRef.current || !refreshAllowedRef.current) return;
@@ -486,11 +487,18 @@ export default function InventoryPage() {
           normalizedMessage.includes('session is locked') ||
           (normalizedMessage.includes('jwt') && normalizedMessage.includes('expired'));
 
+        const diagnosticContext = {
+          errorContextId: 'inventory-load-error',
+          operation: 'inventory-load',
+          requestPath: error instanceof InventoryLoadError ? error.requestPath : null,
+          httpStatus: getErrorStatus(error),
+        };
+
         if (isNetworkFailure || isUnauthorized) {
           // Non-fatal: transient auth/network issues should not be captured as app errors.
-          console.warn('Inventory data fetch skipped (non-fatal):', error);
+          console.warn('Inventory data fetch skipped (non-fatal):', error, diagnosticContext);
         } else {
-          console.error('Error fetching inventory data:', error);
+          console.error('Error fetching inventory data:', error, diagnosticContext);
         }
 
         const errorMessage = getInventoryLoadErrorMessage(error);
@@ -1889,6 +1897,16 @@ function InventoryConfirmActionDialog({ action, onClose }: InventoryConfirmActio
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+class InventoryLoadError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly requestPath: string,
+  ) {
+    super(message);
+  }
 }
 
 function getInventoryLoadErrorMessage(error: unknown): string {
