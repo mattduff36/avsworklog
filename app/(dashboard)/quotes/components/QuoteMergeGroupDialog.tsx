@@ -16,6 +16,8 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { QuoteInvoiceMonthSelect } from './QuoteInvoiceMonthSelect';
+import { formatInvoiceMonth, getQuoteInvoiceStartDate } from '@/lib/quotes/quote-invoice-month';
 import type { Quote, QuoteMergeGroupMember } from '../types';
 
 const VIEW_STORAGE_KEY = 'avs:quote-merge-group-view';
@@ -113,7 +115,7 @@ function MemberFacts({ member }: { member: QuoteMergeGroupMember }) {
       {member.invoices.length > 0 ? (
         <ul className="space-y-1 text-xs text-muted-foreground">
           {member.invoices.map(invoice => (
-            <li key={invoice.id}>{invoice.invoice_number} · {invoice.invoice_date} · {money(invoice.amount)}</li>
+            <li key={invoice.id}>{invoice.invoice_number} · {formatInvoiceMonth(invoice.invoice_date)} · {money(invoice.amount)}</li>
           ))}
         </ul>
       ) : null}
@@ -168,8 +170,7 @@ export function QuoteMergeGroupDialog({
         const first = payload.quote.merge_group_members?.[0];
         setSelectedThreadId(first?.quote_thread_id || null);
         setExpandedThreadId(first?.quote_thread_id || null);
-        const today = new Date().toISOString().slice(0, 10);
-        setInvoiceDate(today);
+        setInvoiceDate('');
         setAmount(first?.financial_summary?.available_to_request
           ? String(first.financial_summary.available_to_request)
           : '');
@@ -219,7 +220,7 @@ export function QuoteMergeGroupDialog({
       return;
     }
     if (!invoiceDate) {
-      toast.error('Enter the requested invoice date.');
+      toast.error('Select an invoice month.');
       return;
     }
     setSubmitting(true);
@@ -242,6 +243,7 @@ export function QuoteMergeGroupDialog({
       }
       toast.success(`Invoice requested for ${member.reference}`);
       setComments('');
+      setInvoiceDate('');
       onRefresh();
       onClose();
     } catch (requestError) {
@@ -316,6 +318,7 @@ export function QuoteMergeGroupDialog({
                     amount={amount}
                     available={selected.financial_summary?.available_to_request || 0}
                     comments={comments}
+                    createdAt={getQuoteInvoiceStartDate(quote, quote?.versions, [selected.quote_thread_id])}
                     invoiceDate={invoiceDate}
                     submitting={submitting}
                     onAmountChange={setAmount}
@@ -356,6 +359,7 @@ export function QuoteMergeGroupDialog({
                           amount={selected?.quote_thread_id === member.quote_thread_id ? amount : String(member.financial_summary?.available_to_request || '')}
                           available={member.financial_summary?.available_to_request || 0}
                           comments={comments}
+                          createdAt={getQuoteInvoiceStartDate(quote, quote?.versions, [member.quote_thread_id])}
                           invoiceDate={invoiceDate}
                           submitting={submitting}
                           onAmountChange={setAmount}
@@ -389,6 +393,7 @@ function InvoiceRequestForm({
   amount,
   available,
   comments,
+  createdAt,
   invoiceDate,
   submitting,
   onAmountChange,
@@ -399,6 +404,7 @@ function InvoiceRequestForm({
   amount: string;
   available: number;
   comments: string;
+  createdAt: string;
   invoiceDate: string;
   submitting: boolean;
   onAmountChange: (value: string) => void;
@@ -420,8 +426,8 @@ function InvoiceRequestForm({
         <p className="mt-1 text-xs text-muted-foreground">{money(available)} available for this quote</p>
       </div>
       <div>
-        <Label htmlFor="merge-invoice-date">Invoice date</Label>
-        <Input id="merge-invoice-date" type="date" value={invoiceDate} onChange={(event) => onDateChange(event.target.value)} />
+        <Label htmlFor="merge-invoice-month">Invoice month *</Label>
+        <QuoteInvoiceMonthSelect id="merge-invoice-month" createdAt={createdAt} value={invoiceDate} onChange={onDateChange} disabled={submitting} />
       </div>
       <div className="md:col-span-2">
         <Label htmlFor="merge-invoice-comments">Comments</Label>

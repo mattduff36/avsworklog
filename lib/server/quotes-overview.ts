@@ -252,7 +252,7 @@ function getInvoicesForQuoteIds(invoicesByQuoteId: Map<string, QuoteOverviewInvo
 }
 
 function getInvoiceOverviewDate(invoice: QuoteOverviewInvoice): string {
-  return invoice.created_at || invoice.invoice_date;
+  return invoice.invoice_date || invoice.created_at;
 }
 
 function getLabourRowsForReferences(

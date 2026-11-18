@@ -70,6 +70,8 @@ import {
   replaceQuoteAttachment,
   uploadQuoteAttachment,
 } from '../quote-attachment-client';
+import { QuoteInvoiceMonthSelect } from './QuoteInvoiceMonthSelect';
+import { formatInvoiceMonth, getQuoteInvoiceMonths, getQuoteInvoiceStartDate } from '@/lib/quotes/quote-invoice-month';
 import { FormattedQuoteText } from './FormattedQuoteText';
 import type {
   Quote,
@@ -312,7 +314,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
   const [invoiceScope, setInvoiceScope] = useState<'full' | 'partial'>('partial');
   const [invoiceComments, setInvoiceComments] = useState('');
   const [invoiceRequestAmount, setInvoiceRequestAmount] = useState('');
-  const [invoiceRequestDate, setInvoiceRequestDate] = useState(new Date().toISOString().slice(0, 10));
+  const [invoiceRequestDate, setInvoiceRequestDate] = useState('');
   const [invoiceRequestScope, setInvoiceRequestScope] = useState<'full' | 'partial'>('full');
   const [invoiceRequestComments, setInvoiceRequestComments] = useState('');
   const [invoiceRequestMergeScope, setInvoiceRequestMergeScope] = useState<'combined' | 'source'>('combined');
@@ -643,8 +645,8 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       errors.requested_amount = 'Enter an invoice request amount greater than 0.';
     }
 
-    if (!invoiceRequestDate) {
-      errors.requested_invoice_date = 'Enter the requested invoice date.';
+    if (!invoiceRequestDate || !getQuoteInvoiceMonths(getQuoteInvoiceStartDate(quote, quote?.versions, invoiceRequestMergeScope === 'source' ? invoiceRequestSourceThreadIds : undefined)).includes(invoiceRequestDate.slice(0, 7))) {
+      errors.requested_invoice_date = 'Select an invoice month from quote creation through the current month.';
     }
 
     if (Number.isFinite(amount) && amount - availableToRequest > 0.005) {
@@ -733,7 +735,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
     setInvoiceScope(nextRemaining === 0 ? 'partial' : 'full');
     setInvoiceComments('');
     setInvoiceRequestAmount(nextInvoiceRequestAmount);
-    setInvoiceRequestDate(today);
+    setInvoiceRequestDate('');
     setInvoiceRequestScope(nextInvoiceRequestScope);
     setInvoiceRequestComments('');
     setInvoiceRequestMergeScope('combined');
@@ -775,7 +777,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
       invoiceScope: nextRemaining === 0 ? 'partial' : 'full',
       invoiceComments: '',
       invoiceRequestAmount: nextInvoiceRequestAmount,
-      invoiceRequestDate: today,
+      invoiceRequestDate: '',
       invoiceRequestScope: nextInvoiceRequestScope,
       invoiceRequestComments: '',
       selectedInvoiceRequestId: nextSelectedInvoiceRequestId,
@@ -2199,16 +2201,18 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                             {renderFieldError(invoiceRequestFieldErrors, 'requested_amount')}
                           </div>
                           <div className="space-y-2">
-                            <Label>Date *</Label>
-                            <Input
-                              type="date"
+                            <Label htmlFor="requested-invoice-month">Invoice month *</Label>
+                            <QuoteInvoiceMonthSelect
+                              id="requested-invoice-month"
+                              createdAt={getQuoteInvoiceStartDate(quote, quote.versions, invoiceRequestMergeScope === 'source' ? invoiceRequestSourceThreadIds : undefined)}
                               value={invoiceRequestDate}
                               disabled={managerRequestControlsDisabled}
-                              onChange={e => {
+                              invalid={Boolean(invoiceRequestFieldErrors.requested_invoice_date)}
+                              onChange={value => {
                                 clearInvoiceRequestError('requested_invoice_date');
-                                setInvoiceRequestDate(e.target.value);
+                                setInvoiceRequestDate(value);
                               }}
-                              className={getFieldClassName(invoiceRequestFieldErrors, 'requested_invoice_date')}
+                              className={getSelectClassName(invoiceRequestFieldErrors, 'requested_invoice_date')}
                             />
                             {renderFieldError(invoiceRequestFieldErrors, 'requested_invoice_date')}
                           </div>
@@ -2315,7 +2319,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                                 £{Number(request.requested_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })} • {request.requested_invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice'}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                Marked ready: {format(new Date(request.requested_at), 'dd MMM yyyy')} • Requested date: {format(new Date(request.requested_invoice_date), 'dd MMM yyyy')}
+                                Marked ready: {format(new Date(request.requested_at), 'dd MMM yyyy')} • Invoice month: {formatInvoiceMonth(request.requested_invoice_date)}
                               </p>
                             </div>
                             <Button
@@ -2361,7 +2365,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                             <SelectItem value="ad-hoc">Ad-hoc invoice / credit note</SelectItem>
                             {pendingInvoiceRequests.map(request => (
                               <SelectItem key={request.id} value={request.id}>
-                                {format(new Date(request.requested_invoice_date), 'dd MMM yyyy')} • £{Number(request.requested_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })} • {request.requested_invoice_scope}
+                                {formatInvoiceMonth(request.requested_invoice_date)} • £{Number(request.requested_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })} • {request.requested_invoice_scope}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -2374,7 +2378,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                     {selectedInvoiceRequest ? (
                       <div className="rounded-md border border-violet-500/30 bg-violet-500/10 p-3 text-sm text-violet-100">
                         <p className="font-medium">Manager requested {selectedInvoiceRequest.requested_invoice_scope} invoice for £{Number(selectedInvoiceRequest.requested_amount).toLocaleString('en-GB', { minimumFractionDigits: 2 })}</p>
-                        <p className="text-xs text-violet-100/80">Requested date: {format(new Date(selectedInvoiceRequest.requested_invoice_date), 'dd MMM yyyy')}</p>
+                        <p className="text-xs text-violet-100/80">Invoice month: {formatInvoiceMonth(selectedInvoiceRequest.requested_invoice_date)}</p>
                         {selectedInvoiceRequest.manager_comments ? (
                           <p className="mt-2 whitespace-pre-wrap text-sm">{selectedInvoiceRequest.manager_comments}</p>
                         ) : null}
@@ -2439,10 +2443,10 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                         ) : null}
                       </div>
                       <div className="space-y-2">
-                        <Label>Date *</Label>
+                        <Label>{selectedInvoiceRequest ? 'Invoice month *' : 'Date *'}</Label>
                         <Input
-                          type="date"
-                          value={selectedInvoiceRequest?.requested_invoice_date || invoiceDate}
+                          type={selectedInvoiceRequest ? 'text' : 'date'}
+                          value={selectedInvoiceRequest ? formatInvoiceMonth(selectedInvoiceRequest.requested_invoice_date) : invoiceDate}
                           disabled={!canManageInvoices || Boolean(selectedInvoiceRequest)}
                           onChange={e => {
                             clearInvoiceError('invoice_date');
@@ -2588,7 +2592,7 @@ export function QuoteDetailsModal({ open, onClose, quoteId, onQuoteChange, onEdi
                             <div>
                               <p className="font-medium text-white">{invoice.invoice_number}</p>
                               <p className="text-xs text-muted-foreground">
-                                Invoice date: {format(new Date(invoice.invoice_date), 'dd MMM yyyy')} • {invoice.invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice'}
+                                Invoice month: {formatInvoiceMonth(invoice.invoice_date)} • {invoice.invoice_scope === 'full' ? 'Full invoice' : 'Partial invoice'}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {linkedRequest ? `Marked ready: ${format(new Date(linkedRequest.requested_at), 'dd MMM yyyy')} • ` : ''}

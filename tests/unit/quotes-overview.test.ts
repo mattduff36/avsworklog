@@ -301,7 +301,7 @@ describe('quotes overview summary', () => {
     expect(summary.invoice_total).toBe(750);
   });
 
-  it('uses the accounts-added timestamp when calculating date-range invoice totals', () => {
+  it('uses the invoice month rather than the accounts-added timestamp for report totals', () => {
     const item = createItem('01234-MD');
     const records: OverviewSummaryRecord[] = [{
       item,
@@ -341,7 +341,7 @@ describe('quotes overview summary', () => {
     });
 
     expect(summary.invoice_count).toBe(1);
-    expect(summary.invoice_total).toBe(100);
+    expect(summary.invoice_total).toBe(250);
   });
 });
 

@@ -132,3 +132,7 @@ HGV rollout: new write actions are disabled unless the server setting `HGV_DAILY
 ## Test Fleet reset
 
 Debug → Test Fleet lets an actual SuperAdmin preview and reset records for one test asset at a time: TE57 VAN, TE57 HGV or TE57 plant. Asset entries, their details and linked Inventory location entries remain available for further testing. Reset requires the preview to remain current and the typed confirmation RESET TEST RECORDS. Shared or unsupported references, including published allocations, block the entire reset. Test checks, related operational records and resolvable test history are removed atomically; a cleanup audit receipt and stored photo/attachment files remain. Users, jobs and global settings are retained.
+
+## Quotes: invoice month
+
+New manager invoice requests require an explicit invoice month, with no default selection. Offer every month from the original quote creation month through the current Europe/London month, newest first, in a bounded scrollable dropdown. Revisions retain their original thread creation month. The selected month carries into Accounts and financial overview reporting; invoice totals use the saved invoice month rather than the date Accounts entered the invoice. Existing saved invoice dates retain their month and are not rewritten. New requests use the first day of the selected month in the existing date field; the day has no business meaning. Direct Accounts invoice and credit entry retain their date controls.

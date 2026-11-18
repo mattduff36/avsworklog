@@ -12,6 +12,7 @@ import { requireSensitiveModuleAccess } from '@/lib/server/sensitive-module-acce
 import { buildQuoteDisplayName } from '@/lib/quotes/quote-display-name';
 import { renderConfiguredQuoteEmailTemplate } from '@/lib/server/quote-email-templates';
 import { allocateMergeBillingAmount } from '@/lib/server/quote-merge-resolution';
+import { formatInvoiceMonth, getQuoteInvoiceMonths, getQuoteInvoiceStartDate, normalizeInvoiceMonth } from '@/lib/quotes/quote-invoice-month';
 
 type InvoiceRequestFieldErrors = Record<string, string>;
 
@@ -49,9 +50,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const normalizedAmount = typeof body.requested_amount === 'number'
       ? body.requested_amount
       : Number(body.requested_amount);
-    const normalizedDate = typeof body.requested_invoice_date === 'string' && body.requested_invoice_date.trim()
-      ? body.requested_invoice_date.trim()
-      : new Date().toISOString().slice(0, 10);
+    const normalizedDate = typeof body.requested_invoice_date === 'string'
+      ? normalizeInvoiceMonth(body.requested_invoice_date.trim())
+      : null;
     const normalizedScope = body.requested_invoice_scope === 'full' ? 'full' : 'partial';
     const normalizedComments = typeof body.manager_comments === 'string'
       ? body.manager_comments.trim() || null
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     if (!normalizedDate) {
-      fieldErrors.requested_invoice_date = 'Enter the requested invoice date.';
+      fieldErrors.requested_invoice_date = 'Select an invoice month.';
     }
 
     if (Object.keys(fieldErrors).length > 0) {
@@ -108,6 +109,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       )
     ) {
       return NextResponse.json({ error: 'Choose at least one valid merged quote source to invoice.' }, { status: 400 });
+    }
+
+    const invoiceStartDate = getQuoteInvoiceStartDate(
+      bundle.quote,
+      bundle.versions,
+      normalizedMergeBillingScope === 'source' ? normalizedMergeSourceThreadIds : undefined,
+    );
+    if (!normalizedDate || !getQuoteInvoiceMonths(invoiceStartDate).includes(normalizedDate.slice(0, 7))) {
+      return NextResponse.json({
+        error: 'Please correct the highlighted fields and try again.',
+        field_errors: { requested_invoice_date: 'Select a month from quote creation through the current month.' },
+      }, { status: 400 });
     }
 
     const selectedSourceAvailable = normalizedMergeBillingScope === 'source'
@@ -241,7 +254,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         quote_name: buildQuoteDisplayName(bundle.quote),
         customer_name: bundle.quote.customer?.company_name || 'Unknown customer',
         invoice_amount: `£${normalizedAmount.toLocaleString('en-GB', { minimumFractionDigits: 2 })}`,
-        invoice_date: normalizedDate,
+        invoice_date: formatInvoiceMonth(normalizedDate),
         invoice_scope: normalizedScope === 'full' ? 'Full invoice' : 'Partial invoice',
         invoice_comments: normalizedComments || '',
         invoice_comments_block: normalizedComments ? `Comments: ${normalizedComments}` : '',

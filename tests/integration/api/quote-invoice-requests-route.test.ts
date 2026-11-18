@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const {
@@ -45,6 +45,8 @@ vi.mock('@/lib/server/quote-email-templates', () => ({
 describe('POST /api/quotes/[id]/invoice-requests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-11-18T12:00:00Z'));
     mockRenderConfiguredQuoteEmailTemplate.mockResolvedValue({
       subject: 'Ready to invoice: Q-001',
       bodyText: 'Quote Q-001 is ready to invoice.',
@@ -70,6 +72,31 @@ describe('POST /api/quotes/[id]/invoice-requests', () => {
     });
   });
 
+  afterEach(() => vi.useRealTimers());
+
+  it.each([undefined, '', '   ', 'garbage', '2026-02-30', '2026-13', '2026-03-24junk'])('requires an explicit valid invoice month (%s)', async value => {
+    const { POST } = await import('@/app/api/quotes/[id]/invoice-requests/route');
+    const response = await POST(new NextRequest('http://localhost/api/quotes/quote-1/invoice-requests', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requested_amount: 50, requested_invoice_date: value }),
+    }), { params: Promise.resolve({ id: 'quote-1' }) });
+    expect(response.status).toBe(400);
+    expect((await response.json()).field_errors.requested_invoice_date).toBe('Select an invoice month.');
+    expect(mockFetchQuoteBundle).not.toHaveBeenCalled();
+  });
+
+  it.each(['2026-02-01', '2026-12-01'])('rejects months outside quote creation and the current month (%s)', async value => {
+    const { POST } = await import('@/app/api/quotes/[id]/invoice-requests/route');
+    mockFetchQuoteBundle.mockResolvedValue({ quote: { id: 'quote-1', created_at: '2026-03-24T12:00:00Z', is_latest_version: true } });
+    const response = await POST(new NextRequest('http://localhost/api/quotes/quote-1/invoice-requests', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ requested_amount: 50, requested_invoice_date: value }),
+    }), { params: Promise.resolve({ id: 'quote-1' }) });
+    expect(response.status).toBe(400);
+    expect((await response.json()).field_errors.requested_invoice_date).toContain('quote creation');
+    expect(mockGetQuoteAccountsRecipientIds).not.toHaveBeenCalled();
+  });
+
   it('rejects invoice requests above the available balance', async () => {
     const { POST } = await import('@/app/api/quotes/[id]/invoice-requests/route');
 
@@ -77,6 +104,7 @@ describe('POST /api/quotes/[id]/invoice-requests', () => {
       quote: {
         id: 'quote-1',
         is_latest_version: true,
+        created_at: '2026-03-01T00:00:00Z',
       },
       invoiceSummary: {
         availableToRequest: 100,
@@ -110,6 +138,7 @@ describe('POST /api/quotes/[id]/invoice-requests', () => {
       quote: {
         id: 'quote-1',
         is_latest_version: true,
+        created_at: '2026-03-01T00:00:00Z',
       },
       invoiceSummary: {
         availableToRequest: 100,
@@ -136,10 +165,11 @@ describe('POST /api/quotes/[id]/invoice-requests', () => {
 
   it('creates a pending invoice request and notifies Accounts', async () => {
     const { POST } = await import('@/app/api/quotes/[id]/invoice-requests/route');
+    const insert = vi.fn(() => ({ select: vi.fn(() => ({ single: vi.fn().mockResolvedValue({ data: insertedRequest, error: null }) })) }));
     const insertedRequest = {
       id: 'request-1',
       requested_amount: 50,
-      requested_invoice_date: '2026-03-24',
+      requested_invoice_date: '2026-03-01',
       requested_invoice_scope: 'partial',
       requested_at: '2026-03-24T09:00:00.000Z',
     };
@@ -157,14 +187,7 @@ describe('POST /api/quotes/[id]/invoice-requests', () => {
         }
 
         return {
-          insert: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: vi.fn().mockResolvedValue({
-                data: insertedRequest,
-                error: null,
-              }),
-            })),
-          })),
+          insert,
         };
       }),
     });
@@ -176,6 +199,7 @@ describe('POST /api/quotes/[id]/invoice-requests', () => {
           quote_reference: '40000-GH',
           quote_thread_id: 'thread-1',
           is_latest_version: true,
+          created_at: '2026-03-01T00:00:00Z',
           customer: { company_name: 'Acme Ltd' },
           status: 'completed_full',
         },
@@ -208,9 +232,11 @@ describe('POST /api/quotes/[id]/invoice-requests', () => {
     const response = await POST(request, { params: Promise.resolve({ id: 'quote-1' }) });
 
     expect(response.status).toBe(201);
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ requested_invoice_date: '2026-03-01' }));
     expect(mockRenderConfiguredQuoteEmailTemplate).toHaveBeenCalledWith(expect.anything(), 'invoice_request', expect.objectContaining({
       quote_reference: '40000-GH',
       invoice_amount: '£50.00',
+      invoice_date: 'March 2026',
       invoice_scope: 'Partial invoice',
     }));
     expect(mockCreateQuoteNotification).toHaveBeenCalledWith(expect.objectContaining({
@@ -261,6 +287,7 @@ describe('POST /api/quotes/[id]/invoice-requests', () => {
           quote_reference: '40000-GH',
           quote_thread_id: 'thread-1',
           is_latest_version: true,
+          created_at: '2026-03-01T00:00:00Z',
           status: 'completed_full',
         },
         invoiceRequests: [{

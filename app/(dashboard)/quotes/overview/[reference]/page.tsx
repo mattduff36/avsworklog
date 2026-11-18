@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/table';
 import { SensitiveModuleGate, SensitiveModuleSessionManager, useSensitiveModuleAccess } from '@/components/security/SensitiveModuleGate';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
+import { formatInvoiceMonth } from '@/lib/quotes/quote-invoice-month';
 import { cn } from '@/lib/utils/cn';
 import { ArrowRight, Clock, Coins, FileText, HardHat, Receipt, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
@@ -478,7 +479,7 @@ export default function QuoteOverviewDetailPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-white">{invoice.invoice_number}</p>
-                      <p className="text-sm text-slate-400">{formatDate(invoice.invoice_date)} · {invoice.invoice_scope}</p>
+                      <p className="text-sm text-slate-400">{formatInvoiceMonth(invoice.invoice_date)} · {invoice.invoice_scope}</p>
                     </div>
                     <p className="font-semibold text-emerald-200">{formatCurrency(invoice.amount)}</p>
                   </div>
@@ -544,7 +545,7 @@ export default function QuoteOverviewDetailPage() {
                         <Badge variant="outline" className={cn('capitalize', getStatusBadgeClass(request.status))}>
                           {getStatusLabel(request.status)}
                         </Badge>
-                        <p className="mt-2 text-sm text-slate-400">{formatDate(request.requested_invoice_date)}</p>
+                        <p className="mt-2 text-sm text-slate-400">{formatInvoiceMonth(request.requested_invoice_date)}</p>
                       </div>
                       <p className="font-semibold text-slate-100">{formatCurrency(request.requested_amount)}</p>
                     </div>
