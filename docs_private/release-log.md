@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.23.0
+
+**GIT COMMIT MESSAGE**
+`feat(inventory): update inventory`
+
+**PUSHED AT**
+2026-11-18T23:39:07.572Z
+
+**WHAT CHANGED**
+Update inventory. Require explicit invoice month and report by saved month.
+
+**VERSION HISTORY DETAILS**
+- Require explicit invoice month and report by saved month, with changes to background routes, app screens, shared logic, and automated tests.
+- Updated inventory, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `feat(inventory): update inventory`
+- `fix(quotes): require explicit invoice month and report by saved month`
+
 ## 1126.22.3
 
 **GIT COMMIT MESSAGE**

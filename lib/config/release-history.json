@@ -1,5 +1,26 @@
 [
   {
+    "version": "1126.23.0",
+    "updateKind": "major",
+    "title": "Inventory update",
+    "description": "Updated inventory. Require explicit invoice month and report by saved month.",
+    "summary": "Updated inventory. Require explicit invoice month and report by saved month.",
+    "details": [
+      "Require explicit invoice month and report by saved month, with changes to background routes, app screens, shared logic, and automated tests.",
+      "Updated inventory, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Quotes",
+      "Inventory. Require explicit invoice month",
+      "Report by saved month"
+    ],
+    "areaKeys": [
+      "inventory",
+      "quotes"
+    ],
+    "pushedAt": "2026-11-18T23:39:07.572Z"
+  },
+  {
     "version": "1126.22.3",
     "updateKind": "minor",
     "title": "Workshop Tasks improvements",
