@@ -13,8 +13,8 @@ import {
   rejectSensitiveText, retrievalMatchSchema, runtimeKnowledgePath, sanitizeKnowledgeText, saveKnowledgeAtomic, type IncidentOutcome,
 } from './fixerrors-knowledge';
 import { writeAndVerifyTextArtifactAtomic } from './fixerrors-safety';
-import { classifyIncident, executionBudget, DEPLOYMENT_VERIFICATION_STEP, diagnosticSchema, TRIAGE_GUIDANCE,
-  type IncidentTriage, type timingsSchema } from '../lib/fixerrors/triage';
+import { classifyIncident, executionBudget, DEPLOYMENT_VERIFICATION_STEP, diagnosticSchema, TRIAGE_GUIDANCE, proportionateClosureBlocker,
+  needsDeployedImprovement, type IncidentTriage, type timingsSchema } from '../lib/fixerrors/triage';
 import { assertWorktreeClientRecovery, isGuardedBusinessClient } from './automation/fixerrors-client-recovery';
 import analysisCatalogue from '../lib/config/fixerrors-analysis-checks.json';
 import { rawErrorEvidenceSchema } from './fixerrors-raw-evidence';
@@ -62,6 +62,7 @@ const clusterSchema = z.object({
   held: z.boolean().optional(),
   existingState: z.enum(['awaiting-evidence', 'awaiting-deployment', 'actionable']).optional(),
   matchingAllowed: z.boolean().optional(),
+  recurrenceAfterResolution: z.boolean().optional(),
   diagnostics: diagnosticSchema.optional(),
   relatedSourceFiles: z.array(sourcePath).max(12).optional(),
   rawEvidence: z.array(rawErrorEvidenceSchema).optional(),
@@ -111,7 +112,7 @@ export interface AutoAdapters {
   checkpoint?(result: AutoRunResult): void;
   repairChecks?(tests: string[], paths: string[]): WorkerRequest['checks'];
   analysisChecks?(sourceFiles: string[]): WorkerRequest['checks'];
-  verifyAnalysis?(request: WorkerRequest, result: WorkerResult, before: CandidateFingerprint): void;
+  verifyAnalysis?(request: WorkerRequest, result: WorkerResult, before: CandidateFingerprint): string[] | void;
 }
 function git(cwd: string, ...args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }).trimEnd();
@@ -197,9 +198,34 @@ export async function dispatchFixerrorsWorker(request: WorkerRequest, requestPat
     changedFiles: summary.changed_files, runDirectory,
   };
 }
+export function passedAnalysisTests(request: WorkerRequest, value: unknown): string[] {
+  const receipts = z.array(z.object({ checkId: z.string(), stdout: z.string(), truncated: z.boolean() }).strict()).safeParse(value);
+  if (!receipts.success) return [];
+  const passed = new Set<string>();
+  for (const [id, check] of Object.entries(request.checks)) {
+    const index = check.argv.indexOf('observe-tests');
+    if (index < 0) continue;
+    const matches = receipts.data.filter(receipt => receipt.checkId === id);
+    if (matches.length !== 1 || matches[0].truncated) continue;
+    const lines = matches[0].stdout.trim().split(/\r?\n/u);
+    const prefix = 'SQUIRES_OBSERVATION_V1 ';
+    if (lines.filter(line => line.startsWith(prefix)).length !== 1 || !lines.at(-1)?.startsWith(prefix)) continue;
+    try {
+      const report = z.object({ selected: z.array(z.string()), passed: z.array(z.string()) }).strict()
+        .parse(JSON.parse(lines.at(-1)!.slice(prefix.length)));
+      const expected = check.argv.slice(index + 1);
+      exactList(report.selected, expected, 'Observed test coverage');
+      if (new Set(report.selected).size !== report.selected.length || new Set(report.passed).size !== report.passed.length ||
+          report.passed.some(test => !expected.includes(test))) continue;
+      report.passed.forEach(test => passed.add(test));
+    } catch { /* Older or invalid observations never establish passing assertions. */ }
+  }
+  return [...passed];
+}
+
 export function verifyFixerrorsReceipts(request: WorkerRequest, result: WorkerResult, options: {
   cwd: string; expectedDirectory: string; baseHead: string; branch: string; changed: string[];
-}): void {
+}): { checkId: string; stdout: string; truncated: boolean }[] {
   const { cwd, expectedDirectory, baseHead, branch, changed } = options;
   if (result.runDirectory !== expectedDirectory) throw new Error('Worker receipt directory mismatch');
   const summary = summarySchema.parse(readJson(path.join(expectedDirectory, 'summary.json')));
@@ -220,6 +246,7 @@ export function verifyFixerrorsReceipts(request: WorkerRequest, result: WorkerRe
     `${JSON.stringify(file)}: ${JSON.stringify(createHash('sha256').update(readFileSync(assertFile(cwd, file))).digest('hex'))}`);
   const fingerprint = createHash('sha256').update(`{${entries.join(', ')}}`).digest('hex');
   const configHash = createHash('sha256').update(readFileSync(path.join(expectedDirectory, 'check-config.json'))).digest('hex');
+  const outputs: { checkId: string; stdout: string; truncated: boolean }[] = [];
   for (const [id, definition] of Object.entries(request.checks)) {
     const state = z.object({
       check_id: z.literal(id), last_receipt: z.string().regex(/^[a-f0-9]{32}$/u),
@@ -233,7 +260,10 @@ export function verifyFixerrorsReceipts(request: WorkerRequest, result: WorkerRe
     }).passthrough().parse(readJson(path.join(expectedDirectory, 'checks', `${state.last_receipt}.json`)));
     if (path.resolve(receipt.cwd) !== cwd || path.resolve(receipt.argv[0] ?? '') !== path.resolve(definition.argv[0]) ||
         JSON.stringify(receipt.argv.slice(1)) !== JSON.stringify(definition.argv.slice(1))) throw new Error('Check command receipt mismatch');
+    outputs.push({ checkId: id, stdout: typeof receipt.stdout === 'string' ? receipt.stdout : '',
+      truncated: receipt.stdout_truncated !== false });
   }
+  return outputs;
 }
 export function createAutoAdapters(cwd = process.cwd()): AutoAdapters {
   assertCleanLocalMain(cwd);
@@ -263,9 +293,10 @@ export function createAutoAdapters(cwd = process.cwd()): AutoAdapters {
     verifyAnalysis: (request, result, before) => {
       assertGit();
       if (!sameCandidate(before, captureCandidateFingerprint(cwd))) throw new Error('Analysis candidate drift');
-      verifyFixerrorsReceipts(request, result, {
+      const outputs = verifyFixerrorsReceipts(request, result, {
         cwd, expectedDirectory: path.join(runnerPaths().runs, request.task_id, '1'), baseHead: head, branch: 'main', changed: [],
       });
+      return passedAnalysisTests(request, outputs);
     },
     assertUnchanged: before => {
       assertGit();
@@ -419,21 +450,11 @@ export async function runAutomaticFixerrors(input: {
     const triage = classifyIncident(evidence.diagnostics);
     let analysisMs = 0, repairAndChecksMs = 0;
     adapters.assertUnchanged(result.candidate);
-    if (evidence.existingState === 'awaiting-deployment') {
-      result.clusters.push({
-        id: evidence.id, status: 'held', reason: DEPLOYMENT_VERIFICATION_STEP,
-        attempt: 'Early deployment-evidence routing; no worker dispatch or Deploy authority used',
-        tests: [], evidence: ['Retained lifecycle label is not proof of a current verified candidate'],
-        triage, timings: { analysisMs, repairAndChecksMs, totalMs: Math.round(performance.now() - started) },
-      });
-      checkpoint();
-      continue;
-    }
     const matching = evidence.held && evidence.matchingAllowed !== false ? retrieval.clusters.find(entry => !entry.held &&
       fingerprintIncident(entry.query) === fingerprintIncident(evidence.query)) : undefined;
     const reused = matching && result.clusters.find(entry => entry.id === matching.id);
     const prior = matching && decisions.find(entry => entry.id === matching.id);
-    if (reused && prior && triage.importance !== 'Urgent' &&
+    if (reused && prior && !evidence.recurrenceAfterResolution && triage.importance !== 'Urgent' &&
         JSON.stringify(evidence.diagnostics) === JSON.stringify(matching.diagnostics) &&
         JSON.stringify(evidence.rawEvidence) === JSON.stringify(matching.rawEvidence) &&
         reusableCandidates.has(reused.id) && sameCandidate(reusableCandidates.get(reused.id)!, adapters.candidate()) &&
@@ -456,7 +477,8 @@ export async function runAutomaticFixerrors(input: {
       'Separate the historical server outcome from any reproducible client defect. A valid HTTP rejection can expose a repairable client response: record both in the rationale. A confined recovery or notification in a client catch branch may use guarded if it preserves all authorization, financial rules, data access and unexpected-error handling. Other critical work requires owner approval.',
       'External/network/user-input failures without a code defect are report-only/no_fix_required/null nextStep. A concrete current investigation may be manual-investigation/outstanding.',
       'Return FixerrorsDecision JSON: schemaVersion:1,snapshotId,analyst,baseHead,treeFingerprint,clusters.',
-      'The cluster has exactly id,lane,action,disposition,nextStep,evidencePaths,files,requiredTestIds,forbiddenChanges,rationale,priorIncidentIds,evidenceEnrichmentAttempted.',
+      'The cluster requires id,lane,action,disposition,nextStep,evidencePaths,files,requiredTestIds,forbiddenChanges,rationale,priorIncidentIds,evidenceEnrichmentAttempted. Optional resolution: {reason:fixed|mitigated|diagnostics_improved|expected_behaviour|reviewed_unable_to_reproduce,summary,changeCommit?:full SHA}. State what remains unknown; never claim a root-cause fix from diagnostics alone.',
+      'Reassess old awaiting-deployment incidents with source and test evidence; do not duplicate the pending repair. Diagnostics/mitigation improvements remain outstanding until independently verified deployed. Report-only review of an existing improvement requires changeCommit plus source and relevant test paths. Serious, continuing or recurring failures remain outstanding for concrete work.',
       'Actions: fix|report-only|manual-investigation. Dispositions: outstanding|no_fix_required. Enrich evidence before deciding; never claim fixed_live.',
       'For fixes list only files requiring edits. Select exact offline test paths in requiredTestIds; registered UI/integration tests are run-only and do not belong in files. For guarded business-client error handling include every registered source-specific check, preserve the fallback and reuse established recovery logic. Select a test for the observed behaviour. Provide a concrete nextStep and forbiddenChanges suppress-logging,empty-success,weaken-authorization. No file edits.',
       'Registered offline checks for this source: ' + JSON.stringify(approvedAnalysisTests(evidence.sourceFiles)),
@@ -476,12 +498,13 @@ export async function runAutomaticFixerrors(input: {
       analysisReturned = true;
       adapters.assertUnchanged(before);
       exactList(analyzed.changedFiles, [], 'Read-only analysis');
+      let passedChecks: string[] = [];
       if (Object.keys(request.checks).length) {
         if (!adapters.verifyAnalysis) throw new Error('Analysis receipt verifier unavailable');
-        adapters.verifyAnalysis(request, analyzed, before);
+        passedChecks = adapters.verifyAnalysis(request, analyzed, before) ?? [];
       }
       analysisVerified = true;
-      const checkedAnalysis = Object.keys(request.checks).map(id => `${id}: baseline checks executed; inspect observed assertions`);
+      const checkedAnalysis = [...Object.keys(request.checks).map(id => `${id}: baseline checks executed; inspect observed assertions`), ...passedChecks];
       const validated = validateDecision({
         decision: analyzed.outcome, snapshotId: retrieval.snapshotId, snapshotChecksum: input.snapshotChecksum,
         retrieval: scopedRetrieval, candidate: before,
@@ -491,6 +514,8 @@ export async function runAutomaticFixerrors(input: {
       decisions.push(decision);
       adapters.write(`${request.task_id}.decision.json`, validated);
       if (decision.action === 'report-only') {
+        const blocker = proportionateClosureBlocker({ ...evidence, lane: decision.lane });
+        if (blocker) throw new Error(blocker);
         adapters.learn(retrieval, decision, 'report_only', [], checkedAnalysis);
         result.clusters.push({
           id: evidence.id, status: 'report-only', reason: decision.rationale, attempt: 'Source and targeted test evidence enrichment',
@@ -537,6 +562,9 @@ export async function runAutomaticFixerrors(input: {
         }
         exactList(report.checks, Object.keys(repair.checks), 'Required check result');
         adapters.verifyRepair(repair, repaired, before);
+        if (needsDeployedImprovement(decision.resolution) && !repaired.changedFiles.some(isFixerrorsSourcePath)) {
+          throw new Error('Diagnostic improvement or mitigation requires an authenticated production source change');
+        }
         decision.files.forEach(file => used.add(file));
         adapters.learn(retrieval, decision, 'fix_verified_local', report.changedFiles,
           [...checkedAnalysis, ...decision.requiredTestIds], report.summary);

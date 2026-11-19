@@ -39,6 +39,7 @@ import {
   applyLifecyclePlan, fetchLifecycleRecords, hashLifecycleRecord, parseLifecyclePlan,
 } from './fixerrors-lifecycle';
 import { buildAutomaticLifecyclePlan, renderAutomaticLifecycleSummary } from './fixerrors-lifecycle-run';
+import { verifyReviewedDeployments } from './fixerrors-deployment-evidence';
 import { renderFixerrorsRunSummary } from './fixerrors-summary';
 import {
   loadRuntimeKnowledgeStore,
@@ -1014,6 +1015,7 @@ async function main() {
             : runAutomaticFixerrors({ retrieval: automaticRetrieval, snapshotChecksum: snapshot.checksum, adapters: autoAdapters }));
         const plan = buildAutomaticLifecyclePlan({
           result: automatic, retrieval: automaticRetrieval, bindings,
+          deployments: await verifyReviewedDeployments({ result: automatic, retrieval: automaticRetrieval, bindings }),
           suppressed,
           target: databaseTargetFingerprint,
         });

@@ -5,7 +5,8 @@ import {
   type LifecyclePlan, type LifecycleRecord, type LifecycleReview,
 } from './fixerrors-lifecycle';
 import { renderFixerrorsRunSummary } from './fixerrors-summary';
-import { DEPLOYMENT_VERIFICATION_STEP } from '../lib/fixerrors/triage';
+import { getErrorLogStatusLabel } from '../lib/utils/error-log-triage';
+import { DEPLOYMENT_VERIFICATION_STEP, needsDeployedImprovement, proportionateClosureBlocker } from '../lib/fixerrors/triage';
 
 export interface LifecycleBinding {
   clusterId: string;
@@ -19,6 +20,7 @@ export function buildAutomaticLifecyclePlan(input: {
   suppressed: LifecycleRecord[];
   target: string;
   now?: Date;
+  deployments?: Record<string, NonNullable<LifecycleReview['deploymentEvidence']>>;
 }): LifecyclePlan | null {
   const now = input.now ?? new Date();
   const reviewedAt = now.toISOString();
@@ -35,6 +37,15 @@ export function buildAutomaticLifecyclePlan(input: {
     let proposedState: LifecycleReview['state'] = decision?.action === 'fix' ? 'actionable' : 'awaiting-evidence';
     if (outcome.status === 'verified-local') proposedState = 'awaiting-deployment';
     if (outcome.status === 'report-only') proposedState = 'resolved-no-fix';
+    const deployment = input.deployments?.[binding.clusterId];
+    const blocker = proportionateClosureBlocker({ ...cluster, lane: decision?.lane });
+    const resolution = decision?.resolution;
+    const missingChecks = resolution && resolution.reason !== 'expected_behaviour' &&
+      (!decision?.requiredTestIds.length || decision.requiredTestIds.some(test =>
+        !outcome.tests.some(passed => passed === test || passed === `${test}: passed`)));
+    const missingDeployment = needsDeployedImprovement(resolution) && !deployment;
+    if (proposedState === 'resolved-no-fix' && (blocker || missingChecks || missingDeployment)) proposedState = 'actionable';
+    if (blocker && proposedState === 'awaiting-evidence') proposedState = 'actionable';
     const matchingAt = cluster.held
       ? cluster.matchingAllowed === false ? undefined : matchNewEvidence(cluster.query, newEvidence)
       : binding.observedAt;
@@ -42,24 +53,34 @@ export function buildAutomaticLifecyclePlan(input: {
       // A held row's original fingerprint remains authoritative even if source extraction changes later.
       const prior = readLifecycle(record);
       const fingerprint = prior?.fingerprint ?? fingerprintIncident(cluster.query);
-      const state = prior?.state === 'awaiting-deployment' || record.triage_local_commit ? 'awaiting-deployment' :
+      const explicitClosure = proposedState === 'resolved-no-fix' && resolution &&
+        (!(prior?.state === 'awaiting-deployment' || record.triage_local_commit) || deployment);
+      const state = explicitClosure ? 'resolved-no-fix' : prior?.state === 'awaiting-deployment' || record.triage_local_commit ? 'awaiting-deployment' :
         prior?.state === 'actionable' && proposedState !== 'awaiting-deployment' ? 'actionable' : proposedState;
-      const nextStep = state === 'awaiting-deployment'
-        ? DEPLOYMENT_VERIFICATION_STEP
+      const nextStep = blocker ?? (missingChecks ? 'Run the relevant focused checks before resolving this incident.' : null) ??
+        (missingDeployment ? 'Verify that the tested improvement is deployed, then review this exact incident for resolution; reproducing the original intermittent failure is not required.' : null) ??
+        (state === 'awaiting-deployment'
+        ? deployment ? 'Change is deployed. Verify the original defect or review an eligible explicit resolution reason; deployment alone does not prove a fix.'
+          : needsDeployedImprovement(resolution) ? 'Deploy the tested improvement and verify deployment identity; reproducing the original intermittent failure is not required for this resolution.'
+            : DEPLOYMENT_VERIFICATION_STEP
         : decision?.nextStep ?? (typeof record.triage_next_step === 'string' ? record.triage_next_step : null) ??
-          'Inspect the scoped investigation receipt and add the named targeted diagnostic evidence.';
+          'Inspect the scoped investigation receipt and add the named targeted diagnostic evidence.');
       rows.push(reviewLifecycleRow(record, {
         fingerprint, state, nextStep,
         matchingNewEvidenceAt: prior && prior.fingerprint !== fingerprintIncident(cluster.query) ? undefined : matchingAt,
         closureReason: state === 'resolved-no-fix'
-          ? ['external-network', 'user-input'].includes(cluster.query.rootCauseFamily) ? 'expected_behavior' : 'insufficient_evidence'
+          ? resolution ? resolution.reason === 'expected_behaviour' ? 'expected_behavior' :
+              resolution.reason === 'fixed' ? null : resolution.reason
+            : ['external-network', 'user-input'].includes(cluster.query.rootCauseFamily) ? 'expected_behavior' : 'insufficient_evidence'
           : null,
+        ...(resolution ? { resolution } : {}),
+        ...(deployment ? { deploymentEvidence: deployment } : {}),
         attempt: {
           id: `${input.result.runId}-${binding.clusterId}`, reviewedAt,
           diagnosis: decision?.rationale ?? outcome.reason, attempt: outcome.attempt,
           tests: outcome.tests, result: outcome.status === 'verified-local' ? 'verified-local' :
             outcome.status === 'report-only' ? 'no-fix' : outcome.status === 'failed' ? 'failed' : 'blocked',
-          evidence: outcome.evidence,
+          evidence: [...outcome.evidence, ...(deployment ? [deployment.check] : [])],
           ...(outcome.status === 'verified-local' ? { verifiedCandidate: input.result.candidate } : {}),
         },
       }));
@@ -93,7 +114,10 @@ export function renderAutomaticLifecycleSummary(input: {
     const reviewed = proposed?.metadata.history.at(-1);
     return {
       id: record.id,
-      title: `${metadata?.state ?? 'untriaged'}; oldest occurrence ${String(record.created_at)}; ` +
+      title: `${getErrorLogStatusLabel({ status: closing ? 'archived' : 'active',
+        triage_state: metadata?.state === 'fixed-live' ? 'fixed_live' : closing ? 'no_fix_required' : metadata ? 'outstanding' : null,
+        additional_data: { fixerrorsLifecycle: metadata },
+      }) ?? 'Untriaged'}; oldest occurrence ${String(record.created_at)}; ` +
         (metadata ? `last matching evidence ${metadata.lastMatchingEvidenceAt}; ` : '') +
         (input.blocker ? `transition blocked: ${input.blocker}; ` : '') +
         (metadata?.closureReason ?? reviewed?.diagnosis ?? String(record.triage_summary ?? 'Review captured diagnostics')),

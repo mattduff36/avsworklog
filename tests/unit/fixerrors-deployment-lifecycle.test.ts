@@ -30,7 +30,7 @@ afterEach(() => {
   vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); database.run.mockReset();
 });
 
-type Case = 'synthetic' | 'unsupported' | 'held' | 'report-only' | 'failed';
+type Case = 'synthetic' | 'unsupported' | 'held' | 'report-only' | 'failed' | 'diagnostics' | 'serious-diagnostics';
 async function fixture(cases: Case[] = ['synthetic']) {
   const store = new FixtureStore();
   const id = randomUUID();
@@ -39,6 +39,11 @@ async function fixture(cases: Case[] = ['synthetic']) {
   manifest.retrieval = parseAutomaticFixerrorsRetrieval({ ...manifest.retrieval,
     clusters: manifest.retrieval.clusters.map((cluster, index) => {
       if (cases[index] === 'unsupported') return cluster;
+      if (cases[index].includes('diagnostics')) return { ...cluster,
+        query: { ...cluster.query, sourceFile: 'lib/utils/diagnostic-context.ts' }, sourceFiles: ['lib/utils/diagnostic-context.ts'],
+        diagnostics: { classes: [cases[index] === 'serious-diagnostics' ? 'financial-loss' as const : 'unknown' as const],
+          operation: 'unknown' as const, noncriticalHandled: false, occurrences: 1, frames: [] },
+      };
       return { ...cluster, query: { ...cluster.query, sourceFile: SYNTHETIC_REPAIR_SOURCE },
         sourceFiles: [SYNTHETIC_REPAIR_SOURCE], held: cases[index] === 'held' };
     }),
@@ -57,18 +62,20 @@ async function fixture(cases: Case[] = ['synthetic']) {
   const outcome = {
     runId: `fixerrors-${id}`, candidate: { baseHead: workspace.head, treeFingerprint: 'c'.repeat(64) },
     clusters: cases.map((kind, index) => ({
-      id: `cluster-${index + 1}`, status: kind === 'synthetic' || kind === 'unsupported' ? 'verified-local' as const : kind,
+      id: `cluster-${index + 1}`, status: kind === 'synthetic' || kind === 'unsupported' || kind.includes('diagnostics') ? 'verified-local' as const : kind as 'held' | 'report-only' | 'failed',
       reason: 'Synthetic source investigation', attempt: 'Synthetic scoped repair',
-      tests: [SYNTHETIC_REPAIR_TEST], evidence: ['Synthetic candidate-bound receipts'],
+      tests: [kind.includes('diagnostics') ? 'tests/unit/diagnostic-context.test.ts' : SYNTHETIC_REPAIR_TEST], evidence: ['Synthetic candidate-bound receipts'],
     })),
     decisions: cases.flatMap((kind, index) => kind === 'held' || kind === 'failed' ? [] : [{
       id: `cluster-${index + 1}`, lane: 'fast' as const,
       action: kind === 'report-only' ? 'report-only' as const : 'fix' as const,
       disposition: kind === 'report-only' ? 'no_fix_required' as const : 'outstanding' as const,
       nextStep: kind === 'report-only' ? null : 'Inspect synthetic source evidence',
-      evidencePaths: [SYNTHETIC_REPAIR_SOURCE], files: [SYNTHETIC_REPAIR_SOURCE, SYNTHETIC_REPAIR_TEST],
-      requiredTestIds: [SYNTHETIC_REPAIR_TEST], forbiddenChanges: ['suppress-logging', 'empty-success', 'weaken-authorization'],
+      evidencePaths: [SYNTHETIC_REPAIR_SOURCE], files: kind.includes('diagnostics') ? ['lib/utils/diagnostic-context.ts'] : [SYNTHETIC_REPAIR_SOURCE, SYNTHETIC_REPAIR_TEST],
+      requiredTestIds: [kind.includes('diagnostics') ? 'tests/unit/diagnostic-context.test.ts' : SYNTHETIC_REPAIR_TEST], forbiddenChanges: ['suppress-logging', 'empty-success', 'weaken-authorization'],
       rationale: 'Synthetic label regression', priorIncidentIds: [], evidenceEnrichmentAttempted: true,
+      ...(kind.includes('diagnostics') ? { resolution: { reason: 'diagnostics_improved' as const,
+        summary: 'Added useful diagnostic context; original intermittent cause remains unknown' } } : {}),
     }]),
   };
   await store.transact(tx => applyAdminCommand(tx, actorId, {
@@ -94,7 +101,7 @@ async function fixture(cases: Case[] = ['synthetic']) {
     if (text.includes('UPDATE public.error_logs')) {
       const row = records.get(String(values[0]))!;
       const additional = JSON.parse(String(values[11]));
-      const live = additional.fixerrorsLifecycle.state === 'fixed-live';
+      const live = additional.fixerrorsLifecycle.state === 'fixed-live' || Boolean(additional.fixerrorsLifecycle.deployment);
       const retained = store.state.jobs[0].privateBatch!;
       expect(Object.keys(live ? retained.deployment!.receipts : retained.lifecycle!.receipts)
         .some(file => file.endsWith('.pre.json'))).toBe(true);
@@ -187,6 +194,30 @@ describe('post-deployment exact incident reconciliation (synthetic mock applicat
     expect(JSON.stringify(projection)).not.toContain('Synthetic private row');
     expect(readLifecycle([...f.records.values()][0])?.history).toHaveLength(2);
     expect(f.store.events.at(-1)).toMatchObject({ actor: deviceId, event: 'batch-live-reconciled' });
+  });
+
+  it('resolves useful diagnostics only after the approved deployment, without executing the synthetic root-cause check', async () => {
+    const f = await fixture(['diagnostics']);
+    expect(readLifecycle([...f.records.values()][0])?.state).toBe('awaiting-deployment');
+    vi.spyOn(synthetic, 'syntheticDisplayLabel').mockImplementation(() => { throw new Error('Original failure cannot be reproduced'); });
+    await f.deploy();
+    await reconcileDeployedBatchLifecycle(f.store, f.releaseId());
+    const record = [...f.records.values()][0];
+    expect(record).toMatchObject({ status: 'archived', triage_state: 'no_fix_required', triage_live_evidence: null });
+    expect(readLifecycle(record)).toMatchObject({ state: 'resolved-no-fix', closureReason: 'diagnostics_improved',
+      resolution: { changeCommit: f.candidate.head }, deployment: { deployedCommit: f.candidate.head, result: 'passed' } });
+    expect(readLifecycle(record)?.history).toHaveLength(2);
+    expect(f.live()).toMatchObject({ state: 'applied', verifiedRows: 1, remainingRows: 0 });
+    await reconcileDeployedBatchLifecycle(f.store, f.releaseId());
+    expect(f.updates()).toBe(1);
+  });
+
+  it('does not resolve serious impact just because a diagnostic improvement deployed', async () => {
+    const f = await fixture(['serious-diagnostics']);
+    await f.deploy();
+    await reconcileDeployedBatchLifecycle(f.store, f.releaseId());
+    expect([...f.records.values()][0]).toMatchObject({ status: 'active', triage_state: 'outstanding' });
+    expect(f.updates()).toBe(0);
   });
 
   it('does not treat deployment as original-error verification for an unsupported source', async () => {

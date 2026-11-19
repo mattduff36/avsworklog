@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { z } from 'zod';
 import { assertWorktreeClientRecovery } from './fixerrors-client-recovery';
-import { assertAutomaticCheckPath, assertAutomaticPath, assertAutomaticFixerrorsRepair, learnAutomaticOutcome, parseAutomaticFixerrorsRetrieval, runAutomaticFixerrors,
+import { assertAutomaticCheckPath, assertAutomaticPath, assertAutomaticFixerrorsRepair, learnAutomaticOutcome, parseAutomaticFixerrorsRetrieval, runAutomaticFixerrors, passedAnalysisTests,
   type AutoAdapters, type AutoRunResult, type WorkerRequest, type WorkerResult } from '../fixerrors-auto';
 import { captureCandidateFingerprint, parseDecision, validateDecision, type CandidateFingerprint } from '../fixerrors-decision';
 import { FIXERRORS_WORKSPACE } from './fixerrors-device-admission';
@@ -109,7 +109,7 @@ export function nativeBatchAdapters(cwd: string, native: NativeBatchTransport): 
       call('verify', { request, result, before });
       assertWorktreeClientRecovery(cwd, result.changedFiles);
     },
-    verifyAnalysis: (request, result, before) => { call('verify-analysis', { request, result, before }); },
+    verifyAnalysis: (request, result, before) => passedAnalysisTests(request, call('verify-analysis', { request, result, before })),
     write: (file, value) => { call('write', { file, value }); },
     learn: (...args) => {
       call('unchanged', null);

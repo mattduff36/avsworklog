@@ -70,6 +70,21 @@ const run = (adapters: AutoAdapters, retrieval = packet()) =>
   runAutomaticFixerrors({ retrieval, snapshotChecksum: 'c'.repeat(64), adapters });
 
 describe('automatic local fixerrors lifecycle investigation', () => {
+  it('never calls a test-only change a diagnostic improvement', async () => {
+    const h = harness([cluster('cluster-1', { resolution: { reason: 'diagnostics_improved',
+      summary: 'Add relevant diagnostic context while retaining uncertainty' } })]);
+    const dispatch = h.adapters.dispatch;
+    h.adapters.dispatch = async request => {
+      const result = await dispatch(request);
+      if (request.mode === 'implement') {
+        result.changedFiles = [test];
+        (result.outcome as { changedFiles: string[] }).changedFiles = [test];
+      }
+      return result;
+    };
+    const result = await run(h.adapters);
+    expect(result.clusters[0]).toMatchObject({ status: 'failed', reason: expect.stringContaining('production source change') });
+  });
   it('provides full evidence to workers and never reuses a different original error', async () => {
     const retrieval = packet(2);
     const raw = { id: '00000000-0000-4000-8000-000000000001', timestamp: '2026-11-13T16:16:39Z',
@@ -202,14 +217,15 @@ describe('automatic local fixerrors lifecycle investigation', () => {
     retrieval.clusters[0].existingState = 'awaiting-deployment';
     const pending = (await run(deployed.adapters, retrieval)).clusters[0];
     expect(pending.reason).toContain('missing or stale');
-    expect(pending.timings).toMatchObject({ analysisMs: 0, repairAndChecksMs: 0 });
-    expect(deployed.requests).toHaveLength(0);
-    expect(deployed.adapters.learn).not.toHaveBeenCalled();
+    expect(pending.timings).toMatchObject({ analysisMs: expect.any(Number), repairAndChecksMs: 0 });
+    expect(deployed.requests.map(request => request.mode)).toEqual(['ask']);
+    expect(deployed.adapters.verifyRepair).not.toHaveBeenCalled();
     const contradicted = harness([cluster('cluster-1', {
       action: 'report-only', disposition: 'no_fix_required', nextStep: null,
     })]);
-    expect((await run(contradicted.adapters, retrieval)).clusters[0].status).toBe('held');
-    expect(contradicted.adapters.learn).not.toHaveBeenCalled();
+    expect((await run(contradicted.adapters, retrieval)).clusters[0].status).toBe('report-only');
+    expect(contradicted.requests.map(request => request.mode)).toEqual(['ask']);
+    expect(contradicted.adapters.verifyRepair).not.toHaveBeenCalled();
   });
   it('requires genuine named analysis receipts and reports measured effort without granting repair authority', async () => {
     const h = harness([cluster('cluster-1', { action: 'report-only', disposition: 'no_fix_required', nextStep: null })]);

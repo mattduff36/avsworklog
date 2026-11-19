@@ -632,7 +632,7 @@ export function buildRetrievalCluster(cluster: ErrorRootCauseCluster, knowledge:
       // Only fixed structured signals escalate. Ordinary 401/403, prose and
       // console.error never establish an outage or security compromise.
       const impact = entry.additional_data?.impact;
-      const serious = ['security-compromise', 'data-corruption', 'service-outage'] as const;
+      const serious = ['security-compromise', 'data-corruption', 'service-outage', 'financial-loss'] as const;
       for (const value of serious) {
         if (impact === value) { classes.add(value); known = true; }
       }
@@ -666,6 +666,7 @@ export function buildRetrievalCluster(cluster: ErrorRootCauseCluster, knowledge:
       ...(typeof code === 'string' && /^(?:[A-Z0-9]{5}|PGRST[0-9]{3})$/u.test(code) ? { databaseCode: code } : {}),
       noncriticalHandled: operation === 'usage-analytics' && stage === 'record-usage' &&
         occurrences.every(entry => entry.additional_data?.transient === true),
+      ...(occurrences.some(entry => entry.additional_data?.continuingFailure === true) ? { continuingFailure: true } : {}),
       occurrences: Math.max(1, cluster.occurrences),
       ...(firstDays.length ? { firstDay: firstDays[0] } : {}),
       ...(lastDays.length ? { lastDay: lastDays.at(-1) } : {}),

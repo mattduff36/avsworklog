@@ -17,7 +17,7 @@ export class LiveVerificationError extends Error {
 
 // The imported implementation must belong to the approved revision, not an old
 // server instance that merely observed the new deployment at the public endpoint.
-export async function verifySyntheticRepairLive(head: string) {
+export async function verifyProductionDeployment(head: string) {
   if (!isFixerrorsProductionEnabled() || !/^[a-f0-9]{40}$/u.test(head) ||
       process.env.VERCEL_GIT_COMMIT_SHA !== head) {
     throw new LiveVerificationError('server-revision-mismatch');
@@ -50,6 +50,15 @@ export async function verifySyntheticRepairLive(head: string) {
   if (!identity.success || identity.data.deployment_id !== process.env.VERCEL_DEPLOYMENT_ID) {
     throw new LiveVerificationError('deployment-identity-mismatch');
   }
+  return {
+    deployedCommit: head, deploymentId: identity.data.deployment_id,
+    check: 'Exact approved revision is serving at the production deployment identity endpoint',
+    result: 'passed' as const, verifiedAt: new Date().toISOString(),
+  };
+}
+
+export async function verifySyntheticRepairLive(head: string) {
+  const deployment = await verifyProductionDeployment(head);
   const cases = [
     [' \tfixture', 'fixture'], ['fixture\t ', 'fixture'], [' fixture ', 'fixture'],
     [' \t\n ', ''], ['fixture label', 'fixture label'], ['', ''],
@@ -60,7 +69,7 @@ export async function verifySyntheticRepairLive(head: string) {
     }
   } catch { throw new LiveVerificationError('runtime-verification-failed'); }
   return {
-    deployedCommit: head, deploymentId: identity.data.deployment_id, check: SYNTHETIC_LIVE_CHECK,
+    ...deployment, check: SYNTHETIC_LIVE_CHECK,
     result: 'passed' as const, verifiedAt: new Date().toISOString(),
   };
 }

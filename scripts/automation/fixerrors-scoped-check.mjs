@@ -67,6 +67,10 @@ function observe(tests) {
     const passed = report.files.reduce((sum, file) => sum + file.passed, 0);
     console.log(`Baseline observations: ${passed} passed, ${failed.length} failed.`);
     for (const name of failed) console.log('FAILED:', name);
+    console.log('SQUIRES_OBSERVATION_V1 ' + JSON.stringify({
+      selected: tests,
+      passed: report.files.filter(file => file.complete && file.failed.length === 0 && file.passed > 0).map(file => file.path),
+    }));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

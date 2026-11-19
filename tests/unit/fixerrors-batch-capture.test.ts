@@ -5,7 +5,7 @@ import { join } from 'path';
 import { buildFixerrorsBatchRetrieval, fetchFixerrorsBatchSnapshot } from '@/scripts/fixerrors-capture';
 import { hashLifecycleRecord, type LifecycleRecord } from '@/scripts/fixerrors-lifecycle';
 import { clusterErrorPatterns, groupIntoPatterns, lifecycleErrorEntry } from '@/scripts/fixerrors-retrieval';
-import { recordIncidentOutcome } from '@/scripts/fixerrors-knowledge';
+import { recordIncidentOutcome, fingerprintIncident } from '@/scripts/fixerrors-knowledge';
 import { type PgClientLike, verifyErrorSnapshot } from '@/scripts/fixerrors-safety';
 
 const now = new Date('2026-09-10T12:00:00.000Z');
@@ -99,6 +99,24 @@ class BatchClient implements PgClientLike {
 }
 
 describe('shared full Fixerrors capture', () => {
+  it('keeps a recurrence flag even when a later closure brackets the occurrence date', async () => {
+    const capture = await fetchFixerrorsBatchSnapshot(new BatchClient([record(1, true)]), 'c'.repeat(64), now);
+    const repoRoot = sourceFixture();
+    const first = buildFixerrorsBatchRetrieval({ ...capture, candidate, knowledge, repoRoot });
+    const fingerprint = fingerprintIncident(first.retrieval.clusters[0].query);
+    const built = buildFixerrorsBatchRetrieval({ ...capture, candidate, knowledge, repoRoot,
+      records: { ...capture.records, priorClosures: [
+        { fingerprint, resolvedAt: '2026-09-11T00:00:00.000Z' },
+        { fingerprint, resolvedAt: '2026-09-01T00:00:00.000Z' },
+      ] },
+    });
+    expect(built.retrieval.clusters[0].recurrenceAfterResolution).toBe(true);
+    expect(built.bindings[0].records[0]).toEqual(capture.records.held[0]);
+    const unrelated = buildFixerrorsBatchRetrieval({ ...capture, candidate, knowledge, repoRoot,
+      records: { ...capture.records, priorClosures: [{ fingerprint: 'f'.repeat(64), resolvedAt: '2026-09-01T00:00:00.000Z' }] },
+    });
+    expect(unrelated.retrieval.clusters[0].recurrenceAfterResolution).toBeUndefined();
+  });
   it('retains full original diagnostic records for new and held occurrences', async () => {
     const warning = '`DialogContent` requires a `DialogTitle` for the component to be accessible for screen reader users.';
     const rows = [record(91), record(92, true)];

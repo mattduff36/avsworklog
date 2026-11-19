@@ -89,13 +89,33 @@ with tempfile.TemporaryDirectory(prefix='SquiresRepairFixture-') as temporary:
         git('commit', '-m', 'test: synthetic baseline')
         subprocess.run([str(node), r.CACHE_SCRIPT, 'warmup'], cwd=checkout, env=r.local_env(),
                        check=True, stdout=subprocess.DEVNULL)
+        # Elevated Windows tokens can assign new files to Administrators. Give
+        # only this disposable fixture's cache files to the test user; the real
+        # owner-only guard still runs unchanged before every cache operation.
+        def own_fixture_cache():
+            subprocess.run(['C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+                            '-NoProfile', '-NonInteractive', '-Command',
+                            '& { $ErrorActionPreference="Stop"; '
+                            '$id=[Security.Principal.WindowsIdentity]::GetCurrent().User; '
+                            'Get-ChildItem -LiteralPath $args[0] -File | ForEach-Object { '
+                            '$acl=Get-Acl -LiteralPath $_.FullName; $acl.SetOwner($id); '
+                            'Set-Acl -LiteralPath $_.FullName -AclObject $acl } }', str(cache_root)],
+                           check=True, stdout=subprocess.DEVNULL, env=r.local_env())
+        own_fixture_cache()
+        original_run_check = CheckServer.call
+        def run_fixture_check(server, arguments):
+            result = original_run_check(server, arguments)
+            if arguments.get('check_id') == 'typecheck':
+                own_fixture_cache()
+            return result
         print('Synthetic fixture cache warmed', file=sys.stderr, flush=True)
         cfg = dict(allowBoundedRepair=True, gitExe='C:\\Program Files\\Git\\cmd\\git.exe',
                    releaseAdapter=dict(nodeExe=str(node)))
         cfg['checks'] = {key: dict(argv=[str(node), r.CHECK_SCRIPT, key],
                                   timeout_seconds=120, description='Synthetic fixture ' + key) for key in r.CHECK_IDS}
         with patch.object(s, 'WORKSPACE', checkout), patch.object(s, 'config', return_value=cfg), \
-                patch.object(worker, 'ROOT', root / 'runner'):
+                patch.object(worker, 'ROOT', root / 'runner'), \
+                patch.object(CheckServer, 'call', run_fixture_check):
             (checkout / '.git/squires-fixerrors').mkdir()
             base = worker.snapshot(checkout)
             if batch_mode:

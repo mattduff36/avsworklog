@@ -148,6 +148,8 @@ def _exercise_batch(root, checkout, repo, node, cfg, write, git, base, cleanup):
                             requiredTestIds=[tests[slot]],
                             forbiddenChanges=['suppress-logging', 'empty-success', 'weaken-authorization'],
                             rationale='Synthetic whitespace regression', priorIncidentIds=[], evidenceEnrichmentAttempted=True)
+            if slot == 1 and index == 2:
+                decision['resolution'] = dict(reason='diagnostics_improved', summary='Added useful diagnostic handling with verified source changes')
             outcome = dict(schemaVersion=1, snapshotId=snapshot_id, analyst='MPDEE Worker',
                            **r.batch_fingerprint(before, base, ticket['tree']), clusters=[decision])
             if req['checks']:

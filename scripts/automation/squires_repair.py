@@ -27,9 +27,16 @@ ANALYSIS = (
     'docs_private, credentials or customer records. Do not edit, run arbitrary commands, delegate or release. '
     'Only supplied named analysis checks may run through the check tool, with genuine receipts. '
     'Return ONLY FixerrorsDecision JSON with schemaVersion:1,snapshotId,analyst,baseHead,treeFingerprint,clusters. '
-    'Copy the packet candidate and snapshot identity exactly. Each cluster has exactly '
+    'Copy the packet candidate and snapshot identity exactly. Each cluster requires '
     'id,lane,action,disposition,nextStep,evidencePaths,files,requiredTestIds,forbiddenChanges,rationale,'
-    'priorIncidentIds,evidenceEnrichmentAttempted. Enrich evidence from actual code/tests before deciding. '
+    'priorIncidentIds,evidenceEnrichmentAttempted. Optional resolution has reason '
+    'fixed|mitigated|diagnostics_improved|expected_behaviour|reviewed_unable_to_reproduce, summary, '
+    'and optional changeCommit (full SHA for an existing deployed improvement). '
+    'Enrich evidence from actual code/tests before deciding. Lower-impact historical incidents may '
+    'resolve after a reasonable review or a useful tested, deployed diagnostic improvement, even '
+    'when the original cause is unknown. Preserve that uncertainty in the summary. '
+    'Keep serious, continuing and recurring failures outstanding. Pending improvements need '
+    'independent deployment verification; reassess old holds without duplicating their repair. '
     'Distinguish an expected server rejection from a separately reproducible client recovery defect. '
     'Keep genuinely critical changes to access, finance, persistence or concurrency for owner review. '
     'Actions fix|report-only|manual-investigation; dispositions outstanding|no_fix_required, never fixed_live. '
@@ -225,7 +232,7 @@ def effort_budget(packet):
     diagnostic = clusters[0].get('diagnostics') or {}
     classes = diagnostic.get('classes', [])
     importance = 'Important'
-    if any(value in ('security-compromise', 'data-corruption', 'service-outage') for value in classes):
+    if any(value in ('security-compromise', 'data-corruption', 'service-outage', 'financial-loss') for value in classes):
         importance = 'Urgent'
     elif (diagnostic.get('occurrences', 1) < 10 and diagnostic.get('noncriticalHandled') is True
           and diagnostic.get('operation') == 'usage-analytics' and diagnostic.get('stage') == 'record-usage'
@@ -426,6 +433,13 @@ def batch_lease(raw, cfg, expected, now):
     return lease
 
 
+def require_improvement_source_change(decision, state):
+    cluster = decision['clusters'][0]
+    if cluster.get('resolution', {}).get('reason') in ('diagnostics_improved', 'mitigated'):
+        s.require(any(re.fullmatch(r'(?:app|components|lib|hooks|utils|services)/[A-Za-z0-9_()/.[\]-]+\.[jt]sx?', name)
+                      for name in state['changed_files']), 'improvement_requires_source_change')
+
+
 def batch_code_sha(cfg):
     import run_worker
     import worker_checks
@@ -497,12 +511,13 @@ def verify_batch_records(records):
         if previous is not None:
             s.require(before == previous, 'batch_intermediate_candidate_drift')
         req = read_json(run / 'request.json')
-        _, previous = successful_run(run, req, before, record['readonly'], current=False)
+        verified, previous = successful_run(run, req, before, record['readonly'], current=False)
         if not record['readonly']:
             decision = read_json(run / 'validated-decision.json')
             s.require(s.sha((run / 'validated-decision.json').read_bytes()) == record['decisionSha256']
                       and s.sha(s.encoded(decision)) == req['squires_job']['decisionSha256'],
                       'batch_decision_changed')
+            require_improvement_source_change(decision, verified)
     return previous
 
 
@@ -766,7 +781,9 @@ class NativeBatchSession:
             self.save()
             result = self.operation(self.cfg, 'dispatch', dict(ticket=ticket, request=req), self.live, self.assert_snapshot)
             run = ROOT / 'runs' / req['task_id'] / '1'
-            _, after = successful_run(run, req, self.expected, analysis)
+            verified, after = successful_run(run, req, self.expected, analysis)
+            if decision is not None:
+                require_improvement_source_change(decision, verified)
             if decision is not None:
                 exclusive_json(run / 'validated-decision.json', decision)
             record = artifact_record(run, analysis)
@@ -781,6 +798,18 @@ class NativeBatchSession:
             record = self.batch['records'][-1]
             s.require(record['readonly'] is (method == 'verify-analysis') and value['result']['runDirectory'] ==
                       str(ROOT / 'runs' / record['taskId'] / '1'), 'batch_repair_receipt_mismatch')
+            if method == 'verify-analysis':
+                run = ROOT / 'runs' / record['taskId'] / '1'
+                outputs = []
+                for check_id in read_json(run / 'request.json')['checks']:
+                    state_name = 'checks/' + check_id + '.state.json'
+                    s.require(s.sha((run / state_name).read_bytes()) == record['artifacts'][state_name], 'batch_worker_artifact_changed')
+                    receipt_name = 'checks/' + read_json(run / state_name)['last_receipt'] + '.json'
+                    s.require(s.sha((run / receipt_name).read_bytes()) == record['artifacts'][receipt_name], 'batch_worker_artifact_changed')
+                    receipt = read_json(run / receipt_name)
+                    outputs.append(dict(checkId=check_id, stdout=receipt.get('stdout', ''),
+                                        truncated=receipt.get('stdout_truncated', True)))
+                return outputs
             return None
         if method == 'checkpoint':
             self.assert_snapshot()

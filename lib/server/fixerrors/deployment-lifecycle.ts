@@ -3,6 +3,8 @@ import { batchOutcomeHash, parseBatchBytes, validateBatchOutcome, type CapturedB
 import { checkEvidenceDigest, type QueueStore } from '@/lib/fixerrors/control';
 import { sameCandidate, type FixerrorsJob } from '@/lib/fixerrors/protocol';
 import { parseStackTrace } from '@/lib/fixerrors/stack';
+import { needsDeployedImprovement, proportionateClosureBlocker } from '@/lib/fixerrors/triage';
+import type { DecisionCluster } from '@/scripts/fixerrors-decision';
 import {
   applyLifecyclePlan, fetchLifecycleRecords, hasAppliedLifecycleReceipt, hashLifecycleRecord,
   makeLifecyclePlan, readLifecycle, reviewLifecycleRow,
@@ -10,7 +12,7 @@ import {
 import { lifecycleBlocker, reconcileBatchLifecycle } from './batch-lifecycle';
 import { withFixerrorsApplicationDatabase } from './evidence';
 import {
-  LiveVerificationError, SYNTHETIC_REPAIR_SOURCE, SYNTHETIC_REPAIR_TEST, verifySyntheticRepairLive,
+  LiveVerificationError, SYNTHETIC_REPAIR_SOURCE, SYNTHETIC_REPAIR_TEST, verifySyntheticRepairLive, verifyProductionDeployment,
 } from './live-verification';
 
 function deploymentBinding(parent: FixerrorsJob, release: FixerrorsJob): string {
@@ -60,6 +62,7 @@ function supportedRows(batch: CapturedBatch) {
   const retrieval = parseBatchBytes(Buffer.from(batch.manifest)).retrieval;
   const repaired = batch.outcome!.clusters.filter(outcome => outcome.status === 'verified-local');
   const supported: string[] = [];
+  const improvements = new Map<string, DecisionCluster>();
   let total = 0;
   for (const outcome of repaired) {
     const cluster = retrieval.clusters.find(entry => entry.id === outcome.id)!;
@@ -67,6 +70,13 @@ function supportedRows(batch: CapturedBatch) {
     const binding = batch.bindings.find(entry => entry.clusterId === outcome.id);
     if (!binding) throw new Error('Deployment captured row coverage conflict');
     total += binding.records.length;
+    if (!cluster.held && !outcome.reusedFrom && decision && needsDeployedImprovement(decision.resolution) &&
+        !proportionateClosureBlocker({ ...cluster, lane: decision.lane }) &&
+        decision.files.some(file => [...cluster.sourceFiles, ...cluster.relatedSourceFiles ?? []].includes(file)) &&
+        decision.requiredTestIds.length > 0 && decision.requiredTestIds.every(test => outcome.tests.includes(test))) {
+      for (const record of binding.records) { supported.push(record.id); improvements.set(record.id, decision); }
+      continue;
+    }
     if (cluster.held || outcome.reusedFrom || cluster.query.sourceFile !== SYNTHETIC_REPAIR_SOURCE ||
         !cluster.sourceFiles.includes(SYNTHETIC_REPAIR_SOURCE) ||
         !decision?.files.includes(SYNTHETIC_REPAIR_SOURCE) ||
@@ -76,7 +86,7 @@ function supportedRows(batch: CapturedBatch) {
       if (frames[0]?.file === SYNTHETIC_REPAIR_SOURCE) supported.push(record.id);
     }
   }
-  return { supported, total };
+  return { supported, total, improvements };
 }
 
 function publishLive(parent: FixerrorsJob) {
@@ -106,7 +116,7 @@ export async function reconcileDeployedBatchLifecycle(store: QueueStore, jobId: 
     const current = await store.transact(({ state }) => structuredClone(state.jobs.find(entry => entry.id === parentId)!));
     bindingSha256 = deploymentBinding(current, saved.release);
     const batch = current.privateBatch!;
-    const { supported, total } = supportedRows(batch);
+    const { supported, total, improvements } = supportedRows(batch);
     if (batch.deployment && (batch.deployment.bindingSha256 !== bindingSha256 ||
         batch.deployment.releaseJobId !== saved.release.id)) throw new Error('Retained deployment binding conflict');
     if (batch.deployment?.planApplied) return;
@@ -126,7 +136,8 @@ export async function reconcileDeployedBatchLifecycle(store: QueueStore, jobId: 
       });
       return;
     }
-    const live = await verifySyntheticRepairLive(current.candidate!.head);
+    const live = await (supported.some(id => !improvements.has(id))
+      ? verifySyntheticRepairLive(current.candidate!.head) : verifyProductionDeployment(current.candidate!.head));
     let plan = batch.deployment?.plan;
     if (!plan) {
       const localPlan = batch.lifecycle!.plan!;
@@ -140,13 +151,28 @@ export async function reconcileDeployedBatchLifecycle(store: QueueStore, jobId: 
         const local = localPlan.rows.find(row => row.id === record.id);
         const metadata = readLifecycle(record);
         const attempt = metadata?.history.at(-1);
+        const improvement = improvements.get(record.id);
         if (!local || !hasAppliedLifecycleReceipt(record, local, hashLifecycleRecord(localPlan)) ||
             metadata?.state !== 'awaiting-deployment' || record.status !== 'active' ||
             record.triage_state !== 'outstanding' || attempt?.result !== 'verified-local' ||
-            !attempt.tests.includes(SYNTHETIC_REPAIR_TEST) || !attempt.verifiedCandidate ||
+            !(improvement ? improvement.requiredTestIds.every(test => attempt.tests.includes(test))
+              : attempt.tests.includes(SYNTHETIC_REPAIR_TEST)) || !attempt.verifiedCandidate ||
             batchOutcomeHash(attempt.verifiedCandidate) !== batchOutcomeHash(batch.outcome!.candidate)) {
           throw new Error('Deployment local repair receipt or row state conflict');
         }
+        if (improvement) return reviewLifecycleRow(record, {
+          fingerprint: metadata.fingerprint, state: 'resolved-no-fix', nextStep: null,
+          closureReason: improvement.resolution!.reason as 'diagnostics_improved' | 'mitigated',
+          resolution: { ...improvement.resolution!, changeCommit: current.candidate!.head },
+          deploymentEvidence: live,
+          attempt: {
+            id: `fixerrors-${saved.release.id}-resolved`, reviewedAt: live.verifiedAt,
+            diagnosis: improvement.resolution!.summary,
+            attempt: 'Verified relevant candidate-bound tests and exact approved production deployment; original cause may remain unknown',
+            tests: improvement.requiredTestIds, result: 'no-fix',
+            evidence: [live.check, 'Candidate-bound targeted-tests, typecheck and lint evidence verified'],
+          },
+        });
         return reviewLifecycleRow(record, {
           fingerprint: metadata.fingerprint, state: 'fixed-live', nextStep: null, liveEvidence: live,
           attempt: {
@@ -228,7 +254,7 @@ export async function reconcileDeviceDeployments(store: QueueStore, deviceId: st
     if (release.candidate?.head !== servingHead) return false;
     const batch = state.jobs.find(parent => parent.id === release.parentRepairId)?.privateBatch;
     return batch?.outcome && !batch.deployment?.planApplied &&
-      batch.deployment?.reason !== 'live-verification-required';
+      (batch.deployment?.reason !== 'live-verification-required' || supportedRows(batch).supported.length > 0);
   })?.id);
   if (jobId) await reconcileDeployedBatchLifecycle(store, jobId);
 }

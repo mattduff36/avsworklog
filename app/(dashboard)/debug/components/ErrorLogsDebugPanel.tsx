@@ -33,7 +33,7 @@ import {
   isVisibleWithDefaultErrorLogFilters,
 } from '@/lib/utils/error-log-filters';
 import { ErrorLogEntry } from '../types';
-import { errorLogCardClass, errorLogMessageClass, getErrorLogTone } from '@/lib/utils/error-log-triage';
+import { errorLogCardClass, errorLogMessageClass, getErrorLogStatusLabel, getErrorLogTone } from '@/lib/utils/error-log-triage';
 
 type ErrorSeverity = 'urgent' | 'important' | 'medium' | 'low';
 type ErrorSummaryTone = 'info' | 'success' | 'warning' | 'danger' | 'neutral';
@@ -845,6 +845,7 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                           const userAction = getUserAction(log);
                           const userFacingMessage = getUserFacingMessage(log);
                           const tone = getErrorLogTone(log);
+                          const statusLabel = getErrorLogStatusLabel(log);
 
                           return (
                             <div
@@ -883,9 +884,11 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                                         </Badge>
                                       )}
                                     </div>
-                                    {log.triage_state === 'outstanding' && (
-                                      <Badge className="border-orange-400/40 bg-orange-500/20 font-mono text-xs text-orange-100">
-                                        Triaged — outstanding
+                                    {statusLabel && (
+                                      <Badge variant="outline" className={tone === 'orange'
+                                        ? 'border-orange-400/40 bg-orange-500/20 font-mono text-xs text-orange-100'
+                                        : 'border-slate-500/40 bg-slate-500/10 font-mono text-xs text-slate-200'}>
+                                        {statusLabel}
                                       </Badge>
                                     )}
                                     <p className={errorLogMessageClass(tone)}>{log.error_message}</p>
@@ -1021,6 +1024,7 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                           const userAction = getUserAction(log);
                           const userFacingMessage = getUserFacingMessage(log);
                           const tone = getErrorLogTone(log);
+                          const statusLabel = getErrorLogStatusLabel(log);
 
                           return (
                             <div
@@ -1059,9 +1063,11 @@ ${log.error_stack ? `STACK TRACE:\n${log.error_stack}\n\n` : ''}${log.additional
                                         </Badge>
                                       )}
                                     </div>
-                                    {log.triage_state === 'outstanding' && (
-                                      <Badge className="border-orange-400/40 bg-orange-500/20 font-mono text-xs text-orange-100">
-                                        Triaged — outstanding
+                                    {statusLabel && (
+                                      <Badge variant="outline" className={tone === 'orange'
+                                        ? 'border-orange-400/40 bg-orange-500/20 font-mono text-xs text-orange-100'
+                                        : 'border-slate-500/40 bg-slate-500/10 font-mono text-xs text-slate-200'}>
+                                        {statusLabel}
                                       </Badge>
                                     )}
                                     <p className={errorLogMessageClass(tone)}>{log.error_message}</p>

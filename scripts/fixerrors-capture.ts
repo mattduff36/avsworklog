@@ -26,6 +26,7 @@ const recordSchema = z.object({ id: z.string().uuid() }).passthrough();
 export interface FixerrorsCapturedRecords {
   captured: LifecycleRecord[];
   held: LifecycleRecord[];
+  priorClosures?: { fingerprint: string; resolvedAt: string }[];
 }
 
 async function readBatchRecords(client: PgClientLike): Promise<LifecycleRecord[]> {
@@ -83,7 +84,22 @@ export async function fetchFixerrorsBatchSnapshot(
     const rows = await readBatchRecords(transaction);
     const captured = rows.filter(record => record.triage_state === null);
     assertLifecycleSnapshotRows(captured, snapshot.errors);
-    return { captured, held: rows.filter(record => record.triage_state === 'outstanding') };
+    // Only accepted closure metadata is exposed; archived incident contents stay private.
+    const closures = await transaction.query<{ fingerprint: string; resolvedAt: string }>(
+      `/* fixerrors:prior-resolutions */ SELECT
+         additional_data->'fixerrorsLifecycle'->>'fingerprint' AS fingerprint,
+         MIN(archived_at)::text AS "resolvedAt"
+       FROM public.error_logs
+       WHERE status = 'archived' AND triage_state = 'no_fix_required'
+         AND additional_data->'fixerrorsLifecycle'->'resolution'->>'reason'
+           IN ('diagnostics_improved', 'mitigated', 'reviewed_unable_to_reproduce')
+       GROUP BY additional_data->'fixerrorsLifecycle'->>'fingerprint'`,
+    );
+    const priorClosures = closures.rows.map(row => ({
+      fingerprint: z.string().regex(/^[a-f0-9]{64}$/u).parse(row.fingerprint),
+      resolvedAt: new Date(row.resolvedAt).toISOString(),
+    }));
+    return { captured, held: rows.filter(record => record.triage_state === 'outstanding'), priorClosures };
   });
   return { snapshot: result.snapshot, records: result.related };
 }
@@ -152,6 +168,11 @@ export function buildFixerrorsBatchRetrieval(input: {
       !JSON.stringify(entry.query).includes('[redacted]');
     retrieval.clusters.push(entry);
     bindings.push({ clusterId: entry.id, records: [record], observedAt: String(record.timestamp) });
+  }
+  for (const cluster of retrieval.clusters) {
+    const binding = bindings.find(entry => entry.clusterId === cluster.id)!;
+    if (records.priorClosures?.some(entry => entry.fingerprint === fingerprintIncident(cluster.query) &&
+        Date.parse(binding.observedAt) > Date.parse(entry.resolvedAt))) cluster.recurrenceAfterResolution = true;
   }
   return {
     retrieval: parseAutomaticFixerrorsRetrieval(retrieval), bindings,

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { rejectSensitiveText, type IncidentQuery, fingerprintIncident } from './fixerrors-knowledge';
 import { writeAndVerifyTextArtifactAtomic, type PgClientLike } from './fixerrors-safety';
 import { TRUSTED_OPERATIONAL_ACTIONS, classifyOperationalAction } from './automation/trusted-operational-actions';
+import { needsDeployedImprovement, resolutionSchema, type IncidentResolution } from '../lib/fixerrors/triage';
 
 export const LIFECYCLE_CONTRACT = 'fixerrors-lifecycle-exact-id-v1';
 export const EVIDENCE_GAP_EXPIRY_MS = 30 * 86400000;
@@ -40,7 +41,11 @@ const lifecycleSchema = z.object({
   firstReviewedAt: timestamp,
   lastMatchingEvidenceAt: timestamp,
   history: z.array(attemptSchema).min(1),
-  closureReason: z.enum(['expected_behavior', 'insufficient_evidence', 'evidence_gap_expired']).nullable(),
+  closureReason: z.enum(['expected_behavior', 'insufficient_evidence', 'evidence_gap_expired',
+    'mitigated', 'diagnostics_improved', 'reviewed_unable_to_reproduce']).nullable(),
+  resolution: resolutionSchema.optional(),
+  deployment: liveSchema.optional(),
+  previousLocalCommit: text.optional(),
 }).strict();
 export type LifecycleMetadata = z.infer<typeof lifecycleSchema>;
 export type LifecycleAttempt = z.infer<typeof attemptSchema>;
@@ -53,6 +58,8 @@ export type LifecycleReview = {
   matchingNewEvidenceAt?: string;
   closureReason?: LifecycleMetadata['closureReason'];
   liveEvidence?: z.infer<typeof liveSchema>;
+  resolution?: IncidentResolution;
+  deploymentEvidence?: z.infer<typeof liveSchema>;
 };
 const rowSchema = z.object({
   id: z.string().uuid(),
@@ -111,17 +118,38 @@ export function reviewLifecycleRow(record: LifecycleRecord, review: LifecycleRev
     Date.parse(prior?.lastMatchingEvidenceAt ?? firstReviewedAt))).toISOString();
   let state = review.state;
   let closureReason = review.closureReason ?? null;
+  const resolution = review.resolution ? resolutionSchema.parse(review.resolution) : prior?.resolution;
+  if (resolution) rejectSensitiveText(resolution.summary, 'resolution summary');
+  const deployment = review.deploymentEvidence ? liveSchema.parse(review.deploymentEvidence) : prior?.deployment;
+  if (deployment && Date.parse(deployment.verifiedAt) > Date.parse(attempt.reviewedAt)) throw new Error('Future deployment evidence');
+  const explicitClosure = state === 'resolved-no-fix' && review.resolution && attempt.result === 'no-fix';
+  const originalData = dataObject(record.additional_data);
+  const seriousOrContinuing = ['security-compromise', 'data-corruption', 'service-outage', 'financial-loss']
+    .includes(String(originalData.impact)) || originalData.continuingFailure === true ||
+    ['XX001', 'XX002'].includes(String(originalData.databaseCode));
+  if (seriousOrContinuing && state === 'awaiting-evidence') state = 'actionable';
   // Neither a verified candidate nor an evidenced actionable defect is an evidence gap.
-  if (prior?.state === 'awaiting-deployment' && state !== 'fixed-live') state = 'awaiting-deployment';
+  if (prior?.state === 'awaiting-deployment' && state !== 'fixed-live' && !(explicitClosure && deployment)) state = 'awaiting-deployment';
   if (prior?.state === 'actionable' && state === 'awaiting-evidence') state = 'actionable';
   if (state === 'awaiting-evidence' && !record.triage_local_commit &&
       Date.parse(attempt.reviewedAt) - Date.parse(lastMatchingEvidenceAt) >= EVIDENCE_GAP_EXPIRY_MS) {
     state = 'resolved-no-fix';
     closureReason = 'evidence_gap_expired';
   }
-  if (state === 'resolved-no-fix' && (!closureReason || record.triage_local_commit ||
-      prior?.state === 'actionable' || prior?.state === 'awaiting-deployment')) {
+  if (state === 'resolved-no-fix' && (!closureReason || (!explicitClosure && (record.triage_local_commit ||
+      prior?.state === 'actionable' || prior?.state === 'awaiting-deployment')))) {
     throw new Error('No-fix closure cannot discard evidenced actionable or local repair evidence');
+  }
+  if (state === 'resolved-no-fix' && seriousOrContinuing) {
+    throw new Error('Serious or continuing impact cannot use proportionate closure');
+  }
+  if (state === 'resolved-no-fix' && resolution) {
+    const expectedReason = resolution.reason === 'expected_behaviour' ? 'expected_behavior' : resolution.reason;
+    if (resolution.reason === 'fixed' || closureReason !== expectedReason) throw new Error('Resolution reason mismatch');
+    if (resolution.reason !== 'expected_behaviour' && !attempt.tests.length) throw new Error('Resolution requires relevant checks');
+    if ((needsDeployedImprovement(resolution) || record.triage_local_commit || prior?.state === 'awaiting-deployment') &&
+        (!deployment || !attempt.evidence.includes(deployment.check))) throw new Error('Resolution requires verified deployment evidence');
+    if (needsDeployedImprovement(resolution) && !resolution.changeCommit) throw new Error('Resolution requires the deployed improvement commit');
   }
   if (state === 'awaiting-deployment' && prior?.state !== state && !record.triage_local_commit &&
       (attempt.result !== 'verified-local' || !attempt.verifiedCandidate || !attempt.tests.length)) {
@@ -143,6 +171,10 @@ export function reviewLifecycleRow(record: LifecycleRecord, review: LifecycleRev
     metadata: {
       version: 1, state, fingerprint: review.fingerprint, firstReviewedAt, lastMatchingEvidenceAt,
       history: existing ? history : [...history, attempt], closureReason: state === 'resolved-no-fix' ? closureReason : null,
+      ...(resolution ? { resolution } : {}),
+      ...(deployment ? { deployment } : {}),
+      ...(prior?.previousLocalCommit || (closing && record.triage_local_commit)
+        ? { previousLocalCommit: prior?.previousLocalCommit ?? record.triage_local_commit } : {}),
     },
     nextStep: closing ? null : review.nextStep,
     liveEvidence: state === 'fixed-live' ? review.liveEvidence : null,
@@ -246,6 +278,7 @@ export async function applyLifecyclePlan(client: PgClientLike, input: LifecycleP
         fingerprint: row.metadata.fingerprint, state: row.metadata.state, nextStep: row.nextStep,
         attempt: row.metadata.history.at(-1)!, matchingNewEvidenceAt: row.metadata.lastMatchingEvidenceAt,
         closureReason: row.metadata.closureReason, liveEvidence: row.liveEvidence ?? undefined,
+        resolution: row.metadata.resolution, deploymentEvidence: row.metadata.deployment,
       });
       if (JSON.stringify(reviewed.metadata) !== JSON.stringify(row.metadata) || reviewed.nextStep !== row.nextStep ||
           Date.parse(row.metadata.history.at(-1)!.reviewedAt) > now().getTime()) {

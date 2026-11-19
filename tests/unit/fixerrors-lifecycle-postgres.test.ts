@@ -102,6 +102,35 @@ describe('automatic lifecycle on disposable real PostgreSQL only', () => {
       expect(readLifecycle(record)).toMatchObject({ state: 'resolved-no-fix', closureReason: 'expected_behavior' });
     }
   });
+  it('resolves only a deployed diagnostic improvement and replays its receipt without losing original repair evidence', async () => {
+    await applyLifecyclePlan(client, await plan('awaiting-deployment'), target, { writer });
+    const change = 'd'.repeat(40);
+    await client.query('UPDATE public.error_logs SET triage_local_commit=$2 WHERE id=$1', [A, change]);
+    const before = await records();
+    const original = before.find(row => row.id === A)!;
+    const at = now();
+    const live = { deployedCommit: 'e'.repeat(40), deploymentId: 'dpl_Diagnostics',
+      check: 'Exact approved diagnostic improvement deployed after passing relevant checks', result: 'passed' as const, verifiedAt: at.toISOString() };
+    const resolved = makeLifecyclePlan(target, [reviewLifecycleRow(original, {
+      fingerprint: readLifecycle(original)!.fingerprint, state: 'resolved-no-fix', nextStep: null,
+      closureReason: 'diagnostics_improved', deploymentEvidence: live,
+      resolution: { reason: 'diagnostics_improved', summary: 'Added useful request diagnostics; original cause remains unknown', changeCommit: change },
+      attempt: { id: 'deployed-diagnostics', reviewedAt: at.toISOString(), diagnosis: 'Useful request diagnostics are deployed',
+        attempt: 'Reviewed candidate-bound regression checks and exact deployment identity', tests: ['tests/unit/display-label.test.ts'],
+        result: 'no-fix', evidence: [live.check] },
+    })], at);
+    expect(await applyLifecyclePlan(client, resolved, target, { writer })).toEqual({ updated: 1, alreadyApplied: 0 });
+    const after = await records();
+    const closed = after.find(row => row.id === A)!;
+    expect(closed).toMatchObject({ status: 'archived', triage_state: 'no_fix_required', triage_local_commit: null,
+      triage_live_evidence: null, error_message: 'Original diagnostic', error_stack: 'Original stack' });
+    expect(readLifecycle(closed)).toMatchObject({ closureReason: 'diagnostics_improved', previousLocalCommit: change, deployment: live });
+    expect(readLifecycle(closed)?.history).toHaveLength(2);
+    expect(after.find(row => row.id === B)).toEqual(before.find(row => row.id === B));
+    expect((await client.query('SELECT count(*)::int n FROM public.error_log_alerts')).rows[0].n).toBe(1);
+    expect(await applyLifecyclePlan(client, resolved, target, { writer,
+      now: () => new Date(Date.now() + 86400000) })).toEqual({ updated: 0, alreadyApplied: 1 });
+  });
   it('expires only evidence gaps after thirty days and preserves a case with exact new evidence', async () => {
     const started = new Date(Date.now() - 31 * 86400000).toISOString();
     const first = (await records()).map(record => reviewLifecycleRow(record, {

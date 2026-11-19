@@ -6,7 +6,7 @@ import { proveOutstandingIds } from '@/scripts/fixerrors-reconcile';
 import { renderFixerrorsRunSummary } from '@/scripts/fixerrors-summary';
 import type { ErrorSnapshotExport } from '@/scripts/fixerrors-safety';
 import type { FixerrorsDecision } from '@/scripts/fixerrors-decision';
-import { errorLogCardClass, getErrorLogTone } from '@/lib/utils/error-log-triage';
+import { errorLogCardClass, getErrorLogStatusLabel, getErrorLogTone } from '@/lib/utils/error-log-triage';
 
 const rowId = '00000000-0000-4000-8000-000000000001';
 
@@ -138,7 +138,7 @@ describe('fixerrors triage summary', () => {
     })).toThrow(/verification failed/u);
   });
 
-  it('FXERR-V5-ROUTING-009 alerts only untriaged rows and still counts outstanding rows', () => {
+  it('FXERR-V5-ROUTING-009 alerts and dashboard badges count untriaged rows while debug retains exact review controls', () => {
     const notify = readFileSync('app/api/errors/notify-new/route.ts', 'utf8');
     const daily = readFileSync('app/api/errors/daily-summary/route.ts', 'utf8');
     const dashboard = readFileSync('app/api/dashboard/summary/route.ts', 'utf8');
@@ -146,7 +146,7 @@ describe('fixerrors triage summary', () => {
     expect(notify).toContain(".is('triage_state', null)");
     expect(daily).toContain(".is('triage_state', null)");
     expect(dashboard).toContain(".eq('status', 'active')");
-    expect(dashboard).not.toContain(".is('triage_state', null)");
+    expect(dashboard).toContain(".is('triage_state', null)");
     expect(debugRoute).toContain('status: 409');
     expect(debugRoute).not.toContain('clearAllErrorLogs');
   });
@@ -156,5 +156,74 @@ describe('fixerrors triage summary', () => {
     expect(getErrorLogTone({ status: 'active', triage_state: 'outstanding' })).toBe('orange');
     expect(errorLogCardClass('orange')).toContain('orange');
     expect(errorLogCardClass('red')).toContain('red');
+  });
+
+  it('keeps current work open even when lifecycle metadata contains a resolution reason', () => {
+    const outstanding = { status: 'active', triage_state: 'outstanding' };
+    expect(getErrorLogStatusLabel(outstanding)).toBe('Needs attention');
+    expect(getErrorLogStatusLabel({ ...outstanding, additional_data: {
+      fixerrorsLifecycle: { resolution: { reason: 'fixed' } },
+    } })).toBe('Needs attention');
+    expect(getErrorLogStatusLabel({ ...outstanding, additional_data: {
+      fixerrorsLifecycle: { state: 'awaiting-deployment' },
+    } })).toBe('Awaiting deployment');
+    expect(getErrorLogStatusLabel({ ...outstanding, additional_data: {
+      fixerrorsLifecycle: { state: 'awaiting-evidence' },
+    } })).toBe('Awaiting evidence');
+    expect(getErrorLogStatusLabel({ status: 'active', triage_state: null })).toBeNull();
+    expect(getErrorLogStatusLabel({ status: 'active', triage_state: 'fixed_live' })).toBeNull();
+  });
+
+  it('distinguishes retained archives from resolved records', () => {
+    expect(getErrorLogStatusLabel({ status: 'archived' })).toBe('Archived');
+    expect(getErrorLogStatusLabel({ status: 'archived', additional_data: {
+      fixerrorsLifecycle: { resolution: { reason: 'fixed' } },
+    } })).toBe('Archived');
+    expect(getErrorLogStatusLabel({ status: 'archived', triage_state: 'fixed_live' })).toBe('Resolved — Fixed');
+    expect(getErrorLogStatusLabel({ status: 'archived', triage_state: 'no_fix_required' })).toBe('Resolved');
+  });
+
+  it.each([
+    ['fixed', 'Fixed'],
+    ['mitigated', 'Mitigated'],
+    ['diagnostics_improved', 'Diagnostics improved'],
+    ['expected_behaviour', 'Expected behaviour'],
+    ['reviewed_unable_to_reproduce', 'Reviewed unable to reproduce'],
+  ])('labels a resolved record with the accepted %s reason', (reason, label) => {
+    expect(getErrorLogStatusLabel({ status: 'archived', triage_state: 'no_fix_required', additional_data: {
+      fixerrorsLifecycle: { resolution: { reason }, closureReason: 'expected_behavior' },
+    } })).toBe(`Resolved — ${label}`);
+  });
+
+  it.each([
+    ['expected_behavior', 'Expected behaviour'],
+    ['insufficient_evidence', 'Reviewed unable to reproduce'],
+    ['evidence_gap_expired', 'Reviewed unable to reproduce'],
+  ])('keeps legacy %s closure reasons readable', (closureReason, label) => {
+    expect(getErrorLogStatusLabel({ status: 'archived', triage_state: 'no_fix_required', additional_data: {
+      fixerrorsLifecycle: { closureReason },
+    } })).toBe(`Resolved — ${label}`);
+  });
+
+  it('ignores malformed or unknown metadata without inventing a resolution reason', () => {
+    for (const additional_data of [
+      null, 'invalid', [], { fixerrorsLifecycle: [] }, { fixerrorsLifecycle: 'invalid' },
+      { fixerrorsLifecycle: { resolution: [] } },
+      { fixerrorsLifecycle: { resolution: { reason: 'unknown' } } },
+      { fixerrorsLifecycle: { resolution: { reason: 'constructor' }, closureReason: 'toString' } },
+    ]) {
+      expect(getErrorLogStatusLabel({ status: 'archived', triage_state: 'no_fix_required', additional_data }))
+        .toBe('Resolved');
+    }
+    expect(getErrorLogStatusLabel({ status: 'archived', triage_state: 'no_fix_required', additional_data: {
+      fixerrorsLifecycle: { resolution: { reason: 'unknown' }, closureReason: 'expected_behavior' },
+    } })).toBe('Resolved — Expected behaviour');
+  });
+
+  it('uses status labels for both unread and viewed error cards', () => {
+    const panel = readFileSync('app/(dashboard)/debug/components/ErrorLogsDebugPanel.tsx', 'utf8');
+    expect(panel.match(/getErrorLogStatusLabel\(log\)/gu)).toHaveLength(2);
+    expect(panel.match(/\{statusLabel\}/gu)).toHaveLength(2);
+    expect(panel).not.toContain('Triaged — outstanding');
   });
 });

@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { isOperationalSnapshotId, rejectSensitiveDocument, rejectSensitiveText } from './fixerrors-knowledge';
 import { verifyErrorSnapshot } from './fixerrors-safety';
+import { resolutionSchema, needsDeployedImprovement, type IncidentResolution } from '../lib/fixerrors/triage';
 
 export const FIXERRORS_DECISION_VERSION = 1;
 
@@ -43,6 +44,7 @@ export interface DecisionCluster {
   rationale: string;
   priorIncidentIds: string[];
   evidenceEnrichmentAttempted: boolean;
+  resolution?: IncidentResolution;
 }
 
 export interface FixerrorsDecision {
@@ -105,7 +107,8 @@ function assertStringList(value: unknown, field: string, paths: boolean): string
 function parseCluster(value: unknown): DecisionCluster {
   if (!isRecord(value)) throw new Error('Decision cluster must be an object');
   const keys = Object.keys(value);
-  if (keys.length !== CLUSTER_KEYS.length || CLUSTER_KEYS.some((key) => !keys.includes(key))) {
+  if (keys.some(key => key !== 'resolution' && !CLUSTER_KEYS.includes(key as typeof CLUSTER_KEYS[number])) ||
+      CLUSTER_KEYS.some(key => !keys.includes(key))) {
     throw new Error('Decision cluster fields do not match the allowlist');
   }
   const cluster = value as unknown as DecisionCluster;
@@ -158,6 +161,21 @@ function parseCluster(value: unknown): DecisionCluster {
   }
   if (cluster.action === 'manual-investigation' && !cluster.evidenceEnrichmentAttempted) {
     throw new Error(`Cluster ${cluster.id} lacks evidence enrichment`);
+  }
+  if (value.resolution !== undefined) {
+    cluster.resolution = resolutionSchema.parse(value.resolution);
+    rejectSensitiveText(cluster.resolution.summary, 'resolution summary');
+    if (!cluster.evidenceEnrichmentAttempted) throw new Error('Resolution requires a completed evidence review');
+    if (cluster.action === 'manual-investigation' ||
+        (cluster.resolution.reason === 'fixed' && cluster.action !== 'fix') ||
+        (['expected_behaviour', 'reviewed_unable_to_reproduce'].includes(cluster.resolution.reason) && cluster.action !== 'report-only')) {
+      throw new Error('Resolution reason contradicts the decision action');
+    }
+    if (needsDeployedImprovement(cluster.resolution) &&
+        (!cluster.files.length || !cluster.requiredTestIds.length ||
+          (cluster.action === 'report-only' && !cluster.resolution.changeCommit))) {
+      throw new Error('Improvement resolution requires source, relevant tests and the existing change commit when reviewing a deployed change');
+    }
   }
   return cluster;
 }
