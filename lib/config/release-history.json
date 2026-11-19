@@ -1,5 +1,23 @@
 [
   {
+    "version": "1126.23.1",
+    "updateKind": "minor",
+    "title": "Debug tools improvements",
+    "description": "Make error resolution proportionate.",
+    "summary": "Make error resolution proportionate.",
+    "details": [
+      "Updated error reporting, with changes to shared logic.",
+      "Make error resolution proportionate, with changes to app screens."
+    ],
+    "areas": [
+      "Debug tools"
+    ],
+    "areaKeys": [
+      "debug"
+    ],
+    "pushedAt": "2026-11-19T00:28:23.489Z"
+  },
+  {
     "version": "1126.23.0",
     "updateKind": "major",
     "title": "Inventory update",
