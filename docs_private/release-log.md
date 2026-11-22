@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.24.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop): add optional plant inspection checklist`
+
+**PUSHED AT**
+2026-11-22T23:21:07.918Z
+
+**WHAT CHANGED**
+Add optional plant inspection checklist.
+
+**VERSION HISTORY DETAILS**
+- Added optional plant inspection checklist, with changes to background routes, app screens, interface components, and automated tests.
+- Updated data storage, with changes to shared typing and data storage.
+- Updated daily tasks, with changes to data storage.
+
+**COMMITS IN THIS RELEASE**
+- `feat(workshop): add optional plant inspection checklist`
+
 ## 1126.23.1
 
 **GIT COMMIT MESSAGE**
