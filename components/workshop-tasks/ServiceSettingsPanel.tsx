@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2, Save, ArrowUp, ArrowDown, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -12,6 +13,7 @@ import type { ServiceAssetType, ServiceMeterUnit } from '@/lib/utils/assetServic
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
 
 interface ServiceSettingsPanelProps {
+  assetPicker: ReactNode;
   assetType: ServiceAssetType;
 }
 
@@ -31,7 +33,7 @@ interface RotationStep {
   compactLabel?: string | null;
 }
 
-export function ServiceSettingsPanel({ assetType }: ServiceSettingsPanelProps) {
+export function ServiceSettingsPanel({ assetType, assetPicker }: ServiceSettingsPanelProps) {
   const { templates: allTemplates } = useAttachmentTemplates();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -120,7 +122,8 @@ export function ServiceSettingsPanel({ assetType }: ServiceSettingsPanelProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Service Interval & Rotation</CardTitle>
+          {assetPicker && <div className="mb-3">{assetPicker}</div>}
+        <CardTitle>Service schedule</CardTitle>
         <CardDescription>
           Configure the {assetType.toUpperCase()} service interval, linked service attachments, and rotation order.
         </CardDescription>

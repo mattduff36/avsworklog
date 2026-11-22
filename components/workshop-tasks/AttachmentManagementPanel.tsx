@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { ChevronDown, Edit, FileText, HardHat, Plus, Trash2, Truck } from 'lucide-react';
+import { Edit, HardHat, Plus, Trash2, Truck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -23,7 +24,11 @@ import { AttachmentSchemaBuilderPanel } from './AttachmentSchemaBuilderPanel';
 type Template = Database['public']['Tables']['workshop_attachment_templates']['Row'];
 
 interface AttachmentManagementPanelProps {
+  assetPicker: ReactNode;
   taxonomyMode?: 'van' | 'plant' | 'hgv';
+  selectedTemplateId: string | null;
+  onSelectedTemplateChange: (templateId: string) => void;
+  onTemplatesChanged: () => Promise<void>;
 }
 
 function normalizeTemplateAppliesTo(rawValues?: string[] | null): string[] {
@@ -36,14 +41,13 @@ function normalizeTemplateAppliesTo(rawValues?: string[] | null): string[] {
   return Array.from(new Set(normalized));
 }
 
-export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagementPanelProps) {
+export function AttachmentManagementPanel({ taxonomyMode, selectedTemplateId, onSelectedTemplateChange, onTemplatesChanged, assetPicker }: AttachmentManagementPanelProps) {
   const supabase = createClient();
   const { tabletModeEnabled } = useTabletMode();
 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
@@ -61,6 +65,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
   const templateDialogRef = useRef<HTMLDivElement>(null);
 
   const fetchTemplates = useCallback(async () => {
+    setLoadError(false);
     try {
       const { data, error } = await supabase
         .from('workshop_attachment_templates')
@@ -70,7 +75,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
       setTemplates(data || []);
     } catch (error) {
       console.error('Error loading templates:', error);
-      toast.error('Failed to load attachment templates');
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -88,18 +93,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
       : templates
   ), [taxonomyMode, templates]);
 
-  useEffect(() => {
-    if (!selectedTemplateId && filteredTemplates.length > 0) {
-      setSelectedTemplateId(filteredTemplates[0].id);
-      return;
-    }
-
-    if (selectedTemplateId && !filteredTemplates.some((template) => template.id === selectedTemplateId)) {
-      setSelectedTemplateId(filteredTemplates[0]?.id || null);
-    }
-  }, [filteredTemplates, selectedTemplateId]);
-
-  const selectedTemplate = filteredTemplates.find((template) => template.id === selectedTemplateId) || null;
+  const selectedTemplate = filteredTemplates.find((template) => template.id === selectedTemplateId) ?? filteredTemplates[0];
 
   const isTemplateDirty = useMemo(() => {
     const originalName = editingTemplate?.name || '';
@@ -192,7 +186,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
       }
 
       setShowTemplateDialog(false);
-      await fetchTemplates();
+      await Promise.all([fetchTemplates(), onTemplatesChanged()]);
     } catch (error) {
       console.error('Error saving template:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to save template');
@@ -213,7 +207,7 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
       if (error) throw error;
       toast.success('Template deleted');
       setDeleteTemplateId(null);
-      await fetchTemplates();
+      await Promise.all([fetchTemplates(), onTemplatesChanged()]);
     } catch (error) {
       console.error('Error deleting template:', error);
       toast.error('Failed to delete template');
@@ -224,152 +218,88 @@ export function AttachmentManagementPanel({ taxonomyMode }: AttachmentManagement
 
   return (
     <>
-      <Card className="border-border">
-        <CardHeader
-          className="cursor-pointer hover:bg-slate-800/30 transition-colors"
-          onClick={() => setIsExpanded((prev) => !prev)}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 flex-1">
-              <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-              <div>
-                <CardTitle className="text-white">Attachment Templates</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  {loading
-                    ? 'Loading...'
-                    : `${filteredTemplates.length} ${filteredTemplates.length === 1 ? 'template' : 'templates'} • V2 schema builder`}
-                </CardDescription>
-              </div>
+      <Card>
+        <CardHeader>
+          {assetPicker && <div className="mb-3">{assetPicker}</div>}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <CardTitle>Attachment templates</CardTitle>
+              <CardDescription>Manage the forms staff can attach to workshop tasks.</CardDescription>
             </div>
-            <Button
-              size="sm"
-              onClick={(event) => {
-                event.stopPropagation();
-                resetTemplateDialogForCreate();
-              }}
-              className={`bg-workshop hover:bg-workshop-dark text-white ${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''}`}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Template
+            <Button size="sm" onClick={resetTemplateDialogForCreate} className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}>
+              <Plus aria-hidden="true" className="h-4 w-4" /> Add template
             </Button>
           </div>
         </CardHeader>
+        <CardContent>
+          {loading ? (
+            <PanelLoader message="Loading attachment templates..." accent="workshop" className="py-8" />
+          ) : loadError ? (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span role="alert">Unable to load attachment templates.</span>
+              <Button size="sm" variant="outline" onClick={() => { setLoading(true); void fetchTemplates(); }}>Retry</Button>
+            </div>
+          ) : selectedTemplate ? (
+            <div className="grid min-w-0 rounded-lg border border-border md:grid-cols-[minmax(13rem,1fr)_minmax(0,2fr)]">
+              <ul aria-label="Attachment templates" className="divide-y divide-border border-b border-border md:border-b-0 md:border-r">
+                {filteredTemplates.map((template) => (
+                  <li key={template.id}>
+                    <button
+                      type="button"
+                      aria-pressed={selectedTemplate.id === template.id}
+                      onClick={() => onSelectedTemplateChange(template.id)}
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset aria-pressed:bg-muted aria-pressed:font-semibold ${tabletModeEnabled ? 'min-h-11' : 'min-h-10'}`}
+                    >
+                      <span className="min-w-0 break-words">{template.name}</span>
+                      {!template.is_active && <Badge variant="outline">Inactive</Badge>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
 
-        {isExpanded && (
-          <CardContent className="pt-6">
-            {loading ? (
-              <PanelLoader message="Loading attachment templates..." accent="workshop" className="py-12" />
-            ) : filteredTemplates.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold text-foreground mb-2">No Templates Yet</h3>
-                <p className="text-muted-foreground text-center max-w-md">
-                  Create a template, then configure sections and fields using the V2 schema builder.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground mb-3 uppercase tracking-wide">
-                    Templates ({filteredTemplates.length})
-                  </p>
-                  {filteredTemplates.map((template) => {
-                    const isSelected = selectedTemplateId === template.id;
-                    return (
-                      <button
-                        key={template.id}
-                        onClick={() => setSelectedTemplateId(template.id)}
-                        className={`w-full text-left p-3 rounded-lg border transition-all ${
-                          isSelected
-                            ? 'bg-workshop/10 border-workshop'
-                            : 'bg-muted/30 border-border hover:border-border/80'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className={`font-medium truncate ${isSelected ? 'text-workshop' : 'text-foreground'}`}>
-                                {template.name}
-                              </p>
-                              {!template.is_active && (
-                                <Badge variant="outline" className="text-xs bg-muted">
-                                  Inactive
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="space-y-4">
-                  {selectedTemplate ? (
-                    <>
-                      <div className="flex items-start justify-between pb-4 border-b border-border">
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="text-xl font-semibold text-foreground">{selectedTemplate.name}</h3>
-                            {!selectedTemplate.is_active && (
-                              <Badge variant="outline" className="bg-muted">
-                                Inactive
-                              </Badge>
-                            )}
-                          </div>
-                          {selectedTemplate.description && (
-                            <p className="text-sm text-muted-foreground">{selectedTemplate.description}</p>
-                          )}
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground mt-2">
-                            {normalizeTemplateAppliesTo(selectedTemplate.applies_to).includes('van') && (
-                              <span className="inline-flex items-center gap-1"><Truck className="h-3 w-3" /> Van</span>
-                            )}
-                            {normalizeTemplateAppliesTo(selectedTemplate.applies_to).includes('hgv') && (
-                              <span className="inline-flex items-center gap-1"><Truck className="h-3 w-3" /> HGV</span>
-                            )}
-                            {normalizeTemplateAppliesTo(selectedTemplate.applies_to).includes('plant') && (
-                              <span className="inline-flex items-center gap-1"><HardHat className="h-3 w-3" /> Plant</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => resetTemplateDialogForEdit(selectedTemplate)}
-                            className={tabletModeEnabled ? 'min-h-11 text-base px-4' : undefined}
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDeleteTemplateId(selectedTemplate.id)}
-                            className={`${tabletModeEnabled ? 'min-h-11 text-base px-4' : ''} border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950`}
-                          >
-                            <Trash2 className="h-4 w-4 mr-1" />
-                            Delete
-                          </Button>
-                        </div>
-                      </div>
-
-                      <AttachmentSchemaBuilderPanel
-                        templateId={selectedTemplate.id}
-                        templateName={selectedTemplate.name}
-                        templates={templates}
-                      />
-                    </>
-                  ) : (
-                    <div className="text-center py-12">
-                      <p className="text-muted-foreground">Select a template from the list to manage its schema.</p>
+              <div className="min-w-0 space-y-4 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <h3 className="break-words font-semibold">{selectedTemplate.name}</h3>
+                    {selectedTemplate.description && (
+                      <p className="break-words text-sm text-muted-foreground">{selectedTemplate.description}</p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-muted-foreground">
+                      {normalizeTemplateAppliesTo(selectedTemplate.applies_to).includes('van') && (
+                        <span className="inline-flex items-center gap-1"><Truck aria-hidden="true" className="h-3 w-3" /> Van</span>
+                      )}
+                      {normalizeTemplateAppliesTo(selectedTemplate.applies_to).includes('hgv') && (
+                        <span className="inline-flex items-center gap-1"><Truck aria-hidden="true" className="h-3 w-3" /> HGV</span>
+                      )}
+                      {normalizeTemplateAppliesTo(selectedTemplate.applies_to).includes('plant') && (
+                        <span className="inline-flex items-center gap-1"><HardHat aria-hidden="true" className="h-3 w-3" /> Plant</span>
+                      )}
                     </div>
-                  )}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => resetTemplateDialogForEdit(selectedTemplate)} className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}>
+                      <Edit aria-hidden="true" className="h-4 w-4" /> Edit template
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setDeleteTemplateId(selectedTemplate.id)} className={tabletModeEnabled ? 'min-h-11 text-base text-destructive' : 'text-destructive'}>
+                      <Trash2 aria-hidden="true" className="h-4 w-4" /> Delete
+                    </Button>
+                  </div>
                 </div>
+
+                <details key={selectedTemplate.id} className="space-y-3 border-t border-border pt-3">
+                  <summary className="w-fit cursor-pointer rounded text-sm font-medium focus-visible:outline focus-visible:outline-2">
+                    Checklist editor
+                  </summary>
+                  <AttachmentSchemaBuilderPanel
+                    templateId={selectedTemplate.id}
+                    templateName={selectedTemplate.name}
+                    templates={templates}
+                  />
+                </details>
               </div>
-            )}
-          </CardContent>
-        )}
+            </div>
+          ) : <p className="text-sm text-muted-foreground">No attachment templates for this asset type.</p>}
+        </CardContent>
       </Card>
 
       <Dialog

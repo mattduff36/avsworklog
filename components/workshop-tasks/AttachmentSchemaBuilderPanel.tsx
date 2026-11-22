@@ -15,9 +15,13 @@ import { Database } from '@/types/database';
 type Template = Database['public']['Tables']['workshop_attachment_templates']['Row'];
 
 interface SchemaFieldDraft {
+  field_key?: string;
   label: string;
   field_type: 'marking_code' | 'text' | 'long_text' | 'number' | 'date' | 'yes_no' | 'signature';
   is_required: boolean;
+  help_text?: string | null;
+  options_json?: Record<string, unknown> | null;
+  validation_json?: Record<string, unknown> | null;
 }
 
 interface SchemaSectionDraft {
@@ -77,12 +81,7 @@ export function AttachmentSchemaBuilderPanel({
           section_key: string;
           title: string;
           description: string | null;
-          fields: Array<{
-            field_key: string;
-            label: string;
-            field_type: SchemaFieldDraft['field_type'];
-            is_required: boolean;
-          }>;
+          fields: SchemaFieldDraft[];
         }>;
         version?: { version_number: number; status: string } | null;
       };
@@ -92,9 +91,13 @@ export function AttachmentSchemaBuilderPanel({
         title: section.title,
         description: section.description || '',
         fields: (section.fields || []).map((field) => ({
+          field_key: field.field_key,
           label: field.label,
           field_type: field.field_type,
           is_required: Boolean(field.is_required),
+          help_text: field.help_text,
+          options_json: field.options_json,
+          validation_json: field.validation_json,
         })),
       }));
       setSections(nextSections);
@@ -177,10 +180,13 @@ export function AttachmentSchemaBuilderPanel({
           title: section.title.trim() || `Section ${sectionIndex + 1}`,
           description: section.description.trim(),
           fields: section.fields.map((field, fieldIndex) => ({
-            field_key: toKey(field.label, `field_${fieldIndex + 1}`),
+            field_key: field.field_key || toKey(field.label, `field_${fieldIndex + 1}`),
             label: field.label.trim(),
             field_type: field.field_type,
             is_required: field.is_required,
+            help_text: field.help_text,
+            options_json: field.options_json,
+            validation_json: field.validation_json,
           })),
         })),
         version: null,

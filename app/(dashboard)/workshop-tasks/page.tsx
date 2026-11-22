@@ -7,12 +7,13 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { useBrowserSupabaseClient } from '@/lib/hooks/useBrowserSupabaseClient';
 import { useAttachmentTemplates } from '@/lib/hooks/useAttachmentTemplates';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppPageLoadingShell } from '@/components/layout/AppPageLoadingShell';
 import { PanelLoader } from '@/components/ui/panel-loader';
-import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause, Archive } from 'lucide-react';
+import { Settings, Plus, CheckCircle2, Clock, AlertTriangle, Wrench, Pause, Archive, Layers3, CalendarClock, ClipboardList, Monitor } from 'lucide-react';
 import { isArchivedWorkshopTask, shouldFetchArchivedWorkshopRows } from '@/lib/workshop-tasks/archive';
 import { ErrorDetailsResponse } from '@/types/error-details';
 import { WorkshopTasksOverviewTab } from './components/WorkshopTasksOverviewTab';
@@ -28,6 +29,15 @@ import type { Action, Category, Subcategory, Vehicle, WorkshopTaskTileFilter } f
 import { useTaskInspectionPhotos } from '@/lib/hooks/useTaskInspectionPhotos';
 import { useWorkshopActiveWakeLock } from '@/lib/hooks/useWorkshopActiveWakeLock';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
+
+const SETTINGS_SECTIONS = [
+  { id: 'categories', label: 'Categories', icon: Layers3 },
+  { id: 'service', label: 'Service schedule', icon: CalendarClock },
+  { id: 'attachments', label: 'Attachment templates', icon: ClipboardList },
+  { id: 'display', label: 'Display board', icon: Monitor },
+] as const;
+
+type WorkshopSettingsSection = typeof SETTINGS_SECTIONS[number]['id'];
 
 function ModalChunkLoader({ message }: { message: string }) {
   return (
@@ -90,7 +100,7 @@ export default function WorkshopTasksPage() {
   const { tabletModeEnabled } = useTabletMode();
   const showSettings = isAdmin || isManager;
   const supabase = useBrowserSupabaseClient();
-  const { templates: attachmentTemplates } = useAttachmentTemplates();
+  const { templates: attachmentTemplates, refetch: refetchAttachmentTemplates } = useAttachmentTemplates();
 
   const [tasks, setTasks] = useState<Action[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -102,6 +112,8 @@ export default function WorkshopTasksPage() {
   const [hgvCategories, setHgvCategories] = useState<Category[]>([]);
   const [hgvSubcategories, setHgvSubcategories] = useState<Subcategory[]>([]);
   const [categoryTaxonomyMode, setCategoryTaxonomyMode] = useState<'van' | 'plant' | 'hgv'>('van');
+  const [settingsSection, setSettingsSection] = useState<WorkshopSettingsSection>('categories');
+  const [settingsTemplateId, setSettingsTemplateId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<WorkshopTaskTileFilter>('all');
   const [vehicleFilter, setVehicleFilter] = useState('all');
@@ -509,6 +521,28 @@ export default function WorkshopTasksPage() {
   }
   if (!hasPermission) return null;
 
+  const settingsAssetPicker = (
+    <div className="flex flex-wrap items-center gap-3 border-b border-border pb-4">
+      <Label htmlFor="workshop-settings-asset">Asset type</Label>
+      <Select
+        value={categoryTaxonomyMode}
+        onValueChange={(value) => {
+          setCategoryTaxonomyMode(value as 'van' | 'plant' | 'hgv');
+          setSettingsTemplateId(null);
+        }}
+      >
+        <SelectTrigger id="workshop-settings-asset" className={tabletModeEnabled ? 'w-32 min-h-11 text-base' : 'w-32'}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="van">Van</SelectItem>
+          <SelectItem value="plant">Plant</SelectItem>
+          <SelectItem value="hgv">HGV</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className={`bg-white dark:bg-slate-900 rounded-lg border border-border ${tabletModeEnabled ? 'p-5 md:p-6' : 'p-6'}`}>
@@ -606,38 +640,50 @@ export default function WorkshopTasksPage() {
           onDeleteTask={crud.handleDeleteTask}
         />
         {showSettings && (
-          <TabsContent value="settings" className="space-y-6 mt-0">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-white">Category Taxonomy</CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Manage categories for vans, HGVs, or plant machinery
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={categoryTaxonomyMode} onValueChange={(v) => setCategoryTaxonomyMode(v as 'van' | 'plant' | 'hgv')}>
-                  <TabsList className="grid w-full grid-cols-1 sm:grid-cols-3">
-                    <TabsTrigger value="van">Van Categories</TabsTrigger>
-                    <TabsTrigger value="plant">Plant Categories</TabsTrigger>
-                    <TabsTrigger value="hgv">HGV Categories</TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </CardContent>
-            </Card>
-            <CategoryManagementPanel
-              categories={categoryTaxonomyMode === 'plant' ? plantCategories : categoryTaxonomyMode === 'hgv' ? hgvCategories : categories}
-              subcategories={categoryTaxonomyMode === 'plant' ? plantSubcategories : categoryTaxonomyMode === 'hgv' ? hgvSubcategories : subcategories}
-              onAddCategory={crud.openAddCategoryModal}
-              onEditCategory={crud.openEditCategoryModal}
-              onDeleteCategory={crud.handleDeleteCategory}
-              onAddSubcategory={crud.openAddSubcategoryModal}
-              onEditSubcategory={crud.openEditSubcategoryModal}
-              onDeleteSubcategory={crud.handleDeleteSubcategory}
-              hideSubcategories
-            />
-            <ServiceSettingsPanel assetType={categoryTaxonomyMode} />
-            <AttachmentManagementPanel taxonomyMode={categoryTaxonomyMode} />
-            <DisplayBoardSettingsCard />
+          <TabsContent value="settings" className="mt-0">
+            <Tabs value={settingsSection} onValueChange={(value) => setSettingsSection(value as WorkshopSettingsSection)} className="space-y-6">
+              <div className={tabletModeEnabled ? 'flex justify-start' : 'flex justify-end'}>
+                <TabsList
+                  aria-label="Workshop settings"
+                  className={tabletModeEnabled ? 'h-auto flex-wrap gap-2 p-1.5 justify-start' : 'max-sm:h-auto max-sm:w-full max-sm:grid max-sm:grid-cols-2'}
+                >
+                  {SETTINGS_SECTIONS.map(({ id, label, icon: Icon }) => (
+                    <TabsTrigger key={id} value={id} className={tabletModeEnabled ? 'gap-2 min-h-11 text-base px-4' : 'gap-2 max-sm:whitespace-normal max-sm:px-2'}>
+                      <Icon aria-hidden="true" className="h-4 w-4" /> {label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+              <TabsContent forceMount value="categories" className="data-[state=inactive]:hidden">
+                <CategoryManagementPanel
+                  active={settingsSection === 'categories'}
+                  assetPicker={settingsSection === 'categories' ? settingsAssetPicker : null}
+                  categories={categoryTaxonomyMode === 'plant' ? plantCategories : categoryTaxonomyMode === 'hgv' ? hgvCategories : categories}
+                  onAddCategory={crud.openAddCategoryModal}
+                  onEditCategory={crud.openEditCategoryModal}
+                  onDeleteCategory={crud.handleDeleteCategory}
+                  onOpenTemplate={(templateId) => {
+                    setSettingsTemplateId(templateId);
+                    setSettingsSection('attachments');
+                  }}
+                />
+              </TabsContent>
+              <TabsContent forceMount value="service" className="data-[state=inactive]:hidden">
+                <ServiceSettingsPanel assetType={categoryTaxonomyMode} assetPicker={settingsSection === 'service' ? settingsAssetPicker : null} />
+              </TabsContent>
+              <TabsContent forceMount value="attachments" className="data-[state=inactive]:hidden">
+                <AttachmentManagementPanel
+                  taxonomyMode={categoryTaxonomyMode}
+                  selectedTemplateId={settingsTemplateId}
+                  onSelectedTemplateChange={setSettingsTemplateId}
+                  onTemplatesChanged={refetchAttachmentTemplates}
+                  assetPicker={settingsSection === 'attachments' ? settingsAssetPicker : null}
+                />
+              </TabsContent>
+              <TabsContent forceMount value="display" className="data-[state=inactive]:hidden">
+                <DisplayBoardSettingsCard />
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         )}
       </Tabs>
