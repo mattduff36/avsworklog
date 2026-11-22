@@ -25,9 +25,14 @@ export async function GET(request: NextRequest) {
     }
 
     const templates = await listLinkedTemplatesForCategory(categoryId);
+    // Keep the required choices separate for already-open versions of the creation forms.
+    const requiredTemplates = templates.filter((template) => template.isRequired);
     return NextResponse.json({
-      templates: templates.filter((template) => template.isActive),
-      allTemplates: templates,
+      templates: requiredTemplates.filter((template) => template.isActive),
+      allTemplates: requiredTemplates,
+      optionalTemplates: requiredTemplates.length === 0
+        ? templates.filter((template) => template.isActive && !template.isRequired)
+        : [],
     });
   } catch (error) {
     await logServerError({

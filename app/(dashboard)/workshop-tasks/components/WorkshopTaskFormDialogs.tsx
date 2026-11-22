@@ -52,7 +52,7 @@ type CategoryLinkState =
   | { status: 'idle' }
   | { status: 'loading'; categoryId: string }
   | { status: 'error'; categoryId: string }
-  | { status: 'ready'; categoryId: string; linkedIds: string[] };
+  | { status: 'ready'; categoryId: string; linkedIds: string[]; requiresAttachment: boolean };
 
 interface WorkshopTaskFormDialogsProps {
   userId?: string | null;
@@ -191,6 +191,7 @@ export function WorkshopTaskFormDialogs({
     categoryId: string;
     status: 'error' | 'ready';
     linkedIds: string[];
+    requiresAttachment?: boolean;
   } | null>(null);
   const [categoryLinkRetry, setCategoryLinkRetry] = useState(0);
   const categoryLinkRequestRef = useRef(0);
@@ -225,7 +226,12 @@ export function WorkshopTaskFormDialogs({
       return { status: 'loading', categoryId: selectedCategoryId };
     }
     if (categoryLinkResult.status === 'ready') {
-      return { status: 'ready', categoryId: selectedCategoryId, linkedIds: categoryLinkResult.linkedIds };
+      return {
+        status: 'ready',
+        categoryId: selectedCategoryId,
+        linkedIds: categoryLinkResult.linkedIds,
+        requiresAttachment: categoryLinkResult.requiresAttachment === true,
+      };
     }
     return { status: 'error', categoryId: selectedCategoryId };
   }, [categoryLinkResult, selectedCategoryId]);
@@ -268,10 +274,12 @@ export function WorkshopTaskFormDialogs({
           setCategoryLinkResult({ status: 'error', categoryId, linkedIds: [] });
           return;
         }
-        const linkedIds = ((Array.isArray(data.allTemplates) ? data.allTemplates : data.templates) as Array<{ templateId?: string }>)
+        const requiredTemplates = (Array.isArray(data.allTemplates) ? data.allTemplates : data.templates) as Array<{ templateId?: string }>;
+        const optionalTemplates = (data.optionalTemplates || []) as Array<{ templateId?: string }>;
+        const linkedIds = [...requiredTemplates, ...optionalTemplates]
           .map((template) => template.templateId || '')
           .filter(Boolean);
-        setCategoryLinkResult({ status: 'ready', categoryId, linkedIds });
+        setCategoryLinkResult({ status: 'ready', categoryId, linkedIds, requiresAttachment: requiredTemplates.length > 0 });
       } catch {
         if (categoryLinkRequestRef.current !== requestId) return;
         setCategoryLinkResult({ status: 'error', categoryId, linkedIds: [] });
@@ -469,7 +477,7 @@ export function WorkshopTaskFormDialogs({
       return;
     }
 
-    if (compatibleLinkedTemplates.length === 1) {
+    if (categoryLinkState.requiresAttachment && compatibleLinkedTemplates.length === 1) {
       const onlyId = compatibleLinkedTemplates[0]?.id;
       if (onlyId && (selectedAttachmentTemplateIds.length !== 1 || selectedAttachmentTemplateIds[0] !== onlyId)) {
         onSelectedAttachmentTemplateIdsChange([onlyId]);
@@ -641,7 +649,7 @@ export function WorkshopTaskFormDialogs({
   }
 
   const categoryLinksReady = categoryLinkState.status === 'ready' && categoryLinkState.categoryId === selectedCategoryId;
-  const categoryRequiresForm = categoryLinksReady && linkedCategoryTemplateIds.length > 0;
+  const categoryRequiresForm = categoryLinksReady && categoryLinkState.requiresAttachment;
   const serviceSchedulePending = (selectedAddAssetType === 'van' || selectedAddAssetType === 'hgv') &&
     linkedCategoryTemplateIds.length >= 2 && (!assetServiceSchedule ||
       assetServiceSchedule.assetId !== selectedVehicleId || assetServiceSchedule.categoryId !== selectedCategoryId ||
@@ -657,7 +665,7 @@ export function WorkshopTaskFormDialogs({
       selectedAttachmentTemplateIds.length !== 1 ||
       !compatibleLinkedTemplates.some((template) => template.id === selectedAttachmentTemplateIds[0])
     ));
-  const showRequiredFormSection = categoryRequiresForm;
+  const showAttachmentSection = categoryRequiresForm || compatibleLinkedTemplates.length > 0;
   const assetTypeLabel = selectedAddAssetType === 'plant' ? 'plant' : selectedAddAssetType === 'hgv' ? 'HGV' : selectedAddAssetType === 'van' ? 'van' : 'asset';
 
   function handleCreateTask() {
@@ -870,12 +878,12 @@ export function WorkshopTaskFormDialogs({
               </div>
             </section>
 
-            {showRequiredFormSection && (
-              <section className="space-y-2 rounded-lg border border-workshop/40 bg-slate-950/60 p-3" aria-labelledby="required-form-heading">
-                <h3 id="required-form-heading" className="flex items-center gap-2 text-base font-semibold text-slate-100">
+            {showAttachmentSection && (
+              <section className="space-y-2 rounded-lg border border-workshop/40 bg-slate-950/60 p-3" aria-labelledby="attachment-form-heading">
+                <h3 id="attachment-form-heading" className="flex items-center gap-2 text-base font-semibold text-slate-100">
                   <FileText className="h-4 w-4" aria-hidden="true" />
-                  Required form
-                  <span className="text-red-400">*</span>
+                  {categoryRequiresForm ? 'Required form' : 'Attachments (Optional)'}
+                  {categoryRequiresForm && <span className="text-red-400">*</span>}
                 </h3>
                 {serviceSchedulePending && (
                   <p role="status" className="text-sm text-slate-300">
@@ -888,7 +896,7 @@ export function WorkshopTaskFormDialogs({
                     This category requires a form, but no active template matches this asset. Choose Repair instead if this is ordinary repair work.
                   </p>
                 )}
-                {categoryRequiresForm && compatibleLinkedTemplates.length > 0 && (
+                {compatibleLinkedTemplates.length > 0 && (
                   <div className={`max-h-40 space-y-2 overflow-y-auto rounded-md border border-slate-700 bg-slate-900 p-2 ${tabletModeEnabled ? 'p-3' : ''}`}>
                     {assetServiceScheduleApplies && (
                       <p className="text-sm text-amber-100" role="status">
@@ -902,15 +910,15 @@ export function WorkshopTaskFormDialogs({
                       return (
                       <div key={template.id} className={`flex items-center ${tabletModeEnabled ? 'space-x-3 py-1' : 'space-x-2'}`}>
                         <input
-                          type="radio"
-                          name="workshop-create-required-form"
+                          type={categoryRequiresForm ? 'radio' : 'checkbox'}
+                          name="workshop-create-linked-form"
                           id={`template-inline-${template.id}`}
                           checked={selectedAttachmentTemplateIds.length === 1 && selectedAttachmentTemplateIds[0] === template.id}
                           disabled={serviceSchedulePending || (assetServiceScheduleApplies && !canChooseServiceType && !scheduled)}
-                          onChange={() => {
+                          onChange={(event) => {
                             markManualChoice(true);
                             autoAppliedSelectionRef.current = null;
-                            onSelectedAttachmentTemplateIdsChange([template.id]);
+                            onSelectedAttachmentTemplateIdsChange(event.target.checked ? [template.id] : []);
                           }}
                           className={`border-slate-500 text-workshop focus:ring-workshop ${tabletModeEnabled ? 'h-5 w-5' : 'h-4 w-4'}`}
                         />

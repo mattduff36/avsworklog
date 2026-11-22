@@ -111,6 +111,7 @@ export function CreateWorkshopTaskDialog({
   const [submitting, setSubmitting] = useState(false);
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
   const [linkedCategoryTemplateIds, setLinkedCategoryTemplateIds] = useState<string[] | null>(null);
+  const [requiresLinkedAttachment, setRequiresLinkedAttachment] = useState(false);
   const [categoryLinksState, setCategoryLinksState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle');
   const manualServiceChoice = useRef(false);
   const [scheduleRefresh, setScheduleRefresh] = useState(0);
@@ -447,9 +448,12 @@ export function CreateWorkshopTaskDialog({
           setCategoryLinksState('failed');
           return;
         }
-        const ids = ((data.templates || []) as Array<{ templateId?: string }>)
+        const requiredTemplates = (data.templates || []) as Array<{ templateId?: string }>;
+        const optionalTemplates = (data.optionalTemplates || []) as Array<{ templateId?: string }>;
+        const ids = [...requiredTemplates, ...optionalTemplates]
           .map((template) => template.templateId)
           .filter((templateId): templateId is string => Boolean(templateId));
+        setRequiresLinkedAttachment(requiredTemplates.length > 0);
         setLinkedCategoryTemplateIds(ids);
         setCategoryLinksState('ready');
       } catch {
@@ -484,9 +488,8 @@ export function CreateWorkshopTaskDialog({
     }
 
     const needsSubcategory = categoryHasSubcategories;
-    const hasConfiguredLinks = (linkedCategoryTemplateIds?.length ?? 0) > 0;
-    const requiresExactOneAttachment = hasConfiguredLinks && filteredAttachmentTemplates.length > 0;
-    const invalidLinkConfiguration = hasConfiguredLinks && filteredAttachmentTemplates.length === 0;
+    const requiresExactOneAttachment = requiresLinkedAttachment && filteredAttachmentTemplates.length > 0;
+    const invalidLinkConfiguration = requiresLinkedAttachment && filteredAttachmentTemplates.length === 0;
     const linksBusy = Boolean(selectedCategoryId) && categoryLinksState !== 'ready';
     if (!selectedVehicleId || !selectedCategoryId || (needsSubcategory && !selectedSubcategoryId) || !workshopComments.trim() || !newMeterReading.trim()) {
       toast.error('Please fill in all required fields');
@@ -583,7 +586,7 @@ export function CreateWorkshopTaskDialog({
         throw new Error('Failed to create task');
       }
 
-      const templatesToAttach = requiresExactOneAttachment ? validSelectedTemplateIds : [];
+      const templatesToAttach = validSelectedTemplateIds;
 
       const attachmentErrors: string[] = [];
       if (templatesToAttach.length > 0) {
@@ -683,14 +686,14 @@ export function CreateWorkshopTaskDialog({
       if (next.join('|') !== selectedTemplateIds.join('|')) setSelectedTemplateIds(next);
       return;
     }
-    if (validSelected.length !== 1) {
+    if (requiresLinkedAttachment && validSelected.length !== 1) {
       setSelectedTemplateIds([filteredAttachmentTemplates[0].id]);
       return;
     }
     if (validSelected.length !== selectedTemplateIds.length) {
       setSelectedTemplateIds(validSelected);
     }
-  }, [categoryLinksState, filteredAttachmentTemplates, linkedCategoryTemplateIds, selectedTemplateIds, schedulePending, isScheduledService, serviceSchedule, canChooseServiceType]);
+  }, [categoryLinksState, filteredAttachmentTemplates, linkedCategoryTemplateIds, selectedTemplateIds, schedulePending, isScheduledService, serviceSchedule, canChooseServiceType, requiresLinkedAttachment]);
 
   return (
     <Dialog
@@ -886,10 +889,10 @@ export function CreateWorkshopTaskDialog({
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                {(linkedCategoryTemplateIds?.length ?? 0) > 0 && filteredAttachmentTemplates.length > 0
+                {requiresLinkedAttachment && filteredAttachmentTemplates.length > 0
                   ? 'Attachments'
                   : 'Attachments (Optional)'}
-                {(linkedCategoryTemplateIds?.length ?? 0) > 0 && filteredAttachmentTemplates.length > 0 ? (
+                {requiresLinkedAttachment && filteredAttachmentTemplates.length > 0 ? (
                   <span className="text-red-500">*</span>
                 ) : null}
               </Label>
@@ -907,7 +910,7 @@ export function CreateWorkshopTaskDialog({
                     ? 'Unable to load category attachments. Retry by changing category.'
                     : (linkedCategoryTemplateIds?.length ?? 0) > 0 && filteredAttachmentTemplates.length === 0
                       ? 'This category has no active attachments compatible with the selected asset.'
-                      : (linkedCategoryTemplateIds?.length ?? 0) > 0
+                      : requiresLinkedAttachment
                         ? 'Select the required checklist for this workshop category'
                         : 'Add service checklists or documentation to complete later'}
               </p>
@@ -927,6 +930,8 @@ export function CreateWorkshopTaskDialog({
                         if (checked) {
                           manualServiceChoice.current = true;
                           setSelectedTemplateIds([template.id]);
+                        } else if (!requiresLinkedAttachment) {
+                          setSelectedTemplateIds([]);
                         }
                       }}
                     />
@@ -968,8 +973,8 @@ export function CreateWorkshopTaskDialog({
               !newMeterReading.trim() ||
               (Boolean(selectedCategoryId) && categoryLinksState !== 'ready') ||
               categoryLinksState === 'failed' ||
-              ((linkedCategoryTemplateIds?.length ?? 0) > 0 && filteredAttachmentTemplates.length === 0) ||
-              ((linkedCategoryTemplateIds?.length ?? 0) > 0 &&
+              (requiresLinkedAttachment && filteredAttachmentTemplates.length === 0) ||
+              (requiresLinkedAttachment &&
                 filteredAttachmentTemplates.length > 0 &&
                 selectedTemplateIds.filter((templateId) =>
                   filteredAttachmentTemplates.some((template) => template.id === templateId),

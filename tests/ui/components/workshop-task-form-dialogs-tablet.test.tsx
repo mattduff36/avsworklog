@@ -440,6 +440,38 @@ describe('Workshop task dialog tablet safeguards', () => {
     expect(screen.getByRole('button', { name: 'Create Task' })).toBeEnabled();
   });
 
+  it('allows creation without the optional Plant Daily Check', async () => {
+    const props = createBaseProps();
+    props.assetTab = 'plant';
+    props.vehicles = [{ id: 'plant-1', reg_number: 'PLANT1', nickname: null, asset_type: 'plant' }];
+    props.selectedVehicleId = 'plant-1';
+    props.selectedCategoryId = 'inspection';
+    props.workshopComments = 'Perform a general inspection';
+    props.newMeterReading = '100';
+    props.attachmentTemplates = [{ id: 'plant-check', name: 'Plant Daily Check', applies_to: ['plant'] }];
+    global.fetch = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ templates: [], allTemplates: [], optionalTemplates: [{ templateId: 'plant-check' }] }),
+    } as Response));
+
+    const view = render(<TabletModeProvider><WorkshopTaskFormDialogs {...props} /></TabletModeProvider>);
+    const checklist = await screen.findByRole('checkbox', { name: 'Plant Daily Check' });
+    expect(checklist).not.toBeChecked();
+    expect(props.onSelectedAttachmentTemplateIdsChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Task' }));
+    expect(props.onCreateTask).toHaveBeenCalledOnce();
+
+    fireEvent.click(checklist);
+    expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenLastCalledWith(['plant-check']);
+    view.rerender(
+      <TabletModeProvider>
+        <WorkshopTaskFormDialogs {...props} selectedAttachmentTemplateIds={['plant-check']} />
+      </TabletModeProvider>,
+    );
+    fireEvent.click(checklist);
+    expect(props.onSelectedAttachmentTemplateIdsChange).toHaveBeenLastCalledWith([]);
+  });
+
   it('requires an explicit linked template and ignores unrelated templates', async () => {
     const props = createBaseProps();
     props.assetTab = 'plant';

@@ -353,6 +353,54 @@ describe('CreateWorkshopTaskDialog category-linked attachments', () => {
     });
   });
 
+  it.each([false, true])('creates a task with an optional checklist selected: %s', async (attach) => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes('/category-attachments')) {
+        return jsonResponse({ templates: [], optionalTemplates: [{ templateId: 'tmpl-pack' }] });
+      }
+      if (url.includes('/api/workshop-tasks/tasks') && init?.method === 'POST') {
+        return jsonResponse({ task: { id: 'task-1' }, meter_reading_updated: true });
+      }
+      return jsonResponse({});
+    });
+    global.fetch = fetchMock;
+
+    render(
+      <CreateWorkshopTaskDialog
+        open
+        onOpenChange={vi.fn()}
+        initialVehicleId="van-1"
+        initialCategoryId="cat-pack"
+      />,
+    );
+
+    const checklist = await screen.findByRole('checkbox', { name: 'Pack checklist' });
+    expect(checklist).not.toBeChecked();
+    fireEvent.click(checklist);
+    expect(checklist).toBeChecked();
+    if (!attach) {
+      fireEvent.click(checklist);
+      expect(checklist).not.toBeChecked();
+    }
+
+    fireEvent.change(screen.getByLabelText(/Task Details/i), {
+      target: { value: 'Perform a general inspection' },
+    });
+    fireEvent.change(screen.getByLabelText(/Current Mileage/i), { target: { value: '20' } });
+    const createTask = screen.getByRole('button', { name: 'Create Task' });
+    expect(createTask).toBeEnabled();
+    fireEvent.click(createTask);
+
+    await waitFor(() => expect(toastSuccess).toHaveBeenCalled());
+    const attachmentPosts = fetchMock.mock.calls.filter(([input, init]) => (
+      String(input).includes('/attachments/task/') && init?.method === 'POST'
+    ));
+    expect(attachmentPosts.map(([, init]) => JSON.parse(String(init?.body)))).toEqual(
+      attach ? [{ template_id: 'tmpl-pack' }] : [],
+    );
+  });
+
   it('reports a network attachment failure as partial success without retry', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
     global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

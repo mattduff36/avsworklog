@@ -91,7 +91,7 @@ export function TaskAttachmentsSection({
         );
         const data = await response.json();
         if (!response.ok || cancelled) return;
-        const ids = ((data.templates || []) as Array<{ templateId?: string; id?: string }>)
+        const ids = ([...(data.templates || []), ...(data.optionalTemplates || [])] as Array<{ templateId?: string; id?: string }>)
           .map((template) => template.templateId || template.id)
           .filter((id): id is string => Boolean(id));
         setLinkedTemplateIds(ids);

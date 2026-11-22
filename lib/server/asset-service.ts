@@ -181,6 +181,7 @@ export async function listLinkedTemplatesForCategory(
   sortOrder: number;
   compactLabel: string | null;
   isActive: boolean;
+  isRequired: boolean;
 }>> {
   return withTransaction(async (client) => {
     const { rows } = await client.query<{
@@ -189,6 +190,7 @@ export async function listLinkedTemplatesForCategory(
       sort_order: number;
       compact_label: string | null;
       is_active: boolean;
+      is_required: boolean;
     }>(
       `
       SELECT
@@ -196,7 +198,8 @@ export async function listLinkedTemplatesForCategory(
         t.name AS template_name,
         w.sort_order,
         w.compact_label,
-        t.is_active
+        t.is_active,
+        w.is_required
       FROM public.workshop_category_attachment_templates w
       JOIN public.workshop_attachment_templates t ON t.id = w.template_id
       WHERE w.category_id = $1
@@ -210,6 +213,7 @@ export async function listLinkedTemplatesForCategory(
       sortOrder: row.sort_order,
       compactLabel: row.compact_label,
       isActive: row.is_active,
+      isRequired: row.is_required,
     }));
   });
 }

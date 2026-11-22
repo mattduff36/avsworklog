@@ -11274,6 +11274,7 @@ export type Database = {
           template_id: string
           sort_order: number
           compact_label: string | null
+          is_required: boolean
           created_at: string
           updated_at: string
         }
@@ -11283,6 +11284,7 @@ export type Database = {
           template_id: string
           sort_order?: number
           compact_label?: string | null
+          is_required?: boolean
           created_at?: string
           updated_at?: string
         }
@@ -11292,6 +11294,7 @@ export type Database = {
           template_id?: string
           sort_order?: number
           compact_label?: string | null
+          is_required?: boolean
           created_at?: string
           updated_at?: string
         }
