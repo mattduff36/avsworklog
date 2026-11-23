@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.25.0",
+    "updateKind": "major",
+    "title": "Workshop Tasks update",
+    "description": "Organise the settings workspace.",
+    "summary": "Organise the settings workspace.",
+    "details": [
+      "Organise the settings workspace, with changes to app screens, interface components, and data storage."
+    ],
+    "areas": [
+      "Workshop Tasks"
+    ],
+    "areaKeys": [
+      "workshop-tasks"
+    ],
+    "pushedAt": "2026-11-23T00:04:05.600Z"
+  },
+  {
     "version": "1126.24.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",

@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.25.0
+
+**GIT COMMIT MESSAGE**
+`feat(workshop): organise the settings workspace`
+
+**PUSHED AT**
+2026-11-23T00:04:05.600Z
+
+**WHAT CHANGED**
+Organise the settings workspace.
+
+**VERSION HISTORY DETAILS**
+- Organise the settings workspace, with changes to app screens, interface components, and data storage.
+
+**COMMITS IN THIS RELEASE**
+- `feat(workshop): organise the settings workspace`
+
 ## 1126.24.0
 
 **GIT COMMIT MESSAGE**
