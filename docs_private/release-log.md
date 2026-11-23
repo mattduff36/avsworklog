@@ -2,6 +2,24 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.25.2
+
+**GIT COMMIT MESSAGE**
+`fix(workshop): highlight selected settings rows`
+
+**PUSHED AT**
+2026-11-23T00:42:40.140Z
+
+**WHAT CHANGED**
+Clarify settings action buttons. Highlight selected settings rows.
+
+**VERSION HISTORY DETAILS**
+- Clarify settings action buttons, with changes to interface components.
+
+**COMMITS IN THIS RELEASE**
+- `fix(workshop): clarify settings action buttons`
+- `fix(workshop): highlight selected settings rows`
+
 ## 1126.25.1
 
 **GIT COMMIT MESSAGE**
