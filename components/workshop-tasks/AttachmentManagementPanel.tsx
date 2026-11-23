@@ -280,10 +280,20 @@ export function AttachmentManagementPanel({ taxonomyMode, selectedTemplateId, on
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                    <Button variant="ghost" size="sm" onClick={() => resetTemplateDialogForEdit(selectedTemplate)} className={tabletModeEnabled ? 'min-h-11 text-base' : undefined}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => resetTemplateDialogForEdit(selectedTemplate)}
+                      className={`bg-[hsl(var(--workshop-primary)/0.22)] text-foreground hover:bg-[hsl(var(--workshop-primary)/0.32)] hover:text-foreground ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}
+                    >
                       <Edit aria-hidden="true" className="h-4 w-4" /> Edit template
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setDeleteTemplateId(selectedTemplate.id)} className={tabletModeEnabled ? 'min-h-11 text-base text-destructive' : 'text-destructive'}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeleteTemplateId(selectedTemplate.id)}
+                      className={`bg-red-500/10 text-red-700 hover:bg-red-500/20 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200 ${tabletModeEnabled ? 'min-h-11 text-base' : ''}`}
+                    >
                       <Trash2 aria-hidden="true" className="h-4 w-4" /> Delete
                     </Button>
                   </div>

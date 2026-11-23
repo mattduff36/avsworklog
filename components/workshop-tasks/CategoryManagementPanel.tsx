@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, Plus } from 'lucide-react';
+import { ArrowRight, Check, Edit, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -117,8 +117,22 @@ export function CategoryManagementPanel({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h3 className="min-w-0 break-words font-semibold">{selected.name}</h3>
                 <div className="flex flex-wrap gap-1">
-                  <Button size="sm" variant="ghost" onClick={() => onEditCategory(selected)} className={touchClassName}>Edit category</Button>
-                  <Button size="sm" variant="ghost" onClick={() => onDeleteCategory(selected)} className={`text-destructive ${touchClassName ?? ''}`}>Delete</Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onEditCategory(selected)}
+                    className={`bg-[hsl(var(--workshop-primary)/0.22)] text-foreground hover:bg-[hsl(var(--workshop-primary)/0.32)] hover:text-foreground ${touchClassName ?? ''}`}
+                  >
+                    <Edit aria-hidden="true" /> Edit category
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onDeleteCategory(selected)}
+                    className={`bg-red-500/10 text-red-700 hover:bg-red-500/20 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200 ${touchClassName ?? ''}`}
+                  >
+                    <Trash2 aria-hidden="true" /> Delete
+                  </Button>
                 </div>
               </div>
               <div>
@@ -142,7 +156,13 @@ export function CategoryManagementPanel({
                             ? (template.isRequired ? 'Required when creating a task' : 'Optional when creating a task')
                             : 'Inactive'}</p>
                         </div>
-                        <Button size="sm" variant="ghost" aria-label={`Open template ${template.templateName}`} onClick={() => onOpenTemplate(template.templateId)} className={touchClassName}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-label={`Open template ${template.templateName}`}
+                          onClick={() => onOpenTemplate(template.templateId)}
+                          className={`bg-[hsl(var(--workshop-primary)/0.13)] text-foreground hover:bg-[hsl(var(--workshop-primary)/0.23)] hover:text-foreground ${touchClassName ?? ''}`}
+                        >
                           Open template <ArrowRight aria-hidden="true" className="h-4 w-4" />
                         </Button>
                       </li>
