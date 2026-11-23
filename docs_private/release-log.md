@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.25.1
+
+**GIT COMMIT MESSAGE**
+`fix(workshop): reorder settings tabs`
+
+**PUSHED AT**
+2026-11-23T00:19:56.575Z
+
+**WHAT CHANGED**
+Reorder settings tabs.
+
+**VERSION HISTORY DETAILS**
+- Reorder settings tabs, with changes to app screens.
+
+**COMMITS IN THIS RELEASE**
+- `fix(workshop): reorder settings tabs`
+
 ## 1126.25.0
 
 **GIT COMMIT MESSAGE**

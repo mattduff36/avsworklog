@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.25.1",
+    "updateKind": "minor",
+    "title": "Workshop Tasks improvements",
+    "description": "Reorder settings tabs.",
+    "summary": "Reorder settings tabs.",
+    "details": [
+      "Reorder settings tabs, with changes to app screens."
+    ],
+    "areas": [
+      "Workshop Tasks"
+    ],
+    "areaKeys": [
+      "workshop-tasks"
+    ],
+    "pushedAt": "2026-11-23T00:19:56.575Z"
+  },
+  {
     "version": "1126.25.0",
     "updateKind": "major",
     "title": "Workshop Tasks update",
