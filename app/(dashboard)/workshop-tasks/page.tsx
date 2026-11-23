@@ -32,8 +32,8 @@ import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
 const SETTINGS_SECTIONS = [
   { id: 'categories', label: 'Categories', icon: Layers3 },
-  { id: 'service', label: 'Service schedule', icon: CalendarClock },
   { id: 'attachments', label: 'Attachment templates', icon: ClipboardList },
+  { id: 'service', label: 'Service schedule', icon: CalendarClock },
   { id: 'display', label: 'Display board', icon: Monitor },
 ] as const;
 
