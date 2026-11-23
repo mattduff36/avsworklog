@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Edit, HardHat, Plus, Trash2, Truck } from 'lucide-react';
+import { Check, Edit, HardHat, Plus, Trash2, Truck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { triggerShakeAnimation } from '@/lib/utils/animations';
 import { useTabletMode } from '@/components/layout/tablet-mode-context';
@@ -248,10 +248,13 @@ export function AttachmentManagementPanel({ taxonomyMode, selectedTemplateId, on
                       type="button"
                       aria-pressed={selectedTemplate.id === template.id}
                       onClick={() => onSelectedTemplateChange(template.id)}
-                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset aria-pressed:bg-muted aria-pressed:font-semibold ${tabletModeEnabled ? 'min-h-11' : 'min-h-10'}`}
+                      className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset aria-pressed:bg-[hsl(var(--workshop-primary)/0.28)] aria-pressed:hover:bg-[hsl(var(--workshop-primary)/0.34)] aria-pressed:font-semibold ${tabletModeEnabled ? 'min-h-11' : 'min-h-10'}`}
                     >
                       <span className="min-w-0 break-words">{template.name}</span>
-                      {!template.is_active && <Badge variant="outline">Inactive</Badge>}
+                      <span className="flex shrink-0 items-center gap-2">
+                        {!template.is_active && <Badge variant="outline">Inactive</Badge>}
+                        {selectedTemplate.id === template.id && <Check aria-hidden="true" className="h-4 w-4" />}
+                      </span>
                     </button>
                   </li>
                 ))}

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Plus } from 'lucide-react';
+import { ArrowRight, Check, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,10 +102,13 @@ export function CategoryManagementPanel({
                     type="button"
                     aria-pressed={category.id === categoryId}
                     onClick={() => { if (category.id !== categoryId) { setLinkState(null); setSelectedId(category.id); } }}
-                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset aria-pressed:bg-muted aria-pressed:font-semibold ${tabletModeEnabled ? 'min-h-11' : 'min-h-10'}`}
+                    className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset aria-pressed:bg-[hsl(var(--workshop-primary)/0.28)] aria-pressed:hover:bg-[hsl(var(--workshop-primary)/0.34)] aria-pressed:font-semibold ${tabletModeEnabled ? 'min-h-11' : 'min-h-10'}`}
                   >
                     <span className="break-words">{category.name}</span>
-                    {!category.is_active && <Badge variant="outline">Inactive</Badge>}
+                    <span className="flex shrink-0 items-center gap-2">
+                      {!category.is_active && <Badge variant="outline">Inactive</Badge>}
+                      {category.id === categoryId && <Check aria-hidden="true" className="h-4 w-4" />}
+                    </span>
                   </button>
                 </li>
               ))}
