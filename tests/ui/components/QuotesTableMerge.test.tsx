@@ -82,6 +82,58 @@ function buildQuote(id: string, reference: string, overrides: Partial<Quote> = {
 }
 
 describe('QuotesTable live quote merge', () => {
+  it('explains blocked selections while allowing the latest revision on the same account', () => {
+    render(
+      <QuotesTable
+        quotes={[
+          buildQuote('quote-1', '40101-GH'),
+          buildQuote('quote-2', '40112-GH', {
+            quote_reference: '40112-GH-REV4',
+            revision_number: 4,
+            revision_type: 'revision',
+          }),
+          buildQuote('quote-3', '40168-GH', {
+            customer_id: 'customer-2',
+            customer: { id: 'customer-2', company_name: 'Customer Ltd', short_name: 'Customer' },
+          }),
+          buildQuote('quote-4', '40061-GH', { requester_id: 'manager-2' }),
+          buildQuote('quote-5', '40062-GH', { commercial_status: 'closed' }),
+          buildQuote('quote-6', '40063-GH', { requester_id: null }),
+        ]}
+        onRowClick={vi.fn()}
+        canMerge
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Merge Quotes' }));
+    const first = screen.getAllByLabelText('Select 40101-GH for merge')[0];
+    fireEvent.click(first);
+
+    const blockedQuotes = [
+      ['40168-GH', 'This quote is on a different customer account.'],
+      ['40061-GH', 'This quote has a different manager.'],
+      ['40062-GH', 'Only commercially open quotes can be merged.'],
+      ['40063-GH', 'This quote has no assigned manager.'],
+    ];
+    for (const [reference, reason] of blockedQuotes) {
+      const inputs = screen.getAllByLabelText(`Select ${reference} for merge`);
+      expect(inputs).toHaveLength(2);
+      for (const input of inputs) {
+        expect(input).toBeDisabled();
+        expect(input).toHaveAccessibleDescription(reason);
+      }
+    }
+    for (const input of screen.getAllByLabelText('Select 40112-GH for merge')) {
+      expect(input).toBeEnabled();
+    }
+
+    fireEvent.click(first);
+    for (const input of screen.getAllByLabelText('Select 40168-GH for merge')) {
+      expect(input).toBeEnabled();
+      expect(input).not.toHaveAccessibleDescription();
+    }
+  });
+
   it('requires permanent-merge confirmation before submission', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

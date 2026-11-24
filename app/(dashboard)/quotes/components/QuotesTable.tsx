@@ -394,16 +394,25 @@ export function QuotesTable({
     [quotes, selectedMergeQuoteIds],
   );
 
-  function isQuoteMergeCompatible(quote: Quote): boolean {
-    if (!quote.is_latest_version || quote.commercial_status !== 'open' || !quote.requester_id) return false;
+  function getMergeBlockReason(quote: Quote): string | undefined {
+    if (selectedMergeQuoteIds.includes(quote.id)) return;
+    if (!quote.is_latest_version) return 'Select the latest version of this quote.';
+    if (quote.commercial_status !== 'open') return 'Only commercially open quotes can be merged.';
+    if (!quote.requester_id) return 'This quote has no assigned manager.';
+
     const first = selectedMergeQuotes[0];
-    if (!first) return true;
-    return first.customer_id === quote.customer_id && first.requester_id === quote.requester_id;
+    if (first && first.customer_id !== quote.customer_id) {
+      return 'This quote is on a different customer account.';
+    }
+    if (first && first.requester_id !== quote.requester_id) {
+      return 'This quote has a different manager.';
+    }
   }
 
   function toggleMergeQuote(quote: Quote) {
-    if (!isQuoteMergeCompatible(quote) && !selectedMergeQuoteIds.includes(quote.id)) {
-      toast.error('Merged quotes must have the same customer and manager.');
+    const reason = getMergeBlockReason(quote);
+    if (reason) {
+      toast.error(reason);
       return;
     }
     setSelectedMergeQuoteIds(current => (
@@ -825,6 +834,7 @@ export function QuotesTable({
                 const previousVersions = quote.previous_versions || [];
                 const isExpanded = Boolean(expandedThreads[quote.quote_thread_id]);
                 const quoteCustomerName = quote.customer?.company_name;
+                const mergeBlockReason = mergeSelectionMode ? getMergeBlockReason(quote) : undefined;
                 return (
                   <Fragment key={quote.id}>
                     <tr
@@ -841,7 +851,8 @@ export function QuotesTable({
                               type="checkbox"
                               aria-label={`Select ${quote.base_quote_reference} for merge`}
                               checked={selectedMergeQuoteIds.includes(quote.id)}
-                              disabled={!isQuoteMergeCompatible(quote) && !selectedMergeQuoteIds.includes(quote.id)}
+                              disabled={Boolean(mergeBlockReason)}
+                              aria-describedby={mergeBlockReason ? `merge-block-desktop-${quote.id}` : undefined}
                               onClick={event => event.stopPropagation()}
                               onChange={() => toggleMergeQuote(quote)}
                               className="h-4 w-4"
@@ -869,6 +880,11 @@ export function QuotesTable({
                             </span>
                           ) : null}
                         </div>
+                        {mergeBlockReason && (
+                          <p id={`merge-block-desktop-${quote.id}`} className="mt-1 font-sans text-xs font-normal text-amber-300">
+                            {mergeBlockReason}
+                          </p>
+                        )}
                       </td>
                       <td className={cn('px-4 py-3 text-white', isTestCustomerName(quoteCustomerName) && 'text-red-300')}>
                         {quoteCustomerName || '—'}
@@ -955,6 +971,7 @@ export function QuotesTable({
             const previousVersions = quote.previous_versions || [];
             const isExpanded = Boolean(expandedThreads[quote.quote_thread_id]);
             const quoteCustomerName = quote.customer?.company_name;
+            const mergeBlockReason = mergeSelectionMode ? getMergeBlockReason(quote) : undefined;
             return (
               <div
                 key={quote.id}
@@ -970,7 +987,8 @@ export function QuotesTable({
                         type="checkbox"
                         aria-label={`Select ${quote.base_quote_reference} for merge`}
                         checked={selectedMergeQuoteIds.includes(quote.id)}
-                        disabled={!isQuoteMergeCompatible(quote) && !selectedMergeQuoteIds.includes(quote.id)}
+                        disabled={Boolean(mergeBlockReason)}
+                        aria-describedby={mergeBlockReason ? `merge-block-mobile-${quote.id}` : undefined}
                         onClick={event => event.stopPropagation()}
                         onChange={() => toggleMergeQuote(quote)}
                         className="h-4 w-4"
@@ -1000,6 +1018,11 @@ export function QuotesTable({
                     )}
                   </div>
                 </div>
+                {mergeBlockReason && (
+                  <p id={`merge-block-mobile-${quote.id}`} className="text-xs text-amber-300">
+                    {mergeBlockReason}
+                  </p>
+                )}
                 <div className="text-xs text-slate-400">{quote.version_label || 'Original'}</div>
                 {quote.merge_info?.aliases.length ? (
                   <div className="text-xs text-amber-300">
