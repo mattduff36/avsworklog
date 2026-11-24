@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.25.3",
+    "updateKind": "minor",
+    "title": "Quotes improvements",
+    "description": "Explain blocked merge selections.",
+    "summary": "Explain blocked merge selections.",
+    "details": [
+      "Explain blocked merge selections, with changes to app screens and automated tests."
+    ],
+    "areas": [
+      "Quotes"
+    ],
+    "areaKeys": [
+      "quotes"
+    ],
+    "pushedAt": "2026-11-24T23:44:43.262Z"
+  },
+  {
     "version": "1126.25.2",
     "updateKind": "minor",
     "title": "Workshop Tasks improvements",
