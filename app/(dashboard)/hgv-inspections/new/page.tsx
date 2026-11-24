@@ -1273,7 +1273,7 @@ function NewHgvInspectionContent() {
         <p className="font-semibold">Open defects on the selected trailer</p>
         <ul className="mt-1 list-disc space-y-1 pl-5">
           {trailerWarnings.map(warning => <li key={warning.actionId}>
-            <span className="font-medium">{warning.item_description}</span>{warning.comment && ` · ${warning.comment}`}
+            <span className="font-medium">{warning.item_description}</span>{warning.comment && ` Â· ${warning.comment}`}
           </li>)}
         </ul>
       </div>
