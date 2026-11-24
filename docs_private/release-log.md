@@ -2,6 +2,27 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.25.3
+
+**GIT COMMIT MESSAGE**
+`fix(quotes): explain blocked merge selections`
+
+**PUSHED AT**
+2026-11-24T23:44:43.262Z
+
+**WHAT CHANGED**
+Explain blocked merge selections.
+
+**VERSION HISTORY DETAILS**
+- Explain blocked merge selections, with changes to app screens and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(quotes): explain blocked merge selections`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 1126.25.2
 
 **GIT COMMIT MESSAGE**
