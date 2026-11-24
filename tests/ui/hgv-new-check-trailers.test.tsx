@@ -80,7 +80,7 @@ describe('trailer handling from the driver Daily Check form', () => {
     })));
   });
 
-  it('shows the selected trailer warning without answering tractor Tyres, and clears it immediately when changing trailers', async () => {
+  it('[trailer-walkaround-warning] shows the selected trailer warning without answering tractor Tyres, and clears it immediately when changing trailers', async () => {
     let releaseSecond: (() => void) | undefined;
     outstanding = async url => {
       if (url.includes('trailerHgvId=second')) {
