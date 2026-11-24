@@ -190,6 +190,7 @@ function NewHgvInspectionContent() {
   const draftSavePromiseRef = useRef<Promise<string | null> | null>(null);
   const activeDraftLoadIdRef = useRef<string | null>(null);
   const loadedDraftIdRef = useRef<string | null>(null);
+  const [retryDraftId, setRetryDraftId] = useState<string | null>(null);
   const loadLockedDefectsRef = useRef<((selectedHgvId: string, mode?: 'replace' | 'merge', trailer?: HgvTrailerSelection | null) => Promise<void>) | null>(null);
 
   const showPermissionLoader = permissionLoading;
@@ -240,7 +241,7 @@ function NewHgvInspectionContent() {
     setNowMs(startedAt);
   }, []);
 
-  const findExistingInspectionConflict = useCallback(async (): Promise<ExistingInspectionConflict | null> => {
+  const findExistingInspectionConflict = useCallback(async (status: 'draft' | 'submitted' = 'draft'): Promise<ExistingInspectionConflict | null> => {
     if (!hgvId || !inspectionDate || !selectedEmployeeId) {
       return null;
     }
@@ -248,9 +249,12 @@ function NewHgvInspectionContent() {
     const { data, error } = await supabase
       .from('hgv_inspections')
       .select('id, status')
-      .eq('id', existingInspectionId || '00000000-0000-0000-0000-000000000000')
+      .eq('hgv_id', hgvId)
+      .eq('record_kind', 'full_check')
+      .eq('status', status)
       .eq('user_id', selectedEmployeeId)
       .eq('inspection_date', inspectionDate)
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
@@ -265,7 +269,7 @@ function NewHgvInspectionContent() {
           errorContextId: 'hgv-inspections-new-check-existing-error',
         });
       }
-      return null;
+      throw new Error('Could not check for an existing Daily Check. Please retry.');
     }
 
     if (!data) {
@@ -323,6 +327,7 @@ function NewHgvInspectionContent() {
       throw new Error('Please enter a valid current KM');
     }
 
+    if (!isDraftHydratedRef.current) throw new Error('Reopen the saved draft before saving changes');
     const saved = await requestHgvInspectionSave({
       requestId: requestIdRef.current!,
       recordKind: 'full_check',
@@ -339,6 +344,7 @@ function NewHgvInspectionContent() {
       items: buildCurrentInspectionItemsPayload(),
     });
 
+    loadedDraftIdRef.current = saved.id;
     setExistingInspectionId(saved.id);
     window.history.replaceState(null, '', `/hgv-inspections/new?id=${saved.id}`);
     return saved;
@@ -462,12 +468,10 @@ function NewHgvInspectionContent() {
     }
 
     const pendingDraftSave = (async () => {
-      const { silent = false, source = 'user' } = options;
+      const { silent = false } = options;
+      if (!isDraftHydratedRef.current || loadingRef.current) return null;
 
       if (existingInspectionId) {
-        if (source === 'auto' && !isDraftHydratedRef.current) {
-          return existingInspectionId;
-        }
         if (saveInspectionInFlightRef.current) {
           return existingInspectionIdRef.current;
         }
@@ -504,7 +508,9 @@ function NewHgvInspectionContent() {
         const inspectionConflict = await findExistingInspectionConflict();
         if (inspectionConflict) {
           if (inspectionConflict.status === 'draft') {
-            return mergeIntoExistingDraft(inspectionConflict.id, { showToast: !silent });
+            await loadDraftInspection(inspectionConflict.id);
+            // The photo button belonged to the previous form. Reopen it on the restored checklist.
+            return null;
           }
           handleInspectionConflict(inspectionConflict);
           return null;
@@ -559,19 +565,10 @@ function NewHgvInspectionContent() {
         .eq('status', 'draft')
         .maybeSingle();
 
-      if (draftError || !draft) {
-        setExistingInspectionId(null);
-        window.history.replaceState(null, '', '/hgv-inspections/new');
-        isDraftHydratedRef.current = true;
-        return;
-      }
+      if (draftError || !draft) throw draftError || new Error('This draft is no longer available. Refresh the HGV checks list.');
 
       if (!canManageCrossUserInspections && draft.user_id !== user?.id) {
-        setExistingInspectionId(null);
-        window.history.replaceState(null, '', '/hgv-inspections/new');
-        setError('You do not have permission to edit this inspection');
-        isDraftHydratedRef.current = true;
-        return;
+        throw new Error('You do not have permission to edit this inspection');
       }
 
       if (draft.record_kind === 'defect_report') {
@@ -579,6 +576,12 @@ function NewHgvInspectionContent() {
         router.replace(`/hgv-inspections/${id}`);
         return;
       }
+
+      const { data: items, error: itemsError } = await supabase
+        .from('inspection_items')
+        .select('item_number, item_description, status, comments')
+        .eq('inspection_id', id);
+      if (itemsError || !items) throw new Error('Could not load the saved checklist answers. Please retry opening the draft.');
 
       setExistingInspectionId(id);
       setSubmittedConflictInspectionId(null);
@@ -590,11 +593,6 @@ function NewHgvInspectionContent() {
       setCurrentMileage(draft.current_mileage != null ? String(draft.current_mileage) : '');
       setSelectedEmployeeId(draft.user_id || '');
       setInspectorComments(draft.inspector_comments || '');
-
-      const { data: items } = await supabase
-        .from('inspection_items')
-        .select('item_number, item_description, status, comments')
-        .eq('inspection_id', id);
 
       const restoredStates: Record<string, InspectionStatus> = {};
       const restoredComments: Record<string, string> = {};
@@ -626,8 +624,13 @@ function NewHgvInspectionContent() {
       if (draft.hgv_id) {
         await loadLockedDefectsRef.current?.(draft.hgv_id, 'merge', restoredTrailer);
       }
+      window.history.replaceState(null, '', `/hgv-inspections/new?id=${id}`);
       loadedDraftIdRef.current = id;
+      setRetryDraftId(null);
+      isDraftHydratedRef.current = true;
+      setError('');
     } catch (err) {
+      setRetryDraftId(id);
       const errorContextId = 'hgv-inspections-new-load-draft-error';
       if (isNetworkFetchError(err)) {
         console.warn('Unable to load HGV draft inspection (network):', err, { errorContextId });
@@ -645,7 +648,6 @@ function NewHgvInspectionContent() {
         activeDraftLoadIdRef.current = null;
       }
       loadingRef.current = false;
-      isDraftHydratedRef.current = true;
       setLoading(false);
     }
   }, [router, canManageCrossUserInspections, supabase, user?.id]);
@@ -673,7 +675,7 @@ function NewHgvInspectionContent() {
             has_module_access: employee.has_module_access,
           })) as Employee[]
         );
-        setSelectedEmployeeId(user.id);
+        setSelectedEmployeeId(current => current || user.id);
       } catch (error) {
         if (!isAuthErrorStatus(getErrorStatus(error))) {
           console.error('Error loading HGV inspection setup data:', error);
@@ -698,11 +700,6 @@ function NewHgvInspectionContent() {
         void loadDraftInspection(draftId);
       }, 100);
       return () => clearTimeout(timer);
-    } else {
-      if (!draftId) {
-        loadedDraftIdRef.current = null;
-      }
-      isDraftHydratedRef.current = true;
     }
   }, [draftId, user, loadDraftInspection]);
 
@@ -714,7 +711,7 @@ function NewHgvInspectionContent() {
 
   useEffect(() => {
     const persistDraft = () => {
-      if (existingInspectionId && !isDraftHydratedRef.current) return;
+      if (!isDraftHydratedRef.current) return;
       if (
         loadingRef.current ||
         saveInspectionInFlightRef.current ||
@@ -917,19 +914,27 @@ function NewHgvInspectionContent() {
       return;
     }
 
+    if (loadingRef.current || saveInspectionInFlightRef.current) return;
     if (!existingInspectionId) {
-      const inspectionConflict = await findExistingInspectionConflict();
-      if (inspectionConflict) {
-        if (inspectionConflict.status === 'draft') {
-          const merged = await mergeIntoExistingDraft(inspectionConflict.id);
-          if (!merged) {
-            return;
-          }
-        } else {
-          handleInspectionConflict(inspectionConflict);
+      loadingRef.current = true;
+      setLoading(true);
+      try {
+        const matchingDraft = await findExistingInspectionConflict();
+        if (matchingDraft) {
+          await loadDraftInspection(matchingDraft.id);
           return;
         }
+        isDraftHydratedRef.current = true;
+      } catch (lookupError) {
+        setError(lookupError instanceof Error ? lookupError.message : 'Could not look up the existing draft.');
+        return;
+      } finally {
+        loadingRef.current = false;
+        setLoading(false);
       }
+    } else if (!isDraftHydratedRef.current) {
+      await loadDraftInspection(existingInspectionId);
+      return;
     }
 
     setError('');
@@ -992,6 +997,7 @@ function NewHgvInspectionContent() {
       return 'Click Start Daily Check before completing the checklist';
     }
 
+    if (!isDraftHydratedRef.current) return 'Reopen the saved draft before submitting';
     if (!selectedTrailer) return 'Select a trailer or choose No trailer attached';
     if (lockError) return 'Retry the outstanding defect lookup before submitting';
     if (lockLoading) return 'Wait for outstanding defect checks to finish loading';
@@ -1131,7 +1137,7 @@ function NewHgvInspectionContent() {
       }
     } catch (err) {
       if (isHgvSubmittedConflictError(err)) {
-        const conflict = existingInspectionId ? { id: existingInspectionId, status: 'submitted' as const } : await findExistingInspectionConflict();
+        const conflict = existingInspectionId ? { id: existingInspectionId, status: 'submitted' as const } : await findExistingInspectionConflict('submitted').catch(() => null);
         setError('This check was submitted in another tab. Your new answers were not saved. View the submitted check to make a correction or start another check.');
         if (conflict) handleInspectionConflict(conflict);
         return;
@@ -1309,7 +1315,7 @@ function NewHgvInspectionContent() {
       {error && (
         <div className="p-4 text-sm text-red-300 bg-red-500/10 border border-red-500/30 rounded-lg backdrop-blur-xl flex items-start gap-3">
           <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
-          <div>{error}</div>
+          <div>{error}{retryDraftId && <Button variant="link" type="button" disabled={loading} onClick={() => void loadDraftInspection(retryDraftId)}>Retry opening draft</Button>}</div>
         </div>
       )}
 
@@ -1327,7 +1333,7 @@ function NewHgvInspectionContent() {
                 <User className="h-4 w-4" />
                 Creating daily check for
               </Label>
-              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+              <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId} disabled={loading || checklistStarted}>
                 <SelectTrigger id="selectedEmployeeId" className="h-12 text-base bg-slate-900/50 border-slate-600 text-white">
                   <SelectValue placeholder="Select employee..." />
                 </SelectTrigger>
@@ -1353,7 +1359,7 @@ function NewHgvInspectionContent() {
               </Label>
               <Select
                 value={hgvId}
-                disabled={checklistStarted}
+                disabled={checklistStarted || loading}
                 onValueChange={(value) => {
                   setHgvId(value);
                   setTrailerSelection(null);
@@ -1433,7 +1439,7 @@ function NewHgvInspectionContent() {
                   setInspectionDate(e.target.value);
                 }}
                 max={formatDateISO(new Date())}
-                disabled={checklistStarted}
+                disabled={checklistStarted || loading}
                 className="h-12 text-base bg-slate-900/50 border-slate-600 text-white w-full"
                 required
               />
@@ -1452,6 +1458,7 @@ function NewHgvInspectionContent() {
                 min="0"
                 step="1"
                 value={currentMileage}
+                disabled={loading}
                 onChange={(e) => {
                   setCurrentMileage(e.target.value);
                   setShowDigitGrowthWarningDialog(false);
@@ -1495,7 +1502,7 @@ function NewHgvInspectionContent() {
             {!checklistStarted ? (
               <Button
                 onClick={startInspection}
-                disabled={!hgvId || !inspectionDate || !currentMileage}
+                disabled={loading || !hgvId || !inspectionDate || !currentMileage}
                 className="w-full md:w-auto h-12 bg-inspection hover:bg-inspection/90 text-slate-900 font-semibold whitespace-nowrap"
               >
                 <Timer className="h-4 w-4 mr-2" />

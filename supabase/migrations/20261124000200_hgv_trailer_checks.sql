@@ -132,6 +132,20 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- Re-check eligibility when a draft is first signed, even if its saved selection has not changed.
+  -- Retried signed requests and audited corrections must continue to work after asset retirement.
+  IF TG_OP='UPDATE' AND OLD.status='draft' AND NEW.status='submitted' THEN
+    PERFORM 1 FROM public.hgvs h JOIN public.hgv_categories c ON c.id=h.category_id
+      WHERE h.id=NEW.hgv_id AND h.status='active' AND h.retired_at IS NULL AND lower(trim(c.name))<>'trailer'
+      FOR SHARE OF h,c;
+    IF NOT FOUND THEN RAISE EXCEPTION 'HGV_SAVE:INVALID_TRAILER'; END IF;
+    IF NEW.trailer_kind='fleet' THEN
+      PERFORM 1 FROM private.hgv_trailer_identity(NEW.hgv_id,jsonb_build_object('kind','fleet','trailerHgvId',NEW.trailer_hgv_id));
+    END IF;
+    IF NEW.trailer_kind IN ('fleet','hired') AND EXISTS (SELECT FROM public.vehicle_maintenance
+      WHERE hgv_id=NEW.hgv_id AND upper(ves_wheelplan) LIKE '%RIGID%') THEN RAISE EXCEPTION 'HGV_SAVE:INVALID_TRAILER'; END IF;
+  END IF;
+
   IF selection='{"keep":true}'::jsonb OR selection=private.hgv_saved_trailer_selection(
     NEW.trailer_kind,NEW.trailer_hgv_id,NEW.hired_trailer_id,NEW.hired_trailer_company) THEN RETURN NEW; END IF;
   IF TG_OP='UPDATE' THEN
@@ -190,10 +204,6 @@ BEGIN
       IF inspection.trailer_kind IS NULL AND (coalesce(wheelplan,'') NOT LIKE '%RIGID%'
         OR EXISTS(SELECT FROM jsonb_array_elements(p_items) i WHERE (i->>'item_number')::integer BETWEEN 23 AND 26 AND i->>'status'<>'na')) THEN
         RAISE EXCEPTION 'HGV_SAVE:TRAILER_REQUIRED';
-      END IF;
-      IF inspection.trailer_kind IN ('fleet','hired') AND (wheelplan LIKE '%RIGID%' OR EXISTS(
-          SELECT FROM public.hgvs h JOIN public.hgv_categories c ON c.id=h.category_id WHERE h.id=p_hgv_id AND lower(trim(c.name))='trailer')) THEN
-        RAISE EXCEPTION 'HGV_SAVE:INVALID_TRAILER';
       END IF;
     END IF;
     IF inspection.trailer_kind='none' AND EXISTS(SELECT FROM jsonb_array_elements(p_items) i

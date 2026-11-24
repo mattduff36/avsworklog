@@ -61,6 +61,22 @@ export async function verifyTrailerAssociations(db: Client, date: string, day: n
   await expect(save({ selection:{kind:'none'} })).rejects.toThrow('INVALID_TRAILER');
   await save({ hgv:rigid,selection:{kind:'none'},na:true,compat:true });
 
+  await expect(save({hgv:trailer,selection:{kind:'none'},na:true})).rejects.toThrow('INVALID_TRAILER');
+  const retirementDraft=randomUUID();
+  await save({id:retirementDraft,status:'draft',selection:fleet});
+  await db.query('UPDATE hgvs SET retired_at=now() WHERE id=$1',[trailer]);
+  await expect(save({hint:retirementDraft,selection:fleet})).rejects.toThrow('INVALID_TRAILER');
+  expect((await db.query('SELECT status FROM hgv_inspections WHERE id=$1',[retirementDraft])).rows[0].status).toBe('draft');
+  await db.query("UPDATE hgvs SET retired_at=NULL,category_id=(SELECT id FROM hgv_categories WHERE name='All HGVs') WHERE id=$1",[trailer]);
+  await expect(save({hint:retirementDraft,selection:fleet})).rejects.toThrow('INVALID_TRAILER');
+  await db.query("UPDATE hgvs SET category_id=(SELECT id FROM hgv_categories WHERE name='Trailer') WHERE id=$1",[trailer]);
+  const signingId=randomUUID();
+  await save({id:signingId,hint:retirementDraft,selection:fleet});
+  await db.query('UPDATE hgvs SET retired_at=now() WHERE id=$1',[trailer]);
+  await save({id:signingId,hint:retirementDraft,selection:fleet});
+  await save({hint:retirementDraft,correction:true});
+  await db.query('UPDATE hgvs SET retired_at=NULL WHERE id=$1',[trailer]);
+
   const draft=randomUUID();
   await save({id:draft,status:'draft',selection:fleet});
   await db.query('INSERT INTO inspection_photos(inspection_id,item_number) VALUES ($1,23)',[draft]);

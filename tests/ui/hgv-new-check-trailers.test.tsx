@@ -7,6 +7,8 @@ import { requestHgvInspectionSave } from '@/lib/client/hgv-inspection-save';
 const auth = {user:{id:'driver'},loading:false};
 const router = {push: vi.fn(), replace: vi.fn()};
 let query: URLSearchParams;
+let matchingDraft = false;
+let failDraftItems = false;
 const photos = {photoMap:{}, photos:[], refresh:vi.fn(), loading:false, error:null};
 const assets = [
   {id:'tractor',reg_number:'TRACTOR',nickname:null,current_mileage:100,classification:'artic'},
@@ -18,17 +20,31 @@ vi.mock('next/navigation', () => ({useRouter: () => router, useSearchParams: () 
 vi.mock('@/lib/hooks/useAuth', () => ({useAuth: () => auth}));
 vi.mock('@/lib/hooks/usePermissionCheck', () => ({usePermissionCheck: () => ({loading:false,hasPermission:true})}));
 vi.mock('@/components/layout/tablet-mode-context', () => ({useTabletMode: () => ({tabletModeEnabled:true})}));
-vi.mock('@/lib/hooks/useInspectionPhotos', () => ({useInspectionPhotos: () => photos}));
+vi.mock('@/lib/hooks/useInspectionPhotos', () => ({useInspectionPhotos: (id: string) => id === 'saved' && matchingDraft ? {...photos, photos:[{id:'photo',item_number:23,day_of_week:7}]} : photos}));
 vi.mock('@/lib/client/hgv-inspection-save', () => ({requestHgvInspectionSave: vi.fn(),isHgvSubmittedConflictError: () => false}));
 vi.mock('@/lib/supabase/client', () => ({createClient: () => ({from: (table: string) => {
-  if (table === 'inspection_items') return {select: () => ({eq: async () => ({data:[{item_number:23,item_description:'Brake Hoses',status:'ok',comments:null}]})})};
-  const builder = {select: () => builder,eq: () => builder,limit: () => builder,maybeSingle: async () => ({data: query.has('id') ? {
-    id:'saved',user_id:'driver',hgv_id:'tractor',inspection_date:'2026-11-01',current_mileage:100,record_kind:'full_check',trailer_kind:'fleet',trailer_hgv_id:'trailer'
-  } : null})};
+  if (table === 'inspection_items') return {select: () => ({eq: async () => failDraftItems ? {data:null,error:{message:'Failed'}} : {
+    data:[{item_number:23,item_description:'Brake Hoses',status:'ok',comments:'Existing trailer note'}]
+  }})};
+  const filters = new Map<string, string>();
+  const builder = {
+    select: () => builder, eq: (key: string, value: string) => { filters.set(key,value); return builder; },
+    order: () => builder, limit: () => builder,
+    maybeSingle: async () => {
+      if (filters.get('id') === 'saved') return {data:{
+        id:'saved',user_id:'driver',hgv_id:'tractor',inspection_date:'2026-11-01',current_mileage:100,record_kind:'full_check',trailer_kind:'fleet',trailer_hgv_id:'trailer'
+      }};
+      const matches = matchingDraft && filters.get('hgv_id') === 'tractor' && filters.get('user_id') === 'driver' &&
+        filters.get('inspection_date') === '2026-11-01' && filters.get('status') === 'draft' && filters.get('record_kind') === 'full_check';
+      return {data: matches ? {id:'saved',status:'draft'} : null};
+    }
+  };
   return builder;
 }})}));
 
 beforeEach(() => {
+  matchingDraft = false;
+  failDraftItems = false;
   Element.prototype.scrollIntoView = vi.fn();
   vi.mocked(requestHgvInspectionSave).mockResolvedValue({id:'saved',items:[],status:'draft'});
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
@@ -40,14 +56,14 @@ beforeEach(() => {
 });
 afterEach(() => {cleanup();vi.clearAllMocks();vi.unstubAllGlobals();});
 
-async function start(id: string) {
+async function start(id: string, waitForChecklist = true) {
   query = new URLSearchParams({hgvId:id});
   render(<NewHgvInspectionPage />);
   await waitFor(() => expect((screen.getByLabelText(/Current KM/) as HTMLInputElement).placeholder).toBe('e.g. 100'));
   fireEvent.change(screen.getByLabelText(/Daily Check Date/),{target:{value:'2026-11-01'}});
   fireEvent.change(screen.getByLabelText(/Current KM/),{target:{value:'100'}});
   fireEvent.click(screen.getByRole('button',{name:'Start Daily Check'}));
-  await screen.findByText('26-Point HGV Safety Check');
+  if (waitForChecklist) await screen.findByText('26-Point HGV Safety Check');
 }
 
 describe('trailer handling from the driver Daily Check form', () => {
@@ -59,6 +75,39 @@ describe('trailer handling from the driver Daily Check form', () => {
       status:'draft', hgvId:'rigid', trailerSelection:{kind:'none'},
       items:[23,24,25,26].map(item_number => expect.objectContaining({item_number,status:'na'})),
     })));
+  });
+
+  it('opens a matching tractor draft without an initial write and preserves its pairing, note and photos', async () => {
+    matchingDraft = true;
+    await start('tractor');
+    await screen.findAllByText('Trailer · C517773 (Nooteboom)');
+    expect(await screen.findAllByRole('button', {name:'Manage photos for Brake Hoses'})).not.toHaveLength(0);
+    expect(requestHgvInspectionSave).not.toHaveBeenCalled();
+    fireEvent(window,new Event('pagehide'));
+    await waitFor(() => expect(requestHgvInspectionSave).toHaveBeenCalledWith(expect.objectContaining({
+      hintInspectionId:'saved', trailerSelection:{kind:'fleet',trailerHgvId:'trailer'},
+      items:[expect.objectContaining({item_number:23,status:'ok',comments:'Existing trailer note'})],
+    })));
+  });
+
+  it('leaves saved evidence untouched if hydration fails and allows reopening it', async () => {
+    matchingDraft = true; failDraftItems = true;
+    await start('tractor',false);
+    const retry = await screen.findByRole('button',{name:'Retry opening draft'});
+    fireEvent(window,new Event('pagehide'));
+    expect(requestHgvInspectionSave).not.toHaveBeenCalled();
+    failDraftItems = false;
+    fireEvent.click(retry);
+    await screen.findAllByText('Trailer · C517773 (Nooteboom)');
+    expect(requestHgvInspectionSave).not.toHaveBeenCalled();
+  });
+
+  it('resumes a draft discovered during photo or page-hide saving before accepting new evidence', async () => {
+    await start('tractor');
+    matchingDraft = true;
+    fireEvent(window,new Event('pagehide'));
+    await screen.findAllByText('Trailer · C517773 (Nooteboom)');
+    expect(requestHgvInspectionSave).not.toHaveBeenCalled();
   });
 
   it('restores a tractor draft and keeps its trailer and answers on the next save', async () => {
