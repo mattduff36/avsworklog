@@ -37,6 +37,7 @@ export async function PUT(
       .single();
 
     if (error) {
+      if (error.code === '23514') return NextResponse.json({ error: 'The Trailer category is used by HGV Daily Checks' }, { status: 409 });
       if (error.code === '23505') {
         return NextResponse.json(
           { error: 'HGV category with this name already exists' },
@@ -95,6 +96,7 @@ export async function DELETE(
       .delete()
       .eq('id', categoryId);
 
+    if (error?.code === '23514') return NextResponse.json({ error: 'The Trailer category is used by HGV Daily Checks' }, { status: 409 });
     if (error) throw error;
 
     return NextResponse.json({ success: true });

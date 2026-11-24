@@ -128,7 +128,7 @@ export function AddHgvDialog({ open, onOpenChange, onSuccess }: AddHgvDialogProp
       <form onSubmit={handleSubmit} className="space-y-4">
         {error ? <p className="rounded border border-red-700 bg-red-900/20 p-2 text-sm text-red-300">{error}</p> : null}
         <div className="space-y-2">
-          <Label htmlFor="hgv-reg">Registration *</Label>
+          <Label htmlFor="hgv-reg">Registration / trailer ID *</Label>
           <Input
             id="hgv-reg"
             value={formData.reg_number}

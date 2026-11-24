@@ -8,6 +8,9 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { usePermissionCheck } from '@/lib/hooks/usePermissionCheck';
 import { canAccessScopedInspection, getInspectionVisibilityFlags } from '@/lib/utils/inspection-access';
+import { HgvTrailerSwaps } from '@/components/inspections/HgvTrailerSwaps';
+import { canCorrectHgvCheck } from '@/lib/inspections/hgv-updates';
+import { HGV_ARTIC_ONLY_START_ITEM, TRUCK_CHECKLIST_ITEMS } from '@/lib/checklists/vehicle-checklists';
 import { HgvCheckUpdates } from '@/components/inspections/HgvCheckUpdates';
 import { BackButton } from '@/components/ui/back-button';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +49,8 @@ interface HgvInspectionDetails {
   inspection_date: string;
   inspection_end_date: string | null;
   current_mileage: number | null;
+  trailer_kind: string | null;
+  trailer_label: string | null;
   status: 'draft' | 'submitted';
   submitted_at: string | null;
   record_kind: 'full_check' | 'defect_report';
@@ -229,6 +234,10 @@ export default function ViewHgvInspectionPage() {
     fetchInspection(params.id as string);
   }, [authLoading, permissionLoading, canAccessInspectionModule, fetchInspection, params.id]);
 
+  useEffect(() => {
+    if (inspection && window.location.hash === '#trailer-check') document.getElementById('trailer-check')?.scrollIntoView();
+  }, [inspection]);
+
   const getStatusIcon = (status: InspectionStatus) => {
     if (status === 'ok') return <CheckCircle2 className="h-5 w-5 text-green-400" />;
     if (status === 'attention') return <XCircle className="h-5 w-5 text-red-400" />;
@@ -254,6 +263,12 @@ export default function ViewHgvInspectionPage() {
 
   if (!inspection) return null;
 
+  const trailerDescriptions = TRUCK_CHECKLIST_ITEMS.slice(HGV_ARTIC_ONLY_START_ITEM - 1).map(label => label.toLowerCase());
+  const isTrailerItem = (item: InspectionItemWithDay) => trailerDescriptions.includes(item.item_description?.trim().toLowerCase() || '');
+  const checklistGroups = inspection.trailer_kind && inspection.trailer_kind !== 'none' ? [
+    { label: 'Checklist Items', items: items.filter(item => !isTrailerItem(item)), id: undefined },
+    { label: 'Artics only', items: items.filter(isTrailerItem), id: 'trailer-check' },
+  ] : [{label: 'Checklist Items', items, id: undefined}];
   const defectCount = items.filter(item => item.status === 'attention').length;
   const okCount = items.filter(item => item.status === 'ok').length;
   const canUploadPhotos = inspection.user_id === user?.id;
@@ -294,6 +309,7 @@ export default function ViewHgvInspectionPage() {
                 {formatDate(inspection.inspection_date)}
                 {inspection.profiles?.full_name ? ` • ${inspection.profiles.full_name}` : ''}
               </p>
+              {inspection.trailer_label && <p className="text-sm">Trailer · {inspection.trailer_label}</p>}
               {inspectionReference && (
                 <div className="mt-1 text-xs md:text-sm text-slate-500 dark:text-slate-400/80">
                   <span>{inspectionReference}</span>
@@ -373,10 +389,10 @@ export default function ViewHgvInspectionPage() {
         </Card>
       </div>
 
-      <Card className="">
+      {checklistGroups.map(group => <Card key={group.label} id={group.id} className="scroll-mt-24">
         <CardHeader>
-          <CardTitle>Checklist Items</CardTitle>
-          <CardDescription>HGV checklist results</CardDescription>
+          <CardTitle>{group.label}</CardTitle>
+          <CardDescription>{group.id ? inspection.trailer_label : 'HGV checklist results'}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="hidden md:block overflow-x-auto">
@@ -390,7 +406,7 @@ export default function ViewHgvInspectionPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
+                {group.items.map((item) => (
                   <tr key={item.id} className="border-b border-border/50 hover:bg-slate-800/30">
                     <td className="p-3 text-sm text-muted-foreground">{item.item_number}</td>
                     <td className="p-3 text-sm text-white">{item.item_description}</td>
@@ -402,7 +418,7 @@ export default function ViewHgvInspectionPage() {
                     <td className="p-3 text-sm">
                       <div className="space-y-3">
                         <div className="text-muted-foreground">{item.comments || '-'}</div>
-                        {item.status === 'attention' && (
+                        {(item.status === 'attention' || getPhotosForItem(item.item_number, item.day_of_week).length > 0) && (
                           <>
                             <InspectionPhotoTiles
                               photos={getPhotosForItem(item.item_number, item.day_of_week)}
@@ -428,7 +444,7 @@ export default function ViewHgvInspectionPage() {
             </table>
           </div>
           <div className="md:hidden space-y-3">
-            {items.map((item) => (
+            {group.items.map((item) => (
               <div key={item.id} className="bg-slate-900/30 border border-border/50 rounded-lg p-4 space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
@@ -444,7 +460,7 @@ export default function ViewHgvInspectionPage() {
                   </div>
                 </div>
                 <div className="text-sm text-muted-foreground">{item.comments || 'No comments'}</div>
-                {item.status === 'attention' && (
+                {(item.status === 'attention' || getPhotosForItem(item.item_number, item.day_of_week).length > 0) && (
                   <InspectionPhotoTiles
                     photos={getPhotosForItem(item.item_number, item.day_of_week)}
                     onManage={
@@ -463,7 +479,11 @@ export default function ViewHgvInspectionPage() {
             ))}
           </div>
         </CardContent>
-      </Card>
+      </Card>)}
+
+      {isSubmittedInspection && inspection.record_kind === 'full_check' && inspection.hgv_id && (
+        <HgvTrailerSwaps key={inspection.id} checkId={inspection.id} hgvId={inspection.hgv_id} canRecord={Boolean(user && canCorrectHgvCheck(inspection, user.id))} />
+      )}
 
       {(inspection.inspector_comments || defectsWithWorkshop.length > 0 || hasInformWorkshopTask) && (
         <Card>

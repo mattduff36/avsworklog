@@ -1000,7 +1000,7 @@ async function loadWorkshopTasksForBoard() {
         .select(`
           id,
           hgv_id,
-          hgvs (
+          hgvs!hgv_inspections_hgv_id_fkey (
             reg_number,
             nickname
           )

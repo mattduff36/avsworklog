@@ -80,7 +80,7 @@ async function addDefectCounts(rows: DailyCheckHistoryItem[]) {
 
 function getDailyCheckStatusLabel(inspection: DailyCheckHistoryItem) {
   const defectCount = inspection.defect_count || 0;
-  if (defectCount === 0) return 'All Passed';
+  if (defectCount === 0) return inspection.history_summary ? 'No defects recorded' : 'All Passed';
   return `${defectCount} ${defectCount === 1 ? 'Defect' : 'Defects'}`;
 }
 
@@ -99,7 +99,7 @@ function formatDistance(value: number | null, assetType: AssetType) {
   return `${formattedValue} ${assetConfig[assetType].distanceUnit}`;
 }
 
-export async function fetchDailyChecks(assetType: AssetType, assetId: string) {
+export async function fetchDailyChecks(assetType: AssetType, assetId: string, offset = 0) {
   const supabase = createClient();
 
   switch (assetType) {
@@ -146,26 +146,27 @@ export async function fetchDailyChecks(assetType: AssetType, assetId: string) {
       return addDefectCounts((data || []).map(row => ({ ...row, profile: row.guest_name ? { full_name: guestInspectorName(row) } : row.profile })) as unknown as DailyCheckHistoryItem[]);
     }
     case 'hgv': {
-      const { data, error } = await supabase
-        .from('hgv_inspections')
-        .select(`
-          id,
-          inspection_date,
-          inspection_end_date,
-          submitted_at,
-          record_kind,
-          status,
-          current_mileage,
-          profile:profiles!hgv_inspections_user_id_fkey(full_name)
-        `)
-        .eq('hgv_id', assetId)
-        .eq('status', 'submitted')
-        .order('inspection_date', { ascending: false })
-        .order('submitted_at', { ascending: false })
-        .limit(50);
-
+      const { data, error } = await supabase.rpc('hgv_asset_daily_checks', {
+        p_asset_id: assetId,
+        p_offset: offset,
+      });
       if (error) throw error;
-      return addDefectCounts((data || []) as unknown as DailyCheckHistoryItem[]);
+      return (data || []).map((entry): DailyCheckHistoryItem => {
+        const tractor = entry.tractor_registration || 'HGV';
+        const summary = entry.entry_kind === 'swap'
+          ? `Trailer change · ${tractor} · ${entry.trailer_label || 'Trailer'}`
+          : entry.entry_kind === 'trailer' ? `${entry.record_kind === 'defect_report' ? 'Trailer defect report' : 'Trailer check'} · ${tractor}` : undefined;
+        const section = entry.entry_kind === 'swap'
+          ? `#trailer-swap-${entry.id}` : entry.entry_kind === 'trailer' ? '#trailer-check' : '';
+        return {
+          ...entry,
+          status: 'submitted',
+          inspection_end_date: null,
+          profile: entry.driver_name ? { full_name: entry.driver_name } : null,
+          history_summary: summary,
+          history_href: `/hgv-inspections/${entry.inspection_id}${section}`,
+        };
+      });
     }
   }
 }
@@ -233,7 +234,7 @@ export function DailyChecksHistoryTab({ assetId, assetType }: DailyChecksHistory
                 <button
                   key={inspection.id}
                   type="button"
-                  onClick={() => router.push(`${config.routePrefix}/${inspection.id}`)}
+                  onClick={() => router.push(inspection.history_href || `${config.routePrefix}/${inspection.id}`)}
                   className="w-full rounded-lg border border-border p-4 text-left transition-colors hover:bg-slate-700/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -243,7 +244,7 @@ export function DailyChecksHistoryTab({ assetId, assetType }: DailyChecksHistory
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {inspection.profile?.full_name ? `${inspection.profile.full_name} - ` : ''}
-                        {formatDistance(inspection.current_mileage, assetType)}
+                        {inspection.history_summary || formatDistance(inspection.current_mileage, assetType)}
                       </div>
                       {inspection.submitted_at && (
                         <div className="mt-1 text-xs text-muted-foreground">

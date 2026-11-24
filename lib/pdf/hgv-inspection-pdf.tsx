@@ -157,6 +157,7 @@ interface HgvInspectionPDFProps {
     id: string;
     inspection_date: string;
     current_mileage: number | null;
+    trailer_label?: string | null;
     inspector_comments: string | null;
     signature_data?: string | null;
     signed_at?: string | null;
@@ -275,6 +276,7 @@ export function HgvInspectionPDF({ inspection, hgv, operator, items, defectsWith
                   context: assetLabelContext,
                 })}
               </Text>
+              {inspection.trailer_label && <Text style={styles.topValue}>Trailer · {inspection.trailer_label}</Text>}
             </View>
             <View style={[styles.topCell, { width: '20%' }]}>
               <Text style={styles.topLabel}>HOURS / KM</Text>

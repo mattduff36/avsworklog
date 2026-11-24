@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fetchDailyChecks } from '@/components/fleet/DailyChecksHistoryTab';
 const state = vi.hoisted(() => ({ selects: [] as string[], rows: [] as Record<string, unknown>[] }));
-vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ from: (table: string) => {
+vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ rpc: () => {
+  state.selects.push('driver_name');
+  return Promise.resolve({ data: [{ id: 'check', inspection_id: 'check', entry_kind: 'tractor', driver_name: 'Temporary Plant Checks' }], error: null });
+}, from: (table: string) => {
   const query = { select: (value: string) => {state.selects.push(value);return query;}, eq: () => query, order: () => query, limit: () => query, in: () => query, then: (resolve: (value: unknown) => unknown) => Promise.resolve({data:table === 'inspection_items' ? [] : state.rows,error:null}).then(resolve) };return query;
 } }) }));
 describe('Asset daily-check history guest attribution', () => {

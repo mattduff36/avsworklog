@@ -2,7 +2,7 @@
 
 import { AssetExternalDocuments } from '@/components/external-documents/AssetExternalDocuments';
 
-import { useState, useEffect, useCallback, use, useMemo } from 'react';
+import { useState, useEffect, useCallback, use, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -352,6 +352,9 @@ export default function HgvHistoryPage({
   const [maintenanceHistory, setMaintenanceHistory] = useState<MaintenanceHistoryEntry[]>([]);
   const [workshopTasks, setWorkshopTasks] = useState<WorkshopTask[]>([]);
   const [dailyChecks, setDailyChecks] = useState<DailyCheckHistoryItem[]>([]);
+  const dailyCheckRequest = useRef(0);
+  const [dailyCheckOffset, setDailyCheckOffset] = useState<number | null>(null);
+  const [dailyCheckError, setDailyCheckError] = useState(false);
   const [dailyChecksLoading, setDailyChecksLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('maintenance');
   const [motData, setMotData] = useState<{
@@ -608,7 +611,9 @@ export default function HgvHistoryPage({
     }
   }, [supabase, resolvedParams.hgvId]);
 
-  const fetchDailyCheckHistory = useCallback(async () => {
+  const fetchDailyCheckHistory = useCallback(async (offset = 0) => {
+    const request = ++dailyCheckRequest.current;
+    if (offset === 0) setDailyCheckOffset(null);
     if (!resolvedParams.hgvId) {
       setDailyChecks([]);
       setDailyChecksLoading(false);
@@ -617,13 +622,20 @@ export default function HgvHistoryPage({
 
     try {
       setDailyChecksLoading(true);
-      const rows = await fetchDailyChecks('hgv', resolvedParams.hgvId);
-      setDailyChecks(rows);
+      setDailyCheckError(false);
+      const rows = await fetchDailyChecks('hgv', resolvedParams.hgvId, offset);
+      if (request !== dailyCheckRequest.current) return;
+      setDailyChecks(previous => offset === 0 ? rows : [
+        ...previous, ...rows.filter(row => !previous.some(existing => existing.id === row.id)),
+      ]);
+      setDailyCheckOffset(rows.length === 50 ? offset + rows.length : null);
     } catch (error) {
+      if (request !== dailyCheckRequest.current) return;
       console.error('Error fetching HGV daily checks:', error);
-      setDailyChecks([]);
+      setDailyCheckError(true);
+      if (offset === 0) setDailyChecks([]);
     } finally {
-      setDailyChecksLoading(false);
+      if (request === dailyCheckRequest.current) setDailyChecksLoading(false);
     }
   }, [resolvedParams.hgvId]);
 
@@ -1016,6 +1028,13 @@ export default function HgvHistoryPage({
             taskComments={taskComments}
             taskInspectionPhotos={taskInspectionPhotos}
           />
+          {dailyCheckError && <p role="alert">Daily checks could not be loaded.</p>}
+          {(dailyCheckOffset !== null || dailyCheckError) && (
+            <Button variant="outline" disabled={dailyChecksLoading}
+              onClick={() => void fetchDailyCheckHistory(dailyCheckOffset ?? 0)}>
+              {dailyCheckError ? 'Retry daily checks' : 'Load older daily checks'}
+            </Button>
+          )}
         </TabsContent>
 
         {/* MOT Tab */}

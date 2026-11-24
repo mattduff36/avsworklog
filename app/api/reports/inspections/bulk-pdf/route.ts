@@ -170,6 +170,7 @@ function resolvePlantTemplate(
 function resolveHgvTemplate(inspection: HgvInspectionWithRelations, items: InspectionItem[]) {
   return HgvInspectionPDF({
     inspection: {
+      trailer_label: inspection.trailer_label,
       id: inspection.id,
       inspection_date: inspection.inspection_date,
       current_mileage: inspection.current_mileage || null,

@@ -381,6 +381,7 @@ export function FleetSettingsTab({
                                   <Button
                                     variant="ghost"
                                     size="sm"
+                                    disabled={category.name === 'Trailer'}
                                     onClick={() => onDeleteHgvCategory(category)}
                                     className="text-red-400 hover:text-red-300 hover:bg-slate-800"
                                     title="Delete Category"

@@ -55,6 +55,8 @@ export interface AssetHistoryWorkshopTaskSource {
 }
 
 export interface AssetHistoryDailyTaskSource {
+  history_summary?: string;
+  history_href?: string;
   id: string;
   inspection_date: string;
   inspection_end_date: string | null;
@@ -226,13 +228,13 @@ function buildDailyTaskRows(
       timestamp,
       sortTime: getSortTime(timestamp),
       typeLabel: 'Daily Task',
-      summary: `Daily check submitted`,
+      summary: dailyTask.history_summary || `Daily check submitted`,
       statusLabel: defectCount > 0
         ? `${defectCount} ${defectCount === 1 ? 'Defect' : 'Defects'}`
-        : 'All Passed',
+        : dailyTask.history_summary ? 'No defects recorded' : 'All Passed',
       person: formatHistoryPersonName(dailyTask.profile?.full_name),
       meter: getMeterLabel(dailyTask.current_mileage, assetType),
-      href: `${DAILY_TASK_ROUTE_PREFIX[assetType]}/${dailyTask.id}`,
+      href: dailyTask.history_href || `${DAILY_TASK_ROUTE_PREFIX[assetType]}/${dailyTask.id}`,
       inspectionRange,
       source: dailyTask,
     };

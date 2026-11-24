@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
+import { fetchHgvWorkshopDefects, parseHgvWorkshopLookup } from '@/lib/server/hgv-check-workshop-defects';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 import { buildRecentCompletedDefectMap } from '@/lib/utils/inspectionRecentCompletedDefects';
 
@@ -14,14 +15,14 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const hgvId = searchParams.get('hgvId');
+    const lookup = parseHgvWorkshopLookup(searchParams);
     const requestedDays = Number(searchParams.get('days') || DEFAULT_LOOKBACK_DAYS);
     const lookbackDays = Number.isFinite(requestedDays)
       ? Math.min(Math.max(Math.floor(requestedDays), 1), MAX_LOOKBACK_DAYS)
       : DEFAULT_LOOKBACK_DAYS;
 
-    if (!hgvId) {
-      return NextResponse.json({ error: 'hgvId is required' }, { status: 400 });
+    if (!lookup.success) {
+      return NextResponse.json({ error: 'Invalid HGV or trailer identifier' }, { status: 400 });
     }
 
     const supabaseAdmin = createSupabaseClient(
@@ -35,14 +36,7 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const { data: tasks, error: tasksError } = await supabaseAdmin
-      .from('actions')
-      .select('description, actioned_at, updated_at')
-      .eq('hgv_id', hgvId)
-      .eq('action_type', 'inspection_defect')
-      .eq('status', 'completed')
-      .order('actioned_at', { ascending: false, nullsFirst: false })
-      .limit(100);
+    const { data: tasks, error: tasksError } = await fetchHgvWorkshopDefects(supabaseAdmin, lookup.data, true, lookbackDays);
 
     if (tasksError) {
       console.error('Error fetching recently completed HGV defect tasks:', tasksError);

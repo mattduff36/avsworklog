@@ -57,16 +57,15 @@ import type { HgvInspectionSavedItem } from '@/lib/server/hgv-inspection-save';
 import { WORKSHOP_TASK_COMMENT_MIN_LENGTH } from '@/lib/workshop-tasks/validation';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 
+import { HgvTrailerPicker } from '@/components/inspections/HgvTrailerPicker';
+import type { HgvTrailerSelection } from '@/lib/checklists/hgv-trailer-swap';
+import { fetchHgvCheckAssets, type HgvCheckAsset, applyArticNA, clearArticAnswers, restoreTrailerSelection, trailerDefectQuery } from '@/lib/inspections/hgv-trailer-form';
+
+const NO_TRAILER = {kind: 'none'} as const;
 const PhotoUpload = dynamic(() => import('@/components/forms/PhotoUpload'), { ssr: false });
 const SignaturePad = dynamic(() => import('@/components/forms/SignaturePad'), { ssr: false });
 
-type HgvAsset = {
-  id: string;
-  reg_number: string;
-  nickname: string | null;
-  current_mileage?: number | null;
-  hgv_categories?: { name: string } | null;
-};
+
 
 type PendingNavigation = { type: 'href'; href: string } | { type: 'back' };
 type ExistingInspectionConflict = { id: string; status: 'draft' | 'submitted' };
@@ -125,7 +124,7 @@ function NewHgvInspectionContent() {
   });
   const { tabletModeEnabled } = useTabletMode();
 
-  const [hgvs, setHgvs] = useState<HgvAsset[]>([]);
+  const [hgvs, setHgvs] = useState<HgvCheckAsset[]>([]);
   const [recentHgvIds, setRecentHgvIds] = useState<string[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -141,8 +140,16 @@ function NewHgvInspectionContent() {
   const [nowMs, setNowMs] = useState<number>(Date.now());
   const lockedDefectsRequestIdRef = useRef(0);
 
-  const [checkboxStates, setCheckboxStates] = useState<Record<string, InspectionStatus>>({});
-  const [comments, setComments] = useState<Record<string, string>>({});
+  const [trailerSelection, setTrailerSelection] = useState<HgvTrailerSelection | null>(null);
+  const [lockLoading, setLockLoading] = useState(false);
+  const [lockError, setLockError] = useState(false);
+  const classification = hgvs.find(asset => asset.id === hgvId)?.classification;
+  const selectedTrailer = classification === 'rigid' ? NO_TRAILER : trailerSelection;
+  const skipArticItems = selectedTrailer?.kind === 'none';
+  const [rawStates, setCheckboxStates] = useState<Record<string, InspectionStatus>>({});
+  const [rawComments, setComments] = useState<Record<string, string>>({});
+  const checkboxStates = useMemo(() => skipArticItems ? applyArticNA(rawStates) : rawStates, [rawStates, skipArticItems]);
+  const comments = useMemo(() => skipArticItems ? clearArticAnswers(rawComments) : rawComments, [rawComments, skipArticItems]);
   const [loggedDefects, setLoggedDefects] = useState<Map<string, { comment: string; actionId: string }>>(new Map());
   const [recentlyCompletedDefects, setRecentlyCompletedDefects] = useState<Map<string, RecentCompletedDefect>>(new Map());
   const [confirmedRepeatDefects, setConfirmedRepeatDefects] = useState<Set<string>>(new Set());
@@ -176,14 +183,14 @@ function NewHgvInspectionContent() {
   const [discardingDraft, setDiscardingDraft] = useState(false);
   const [submittedConflictInspectionId, setSubmittedConflictInspectionId] = useState<string | null>(null);
   const [showSubmittedConflictDialog, setShowSubmittedConflictDialog] = useState(false);
-  const { photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(existingInspectionId, {
+  const { photos, loading: photosLoading, error: photosError, photoMap, refresh: refreshInspectionPhotos } = useInspectionPhotos(existingInspectionId, {
     enabled: Boolean(existingInspectionId),
   });
   const isDraftHydratedRef = useRef(!draftId);
   const draftSavePromiseRef = useRef<Promise<string | null> | null>(null);
   const activeDraftLoadIdRef = useRef<string | null>(null);
   const loadedDraftIdRef = useRef<string | null>(null);
-  const loadLockedDefectsRef = useRef<((selectedHgvId: string, mode?: 'replace' | 'merge') => Promise<void>) | null>(null);
+  const loadLockedDefectsRef = useRef<((selectedHgvId: string, mode?: 'replace' | 'merge', trailer?: HgvTrailerSelection | null) => Promise<void>) | null>(null);
 
   const showPermissionLoader = permissionLoading;
 
@@ -319,6 +326,7 @@ function NewHgvInspectionContent() {
     const saved = await requestHgvInspectionSave({
       requestId: requestIdRef.current!,
       recordKind: 'full_check',
+      trailerSelection: selectedTrailer,
       informWorkshop,
       hintInspectionId: options.hintInspectionId ?? existingInspectionId,
       hgvId,
@@ -342,6 +350,7 @@ function NewHgvInspectionContent() {
     inspectionDate,
     inspectorComments,
     informWorkshop,
+    selectedTrailer,
     selectedEmployeeId,
   ]);
 
@@ -545,7 +554,7 @@ function NewHgvInspectionContent() {
       setLoading(true);
       const { data: draft, error: draftError } = await supabase
         .from('hgv_inspections')
-        .select('id, hgv_id, user_id, inspection_date, current_mileage, inspector_comments, record_kind')
+        .select('id, hgv_id, user_id, inspection_date, current_mileage, inspector_comments, record_kind, trailer_kind, trailer_hgv_id, hired_trailer_id, hired_trailer_company')
         .eq('id', id)
         .eq('status', 'draft')
         .maybeSingle();
@@ -575,6 +584,8 @@ function NewHgvInspectionContent() {
       setSubmittedConflictInspectionId(null);
       setShowSubmittedConflictDialog(false);
       setHgvId(draft.hgv_id || '');
+      const restoredTrailer = restoreTrailerSelection(draft);
+      setTrailerSelection(restoredTrailer);
       setInspectionDate(draft.inspection_date || '');
       setCurrentMileage(draft.current_mileage != null ? String(draft.current_mileage) : '');
       setSelectedEmployeeId(draft.user_id || '');
@@ -613,7 +624,7 @@ function NewHgvInspectionContent() {
       setNowMs(inspectionTimerStartMs);
 
       if (draft.hgv_id) {
-        await loadLockedDefectsRef.current?.(draft.hgv_id, 'merge');
+        await loadLockedDefectsRef.current?.(draft.hgv_id, 'merge', restoredTrailer);
       }
       loadedDraftIdRef.current = id;
     } catch (err) {
@@ -646,18 +657,14 @@ function NewHgvInspectionContent() {
 
     const loadData = async () => {
       try {
-        const [{ data: hgvData }, employeeData] = await Promise.all([
-          supabase
-            .from('hgvs')
-            .select('id, reg_number, nickname, current_mileage, hgv_categories(name)')
-            .eq('status', 'active')
-            .order('reg_number'),
+        const [hgvData, employeeData] = await Promise.all([
+          fetchHgvCheckAssets(),
           canManageCrossUserInspections
             ? fetchUserDirectory({ module: 'hgv-inspections' })
             : Promise.resolve([] as DirectoryUser[]),
         ]);
 
-        setHgvs((hgvData || []) as HgvAsset[]);
+        setHgvs(hgvData);
         setEmployees(
           employeeData.map((employee) => ({
             id: employee.id,
@@ -670,6 +677,7 @@ function NewHgvInspectionContent() {
       } catch (error) {
         if (!isAuthErrorStatus(getErrorStatus(error))) {
           console.error('Error loading HGV inspection setup data:', error);
+          setError(error instanceof Error ? error.message : 'Could not load HGV inspection details.');
         }
       }
     };
@@ -812,22 +820,22 @@ function NewHgvInspectionContent() {
 
   const loadLockedDefects = async (
     selectedHgvId: string,
-    mode: 'replace' | 'merge' = 'replace'
+    mode: 'replace' | 'merge' = 'replace',
+    trailer: HgvTrailerSelection | null = null
   ) => {
     const requestId = ++lockedDefectsRequestIdRef.current;
+    setLockLoading(true);
+    setLockError(false);
+    const query = trailerDefectQuery(selectedHgvId, trailer);
     try {
       const [lockedResponse, recentCompletedResponse] = await Promise.all([
-        fetch(`/api/hgv-inspections/locked-defects?hgvId=${selectedHgvId}`),
-        fetch(`/api/hgv-inspections/recent-completed-defects?hgvId=${selectedHgvId}&days=7`),
+        fetch(`/api/hgv-inspections/locked-defects?${query}`),
+        fetch(`/api/hgv-inspections/recent-completed-defects?${query}&days=7`),
       ]);
 
       if (requestId !== lockedDefectsRequestIdRef.current) return;
 
-      if (!lockedResponse.ok) {
-        setRecentlyCompletedDefects(new Map());
-        setConfirmedRepeatDefects(new Set());
-        return;
-      }
+      if (!lockedResponse.ok) throw new Error('Outstanding defects could not be loaded');
       const { lockedItems } = await lockedResponse.json();
       const recentCompletedItems = recentCompletedResponse.ok
         ? ((await recentCompletedResponse.json()) as {
@@ -843,6 +851,7 @@ function NewHgvInspectionContent() {
 
       for (const item of lockedItems as Array<{ item_number: number; item_description?: string | null; status?: string; comment: string; actionId: string }>) {
         const itemNumber = resolveCurrentHgvChecklistItemNumber(item.item_description, item.item_number);
+        if (isArticOnlyItem(itemNumber) && (!trailer || trailer.kind === 'none')) continue;
         const key = `${itemNumber}`;
         map.set(key, { comment: item.comment, actionId: item.actionId });
         initialStates[key] = 'attention';
@@ -868,14 +877,34 @@ function NewHgvInspectionContent() {
       if (requestId !== lockedDefectsRequestIdRef.current) return;
       setRecentlyCompletedDefects(new Map());
       setConfirmedRepeatDefects(new Set());
-      // Non-blocking.
+      setLockError(true);
+    } finally {
+      if (requestId === lockedDefectsRequestIdRef.current) setLockLoading(false);
     }
   };
   loadLockedDefectsRef.current = loadLockedDefects;
 
+  const changeTrailer = (next: HgvTrailerSelection) => {
+    if (photosLoading || photosError || photos.some(p => p.item_number !== null && isArticOnlyItem(p.item_number))) {
+      toast.error('Remove any photos from the four artic items before changing trailers. If photos could not load, refresh first.');
+      return false;
+    }
+    setCheckboxStates(clearArticAnswers);
+    setComments(clearArticAnswers);
+    setLoggedDefects(previous => new Map([...previous].filter(([key]) => !isArticOnlyItem(Number(key)))));
+    setConfirmedRepeatDefects(new Set());
+    setTrailerSelection(next);
+    void loadLockedDefects(hgvId, 'merge', next);
+    return true;
+  };
+
   const startInspection = async () => {
     if (!hgvId) {
       setError('Please select an HGV first');
+      return;
+    }
+    if (!classification || classification === 'trailer') {
+      setError('Select an active HGV or tractor unit to start the check');
       return;
     }
     if (!inspectionDate) {
@@ -905,6 +934,7 @@ function NewHgvInspectionContent() {
 
     setError('');
     beginChecklist();
+    void loadLockedDefects(hgvId, 'merge', selectedTrailer);
   };
 
   const handleStatusChange = (itemNumber: number, status: InspectionStatus) => {
@@ -961,6 +991,10 @@ function NewHgvInspectionContent() {
     if (!checklistStarted) {
       return 'Click Start Daily Check before completing the checklist';
     }
+
+    if (!selectedTrailer) return 'Select a trailer or choose No trailer attached';
+    if (lockError) return 'Retry the outstanding defect lookup before submitting';
+    if (lockLoading) return 'Wait for outstanding defect checks to finish loading';
 
     const missingStatus = TRUCK_CHECKLIST_ITEMS
       .map((label, idx) => ({ label, key: `${idx + 1}` }))
@@ -1022,6 +1056,10 @@ function NewHgvInspectionContent() {
       return;
     }
 
+    if (!selectedTrailer) {
+      scroll(Array.from(document.querySelectorAll('[data-trailer-picker]')).find(el => el.getClientRects().length > 0) ?? null);
+      return;
+    }
     const firstMissingStatus = TRUCK_CHECKLIST_ITEMS
       .map((_, idx) => `${idx + 1}`)
       .find((itemKey) => !checkboxStates[itemKey]);
@@ -1178,6 +1216,7 @@ function NewHgvInspectionContent() {
     setSubmittedConflictInspectionId(null);
     requestIdRef.current = crypto.randomUUID();
     setExistingInspectionId(null);
+    setTrailerSelection(null);
     setCheckboxStates({});
     setComments({});
     setChecklistStarted(false);
@@ -1214,6 +1253,17 @@ function NewHgvInspectionContent() {
   const completedItems = Object.keys(checkboxStates).length;
   const totalItems = TRUCK_CHECKLIST_ITEMS.length;
   const progressPercent = totalItems > 0 ? Math.round((completedItems / totalItems) * 100) : 0;
+
+  const trailerPicker = classification !== 'rigid' && <div data-trailer-picker className="space-y-2 p-2 text-left">
+    <h3 className="font-semibold text-foreground">Artics only</h3>
+    <HgvTrailerPicker assets={hgvs} value={trailerSelection} onChange={changeTrailer} unknownClassification={classification === 'unknown'}
+      confirmChange={Object.keys({...rawStates, ...rawComments}).some(key => isArticOnlyItem(Number(key))) ? 'Changing trailer clears the four artic answers and their notes so you can check the newly attached trailer.' : undefined}
+      disabled={lockLoading || savingDraftForPhoto || loading} />
+    {photos.filter(p => p.item_number !== null && isArticOnlyItem(p.item_number)).filter((p, index, all) => all.findIndex(other => other.item_number === p.item_number && other.day_of_week === p.day_of_week) === index).map(photo =>
+      <Button key={photo.id} variant="link" type="button" onClick={() => setPhotoUploadItem({itemNumber: photo.item_number!, dayOfWeek: photo.day_of_week ?? 1})}>
+        Manage photos for {TRUCK_CHECKLIST_ITEMS[photo.item_number! - 1]}
+      </Button>)}
+  </div>;
 
   if (showPermissionLoader) {
     return <PageLoader message="Loading HGV inspection form..." />;
@@ -1306,6 +1356,7 @@ function NewHgvInspectionContent() {
                 disabled={checklistStarted}
                 onValueChange={(value) => {
                   setHgvId(value);
+                  setTrailerSelection(null);
                   setShowDigitGrowthWarningDialog(false);
                   if (user?.id) {
                     const updatedRecent = recordRecentVehicleId(user.id, value, 3, 'hgvs');
@@ -1328,7 +1379,7 @@ function NewHgvInspectionContent() {
                 </SelectTrigger>
                 <SelectContent>
                   {(() => {
-                    const { recentVehicles, otherVehicles } = splitVehiclesByRecent(hgvs, recentHgvIds);
+                    const { recentVehicles, otherVehicles } = splitVehiclesByRecent(hgvs.filter(asset => asset.classification !== 'trailer'), recentHgvIds);
                     return (
                       <>
                         {recentVehicles.length > 0 && (
@@ -1471,6 +1522,7 @@ function NewHgvInspectionContent() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 p-4 md:p-6">
+            {lockError && <p role="alert">Outstanding defects could not be loaded. <Button type="button" variant="link" onClick={() => void loadLockedDefects(hgvId, 'merge', selectedTrailer)}>Retry</Button></p>}
             <div className={tabletModeEnabled ? 'hidden' : 'hidden md:block overflow-x-auto'}>
               <table className="w-full border-collapse">
                 <thead>
@@ -1485,6 +1537,8 @@ function NewHgvInspectionContent() {
                   {TRUCK_CHECKLIST_ITEMS.map((item, index) => {
                     const itemNumber = index + 1;
                     const key = `${itemNumber}`;
+                    if (isArticOnlyItem(itemNumber) && classification === 'rigid') return null;
+                    const showRow = !isArticOnlyItem(itemNumber) || (selectedTrailer && !skipArticItems);
                     const currentStatus = checkboxStates[key];
                     const isLocked = loggedDefects.has(key);
                     const statusOptions = getStatusOptions(itemNumber);
@@ -1492,12 +1546,12 @@ function NewHgvInspectionContent() {
                       <Fragment key={itemNumber}>
                         {itemNumber === HGV_ARTIC_ONLY_START_ITEM && (
                           <tr className="bg-blue-500/10 border-y border-blue-400/40">
-                            <td colSpan={4} className="p-2 text-center text-xs font-semibold tracking-wide text-blue-200 uppercase">
-                              Artics only
+                            <td colSpan={4} className="p-2">
+                              {trailerPicker}
                             </td>
                           </tr>
                         )}
-                        <tr data-checklist-item={key} className={`border-b border-border/50 hover:bg-slate-800/30 ${isLocked ? 'bg-red-500/5' : ''}`}>
+                        {showRow && <tr data-checklist-item={key} className={`border-b border-border/50 hover:bg-slate-800/30 ${isLocked ? 'bg-red-500/5' : ''}`}>
                           <td className="p-3 text-sm text-muted-foreground">{itemNumber}</td>
                           <td className="p-3 text-sm text-white">
                             {item}
@@ -1510,7 +1564,7 @@ function NewHgvInspectionContent() {
                                   key={status}
                                   type="button"
                                   onClick={() => handleStatusChange(itemNumber, status)}
-                                  disabled={isLocked}
+                                  disabled={isLocked || (lockLoading && isArticOnlyItem(itemNumber))}
                                   className={`flex flex-col items-center justify-center w-14 h-14 rounded-lg border-2 transition-all ${getStatusColor(status, currentStatus === status)} ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                                 >
                                   {getStatusIcon(status, currentStatus === status)}
@@ -1556,7 +1610,7 @@ function NewHgvInspectionContent() {
                               );
                             })()}
                           </td>
-                        </tr>
+                        </tr>}
                       </Fragment>
                     );
                   })}
@@ -1568,17 +1622,19 @@ function NewHgvInspectionContent() {
               {TRUCK_CHECKLIST_ITEMS.map((item, index) => {
                 const itemNumber = index + 1;
                 const key = `${itemNumber}`;
+                if (isArticOnlyItem(itemNumber) && classification === 'rigid') return null;
+                const showRow = !isArticOnlyItem(itemNumber) || (selectedTrailer && !skipArticItems);
                 const currentStatus = checkboxStates[key];
                 const isLocked = loggedDefects.has(key);
                 const statusOptions = getStatusOptions(itemNumber);
                 return (
                   <Fragment key={itemNumber}>
                     {itemNumber === HGV_ARTIC_ONLY_START_ITEM && (
-                      <div className="rounded-md border border-blue-400/50 bg-blue-500/10 px-3 py-2 text-center text-xs font-semibold uppercase tracking-wide text-blue-200">
-                        Artics only
+                      <div className="rounded-md border border-blue-400/50 bg-blue-500/10 px-3 py-2">
+                        {trailerPicker}
                       </div>
                     )}
-                    <div data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${isLocked ? 'border-red-500/50 bg-red-500/5' : 'border-border/50'}`}>
+                    {showRow && <div data-checklist-item={key} className={`bg-slate-900/30 border rounded-lg p-4 space-y-3 ${isLocked ? 'border-red-500/50 bg-red-500/5' : 'border-border/50'}`}>
                       <div className="flex items-start gap-3">
                         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-800 border border-slate-600 flex items-center justify-center">
                           <span className="text-sm font-bold text-muted-foreground">{itemNumber}</span>
@@ -1598,7 +1654,7 @@ function NewHgvInspectionContent() {
                             key={status}
                             type="button"
                             onClick={() => handleStatusChange(itemNumber, status)}
-                            disabled={isLocked}
+                            disabled={isLocked || (lockLoading && isArticOnlyItem(itemNumber))}
                             className={`flex flex-col items-center justify-center h-14 rounded-xl border-3 transition-all ${getStatusColor(status, currentStatus === status)} ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                           >
                             {getStatusIcon(status, currentStatus === status)}
@@ -1641,7 +1697,7 @@ function NewHgvInspectionContent() {
                           />
                         );
                       })()}
-                    </div>
+                    </div>}
                   </Fragment>
                 );
               })}
@@ -1896,7 +1952,7 @@ function NewHgvInspectionContent() {
           inspectionId={existingInspectionId}
           itemNumber={photoUploadItem.itemNumber}
           dayOfWeek={photoUploadItem.dayOfWeek}
-          onClose={() => setPhotoUploadItem(null)}
+          onClose={() => { setPhotoUploadItem(null); void refreshInspectionPhotos(); }}
           onUploadComplete={() => {
             void refreshInspectionPhotos();
           }}

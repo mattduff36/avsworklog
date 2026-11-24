@@ -1,3 +1,4 @@
+import { verifyTrailerAssociations } from './hgv-trailer-checks-harness';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { Client } from 'pg';
@@ -310,5 +311,8 @@ suite('HGV same-day updates - disposable real PostgreSQL', () => {
     await expect(db.query("INSERT INTO hgv_inspection_versions VALUES($1,99,$2,$3,now(),'invalid', $4)",[original.id,randomUUID(),F.actor,JSON.stringify({photos:[{photo_url:'https://example.test/storage/v1/object/public/inspection-photos/deleted.png'}]})])).rejects.toThrow('deleted Daily Check');
     await db.query('DELETE FROM hgv_inspections WHERE id=$1',[original.id]);
     expect((await db.query('SELECT 1 FROM hgv_inspection_versions WHERE inspection_id=$1',[original.id])).rowCount).toBe(1);
+  });
+  it('preserves historical evidence and isolates signed tractor/trailer pairings', async () => {
+    await verifyTrailerAssociations(db, date, day);
   });
 });

@@ -20,13 +20,14 @@ function collectText(node: ReactNode): string {
   return '';
 }
 
-function renderPdfText(operatorName: string): string {
+function renderPdfText(operatorName: string, trailerLabel?: string): string {
   return collectText(HgvInspectionPDF({
     inspection: {
       id: 'inspection-12345',
       inspection_date: '2026-08-03',
       current_mileage: 12000,
       inspector_comments: null,
+      trailer_label: trailerLabel,
     },
     hgv: {
       reg_number: 'YK24 HGV',
@@ -45,6 +46,12 @@ describe('HgvInspectionPDF fleet asset label', () => {
     expect(pdfText).toContain('YK24 HGV');
     expect(pdfText).not.toContain('Friendly Fleet Name');
     expect(pdfText).not.toContain('Nickname:');
+  });
+
+  it('prints the trailer identity beside its tractor', () => {
+    const text = renderPdfText('Driver', 'C517773 (Nooteboom)');
+    expect(text).toContain('YK24 HGV');
+    expect(text).toContain('C517773 (Nooteboom)');
   });
 
   it('keeps the nickname when the operator is unknown', () => {

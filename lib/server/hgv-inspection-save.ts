@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HgvTrailerSelectionSchema } from '@/lib/checklists/hgv-trailer-swap';
 import { randomUUID } from 'node:crypto';
 import { hgvDailyCheckUpdatesEnabled } from '@/lib/server/hgv-update-capabilities';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -29,6 +30,7 @@ export const HgvInspectionSaveBodySchema = z
     correctionReason: z.string().trim().min(5).max(1000).nullable().optional(),
     expectedRevision: z.number().int().nonnegative().nullable().optional(),
     informWorkshop: z.boolean().default(false),
+    trailerSelection: HgvTrailerSelectionSchema.nullable().optional(),
     hgvId: z.string().uuid(),
     userId: z.string().uuid(),
     inspectionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
@@ -145,6 +147,11 @@ export function forbiddenHgvInspectionSaveError(): Error & { status: number; cod
 }
 
 export function mapHgvSaveRpcError(message: string): { status: number; error: string; code: string } {
+  if (message.includes('HGV_SAVE:REPORT_TRAILER_CHANGED')) return { status: 409, error: 'The trailer changed while this report was open. Start a fresh defect report for the trailer now attached.', code: 'REPORT_TRAILER_CHANGED' };
+  if (message.includes('HGV_SAVE:TRAILER_PHOTOS')) return { status: 409, error: 'Remove the saved trailer photos before changing trailer.', code: 'TRAILER_PHOTOS' };
+  if (message.includes('HGV_SAVE:TRAILER_REQUIRED')) return { status: 400, error: 'Select a trailer or confirm no trailer is attached before submitting.', code: 'TRAILER_REQUIRED' };
+  if (message.includes('HGV_SAVE:INVALID_TRAILER')) return { status: 400, error: 'The selected trailer or trailer answers are invalid. Refresh and check your selection.', code: 'INVALID_TRAILER' };
+  if (message.includes('HGV_SAVE:SWAP_EXPIRED')) return { status: 409, error: 'Start a daily check for today before recording a trailer change.', code: 'SWAP_EXPIRED' };
   if (message.includes('HGV_SAVE:COMPAT_CHECK_EXISTS')) return { status: 409, error: 'A check already exists for this HGV and date. Open it from HGV Daily Checks. Your new answers have not been saved.', code: 'COMPAT_CHECK_EXISTS' };
   if (message.includes('HGV_SAVE:COMPAT_REFRESH_REQUIRED')) return { status: 409, error: 'This check has changed or more than one check exists. Refresh HGV Daily Checks and open the specific draft. Your new answers have not been saved.', code: 'COMPAT_REFRESH_REQUIRED' };
   if (message.includes('HGV_SAVE:FORBIDDEN_OWNER') || message.includes('HGV_SAVE:FORBIDDEN_SUBJECT')) {
@@ -278,6 +285,7 @@ export async function saveHgvInspectionForActor(input: {
     p_inspector_comments: input.body.inspectorComments,
     p_signature_data: input.body.signatureData ?? null,
     p_items: input.body.items,
+    p_trailer_selection: input.body.trailerSelection === undefined ? { keep: true } : input.body.trailerSelection,
   });
 
   if (error || !data) {

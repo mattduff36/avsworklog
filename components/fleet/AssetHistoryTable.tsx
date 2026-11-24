@@ -151,7 +151,7 @@ function getStatusBadge(row: AssetHistoryRow, assetType: AssetHistoryAssetType) 
   const className =
     row.statusLabel.includes('Defect')
       ? 'bg-red-500/10 text-red-300 border-red-500/30'
-      : row.statusLabel === 'All Passed'
+      : (row.statusLabel === 'All Passed' || row.statusLabel === 'No defects recorded')
         ? 'bg-green-500/10 text-green-300 border-green-500/30'
         : row.statusLabel === 'completed' || row.statusLabel === 'submitted'
           ? 'bg-green-500/10 text-green-300 border-green-500/30'

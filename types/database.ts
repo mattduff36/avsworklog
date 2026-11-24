@@ -2543,6 +2543,11 @@ export type Database = {
       }
       hgv_inspections: {
         Row: {
+          trailer_kind: 'fleet' | 'hired' | 'none' | null
+          trailer_hgv_id: string | null
+          hired_trailer_id: string | null
+          hired_trailer_company: string | null
+          trailer_label: string | null
           record_kind: 'full_check' | 'defect_report'
           parent_check_id: string | null
           discovered_at: string | null
@@ -2565,6 +2570,11 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          trailer_kind?: 'fleet' | 'hired' | 'none' | null
+          trailer_hgv_id?: string | null
+          hired_trailer_id?: string | null
+          hired_trailer_company?: string | null
+          trailer_label?: string | null
           record_kind?: 'full_check' | 'defect_report'
           parent_check_id?: string | null
           discovered_at?: string | null
@@ -2587,6 +2597,11 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          trailer_kind?: 'fleet' | 'hired' | 'none' | null
+          trailer_hgv_id?: string | null
+          hired_trailer_id?: string | null
+          hired_trailer_company?: string | null
+          trailer_label?: string | null
           record_kind?: 'full_check' | 'defect_report'
           parent_check_id?: string | null
           discovered_at?: string | null
@@ -2610,6 +2625,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: 'hgv_inspections_trailer_hgv_id_fkey'
+            columns: ['trailer_hgv_id']
+            isOneToOne: false
+            referencedRelation: 'hgvs'
+            referencedColumns: ['id']
+          },
+          {
             foreignKeyName: 'hgv_inspections_hgv_id_fkey'
             columns: ['hgv_id']
             isOneToOne: false
@@ -2625,6 +2647,33 @@ export type Database = {
           },
           {
             foreignKeyName: 'hgv_inspections_user_id_fkey'
+            columns: ['user_id']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      hgv_trailer_swaps: {
+        Row: {
+          id: string
+          parent_check_id: string
+          hgv_id: string
+          user_id: string
+          created_at: string
+          signature_data: string
+          trailer_kind: 'fleet' | 'hired'
+          trailer_hgv_id: string | null
+          hired_trailer_id: string | null
+          hired_trailer_company: string | null
+          trailer_label: string
+          items: Json
+        }
+        Insert: never
+        Update: never
+        Relationships: [
+          {
+            foreignKeyName: 'hgv_trailer_swaps_user_id_fkey'
             columns: ['user_id']
             isOneToOne: false
             referencedRelation: 'profiles'
@@ -11566,6 +11615,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      hgv_asset_daily_checks: {
+        Args: { p_asset_id: string; p_offset?: number }
+        Returns: {
+          id: string
+          inspection_id: string
+          inspection_date: string
+          submitted_at: string | null
+          record_kind: 'full_check' | 'defect_report'
+          current_mileage: number | null
+          driver_name: string | null
+          defect_count: number
+          entry_kind: 'tractor' | 'trailer' | 'swap'
+          tractor_registration: string | null
+          trailer_label: string | null
+        }[]
+      }
       delete_absence_with_timesheet_effects: {
         Args: {
           p_absence_id: string

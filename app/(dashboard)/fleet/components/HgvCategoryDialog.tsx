@@ -161,6 +161,7 @@ export function HgvCategoryDialog({
               <Label htmlFor="hgv-name">Category Name *</Label>
               <Input
                 id="hgv-name"
+                readOnly={mode === 'edit' && category?.name === 'Trailer'}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Rigid, Artic, Tipper"

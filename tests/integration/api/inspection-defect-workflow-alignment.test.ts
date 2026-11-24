@@ -223,284 +223,27 @@ describe('Inspection defect workflow alignment', () => {
     expect(String(keeperUpdate?.payload.description || '')).not.toContain('Comment: new report');
   });
 
-  it('hgv sync keeps oldest task and skips creating duplicate for same signature', async () => {
-    mockAuthenticatedUser();
-
-    const actionUpdates: Array<{ id: string; payload: Record<string, unknown> }> = [];
-    const activeTasks = [
-      {
-        id: 'hgv-task-oldest',
-        status: 'pending',
-        title: 'HX01 ABC - Brakes',
-        description: 'HGV inspection defect found:\nItem 9 - Brakes (Mon)\nComment: low pressure',
-        inspection_id: 'hgv-inspection-old',
-        inspection_item_id: 'hgv-item-old',
-        hgv_id: 'hgv-1',
-        created_at: '2026-03-01T08:00:00.000Z',
-      },
-      {
-        id: 'hgv-task-newer',
-        status: 'in_progress',
-        title: 'HX01 ABC - Brakes',
-        description: 'HGV inspection defect found:\nItem 9 - Brakes (Wed)\nComment: still low pressure',
-        inspection_id: 'hgv-inspection-new',
-        inspection_item_id: 'hgv-item-new',
-        hgv_id: 'hgv-1',
-        created_at: '2026-03-02T08:00:00.000Z',
-      },
-    ];
-
-    const adminClient = {
-      from: vi.fn((table: string) => {
-        if (table === 'hgvs') {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { reg_number: 'HX01 ABC' }, error: null }),
-              }),
-            }),
-          };
-        }
-
-        if (table === 'workshop_task_categories') {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  eq: () => ({
-                    single: async () => ({ data: { id: 'repair-hgv' }, error: null }),
-                  }),
-                }),
-              }),
-            }),
-          };
-        }
-
-        if (table === 'hgv_inspections') {
-          return {
-            select: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: { user_id: 'user-1', hgv_id: 'hgv-1' },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-
-        if (table === 'actions') {
-          return {
-            select: () => {
-              const filters: Record<string, unknown> = {};
-              const completedTasksPayload = { data: [], error: null } as const;
-              const query = createSupabaseQueryMock(
-                () => (filters.inspection_id ? { data: [], error: null } : { data: activeTasks, error: null }),
-                []
-              );
-              query.eq = vi.fn((column: string, value: unknown) => {
-                  filters[column] = value;
-                  return query;
-                });
-              query.in = vi.fn(async () => ({ data: activeTasks, error: null }));
-              query.order = vi.fn(() => ({
-                  limit: async () => completedTasksPayload,
-                }));
-              return query;
-            },
-            update: (payload: Record<string, unknown>) => ({
-              eq: async (_column: string, value: string) => {
-                actionUpdates.push({ id: value, payload });
-                return { error: null };
-              },
-            }),
-            insert: () => ({
-              select: () => ({
-                single: async () => ({ data: null, error: null }),
-              }),
-            }),
-          };
-        }
-
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    };
-
-    vi.mocked(createSupabaseJsClient).mockReturnValue(adminClient as never);
-
-    const response = await hgvSyncPost(
-      new NextRequest('http://localhost/api/hgv-inspections/sync-defect-tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inspectionId: 'hgv-inspection-current',
-          hgvId: 'hgv-1',
-          createdBy: 'user-1',
-          defects: [
-            {
-              item_number: 9,
-              item_description: 'BRAKES',
-              dayOfWeek: 3,
-              comment: 'fresh report',
-              primaryInspectionItemId: 'hgv-item-current',
-            },
-          ],
-        }),
-      })
-    );
-
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.created).toBe(0);
-    expect(body.updated).toBe(1);
-    expect(body.skipped).toBe(0);
-    expect(body.dedupedClosed).toBe(1);
-    expect(actionUpdates).toHaveLength(2);
-    const closedUpdate = actionUpdates.find((entry) => entry.id === 'hgv-task-newer');
-    const keeperUpdate = actionUpdates.find((entry) => entry.id === 'hgv-task-oldest');
-    expect(closedUpdate?.payload.status).toBe('completed');
-    expect(keeperUpdate?.payload).not.toHaveProperty('inspection_id');
-    expect(keeperUpdate?.payload).not.toHaveProperty('inspection_item_id');
-    expect(String(keeperUpdate?.payload.description || '')).toContain('(Mon, Wed)');
-    expect(String(keeperUpdate?.payload.description || '')).toContain('Comment: low pressure');
-    expect(String(keeperUpdate?.payload.description || '')).not.toContain('Comment: fresh report');
-  });
-
-  it('hgv sync uses inserted database id for same-signature defects in one batch', async () => {
-    mockAuthenticatedUser();
-
-    const actionUpdates: Array<{ id: string; payload: Record<string, unknown> }> = [];
-    let insertCalls = 0;
-    const insertedActionRow = {
-      id: 'hgv-db-action-1',
-      status: 'pending',
-      title: 'HX01 ABC - Brakes',
-      description: 'HGV inspection defect found:\nItem 9 - Brakes (Mon)\nComment: initial',
-      inspection_id: 'hgv-inspection-current',
-      inspection_item_id: 'hgv-item-a',
-      hgv_id: 'hgv-1',
-      created_at: '2026-03-03T08:00:00.000Z',
-    };
-
-    const adminClient = {
-      from: vi.fn((table: string) => {
-        if (table === 'hgvs') {
-          return {
-            select: () => ({
-              eq: () => ({
-                single: async () => ({ data: { reg_number: 'HX01 ABC' }, error: null }),
-              }),
-            }),
-          };
-        }
-
-        if (table === 'workshop_task_categories') {
-          return {
-            select: () => ({
-              eq: () => ({
-                eq: () => ({
-                  eq: () => ({
-                    single: async () => ({ data: { id: 'repair-hgv' }, error: null }),
-                  }),
-                }),
-              }),
-            }),
-          };
-        }
-
-        if (table === 'hgv_inspections') {
-          return {
-            select: () => ({
-              eq: () => ({
-                maybeSingle: async () => ({
-                  data: { user_id: 'user-1', hgv_id: 'hgv-1' },
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-
-        if (table === 'actions') {
-          return {
-            select: () => {
-              const filters: Record<string, unknown> = {};
-              const completedTasksPayload = { data: [], error: null } as const;
-              const query = createSupabaseQueryMock({ data: [], error: null }, []);
-              query.eq = vi.fn((column: string, value: unknown) => {
-                  filters[column] = value;
-                  return query;
-                });
-              query.in = vi.fn(async () => ({ data: [], error: null }));
-              query.order = vi.fn(() => ({
-                  limit: async () => completedTasksPayload,
-                }));
-              return query;
-            },
-            update: (payload: Record<string, unknown>) => ({
-              eq: async (_column: string, value: string) => {
-                actionUpdates.push({ id: value, payload });
-                return { error: null };
-              },
-            }),
-            insert: () => ({
-              select: () => ({
-                single: async () => ({
-                  data: insertCalls++ === 0 ? insertedActionRow : null,
-                  error: null,
-                }),
-              }),
-            }),
-          };
-        }
-
-        throw new Error(`Unexpected table ${table}`);
-      }),
-    };
-
-    vi.mocked(createSupabaseJsClient).mockReturnValue(adminClient as never);
-
-    const response = await hgvSyncPost(
-      new NextRequest('http://localhost/api/hgv-inspections/sync-defect-tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inspectionId: 'hgv-inspection-current',
-          hgvId: 'hgv-1',
-          createdBy: 'user-1',
-          defects: [
-            {
-              item_number: 9,
-              item_description: 'Brakes',
-              days: [1],
-              comment: 'initial',
-              primaryInspectionItemId: 'hgv-item-a',
-            },
-            {
-              item_number: 9,
-              item_description: 'Brakes',
-              days: [3],
-              comment: 'follow-up',
-              primaryInspectionItemId: 'hgv-item-b',
-            },
-          ],
-        }),
-      })
-    );
-
-    const body = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(body.created).toBe(1);
-    expect(body.updated).toBe(1);
-    expect(body.skipped).toBe(0);
-    expect(actionUpdates).toHaveLength(1);
-    expect(actionUpdates[0]?.id).toBe('hgv-db-action-1');
-    expect(actionUpdates[0]?.payload).not.toHaveProperty('inspection_id');
-    expect(actionUpdates[0]?.payload).not.toHaveProperty('inspection_item_id');
-    expect(String(actionUpdates[0]?.payload.description || '')).toContain('Comment: initial');
-    expect(String(actionUpdates[0]?.payload.description || '')).not.toContain('Comment: follow-up');
+  it.each([
+    { owner: 'user-1', status: 200 },
+    { owner: 'another-driver', status: 403 },
+  ])('HGV reconciliation checks ownership before invoking the atomic compatibility RPC ($status)', async ({ owner, status }) => {
+    vi.mocked(getInspectionRouteActorAccess).mockResolvedValue({
+      access: {userId:'user-1', canManageOthers:false, canDeleteInspections:false}, errorResponse:null,
+    });
+    const lookup = createSupabaseQueryMock({ data: { user_id: owner, hgv_id: 'hgv-1' }, error: null }, ['select','eq','maybeSingle']);
+    const rpc = vi.fn().mockResolvedValue({data: {success:true}, error:null});
+    vi.mocked(createSupabaseJsClient).mockReturnValue({from: () => lookup, rpc} as never);
+    const response = await hgvSyncPost(new NextRequest('http://localhost/api/hgv-inspections/sync-defect-tasks', {
+      method: 'POST', body: JSON.stringify({inspectionId:'check', hgvId:'hgv-1', createdBy:'user-1', defects:[]}),
+    }));
+    expect(response.status).toBe(status);
+    if (status === 200) {
+      expect(rpc).toHaveBeenCalledWith('sync_hgv_defects_compat', {
+        p_actor_id:'user-1', p_can_manage:false, p_inspection_id:'check', p_hgv_id:'hgv-1',
+      });
+    } else {
+      expect(rpc).not.toHaveBeenCalled();
+    }
   });
 
   it('van sync reuses active defect task without mutating original inspection links', async () => {
@@ -783,33 +526,16 @@ describe('Inspection defect workflow alignment', () => {
   it('hgv locked-defects includes pending tasks as locked items', async () => {
     mockAuthenticatedUser();
 
-    let statusFilter: string[] = [];
+    const rpc = vi.fn(async () => ({
+        data: [{
+          id: 'hgv-task-pending', status: 'pending',
+          description: 'HGV inspection defect found:\nItem 11 - Tyres\nComment: split',
+          inspection_item_id: 'hgv-item-11', actioned_at: null, updated_at: null,
+        }], error: null,
+    }));
     const adminClient = {
+      rpc,
       from: vi.fn((table: string) => {
-        if (table === 'actions') {
-          const query = {
-            select: () => query,
-            eq: () => query,
-            in: (_column: string, values: string[]) => {
-              statusFilter = values;
-              return Promise.resolve({
-                data: [
-                  {
-                    id: 'hgv-task-pending',
-                    status: 'pending',
-                    logged_comment: 'Defect pending with workshop',
-                    workshop_comments: 'Workshop status should not be copied',
-                    description: 'HGV inspection defect found:\nItem 11 - Tyres\nComment: split',
-                    inspection_item_id: 'hgv-item-11',
-                  },
-                ],
-                error: null,
-              });
-            },
-          };
-          return query;
-        }
-
         if (table === 'inspection_items') {
           return {
             select: () => ({
@@ -833,12 +559,12 @@ describe('Inspection defect workflow alignment', () => {
     vi.mocked(createSupabaseJsClient).mockReturnValue(adminClient as never);
 
     const response = await hgvLockedDefectsGet(
-      new NextRequest('http://localhost/api/hgv-inspections/locked-defects?hgvId=hgv-1')
+      new NextRequest('http://localhost/api/hgv-inspections/locked-defects?hgvId=00000000-0000-4000-8000-000000000001')
     );
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(statusFilter).toContain('pending');
+    expect(rpc).toHaveBeenCalledWith('hgv_check_workshop_defects', expect.objectContaining({ p_completed: false }));
     expect(body.lockedItems).toHaveLength(1);
     expect(body.lockedItems[0]).toMatchObject({
       item_number: 11,

@@ -75,6 +75,7 @@ export interface PlantInspectionWithRelations extends BaseInspectionShape {
 
 export interface HgvInspectionWithRelations extends BaseInspectionShape {
   source: 'hgv';
+  trailer_label?: string | null;
   record_kind?: string;
   submitted_at?: string | null;
   discovered_at?: string | null;
@@ -179,6 +180,7 @@ const PLANT_DETAIL_SELECT = `
 `;
 
 const HGV_DETAIL_SELECT = `
+  trailer_label,
   id,
   record_kind,
   submitted_at,

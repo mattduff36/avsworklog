@@ -17,6 +17,7 @@ import {
   FileText,
   Pause,
 } from 'lucide-react';
+import { HgvRepairAssignment, type HgvRepairPair, type HgvRepairSide } from '@/components/workshop-tasks/HgvRepairAssignment';
 import { WorkshopTaskLocationButton } from '@/components/workshop-tasks/WorkshopTaskLocationButton';
 import { formatDate } from '@/lib/utils/date';
 import { WorkshopTaskTimeline } from '@/components/workshop-tasks/WorkshopTaskTimeline';
@@ -39,6 +40,8 @@ import {
 } from '@/lib/utils/reference-ids';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 type Task = Database['public']['Tables']['actions']['Row'] & {
+  hgv_pair?: HgvRepairPair | null;
+  hgv_repair_side?: HgvRepairSide | null;
   status_history?: unknown[] | null;
   workshop_task_categories?: {
     id?: string;
@@ -362,6 +365,11 @@ export function WorkshopTaskModal({
                   </p>
                 </CardContent>
               </Card>
+            )}
+            {task.hgv_pair && task.hgv_repair_side && (
+              <HgvRepairAssignment key={`${task.id}-${task.hgv_repair_side}`} taskId={task.id} pair={task.hgv_pair} side={task.hgv_repair_side}
+                editable={task.status !== 'completed' && Boolean(onTaskUpdated)}
+                refresh={async () => { await Promise.all([onTaskUpdated?.(), refetch()]); }} />
             )}
             {workshopNotes && (
               <Card className="bg-background/70 border-border">

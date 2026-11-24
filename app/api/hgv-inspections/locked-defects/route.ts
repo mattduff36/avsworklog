@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import { LOCKED_INSPECTION_DEFECT_STATUSES } from '@/lib/utils/inspectionDefectTaskStatuses';
+import { fetchHgvWorkshopDefects, parseHgvWorkshopLookup } from '@/lib/server/hgv-check-workshop-defects';
 import { getInspectionRouteActorAccess } from '@/lib/server/inspection-route-access';
 
 function extractOriginalInspectionComment(description: string | null | undefined): string {
@@ -20,10 +20,10 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const hgvId = searchParams.get('hgvId');
+    const lookup = parseHgvWorkshopLookup(searchParams);
 
-    if (!hgvId) {
-      return NextResponse.json({ error: 'hgvId is required' }, { status: 400 });
+    if (!lookup.success) {
+      return NextResponse.json({ error: 'Invalid HGV or trailer identifier' }, { status: 400 });
     }
 
     const supabaseAdmin = createSupabaseClient(
@@ -37,19 +37,7 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const { data: tasks, error: tasksError } = await supabaseAdmin
-      .from('actions')
-      .select(`
-        id,
-        status,
-        logged_comment,
-        workshop_comments,
-        description,
-        inspection_item_id
-      `)
-      .eq('hgv_id', hgvId)
-      .eq('action_type', 'inspection_defect')
-      .in('status', LOCKED_INSPECTION_DEFECT_STATUSES as unknown as string[]);
+    const { data: tasks, error: tasksError } = await fetchHgvWorkshopDefects(supabaseAdmin, lookup.data, false);
 
     if (tasksError) {
       return NextResponse.json({ error: 'Failed to fetch tasks' }, { status: 500 });
@@ -59,7 +47,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ lockedItems: [] });
     }
 
-    const itemIds = tasks.map(t => t.inspection_item_id).filter(Boolean);
+    const itemIds = tasks.map(t => t.inspection_item_id).filter((id): id is string => Boolean(id));
     let items: Array<{ id: string; item_number: number; item_description: string; comments: string | null }> = [];
 
     if (itemIds.length > 0) {
@@ -94,7 +82,7 @@ export async function GET(request: NextRequest) {
       }
 
       if (itemNumber === null && task.description) {
-        const descMatch = task.description.match(/Item (\d+) - ([^(]+)/);
+        const descMatch = task.description.match(/Item (\d+) - ([^\n(]+)/);
         if (descMatch) {
           itemNumber = parseInt(descMatch[1], 10);
           itemDescription = descMatch[2].trim();

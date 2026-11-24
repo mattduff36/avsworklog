@@ -17,6 +17,7 @@ interface HgvInspectionWithRelations {
   hgv_id: string | null;
   inspection_date: string;
   current_mileage: number | null;
+  trailer_label?: string | null;
   inspector_comments: string | null;
   signature_data: string | null;
   signed_at: string | null;
@@ -122,6 +123,7 @@ export async function GET(
         id: inspectionWithRelations.id,
         inspection_date: inspectionWithRelations.inspection_date,
         current_mileage: inspectionWithRelations.current_mileage,
+        trailer_label: inspectionWithRelations.trailer_label,
         inspector_comments: inspectionWithRelations.inspector_comments,
         signature_data: inspectionWithRelations.signature_data,
         signed_at: inspectionWithRelations.signed_at,
