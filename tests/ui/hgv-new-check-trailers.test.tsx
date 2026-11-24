@@ -1,6 +1,6 @@
 /** @vitest-environment happy-dom */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import NewHgvInspectionPage from '@/app/(dashboard)/hgv-inspections/new/page';
 import { requestHgvInspectionSave } from '@/lib/client/hgv-inspection-save';
 
@@ -9,10 +9,12 @@ const router = {push: vi.fn(), replace: vi.fn()};
 let query: URLSearchParams;
 let matchingDraft = false;
 let failDraftItems = false;
+let outstanding: (url: string) => Promise<Response>;
 const photos = {photoMap:{}, photos:[], refresh:vi.fn(), loading:false, error:null};
 const assets = [
   {id:'tractor',reg_number:'TRACTOR',nickname:null,current_mileage:100,classification:'artic'},
   {id:'rigid',reg_number:'RIGID',nickname:null,current_mileage:100,classification:'rigid'},
+  {id:'second',reg_number:'T2',nickname:'Second trailer',current_mileage:null,classification:'trailer'},
   {id:'trailer',reg_number:'C517773',nickname:'Nooteboom',current_mileage:null,classification:'trailer'},
 ];
 
@@ -45,11 +47,12 @@ vi.mock('@/lib/supabase/client', () => ({createClient: () => ({from: (table: str
 beforeEach(() => {
   matchingDraft = false;
   failDraftItems = false;
+  outstanding = async () => Response.json({lockedItems:[],trailerWarnings:[]});
   Element.prototype.scrollIntoView = vi.fn();
-  vi.mocked(requestHgvInspectionSave).mockResolvedValue({id:'saved',items:[],status:'draft'});
+  vi.mocked(requestHgvInspectionSave).mockResolvedValue({id:'saved',items:[],status:'draft',revision:0});
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url.endsWith('/assets')) return Response.json({assets});
-    if (url.includes('locked-defects')) return Response.json({lockedItems:[]});
+    if (url.includes('locked-defects')) return outstanding(url);
     if (url.includes('recent-completed-defects')) return Response.json({recentlyCompletedItems:[]});
     throw new Error('Unexpected URL: ' + url);
   }));
@@ -77,6 +80,41 @@ describe('trailer handling from the driver Daily Check form', () => {
     })));
   });
 
+  it('shows the selected trailer warning without answering tractor Tyres, and clears it immediately when changing trailers', async () => {
+    let releaseSecond: (() => void) | undefined;
+    outstanding = async url => {
+      if (url.includes('trailerHgvId=second')) {
+        await new Promise<void>(resolve => { releaseSecond = resolve; });
+        return Response.json({lockedItems:[], trailerWarnings:[]});
+      }
+      return Response.json({lockedItems:[], trailerWarnings:url.includes('trailerHgvId=trailer') ? [
+        {actionId:'trailer-fault',item_description:'Tyres',comment:'Nooteboom tyre wall split'}
+      ] : []});
+    };
+    await start('tractor');
+    async function choose(label: string) {
+      const area = document.querySelector<HTMLElement>('[data-trailer-picker]')!;
+      const picker = within(area).getByRole('combobox');
+      await waitFor(() => expect(picker.hasAttribute('disabled')).toBe(false));
+      fireEvent.keyDown(picker,{key:'ArrowDown'});
+      fireEvent.click(await screen.findByRole('option',{name:label}));
+    }
+    await choose('C517773 (Nooteboom)');
+    expect((await screen.findAllByText(/Nooteboom tyre wall split/)).length).toBeGreaterThan(0);
+    fireEvent(window,new Event('pagehide'));
+    await waitFor(() => expect(requestHgvInspectionSave).toHaveBeenCalledWith(expect.objectContaining({
+      trailerSelection:{kind:'fleet',trailerHgvId:'trailer'}, items:[],
+    })));
+    const pickerArea = within(document.querySelector<HTMLElement>('[data-trailer-picker]')!);
+    fireEvent.click(pickerArea.getByRole('button',{name:'Change selection'}));
+    await choose('T2 (Second trailer)');
+    await waitFor(() => expect(releaseSecond).toBeTypeOf('function'));
+    expect(screen.queryByText(/Nooteboom tyre wall split/)).toBeNull();
+    releaseSecond!();
+    await waitFor(() => expect(pickerArea.getByRole('button',{name:'Change selection'}).hasAttribute('disabled')).toBe(false));
+    expect(screen.queryByText(/Nooteboom tyre wall split/)).toBeNull();
+  }, 15000);
+
   it('opens a matching tractor draft without an initial write and preserves its pairing, note and photos', async () => {
     matchingDraft = true;
     await start('tractor');
@@ -97,6 +135,7 @@ describe('trailer handling from the driver Daily Check form', () => {
     fireEvent(window,new Event('pagehide'));
     expect(requestHgvInspectionSave).not.toHaveBeenCalled();
     failDraftItems = false;
+  outstanding = async () => Response.json({lockedItems:[],trailerWarnings:[]});
     fireEvent.click(retry);
     await screen.findAllByText('Trailer · C517773 (Nooteboom)');
     expect(requestHgvInspectionSave).not.toHaveBeenCalled();

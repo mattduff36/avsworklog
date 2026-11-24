@@ -154,8 +154,8 @@ export async function fetchDailyChecks(assetType: AssetType, assetId: string, of
       return (data || []).map((entry): DailyCheckHistoryItem => {
         const tractor = entry.tractor_registration || 'HGV';
         const summary = entry.entry_kind === 'swap'
-          ? `Trailer change · ${tractor} · ${entry.trailer_label || 'Trailer'}`
-          : entry.entry_kind === 'trailer' ? `${entry.record_kind === 'defect_report' ? 'Trailer defect report' : 'Trailer check'} · ${tractor}` : undefined;
+          ? `Trailer change Â· ${tractor} Â· ${entry.trailer_label || 'Trailer'}`
+          : entry.entry_kind === 'trailer' ? `${entry.record_kind === 'defect_report' ? 'Trailer defect report' : 'Trailer check'} Â· ${tractor}` : undefined;
         const section = entry.entry_kind === 'swap'
           ? `#trailer-swap-${entry.id}` : entry.entry_kind === 'trailer' ? '#trailer-check' : '';
         return {

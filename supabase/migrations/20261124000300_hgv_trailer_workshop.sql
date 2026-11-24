@@ -153,14 +153,20 @@ GRANT EXECUTE ON FUNCTION public.assign_hgv_trailer_repair(uuid,uuid,text,text) 
 
 CREATE FUNCTION public.hgv_check_workshop_defects(
   p_tractor uuid,p_trailer uuid,p_hire_id text,p_company text,p_swap boolean,p_completed boolean,p_days integer
-) RETURNS TABLE(id uuid,status text,description text,inspection_item_id uuid,actioned_at timestamptz,updated_at timestamptz)
+) RETURNS TABLE(id uuid,status text,description text,inspection_item_id uuid,actioned_at timestamptz,updated_at timestamptz,trailer_warning boolean)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
-  SELECT a.id,a.status::text,a.description,a.inspection_item_id,a.actioned_at,a.updated_at FROM public.actions a
+  SELECT a.id,a.status::text,a.description,a.inspection_item_id,a.actioned_at,a.updated_at,
+    NOT COALESCE(scope.checklist_lock,false) AS trailer_warning
+  FROM public.actions a
+  CROSS JOIN LATERAL (SELECT trim(substring(a.description FROM 'Item[[:space:]]+[0-9]+[[:space:]]*-[[:space:]]*([^\n(]+)')) AS name) item
+  CROSS JOIN LATERAL (SELECT private.hgv_defect_applies(a,p_tractor,p_trailer,p_hire_id,p_company,item.name,p_swap) AS checklist_lock) scope
   WHERE a.action_type='inspection_defect' AND a.hgv_id IN (p_tractor,p_trailer)
     AND CASE WHEN p_completed THEN a.status='completed' AND COALESCE(a.actioned_at,a.updated_at)>=now()-make_interval(days=>least(greatest(1,p_days),30))
       ELSE a.status IN ('pending','logged','on_hold','in_progress') END
-    AND private.hgv_defect_applies(a,p_tractor,p_trailer,p_hire_id,p_company,
-      trim(substring(a.description FROM 'Item[[:space:]]+[0-9]+[[:space:]]*-[[:space:]]*([^\n(]+)')),p_swap)
+    -- The tractor checklist and trailer walkaround both contain tyres, brakes and lights.
+    -- An open trailer-only task must be visible without supplying an answer for the tractor.
+    AND (scope.checklist_lock OR (NOT p_swap AND NOT p_completed AND a.hgv_pair IS NOT NULL AND
+      private.hgv_defect_applies(a,p_tractor,p_trailer,p_hire_id,p_company,item.name,true)))
   ORDER BY a.created_at,a.id
 $$;
 REVOKE ALL ON FUNCTION public.hgv_check_workshop_defects(uuid,uuid,text,text,boolean,boolean,integer) FROM PUBLIC,anon,authenticated;

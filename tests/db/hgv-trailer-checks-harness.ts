@@ -117,6 +117,23 @@ export async function verifyTrailerAssociations(db: Client, date: string, day: n
   expect((await db.query("SELECT hgv_pair->>'hired_id' AS hired, hgv_repair_side FROM actions WHERE description LIKE 'Trailer change defect:%'")).rows)
     .toMatchObject([{hired: 'HIRED-1', hgv_repair_side: 'pair'}]);
   await expect(db.query("UPDATE hgv_trailer_swaps SET trailer_label='Changed' WHERE id=$1",[swapId])).rejects.toThrow('append-only');
+  // Exercise the real swap policy under a caller whose parent inspection access changes.
+  await db.query(`
+    ALTER TABLE hgv_inspections ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY fixture_driver_parent_read ON hgv_inspections FOR SELECT TO authenticated
+      USING (user_id::text = current_setting('fixture.driver_id', true));
+    GRANT SELECT ON hgv_inspections, profiles, hgvs, inspection_items TO authenticated;
+    SET ROLE authenticated;
+  `);
+  try {
+    for (const [actor, expected] of [[F.actor, 1], [F.subject, 0]] as const) {
+      await db.query("SELECT set_config('fixture.driver_id', $1, false)", [actor]);
+      expect((await db.query('SELECT id FROM hgv_trailer_swaps WHERE id=$1', [swapId])).rowCount).toBe(expected);
+      expect((await db.query('SELECT id FROM hgv_asset_daily_checks($1) WHERE id=$2', [second, swapId])).rowCount).toBe(expected);
+    }
+  } finally {
+    await db.query('RESET ROLE');
+  }
   for (const role of ['anon','authenticated']) {
     const acl=await db.query(`SELECT has_function_privilege($1,'public.append_hgv_trailer_swap(uuid,uuid,uuid,jsonb,text,jsonb)','execute') AS rpc,
       has_table_privilege($1,'public.hgv_trailer_swaps','insert') AS direct`,[role]);

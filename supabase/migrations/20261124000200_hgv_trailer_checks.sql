@@ -59,7 +59,7 @@ ALTER TABLE public.hgv_trailer_swaps ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.hgv_trailer_swaps FROM PUBLIC,anon,authenticated,service_role;
 GRANT SELECT ON public.hgv_trailer_swaps TO authenticated,service_role;
 CREATE POLICY hgv_swap_parent_visibility ON public.hgv_trailer_swaps FOR SELECT TO authenticated
-  USING (EXISTS (SELECT FROM public.hgv_inspections i WHERE i.id=parent_check_id));
+  USING (EXISTS (SELECT FROM public.hgv_inspections i WHERE i.id=hgv_trailer_swaps.parent_check_id));
 
 -- Convert a driver's validated selection to the durable snapshot used by both kinds of check.
 CREATE FUNCTION private.hgv_trailer_identity(p_hgv uuid,p_selection jsonb)

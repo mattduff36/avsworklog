@@ -21,6 +21,7 @@ export function parseHgvWorkshopLookup(params: URLSearchParams) {
 const defects = z.array(z.object({
   id: z.string(),
   status: z.string(),
+  trailer_warning: z.boolean(),
   description: z.string().nullable(),
   inspection_item_id: z.string().nullable(),
   updated_at: z.string().nullable(),

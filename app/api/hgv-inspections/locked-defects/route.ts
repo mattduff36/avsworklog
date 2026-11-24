@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!tasks || tasks.length === 0) {
-      return NextResponse.json({ lockedItems: [] });
+      return NextResponse.json({ lockedItems: [], trailerWarnings: [] });
     }
 
     const itemIds = tasks.map(t => t.inspection_item_id).filter((id): id is string => Boolean(id));
@@ -68,6 +68,8 @@ export async function GET(request: NextRequest) {
       actionId: string;
       comment: string;
     }> = [];
+
+    const trailerWarnings: typeof lockedItems = [];
 
     for (const task of tasks) {
       let itemNumber: number | null = null;
@@ -93,7 +95,8 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      lockedItems.push({
+      const destination = task.trailer_warning ? trailerWarnings : lockedItems;
+      destination.push({
         item_number: itemNumber,
         item_description: itemDescription,
         status: task.status,
@@ -103,7 +106,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ lockedItems });
+    return NextResponse.json({ lockedItems, trailerWarnings });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

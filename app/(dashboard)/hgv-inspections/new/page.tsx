@@ -150,6 +150,7 @@ function NewHgvInspectionContent() {
   const [rawComments, setComments] = useState<Record<string, string>>({});
   const checkboxStates = useMemo(() => skipArticItems ? applyArticNA(rawStates) : rawStates, [rawStates, skipArticItems]);
   const comments = useMemo(() => skipArticItems ? clearArticAnswers(rawComments) : rawComments, [rawComments, skipArticItems]);
+  const [trailerWarnings, setTrailerWarnings] = useState<Array<{ actionId: string; item_description: string; comment: string }>>([]);
   const [loggedDefects, setLoggedDefects] = useState<Map<string, { comment: string; actionId: string }>>(new Map());
   const [recentlyCompletedDefects, setRecentlyCompletedDefects] = useState<Map<string, RecentCompletedDefect>>(new Map());
   const [confirmedRepeatDefects, setConfirmedRepeatDefects] = useState<Set<string>>(new Set());
@@ -821,6 +822,7 @@ function NewHgvInspectionContent() {
     trailer: HgvTrailerSelection | null = null
   ) => {
     const requestId = ++lockedDefectsRequestIdRef.current;
+    setTrailerWarnings([]);
     setLockLoading(true);
     setLockError(false);
     const query = trailerDefectQuery(selectedHgvId, trailer);
@@ -833,7 +835,7 @@ function NewHgvInspectionContent() {
       if (requestId !== lockedDefectsRequestIdRef.current) return;
 
       if (!lockedResponse.ok) throw new Error('Outstanding defects could not be loaded');
-      const { lockedItems } = await lockedResponse.json();
+      const { lockedItems, trailerWarnings: reportedWarnings = [] } = await lockedResponse.json();
       const recentCompletedItems = recentCompletedResponse.ok
         ? ((await recentCompletedResponse.json()) as {
             recentlyCompletedItems: Array<{ signature: string; completedAt: string }>;
@@ -862,6 +864,7 @@ function NewHgvInspectionContent() {
 
       setRecentlyCompletedDefects(recentCompletedMap);
       setConfirmedRepeatDefects(new Set());
+      setTrailerWarnings(reportedWarnings);
       setLoggedDefects(map);
       if (mode === 'merge') {
         setCheckboxStates((prev) => ({ ...prev, ...initialStates }));
@@ -1265,6 +1268,16 @@ function NewHgvInspectionContent() {
     <HgvTrailerPicker assets={hgvs} value={trailerSelection} onChange={changeTrailer} unknownClassification={classification === 'unknown'}
       confirmChange={Object.keys({...rawStates, ...rawComments}).some(key => isArticOnlyItem(Number(key))) ? 'Changing trailer clears the four artic answers and their notes so you can check the newly attached trailer.' : undefined}
       disabled={lockLoading || savingDraftForPhoto || loading} />
+    {trailerWarnings.length > 0 && selectedTrailer && !skipArticItems && (
+      <div role="status" className="rounded border border-amber-500/50 p-3 text-sm font-normal normal-case tracking-normal">
+        <p className="font-semibold">Open defects on the selected trailer</p>
+        <ul className="mt-1 list-disc space-y-1 pl-5">
+          {trailerWarnings.map(warning => <li key={warning.actionId}>
+            <span className="font-medium">{warning.item_description}</span>{warning.comment && ` · ${warning.comment}`}
+          </li>)}
+        </ul>
+      </div>
+    )}
     {photos.filter(p => p.item_number !== null && isArticOnlyItem(p.item_number)).filter((p, index, all) => all.findIndex(other => other.item_number === p.item_number && other.day_of_week === p.day_of_week) === index).map(photo =>
       <Button key={photo.id} variant="link" type="button" onClick={() => setPhotoUploadItem({itemNumber: photo.item_number!, dayOfWeek: photo.day_of_week ?? 1})}>
         Manage photos for {TRUCK_CHECKLIST_ITEMS[photo.item_number! - 1]}

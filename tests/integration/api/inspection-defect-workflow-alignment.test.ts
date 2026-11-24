@@ -530,7 +530,11 @@ describe('Inspection defect workflow alignment', () => {
         data: [{
           id: 'hgv-task-pending', status: 'pending',
           description: 'HGV inspection defect found:\nItem 11 - Tyres\nComment: split',
-          inspection_item_id: 'hgv-item-11', actioned_at: null, updated_at: null,
+          inspection_item_id: 'hgv-item-11', actioned_at: null, updated_at: null, trailer_warning: false,
+        }, {
+          id: 'trailer-task', status: 'pending', inspection_item_id: null,
+          description: 'Trailer change defect:\nItem 9 - Tyres\nComment: Wall split',
+          actioned_at: null, updated_at: null, trailer_warning: true,
         }], error: null,
     }));
     const adminClient = {
@@ -565,6 +569,8 @@ describe('Inspection defect workflow alignment', () => {
 
     expect(response.status).toBe(200);
     expect(rpc).toHaveBeenCalledWith('hgv_check_workshop_defects', expect.objectContaining({ p_completed: false }));
+    expect(body.trailerWarnings).toEqual([{ item_number: 9, item_description: 'Tyres', status: 'pending',
+      actionId: 'trailer-task', comment: 'Wall split' }]);
     expect(body.lockedItems).toHaveLength(1);
     expect(body.lockedItems[0]).toMatchObject({
       item_number: 11,

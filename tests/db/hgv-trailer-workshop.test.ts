@@ -8,10 +8,10 @@ const migration = 'supabase/migrations/20261124000300_hgv_trailer_workshop.sql';
 const tractor = randomUUID(), otherTractor = randomUUID(), nooteboom = randomUUID(), otherTrailer = randomUUID();
 const driver = randomUUID(), check = randomUUID(), sourceItem = randomUUID(), historicTask = randomUUID();
 let db: PGlite;
-async function locks(hgv: string, trailer: string | null, swap = false, hireId: string | null = null, completed = false) {
+async function locks(hgv: string, trailer: string | null, swap = false, hireId: string | null = null, completed = false, warning = false) {
   const rows = await db.query<{id: string}>(
-    'select id from public.hgv_check_workshop_defects($1,$2,$3,$4,$5,$6,7)',
-    [hgv, trailer, hireId, hireId ? 'Hire company' : null, swap, completed]);
+    'select id from public.hgv_check_workshop_defects($1,$2,$3,$4,$5,$6,7) where trailer_warning=$7',
+    [hgv, trailer, hireId, hireId ? 'Hire company' : null, swap, completed, warning]);
   return rows.rows.map(row => row.id);
 }
 async function submitSwap(hgv: string, trailer: string | null, item = 'Brake Hoses', hireId?: string) {
@@ -111,15 +111,39 @@ describe('trailer workshop diagnosis', () => {
     const observation=await db.query<{task_id:string}>('select task_id from hgv_defect_observations where inspection_id=$1',[legacy]);
     expect(observation.rows[0].task_id).toBe(result.rows.find(row=>row.hgv_pair.trailer_id===otherTrailer)?.id);
   });
-  it('limits swap walkaround faults to that trailer and separates different hires', async () => {
-    await submitSwap(tractor,otherTrailer,'Tyres');
-    const trailerTyres = (await locks(tractor,otherTrailer,true)).filter(id => !(id === historicTask));
-    const full = await locks(tractor,otherTrailer);
-    expect(trailerTyres.filter(id => !full.includes(id))).toHaveLength(1);
+  it('warns on open trailer walkaround faults while keeping the tractor checklist independent', async () => {
+    const warnings = (hgv: string, trailer: string | null, hireId: string | null = null) =>
+      locks(hgv,trailer,false,hireId,false,true);
+    for (const item of ['Tyres','Brakes','Lights']) await submitSwap(tractor,otherTrailer,item);
+    const faults = await warnings(tractor,otherTrailer);
+    expect(faults).toHaveLength(3);
+    expect((await locks(tractor,otherTrailer)).filter(id=>faults.includes(id))).toEqual([]);
+    expect(await locks(tractor,otherTrailer,true)).toEqual(expect.arrayContaining(faults));
+    expect(await warnings(tractor,nooteboom)).toEqual([]);
+    expect(await warnings(tractor,null)).toEqual([]);
+    expect(await warnings(otherTractor,otherTrailer)).toEqual([]);
+
+    const tractorTyre = randomUUID();
+    await db.query(`insert into actions(id,action_type,hgv_id,status,description)
+      values ($1,'inspection_defect',$2,'pending','Item 9 - Tyres (Monday)')`,[tractorTyre,tractor]);
+    expect(await locks(tractor,otherTrailer)).toContain(tractorTyre);
+    expect(await warnings(tractor,otherTrailer)).not.toContain(tractorTyre);
+
+    await db.query("select assign_hgv_trailer_repair($1,$2,'trailer','pair')",[faults[0],driver]);
+    expect(await warnings(otherTractor,otherTrailer)).toEqual([faults[0]]);
+    await db.query("select assign_hgv_trailer_repair($1,$2,'tractor','pair')",[faults[1],driver]);
+    expect(await warnings(tractor,otherTrailer)).not.toContain(faults[1]);
+    expect(await locks(tractor,nooteboom)).toContain(faults[1]);
+    await db.query("update actions set status='completed', actioned_at=now() where id=$1",[faults[0]]);
+    expect(await warnings(otherTractor,otherTrailer)).toEqual([]);
+
     await submitSwap(tractor,null,'Tyres','H-123');
-    const hireFaults = await locks(tractor,null,true,'H-123');
-    const otherHire = await locks(tractor,null,true,'H-124');
-    expect(hireFaults.filter(id => !otherHire.includes(id))).toHaveLength(1);
+    const hired = await warnings(tractor,null,'H-123');
+    expect(hired).toHaveLength(1);
+    expect(await locks(tractor,null,false,'H-123')).not.toContain(hired[0]);
+    expect(await warnings(tractor,null,'H-124')).toEqual([]);
+    await db.query("select assign_hgv_trailer_repair($1,$2,'trailer','pair')",[hired[0],driver]);
+    expect(await warnings(tractor,null,'H-123')).toEqual(hired);
   });
   it('denies direct driver RPC access and retains original pairing after assignment', async () => {
     const original = await db.query<{hgv_pair:{tractor_id:string,trailer_id:string}}>('select hgv_pair from actions where id=$1',[historicTask]);
