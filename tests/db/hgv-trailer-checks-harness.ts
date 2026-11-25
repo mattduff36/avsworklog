@@ -30,6 +30,7 @@ export async function verifyTrailerAssociations(db: Client, date: string, day: n
   await db.query(readFileSync('supabase/migrations/20261124000200_hgv_trailer_checks.sql','utf8'));
   await db.query(readFileSync('supabase/migrations/20261124000300_hgv_trailer_workshop.sql', 'utf8'));
   await db.query(readFileSync('supabase/migrations/20261124000400_hgv_asset_daily_checks.sql', 'utf8'));
+  await db.query(readFileSync('supabase/migrations/20261125000100_hgv_swap_immutable.sql', 'utf8'));
   expect((await db.query("SELECT id,signature_data FROM hgv_inspections WHERE trailer_hgv_id=$1",[trailer])).rows)
     .toEqual([{ id: oldCheck, signature_data: 'historic signature' }]);
 
@@ -117,6 +118,7 @@ export async function verifyTrailerAssociations(db: Client, date: string, day: n
   expect((await db.query("SELECT hgv_pair->>'hired_id' AS hired, hgv_repair_side FROM actions WHERE description LIKE 'Trailer change defect:%'")).rows)
     .toMatchObject([{hired: 'HIRED-1', hgv_repair_side: 'pair'}]);
   await expect(db.query("UPDATE hgv_trailer_swaps SET trailer_label='Changed' WHERE id=$1",[swapId])).rejects.toThrow('append-only');
+  await expect(db.query('DELETE FROM hgv_trailer_swaps WHERE id=$1',[swapId])).rejects.toThrow('append-only');
   // Exercise the real swap policy under a caller whose parent inspection access changes.
   await db.query(`
     ALTER TABLE hgv_inspections ENABLE ROW LEVEL SECURITY;
