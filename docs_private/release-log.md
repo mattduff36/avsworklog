@@ -2,6 +2,35 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.25.6
+
+**GIT COMMIT MESSAGE**
+`fix(users): hide deleted profiles from operational views`
+
+**PUSHED AT**
+2026-11-25T10:35:22.496Z
+
+**WHAT CHANGED**
+Compact assigned cards and theme team menu. Hide deleted profiles from operational views.
+
+**VERSION HISTORY DETAILS**
+- Updated reports, with changes to background routes, shared logic, and automated tests.
+- Updated quotes, with changes to background routes, shared logic, and automated tests.
+- Compact assigned cards and theme team menu, with changes to interface components, shared logic, and automated tests.
+- Updated error reporting, with changes to background routes, shared logic, and automated tests.
+- Updated inventory, with changes to background routes, shared logic, and automated tests.
+- Updated suggestions, with changes to background routes and automated tests.
+- Updated notifications, with changes to background routes.
+- Updated training, with changes to background routes.
+
+**COMMITS IN THIS RELEASE**
+- `fix(allocation): compact assigned cards and theme team menu`
+- `fix(users): hide deleted profiles from operational views`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 1126.25.5
 
 **GIT COMMIT MESSAGE**
