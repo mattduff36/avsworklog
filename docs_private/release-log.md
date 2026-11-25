@@ -2,6 +2,25 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.25.7
+
+**GIT COMMIT MESSAGE**
+`fix(absence): require a visible employee in booking lists`
+
+**PUSHED AT**
+2026-11-25T11:19:24.792Z
+
+**WHAT CHANGED**
+Require a visible employee in booking lists.
+
+**VERSION HISTORY DETAILS**
+- Require a visible employee in booking lists, with changes to shared logic and automated tests.
+- Updated profile, with changes to automated tests.
+- Updated daily allocation, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(absence): require a visible employee in booking lists`
+
 ## 1126.25.6
 
 **GIT COMMIT MESSAGE**

@@ -1,5 +1,24 @@
 [
   {
+    "version": "1126.25.7",
+    "updateKind": "minor",
+    "title": "Absence & Leave improvements",
+    "description": "Require a visible employee in booking lists.",
+    "summary": "Require a visible employee in booking lists.",
+    "details": [
+      "Require a visible employee in booking lists, with changes to shared logic and automated tests.",
+      "Updated profile, with changes to automated tests.",
+      "Updated daily allocation, with changes to automated tests."
+    ],
+    "areas": [
+      "Absence & Leave"
+    ],
+    "areaKeys": [
+      "absence"
+    ],
+    "pushedAt": "2026-11-25T11:19:24.792Z"
+  },
+  {
     "version": "1126.25.6",
     "updateKind": "minor",
     "title": "User Management improvements",
