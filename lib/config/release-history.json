@@ -1,5 +1,26 @@
 [
   {
+    "version": "1126.25.4",
+    "updateKind": "minor",
+    "title": "Hgv improvements",
+    "description": "Bind signed swaps to a dedicated append-only trigger. Bind release review evidence to trailer regressions. Encode trailer warning separator as UTF-8. Preserve trailer swap visibility and outstanding trailer warnings.",
+    "summary": "Bind signed swaps to a dedicated append-only trigger. Bind release review evidence to trailer regressions. Encode trailer warning separator as UTF-8. Preserve trailer swap visibility and outstanding trailer warnings.",
+    "details": [
+      "Updated daily tasks, with changes to background routes, app screens, interface components, shared logic, and automated tests.",
+      "Updated data storage, with changes to shared typing and data storage.",
+      "Updated workshop tasks, with changes to background routes, app screens, interface components, shared logic, automated tests, and data storage.",
+      "Updated fleet, with changes to app screens, interface components, and shared logic.",
+      "Updated PDF document documents, with changes to background routes, shared logic, and automated tests.",
+      "Updated maintenance, with changes to app screens.",
+      "Updated reports, with changes to background routes."
+    ],
+    "areas": [
+      "Outstanding trailer warnings"
+    ],
+    "areaKeys": [],
+    "pushedAt": "2026-11-25T00:09:51.973Z"
+  },
+  {
     "version": "1126.25.3",
     "updateKind": "minor",
     "title": "Quotes improvements",

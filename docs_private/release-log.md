@@ -2,6 +2,36 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.25.4
+
+**GIT COMMIT MESSAGE**
+`fix(hgv): preserve trailer swap visibility and outstanding trailer warnings`
+
+**PUSHED AT**
+2026-11-25T00:09:51.973Z
+
+**WHAT CHANGED**
+Bind signed swaps to a dedicated append-only trigger. Bind release review evidence to trailer regressions. Encode trailer warning separator as UTF-8. Preserve trailer swap visibility and outstanding trailer warnings.
+
+**VERSION HISTORY DETAILS**
+- Updated daily tasks, with changes to background routes, app screens, interface components, shared logic, and automated tests.
+- Updated data storage, with changes to shared typing and data storage.
+- Updated workshop tasks, with changes to background routes, app screens, interface components, shared logic, automated tests, and data storage.
+- Updated fleet, with changes to app screens, interface components, and shared logic.
+- Updated PDF documents, with changes to background routes, shared logic, and automated tests.
+- Updated maintenance, with changes to app screens.
+- Updated reports, with changes to background routes.
+
+**COMMITS IN THIS RELEASE**
+- `fix(hgv): bind signed swaps to a dedicated append-only trigger`
+- `test(hgv): bind release review evidence to trailer regressions`
+- `fix(hgv): encode trailer warning separator as UTF-8`
+- `fix(hgv): preserve trailer swap visibility and outstanding trailer warnings`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 1126.25.3
 
 **GIT COMMIT MESSAGE**
