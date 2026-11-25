@@ -109,7 +109,8 @@ describe('BoardToolbar', () => {
         onTeamChange={onTeamChange}
       />
     );
-    fireEvent.change(screen.getByLabelText('Active team'), { target: { value: 'team-2' } });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active team' }), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByRole('option', { name: 'Team Two' }), { key: 'Enter' });
     expect(onTeamChange).toHaveBeenCalledWith('team-2');
   });
 

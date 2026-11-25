@@ -1262,7 +1262,8 @@ describe('daily allocation manager board', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     renderBoardPage();
-    fireEvent.change(await screen.findByLabelText('Active team'), { target: { value: 'team-2' } });
+    fireEvent.keyDown(await screen.findByRole('combobox', { name: 'Active team' }), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByRole('option', { name: 'Team Two' }), { key: 'Enter' });
     fireEvent.click((await screen.findAllByRole('button', { name: 'Add visit' }))[0]);
     fireEvent.click(await screen.findByRole('button', { name: 'Select job code' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create visit' }));
@@ -1654,7 +1655,8 @@ describe('daily allocation manager board', () => {
     renderBoardPage();
     expect((await screen.findAllByTestId('daily-allocation-visit-visit-1')).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('daily-allocation-visit-visit-team-2')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Active team'), { target: { value: 'team-2' } });
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Active team' }), { key: 'Enter' });
+    fireEvent.keyDown(screen.getByRole('option', { name: 'Team Two' }), { key: 'Enter' });
     expect((await screen.findAllByTestId('daily-allocation-visit-visit-team-2')).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('daily-allocation-visit-visit-1')).not.toBeInTheDocument();
   });

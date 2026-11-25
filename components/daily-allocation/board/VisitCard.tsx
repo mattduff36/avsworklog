@@ -5,7 +5,7 @@ import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
 } from 'react';
-import { AlertTriangle, Pencil, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Pencil, Trash2, UserPlus } from 'lucide-react';
 import { useDraggable, useDroppable } from '@dnd-kit/react';
 import { Button } from '@/components/ui/button';
 import { boardControlStyles } from '@/components/daily-allocation/board/board-control-styles';
@@ -107,91 +107,138 @@ export function VisitCard({
               ? 'border-amber-400'
               : 'border-sky-700/70',
         isDragging && 'opacity-60',
-        compact && 'relative'
+        compact && 'relative @container/visit'
       )}
     >
-      <button
-        type="button"
-        className="flex w-full min-h-11 items-start gap-1 px-2 py-1.5 text-left"
-        onClick={onSelect}
-        aria-pressed={selected}
-        aria-label={`${selected ? 'Selected' : 'Select'} ${visit.job_code} ${timeLabel}`}
-      >
-        <span
-          ref={handleRef}
-          data-testid={`daily-allocation-visit-drag-handle-${visit.id}`}
-          className="mt-0.5 inline-flex min-h-11 min-w-8 touch-none items-center justify-center text-sky-200 [@media(pointer:coarse)]:min-w-11"
-          style={{ touchAction: 'none' }}
-          aria-hidden="true"
-        >
-          <span className="block h-4 w-1.5 rounded-full bg-sky-400/80" />
-        </span>
-        <span className="min-w-0 flex-1 space-y-0.5">
-          <span className="block truncate text-[11px] font-semibold tabular-nums">{timeLabel}</span>
-          <span className="block truncate text-xs font-medium">{title || visit.job_code}</span>
-          <span className="block truncate text-[11px] text-sky-100/80">{visit.site_address}</span>
-          {!addressValid ? (
-            <span className="block text-[11px] text-amber-200" title="Publishing is allowed without an address. Add it to the job when available.">
-              Site address missing or unconfirmed
-            </span>
-          ) : null}
-          {persistenceLabel ? (
-            <span className="block text-[11px] text-sky-200">{persistenceLabel}</span>
-          ) : null}
-          {resources.length > 0 ? (
-            <span className="block truncate text-[11px] text-sky-100/70">{resources.join(' · ')}</span>
-          ) : (
-            <span className="block text-[11px] text-amber-200">No resources assigned</span>
+      <div className={compact ? 'flex flex-col @min-[22rem]/visit:flex-row' : undefined}>
+        <button
+          type="button"
+          className={cn(
+            'flex w-full min-w-0 items-start gap-1 px-2 text-left',
+            compact ? 'min-h-9 flex-1 items-center py-1 [@media(pointer:coarse)]:min-h-11' : 'min-h-11 py-1.5',
           )}
-          {hard.concat(warnings).map((conflict) => (
-            <span key={`${conflict.code}:${conflict.message}`} className="flex items-start gap-1 text-[11px] text-amber-200">
-              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
-              {conflict.message}
+          onClick={onSelect}
+          aria-pressed={selected}
+          aria-label={`${selected ? 'Selected' : 'Select'} ${visit.job_code} ${timeLabel}`}
+        >
+          <span
+            ref={handleRef}
+            data-testid={`daily-allocation-visit-drag-handle-${visit.id}`}
+            className={cn(
+              'inline-flex shrink-0 touch-none items-center justify-center text-sky-200',
+              compact ? 'min-h-8 min-w-4 [@media(pointer:coarse)]:min-w-9' : 'mt-0.5 min-h-11 min-w-8 [@media(pointer:coarse)]:min-w-11',
+            )}
+            style={{ touchAction: 'none' }}
+            aria-hidden="true"
+          >
+            <span className="block h-4 w-1.5 rounded-full bg-sky-400/80" />
+          </span>
+          {compact ? (
+            <span className="min-w-0 flex-1 text-[11px] leading-4">
+              <span className="flex items-baseline gap-1.5">
+                <span className="shrink-0 font-semibold">{title || visit.job_code}</span>
+                <span className="truncate tabular-nums text-sky-100/80">{timeLabel}</span>
+                {persistenceLabel && <span className="truncate text-sky-200">{persistenceLabel}</span>}
+              </span>
+              <span className="flex items-center gap-1.5" title={[
+                visit.site_address,
+                !addressValid && 'Site address missing or unconfirmed',
+                resources.join(' · ') || 'No resources assigned',
+                ...hard.concat(warnings).map((conflict) => conflict.message),
+              ].filter(Boolean).join(' · ')}>
+                {(hard.length > 0 || warnings.length > 0 || !addressValid) && (
+                  <AlertTriangle className="h-3 w-3 shrink-0 text-amber-200" aria-hidden="true" />
+                )}
+                {hard.concat(warnings).map((conflict) => (
+                  <span key={`${conflict.code}:${conflict.message}`} className="truncate text-amber-200">
+                    {conflict.message}
+                  </span>
+                ))}
+                {visit.site_address && <span className="truncate text-sky-100/80">{visit.site_address}</span>}
+                {!addressValid && (
+                  <span className="truncate text-amber-200">Site address missing or unconfirmed</span>
+                )}
+                <span className={cn('truncate', resources.length > 0 ? 'text-sky-100/70' : 'text-amber-200')}>
+                  {resources.join(' · ') || 'No resources assigned'}
+                </span>
+              </span>
             </span>
-          ))}
-        </span>
-      </button>
-      <div className="flex items-center justify-end gap-1 px-1 pb-1">
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className={cn(boardControlStyles.ghost, 'h-8 min-w-8 px-2')}
-          aria-label={`Move visit ${visit.job_code}`}
-          onClick={onMove}
-        >
-          Move
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className={cn(boardControlStyles.ghost, 'h-8 min-w-8 px-2')}
-          aria-label={`Assign resources to ${visit.job_code}`}
-          onClick={onAssign}
-        >
-          Assign
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className={cn(boardControlStyles.ghost, 'h-8 w-8')}
-          aria-label={`Edit visit ${visit.job_code}`}
-          onClick={onEdit}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className={cn(boardControlStyles.ghost, 'h-8 w-8')}
-          aria-label={`Delete visit ${visit.job_code}`}
-          onClick={onDelete}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+          ) : (
+            <span className="min-w-0 flex-1 space-y-0.5">
+              <span className="block truncate text-[11px] font-semibold tabular-nums">{timeLabel}</span>
+              <span className="block truncate text-xs font-medium">{title || visit.job_code}</span>
+              <span className="block truncate text-[11px] text-sky-100/80">{visit.site_address}</span>
+              {!addressValid ? (
+                <span className="block text-[11px] text-amber-200" title="Publishing is allowed without an address. Add it to the job when available.">
+                  Site address missing or unconfirmed
+                </span>
+              ) : null}
+              {persistenceLabel ? (
+                <span className="block text-[11px] text-sky-200">{persistenceLabel}</span>
+              ) : null}
+              {resources.length > 0 ? (
+                <span className="block truncate text-[11px] text-sky-100/70">{resources.join(' · ')}</span>
+              ) : (
+                <span className="block text-[11px] text-amber-200">No resources assigned</span>
+              )}
+              {hard.concat(warnings).map((conflict) => (
+                <span key={`${conflict.code}:${conflict.message}`} className="flex items-start gap-1 text-[11px] text-amber-200">
+                  <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" />
+                  {conflict.message}
+                </span>
+              ))}
+            </span>
+          )}
+        </button>
+        <div className={cn(
+          'flex shrink-0 items-center justify-end gap-1',
+          compact ? 'px-2 pb-0.5 pr-3 @min-[22rem]/visit:pb-0' : 'px-1 pb-1',
+        )}>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className={cn(boardControlStyles.ghost, compact ? 'size-6 p-0 [@media(pointer:coarse)]:size-8' : 'h-8 min-w-8 px-2')}
+            title="Move visit"
+            aria-label={`Move visit ${visit.job_code}`}
+            onClick={onMove}
+          >
+            {compact ? <ArrowRightLeft className="size-3.5" /> : 'Move'}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className={cn(boardControlStyles.ghost, compact ? 'size-6 p-0 [@media(pointer:coarse)]:size-8' : 'h-8 min-w-8 px-2')}
+            title="Assign resources"
+            aria-label={`Assign resources to ${visit.job_code}`}
+            onClick={onAssign}
+          >
+            {compact ? <UserPlus className="size-3.5" /> : 'Assign'}
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className={cn(boardControlStyles.ghost, compact ? 'size-6 p-0 [@media(pointer:coarse)]:size-8' : 'h-8 w-8')}
+            title="Edit visit"
+            aria-label={`Edit visit ${visit.job_code}`}
+            onClick={onEdit}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className={cn(boardControlStyles.ghost, compact ? 'size-6 p-0 [@media(pointer:coarse)]:size-8' : 'h-8 w-8')}
+            title="Delete visit"
+            aria-label={`Delete visit ${visit.job_code}`}
+            onClick={onDelete}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
       </div>
       {onResizePointerDown || onResizeKeyDown ? (
         <>

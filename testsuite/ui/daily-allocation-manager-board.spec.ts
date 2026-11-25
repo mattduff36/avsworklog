@@ -318,9 +318,12 @@ function createConversionSource(): DailyAllocationConversionSource {
 async function installDailyAllocationMocks(
   page: Page,
   mode: MockMode = 'converted',
-  options?: { pendingProfileId?: string; holdAssignedVisit?: boolean },
+  options?: { pendingProfileId?: string; holdAssignedVisit?: boolean; showMultipleTeams?: boolean },
 ): Promise<MockEvidence> {
   let board = createBoard(mode, options?.pendingProfileId);
+  if (options?.showMultipleTeams) {
+    board.resources.teams.push({ id: 'team-accounts', name: 'Accounts' });
+  }
   let publishAttempts = 0;
   let releaseAssignedVisit = () => {};
   let assignedVisitGate = Promise.resolve();
@@ -660,7 +663,7 @@ async function installLocalMiddlewareSession(page: Page): Promise<void> {
 async function openManagerBoard(
   page: Page,
   mode: MockMode = 'converted',
-  options?: { pendingProfileId?: string; holdAssignedVisit?: boolean },
+  options?: { pendingProfileId?: string; holdAssignedVisit?: boolean; showMultipleTeams?: boolean },
 ) {
   await page.clock.setFixedTime(FIXED_NOW);
   await installLocalMiddlewareSession(page);
@@ -720,6 +723,33 @@ async function expectBoardChromeFill(page: Page) {
 }
 
 test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
+  test('shows a readable dark team menu and compact assigned cards', async ({ page }, testInfo) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await openManagerBoard(page, 'converted', { showMultipleTeams: true });
+
+    const assigned = page.getByTestId('daily-allocation-visit-visit-1');
+    const empty = page.getByTestId(`daily-allocation-session-employee-bob-${WORK_DATE}-am`);
+    await expect(assigned).toBeVisible();
+    await expect(empty).toBeVisible();
+    const assignedBox = await assigned.boundingBox();
+    const emptyBox = await empty.boundingBox();
+    expect(assignedBox!.height).toBeLessThanOrEqual(emptyBox!.height);
+    for (const name of [/Move visit/, /Assign resources/, /Edit visit/, /Delete visit/]) {
+      await expect(assigned.getByRole('button', { name })).toBeVisible();
+    }
+
+    const team = page.getByRole('combobox', { name: 'Active team' });
+    await team.click();
+    const menu = page.getByRole('listbox');
+    const accounts = menu.getByRole('option', { name: 'Accounts' });
+    await expect(accounts).toBeVisible();
+    await expect(menu).toHaveCSS('background-color', 'rgb(15, 23, 42)');
+    await expect(accounts).toHaveCSS('color', 'rgb(241, 245, 249)');
+    await testInfo.attach('dark-allocation-board', { body: await page.screenshot(), contentType: 'image/png' });
+    await accounts.click();
+    await expect(team).toHaveText('Accounts');
+  });
+
   test('desktop keeps the same visits across daily, weekly, and all primary projections', async ({ page }) => {
     await openManagerBoard(page);
 

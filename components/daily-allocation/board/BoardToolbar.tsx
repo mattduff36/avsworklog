@@ -1,5 +1,7 @@
 'use client';
 
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import type { ReactNode } from 'react';
 import { Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -91,19 +93,20 @@ export function BoardToolbar({
         />
 
         {teams.length > 1 ? (
-          <select
-            aria-label="Active team"
-            data-testid="daily-allocation-team-selector"
-            value={activeTeamId || ''}
-            onChange={(event) => onTeamChange?.(event.target.value)}
-            className="h-9 w-auto max-w-44 shrink-0 rounded-md border border-input bg-background px-2 text-sm text-foreground"
-          >
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-          </select>
+          <Select value={activeTeamId || ''} onValueChange={onTeamChange}>
+            <SelectTrigger
+              aria-label="Active team"
+              data-testid="daily-allocation-team-selector"
+              className="w-auto max-w-44 shrink-0 gap-2 bg-slate-900 text-slate-100 [&>span]:!text-slate-100"
+            >
+              <SelectValue placeholder="Choose a team" />
+            </SelectTrigger>
+            <SelectContent>
+              {teams.map((team) => (
+                <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : null}
 
         {onJobSearchChange ? (
