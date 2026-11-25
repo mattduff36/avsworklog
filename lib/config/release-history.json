@@ -1,5 +1,25 @@
 [
   {
+    "version": "1126.25.5",
+    "updateKind": "minor",
+    "title": "Daily Allocation improvements",
+    "description": "Allow manager planning across teams.",
+    "summary": "Allow manager planning across teams.",
+    "details": [
+      "Allow manager planning across teams, with changes to interface components, shared logic, shared typing, automated tests, and data storage.",
+      "Updated data storage, with changes to data storage.",
+      "Updated sign in, with changes to shared logic.",
+      "Updated projects, with changes to automated tests."
+    ],
+    "areas": [
+      "Daily Allocation"
+    ],
+    "areaKeys": [
+      "daily-allocation"
+    ],
+    "pushedAt": "2026-11-25T00:21:59.767Z"
+  },
+  {
     "version": "1126.25.4",
     "updateKind": "minor",
     "title": "Hgv improvements",

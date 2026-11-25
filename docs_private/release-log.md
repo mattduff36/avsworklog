@@ -2,6 +2,30 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.25.5
+
+**GIT COMMIT MESSAGE**
+`fix(allocation): allow manager planning across teams`
+
+**PUSHED AT**
+2026-11-25T00:21:59.767Z
+
+**WHAT CHANGED**
+Allow manager planning across teams.
+
+**VERSION HISTORY DETAILS**
+- Allow manager planning across teams, with changes to interface components, shared logic, shared typing, automated tests, and data storage.
+- Updated data storage, with changes to data storage.
+- Updated sign in, with changes to shared logic.
+- Updated projects, with changes to automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(allocation): allow manager planning across teams`
+
+# Production release log
+
+Private changelog for production builds. Newest entries first.
+
 ## 1126.25.4
 
 **GIT COMMIT MESSAGE**
