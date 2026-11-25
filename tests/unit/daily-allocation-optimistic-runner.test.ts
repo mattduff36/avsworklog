@@ -156,6 +156,7 @@ describe('daily allocation optimistic runner', () => {
         access_level: 4,
         is_manager: true,
         is_admin: false,
+        can_manage_all_teams: false,
         team_id: 'team-1',
         team_name: 'Civils',
       },

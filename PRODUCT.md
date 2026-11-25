@@ -30,7 +30,7 @@ Daily Allocation is an AVS publishing and compliance workflow, not a generic sch
 - Europe/London civil dates and wall-clock planning; work happens across DST boundaries.
 - Managers publish a dated allocation; employees receive a low-priority itinerary notification and can reopen earlier revisions.
 - Plant Daily Checks remain the actuals source for reconciliation against planned jobs.
-- Current effective permission boundary: Daily Allocation management is admin-locked; employees can read their issued items.
+- Daily Allocation planning requires Level 4 access. Managers with planning access and administrators can view and assign across all teams. Supervisors with planning access can only plan their own team. Employees with access can read their own issued allocations.
 
 ## Capabilities and Constraints
 

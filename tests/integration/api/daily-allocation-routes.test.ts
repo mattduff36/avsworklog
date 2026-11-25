@@ -91,28 +91,29 @@ describe('daily allocation API auth', () => {
     expect(eq).toHaveBeenCalledWith('profile_id', 'employee-1');
   }, 10_000);
 
-  it('PERM-SERVER-01 resolves Level 2 self, Level 4 manager, and Level 5 admin access', async () => {
+  it.each([
+    ['employee', 'employee', 2, 2, false, false],
+    ['supervisor', 'employee', 4, 4, true, false],
+    ['supervisor', 'employee', 5, 4, true, false],
+    ['manager', 'manager', 4, 4, true, true],
+    ['admin', 'admin', 5, 5, true, true],
+  ])('PERM-SERVER-01 resolves planning scope for %s (%s) with Level %i', async (
+    roleName, roleClass, grantedLevel, effectiveLevel, canPlan, allTeams
+  ) => {
     const { getDailyAllocationContext } = await import('@/lib/server/daily-allocation');
-
-    mockGetEffectiveModuleAccessLevel.mockResolvedValueOnce(2);
-    await expect(getDailyAllocationContext()).resolves.toMatchObject({
-      access_level: 2,
-      is_manager: false,
-      is_admin: false,
+    mockGetEffectiveRole.mockResolvedValue({
+      user_id: 'user-1',
+      role_name: roleName,
+      role_class: roleClass,
+      team_id: 'team-1',
+      team_name: 'Civils',
     });
-
-    mockGetEffectiveModuleAccessLevel.mockResolvedValueOnce(4);
+    mockGetEffectiveModuleAccessLevel.mockResolvedValueOnce(grantedLevel);
     await expect(getDailyAllocationContext()).resolves.toMatchObject({
-      access_level: 4,
-      is_manager: true,
-      is_admin: false,
-    });
-
-    mockGetEffectiveModuleAccessLevel.mockResolvedValueOnce(5);
-    await expect(getDailyAllocationContext()).resolves.toMatchObject({
-      access_level: 5,
-      is_manager: true,
-      is_admin: true,
+      access_level: effectiveLevel,
+      is_manager: canPlan,
+      is_admin: effectiveLevel === 5,
+      can_manage_all_teams: allTeams,
     });
   });
 

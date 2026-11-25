@@ -45,7 +45,7 @@ AS $$
   SELECT NULLIF(current_setting('request.jwt.claim.view_as_role_id', true), '')::uuid;
 $$;
 
-CREATE OR REPLACE FUNCTION public.effective_module_access_level(target_module TEXT)
+CREATE OR REPLACE FUNCTION public.effective_module_access_level(module TEXT)
 RETURNS INTEGER
 LANGUAGE sql
 STABLE
@@ -53,7 +53,7 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
   SELECT CASE
-    WHEN target_module = 'daily-allocation' THEN COALESCE((
+    WHEN module = 'daily-allocation' THEN COALESCE((
       SELECT levels.daily_allocation_level
       FROM private.test_actor_module_level levels
       WHERE levels.profile_id = auth.uid()

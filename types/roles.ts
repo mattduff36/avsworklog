@@ -366,7 +366,7 @@ export const MODULE_DESCRIPTIONS: Record<ModuleName, string> = {
   'quotes': 'Create and track customer quotations',
   'inventory': 'Track small tools, equipment, and location buckets',
   'reminders': 'View and action assigned reminders',
-  'daily-allocation': 'Assign daily labour and plant to jobs, then publish tomorrow’s instructions',
+  'daily-allocation': 'Plan jobs across all teams as a manager or admin. Supervisors with planning access can assign jobs for their own team.',
   'external-documents': 'Store and retrieve shared third-party documents',
   'policies-procedures': 'Controlled company policies, procedures and handbooks',
 };

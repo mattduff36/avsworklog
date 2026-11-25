@@ -17,6 +17,7 @@ export interface DailyAllocationContext {
   access_level: PermissionAccessLevel;
   is_manager: boolean;
   is_admin: boolean;
+  can_manage_all_teams: boolean;
   team_id: string | null;
   team_name: string | null;
 }

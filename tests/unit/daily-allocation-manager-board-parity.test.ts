@@ -69,6 +69,7 @@ function board(): DailyAllocationRangeBoardPayload {
       access_level: 5,
       is_manager: true,
       is_admin: true,
+      can_manage_all_teams: true,
       team_id: 'team-1',
       team_name: 'Team One',
     },

@@ -456,7 +456,7 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
 
   const scopedPublicationIds = new Set((issuedItems || []).map((item) => item.publication_id));
   const teamPublications = (publications || []).filter((row) => (
-    context.is_admin
+    context.can_manage_all_teams
     || !context.team_id
     || row.scope_team_id === context.team_id
     || row.published_by === context.user_id
@@ -647,8 +647,8 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
       plant_id: row.plant_id,
       nickname: row.nickname,
     })),
-    available_teams: (teams || [])
-      .filter((team) => context.is_admin || team.id === context.team_id)
+    available_teams: filterSystemTeams(teams || [])
+      .filter((team) => context.can_manage_all_teams || team.id === context.team_id)
       .map((team) => ({ id: team.id, name: team.name })),
   };
 }
@@ -870,7 +870,7 @@ export async function loadDailyAllocationBoardRange(
 
   const publicationMeta: DailyAllocationPublicationMeta[] = publications
     .filter((row) => (
-      context.is_admin
+      context.can_manage_all_teams
       || !context.team_id
       || row.scope_team_id === context.team_id
       || row.published_by === context.user_id
@@ -941,7 +941,7 @@ export async function loadDailyAllocationBoardRange(
         loler_due_date: row.loler_due_date,
       })),
       teams: filterSystemTeams(teamsResult.data || [])
-        .filter((team) => context.is_admin || team.id === context.team_id)
+        .filter((team) => context.can_manage_all_teams || team.id === context.team_id)
         .map((team) => ({ id: team.id, name: team.name })),
     },
     publications: publicationMeta,

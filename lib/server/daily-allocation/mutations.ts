@@ -8,6 +8,7 @@ import {
   DailyAllocationError,
   blankToNull,
   callDailyAllocationRpc,
+  getDailyAllocationPlanningAccessLevel,
   isWorkDate,
   mapPostgresError,
   parseWithSchema,
@@ -358,8 +359,9 @@ export async function deleteLabourDraft(workDate: string, profileId: string): Pr
 }
 
 export async function savePlantDraft(input: DailyPlantDraftInput): Promise<DailyPlantDraft> {
-  const { supabase } = await requireDailyAllocationMutation();
-  const accessLevel = await getEffectiveModuleAccessLevel('daily-allocation');
+  const { supabase, effectiveRole } = await requireDailyAllocationMutation();
+  const grantedAccessLevel = await getEffectiveModuleAccessLevel('daily-allocation');
+  const accessLevel = getDailyAllocationPlanningAccessLevel(effectiveRole, grantedAccessLevel);
   if (accessLevel < 4) throw new DailyAllocationError('Manager-level daily allocation access is required.', 403);
   if (!isWorkDate(input.work_date)) throw new DailyAllocationError('A valid work date is required.', 400);
   if (input.owner_team_id && accessLevel < 5) {
@@ -464,14 +466,10 @@ export async function getDailyAllocationConversionSource(
 export async function convertDailyAllocationPlanDay(
   input: DailyAllocationConvertInput
 ): Promise<DailyAllocationConvertResult> {
-  const { supabase, effectiveRole } = await requireDailyAllocationManagerMutation();
+  const { supabase } = await requireDailyAllocationManagerMutation();
   const parsed = parseWithSchema(convertPlanDaySchema, input, 'Invalid convert request.');
   if (!isWorkDate(parsed.work_date)) {
     throw new DailyAllocationError('A valid work date is required.', 400, 'VALIDATION');
-  }
-  if (effectiveRole.team_id !== parsed.team_id
-    && !await canEffectiveRoleUseModuleLevel('daily-allocation', 5)) {
-    throw new DailyAllocationError('Not allowed to convert this daily allocation plan', 403, 'FORBIDDEN');
   }
   return callDailyAllocationRpc<DailyAllocationConvertResult>(
     supabase,

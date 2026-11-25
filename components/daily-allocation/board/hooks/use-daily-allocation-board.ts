@@ -126,7 +126,7 @@ export function useDailyAllocationBoardController(options: {
   const queryClient = useQueryClient();
   const query = useDailyAllocationBoardQuery(options.startDate, options.endDate);
   const resolvedUserId = options.userId || query.data?.context.user_id || '';
-  const prefetchScope = JSON.stringify([resolvedUserId, query.data?.context.team_id, query.data?.context.access_level, query.data?.context.is_admin, query.data?.context.is_manager]);
+  const prefetchScope = JSON.stringify([resolvedUserId, query.data?.context.team_id, query.data?.context.access_level, query.data?.context.is_admin, query.data?.context.is_manager, query.data?.context.can_manage_all_teams]);
   const prefetchedRangeRef = useRef<string | null>(null);
   const [pointerInteractionActive, setPointerInteractionActive] = useState(false);
   const [reconciliationBridge] = useState(() => new DailyAllocationReconciliationBridge());

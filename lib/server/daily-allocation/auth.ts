@@ -3,14 +3,22 @@ import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleUseModuleLevel, getEffectiveModuleAccessLevel } from '@/lib/utils/rbac';
-import { getEffectiveRole } from '@/lib/utils/view-as';
+import { getEffectiveRole, type EffectiveRoleInfo } from '@/lib/utils/view-as';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
 import { isSystemAccountProfile } from '@/lib/utils/system-accounts';
 import { logServerError } from '@/lib/utils/server-error-logger';
+import type { PermissionAccessLevel } from '@/types/roles';
 import type { DailyAllocationContext } from '@/types/daily-allocation';
 
 export type AuthedClient = Awaited<ReturnType<typeof createClient>>;
 export type AdminClient = ReturnType<typeof createAdminClient>;
+
+export function getDailyAllocationPlanningAccessLevel(
+  role: EffectiveRoleInfo,
+  accessLevel: PermissionAccessLevel,
+): PermissionAccessLevel {
+  return role.role_name?.toLowerCase() === 'supervisor' && accessLevel === 5 ? 4 : accessLevel;
+}
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const EMPTY_SCOPE_ID = '00000000-0000-0000-0000-000000000000';
@@ -185,16 +193,18 @@ export async function getDailyAllocationV2Runtime(): Promise<{
 
 export async function getDailyAllocationContext(): Promise<DailyAllocationContext> {
   const { user } = await requireDailyAllocationUser();
-  const accessLevel = await getEffectiveModuleAccessLevel('daily-allocation');
+  const effectiveRole = await getEffectiveRole();
+  const grantedAccessLevel = await getEffectiveModuleAccessLevel('daily-allocation');
+  const accessLevel = getDailyAllocationPlanningAccessLevel(effectiveRole, grantedAccessLevel);
   if (accessLevel < 2) {
     throw new DailyAllocationError('Daily allocation access required', 403);
   }
-  const effectiveRole = await getEffectiveRole();
   return {
     user_id: user.id,
     access_level: accessLevel,
     is_manager: accessLevel >= 4,
     is_admin: accessLevel >= 5,
+    can_manage_all_teams: accessLevel >= 5 || (accessLevel >= 4 && effectiveRole.role_class === 'manager'),
     team_id: effectiveRole.team_id,
     team_name: effectiveRole.team_name,
   };

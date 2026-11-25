@@ -92,11 +92,11 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     return client;
   }
 
-  async function authenticate(client: Client): Promise<void> {
+  async function authenticate(client: Client, userId: string = DA2_ACTORS.manager): Promise<void> {
     await client.query('RESET ROLE');
-    await client.query(`SELECT set_config('request.jwt.claim.sub', $1, false)`, [DA2_ACTORS.manager]);
+    await client.query(`SELECT set_config('request.jwt.claim.sub', $1, false)`, [userId]);
     await client.query(`SELECT set_config('request.jwt.claims', $1, false)`, [
-      JSON.stringify({ sub: DA2_ACTORS.manager }),
+      JSON.stringify({ sub: userId }),
     ]);
     await client.query('SET ROLE authenticated');
   }
@@ -164,6 +164,38 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     await setup.query(stripOuterMigrationTransaction(readFileSync(resolve(
       process.cwd(), 'supabase', 'migrations', '20261112_daily_allocation_publish_optional_address.sql'
     ), 'utf8')));
+    // Auth identities are synthetic. Run the production authorization functions,
+    // RLS policies and assignment transaction against disposable PostgreSQL.
+    await setup.query(`
+      CREATE TABLE private.test_actor_role (
+        profile_id UUID PRIMARY KEY,
+        role_name TEXT NOT NULL
+      );
+      INSERT INTO private.test_actor_role VALUES ('${DA2_ACTORS.manager}', 'manager');
+      CREATE FUNCTION public.effective_role_id() RETURNS UUID LANGUAGE sql STABLE AS $$
+        SELECT COALESCE(public.view_as_role_id(), auth.uid());
+      $$;
+      CREATE FUNCTION public.effective_team_id() RETURNS TEXT LANGUAGE sql STABLE AS $$
+        SELECT team_id FROM public.profiles WHERE id = auth.uid();
+      $$;
+      CREATE FUNCTION public.is_actual_super_admin() RETURNS BOOLEAN LANGUAGE sql STABLE AS $$
+        SELECT EXISTS(SELECT 1 FROM private.test_actor_role WHERE profile_id = auth.uid() AND role_name = 'admin');
+      $$;
+      CREATE FUNCTION public.effective_is_manager() RETURNS BOOLEAN LANGUAGE sql STABLE AS $$
+        SELECT EXISTS(SELECT 1 FROM private.test_actor_role WHERE profile_id = public.effective_role_id() AND role_name = 'manager');
+      $$;
+      CREATE FUNCTION public.effective_is_supervisor() RETURNS BOOLEAN LANGUAGE sql STABLE AS $$
+        SELECT EXISTS(SELECT 1 FROM private.test_actor_role WHERE profile_id = public.effective_role_id() AND role_name = 'supervisor');
+      $$;
+      CREATE FUNCTION public.user_module_access_level(actor_id UUID, role_id UUID, team_id TEXT, module TEXT)
+      RETURNS INTEGER LANGUAGE sql STABLE AS $$
+        SELECT COALESCE((SELECT daily_allocation_level FROM private.test_actor_module_level
+          WHERE profile_id = COALESCE(actor_id, role_id) AND module = 'daily-allocation'), 0);
+      $$;
+    `);
+    await setup.query(readFileSync(resolve(
+      process.cwd(), 'supabase', 'migrations', '20261125000210_daily_allocation_team_scope.sql'
+    ), 'utf8'));
     await setup.query(
       `UPDATE private.daily_allocation_v2_runtime
        SET board_enabled = TRUE, writes_enabled = TRUE, updated_at = NOW()
@@ -190,6 +222,92 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     );
     return String(asObject(converted.rows[0]?.converted).plan_day_id);
   }
+
+  it('scopes RLS reads and job assignments by role across two teams', async () => {
+    const date = '2026-02-20';
+    const ownPlan = await convertPlan(date);
+    const otherPlan = randomUUID();
+    const supervisor = randomUUID();
+    const administrator = randomUUID();
+    const otherEmployee = randomUUID();
+    const noAccessManager = randomUUID();
+    const jobId = randomUUID();
+
+    await setup.query("INSERT INTO public.org_teams (id, name) VALUES ('team-2', 'Surfacing')");
+    await setup.query(`INSERT INTO public.profiles (id, full_name, team_id) VALUES
+      ($1, 'Supervisor fixture', 'team-1'), ($2, 'Admin fixture', 'team-1'),
+      ($3, 'Cross-team worker fixture', 'team-2'), ($4, 'Disabled manager fixture', 'team-1')`,
+    [supervisor, administrator, otherEmployee, noAccessManager]);
+    await setup.query(`INSERT INTO private.test_actor_role VALUES
+      ($1, 'supervisor'), ($2, 'admin'), ($3, 'manager')`,
+    [supervisor, administrator, noAccessManager]);
+    await setup.query(`INSERT INTO private.test_actor_module_level VALUES ($1, 5), ($2, 5)`,
+      [supervisor, administrator]);
+    await setup.query(`INSERT INTO public.profile_reporting_lines (profile_id, manager_profile_id)
+      VALUES ($1, $2)`, [otherEmployee, supervisor]);
+    await setup.query(`INSERT INTO public.daily_allocation_plan_days (id, work_date, team_id)
+      VALUES ($1, $2, 'team-2')`, [otherPlan, date]);
+    await setup.query(`INSERT INTO public.quote_project_numbers (id, project_reference, status, site_address)
+      VALUES ($1, '50086-LC', 'open', '15 Site Street, Town')`, [jobId]);
+
+    async function visibleTeams(userId: string): Promise<string[]> {
+      await authenticate(actor, userId);
+      const result = await actor.query<{ team_id: string }>(
+        'SELECT team_id FROM public.daily_allocation_plan_days WHERE work_date = $1 ORDER BY team_id',
+        [date]
+      );
+      return result.rows.map((row) => row.team_id);
+    }
+    function assignJob(planId: string, profileId: string, version: number, afternoon = false) {
+      return actor.query(`SELECT public.create_daily_allocation_assigned_visit_v2(
+        $1, $2, $3, $4, 'project_number', $5, '50086-LC',
+        $6::timestamptz, $7::timestamptz, NULL, NULL, NULL, NULL, NULL
+      ) AS result`, [
+        randomUUID(), planId, version, profileId, jobId,
+        afternoon ? '2026-02-20 12:00:00+00' : '2026-02-20 07:00:00+00',
+        afternoon ? '2026-02-20 16:30:00+00' : '2026-02-20 12:00:00+00',
+      ]);
+    }
+
+    expect(await visibleTeams(DA2_ACTORS.manager)).toEqual(['team-1', 'team-2']);
+    await expect(assignJob(otherPlan, otherEmployee, 1)).resolves.toMatchObject({ rowCount: 1 });
+
+    await setup.query(`INSERT INTO public.absences (profile_id, reason_id, date, status)
+      SELECT id, '77777777-7777-4777-8777-777777777777', '2026-02-23', 'approved'
+      FROM public.profiles WHERE team_id = 'team-1'`);
+    const legacyPublish = await actor.query<{ scope_profile_ids: string[] }>(
+      `INSERT INTO public.daily_allocation_publications (work_date, idempotency_key)
+       VALUES ('2026-02-23', $1) RETURNING scope_profile_ids`,
+      [randomUUID()]
+    );
+    expect(legacyPublish.rows[0].scope_profile_ids).toContain(DA2_ACTORS.employeeA);
+    expect(legacyPublish.rows[0].scope_profile_ids).not.toContain(otherEmployee);
+
+    expect(await visibleTeams(administrator)).toEqual(['team-1', 'team-2']);
+    await expect(assignJob(otherPlan, otherEmployee, 2, true)).resolves.toMatchObject({ rowCount: 1 });
+
+    expect(await visibleTeams(supervisor)).toEqual(['team-1']);
+    await expect(assignJob(otherPlan, otherEmployee, 3)).rejects.toThrow(/Not allowed/);
+    await expect(assignJob(ownPlan, otherEmployee, 1)).rejects.toThrow(/Not allowed/);
+    await setup.query('UPDATE private.test_actor_module_level SET daily_allocation_level = 4 WHERE profile_id = $1', [supervisor]);
+    await expect(assignJob(ownPlan, DA2_ACTORS.employeeA, 1)).resolves.toMatchObject({ rowCount: 1 });
+
+    expect(await visibleTeams(noAccessManager)).toEqual([]);
+    await expect(assignJob(otherPlan, otherEmployee, 3)).rejects.toThrow(/Not allowed|access is required/);
+
+    await authenticate(actor, administrator);
+    try {
+      await actor.query("SELECT set_config('request.jwt.claim.view_as_role_id', $1, false)", [supervisor]);
+      const read = await actor.query<{ team_id: string }>(
+        'SELECT team_id FROM public.daily_allocation_plan_days WHERE work_date = $1 ORDER BY team_id',
+        [date]
+      );
+      expect(read.rows.map((row) => row.team_id)).toEqual(['team-1']);
+      await expect(assignJob(otherPlan, otherEmployee, 3)).rejects.toThrow(/viewing as another role/);
+    } finally {
+      await actor.query("SELECT set_config('request.jwt.claim.view_as_role_id', '', false)");
+    }
+  });
 
   it('publishes an addressless job with one itinerary per employee, replays safely and preserves earlier snapshots', async () => {
     const jobId = randomUUID();
