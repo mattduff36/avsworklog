@@ -1198,10 +1198,11 @@ export function useAllAbsences(filters?: {
 
         while (true) {
           const tableName = source === 'archived' ? 'absences_archive' : 'absences';
+          // Profile RLS hides deleted employees. Exclude their bookings before pagination.
           const profileJoin =
             source === 'archived'
-              ? 'profiles!absences_archive_profile_id_fkey (full_name, employee_id, team_id)'
-              : 'profiles!absences_profile_id_fkey (full_name, employee_id, team_id)';
+              ? 'profiles!absences_archive_profile_id_fkey!inner (full_name, employee_id, team_id)'
+              : 'profiles!absences_profile_id_fkey!inner (full_name, employee_id, team_id)';
           const createdByJoin =
             source === 'archived'
               ? 'created_by_profile:profiles!absences_archive_created_by_fkey (full_name)'
