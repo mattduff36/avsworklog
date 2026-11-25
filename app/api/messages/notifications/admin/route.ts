@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
@@ -134,6 +135,7 @@ export async function GET(request: NextRequest) {
           )
         )
       `)
+      .is('messages.sender.deleted_at', null).not('messages.sender.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('user_id', targetUserId)
       .gte('messages.created_at', sixtyDaysAgo.toISOString())
       .is('cleared_from_inbox_at', null)

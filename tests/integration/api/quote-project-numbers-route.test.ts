@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
@@ -114,15 +115,15 @@ describe('POST /api/quotes/project-numbers', () => {
       error: null,
     });
     const projectSelect = vi.fn().mockReturnValue({ single: projectSingle });
-    const projectInsert = vi.fn().mockReturnValue({ select: projectSelect });
+    const projectInsert = vi.fn().mockReturnValue({ select: withDeletedProfileSelect(projectSelect) });
 
     mockCreateAdminClient.mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === 'profiles') {
           return {
-            select: vi.fn(() => ({
+            select: withDeletedProfileSelect(vi.fn(() => ({
               eq: profileEq,
-            })),
+            }))),
           };
         }
 
@@ -221,12 +222,12 @@ describe('POST /api/quotes/project-numbers', () => {
     });
     mockCreateAdminClient.mockReturnValue({
       from: vi.fn((table: string) => {
-        if (table === 'quote_project_numbers') return { select: projectSelect };
+        if (table === 'quote_project_numbers') return { select: withDeletedProfileSelect(projectSelect) };
         if (table === 'timesheet_entry_job_codes') {
           return {
-            select: vi.fn(() => ({
+            select: withDeletedProfileSelect(vi.fn(() => ({
               in: vi.fn().mockResolvedValue({ data: [], error: null }),
-            })),
+            }))),
           };
         }
         throw new Error(`Unexpected table: ${table}`);

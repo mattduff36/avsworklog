@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -98,6 +99,7 @@ async function buildTeamSummary(
   const { data, error } = await admin
     .from('profiles')
     .select('id, full_name, employee_id, is_placeholder, is_system_account')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq('team_id', teamId)
     .eq('is_placeholder', false)
     .eq('is_system_account', false);
@@ -146,6 +148,7 @@ async function buildManagerSummaries(
   const { data, error } = await admin
     .from('profiles')
     .select('id, full_name, phone_number')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .in('id', managerIds);
 
   if (error) throw error;

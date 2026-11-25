@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 import { describe, expect, it } from 'vitest';
 import {
   isBlockingHierarchyIssue,
@@ -38,28 +39,28 @@ function buildClient(
     from: (table: string) => {
       if (table === 'profiles') {
         return {
-          select: () => ({
+          select: withDeletedProfileSelect(() => ({
             eq: () => ({
               order: async () => ({ data: rows, error }),
             }),
-          }),
+          })),
         };
       }
 
       if (table === 'org_teams') {
         return {
-          select: () => ({
+          select: withDeletedProfileSelect(() => ({
             order: async () => ({ data: teams, error }),
-          }),
+          })),
         };
       }
 
       return {
-        select: () => ({
+        select: withDeletedProfileSelect(() => ({
           in: () => ({
             is: async () => ({ data: reportingLines, error }),
           }),
-        }),
+        })),
       };
     },
   } as unknown as Parameters<typeof runHierarchyValidation>[0];

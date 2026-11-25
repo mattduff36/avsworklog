@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
@@ -31,8 +32,8 @@ function createSensitivePinAccessMocks() {
   };
 
   return {
-    permissionModules: { select: vi.fn(() => permissionModuleChain) },
-    sensitivePins: { select: vi.fn(() => sensitivePinChain) },
+    permissionModules: { select: withDeletedProfileSelect(vi.fn(() => permissionModuleChain)) },
+    sensitivePins: { select: withDeletedProfileSelect(vi.fn(() => sensitivePinChain)) },
   };
 }
 
@@ -101,10 +102,10 @@ describe('debug error logs route', () => {
     vi.mocked(createAdminClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === 'error_logs') {
-          return { select: selectErrorLogs };
+          return { select: withDeletedProfileSelect(selectErrorLogs) };
         }
         if (table === 'profiles') {
-          return { select: selectProfiles };
+          return { select: withDeletedProfileSelect(selectProfiles) };
         }
         if (table === 'permission_modules') {
           return sensitiveAccessMocks.permissionModules;
@@ -182,10 +183,10 @@ describe('debug error logs route', () => {
     vi.mocked(createAdminClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === 'error_logs') {
-          return { select: selectErrorLogs };
+          return { select: withDeletedProfileSelect(selectErrorLogs) };
         }
         if (table === 'profiles') {
-          return { select: selectProfiles };
+          return { select: withDeletedProfileSelect(selectProfiles) };
         }
         if (table === 'permission_modules') {
           return sensitiveAccessMocks.permissionModules;
@@ -260,7 +261,7 @@ describe('debug error logs route', () => {
     vi.mocked(createAdminClient).mockReturnValue({
       from: vi.fn((table: string) => {
         if (table === 'error_logs') {
-          return { select: selectErrorLogs };
+          return { select: withDeletedProfileSelect(selectErrorLogs) };
         }
         if (table === 'permission_modules') {
           return sensitiveAccessMocks.permissionModules;

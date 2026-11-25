@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getProfileWithRole } from '@/lib/utils/permissions';
@@ -59,6 +60,7 @@ export async function GET(
         pdf_file_path,
         sender:profiles!messages_sender_id_fkey(full_name)
       `)
+      .is('sender.deleted_at', null).not('sender.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('id', id)
       .single();
 
@@ -90,6 +92,7 @@ export async function GET(
           employee_id
         )
       `)
+      .is('user.deleted_at', null).not('user.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('message_id', id)
       .order('signed_at', { ascending: false, nullsFirst: false });
 

@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryAccess, requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
@@ -22,6 +23,7 @@ export async function GET() {
         requester:profiles!inventory_location_requests_requester_id_fkey(id, full_name),
         resolved_location:inventory_locations(id, name)
       `)
+      .is('requester.deleted_at', null).not('requester.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .order('created_at', { ascending: false })
       .limit(100);
 

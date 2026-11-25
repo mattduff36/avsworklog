@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { cloneWorkShiftPattern, STANDARD_WORK_SHIFT_PATTERN, calculateDurationDaysForShiftPattern, serializePatternToTemplateSlots } from '@/lib/utils/work-shifts';
 import { getCurrentFinancialYear } from '@/lib/utils/date';
@@ -455,6 +456,7 @@ export async function getWorkShiftMatrix(
     let profilesQuery = supabase
       .from('profiles')
       .select('id, full_name, employee_id, team_id, is_system_account, team:org_teams!profiles_team_id_fkey(id, name)')
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('is_system_account', false)
       .order('full_name', { ascending: true });
     if (enforceTeamScope && options?.teamId) {

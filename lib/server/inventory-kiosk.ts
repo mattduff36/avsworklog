@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import 'server-only';
 
 import type { Json } from '@/types/database';
@@ -328,6 +329,7 @@ export async function getYardKioskBootstrap(
             location_id,
             user:profiles!inventory_user_locations_user_id_fkey(full_name)
           `)
+          .is('user.deleted_at', null).not('user.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
           .limit(5000),
         admin
           .from('inventory_user_site_locations')
@@ -335,6 +337,7 @@ export async function getYardKioskBootstrap(
             location_id,
             user:profiles!inventory_user_site_locations_user_id_fkey(full_name)
           `)
+          .is('user.deleted_at', null).not('user.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
           .limit(5000),
       ])
     : [

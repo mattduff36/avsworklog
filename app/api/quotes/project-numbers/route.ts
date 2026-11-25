@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -171,6 +172,7 @@ async function listProjectNumbers(admin: ReturnType<typeof createAdminClient>) {
       ),
       costs:quote_project_costs(*)
     `)
+    .is('manager.deleted_at', null).not('manager.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .order('created_at', { ascending: false });
   if (error) throw error;
 

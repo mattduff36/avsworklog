@@ -1,22 +1,8 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/admin';
 import pg from 'pg';
 import { requireAdminUsersModuleAccess } from '@/lib/server/admin-users-module-access';
 import { isHiddenSystemTestAccountEmail } from '@/lib/utils/system-test-accounts';
-
-// Helper to create admin client with service role key
-function getSupabaseAdmin() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
-}
 
 interface AuthUserActivityRow {
   user_id: string;
@@ -73,8 +59,26 @@ export async function GET() {
     const sensitiveAccessResponse = await requireAdminUsersModuleAccess();
     if (sensitiveAccessResponse) return sensitiveAccessResponse;
 
-    // Fetch ALL auth users by paginating (default page size is 50)
-    const supabaseAdmin = getSupabaseAdmin();
+    // The admin Users page is the only listing that includes tombstoned profiles.
+    const supabaseAdmin = createAdminClient();
+    const profileQuery = supabaseAdmin
+      .from('profiles')
+      .select(`
+        id, full_name, avatar_url, phone_number, employee_id, created_at, role_id,
+        line_manager_id, secondary_manager_id, team_id, is_placeholder, is_system_account, deleted_at,
+        role:roles(name, display_name, role_class, is_super_admin, is_manager_admin)
+      `)
+      .order('full_name')
+      .order('id');
+    const profiles = [];
+    const profilePageSize = 500;
+    for (let offset = 0; ; offset += profilePageSize) {
+      const { data, error } = await profileQuery.range(offset, offset + profilePageSize - 1);
+      if (error) throw error;
+      profiles.push(...data);
+      if (data.length < profilePageSize) break;
+    }
+
     const allUsers: Array<{
       id: string;
       email: string | undefined;
@@ -120,7 +124,7 @@ export async function GET() {
 
     const usersWithEmails = allUsers;
 
-    return NextResponse.json({ users: usersWithEmails });
+    return NextResponse.json({ users: usersWithEmails, profiles });
   } catch (error) {
     console.error('Error in list-with-emails:', error);
     return NextResponse.json(

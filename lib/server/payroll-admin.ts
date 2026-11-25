@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import pg from 'pg';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { validatePayrollRule } from '@/lib/payroll/schema';
@@ -22,6 +23,8 @@ const { Client } = pg;
 interface DynamicQuery {
   select(columns: string): DynamicQuery;
   eq(column: string, value: unknown): DynamicQuery;
+  is(column: string, value: null): DynamicQuery;
+  not(column: string, operator: string, value: unknown): DynamicQuery;
   in(column: string, values: unknown[]): DynamicQuery;
   order(column: string, options?: { ascending?: boolean; foreignTable?: string }): DynamicQuery;
   limit(count: number): DynamicQuery;
@@ -144,7 +147,13 @@ export async function loadPayrollAdminMatrix(): Promise<PayrollAdminMatrix> {
     admin.from('payroll_rule_versions').select('*').order('version_number', { ascending: false }),
     admin.from('payroll_rule_day_bands').select('*').order('day_of_week'),
     admin.from('org_teams').select('id, name, is_system').eq('active', true).order('name'),
-    admin.from('profiles').select('id, full_name, employee_id, team_id, is_system_account').eq('is_placeholder', false).eq('is_system_account', false).order('full_name'),
+    admin.from('profiles')
+      .select('id, full_name, employee_id, team_id, is_system_account')
+      .is('deleted_at', null)
+      .not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
+      .eq('is_placeholder', false)
+      .eq('is_system_account', false)
+      .order('full_name'),
     admin.from('payroll_team_rule_assignments').select('team_id, rule_set_id, effective_week_ending'),
     admin
       .from('payroll_profile_rule_assignments')

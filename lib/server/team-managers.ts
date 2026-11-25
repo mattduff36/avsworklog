@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export type HierarchyRoleClass = 'admin' | 'manager' | 'employee';
@@ -147,6 +148,7 @@ async function loadManagerCandidates(
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('id, full_name, employee_id, is_placeholder, role:roles(role_class)')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .in('id', managerIds);
 
   if (error) {
@@ -282,6 +284,7 @@ export async function getTeamManagerOptions(
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('id, full_name, employee_id, is_placeholder, is_system_account, role:roles(role_class)')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .order('full_name', { ascending: true });
 
   if (error) {
@@ -320,6 +323,7 @@ export async function reconcileTeamManagerAssignments(
   const { data: profilesData, error: profilesError } = await supabaseAdmin
     .from('profiles')
     .select('id, full_name, team_id, line_manager_id, secondary_manager_id, is_placeholder, role:roles(role_class)')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq('is_system_account', false)
     .eq('team_id', teamId);
 
@@ -342,6 +346,7 @@ export async function reconcileProfileHierarchy(
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('id, full_name, team_id, line_manager_id, secondary_manager_id, is_placeholder, role:roles(role_class)')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq('id', profileId)
     .single();
 

@@ -83,7 +83,7 @@ import { isClientSessionPausedError } from '@/lib/app-auth/session-error';
 import { formatDateTime } from '@/lib/utils/date';
 import { filterHiddenSystemTestAccounts } from '@/lib/utils/system-test-accounts';
 import { getDisplayedTeamName, isSystemAccountProfile, SYSTEM_ACCOUNTS_TEAM_ID } from '@/lib/utils/system-accounts';
-import { isDeletedUserName } from '@/lib/users/deleted-user';
+import { isDeletedProfile } from '@/lib/users/deleted-user';
 import { ContractorTransitionConfirmationDialog } from '@/components/admin/ContractorTransitionConfirmationDialog';
 import {
   computeQuickEditFloatingPosition,
@@ -258,10 +258,6 @@ function normalizeHalfDayString(rawValue: string): string {
   return String(roundToNearestHalfDay(parsed));
 }
 
-function isDeletedUserProfile(user: { full_name?: string | null }): boolean {
-  return isDeletedUserName(user.full_name);
-}
-
 function formatAdminFleetAssignment(assignment: AdminFleetAssignmentSummary | null | undefined): string {
   if (!assignment) return '-';
   return formatFleetAssetLabel({
@@ -433,11 +429,11 @@ export default function UsersAdminPage() {
   }, []);
 
   const activeUsers = useMemo(
-    () => users.filter((user) => !isDeletedUserProfile(user)),
+    () => users.filter((user) => !isDeletedProfile(user)),
     [users]
   );
   const deletedUsers = useMemo(
-    () => users.filter((user) => isDeletedUserProfile(user)),
+    () => users.filter((user) => isDeletedProfile(user)),
     [users]
   );
   const usersForCurrentStatus = useMemo(
@@ -459,16 +455,16 @@ export default function UsersAdminPage() {
 
   const managerNameById = useMemo(() => {
     const map = new Map<string, string>();
-    users.forEach((u) => {
+    activeUsers.forEach((u) => {
       map.set(u.id, u.full_name || u.email || 'Unknown');
     });
     return map;
-  }, [users]);
+  }, [activeUsers]);
 
   const getDisplayedManager = useMemo(() => {
     return (managerId: string | null | undefined) => {
       if (!managerId) return 'No Manager';
-      return managerNameById.get(managerId) || managerId;
+      return managerNameById.get(managerId) || 'No Manager';
     };
   }, [managerNameById]);
 
@@ -619,34 +615,13 @@ export default function UsersAdminPage() {
       return [] as ProfileWithEmail[];
     }
 
-    // Fetch profiles from database with role information
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select(`
-        id,
-        full_name,
-        avatar_url,
-        phone_number,
-        employee_id,
-        created_at,
-        role_id,
-        line_manager_id,
-        secondary_manager_id,
-        team_id,
-        is_placeholder,
-        is_system_account,
-        role:roles(
-          name,
-          display_name,
-          role_class,
-          is_super_admin,
-          is_manager_admin
-        )
-      `)
-      .order('full_name', { ascending: true });
-
-    if (profilesError) throw profilesError;
-    const profileRows = (profiles as unknown as ProfileWithRole[]) || [];
+    const response = await fetch('/api/admin/users/list-with-emails', { cache: 'no-store' });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || 'Failed to load users');
+    }
+    const { users: authUsers, profiles } = await response.json();
+    const profileRows = (profiles || []) as ProfileWithRole[];
 
     const profileIds = profileRows.map((profile) => profile.id);
     const { data: assignmentRows, error: assignmentError } = profileIds.length > 0
@@ -704,14 +679,6 @@ export default function UsersAdminPage() {
         });
       }
     });
-
-    // Fetch auth users to get emails (via API route)
-    const response = await fetch('/api/admin/users/list-with-emails');
-    if (!response.ok) {
-      const result = await response.json().catch(() => ({}));
-      throw new Error(result.error || 'Failed to load auth users');
-    }
-    const { users: authUsers } = await response.json();
 
     // Create a map of auth details by user id.
     const authUserMap = new Map<string, UserActivitySummary & { id: string }>(
@@ -1668,7 +1635,7 @@ export default function UsersAdminPage() {
 
           {userStatusTab === 'deleted' && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-200">
-              Deleted users are hidden from operational pickers by default so they can no longer be selected in modules like absence.
+              This tab lists deleted accounts whose historical records were retained.
             </div>
           )}
 

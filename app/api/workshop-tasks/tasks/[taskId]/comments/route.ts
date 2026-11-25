@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -179,6 +180,7 @@ export async function GET(
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name')
+        .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .in('id', historyAuthorIds);
       const typedProfiles = (profiles || []) as Array<{ id: string; full_name: string }>;
       statusAuthorMap = new Map(typedProfiles.map((p) => [p.id, p]));
@@ -211,6 +213,7 @@ export async function GET(
         const { data: loggedByProfile } = await supabase
           .from('profiles')
           .select('id, full_name')
+          .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
           .eq('id', typedTask.logged_by)
           .single();
 
@@ -228,6 +231,7 @@ export async function GET(
         const { data: actionedByProfile } = await supabase
           .from('profiles')
           .select('id, full_name')
+          .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
           .eq('id', typedTask.actioned_by)
           .single();
 

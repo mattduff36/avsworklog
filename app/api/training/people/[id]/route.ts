@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireTrainingAdminAccess } from '@/lib/server/training-auth';
@@ -73,6 +74,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         *,
         profile:profiles(id, full_name, employee_id)
       `)
+      .is('profile.deleted_at', null).not('profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .single();
 
     if (error) {

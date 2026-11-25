@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { QuoteBundle } from '@/lib/server/quote-workflow';
-import { createInventoryKioskConfigTableMock } from '@/tests/utils/supabase-query-mock';
+import { createInventoryKioskConfigTableMock, withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 
 vi.mock('server-only', () => ({}));
 
@@ -156,7 +156,7 @@ beforeEach(() => {
     from: vi.fn((table: string) => {
       if (table === 'quote_email_templates') {
         return {
-          select: vi.fn().mockResolvedValue({ data: [], error: null }),
+          select: withDeletedProfileSelect(vi.fn().mockResolvedValue({ data: [], error: null })),
         };
       }
 
@@ -311,7 +311,7 @@ describe('sendQuoteToCustomerEmail', () => {
       from: vi.fn((table: string) => {
         if (table === 'quote_email_templates') {
           return {
-            select: vi.fn().mockResolvedValue({
+            select: withDeletedProfileSelect(vi.fn().mockResolvedValue({
               data: [{
                 template_key: 'po_request',
                 subject_template: 'PO needed for {quote_reference}',
@@ -321,7 +321,7 @@ describe('sendQuoteToCustomerEmail', () => {
                 created_at: '2026-06-03T10:00:00.000Z',
               }],
               error: null,
-            }),
+            })),
           };
         }
 
@@ -411,9 +411,9 @@ describe('createQuoteNotification', () => {
   it('uses visible channel toggles even when the legacy enabled flag is false', async () => {
     const { createQuoteNotification } = await import('@/lib/server/quote-workflow');
     const messageInsert = vi.fn(() => ({
-      select: vi.fn(() => ({
+      select: withDeletedProfileSelect(vi.fn(() => ({
         single: vi.fn().mockResolvedValue({ data: { id: 'message-1' }, error: null }),
-      })),
+      }))),
     }));
     const recipientInsert = vi.fn().mockResolvedValue({ error: null });
 
@@ -433,17 +433,17 @@ describe('createQuoteNotification', () => {
       from: vi.fn((table: string) => {
         if (table === 'quote_invoice_notification_recipients') {
           return {
-            select: vi.fn(() => ({
+            select: withDeletedProfileSelect(vi.fn(() => ({
               eq: vi.fn().mockResolvedValue({
                 data: [{ profile_id: 'copy-1', notification_type: 'quote_invoice_request_copy' }],
                 error: null,
               }),
-            })),
+            }))),
           };
         }
         if (table === 'profiles') {
           return {
-            select: vi.fn(() => ({
+            select: withDeletedProfileSelect(vi.fn(() => ({
               eq: vi.fn().mockResolvedValue({ data: [], error: null }),
               in: vi.fn(() => ({
                 eq: vi.fn(() => ({
@@ -453,7 +453,7 @@ describe('createQuoteNotification', () => {
                   }),
                 })),
               })),
-            })),
+            }))),
           };
         }
         if (table === 'inventory_kiosk_config') {
@@ -461,7 +461,7 @@ describe('createQuoteNotification', () => {
         }
         if (table === 'notification_preferences') {
           return {
-            select: vi.fn(() => ({
+            select: withDeletedProfileSelect(vi.fn(() => ({
               eq: vi.fn(() => ({
                 in: vi.fn().mockResolvedValue({
                   data: [
@@ -475,7 +475,7 @@ describe('createQuoteNotification', () => {
                   error: null,
                 }),
               })),
-            })),
+            }))),
           };
         }
         if (table === 'messages') {

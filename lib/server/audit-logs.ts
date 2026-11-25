@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireDebugConsoleAccess } from '@/lib/server/debug-console-access';
 import type { AuditLogEntry } from '@/app/(dashboard)/debug/types';
@@ -226,6 +227,7 @@ async function loadProfilesById(
   const { data, error } = await admin
     .from('profiles')
     .select('id, full_name, team_id')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .in('id', uniqueIds);
 
   if (error) {
@@ -246,7 +248,8 @@ async function findMatchingUserIds(
 ): Promise<string[]> {
   const pattern = `%${escapeIlikePattern(q)}%`;
   const [nameResult, teamResult] = await Promise.all([
-    admin.from('profiles').select('id').eq('is_system_account', false).ilike('full_name', pattern),
+    admin.from('profiles').select('id')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN).eq('is_system_account', false).ilike('full_name', pattern),
     admin.from('org_teams').select('id').ilike('name', pattern),
   ]);
 
@@ -264,6 +267,7 @@ async function findMatchingUserIds(
     const { data, error } = await admin
       .from('profiles')
       .select('id')
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('is_system_account', false)
       .in('team_id', teamIds);
     if (error) {
@@ -281,7 +285,8 @@ async function findUserIdsForTeam(
   admin: ReturnType<typeof createAdminClient>,
   teamId: string
 ): Promise<string[]> {
-  let query = admin.from('profiles').select('id').eq('is_system_account', false);
+  let query = admin.from('profiles').select('id')
+  .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN).eq('is_system_account', false);
   query = teamId === 'unassigned' ? query.is('team_id', null) : query.eq('team_id', teamId);
   const { data, error } = await query;
   if (error) {
@@ -295,6 +300,7 @@ export async function listAuditLogFacets(): Promise<AuditLogFacets> {
   const { data, error } = await admin
     .from('profiles')
     .select('id, full_name, team_id')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq('is_placeholder', false)
     .eq('is_system_account', false)
     .order('full_name', { ascending: true });

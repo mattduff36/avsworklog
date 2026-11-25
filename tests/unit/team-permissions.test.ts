@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 import { describe, expect, it } from 'vitest';
 import {
   buildTeamPermissionRecord,
@@ -278,14 +279,14 @@ describe('team permission helpers', () => {
       from: (table: string) => {
         if (table === 'profiles') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: () => ({
                 single: async () => ({
                   data: { id: 'admin-1', team_id: null, role_id: 'admin-role' },
                   error: null,
                 }),
               }),
-            }),
+            })),
           };
         }
 
@@ -303,7 +304,7 @@ describe('team permission helpers', () => {
             },
           ];
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: () => ({
                 single: async () => ({
                   data: roleRows.find((role) => role.id === 'admin-role'),
@@ -315,13 +316,13 @@ describe('team permission helpers', () => {
                   order: async () => ({ data: roleRows, error: null }),
                 }),
               }),
-            }),
+            })),
           };
         }
 
         if (table === 'permission_modules') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               order: async () => ({
                 data: modules.map((module) => ({
                   module_name: module.module_name,
@@ -332,23 +333,23 @@ describe('team permission helpers', () => {
                 })),
                 error: null,
               }),
-            }),
+            })),
           };
         }
 
         if (table === 'team_module_permissions') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: async () => ({ data: [], error: null }),
-            }),
+            })),
           };
         }
 
         if (table === 'user_module_permissions') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: async () => ({ data: [], error: null }),
-            }),
+            })),
           };
         }
 
@@ -370,14 +371,14 @@ describe('team permission helpers', () => {
       from: (table: string) => {
         if (table === 'profiles') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: () => ({
                 single: async () => ({
                   data: { id: 'employee-1', team_id: 'team-a', role_id: 'employee' },
                   error: null,
                 }),
               }),
-            }),
+            })),
           };
         }
 
@@ -421,7 +422,7 @@ describe('team permission helpers', () => {
             },
           ];
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: () => ({
                 single: async () => ({
                   data: roleRows.find((role) => role.id === 'employee'),
@@ -433,13 +434,13 @@ describe('team permission helpers', () => {
                   order: async () => ({ data: roleRows, error: null }),
                 }),
               }),
-            }),
+            })),
           };
         }
 
         if (table === 'permission_modules') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               order: async () => ({
                 data: modules.map((module) => ({
                   module_name: module.module_name,
@@ -450,13 +451,13 @@ describe('team permission helpers', () => {
                 })),
                 error: null,
               }),
-            }),
+            })),
           };
         }
 
         if (table === 'team_module_permissions') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: async () => ({
                 data: [
                   { module_name: 'timesheets', enabled: true },
@@ -464,13 +465,13 @@ describe('team permission helpers', () => {
                 ],
                 error: null,
               }),
-            }),
+            })),
           };
         }
 
         if (table === 'user_module_permissions') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: async () => ({
                 data: [
                   { module_name: 'timesheets', access_level: 3 },
@@ -478,7 +479,7 @@ describe('team permission helpers', () => {
                 ],
                 error: null,
               }),
-            }),
+            })),
           };
         }
 
@@ -498,14 +499,14 @@ describe('team permission helpers', () => {
       from: (table: string) => {
         if (table === 'profiles') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: () => ({
                 single: async () => ({
                   data: { id: 'employee-1', team_id: null, role_id: null },
                   error: null,
                 }),
               }),
-            }),
+            })),
           };
         }
 
@@ -543,20 +544,20 @@ describe('team permission helpers', () => {
       from: (table: string) => {
         if (table === 'profiles') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: () => ({
                 single: async () => ({
                   data: { id: 'employee-1', team_id: 'team-a', role_id: 'employee' },
                   error: null,
                 }),
               }),
-            }),
+            })),
           };
         }
 
         if (table === 'roles') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: () => ({
                 single: async () => ({
                   data: roles.find((role) => role.id === 'employee'),
@@ -568,21 +569,21 @@ describe('team permission helpers', () => {
                   order: async () => ({ data: roles, error: null }),
                 }),
               }),
-            }),
+            })),
           };
         }
 
         if (table === 'permission_modules') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               order: async () => ({ data: permissionModules, error: null }),
-            }),
+            })),
           };
         }
 
         if (table === 'team_module_permissions') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: async () => ({
                 data: [
                   { team_id: 'team-a', module_name: 'training', enabled: true },
@@ -590,15 +591,15 @@ describe('team permission helpers', () => {
                 ],
                 error: null,
               }),
-            }),
+            })),
           };
         }
 
         if (table === 'user_module_permissions') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: async () => ({ data: [], error: null }),
-            }),
+            })),
           };
         }
 
@@ -673,11 +674,11 @@ describe('team permission helpers', () => {
       from: (table: string) => {
         if (table === 'profiles') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: () => ({
                 in: async () => ({ data: profiles, error: null }),
               }),
-            }),
+            })),
           };
         }
 
@@ -699,33 +700,33 @@ describe('team permission helpers', () => {
           });
 
           return {
-            select: () => directResult,
+            select: withDeletedProfileSelect(() => directResult),
           };
         }
 
         if (table === 'permission_modules') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               order: async () => ({ data: permissionModules, error: null }),
-            }),
+            })),
           };
         }
 
         if (table === 'team_module_permissions') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               in: async () => ({ data: teamPermissions, error: null }),
-            }),
+            })),
           };
         }
 
         if (table === 'user_module_permissions') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               in: () => ({
                 eq: async () => ({ data: [], error: null }),
               }),
-            }),
+            })),
           };
         }
 
@@ -767,11 +768,11 @@ describe('team permission helpers', () => {
       from: (table: string) => {
         if (table === 'profiles') {
           return {
-            select: () => ({
+            select: withDeletedProfileSelect(() => ({
               eq: () => ({
                 in: async () => ({ data: profiles, error: null }),
               }),
-            }),
+            })),
           };
         }
 

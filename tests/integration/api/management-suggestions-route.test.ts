@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { GET } from '@/app/api/management/suggestions/route';
-import { createSupabaseQueryMock } from '@/tests/utils/supabase-query-mock';
+import { createSupabaseQueryMock, withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 
 const { mockCreateClient, mockCanAccess, mockLogServerError } = vi.hoisted(() => ({
   mockCreateClient: vi.fn(),
@@ -97,11 +97,11 @@ describe('GET /api/management/suggestions', () => {
       },
       from: vi.fn((table: string) => {
         if (table === 'suggestions') {
-          return { select: selectSuggestions };
+          return { select: withDeletedProfileSelect(selectSuggestions) };
         }
 
         if (table === 'profiles') {
-          return { select: selectProfiles };
+          return { select: withDeletedProfileSelect(selectProfiles) };
         }
 
         throw new Error(`Unexpected table: ${table}`);
@@ -171,11 +171,11 @@ describe('GET /api/management/suggestions', () => {
       },
       from: vi.fn((table: string) => {
         if (table === 'suggestions') {
-          return { select: selectSuggestions };
+          return { select: withDeletedProfileSelect(selectSuggestions) };
         }
 
         if (table === 'profiles') {
-          return { select: selectProfiles };
+          return { select: withDeletedProfileSelect(selectProfiles) };
         }
 
         throw new Error(`Unexpected table: ${table}`);

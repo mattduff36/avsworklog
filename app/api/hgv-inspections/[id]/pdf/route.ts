@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { createClient } from '@/lib/supabase/server';
@@ -57,6 +58,7 @@ export async function GET(
         ),
         profile:profiles!hgv_inspections_user_id_fkey(full_name)
       `)
+      .is('profile.deleted_at', null).not('profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('id', id)
       .single();
 

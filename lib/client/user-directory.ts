@@ -29,7 +29,6 @@ export interface DirectoryUser {
 export interface FetchUserDirectoryOptions {
   includeRole?: boolean;
   includeAllowance?: boolean;
-  includeDeleted?: boolean;
   ids?: string[];
   module?: ModuleName;
   context?: 'actions-assignment' | 'toolbox-talks-assignment' | 'rams-assignment';
@@ -50,9 +49,6 @@ export async function fetchUserDirectory(
     params.set('includeAllowance', 'true');
   }
 
-  if (options.includeDeleted) {
-    params.set('includeDeleted', 'true');
-  }
 
   if (options.ids?.length) {
     params.set('ids', options.ids.join(','));

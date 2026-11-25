@@ -1,7 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 import { GET } from '@/app/api/superadmin/active-users/route';
-import { createInventoryKioskConfigTableMock } from '@/tests/utils/supabase-query-mock';
+import { createInventoryKioskConfigTableMock, withDeletedProfileFilters } from '@/tests/utils/supabase-query-mock';
 
 vi.mock('@/lib/supabase/server');
 vi.mock('@/lib/supabase/admin');
@@ -42,7 +42,7 @@ function createAdminClientMock(visits: MockVisitRow[], isSuperAdmin = true, auth
       if (table === 'profiles') {
         return {
           select() {
-            return {
+            return withDeletedProfileFilters({
               eq() {
                 return {
                   async single() {
@@ -56,7 +56,7 @@ function createAdminClientMock(visits: MockVisitRow[], isSuperAdmin = true, auth
                   },
                 };
               },
-            };
+            });
           },
         };
       }
@@ -68,7 +68,7 @@ function createAdminClientMock(visits: MockVisitRow[], isSuperAdmin = true, auth
       if (table === 'user_page_visits') {
         return {
           select() {
-            return {
+            return withDeletedProfileFilters({
               order() {
                 return {
                   async limit() {
@@ -76,7 +76,7 @@ function createAdminClientMock(visits: MockVisitRow[], isSuperAdmin = true, auth
                   },
                 };
               },
-            };
+            });
           },
         };
       }

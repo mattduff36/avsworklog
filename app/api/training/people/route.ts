@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireTrainingAccess } from '@/lib/server/training-auth';
@@ -21,6 +22,7 @@ export async function GET(request: NextRequest) {
         *,
         profile:profiles(id, full_name, employee_id)
       `)
+      .is('profile.deleted_at', null).not('profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .order('employee_name_raw', { ascending: true })
       .range(offset, offset + limit - 1);
 
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      people: data || [],
+      people: (data || []).filter((person) => !person.profile_id || Boolean(person.profile)),
       pagination: {
         offset,
         limit,

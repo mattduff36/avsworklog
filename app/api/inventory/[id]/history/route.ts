@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireInventoryManagerAccess } from '@/lib/server/inventory-auth';
@@ -81,6 +82,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           moved_by_profile:profiles!inventory_item_movements_moved_by_fkey(id, full_name),
           batch:inventory_item_movement_batches(id, move_scope, group_id, created_at, group:inventory_item_groups(id, name))
         `)
+        .is('moved_by_profile.deleted_at', null).not('moved_by_profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .eq('item_id', id)
         .order('moved_at', { ascending: false }),
       admin
@@ -89,6 +91,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           *,
           checked_by_profile:profiles!inventory_check_history_checked_by_fkey(id, full_name)
         `)
+        .is('checked_by_profile.deleted_at', null).not('checked_by_profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .eq('item_id', id)
         .order('checked_at', { ascending: false })
         .order('created_at', { ascending: false }),

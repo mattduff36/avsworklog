@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createServerClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -238,6 +239,7 @@ export async function POST(request: NextRequest) {
         const { data: adminProfiles, error: adminProfilesError } = await supabase
           .from('profiles')
           .select('id, full_name, role_id')
+          .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
           .eq('is_system_account', false)
           .in('role_id', adminRoleIds);
 

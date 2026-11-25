@@ -21,6 +21,7 @@ describe('GET /api/users/directory', () => {
     const query = {
       eq: vi.fn().mockReturnThis(),
       in: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
       not: vi.fn().mockReturnThis(),
       order,
       range,
@@ -43,6 +44,7 @@ describe('GET /api/users/directory', () => {
         return {
           select: vi.fn(() => ({
             eq: vi.fn(async () => ({ data: [], error: null })),
+            or: vi.fn(async () => ({ data: [], error: null })),
           })),
         };
       }
@@ -461,6 +463,7 @@ describe('GET /api/users/directory', () => {
     const { query } = createDirectoryQuery([
       { id: 'user-1', full_name: 'Alex Able', employee_id: 'E001' },
       { id: 'user-2', full_name: 'Pat Placeholder (Deleted User)', employee_id: 'E002' },
+      { id: 'user-3', full_name: 'Deleted Without Suffix', deleted_at: '2026-11-25T09:00:00Z' },
     ]);
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
@@ -544,7 +547,7 @@ describe('GET /api/users/directory', () => {
     });
   });
 
-  it('can include deleted users when explicitly requested', async () => {
+  it('never includes deleted users even when explicitly requested', async () => {
     const { createClient } = await import('@/lib/supabase/server');
     const { createAdminClient } = await import('@/lib/supabase/admin');
 
@@ -561,6 +564,7 @@ describe('GET /api/users/directory', () => {
     const { query } = createDirectoryQuery([
       { id: 'user-1', full_name: 'Alex Able', employee_id: 'E001' },
       { id: 'user-2', full_name: 'Pat Placeholder (Deleted User)', employee_id: 'E002' },
+      { id: 'user-3', full_name: 'Deleted Without Suffix', deleted_at: '2026-11-25T09:00:00Z' },
     ]);
     const select = vi.fn().mockReturnValue(query);
     const from = mockAdminFrom(select);
@@ -575,8 +579,8 @@ describe('GET /api/users/directory', () => {
     expect(response.status).toBe(200);
     expect(payload.users).toEqual([
       expect.objectContaining({ id: 'user-1', full_name: 'Alex Able' }),
-      expect.objectContaining({ id: 'user-2', full_name: 'Pat Placeholder (Deleted User)' }),
     ]);
-    expect(query.not).not.toHaveBeenCalled();
+    expect(query.is).toHaveBeenCalledWith('deleted_at', null);
+    expect(query.not).toHaveBeenCalledWith('full_name', 'ilike', '%(Deleted User)%');
   });
 });

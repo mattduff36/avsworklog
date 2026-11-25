@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect, withDeletedProfileFilters } from '@/tests/utils/supabase-query-mock';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/supabase/admin', () => ({
@@ -12,7 +13,7 @@ import {
 
 function buildLocationQuery(data: unknown[]) {
   const query = {
-    select: vi.fn(),
+    select: withDeletedProfileSelect(vi.fn()),
     eq: vi.fn(),
     neq: vi.fn(),
     not: vi.fn(),
@@ -30,12 +31,12 @@ function buildLocationQuery(data: unknown[]) {
     data: data.slice(from, to + 1),
     error: null,
   }));
-  return query;
+  return withDeletedProfileFilters(query);
 }
 
 function buildCategoryQuery(data: unknown[]) {
   const query = {
-    select: vi.fn(),
+    select: withDeletedProfileSelect(vi.fn()),
     eq: vi.fn(),
     order: vi.fn(),
   };
@@ -44,19 +45,19 @@ function buildCategoryQuery(data: unknown[]) {
   query.order
     .mockReturnValueOnce(query)
     .mockResolvedValueOnce({ data, error: null });
-  return query;
+  return withDeletedProfileFilters(query);
 }
 
 function buildAssignmentQuery(data: unknown[]) {
   const query = {
-    select: vi.fn(),
+    select: withDeletedProfileSelect(vi.fn()),
     in: vi.fn(),
     limit: vi.fn(),
   };
   query.select.mockReturnValue(query);
   query.in.mockRejectedValue(new Error('Assignment IDs must not be encoded in the URL'));
   query.limit.mockResolvedValue({ data, error: null });
-  return query;
+  return withDeletedProfileFilters(query);
 }
 
 describe('Yard kiosk bootstrap location assignees', () => {

@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -160,6 +161,7 @@ export async function POST(request: NextRequest) {
         const { data: roleUsers, error: roleUsersError } = await supabase
           .from('profiles')
           .select('id, full_name, employee_id, is_placeholder')
+          .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
           .in('role_id', roleIds);
         if (roleUsersError) throw roleUsersError;
         const visibleRoleUsers = await filterOperationalProfiles(
@@ -173,7 +175,8 @@ export async function POST(request: NextRequest) {
       // Fetch all active users
       const { data: allUsers, error: allError } = await supabase
         .from('profiles')
-        .select('id, full_name, employee_id, is_placeholder');
+        .select('id, full_name, employee_id, is_placeholder')
+        .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN);
 
       if (allError) throw allError;
 
@@ -294,6 +297,7 @@ export async function POST(request: NextRequest) {
       const { data: recipientProfiles, error: emailError } = await supabase
         .from('profiles')
         .select('id, full_name')
+        .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .in('id', recipientUserIds);
 
       if (!emailError && recipientProfiles) {

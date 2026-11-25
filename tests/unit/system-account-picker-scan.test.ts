@@ -20,7 +20,7 @@ const HIDE_MARKERS = [
 ] as const;
 
 const ADMIN_SHOW_FILES = new Set([
-  'app/(dashboard)/admin/users/page.tsx',
+  'app/api/admin/users/list-with-emails/route.ts',
   'lib/server/team-permissions.ts',
 ]);
 

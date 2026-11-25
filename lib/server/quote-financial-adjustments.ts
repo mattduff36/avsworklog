@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import pg from 'pg';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { FINANCIAL_ADJUSTMENT_SEARCH_MIN_LENGTH } from '@/app/(dashboard)/quotes/types';
@@ -256,6 +257,7 @@ export async function fetchQuoteFinancialWorkspace(
     admin
       .from('quote_financial_adjustments')
       .select('*, actor:profiles!quote_financial_adjustments_created_by_fkey(id, full_name)')
+      .is('actor.deleted_at', null).not('actor.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('quote_thread_id', normalizedSelected.quote_thread_id)
       .order('effective_date', { ascending: false })
       .order('created_at', { ascending: false }),

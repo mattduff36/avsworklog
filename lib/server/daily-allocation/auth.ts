@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -224,6 +225,7 @@ export async function loadScopedProfileIds(supabase: AuthedClient, isAdmin: bool
     const { data, error } = await admin
       .from('profiles')
       .select('id, full_name, employee_id, is_system_account')
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('is_placeholder', false)
       .eq('is_system_account', false);
     if (error) throw error;

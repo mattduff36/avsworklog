@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { HgvTrailerSwapSchema } from '@/lib/checklists/hgv-trailer-swap';
@@ -18,6 +19,7 @@ export async function GET(_request: NextRequest, { params }: Context) {
   const db = await createClient();
   const { data, error } = await db.from('hgv_trailer_swaps')
     .select('id,trailer_label,created_at,items,driver:profiles!hgv_trailer_swaps_user_id_fkey(full_name)')
+    .is('driver.deleted_at', null).not('driver.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq('parent_check_id', id).order('created_at', { ascending: true });
   if (error) return NextResponse.json({ error: 'Unable to load trailer checks' }, { status: 500 });
   return NextResponse.json({ swaps: (data || []).map(row => ({

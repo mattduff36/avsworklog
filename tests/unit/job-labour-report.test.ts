@@ -82,7 +82,7 @@ describe('Job labour source completeness and scope', () => {
   function source(rows: LabourSourceTimesheet[], failAt = -1) {
     const calls: Array<[string, unknown[]]> = [];
     const query: Record<string, unknown> = {};
-    for (const method of ['select', 'in', 'gte', 'lte', 'order']) query[method] = (...args: unknown[]) => { calls.push([method, args]); return query; };
+    for (const method of ['select', 'in', 'gte', 'lte', 'order', 'is', 'not']) query[method] = (...args: unknown[]) => { calls.push([method, args]); return query; };
     query.range = vi.fn(async (from: number, to: number) => ({ data: rows.slice(from, to + 1), error: from === failAt ? new Error('private database detail') : null }));
     vi.mocked(createAdminClient).mockReturnValue({ from: () => query } as never);
     return { query, calls };

@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getRoleClass as getTeamRoleClass, shouldClearOwnManagers } from '@/lib/server/team-managers';
 import { isSystemAccountProfile, isSystemTeam } from '@/lib/utils/system-accounts';
@@ -153,6 +154,7 @@ export async function runHierarchyValidation(
       is_system_account,
       role:roles(role_class)
     `)
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq('is_system_account', false);
   const teamQuery = supabaseAdmin
     .from('org_teams')

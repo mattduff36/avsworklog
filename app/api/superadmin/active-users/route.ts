@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -160,12 +161,13 @@ export async function GET() {
       user_id,
       path,
       visited_at,
-      profile:profiles!user_page_visits_user_id_fkey(
+      profile:profiles!user_page_visits_user_id_fkey!inner(
         full_name,
         role:roles(display_name),
         team:org_teams!profiles_team_id_fkey(name)
       )
     `)
+    .is('profile.deleted_at', null).not('profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .order('visited_at', { ascending: false })
     .limit(MAX_VISITS_TO_SCAN);
 

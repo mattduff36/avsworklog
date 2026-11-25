@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import type { FleetAssetType, InventoryAdminClient } from './inventory-locations';
 import { summarizeFleetAssignment, type CurrentFleetAssignmentSummary } from './profile-fleet-assignments';
 
@@ -103,6 +104,7 @@ export async function getCurrentAssignmentForAsset(
       user_id,
       profile:profiles!profile_fleet_assignments_user_id_fkey(full_name)
     `)
+    .is('profile.deleted_at', null).not('profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq(column, assetId)
     .is('ended_at', null)
     .maybeSingle();

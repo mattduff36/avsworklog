@@ -16,9 +16,10 @@ describe('report hidden profile helpers', () => {
                 data: columns.includes('full_name') ? [] : [{ id: 'sys-1' }],
                 error: null,
               }),
-              ilike: async () => ({
+              or: async () => ({
                 data: [
                   { id: 'del-1', full_name: 'Pat Example (Deleted User)' },
+                  { id: 'del-2', full_name: 'Tombstoned', deleted_at: '2026-11-25T09:00:00Z' },
                   { id: 'skip-1', full_name: 'Not actually deleted' },
                 ],
                 error: null,
@@ -40,6 +41,7 @@ describe('report hidden profile helpers', () => {
     expect(hidden.has('sys-1')).toBe(true);
     expect(hidden.has('kiosk-1')).toBe(true);
     expect(hidden.has('del-1')).toBe(true);
+    expect(hidden.has('del-2')).toBe(true);
     expect(hidden.has('skip-1')).toBe(false);
   });
 

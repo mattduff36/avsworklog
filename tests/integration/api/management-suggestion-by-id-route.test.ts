@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -80,9 +81,9 @@ describe('GET /api/management/suggestions/[id]', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table === 'suggestions') return { select: suggestionsSelect };
-        if (table === 'suggestion_updates') return { select: updatesSelect };
-        if (table === 'profiles') return { select: profilesSelect };
+        if (table === 'suggestions') return { select: withDeletedProfileSelect(suggestionsSelect) };
+        if (table === 'suggestion_updates') return { select: withDeletedProfileSelect(updatesSelect) };
+        if (table === 'profiles') return { select: withDeletedProfileSelect(profilesSelect) };
         throw new Error(`Unexpected table: ${table}`);
       }),
     } as unknown as SupabaseClient);
@@ -113,7 +114,7 @@ describe('GET /api/management/suggestions/[id]', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table === 'suggestions') return { select: suggestionsSelect };
+        if (table === 'suggestions') return { select: withDeletedProfileSelect(suggestionsSelect) };
         throw new Error(`Unexpected table: ${table}`);
       }),
     } as unknown as SupabaseClient);
@@ -145,14 +146,14 @@ describe('GET /api/management/suggestions/[id]', () => {
 
     const suggestionsUpdateSingle = vi.fn().mockResolvedValue({ data: updatedSuggestion, error: null });
     const suggestionsUpdateSelect = vi.fn(() => ({ single: suggestionsUpdateSingle }));
-    const suggestionsUpdateEq = vi.fn(() => ({ select: suggestionsUpdateSelect }));
+    const suggestionsUpdateEq = vi.fn(() => ({ select: withDeletedProfileSelect(suggestionsUpdateSelect) }));
     const suggestionsUpdate = vi.fn(() => ({ eq: suggestionsUpdateEq }));
 
     const suggestionUpdatesInsert = vi.fn().mockResolvedValue({ error: null });
 
     const messageInsertSingle = vi.fn().mockResolvedValue({ data: { id: 'msg-1' }, error: null });
     const messageInsertSelect = vi.fn(() => ({ single: messageInsertSingle }));
-    const messageInsert = vi.fn(() => ({ select: messageInsertSelect }));
+    const messageInsert = vi.fn(() => ({ select: withDeletedProfileSelect(messageInsertSelect) }));
     const messageRecipientsInsert = vi.fn().mockResolvedValue({ error: null });
 
     mockCreateClient.mockResolvedValue({
@@ -163,7 +164,7 @@ describe('GET /api/management/suggestions/[id]', () => {
         }),
       },
       from: vi.fn((table: string) => {
-        if (table === 'suggestions') return { select: suggestionsSelect, update: suggestionsUpdate };
+        if (table === 'suggestions') return { select: withDeletedProfileSelect(suggestionsSelect), update: suggestionsUpdate };
         if (table === 'suggestion_updates') return { insert: suggestionUpdatesInsert };
         throw new Error(`Unexpected table: ${table}`);
       }),

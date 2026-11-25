@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import 'server-only';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTimesheetReportScopedProfileIds, filterTimesheetRowsForReportScope } from '@/lib/server/reports-timesheet-scope';
@@ -83,6 +84,7 @@ export async function loadJobLabourReport(filters: JobLabourReportFilters): Prom
       employee:profiles!timesheets_user_id_fkey(full_name),
       timesheet_entries(id,day_of_week,daily_total,time_started,time_finished,did_not_work,working_in_yard,job_number,
         timesheet_entry_job_codes(job_number,display_order))`)
+    .is('employee.deleted_at', null).not('employee.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .in('status', ['approved', 'processed']).gte('week_ending', filters.dateFrom)
       .lte('week_ending', end.toISOString().slice(0, 10)).order('id', { ascending: true });
     if (scope) query = query.in('user_id', [...scope]);

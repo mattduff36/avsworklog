@@ -1,3 +1,5 @@
+import { QUOTE_REQUESTER_VISIBILITY_SELECT, withoutDeletedQuoteManager } from '@/lib/server/quote-display';
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import pg from 'pg';
 import { renderToStream } from '@react-pdf/renderer';
 import { QuotePDF } from '@/lib/pdf/quote-pdf';
@@ -7,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
-import { getSystemAccountIds } from '@/lib/server/system-accounts';
+import { getReportHiddenProfileIds } from '@/lib/server/system-accounts';
 import { buildQuoteDisplayName, buildQuotePdfFilename } from '@/lib/quotes/quote-display-name';
 import { enrichQuoteTimelineEventDescriptions } from '@/lib/quotes/quote-timeline-comments';
 import {
@@ -177,7 +179,7 @@ export function serializeQuoteBundle(
   } = {}
 ) {
   return {
-    ...bundle.quote,
+    ...withoutDeletedQuoteManager(bundle.quote),
     ...(typeof permissions.canManageSage === 'boolean'
       ? { can_manage_sage: permissions.canManageSage }
       : {}),
@@ -192,14 +194,14 @@ export function serializeQuoteBundle(
     purchase_orders: bundle.purchaseOrders,
     po_coverage: bundle.poCoverage,
     purchase_order_count: bundle.purchaseOrders.length,
-    versions: bundle.versions,
+    versions: bundle.versions?.map(withoutDeletedQuoteManager),
     timeline: bundle.timeline,
     invoice_summary: bundle.invoiceSummary,
     financial_summary: bundle.financialSummary,
     financial_adjustments: bundle.financialAdjustments,
     merge_info: bundle.mergeInfo,
     merge_group_members: bundle.mergeGroupMembers,
-    merge_source_quotes: bundle.mergeSourceQuotes,
+    merge_source_quotes: bundle.mergeSourceQuotes?.map(withoutDeletedQuoteManager),
     merge_source_financial_summaries: bundle.mergeSourceFinancialSummaries,
   };
 }
@@ -273,7 +275,7 @@ export async function listQuoteManagerOptions(): Promise<QuoteManagerOption[]> {
   }
 
   const hiddenIds = await getHiddenSystemTestAccountIds(admin);
-  const systemAccountIds = await getSystemAccountIds(admin);
+  const systemAccountIds = await getReportHiddenProfileIds(admin);
   const visibleOptions = ((data || []) as QuoteManagerOption[]).filter(
     (option) =>
       !hiddenIds.has(option.profile_id) &&
@@ -430,6 +432,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     .from('quotes')
     .select(`
       *,
+      ${QUOTE_REQUESTER_VISIBILITY_SELECT},
       customer:customers(
         id,
         company_name,
@@ -461,7 +464,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
     supabase.from('quote_line_items').select('*').eq('quote_id', quoteId).order('sort_order', { ascending: true }),
     supabase.from('quote_attachments').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
     supabase.from('rams_documents').select('*').eq('quote_id', quoteId).order('created_at', { ascending: false }),
-    supabase.from('quotes').select('*').in('quote_thread_id', mergeThreadIds).order('created_at', { ascending: false }),
+    supabase.from('quotes').select(`*, ${QUOTE_REQUESTER_VISIBILITY_SELECT}`).in('quote_thread_id', mergeThreadIds).order('created_at', { ascending: false }),
     supabase.from('quote_invoices').select('*').eq('quote_id', quoteId).order('invoice_date', { ascending: false }),
     supabase.from('quote_invoice_requests').select('*').eq('quote_id', quoteId).order('requested_at', { ascending: false }),
     supabase
@@ -470,6 +473,7 @@ export async function fetchQuoteBundle(supabase: ReturnType<typeof createAdminCl
         *,
         actor:profiles!quote_timeline_events_actor_user_id_fkey(id, full_name)
       `)
+      .is('actor.deleted_at', null).not('actor.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .in('quote_thread_id', mergeThreadIds)
       .order('created_at', { ascending: false }),
     fetchQuoteSelectedSecondaryContacts(supabase, quoteId),
@@ -1387,6 +1391,7 @@ export async function listQuoteNotificationRecipientOptions(
   const { data, error } = await supabase
     .from('profiles')
     .select('id, full_name, employee_id, team_id, is_system_account, team:org_teams!profiles_team_id_fkey(name)')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .in('id', quoteUserIds)
     .eq('is_system_account', false)
     .order('full_name', { ascending: true });

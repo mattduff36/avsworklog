@@ -1,3 +1,4 @@
+import { QUOTE_REQUESTER_VISIBILITY_SELECT, withoutDeletedQuoteManager } from '@/lib/server/quote-display';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -115,6 +116,7 @@ export async function GET(request: NextRequest) {
       .from('quotes')
       .select(`
         *,
+        ${QUOTE_REQUESTER_VISIBILITY_SELECT},
         customer:customers(${customerSelect})
       `)
       .order('created_at', { ascending: false })
@@ -185,7 +187,8 @@ export async function GET(request: NextRequest) {
         .from('quotes')
         .select(`
           *,
-          customer:customers(${customerSelect})
+          ${QUOTE_REQUESTER_VISIBILITY_SELECT},
+        customer:customers(${customerSelect})
         `)
         .in('quote_thread_id', threadIds)
         .eq('is_latest_version', false)
@@ -410,7 +413,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       quotes: quotes.map(quote => ({
-        ...quote,
+        ...withoutDeletedQuoteManager(quote),
         merge_info: mergeContextByThread.has(quote.quote_thread_id)
           ? serializeMergeContext(mergeContextByThread.get(quote.quote_thread_id)!)
           : null,
@@ -420,7 +423,7 @@ export async function GET(request: NextRequest) {
         financial_summary: financialSummaries.get(quote.quote_thread_id),
         sage_status: getQuoteSageStatus(quote),
         previous_versions: (previousVersionsByThreadId.get(quote.quote_thread_id) || []).map(version => ({
-          ...version,
+          ...withoutDeletedQuoteManager(version),
           purchase_order_count: purchaseOrderCountByThread.get(version.quote_thread_id)
             || (version.po_number ? 1 : 0),
           invoice_summary: summaries.get(version.id) || getInvoiceSummary({ total: Number(version.total || 0), invoices: [] }),

@@ -1,3 +1,4 @@
+import { getDeletedUserIds } from '@/lib/server/system-accounts';
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -74,12 +75,12 @@ export async function GET(request: NextRequest) {
       query = query.eq('record_status', statusParam);
     }
 
-    const { data, error } = await query;
+    const [{ data, error }, deletedIds] = await Promise.all([query, getDeletedUserIds(admin)]);
     if (error) throw error;
 
     return NextResponse.json({
       success: true,
-      records: data || [],
+      records: (data || []).filter((row) => !row.person?.profile_id || !deletedIds.has(row.person.profile_id)),
       pagination: {
         offset,
         limit,

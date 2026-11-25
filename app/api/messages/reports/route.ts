@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -175,6 +176,7 @@ export async function GET(request: NextRequest) {
           full_name
         )
       `)
+      .is('sender.deleted_at', null).not('sender.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .is('deleted_at', null)
       .eq('module_key', TOOLBOX_TALKS_MODULE_KEY)
       .order('created_at', { ascending: false });
@@ -225,6 +227,7 @@ export async function GET(request: NextRequest) {
             employee_id
           )
         `)
+        .is('user.deleted_at', null).not('user.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .eq('message_id', message.id)
         .order('created_at', { ascending: true });
 
@@ -343,6 +346,8 @@ export async function GET(request: NextRequest) {
             )
           )
         `)
+        .is('assignee.deleted_at', null).not('assignee.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
+        .is('action.creator.deleted_at', null).not('action.creator.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .eq('action.workflow_key', TOOLBOX_TALK_MANUAL_REMINDER_WORKFLOW_KEY)
         .order('created_at', { ascending: true });
 

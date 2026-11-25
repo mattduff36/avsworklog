@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { guestPlantRoleCanRead } from '@/lib/inspections/guest-plant';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
 import { getEffectiveRole } from '@/lib/utils/view-as';
@@ -331,6 +332,7 @@ export async function loadJobSheet(jobCode: string): Promise<DailyJobSheetPayloa
   const { data: profiles } = await admin
     .from('profiles')
     .select('id, full_name')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .in('id', labourProfileIds.length ? labourProfileIds : inspectionScope);
   const nameById = new Map((profiles || []).map((row) => [row.id, row.full_name]));
 

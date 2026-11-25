@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -325,6 +326,7 @@ export async function GET() {
             profiles!van_inspections_user_id_fkey(full_name)
           )
         `)
+        .is('van_inspections.profiles.deleted_at', null).not('van_inspections.profiles.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .eq('status', 'active')
         .order('inspection_date', { foreignTable: 'van_inspections', ascending: false })
         .limit(1, { foreignTable: 'van_inspections' }),
@@ -342,6 +344,7 @@ export async function GET() {
             profiles!hgv_inspections_user_id_fkey(full_name)
           )
         `)
+        .is('hgv_inspections.profiles.deleted_at', null).not('hgv_inspections.profiles.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .eq('status', 'active')
         .eq('hgv_inspections.record_kind', 'full_check')
         .order('inspection_date', { foreignTable: 'hgv_inspections', ascending: false })
@@ -366,6 +369,7 @@ export async function GET() {
             profiles!plant_inspections_user_id_fkey(full_name)
           )
         `)
+        .is('plant_inspections.profiles.deleted_at', null).not('plant_inspections.profiles.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .eq('status', 'active')
         .order('inspection_date', { foreignTable: 'plant_inspections', ascending: false })
         .limit(1, { foreignTable: 'plant_inspections' }),

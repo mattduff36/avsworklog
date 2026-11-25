@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
 
@@ -284,6 +285,7 @@ export async function enrichInventoryLocations(
         location_id,
         user:profiles!inventory_user_locations_user_id_fkey(full_name)
       `)
+      .is('user.deleted_at', null).not('user.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .in('location_id', locationIds),
     admin
       .from('inventory_user_site_locations')
@@ -291,6 +293,7 @@ export async function enrichInventoryLocations(
         location_id,
         user:profiles!inventory_user_site_locations_user_id_fkey(full_name)
       `)
+      .is('user.deleted_at', null).not('user.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .in('location_id', locationIds),
   ]);
 

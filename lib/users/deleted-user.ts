@@ -1,8 +1,9 @@
 export const DELETED_USER_NAME_MARKER = '(Deleted User)';
+export const DELETED_USER_NAME_PATTERN = `%${DELETED_USER_NAME_MARKER}%`;
 export const DELETED_USER_NAME_SUFFIX = ` ${DELETED_USER_NAME_MARKER}`;
 
 export function isDeletedUserName(fullName: string | null | undefined): boolean {
-  return Boolean(fullName && fullName.includes(DELETED_USER_NAME_MARKER));
+  return Boolean(fullName && fullName.toLowerCase().includes(DELETED_USER_NAME_MARKER.toLowerCase()));
 }
 
 export function hasGeneratedDeletedUserNameSuffix(fullName: string | null | undefined): boolean {

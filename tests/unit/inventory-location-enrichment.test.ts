@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect, withDeletedProfileFilters } from '@/tests/utils/supabase-query-mock';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const fromMock = vi.fn();
@@ -41,14 +42,14 @@ function buildLocation(id: string, overrides: Partial<InventoryLocationRow> = {}
 
 function mockInQuery(result: { data: unknown; error: null }) {
   const query = {
-    select: vi.fn(),
+    select: withDeletedProfileSelect(vi.fn()),
     eq: vi.fn(),
     in: vi.fn(),
   };
   query.select.mockReturnValue(query);
   query.eq.mockReturnValue(query);
   query.in.mockResolvedValue(result);
-  return query;
+  return withDeletedProfileFilters(query);
 }
 
 describe('inventory location enrichment helpers', () => {

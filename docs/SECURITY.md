@@ -154,6 +154,10 @@ Use `createAdminClient()` only for operations that cannot succeed under RLS (ses
 
 Scripts that use the service role are production-capable. Treat them as CRITICAL.
 
+## Deleted profiles
+
+Ordinary profile reads hide accounts with a deletion timestamp or the legacy deleted-name marker. Service-role reads of profiles and profile relationships must apply the same visibility checks. The protected Admin Users listing supplies the Deleted Users tab. Preserve historical records and omit deleted profile identities in live views.
+
 ## Secrets and `.env.local`
 
 Assume `.env.local` exists. Never print it. Never paste connection strings, cookies, or keys into docs, chats, or tickets.

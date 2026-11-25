@@ -196,6 +196,17 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     await setup.query(readFileSync(resolve(
       process.cwd(), 'supabase', 'migrations', '20261125000210_daily_allocation_team_scope.sql'
     ), 'utf8'));
+    await setup.query(`
+      ALTER TABLE public.profiles ADD COLUMN deleted_at TIMESTAMPTZ, ADD COLUMN is_system_account BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+      CREATE POLICY profile_select_fixture ON public.profiles FOR SELECT TO authenticated USING (TRUE);
+    `);
+    await setup.query(productionFunction(
+      '20260819170000_system_accounts.sql', 'public.list_daily_allocation_scope_profile_ids'
+    ));
+    await setup.query(readFileSync(resolve(
+      process.cwd(), 'supabase', 'migrations', '20261125100528_hide_deleted_profiles.sql'
+    ), 'utf8'));
     await setup.query(
       `UPDATE private.daily_allocation_v2_runtime
        SET board_enabled = TRUE, writes_enabled = TRUE, updated_at = NOW()
@@ -222,6 +233,48 @@ describeSessions('daily allocation session enforcement on disposable PostgreSQL'
     );
     return String(asObject(converted.rows[0]?.converted).plan_day_id);
   }
+
+  it('hides deleted accounts from profile and allocation queries while retaining historical records', async () => {
+    const legacy = randomUUID();
+    const deleted = randomUUID();
+    await setup.query(`INSERT INTO public.profiles (id, full_name, team_id, deleted_at)
+      VALUES ($1, 'Former worker (Deleted User)', 'team-1', NULL),
+             ($2, 'Tombstoned worker', 'team-1', NOW())`, [legacy, deleted]);
+    try {
+      await authenticate(actor);
+      const visible = await actor.query<{ id: string }>(
+        'SELECT id FROM public.profiles WHERE id = ANY($1::uuid[]) ORDER BY id',
+        [[DA2_ACTORS.employeeA, legacy, deleted]]
+      );
+      expect(visible.rows).toEqual([{ id: DA2_ACTORS.employeeA }]);
+      const scope = await actor.query<{ ids: string[] }>(
+        'SELECT public.list_daily_allocation_scope_profile_ids() AS ids'
+      );
+      expect(scope.rows[0].ids).toContain(DA2_ACTORS.employeeA);
+      expect(scope.rows[0].ids).not.toContain(legacy);
+      expect(scope.rows[0].ids).not.toContain(deleted);
+      const retained = await setup.query(
+        'SELECT id FROM public.profiles WHERE id = ANY($1::uuid[])', [[legacy, deleted]]
+      );
+      expect(retained.rowCount).toBe(2);
+
+      const plan = await convertPlan('2026-01-08');
+      const published = await actor.query<{ result: unknown }>(
+        `SELECT public.publish_daily_allocation_plan_v2($1::uuid, $2::uuid, 1, $3::text, TRUE) AS result`,
+        [randomUUID(), plan, randomUUID()]
+      );
+      const publicationId = asObject(published.rows[0].result).publication_id;
+      const recipients = await setup.query<{ scope_profile_ids: string[] }>(
+        'SELECT scope_profile_ids FROM public.daily_allocation_publications WHERE id = $1',
+        [publicationId]
+      );
+      expect(recipients.rows[0].scope_profile_ids).toContain(DA2_ACTORS.employeeA);
+      expect(recipients.rows[0].scope_profile_ids).not.toContain(legacy);
+      expect(recipients.rows[0].scope_profile_ids).not.toContain(deleted);
+    } finally {
+      await setup.query('DELETE FROM public.profiles WHERE id = ANY($1::uuid[])', [[legacy, deleted]]);
+    }
+  });
 
   it('scopes RLS reads and job assignments by role across two teams', async () => {
     const date = '2026-02-20';

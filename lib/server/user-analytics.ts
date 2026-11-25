@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireDebugConsoleAccess } from '@/lib/server/debug-console-access';
 import {
@@ -714,12 +715,13 @@ export async function getUserAnalyticsDebugPayload(params: URLSearchParams): Pro
       browser_name,
       event_count,
       page_view_count,
-      profile:profiles!user_usage_sessions_user_id_fkey(
+      profile:profiles!user_usage_sessions_user_id_fkey!inner(
         full_name,
         team:org_teams!profiles_team_id_fkey(name),
         role:roles(display_name)
       )
     `)
+    .is('profile.deleted_at', null).not('profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .gte('last_seen_at', activeSince)
     .order('last_seen_at', { ascending: false })
     .limit(25);
@@ -756,13 +758,14 @@ export async function getUserAnalyticsDebugPayload(params: URLSearchParams): Pro
         session_id,
         duration_ms,
         metadata,
-        profile:profiles!user_usage_events_user_id_fkey(
+        profile:profiles!user_usage_events_user_id_fkey!inner(
           full_name,
           team:org_teams!profiles_team_id_fkey(name),
           role:roles(display_name)
         ),
         session:user_usage_sessions(device_type)
       `)
+      .is('profile.deleted_at', null).not('profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .gte('occurred_at', start.toISOString())
       .lte('occurred_at', end.toISOString());
 

@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -44,7 +45,7 @@ function createOrderedQuery(rows: Array<Record<string, unknown>>) {
     eq: vi.fn(() => chain),
     order,
   };
-  const select = vi.fn().mockReturnValue(chain);
+  const select = withDeletedProfileSelect(vi.fn().mockReturnValue(chain));
 
   return { select, order };
 }

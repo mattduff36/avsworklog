@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextResponse } from 'next/server';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { requireAdminUsersModuleAccess } from '@/lib/server/admin-users-module-access';
@@ -85,7 +86,8 @@ export async function GET() {
       team_id,
       line_manager_id,
       role:roles(role_class)
-    `);
+    `)
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN);
 
   if (error) {
     if (isMissingHierarchySchemaError(error)) {

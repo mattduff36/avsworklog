@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient as createServerClient } from '@/lib/supabase/server';
@@ -80,6 +81,7 @@ export async function GET(request: NextRequest) {
             full_name
           )
         `)
+        .is('profiles.deleted_at', null).not('profiles.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .in('van_id', vehicleRows.map((vehicle) => vehicle.id))
         .order('inspection_date', { ascending: false });
 

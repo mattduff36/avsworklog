@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import 'server-only';
 
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -274,6 +275,7 @@ async function fetchTimesheetRows(admin: AdminClient, timesheetIds: string[]): P
         status,
         profile:profiles!timesheets_user_id_fkey(full_name, employee_id)
       `)
+      .is('profile.deleted_at', null).not('profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .in('id', ids);
     throwIfSupabaseError(error);
     rows.push(...((data || []) as TimesheetRow[]));
@@ -704,6 +706,7 @@ async function fetchProfileMatchedTimesheetIds(admin: AdminClient, query: string
   const { data, error } = await admin
     .from('profiles')
     .select('id')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq('is_system_account', false)
     .or(`full_name.ilike.%${query}%,employee_id.ilike.%${query}%`)
     .limit(100);

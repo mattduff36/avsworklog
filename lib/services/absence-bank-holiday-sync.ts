@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { loadEmployeeWorkShiftPatternMap } from '@/lib/server/work-shifts';
@@ -709,6 +710,7 @@ async function getClosedFinancialYearStatus(
     .select(
       'financial_year_start_year, closed_at, closed_by_profile:profiles!absence_financial_year_closures_closed_by_fkey(full_name)'
     )
+    .is('closed_by_profile.deleted_at', null).not('closed_by_profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .order('financial_year_start_year', { ascending: false });
 
   if (error) {
@@ -1450,6 +1452,7 @@ export async function listBulkAbsenceBatches(
   let query = supabase
     .from('absence_bulk_batches')
     .select('id, reason_id, reason_name, start_date, end_date, notes, apply_to_all, role_names, explicit_profile_ids, targeted_count, created_count, duplicate_count, created_at, created_by_profile:profiles!absence_bulk_batches_created_by_fkey(full_name)')
+    .is('created_by_profile.deleted_at', null).not('created_by_profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .order('created_at', { ascending: false })
     .limit(limit);
 

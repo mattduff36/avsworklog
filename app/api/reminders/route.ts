@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getCurrentAuthenticatedProfile } from '@/lib/server/app-auth/session';
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest) {
       const { data: assigners, error: assignersError } = await admin
         .from('profiles')
         .select('id, full_name')
+        .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .in('id', assignerIds);
 
       if (assignersError) throw assignersError;

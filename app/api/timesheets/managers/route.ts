@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextResponse } from 'next/server';
 import { createClient as createSupabaseAdmin } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
@@ -72,6 +73,7 @@ export async function GET() {
           is_manager_admin
         )
       `)
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('is_system_account', false)
       .eq('roles.is_manager_admin', true)
       .order('full_name');

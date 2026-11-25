@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextResponse } from 'next/server';
 import { renderToStream } from '@react-pdf/renderer';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -116,6 +117,7 @@ export async function GET(_request: Request, { params }: RouteParams) {
           overall_status,
           checked_by_profile:profiles!inventory_check_history_checked_by_fkey(id, full_name)
         `)
+        .is('checked_by_profile.deleted_at', null).not('checked_by_profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .eq('id', checkId)
         .eq('item_id', id)
         .single(),

@@ -120,6 +120,7 @@ export async function getScopedProfileIdsForModule(
   let profileQuery = admin
     .from('profiles')
     .select('id, team_id, is_system_account')
+    .is('deleted_at', null)
     .eq('is_system_account', false)
     .not('full_name', 'ilike', '%(Deleted User)%');
 

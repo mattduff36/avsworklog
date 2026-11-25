@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getHiddenSystemTestAccountIds } from '@/lib/server/system-test-accounts';
@@ -609,6 +610,7 @@ export async function getUserPermissionMatrix(
       .select(
         'id, full_name, phone_number, employee_id, team_id, line_manager_id, role_id, is_placeholder, is_system_account, team:org_teams!profiles_team_id_fkey(id, name, is_system), role:roles(id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin)'
       )
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .order('full_name', { ascending: true }),
     supabaseAdmin
       .from('team_module_permissions')
@@ -785,6 +787,7 @@ export async function updateTeamModulePermissionDefaults(
   const { data: profiles, error: profilesError } = await supabaseAdmin
     .from('profiles')
     .select('id, team_id, role:roles(id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin)')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq('is_system_account', false)
     .in('team_id', teamIds);
 
@@ -882,6 +885,7 @@ export async function updateUserModulePermissionLevels(
   const { data: targetProfiles, error: targetError } = await supabaseAdmin
     .from('profiles')
     .select('id, role:roles(id, name, display_name, role_class, hierarchy_rank, is_super_admin, is_manager_admin)')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .in('id', targetUserIds);
 
   if (targetError) {
@@ -1168,6 +1172,7 @@ export async function getUsersWithModuleAccess(
   const profilesQuery = supabaseAdmin
     .from('profiles')
     .select('id, team_id, role_id, employee_id, full_name, is_placeholder, is_system_account')
+    .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .eq('is_system_account', false);
   const scopedProfilesQuery = userIds?.length ? profilesQuery.in('id', userIds) : profilesQuery;
 

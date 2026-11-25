@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { canEffectiveRoleAccessModule } from '@/lib/utils/rbac';
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
       const { data: profiles } = await supabase
         .from('profiles')
         .select('id, full_name')
+        .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .in('id', creatorIds);
 
       if (profiles) {

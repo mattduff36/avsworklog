@@ -1,3 +1,4 @@
+import { withDeletedProfileFilters } from '@/tests/utils/supabase-query-mock';
 import { describe, expect, it } from 'vitest';
 import {
   OVERVIEW_IN_FILTER_CHUNK_SIZE,
@@ -358,7 +359,7 @@ describe('quotes overview PostgREST .in() chunking', () => {
       from(table: string) {
         return {
           select() {
-            return {
+            return withDeletedProfileFilters({
               async in(column: string, ids: string[]) {
                 inCalls.push({ table, column, ids: [...ids] });
                 if (table === 'timesheet_entry_job_codes' && column === 'job_number') {
@@ -373,7 +374,7 @@ describe('quotes overview PostgREST .in() chunking', () => {
                 }
                 return { data: [], error: null };
               },
-            };
+            });
           },
         };
       },

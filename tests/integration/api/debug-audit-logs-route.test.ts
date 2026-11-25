@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
@@ -89,14 +90,14 @@ function mockAuditAdmin(rows = [
       }
       if (table === 'org_teams') {
         return {
-          select: vi.fn(() => ({
+          select: withDeletedProfileSelect(vi.fn(() => ({
             ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
-          })),
+          }))),
         };
       }
       if (table === 'profiles') {
         return {
-          select: vi.fn((columns: string) => {
+          select: withDeletedProfileSelect(vi.fn((columns: string) => {
             if (columns === 'id') {
               return {
                 ilike: vi.fn().mockResolvedValue({ data: [], error: null }),
@@ -114,7 +115,7 @@ function mockAuditAdmin(rows = [
                 order: vi.fn().mockResolvedValue({ data: [], error: null }),
               })),
             };
-          }),
+          })),
         };
       }
       throw new Error(`Unexpected table: ${table}`);

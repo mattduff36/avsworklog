@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import {
   addIsoDateDays,
   enumerateInclusiveIsoDates,
@@ -447,7 +448,7 @@ async function loadInspectionEvents(
   const rows = await loadSubmittedInspections(admin, assetType, assetId);
   const userIds = [...new Set(rows.map((row) => row.user_id))];
   const { data: profiles, error: profileError } = userIds.length
-    ? await admin.from('profiles').select(PROFILE_NAME_SELECT).in('id', userIds)
+    ? await admin.from('profiles').select(PROFILE_NAME_SELECT).is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN).in('id', userIds)
     : { data: [] as Array<{ id: string; full_name: string | null }>, error: null };
   if (profileError) throw profileError;
   const nameById = new Map((profiles || []).map((row) => [row.id, row.full_name || null]));
@@ -563,6 +564,7 @@ export async function loadAssetWhereabouts(params: {
     const { data: phoneRow, error: phoneError } = await params.admin
       .from('profiles')
       .select(PROFILE_PHONE_SELECT)
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('id', inspection.lastDriverUserId)
       .maybeSingle();
     if (phoneError) throw phoneError;

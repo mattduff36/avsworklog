@@ -1,3 +1,5 @@
+import { QUOTE_REQUESTER_VISIBILITY_SELECT, withoutDeletedQuoteManager } from '@/lib/server/quote-display';
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { createAdminClient } from '@/lib/supabase/admin';
 import type { Database } from '@/types/database';
 import type {
@@ -587,6 +589,7 @@ async function loadQuotes(admin: SupabaseAdminClient): Promise<QuoteSourceRow[]>
     .from('quotes')
     .select(`
       *,
+      ${QUOTE_REQUESTER_VISIBILITY_SELECT},
       customer:customers(
         id,
         company_name,
@@ -599,7 +602,7 @@ async function loadQuotes(admin: SupabaseAdminClient): Promise<QuoteSourceRow[]>
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return (data || []) as QuoteSourceRow[];
+  return (data || []).map(withoutDeletedQuoteManager) as QuoteSourceRow[];
 }
 
 async function loadProjects(admin: SupabaseAdminClient): Promise<ProjectSourceRow[]> {
@@ -624,6 +627,7 @@ async function loadProjects(admin: SupabaseAdminClient): Promise<ProjectSourceRo
       ),
       costs:quote_project_costs(*)
     `)
+    .is('manager.deleted_at', null).not('manager.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -732,6 +736,7 @@ export async function loadLabourRowsByReference(
             profile:profiles!timesheets_user_id_fkey(id, full_name, employee_id)
           )
         `)
+        .is('timesheet.profile.deleted_at', null).not('timesheet.profile.full_name', 'ilike', DELETED_USER_NAME_PATTERN)
         .in('id', chunk)
     ),
   ]);

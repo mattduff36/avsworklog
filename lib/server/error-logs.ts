@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireDebugConsoleAccess } from '@/lib/server/debug-console-access';
 import type { Database } from '@/types/database';
@@ -54,6 +55,7 @@ export async function listErrorLogs(
     const { data: profiles, error: profilesError } = await admin
       .from('profiles')
       .select('id, full_name')
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .in('id', uniqueUserIds);
 
     if (profilesError) {

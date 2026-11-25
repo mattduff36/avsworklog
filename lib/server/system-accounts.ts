@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/database';
-import { isDeletedUserName } from '@/lib/users/deleted-user';
+import { DELETED_USER_NAME_PATTERN, isDeletedProfile, isDeletedUserName } from '@/lib/users/deleted-user';
 import { isSystemAccountProfile, type SystemAccountCandidate } from '@/lib/utils/system-accounts';
 import { isGuestPlantCheck } from '@/lib/inspections/guest-plant';
 
@@ -44,13 +44,13 @@ export async function getDeletedUserIds(admin: SystemAccountAdminClient): Promis
   const ids = new Set<string>();
   const { data: profiles, error } = await admin
     .from('profiles')
-    .select('id, full_name')
-    .ilike('full_name', '%(Deleted User)%');
+    .select('id, full_name, deleted_at')
+    .or(`deleted_at.not.is.null,full_name.ilike."${DELETED_USER_NAME_PATTERN}"`);
   if (error) {
     throw new Error(error.message || 'Failed to load deleted user profiles');
   }
   for (const row of profiles || []) {
-    if (row.id && isDeletedUserName(row.full_name)) {
+    if (row.id && isDeletedProfile(row)) {
       ids.add(row.id);
     }
   }
@@ -93,14 +93,15 @@ export function filterHiddenReportSubjects<T extends {
   });
 }
 
-export async function filterOperationalProfiles<T extends { id?: string | null }>(
+export async function filterOperationalProfiles<T extends { id?: string | null; full_name?: string | null; deleted_at?: string | null }>(
   admin: SystemAccountAdminClient,
   rows: T[]
 ): Promise<T[]> {
-  const systemIds = await getSystemAccountIds(admin);
+  const hiddenIds = await getReportHiddenProfileIds(admin);
   return rows.filter((row) => {
+    if (isDeletedProfile(row)) return false;
     if (isSystemAccountProfile(row as SystemAccountCandidate)) return false;
-    if (row.id && systemIds.has(row.id)) return false;
+    if (row.id && hiddenIds.has(row.id)) return false;
     return true;
   });
 }

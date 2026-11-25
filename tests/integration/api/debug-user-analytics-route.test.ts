@@ -1,3 +1,4 @@
+import { withDeletedProfileSelect } from '@/tests/utils/supabase-query-mock';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
@@ -88,10 +89,10 @@ function createAnalyticsAdminMock() {
   return {
     from: vi.fn((table: string) => {
       if (table === 'user_usage_events') {
-        return { select: vi.fn(() => eventQuery) };
+        return { select: withDeletedProfileSelect(vi.fn(() => eventQuery)) };
       }
       if (table === 'user_usage_sessions') {
-        return { select: sessionSelect };
+        return { select: withDeletedProfileSelect(sessionSelect) };
       }
       throw new Error(`Unexpected table ${table}`);
     }),

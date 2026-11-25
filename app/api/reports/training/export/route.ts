@@ -1,3 +1,4 @@
+import { getDeletedUserIds } from '@/lib/server/system-accounts';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireTrainingAccess } from '@/lib/server/training-auth';
@@ -53,6 +54,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const statusParam = searchParams.get('status');
     const admin = createAdminClient();
+    const deletedIds = await getDeletedUserIds(admin);
     const records: TrainingRecordWithRelations[] = [];
     let offset = 0;
 
@@ -72,7 +74,7 @@ export async function GET(request: NextRequest) {
       if (error) throw error;
 
       const pageRecords = (data || []) as unknown as TrainingRecordWithRelations[];
-      records.push(...pageRecords);
+      records.push(...pageRecords.filter((row) => !row.person?.profile_id || !deletedIds.has(row.person.profile_id)));
       if (pageRecords.length < TRAINING_EXPORT_PAGE_SIZE) break;
 
       offset += TRAINING_EXPORT_PAGE_SIZE;

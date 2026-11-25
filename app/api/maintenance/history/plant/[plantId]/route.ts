@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { guestInspectorName } from '@/lib/inspections/guest-plant';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
@@ -127,6 +128,7 @@ export async function GET(
         const { data: profiles } = await supabaseServiceRole
           .from('profiles')
           .select('id, full_name')
+          .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
           .in('id', userIds);
         
         const profileMap = new Map((profiles || []).map(p => [p.id, p.full_name]));

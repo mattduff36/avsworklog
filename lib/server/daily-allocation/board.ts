@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { formatFleetAssetLabel } from '@/lib/utils/fleet-asset-label';
 import { isHiddenSystemTestAccountProfile } from '@/lib/utils/system-test-accounts';
@@ -379,6 +380,7 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
     admin
       .from('profiles')
       .select('id, full_name, employee_id, team_id, is_system_account')
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .in('id', scopedIds.length ? scopedIds : ['00000000-0000-0000-0000-000000000000'])
       .order('full_name'),
     supabase
@@ -469,6 +471,7 @@ export async function loadDailyAllocationBoard(workDate: string): Promise<DailyA
     ? await admin
       .from('profiles')
       .select('id, full_name')
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .in('id', publisherIds)
     : { data: [] as Array<{ id: string; full_name: string }> };
   const publisherNameById = new Map((publishers || []).map((publisher) => [publisher.id, publisher.full_name]));
@@ -716,6 +719,7 @@ export async function loadDailyAllocationBoardRange(
     admin
       .from('profiles')
       .select('id, full_name, employee_id, team_id, is_system_account')
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .in('id', scopeIds)
       .order('full_name'),
     admin
@@ -756,6 +760,7 @@ export async function loadDailyAllocationBoardRange(
       .order('starts_at', { ascending: true }),
     fromUntyped<LabourAssignmentRow>(supabase, 'daily_allocation_visit_labour')
       .select('id, visit_id, plan_day_id, work_date, profile_id, starts_at, ends_at, meeting_point, meet_person, notes, row_version, updated_at')
+      .in('profile_id', scopeIds)
       .gte('work_date', range.start)
       .lte('work_date', range.end),
     fromUntyped<PlantAssignmentRow>(supabase, 'daily_allocation_visit_plant')
@@ -864,7 +869,7 @@ export async function loadDailyAllocationBoardRange(
   const publications = publicationsResult.data || [];
   const publisherIds = Array.from(new Set(publications.map((publication) => publication.published_by)));
   const { data: publishers } = publisherIds.length
-    ? await admin.from('profiles').select('id, full_name').in('id', publisherIds)
+    ? await admin.from('profiles').select('id, full_name').is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN).in('id', publisherIds)
     : { data: [] as Array<{ id: string; full_name: string }> };
   const publisherNameById = new Map((publishers || []).map((publisher) => [publisher.id, publisher.full_name]));
 

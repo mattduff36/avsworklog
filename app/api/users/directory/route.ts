@@ -9,7 +9,7 @@ import { getUsersWithModuleAccess } from '@/lib/server/team-permissions';
 import { filterHiddenSystemTestAccountProfiles } from '@/lib/server/system-test-accounts';
 import { filterOperationalProfiles } from '@/lib/server/system-accounts';
 import { ALL_MODULES, type ModuleName } from '@/types/roles';
-import { isDeletedUserName } from '@/lib/users/deleted-user';
+import { DELETED_USER_NAME_PATTERN, isDeletedProfile } from '@/lib/users/deleted-user';
 
 const ACTION_ASSIGNMENT_MODULES: readonly ModuleName[] = [
   'inspections',
@@ -102,7 +102,6 @@ export async function GET(request: NextRequest) {
 
   const includeRole = isTruthy(request.nextUrl.searchParams.get('includeRole'));
   const includeAllowance = isTruthy(request.nextUrl.searchParams.get('includeAllowance'));
-  const includeDeleted = isTruthy(request.nextUrl.searchParams.get('includeDeleted'));
   const ids = request.nextUrl.searchParams
     .get('ids')
     ?.split(',')
@@ -111,7 +110,7 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Math.max(Number.parseInt(request.nextUrl.searchParams.get('limit') || '200', 10) || 200, 1), 500);
   const offset = Math.max(Number.parseInt(request.nextUrl.searchParams.get('offset') || '0', 10) || 0, 0);
 
-  const fields = ['id', 'full_name', 'employee_id', 'is_placeholder', 'is_system_account', 'super_admin', 'team:org_teams!profiles_team_id_fkey(id, name)'];
+  const fields = ['id', 'full_name', 'deleted_at', 'employee_id', 'is_placeholder', 'is_system_account', 'super_admin', 'team:org_teams!profiles_team_id_fkey(id, name)'];
 
   if (includeAllowance) {
     fields.push('annual_holiday_allowance_days');
@@ -136,9 +135,7 @@ export async function GET(request: NextRequest) {
     query = query.in('id', ids);
   }
 
-  if (!includeDeleted) {
-    query = query.not('full_name', 'ilike', '%(Deleted User)%');
-  }
+  query = query.is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN);
 
   const { data, error } = await query
     .order('full_name', { ascending: true })
@@ -151,6 +148,7 @@ export async function GET(request: NextRequest) {
   const userRows = ((data || []) as unknown) as Array<Record<string, unknown> & {
     id?: string | null;
     full_name?: string | null;
+    deleted_at?: string | null;
     is_system_account?: boolean | null;
   }>;
 
@@ -167,9 +165,7 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Failed to verify directory eligibility' }, { status: 500 });
   }
-  const filtered = includeDeleted
-    ? visibleUserRows
-    : visibleUserRows.filter((row) => !isDeletedUserName(String(row.full_name || '')));
+  const filtered = visibleUserRows.filter((row) => !isDeletedProfile(row));
   const users = filtered
     .map((userRow) => ({
       ...userRow,

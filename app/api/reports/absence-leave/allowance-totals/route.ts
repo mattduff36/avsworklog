@@ -1,3 +1,4 @@
+import { DELETED_USER_NAME_PATTERN } from '@/lib/users/deleted-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getActorAbsenceSecondaryPermissions, canActorUseScopedAbsencePermission } from '@/lib/server/absence-secondary-permissions';
@@ -141,6 +142,7 @@ export async function GET(request: NextRequest) {
     let baseProfilesQuery = supabase
       .from('profiles')
       .select('id, full_name, employee_id, team_id, annual_holiday_allowance_days, is_system_account')
+      .is('deleted_at', null).not('full_name', 'ilike', DELETED_USER_NAME_PATTERN)
       .eq('is_system_account', false)
       .not('full_name', 'ilike', '%(Deleted User)%')
       .order('full_name', { ascending: true });
