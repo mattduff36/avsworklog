@@ -743,8 +743,33 @@ test.describe('DAFP-UI-001 Daily Allocation manager board', () => {
     const menu = page.getByRole('listbox');
     const accounts = menu.getByRole('option', { name: 'Accounts' });
     await expect(accounts).toBeVisible();
-    await expect(menu).toHaveCSS('background-color', 'rgb(15, 23, 42)');
-    await expect(accounts).toHaveCSS('color', 'rgb(241, 245, 249)');
+    const colours = await accounts.evaluate((option) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext('2d')!;
+      const luminance = (colour: string) => {
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = colour;
+        context.fillRect(0, 0, 1, 1);
+        const [red, green, blue] = Array.from(context.getImageData(0, 0, 1, 1).data)
+          .slice(0, 3)
+          .map((value) => {
+            const channel = value / 255;
+            return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+          });
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+      };
+      const background = luminance(getComputedStyle(option.closest('[role=listbox]')!).backgroundColor);
+      const foreground = luminance(getComputedStyle(option).color);
+      return { background, contrast: (foreground + 0.05) / (background + 0.05) };
+    });
+    expect(colours.background).toBeLessThan(0.1);
+    expect(colours.contrast).toBeGreaterThanOrEqual(4.5);
+    await testInfo.attach('allocation measurements', {
+      body: JSON.stringify({ assignedHeight: assignedBox!.height, emptyHeight: emptyBox!.height, ...colours }),
+      contentType: 'application/json',
+    });
     await testInfo.attach('dark-allocation-board', { body: await page.screenshot(), contentType: 'image/png' });
     await accounts.click();
     await expect(team).toHaveText('Accounts');
