@@ -1,5 +1,22 @@
 [
   {
+    "version": "1126.25.8",
+    "updateKind": "minor",
+    "title": "Quotes improvements",
+    "description": "Keep requester lookup out of revision inserts.",
+    "summary": "Keep requester lookup out of revision inserts.",
+    "details": [
+      "Keep requester lookup out of revision inserts, with changes to background routes, shared logic, and automated tests."
+    ],
+    "areas": [
+      "Quotes"
+    ],
+    "areaKeys": [
+      "quotes"
+    ],
+    "pushedAt": "2026-11-26T12:38:41.869Z"
+  },
+  {
     "version": "1126.25.7",
     "updateKind": "minor",
     "title": "Absence & Leave improvements",

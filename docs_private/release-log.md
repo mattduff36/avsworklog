@@ -2,6 +2,23 @@
 
 Private changelog for production builds. Newest entries first.
 
+## 1126.25.8
+
+**GIT COMMIT MESSAGE**
+`fix(quotes): keep requester lookup out of revision inserts`
+
+**PUSHED AT**
+2026-11-26T12:38:41.869Z
+
+**WHAT CHANGED**
+Keep requester lookup out of revision inserts.
+
+**VERSION HISTORY DETAILS**
+- Keep requester lookup out of revision inserts, with changes to background routes, shared logic, and automated tests.
+
+**COMMITS IN THIS RELEASE**
+- `fix(quotes): keep requester lookup out of revision inserts`
+
 ## 1126.25.7
 
 **GIT COMMIT MESSAGE**
