@@ -648,8 +648,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         : buildVersionReference(current.quote.base_quote_reference, revisionType, nextRevisionNumber);
       const baseReference = isDuplicate ? quoteReference : current.quote.base_quote_reference;
 
+      // Quote details also carry read-only relationships and recipient projections.
+      const {
+        customer: _customer,
+        requester_profile: _requesterProfile,
+        selected_secondary_contact_ids: _selectedSecondaryContactIds,
+        selected_secondary_contacts: _selectedSecondaryContacts,
+        ...sourceQuote
+      } = current.quote;
       const insertPayload = {
-        ...current.quote,
+        ...sourceQuote,
         id: newQuoteId,
         quote_reference: quoteReference,
         base_quote_reference: baseReference,
@@ -698,10 +706,6 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         created_by: user.id,
         updated_by: user.id,
       };
-
-      delete (insertPayload as { customer?: unknown }).customer;
-      delete (insertPayload as { selected_secondary_contact_ids?: unknown }).selected_secondary_contact_ids;
-      delete (insertPayload as { selected_secondary_contacts?: unknown }).selected_secondary_contacts;
 
       const { error: insertError } = await supabase
         .from('quotes')

@@ -211,7 +211,11 @@ describe('PATCH /api/quotes/[id]', () => {
     mockNormalizeSecondaryContactIds.mockReturnValue([]);
     mockReplaceQuoteCustomerContactRecipients.mockResolvedValue({});
     mockValidateSecondaryContactIdsForCustomer.mockResolvedValue({});
-    mockQuoteInsert.mockResolvedValue({ error: null });
+    mockQuoteInsert.mockImplementation(async (row: object) => ({
+      error: 'requester_profile' in row
+        ? { code: 'PGRST204', message: "Could not find the 'requester_profile' column of 'quotes' in the schema cache" }
+        : null,
+    }));
     mockLineItemInsert.mockResolvedValue({ error: null });
     mockCreateAdminClient.mockReturnValue({
       storage: {
@@ -284,10 +288,7 @@ describe('PATCH /api/quotes/[id]', () => {
       from: vi.fn((table: string) => {
         if (table === 'quotes') {
           return {
-            insert: vi.fn((payload: unknown) => {
-              mockQuoteInsert(payload);
-              return Promise.resolve({ error: null });
-            }),
+            insert: mockQuoteInsert,
             update: vi.fn((payload: unknown) => {
               mockQuoteUpdate(payload);
               return {
@@ -504,6 +505,7 @@ describe('PATCH /api/quotes/[id]', () => {
         revision_type: 'original',
         subject_line: 'Fence repairs',
         requester_id: 'manager-1',
+        requester_profile: { full_name: 'Source Manager', deleted_at: null },
         requester_initials: 'MD',
         manager_name: 'Matt Duffill',
         manager_email: 'matt@avsquires.co.uk',
@@ -591,6 +593,7 @@ describe('PATCH /api/quotes/[id]', () => {
         revision_number: 0,
         revision_type: 'original',
         requester_id: 'manager-1',
+        requester_profile: { full_name: 'Source Manager', deleted_at: null },
         requester_initials: 'MD',
         sage_posted_at: '2026-06-05T12:00:00.000Z',
         sage_posted_by: 'accounts-user',

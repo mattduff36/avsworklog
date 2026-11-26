@@ -133,6 +133,7 @@ interface QuoteManagerOption {
 
 export interface QuoteBundle {
   quote: QuoteRow & {
+    requester_profile?: { full_name: string | null; deleted_at: string | null } | null;
     customer?: {
       id: string;
       company_name: string;

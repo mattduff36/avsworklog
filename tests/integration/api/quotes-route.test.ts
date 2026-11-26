@@ -266,7 +266,12 @@ describe('POST /api/quotes', () => {
       default_estimated_duration_days: null,
     });
     mockFetchQuoteBundle.mockResolvedValue({
-      quote: { id: 'quote-1', quote_reference: '80000-MD' },
+      quote: {
+        id: 'quote-1',
+        quote_reference: '80000-MD',
+        requester_id: 'manager-1',
+        requester_profile: { full_name: 'Quote Manager', deleted_at: null },
+      },
       lineItems: [],
       attachments: [],
       ramsDocuments: [],
@@ -402,6 +407,7 @@ describe('POST /api/quotes', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(201);
+    expect((await response.json()).quote).not.toHaveProperty('requester_profile');
     expect(quoteInsert).toHaveBeenCalledWith(expect.objectContaining({
       customer_id: 'customer-1',
       quote_reference: '80000-MD',

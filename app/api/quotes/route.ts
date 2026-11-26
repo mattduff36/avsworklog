@@ -702,7 +702,7 @@ export async function POST(request: NextRequest) {
     const bundle = await fetchQuoteBundle(admin, quoteId);
     return NextResponse.json({
       quote: {
-        ...bundle.quote,
+        ...withoutDeletedQuoteManager(bundle.quote),
         line_items: bundle.lineItems,
         invoice_summary: bundle.invoiceSummary,
         timeline: bundle.timeline,
